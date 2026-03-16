@@ -50,12 +50,26 @@ scripts/alipay-mcp.env
 
 # Local diagnostics / comparison artifacts
 .npm-cache/
+.codex-backups/
+.codex-temp*/
+.codex-tmp*/
+.codex-temp-*
 app-compare.patch
 canvas-compare.patch
 check-tc*.json
 check-tc*.js
 modal-fix-test-*.png
 settings-panel-current.png
+
+# Local release artifacts
+release/
+
+# Payment sidecar local files
+payment-server/.env
+payment-server/node_modules/
+payment-server/*.log
+payment-server/*.out.log
+payment-server/*.err.log
 
 # Supabase CLI 临时文件
 supabase/.temp/

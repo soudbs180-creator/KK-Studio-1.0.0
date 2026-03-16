@@ -1271,7 +1271,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     isGenerating,
     executeGeneration,
     pollTaskStatus,
-    cancelGeneration: cancelGen
+    cancelGeneration: cancelGen,
+    recoverFailedSyncBridgeGeneration
   } = useImageGeneration({
     isMobile,
     getCardDimensions,
@@ -3023,6 +3024,17 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...resolvedRoute,
     };
 
+    const recovered = await recoverFailedSyncBridgeGeneration(executionNode);
+    if (recovered.recoveredCount > 0 || recovered.pendingCount > 0) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        const message = recovered.pendingCount > 0
+          ? `已重新接管 ${recovered.pendingCount} 个可恢复请求，后台返图后会自动补回。`
+          : `已找到 ${recovered.recoveredCount} 个已返图结果，正在补回到当前卡片。`;
+        notify.info('恢复历史结果', message);
+      });
+      return;
+    }
+
     // 1. Reset state to generating
     updatePromptNode({
       ...executionNode,
@@ -3408,7 +3420,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('閲嶈瘯澶辫触', error.message);
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

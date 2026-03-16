@@ -8,9 +8,11 @@
         "node": "24.x"
     },
     "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "build": "vite build",
+    "package:portable": "npm run build && node scripts/create-portable-release.mjs",
+    "package:portable:with-payment-env": "npm run build && node scripts/create-portable-release.mjs --include-payment-env",
+    "typecheck": "tsc --noEmit",
         "preview": "vite preview",
         "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
         "check:encoding": "node scripts/check-encoding.js"

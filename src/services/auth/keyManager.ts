@@ -946,20 +946,36 @@ export class KeyManager {
      * 妫板嫮鐣婚挜妤€鏁栭暈鎯板殰閿枫劌鐨?key 缁夎鍩岄槖鐔峰灙閾绢偄鐔?
      */
     addUsage(keyId: string, tokens: number): void {
+        const now = Date.now();
         const slot = this.state.slots.find(s => s.id === keyId);
+        let stateChanged = false;
         if (slot) {
             slot.usedTokens = (slot.usedTokens || 0) + tokens;
-            slot.updatedAt = Date.now(); // Update timestamp
+            slot.updatedAt = now; // Update timestamp
+            stateChanged = true;
 
             // Check budget - 妫板嫮鐣婚挜妤€鏁栭暈鎯板殰閿枫劏鐤嗛幑?
             if (slot.budgetLimit > 0 && slot.totalCost >= slot.budgetLimit) {
                 console.log(`[KeyManager] API ${slot.name} 妫板嫮鐣诲鑼垛偓妤€鏁?($${slot.totalCost.toFixed(2)}/$${slot.budgetLimit})`);
                 // Removed strategy-based rotation, now handled by external logic or just disabled
             }
-
-            this.saveState();
-            this.notifyListeners();
+            if ((slot.tokenLimit || -1) > 0 && (slot.usedTokens || 0) >= (slot.tokenLimit || -1)) {
+                console.log(`[KeyManager] API ${slot.name} token quota exhausted (${slot.usedTokens}/${slot.tokenLimit})`);
+            }
         }
+
+        const linkedProvider = this.getProviderForKeySlot(keyId);
+        const providerChanged = linkedProvider ? !!this.applyProviderUsageDelta(linkedProvider.id, tokens, 0) : false;
+
+        if (!stateChanged && !providerChanged) return;
+
+        if (stateChanged) {
+            this.saveState();
+        }
+        if (providerChanged) {
+            this.saveProviders();
+        }
+        this.notifyListeners();
     }
 
 
@@ -1781,6 +1797,86 @@ export class KeyManager {
         return this.state.rotationStrategy || 'round-robin'; // Default to round-robin
     }
 
+    private resolveProviderBudgetLimit(provider: ThirdPartyProvider): number {
+        if (typeof provider.budgetLimit === 'number' && Number.isFinite(provider.budgetLimit)) {
+            return provider.budgetLimit;
+        }
+
+        if (provider.customCostMode === 'amount' && typeof provider.customCostValue === 'number' && Number.isFinite(provider.customCostValue)) {
+            return provider.customCostValue;
+        }
+
+        return -1;
+    }
+
+    private resolveProviderTokenLimit(provider: ThirdPartyProvider): number {
+        if (typeof provider.tokenLimit === 'number' && Number.isFinite(provider.tokenLimit)) {
+            return provider.tokenLimit;
+        }
+
+        if (provider.customCostMode === 'tokens' && typeof provider.customCostValue === 'number' && Number.isFinite(provider.customCostValue)) {
+            return provider.customCostValue;
+        }
+
+        return -1;
+    }
+
+    private isUsageLimitExceeded(target: {
+        budgetLimit?: number;
+        totalCost?: number;
+        tokenLimit?: number;
+        usedTokens?: number;
+    }): boolean {
+        const budgetLimit = target.budgetLimit ?? -1;
+        const totalCost = target.totalCost ?? 0;
+        const tokenLimit = target.tokenLimit ?? -1;
+        const usedTokens = target.usedTokens ?? 0;
+
+        if (budgetLimit > 0 && totalCost >= budgetLimit) {
+            return true;
+        }
+
+        if (tokenLimit > 0 && usedTokens >= tokenLimit) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private applyProviderUsageDelta(providerId: string, tokenDelta: number, costDelta: number): ThirdPartyProvider | undefined {
+        this.loadProviders();
+
+        const provider = this.providers.find((entry) => entry.id === providerId);
+        if (!provider) return undefined;
+
+        const now = Date.now();
+        if (!provider.usage) {
+            provider.usage = {
+                totalTokens: 0,
+                totalCost: 0,
+                dailyTokens: 0,
+                dailyCost: 0,
+                lastReset: now,
+            };
+        }
+
+        const lastResetDate = new Date(provider.usage.lastReset || 0);
+        const today = new Date(now);
+        if (lastResetDate.toDateString() !== today.toDateString()) {
+            provider.usage.dailyTokens = 0;
+            provider.usage.dailyCost = 0;
+            provider.usage.lastReset = now;
+        }
+
+        provider.usage.totalTokens = Math.max(0, (provider.usage.totalTokens || 0) + tokenDelta);
+        provider.usage.totalCost = Math.max(0, (provider.usage.totalCost || 0) + costDelta);
+        provider.usage.dailyTokens = Math.max(0, (provider.usage.dailyTokens || 0) + tokenDelta);
+        provider.usage.dailyCost = Math.max(0, (provider.usage.dailyCost || 0) + costDelta);
+        provider.updatedAt = now;
+
+        return provider;
+    }
+
     /**
      * Get the best available channel for a specific model
      * Strategy:
@@ -1851,16 +1947,18 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 group: p.group,
                 status: 'valid',
-                budgetLimit: -1,
-                totalCost: 0,
+                budgetLimit: this.resolveProviderBudgetLimit(p),
+                tokenLimit: this.resolveProviderTokenLimit(p),
+                usedTokens: p.usage?.totalTokens || 0,
+                totalCost: p.usage?.totalCost || 0,
                 successCount: 0,
                 failCount: 0,
                 supportedModels: p.models,
                 type: 'third-party',
-                lastUsed: 0,
-                lastError: null,
-                disabled: false,
-                createdAt: 0,
+                lastUsed: p.lastChecked || 0,
+                lastError: p.lastError || null,
+                disabled: !p.isActive,
+                createdAt: p.createdAt || 0,
                 proxyConfig: {
                     serverUrl: p.baseUrl,
                     serverName: p.name,
@@ -1896,7 +1994,7 @@ export class KeyManager {
 
         const isSlotHealthy = (slot: KeySlot) => {
             if (slot.disabled) return false;
-            if (slot.budgetLimit > 0 && slot.totalCost >= slot.budgetLimit) return false;
+            if (this.isUsageLimitExceeded(slot)) return false;
             return true;
         };
 
@@ -2029,7 +2127,7 @@ export class KeyManager {
                 disabled.push(s);
                 continue;
             }
-            if (s.budgetLimit > 0 && (s.totalCost || 0) >= s.budgetLimit) {
+            if (this.isUsageLimitExceeded(s)) {
                 budgetExhausted.push(s);
                 continue;
             }
@@ -2044,7 +2142,7 @@ export class KeyManager {
                 const healingCandidates = this.state.slots.filter(s =>
                     (s.provider === 'Google' || (s.provider as string) === 'Gemini') &&
                     !s.disabled &&
-                    (s.budgetLimit < 0 || (s.totalCost || 0) < s.budgetLimit)
+                    !this.isUsageLimitExceeded(s)
                 );
 
                 if (healingCandidates.length > 0) {
@@ -2298,35 +2396,47 @@ export class KeyManager {
      */
     addCost(keyId: string, cost: number): void {
         const slot = this.state.slots.find((s) => s.id === keyId);
-        if (!slot) return;
+        let stateChanged = false;
+        if (slot) {
+            const previousCost = slot.totalCost || 0;
+            slot.totalCost = previousCost + cost;
+            stateChanged = true;
 
-        const previousCost = slot.totalCost || 0;
-        slot.totalCost = previousCost + cost;
+            if (slot.budgetLimit > 0) {
+                const usageRatio = slot.totalCost / slot.budgetLimit;
+                const previousRatio = previousCost / slot.budgetLimit;
 
-        if (slot.budgetLimit > 0) {
-            const usageRatio = slot.totalCost / slot.budgetLimit;
-            const previousRatio = previousCost / slot.budgetLimit;
+                if (usageRatio >= 0.9 && previousRatio < 0.9) {
+                    import('../system/notificationService').then(({ notify }) => {
+                        notify.warning(
+                            'Budget warning',
+                            `API Key "${slot.name}" is using ${(usageRatio * 100).toFixed(0)}% of its budget ($${slot.totalCost.toFixed(2)} / $${slot.budgetLimit}).`
+                        );
+                    });
+                }
 
-            if (usageRatio >= 0.9 && previousRatio < 0.9) {
-                import('../system/notificationService').then(({ notify }) => {
-                    notify.warning(
-                        'Budget warning',
-                        `API Key "${slot.name}" is using ${(usageRatio * 100).toFixed(0)}% of its budget ($${slot.totalCost.toFixed(2)} / $${slot.budgetLimit}).`
-                    );
-                });
-            }
-
-            if (usageRatio >= 1.0 && previousRatio < 1.0) {
-                import('../system/notificationService').then(({ notify }) => {
-                    notify.error(
-                        'Budget exhausted',
-                        `API Key "${slot.name}" reached its budget limit. Recharge or increase the budget to continue.`
-                    );
-                });
+                if (usageRatio >= 1.0 && previousRatio < 1.0) {
+                    import('../system/notificationService').then(({ notify }) => {
+                        notify.error(
+                            'Budget exhausted',
+                            `API Key "${slot.name}" reached its budget limit. Recharge or increase the budget to continue.`
+                        );
+                    });
+                }
             }
         }
 
-        this.saveState();
+        const linkedProvider = this.getProviderForKeySlot(keyId);
+        const providerChanged = linkedProvider ? !!this.applyProviderUsageDelta(linkedProvider.id, 0, cost) : false;
+
+        if (!stateChanged && !providerChanged) return;
+
+        if (stateChanged) {
+            this.saveState();
+        }
+        if (providerChanged) {
+            this.saveProviders();
+        }
         this.notifyListeners();
     }
 
@@ -3252,7 +3362,7 @@ export class KeyManager {
         const hasValidSlot = this.state.slots.some(s => {
             if (s.disabled || s.status === 'invalid') return false;
             // Budget check: if budget is set and exhausted, it's effectively invalid
-            if (s.budgetLimit > 0 && s.totalCost >= s.budgetLimit) return false;
+            if (this.isUsageLimitExceeded(s)) return false;
 
             // Scenario 1: Exact model support in supportedModels array (or wildcard)
             const supported = s.supportedModels || [];
@@ -3274,6 +3384,12 @@ export class KeyManager {
         this.loadProviders();
         return this.providers.some(p => {
             if (!p.isActive) return false;
+            if (this.isUsageLimitExceeded({
+                budgetLimit: this.resolveProviderBudgetLimit(p),
+                totalCost: p.usage?.totalCost,
+                tokenLimit: this.resolveProviderTokenLimit(p),
+                usedTokens: p.usage?.totalTokens,
+            })) return false;
 
             // Check if model matches asterisk or specifically supported
             if (p.models.includes('*') || p.models.includes(normalizedModelId)) return true;
@@ -3513,6 +3629,10 @@ export class KeyManager {
             baseUrl: provider.baseUrl || slot.baseUrl,
             group: provider.group,
             disabled: !provider.isActive,
+            budgetLimit: this.resolveProviderBudgetLimit(provider),
+            tokenLimit: this.resolveProviderTokenLimit(provider),
+            usedTokens: provider.usage?.totalTokens || 0,
+            totalCost: provider.usage?.totalCost || 0,
             format,
             supportedModels: provider.models?.length
                 ? normalizeModelList(provider.models, slot.provider)
@@ -3544,27 +3664,8 @@ export class KeyManager {
      * 鐠佹澘缍嶉摼宥呭閸熷棔濞囬悽銊╁櫤
      */
     addProviderUsage(providerId: string, tokens: number, cost: number): void {
-        this.loadProviders();
-
-        const provider = this.providers.find(p => p.id === providerId);
+        const provider = this.applyProviderUsageDelta(providerId, tokens, cost);
         if (!provider) return;
-
-        // 濡偓闀嗐儲妲搁挅锕傛付鐟曚線鍚ㄧ純顔界柈闀炪儴顓搁弫甯焊濮ｅ繐銇?0 闀ｅ綊鍚ㄧ純顕嗙骇
-        const now = Date.now();
-        const lastResetDate = new Date(provider.usage.lastReset);
-        const today = new Date(now);
-        if (lastResetDate.toDateString() !== today.toDateString()) {
-            provider.usage.dailyTokens = 0;
-            provider.usage.dailyCost = 0;
-            provider.usage.lastReset = now;
-        }
-
-        provider.usage.totalTokens += tokens;
-        provider.usage.totalCost += cost;
-        provider.usage.dailyTokens += tokens;
-        provider.usage.dailyCost += cost;
-        provider.updatedAt = now;
-
         this.saveProviders();
         this.notifyListeners();
     }

@@ -13,6 +13,14 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://127.0.0.1:3000',
   'http://localhost:8888',
   'http://127.0.0.1:8888',
+  'http://localhost:3010',
+  'http://127.0.0.1:3010',
+  'http://localhost:3011',
+  'http://127.0.0.1:3011',
+  'http://localhost:3100',
+  'http://127.0.0.1:3100',
+  'http://localhost:3200',
+  'http://127.0.0.1:3200',
 ];
 
 function getAllowedOrigins() {

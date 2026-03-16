@@ -13,7 +13,12 @@ import { ImageSize, AspectRatio, GenerationMode } from '../../types';
 import { logError, logWarning, addLog, LogLevel } from '../system/systemLogService';
 import { GoogleAdapter, convertImageToBase64, buildInlineImagePart } from './GoogleAdapter';
 import { RegionService } from '../system/RegionService';
-import { SyncImageBridgeParserType, executeSyncImageBridgeRequest, isSyncImageBridgeSupported } from './syncImageBridge';
+import {
+    SyncImageBridgeParserType,
+    isSyncImageBridgeSupported,
+    startSyncImageBridgeRequest,
+    waitForSyncImageBridgeResult
+} from './syncImageBridge';
 
 type WuyinImageRoute = {
     endpointPath: string;
@@ -265,7 +270,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             return null;
         }
 
-        const result = await executeSyncImageBridgeRequest({
+        const startResult = await startSyncImageBridgeRequest({
             requestId,
             parserType,
             url,
@@ -273,9 +278,21 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             headers,
             body,
             timeoutMs,
-            signal: options.signal,
         });
-        options.onSyncBridgeRegistered?.(requestId);
+        let result = startResult;
+
+        if (startResult.status === 'pending') {
+            try {
+                options.onSyncBridgeRegistered?.(requestId);
+            } catch (error) {
+                console.warn('[OpenAICompatibleAdapter] Failed to register sync bridge request early:', error);
+            }
+
+            result = await waitForSyncImageBridgeResult(requestId, {
+                signal: options.signal,
+                timeoutMs,
+            });
+        }
 
         if (result.status === 'success') {
             return {

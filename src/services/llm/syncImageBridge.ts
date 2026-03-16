@@ -191,18 +191,19 @@ export async function abortSyncImageBridgeRequest(requestId: string): Promise<vo
   await postBridgeMessage('abort-job', { requestId }, 10000);
 }
 
-export async function executeSyncImageBridgeRequest(params: StartJobPayload & { signal?: AbortSignal }): Promise<SyncImageBridgeResult> {
-  const { signal, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS, requestId, ...startPayload } = params;
-  const startResult = await startSyncImageBridgeRequest({
-    requestId,
-    timeoutMs,
-    ...startPayload,
-  });
-
-  if (startResult.status === 'success' || startResult.status === 'error') {
-    return startResult;
-  }
-
+export async function waitForSyncImageBridgeResult(
+  requestId: string,
+  options: {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  } = {}
+): Promise<SyncImageBridgeResult> {
+  const {
+    signal,
+    timeoutMs = DEFAULT_WAIT_TIMEOUT_MS,
+    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  } = options;
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
@@ -215,7 +216,7 @@ export async function executeSyncImageBridgeRequest(params: StartJobPayload & { 
       throw signal.reason instanceof Error ? signal.reason : new Error('Generation cancelled');
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, DEFAULT_POLL_INTERVAL_MS));
+    await new Promise((resolve) => window.setTimeout(resolve, pollIntervalMs));
     const current = await getSyncImageBridgeRequest(requestId);
     if (current.status === 'success' || current.status === 'error') {
       return current;
@@ -223,4 +224,19 @@ export async function executeSyncImageBridgeRequest(params: StartJobPayload & { 
   }
 
   throw new Error('Timed out waiting for sync image bridge result');
+}
+
+export async function executeSyncImageBridgeRequest(params: StartJobPayload & { signal?: AbortSignal }): Promise<SyncImageBridgeResult> {
+  const { signal, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS, requestId, ...startPayload } = params;
+  const startResult = await startSyncImageBridgeRequest({
+    requestId,
+    timeoutMs,
+    ...startPayload,
+  });
+
+  if (startResult.status === 'success' || startResult.status === 'error') {
+    return startResult;
+  }
+
+  return waitForSyncImageBridgeResult(requestId, { signal, timeoutMs });
 }

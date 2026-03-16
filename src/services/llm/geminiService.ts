@@ -1,6 +1,6 @@
 import { AspectRatio, ImageSize, ModelType, ReferenceImage, GenerationMode } from "../../types";
 import { keyManager, normalizeModelId } from '../auth/keyManager';
-import { getImageTokenEstimate, getModelPricing } from '../model/modelPricing';
+import { calculateCost } from '../billing/costService';
 import { AuthMethod, buildApiUrl, buildHeaders, GOOGLE_API_BASE } from '../api/apiConfig';
 import { classifyApiFailure } from '../api/errorClassification';
 import { ProxyModelConfig } from '../model/proxyModelConfig';
@@ -509,24 +509,33 @@ export const generateImage = async (
   try {
     const result = await llmService.generateImage(llmOptions);
     const resultUrl = result.urls[0];
+    const resolvedResultModel = result.model || model;
+    const resolvedResultImageSize = (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K;
+    const resolvedKeySlotId = result.keySlotId || options?.preferredKeyId;
 
     // --- Cost Estimation Cleanup ---
     let cost = result.usage?.cost || 0;
     let tokens = result.usage?.totalTokens || 0;
 
-    if (tokens === 0) {
-      tokens = getImageTokenEstimate(model, imageSize);
-    }
+    if (tokens === 0 || cost === 0) {
+      try {
+        const estimate = calculateCost(
+          resolvedResultModel,
+          resolvedResultImageSize,
+          1,
+          prompt.length,
+          normalizedReferenceImages.length,
+          resolvedKeySlotId
+        );
 
-    // 🚀 [Fix Cost Calculation] Don't hide behind 'tokens > 0' check. Some models charge per image strictly.
-    if (cost === 0) {
-      const pricing = getModelPricing(model);
-      if (pricing) {
-        if (pricing.pricePerImage) {
-          cost = pricing.pricePerImage;
-        } else if (pricing.outputPerMillionTokens && tokens > 0) {
-          cost = (tokens / 1000000) * pricing.outputPerMillionTokens;
+        if (tokens === 0) {
+          tokens = estimate.tokens;
         }
+        if (cost === 0) {
+          cost = estimate.cost;
+        }
+      } catch {
+        // Keep adapter/LLM usage values when estimation is unavailable.
       }
     }
 
@@ -535,9 +544,9 @@ export const generateImage = async (
       apiDurationMs: result.metadata?.apiDurationMs,
       tokens,
       cost,
-      imageSize: (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K,
-      effectiveModel: result.model || model,
-      effectiveSize: (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K,
+      imageSize: resolvedResultImageSize,
+      effectiveModel: resolvedResultModel,
+      effectiveSize: resolvedResultImageSize,
       aspectRatio,
       dimensions: result.metadata?.dimensions || autoRatioDimensions,
       provider: result.provider,
