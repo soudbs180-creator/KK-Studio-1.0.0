@@ -5,7 +5,7 @@ import { ChevronRight, Download, Loader2, Sparkles, Trash2 } from 'lucide-react'
 import { GeneratedImage, GenerationMode, ImageSize, PromptNode } from '../types';
 import { getModelDisplayName } from '../services/model/modelCapabilities';
 import { getModelCredits, isCreditBasedModel } from '../services/model/modelPricing';
-import { calculateCost } from '../services/billing/costService';
+import { resolveImageCost } from '../services/billing/costService';
 import { notify } from '../services/system/notificationService';
 import { generateTagColor } from '../utils/colorUtils';
 
@@ -164,26 +164,15 @@ const getMediaExtension = (image: GeneratedImage, source: string | null, blobTyp
 };
 
 const getDisplayCost = (image: GeneratedImage): number => {
-  const storedCost = typeof image.cost === 'number' && Number.isFinite(image.cost)
-    ? image.cost
-    : undefined;
-  if (storedCost !== undefined && (storedCost > 0 || !image.keySlotId)) {
-    return storedCost;
-  }
-
-  try {
-    const estimate = calculateCost(
-      image.model || '',
-      image.imageSize || ImageSize.SIZE_1K,
-      1,
-      image.prompt?.length || 0,
-      0,
-      image.keySlotId
-    );
-    return estimate.cost;
-  } catch {
-    return 0;
-  }
+  return resolveImageCost({
+    model: image.model || '',
+    imageSize: image.imageSize || ImageSize.SIZE_1K,
+    count: 1,
+    prompt: image.prompt,
+    referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
+    keySlotId: image.keySlotId,
+    storedCost: image.cost,
+  }).cost;
 };
 
 const getImageAmountLabel = (image: GeneratedImage): string => {

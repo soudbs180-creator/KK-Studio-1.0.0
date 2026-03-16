@@ -9,6 +9,7 @@ import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from 
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import ImagePreview from '../image/ImagePreview';
+import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -31,6 +32,7 @@ const snapCanvasCoordinate = (value: number, scale: number = 1) => {
 
 interface PromptNodeProps {
     node: PromptNode;
+    detailLevel?: CanvasCardDetailLevel;
     groupLayerZIndex?: number;
     stackZIndexOverride?: number;
     actualChildImageCount?: number;
@@ -64,6 +66,7 @@ interface PromptNodeProps {
     onRemoveTag?: (id: string, tag: string) => void; // 🚀 [New Prop] Remove Tag
     onDragDelta?: (delta: { x: number; y: number }, sourceNodeId?: string) => void; // 🚀 [New Prop] Relative Drag
     onUpdateNode?: (node: PromptNode) => void; // 🚀 [New Prop] Update node externally
+    isCanvasTransforming?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] Render as standard block in chat feed
 }
 
@@ -245,6 +248,7 @@ const GenerationTimer: React.FC<{ start: number; onTimeout?: () => void }> = ({ 
 
 const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     node,
+    detailLevel = 'full',
     groupLayerZIndex,
     stackZIndexOverride,
     actualChildImageCount = 0,
@@ -276,6 +280,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onRemoveTag,
     onDragDelta,
     onUpdateNode,
+    isCanvasTransforming = false,
     isChatMode = false
 }) => {
     // 🚀 [DEBUG] Trace PromptNode Rendering
@@ -598,9 +603,188 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         : (node.lastGenerationSuccessCount || 0);
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
     const showError = Boolean(node.error) && renderedSuccessCount === 0;
+    const isThumbnailShell = detailLevel === 'thumbnail-shell';
+    const shellPreviewText = (
+        node.optimizedPromptEn
+        || node.promptOptimizerResult?.optimized_prompt_en
+        || node.originalPrompt
+        || node.prompt
+        || ''
+    ).trim();
+    const shellReferenceImages = node.referenceImages?.slice(0, isThumbnailShell ? 1 : 2) || [];
     const stackZIndex = stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex);
     const renderLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1);
+    const shouldSoftenText = (zoomScale || 1) < 1 && (detailLevel === 'compact' || isCanvasTransforming);
+    const textTransition = 'filter 140ms ease, opacity 140ms ease';
+    const primaryTextRenderStyle = {
+        filter: shouldSoftenText ? 'blur(0.65px)' : 'none',
+        opacity: shouldSoftenText ? 0.9 : 1,
+        transition: textTransition,
+    };
+    const secondaryTextRenderStyle = {
+        filter: shouldSoftenText ? 'blur(0.85px)' : 'none',
+        opacity: shouldSoftenText ? 0.72 : 1,
+        transition: textTransition,
+    };
+
+    if (detailLevel === 'thumbnail-shell') {
+        const shellStatusTone = showError
+            ? 'text-red-400 bg-red-500/10 border-red-500/20'
+            : node.isGenerating
+                ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
+
+        return (
+            <div
+                ref={containerRef}
+                className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
+                style={isChatMode ? {
+                    zIndex: stackZIndex,
+                    opacity: 1,
+                } : {
+                    left: renderLeft,
+                    top: renderTop,
+                    zIndex: stackZIndex,
+                    opacity: 1,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    willChange: isDragging ? 'transform, left, top' : 'auto',
+                    transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                    pointerEvents: 'auto',
+                    touchAction: 'none'
+                }}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleMouseDown}
+            >
+                <div
+                    ref={cardRef}
+                    data-canvas-surface="prompt"
+                    className={`relative flex flex-col rounded-2xl border overflow-hidden ${isThumbnailShell ? 'backdrop-blur-sm' : ''}`}
+                    style={{
+                        width: isChatMode ? '100%' : cardWidth,
+                        maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
+                        backgroundColor: 'var(--bg-overlay)',
+                        borderColor: showError
+                            ? 'rgba(239, 68, 68, 0.45)'
+                            : isSelected
+                                ? 'rgba(59, 130, 246, 0.6)'
+                                : 'var(--border-light)',
+                        boxShadow: isSelected
+                            ? '0 0 18px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28)'
+                            : '0 4px 16px rgba(0,0,0,0.14)',
+                    }}
+                >
+                    {onConnectStart && !isChatMode && (
+                        <div
+                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-indigo-500/40 rounded-full z-50 cursor-crosshair transition-colors"
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onConnectStart(node.id, {
+                                    x: node.position.x,
+                                    y: node.position.y,
+                                });
+                            }}
+                            title="拖拽连线"
+                        />
+                    )}
+
+                    <div className={`flex items-center justify-between gap-2 border-b border-[rgba(255,255,255,0.06)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
+                        <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
+                            {showError ? (
+                                <AlertTriangle size={12} />
+                            ) : node.isGenerating ? (
+                                <Loader2 size={12} className="animate-spin" />
+                            ) : node.mode === GenerationMode.VIDEO ? (
+                                <Video size={12} />
+                            ) : node.mode === GenerationMode.AUDIO ? (
+                                <Music size={12} />
+                            ) : (
+                                <Sparkles size={12} />
+                            )}
+                            <span className="truncate">
+                                {showError ? '生成异常' : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
+                            </span>
+                        </div>
+                        <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
+                            {node.aspectRatio}
+                        </div>
+                    </div>
+
+                    <div
+                        className={isThumbnailShell ? 'p-3 flex flex-col gap-3' : 'p-4 flex flex-col gap-3'}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (hasMoved.current) return;
+                            onClickPrompt?.(node, activeTab === 'opt');
+                        }}
+                    >
+                        {shellReferenceImages.length > 0 && (
+                            <div className="flex gap-2">
+                                {shellReferenceImages.map((img, index) => {
+                                    const thumbSrc = img.data || img.url || '';
+                                    return (
+                                        <div
+                                            key={img.id || index}
+                                            className={`${isThumbnailShell ? 'w-12 h-12' : 'w-14 h-14'} rounded-xl overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)] shrink-0`}
+                                        >
+                                            {thumbSrc ? (
+                                                <img
+                                                    src={thumbSrc}
+                                                    alt="Reference"
+                                                    className="w-full h-full object-cover"
+                                                    draggable={false}
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-[var(--text-tertiary)]">
+                                                    <Image size={14} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <div
+                                className={`${isThumbnailShell ? 'text-[13px] leading-5' : 'text-[14px] leading-6'} font-medium text-[var(--text-primary)]`}
+                                style={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: isThumbnailShell ? 2 : 4,
+                                    WebkitBoxOrient: 'vertical' as any,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {shellPreviewText || '输入提示词...'}
+                            </div>
+
+                            {!isThumbnailShell && node.tags && node.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {node.tags.slice(0, 3).map((tag) => {
+                                        const colors = generateTagColor(tag);
+                                        return (
+                                            <span
+                                                key={tag}
+                                                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                                style={{
+                                                    backgroundColor: colors.bg,
+                                                    color: colors.text,
+                                                    borderColor: colors.border,
+                                                }}
+                                            >
+                                                {truncateByChars(tag, 8)}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -675,7 +859,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <line x1="12" y1="16" x2="12.01" y2="16"></line>
                                     </svg>
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error}>
+                                <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error} style={secondaryTextRenderStyle}>
                                     生成失败{(() => {
                                         // 🚀 [Fix] 只有 SystemProxy 或者明确带有 @system 后缀才是积分模型
                                         const lowerModelId = node.model?.toLowerCase() || '';
@@ -693,7 +877,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-blue-500/15">
                                     <Sparkles size={12} className="text-blue-400 animate-pulse" />
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate text-blue-400">
+                                <span className="text-[13px] font-medium tracking-wide truncate text-blue-400" style={secondaryTextRenderStyle}>
                                     正在生成 {node.parallelCount || 1} 张
                                 </span>
                             </>
@@ -702,7 +886,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-amber-500/10`}>
                                     <Sparkles size={12} className="text-amber-400" />
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate">
+                                <span className="text-[13px] font-medium tracking-wide truncate" style={secondaryTextRenderStyle}>
                                     {renderedSuccessCount > 0 ? (
                                         <span className="text-[var(--text-secondary)]">
                                             {renderedFailCount > 0
@@ -795,6 +979,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     {/* Prompt Text Area - 文本可选，但选择范围被约束在本卡片内 */}
                     <div
                         className="relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] select-text cursor-text group/content"
+                        style={primaryTextRenderStyle}
                         onWheel={(e) => e.stopPropagation()}
                         onMouseDown={(e) => {
                             e.stopPropagation();
@@ -1445,6 +1630,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.actualChildImageCount === next.actualChildImageCount &&
         prev.isSelected === next.isSelected &&
         prev.highlighted === next.highlighted &&
+        prev.detailLevel === next.detailLevel &&
+        prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.zoomScale === next.zoomScale &&
         prev.isMobile === next.isMobile &&
         prev.sourcePosition?.x === next.sourcePosition?.x &&

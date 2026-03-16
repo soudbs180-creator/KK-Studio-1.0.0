@@ -1480,8 +1480,8 @@ body.is-animating-card .canvas-grid {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(calc(100vw - 32px), 700px);
-  max-width: 700px;
+  /* Width is controlled by PromptBar.tsx responsive utility classes.
+     Keeping fixed width here causes build-order dependent overrides. */
   /* Fallback for browsers without backdrop-filter support */
   background: rgba(255, 255, 255, 0.85);
   /* Modern browsers with backdrop-filter */

@@ -4,7 +4,7 @@ import { llmService } from '../services/llm/LLMService';
 import { generateImage, cancelGeneration } from '../services/llm/geminiService';
 import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
-import { calculateCost } from '../services/billing/costService';
+import { calculateCost, resolveImageCost } from '../services/billing/costService';
 import { saveImage, saveOriginalImage, getImage } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { keyManager } from '../services/auth/keyManager';
@@ -73,6 +73,15 @@ const resolveUsageMetrics = (params: {
   const resolvedImageSize = params.imageSize || ImageSize.SIZE_1K;
 
   try {
+    const resolvedCost = resolveImageCost({
+      model: params.model,
+      imageSize: resolvedImageSize,
+      count: Math.max(1, params.imageCount || 1),
+      prompt: params.prompt,
+      referenceImageCount: Math.max(0, params.referenceImageCount || 0),
+      keySlotId: params.keySlotId,
+      explicitCost,
+    });
     const estimate = calculateCost(
       params.model,
       resolvedImageSize,
@@ -83,7 +92,7 @@ const resolveUsageMetrics = (params: {
     );
 
     return {
-      cost: explicitCost ?? estimate.cost,
+      cost: resolvedCost.cost,
       tokens: explicitTokens ?? estimate.tokens,
     };
   } catch {
@@ -282,22 +291,23 @@ export const useImageGeneration = (options: {
   ) => {
     const safeTotalCount = Math.max(1, totalCount);
     const gapToImages = 80;
-    const gap = 20;
     const { width: cardWidth, totalHeight: cardHeight } = getCardDimensions(aspectRatio, true);
+    const compactSpacing = cardWidth < 260;
+    const gap = compactSpacing ? 12 : 20;
     const columns = 2;
     const row = Math.floor(index / columns);
     const col = index % columns;
     const cardsInCurrentRow = Math.min(columns, safeTotalCount - row * columns);
 
     if (mode === GenerationMode.PPT) {
-      const pptGap = 28;
+      const pptGap = compactSpacing ? 18 : 28;
       return { x: basePosition.x, y: basePosition.y + gapToImages + cardHeight + index * (cardHeight + pptGap) };
     }
     
     if (isMobile) {
       const mobileCardWidth = 170;
       const mobileCardHeight = 260;
-      const mobileGap = 10;
+      const mobileGap = 8;
       const rowWidth = cardsInCurrentRow * mobileCardWidth + (cardsInCurrentRow - 1) * mobileGap;
       const startX = -rowWidth / 2;
       return {
@@ -428,6 +438,7 @@ export const useImageGeneration = (options: {
           timestamp: Date.now(),
           canvasId: activeCanvasRef.current?.id || 'default',
           parentPromptId: nodeId,
+          sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
           position: getGeneratedImagePosition(latestNode.position, latestNode.aspectRatio, latestNode.mode, layoutIndex, expectedCount),
           provider: latestNode.provider,
           providerLabel: latestNode.providerLabel,
@@ -671,6 +682,7 @@ export const useImageGeneration = (options: {
                 aspectRatio: resolvedAspectRatio, imageSize: resolvedImageSize,
                 timestamp: Date.now(), canvasId: activeCanvasRef.current?.id || 'default',
                 parentPromptId: node.id,
+                sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
                 provider: latestNode.provider || (result as any).provider,
@@ -949,6 +961,7 @@ export const useImageGeneration = (options: {
             provider: item.provider || executionNode.provider,
             providerLabel: item.providerName || executionNode.providerLabel,
             parentPromptId: promptNodeId, position: getGeneratedImagePosition(executionNode.position, executionNode.aspectRatio, executionNode.mode, idx, actualCount),
+            sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: item.generationTime, keySlotId: item.keySlotId, mode,
             tokens: item.tokens, cost: item.cost,
           };

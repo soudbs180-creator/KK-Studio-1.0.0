@@ -7,17 +7,20 @@ import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/
 import { generateTagColor } from '../../utils/colorUtils';
 import { useLazyImage } from '../../hooks/useLazyImage';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
-import { calculateCost } from '../../services/billing/costService';
+import { resolveImageCost } from '../../services/billing/costService';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
 import { loadImage, cancelImageLoad } from '../../services/image/imageLoader';
-import { ImageQuality, getAppropriateQuality } from '../../services/image/imageQuality';
+import { ImageQuality, getAppropriateQuality, type ImageQualityBias } from '../../services/image/imageQuality';
 import { getModelThemeBgColor } from '../../services/model/modelCapabilities';
 import { getModelCredits, isCreditBasedModel } from '../../services/model/modelPricing';
+import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
     return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 1))}…` : text;
 };
+
+const joinClasses = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 const QUALITY_RANK: Record<ImageQuality, number> = {
     [ImageQuality.MICRO]: 0,
@@ -47,8 +50,11 @@ const snapCanvasCoordinate = (value: number, scale: number = 1) => {
     return Math.round(value * scale) / scale;
 };
 
+type FooterDensity = 'normal' | 'compact' | 'tight';
+
 interface ImageNodeProps {
     image: GeneratedImage;
+    detailLevel?: CanvasCardDetailLevel;
     groupLayerZIndex?: number;
     stackZIndexOverride?: number;
     position: { x: number; y: number };
@@ -79,6 +85,7 @@ interface ImageNodeProps {
 
 const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     image,
+    detailLevel = 'full',
     groupLayerZIndex,
     stackZIndexOverride,
     position,
@@ -106,11 +113,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false // 🚀 [New] 垂直聊天流标识
 }) => {
+    const qualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
+        ? 'micro-only'
+        : detailLevel === 'compact'
+            ? 'thumbnail-preferred'
+            : 'default';
     const containerRef = useRef<HTMLDivElement>(null);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const dragCleanupRef = useRef<(() => void) | null>(null); // 🚀 [Fix] Drag Cleanup Ref
     const dragRafRef = useRef<number | null>(null);
     const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+    const topMetaRowRef = useRef<HTMLDivElement>(null);
+    const footerInfoRowRef = useRef<HTMLDivElement>(null);
     const hasAnimatedRef = useRef<string | null>(null);
 
     const [isDragging, setIsDragging] = useState(false);
@@ -268,6 +282,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return { w: finalWidth, h: finalHeight };
     };
     const { w: nodeWidth, h: nodeHeight } = getDims();
+    const [footerDensity, setFooterDensity] = useState<FooterDensity>(nodeWidth < 260 ? 'compact' : 'normal');
 
     // Local display position to avoid global re-renders during drag
     // Ref to track latest localPos without triggering effect re-runs
@@ -359,6 +374,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const imageStorageKey = image.storageId || image.id;
     const failedSourcesRef = useRef<Set<string>>(new Set());
 
+    useEffect(() => {
+        const desiredQuality = getAppropriateQuality(zoomScale || 1, qualityBias);
+        if (detailLevel === 'full') return;
+        if (currentQuality === desiredQuality) return;
+
+        loadedRef.current = false;
+        setRetryTick((prev) => prev + 1);
+    }, [currentQuality, detailLevel, qualityBias, zoomScale]);
+
     const preloadDisplaySource = useCallback((src: string): Promise<void> => {
         if (!src) return Promise.resolve();
         if (
@@ -447,28 +471,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     // Video Control
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(true); // Default autoPlay is true
-    const displayCost = useMemo(() => {
-        const storedCost = typeof image.cost === 'number' && Number.isFinite(image.cost)
-            ? image.cost
-            : undefined;
-        if (storedCost !== undefined && (storedCost > 0 || !image.keySlotId)) {
-            return storedCost;
-        }
-
-        try {
-            const estimate = calculateCost(
-                image.model || '',
-                image.imageSize || ImageSize.SIZE_1K,
-                1,
-                image.prompt?.length || 0,
-                0,
-                image.keySlotId
-            );
-            return estimate.cost;
-        } catch {
-            return 0;
-        }
-    }, [image.cost, image.model, image.imageSize, image.prompt, image.keySlotId]);
+    const resolvedDisplayCost = useMemo(() => resolveImageCost({
+        model: image.model || '',
+        imageSize: image.imageSize || ImageSize.SIZE_1K,
+        count: 1,
+        prompt: image.prompt,
+        referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
+        keySlotId: image.keySlotId,
+        storedCost: image.cost,
+    }), [image.cost, image.keySlotId, image.imageSize, image.model, image.prompt, image.sourceReferenceStorageIds]);
+    const displayCost = resolvedDisplayCost.cost;
 
     // 🚀 [UI Optimization] 判断是否为内置积分加速模型
     const isCreditModel = useMemo(() => {
@@ -494,11 +506,77 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return isCreditBasedModel(modelId, image.provider);
     }, [image.provider, image.model, image.tokens, displayCost]);
 
+    const isCompactFooter = footerDensity !== 'normal';
+    const isTightFooter = footerDensity === 'tight';
+    const minimumFooterDensity: FooterDensity = nodeWidth < 260 ? 'compact' : 'normal';
+    const metaRowGapClass = isTightFooter ? 'gap-1' : isCompactFooter ? 'gap-1.5' : 'gap-2';
+    const metaLeftGapClass = isTightFooter ? 'gap-0.5' : isCompactFooter ? 'gap-1' : 'gap-1.5';
+    const metaRightGapClass = isTightFooter ? 'gap-0.5' : isCompactFooter ? 'gap-1' : 'gap-2';
+    const capsulePaddingClass = isTightFooter ? 'px-1 py-0.5' : isCompactFooter ? 'px-1.5 py-0.5' : 'px-2 py-0.5';
+    const modelCapsulePaddingClass = isTightFooter ? 'px-1 py-0.5' : isCompactFooter ? 'px-1.5 py-0.5' : 'px-2 py-0.5';
+    const modelCapsuleTextClass = isTightFooter ? 'text-[9px]' : 'text-[10px]';
+    const providerCapsuleTextClass = isTightFooter ? 'text-[8px]' : 'text-[9px]';
+    const footerInfoGapClass = isTightFooter ? 'gap-0.5' : isCompactFooter ? 'gap-1' : 'gap-2';
+    const footerInfoTextClass = isTightFooter ? 'text-[9px]' : 'text-2xs';
+    const iconButtonPaddingClass = isCompactFooter ? 'p-px' : 'p-0.5';
+    const actionIconSize = isTightFooter ? 9 : 10;
+    const modelBadgeMaxWidthClass = isTightFooter ? 'max-w-[110px]' : isCompactFooter ? 'max-w-[120px]' : 'max-w-[140px]';
+    const creditModelBadgeMaxWidthClass = isTightFooter ? 'max-w-[128px]' : isCompactFooter ? 'max-w-[136px]' : 'max-w-[150px]';
+    const generatingBadgeMaxWidthClass = isTightFooter ? 'max-w-[142px]' : isCompactFooter ? 'max-w-[150px]' : 'max-w-[170px]';
+    const footerSeparatorClass = isTightFooter ? 'mx-px text-[var(--border-medium)]' : 'text-[var(--border-medium)]';
+    const metaActionMarginClass = isCompactFooter ? 'ml-1' : 'ml-2';
+
+    useLayoutEffect(() => {
+        const hasHorizontalOverflow = (element: HTMLDivElement | null) => Boolean(element && element.scrollWidth > element.clientWidth + 1);
+        let frameId: number | null = null;
+
+        const measureDensity = () => {
+            const overflowDetected = hasHorizontalOverflow(topMetaRowRef.current) || hasHorizontalOverflow(footerInfoRowRef.current);
+            setFooterDensity((current) => {
+                let nextDensity: FooterDensity = minimumFooterDensity;
+
+                if (overflowDetected) {
+                    nextDensity = minimumFooterDensity === 'normal'
+                        ? (current === 'normal' ? 'compact' : 'tight')
+                        : 'tight';
+                } else if (current === 'tight' && minimumFooterDensity === 'compact') {
+                    // Prevent compact/tight oscillation on narrow subcards.
+                    nextDensity = 'tight';
+                }
+
+                return current === nextDensity ? current : nextDensity;
+            });
+        };
+
+        const scheduleMeasure = () => {
+            if (frameId !== null) cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(measureDensity);
+        };
+
+        scheduleMeasure();
+
+        const resizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(() => scheduleMeasure())
+            : null;
+        const observerTargets = [containerRef.current, topMetaRowRef.current, footerInfoRowRef.current].filter(Boolean) as Element[];
+        observerTargets.forEach((target) => resizeObserver?.observe(target));
+        window.addEventListener('resize', scheduleMeasure);
+
+        return () => {
+            if (frameId !== null) cancelAnimationFrame(frameId);
+            resizeObserver?.disconnect();
+            window.removeEventListener('resize', scheduleMeasure);
+        };
+    }, [displayCost, image.generationTime, image.id, image.isGenerating, image.model, image.modelLabel, image.orphaned, image.provider, image.providerLabel, image.tokens, minimumFooterDensity]);
+
     useEffect(() => {
         if (!onUpdate) return;
         if (isCreditModel) return;
-        if (typeof image.cost === 'number' && Number.isFinite(image.cost) && image.cost > 0) return;
         if (!(displayCost > 0)) return;
+        const storedCost = typeof image.cost === 'number' && Number.isFinite(image.cost)
+            ? image.cost
+            : undefined;
+        if (storedCost !== undefined && Math.abs(storedCost - displayCost) < 0.000001) return;
 
         onUpdate(image.id, { cost: displayCost });
     }, [displayCost, image.cost, image.id, isCreditModel, onUpdate]);
@@ -514,6 +592,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         textColor: image.modelTextColor,
     }), [image.model, modelText, providerText, image.modelColorStart, image.modelColorEnd, image.modelTextColor]);
     const providerBadgeStyle = useMemo(() => getProviderBadgeStyle(providerText), [providerText]);
+    const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
+    const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
+    const footerTimeLabel = image.generationTime ? `耗时 ${(image.generationTime / 1000).toFixed(1)}s` : '耗时 --';
+    const footerTokenLabel = `令牌 ${image.tokens || 0}`;
+    const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
+    const footerCreditsLabel = `✨${getModelCredits(image.model || '', image.imageSize)}`;
+    const footerSummaryTitle = isCreditModel
+        ? `${footerTimeLabel} | ${footerCreditsLabel}`
+        : `${footerTimeLabel} | 令牌 ${image.tokens || 0} | ${footerCostLabel}`;
 
     // 🚀 根据画布缩放自动选择合适质量 - 使用队列加载优化
     useEffect(() => {
@@ -529,7 +616,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         // 🚀 如果已加载过且有显示图，完全跳过质量切换（大幅提升性能）
         // 只在首次加载或缩放变化非常大(>50%)时才切换质量
         const currentZoom = zoomScale || 1.0;
-        const targetQuality = getAppropriateQuality(currentZoom);
+        const targetQuality = getAppropriateQuality(currentZoom, qualityBias);
 
         if (image.isGenerating && displaySrc) {
             return;
@@ -543,7 +630,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             return;
         }
 
-        if (displaySrc && loadedRef.current && QUALITY_RANK[targetQuality] <= QUALITY_RANK[currentQuality]) {
+        if (displaySrc && loadedRef.current && QUALITY_RANK[targetQuality] <= QUALITY_RANK[currentQuality] && detailLevel === 'full') {
             return;
         }
 
@@ -584,7 +671,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             try {
                 lastZoomRef.current = currentZoom;
                 const scale = currentZoom;
-                const quality = getAppropriateQuality(scale);
+                const quality = getAppropriateQuality(scale, qualityBias);
 
                 const priority = isNew ? 999 : Math.round(100 - Math.abs(scale - 1) * 50);
                 const url = await loadImage(imageStorageKey, quality, priority);
@@ -671,9 +758,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
         };
 
+        const qualityChangeDelayMs = !displaySrc
+            ? 100
+            : detailLevel === 'thumbnail-shell'
+                ? 160
+                : detailLevel === 'compact'
+                    ? 320
+                    : 700;
+
         qualityDebounceRef.current = setTimeout(() => {
             loadQualityImage();
-        }, displaySrc ? 700 : 100); // 已有图片时延后升级，优先保证缩放体感稳定
+        }, qualityChangeDelayMs); // Keep near-view quality upgrades gentle while simplified views switch faster
 
         return () => {
             // 🚀 [Fix] 只清除防抖定时器，不取消队列中的加载
@@ -682,7 +777,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 clearTimeout(qualityDebounceRef.current);
             }
         };
-    }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource]); // 仅在必要状态变化时重新评估
+    }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew]); // Re-evaluate when performance detail mode changes
 
     const handleRetryLoad = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -973,6 +1068,150 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const stackZIndex = stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex);
     const renderLeft = snapCanvasCoordinate(renderPos.x - nodeWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(renderPos.y - nodeHeight, zoomScale || 1);
+    const shouldSoftenText = (zoomScale || 1) < 1 && (detailLevel === 'compact' || isCanvasTransforming);
+    const textTransition = 'filter 140ms ease, opacity 140ms ease';
+    const primaryTextRenderStyle = {
+        filter: shouldSoftenText ? 'blur(0.65px)' : 'none',
+        opacity: shouldSoftenText ? 0.9 : 1,
+        transition: textTransition,
+    };
+    const secondaryTextRenderStyle = {
+        filter: shouldSoftenText ? 'blur(0.85px)' : 'none',
+        opacity: shouldSoftenText ? 0.72 : 1,
+        transition: textTransition,
+    };
+
+    if (detailLevel === 'thumbnail-shell') {
+        const isThumbnailShell = detailLevel === 'thumbnail-shell';
+        const shellTitle = image.alias || image.fileName || image.prompt || 'Image';
+        const shellSubtitle = isThumbnailShell
+            ? truncateByChars(shellTitle, 22)
+            : truncateByChars(image.prompt || shellTitle, 42);
+        const shellBadgeClass = image.error && !image.isGenerating
+            ? 'text-red-400 bg-red-500/10 border-red-500/20'
+            : image.isGenerating
+                ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
+        const isVideoLike = image.mode === GenerationMode.VIDEO || displaySrc?.startsWith('data:video') || displaySrc?.endsWith('.mp4');
+        const isAudioLike = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
+
+        return (
+            <div
+                ref={containerRef}
+                className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                style={isChatMode ? {
+                    zIndex: stackZIndex,
+                    width: isChatMode ? '100%' : nodeWidth,
+                    opacity: 1,
+                } : {
+                    left: renderLeft,
+                    top: renderTop,
+                    zIndex: stackZIndex,
+                    width: nodeWidth,
+                    opacity: 1,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
+                    willChange: isDragging ? 'left, top' : 'auto',
+                    touchAction: 'none',
+                    contain: 'layout style'
+                }}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleMouseDown}
+            >
+                <div
+                    data-canvas-surface="image"
+                    className="relative w-full overflow-hidden rounded-[20px] border flex flex-col"
+                    style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        borderColor: image.error && !image.isGenerating
+                            ? 'rgb(239, 68, 68)'
+                            : isSelected
+                                ? 'var(--selected-border)'
+                                : isActive
+                                    ? 'var(--accent-gold)'
+                                    : 'var(--border-default)',
+                        borderWidth: adaptiveBorderWidth,
+                        boxShadow: isSelected
+                            ? 'var(--glow-blue)'
+                            : highlighted
+                                ? 'var(--glow-gold)'
+                                : 'var(--shadow-xl)',
+                    }}
+                >
+                    <div
+                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-indigo-500/50 rounded-full z-50 cursor-crosshair"
+                        onMouseUp={() => onConnectEnd?.(image.id)}
+                    />
+
+                    <div
+                        className="w-full p-1"
+                        onClick={handleImageClick}
+                        onDoubleClick={handleImageClick}
+                    >
+                        <div
+                            className="relative w-full overflow-hidden rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]"
+                            style={{
+                                aspectRatio: image.aspectRatio.replace(':', '/')
+                            }}
+                        >
+                            {isAudioLike ? (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-950/90 to-slate-900/90 text-indigo-200">
+                                    <Music size={28} />
+                                </div>
+                            ) : isVideoLike ? (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900/90 to-indigo-950/90 text-white/85">
+                                    <Play size={26} />
+                                </div>
+                            ) : displaySrc && !imgError ? (
+                                <img
+                                    src={displaySrc}
+                                    decoding="async"
+                                    loading="lazy"
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    alt={shellTitle}
+                                    className="w-full h-full object-cover block"
+                                    onError={() => {
+                                        void handleMediaLoadError();
+                                    }}
+                                />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)]">
+                                    {isLoading ? <Loader2 size={24} className="animate-spin" /> : <ImageOff size={24} />}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div
+                        className={`${isThumbnailShell ? 'px-3 py-2.5' : 'px-3 py-3'} border-t border-[var(--border-light)] bg-[var(--bg-elevated)] cursor-pointer`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (!wasDraggingRef.current) onClick?.(image.id);
+                        }}
+                    >
+                        <div className="flex items-center justify-between gap-2">
+                            <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellBadgeClass}`}>
+                                {image.error && !image.isGenerating ? (
+                                    <ImageOff size={12} />
+                                ) : image.isGenerating ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                )}
+                                <span className="truncate">{isThumbnailShell ? aspectSizeLabel : truncateByChars(modelText, 16)}</span>
+                            </div>
+                            {!isThumbnailShell && (
+                                <span className="text-[11px] text-[var(--text-tertiary)] shrink-0">{aspectSizeLabel}</span>
+                            )}
+                        </div>
+                        <div className={`${isThumbnailShell ? 'mt-2 text-[12px]' : 'mt-2.5 text-[13px]'} leading-5 text-[var(--text-primary)] font-medium`}>
+                            {shellSubtitle}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         // ... (Wrapper Divs) ...
@@ -1334,6 +1573,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             ) : (
                                                 <span
                                                     className="text-xs font-medium text-[var(--text-secondary)] truncate cursor-text hover:text-[var(--text-primary)]"
+                                                    style={secondaryTextRenderStyle}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setAliasValue(image.alias || image.fileName || 'Image');
@@ -1346,7 +1586,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             )}
                                             {/* 像素尺寸 */}
                                             {image.dimensions && (
-                                                <span className="text-2xs text-[var(--text-tertiary)] whitespace-nowrap">
+                                                <span className="text-2xs text-[var(--text-tertiary)] whitespace-nowrap" style={secondaryTextRenderStyle}>
                                                     {image.dimensions}
                                                 </span>
                                             )}
@@ -1354,35 +1594,35 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         {/* 右侧：删除按钮 */}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onDelete(image.id); }}
-                                            className="hover:text-[var(--accent-red)] transition-colors p-0.5 ml-2"
+                                            className={joinClasses('hover:text-[var(--accent-red)] transition-colors', iconButtonPaddingClass, metaActionMarginClass)}
                                             title="删除"
                                         >
-                                            <Trash2 size={10} />
+                                            <Trash2 size={actionIconSize} />
                                         </button>
                                     </div>
                                 )}
 
                                 {/* 状态2: 生成过程中 - 只有一层，居中显示 */}
                                 {!image.orphaned && image.isGenerating && (
-                                    <div className="flex items-center justify-center h-5 gap-2 flex-nowrap group relative">
-                                        <div className={`flex items-center gap-1 px-2 h-5 rounded-lg border min-w-0 max-w-[170px] ${isCreditModel ? getModelThemeBgColor(image.model || '') : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`}>
-                                            <span className={`text-2xs leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'text-white drop-shadow-sm' : modelBadge.colorClass}`} title={modelText || 'AI'}>
+                                    <div className={joinClasses('flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')}>
+                                        <div className={joinClasses(`flex items-center gap-1 rounded-lg border min-w-0 ${isCreditModel ? getModelThemeBgColor(image.model || '') : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`, generatingBadgeMaxWidthClass, capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
+                                            <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'text-white drop-shadow-sm' : modelBadge.colorClass}`)} title={modelText || 'AI'} style={secondaryTextRenderStyle}>
                                                 {truncateByChars(modelText || 'AI', 15)}
                                             </span>
                                             {!isCreditModel && providerText && (
                                                 <span
-                                                    className={`text-[9px] leading-none px-1 py-0.5 rounded whitespace-nowrap border shrink-0 ${getProviderBadgeColor(providerText)}`}
+                                                    className={joinClasses(providerCapsuleTextClass, `leading-none px-1 py-0.5 rounded whitespace-nowrap border shrink-0 ${getProviderBadgeColor(providerText)}`)}
                                                     title={providerText}
-                                                    style={providerBadgeStyle}
+                                                    style={{ ...providerBadgeStyle, ...secondaryTextRenderStyle }}
                                                 >
                                                     {truncateByChars(providerText, 12)}
                                                 </span>
                                             )}
                                         </div>
                                         {/* 参数也加框 */}
-                                        <div className="flex items-center gap-1 px-2 h-5 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-light)]">
-                                            <span className="text-2xs leading-none text-[var(--text-secondary)] whitespace-nowrap">
-                                                {image.aspectRatio || '1:1'} · {(image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K')}
+                                        <div className={joinClasses('flex items-center gap-1 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-light)]', capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
+                                            <span className={joinClasses(modelCapsuleTextClass, 'leading-none text-[var(--text-secondary)] whitespace-nowrap')} style={secondaryTextRenderStyle}>
+                                                {aspectSizeLabel}
                                             </span>
                                         </div>
 
@@ -1396,9 +1636,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--bg-elevated)] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                                 title="点击结束生成"
                                             >
-                                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-sm transform translate-y-[1px]">
-                                                    <svg className="w-3 h-3 animate-spin border-r-transparent border-red-500 rounded-full border-2" viewBox="0 0 24 24" />
-                                                    <span className="text-[10px] font-bold">结束生成</span>
+                                                <div className={joinClasses('flex items-center px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-sm transform translate-y-[1px]', isCompactFooter ? 'gap-1' : 'gap-1.5')}>
+                                                    <svg className={joinClasses('animate-spin border-r-transparent border-red-500 rounded-full border-2', isTightFooter ? 'w-2.5 h-2.5' : 'w-3 h-3')} viewBox="0 0 24 24" />
+                                                    <span className={joinClasses('font-bold', isTightFooter ? 'text-[9px]' : 'text-[10px]')}>结束生成</span>
                                                 </div>
                                             </button>
                                         )}
@@ -1409,9 +1649,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 {!image.orphaned && !image.isGenerating && (
                                     <>
                                         {/* 第一层：模型/供应商 + 参数/操作 */}
-                                        <div className="flex items-center justify-between gap-2 w-full min-h-[20px]">
+                                        <div ref={topMetaRowRef} className={joinClasses('flex items-center justify-between w-full min-h-[20px] overflow-hidden', metaRowGapClass)}>
                                             {/* 左侧：模型名 + 供应商（积分模型不显示供应商） */}
-                                            <div className="min-w-0 flex items-center gap-1.5">
+                                            <div className={joinClasses('min-w-0 flex items-center overflow-hidden', metaLeftGapClass)}>
                                                 {(() => {
                                                     const modelText = image.modelLabel || image.model || image.id;
                                                     const providerText = image.providerLabel || image.provider || '';
@@ -1427,7 +1667,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     if (isCreditModel) {
                                                         // 积分模型：保持与Prompt加载占位符一样的外观 (胶囊带有系统设置颜色作为字体颜色/透明背景)
                                                         return (
-                                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border border-[var(--border-light)] bg-[var(--bg-tertiary)] truncate max-w-[150px] ${modelBadge.colorClass}`} title={modelText}>
+                                                            <span className={joinClasses(`inline-flex items-center rounded font-medium border border-[var(--border-light)] bg-[var(--bg-tertiary)] truncate ${modelBadge.colorClass}`, creditModelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText} style={secondaryTextRenderStyle}>
                                                                 {truncateByChars(modelText, 18)}
                                                             </span>
                                                         );
@@ -1436,11 +1676,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     // 用户 API：普通灰色框 + 普通文本 + 供应商标签
                                                     return (
                                                         <>
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-light)] truncate max-w-[140px] ${modelBadge.colorClass}`} title={modelText}>
+                                                            <span className={joinClasses(`inline-flex items-center rounded-md font-medium bg-[var(--bg-tertiary)] border border-[var(--border-light)] truncate ${modelBadge.colorClass}`, modelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText} style={secondaryTextRenderStyle}>
                                                                 {truncateByChars(modelText, 14)}
                                                             </span>
                                                             {providerText && (
-                                                                <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${getProviderBadgeColor(providerText)}`} title={providerText} style={providerBadgeStyle}>
+                                                                <span className={joinClasses(`inline-flex max-w-[72px] truncate px-1 py-0.5 rounded border shrink-0 ${getProviderBadgeColor(providerText)}`, providerCapsuleTextClass)} title={providerText} style={{ ...providerBadgeStyle, ...secondaryTextRenderStyle }}>
                                                                     {truncateByChars(providerText, 12)}
                                                                 </span>
                                                             )}
@@ -1450,14 +1690,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             </div>
 
                                             {/* 右侧：参数胶囊 + 下载 + 删除 */}
-                                            <div className="flex items-center gap-2 shrink-0">
+                                            <div className={joinClasses('flex items-center shrink-0', metaRightGapClass)}>
                                                 {/* 参数胶囊 */}
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap">
-                                                    {image.aspectRatio || '1:1'} · {(image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K')}
+                                                <span className={joinClasses('inline-flex items-center rounded-md font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap', capsulePaddingClass, modelCapsuleTextClass)} style={secondaryTextRenderStyle}>
+                                                    {aspectSizeLabel}
                                                 </span>
                                                 <div className="relative" ref={downloadMenuRef}>
-                                                    <button onClick={handleDownload} className="hover:text-[var(--accent-blue)] transition-colors p-0.5" title={isPptSubCard ? '下载选项' : '下载原图'}>
-                                                        <Download size={10} />
+                                                    <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-blue)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
+                                                        <Download size={actionIconSize} />
                                                     </button>
                                                     {showDownloadMenu && isPptSubCard && (
                                                         <div className="absolute right-0 top-full z-30 mt-1 w-28 rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-1 shadow-xl">
@@ -1485,8 +1725,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                         </div>
                                                     )}
                                                 </div>
-                                                <button onClick={(e) => { e.stopPropagation(); onDelete(image.id); }} className="hover:text-[var(--accent-red)] transition-colors p-0.5" title="删除">
-                                                    <Trash2 size={10} />
+                                                <button onClick={(e) => { e.stopPropagation(); onDelete(image.id); }} className={joinClasses('hover:text-[var(--accent-red)] transition-colors', iconButtonPaddingClass)} title="删除">
+                                                    <Trash2 size={actionIconSize} />
                                                 </button>
                                             </div>
                                         </div>
@@ -1495,30 +1735,35 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         <div className="w-full h-px bg-[var(--border-light)] my-1"></div>
 
                                         {/* 第二层：耗时/费用 */}
-                                        <div className="flex items-center justify-center gap-2 h-5 text-2xs leading-none text-[var(--text-secondary)] relative group/info">
+                                        <div
+                                            ref={footerInfoRowRef}
+                                            title={footerSummaryTitle}
+                                            className={joinClasses('flex items-center justify-center leading-none text-[var(--text-secondary)] relative group/info overflow-hidden whitespace-nowrap', footerInfoGapClass, isTightFooter ? 'h-[18px]' : 'h-5', footerInfoTextClass)}
+                                            style={primaryTextRenderStyle}
+                                        >
                                             {image.generationTime ? (
-                                                <span title="耗时" className="text-blue-400">耗时 {(image.generationTime / 1000).toFixed(1)}s</span>
+                                                <span title="耗时" className="text-blue-400 shrink-0">{footerTimeLabel}</span>
                                             ) : (
-                                                <span className="text-blue-400/50">耗时 --</span>
+                                                <span className="text-blue-400/50 shrink-0">{footerTimeLabel}</span>
                                             )}
                                             {isCreditModel ? (
                                                 <>
-                                                    <span className="text-[var(--border-medium)]">|</span>
-                                                    <span title="积分消耗" className="text-blue-400 font-medium">✨{getModelCredits(image.model || '', image.imageSize)}</span>
+                                                    <span className={footerSeparatorClass}>|</span>
+                                                    <span title="积分消耗" className="text-blue-400 font-medium shrink-0">{footerCreditsLabel}</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span className="text-[var(--border-medium)]">|</span>
-                                                    <span title="Token消耗" className="text-emerald-400">令牌 {image.tokens || 0}</span>
-                                                    <span className="text-[var(--border-medium)]">|</span>
-                                                    <span title="费用" className="text-amber-400">费用 ${image.cost ? image.cost.toFixed(4) : '0'}</span>
+                                                    <span className={footerSeparatorClass}>|</span>
+                                                    <span title={`Token消耗 ${image.tokens || 0}`} className="text-emerald-400 shrink-0">{footerTokenLabel}</span>
+                                                    <span className={footerSeparatorClass}>|</span>
+                                                    <span title={footerCostLabel} className="text-amber-400 shrink-0">{footerCostLabel}</span>
                                                 </>
                                             )}
                                         </div>
 
                                         {/* 第三层：标签（如果有），最多4个，每个最多6个字 */}
                                         {image.tags && image.tags.length > 0 && (
-                                            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5">
+                                            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5" style={secondaryTextRenderStyle}>
                                                 {image.tags.slice(0, 4).map(tag => {
                                                     const colors = generateTagColor(tag);
                                                     // 截断超过6个字的标签
@@ -1560,6 +1805,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         prev.isActive === next.isActive &&
         prev.groupLayerZIndex === next.groupLayerZIndex &&
         prev.stackZIndexOverride === next.stackZIndexOverride &&
+        prev.detailLevel === next.detailLevel &&
         prev.zoomScale === next.zoomScale &&
         prev.isSelected === next.isSelected &&
         prev.highlighted === next.highlighted &&

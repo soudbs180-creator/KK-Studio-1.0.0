@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode } from '../types';
+import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, type WorkflowNode } from '../types';
 import { saveImage, getImage, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
@@ -8,6 +8,9 @@ import { calculateImageHash } from '../utils/imageUtils';
 import { getCardDimensions } from '../utils/styleUtils';
 import { supabase } from '../lib/supabase'; // Import supabase for auth check
 import { notify } from '../services/system/notificationService';
+import { featureFlags } from '../config/featureFlags';
+import { createEmptyWorkflowGraph } from '../workflow/types';
+import { syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
 
 const MAX_CANVASES = 10;
 
@@ -117,6 +120,9 @@ const SYNC_GENERATION_INTERRUPTED_ERROR = '页面刷新或离开时中断了同�
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
+const createCanvasWorkflow = (): Canvas['workflow'] | undefined =>
+    featureFlags.experimentalWorkflowGraph ? createEmptyWorkflowGraph<WorkflowNode>() : undefined;
+
 const DEFAULT_CANVAS: Canvas = {
     id: 'default',
     name: '椤圭洰1',
@@ -124,6 +130,7 @@ const DEFAULT_CANVAS: Canvas = {
     imageNodes: [],
     groups: [] as CanvasGroup[],
     drawings: [] as CanvasDrawing[],
+    workflow: createCanvasWorkflow(),
     lastModified: Date.now()
 };
 const DEFAULT_STATE: CanvasState = {
@@ -137,6 +144,49 @@ const DEFAULT_STATE: CanvasState = {
     viewportCenter: { x: 0, y: 0 } // 榛樿鐢诲竷涓績
 };
 
+const stripReferenceImageData = (
+    referenceImages: PromptNode['referenceImages'],
+    aggressive: boolean
+): PromptNode['referenceImages'] => (
+    referenceImages?.map(ref => {
+        // [CRITICAL FIX] Keep small reference images in localStorage to prevent data loss on fast refresh.
+        // If storage quota is exceeded, we retry with aggressive mode that strips all ref data.
+        const shouldKeep = !aggressive && ref.data && ref.data.length < 500000;
+        return {
+            ...ref,
+            data: shouldKeep ? ref.data : ''
+        };
+    })
+);
+
+const stripWorkflowNodeData = (node: WorkflowNode, aggressive: boolean): WorkflowNode => {
+    if (node.kind === 'image') {
+        return {
+            ...node,
+            data: {
+                ...node.data,
+                url: '',
+                originalUrl: ''
+            }
+        };
+    }
+
+    if (node.kind === 'prompt') {
+        return {
+            ...node,
+            data: {
+                ...node.data,
+                referenceImages: stripReferenceImageData(node.data.referenceImages, aggressive)
+            }
+        };
+    }
+
+    return node;
+};
+
+const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
+    syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph);
+
 // Helper to strip image URLs and Reference Image data for localStorage
 const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas[] => {
     return canvases.map(c => ({
@@ -148,16 +198,14 @@ const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas
         })),
         promptNodes: c.promptNodes.map(pn => ({
             ...pn,
-            referenceImages: pn.referenceImages?.map(ref => {
-                // [CRITICAL FIX] Keep small reference images in localStorage to prevent data loss on fast refresh.
-                // If storage quota is exceeded, we retry with aggressive mode that strips all ref data.
-                const shouldKeep = !aggressive && ref.data && ref.data.length < 500000;
-                return {
-                    ...ref,
-                    data: shouldKeep ? ref.data : ''
-                };
-            })
-        }))
+            referenceImages: stripReferenceImageData(pn.referenceImages, aggressive)
+        })),
+        workflow: c.workflow
+            ? {
+                ...c.workflow,
+                nodes: c.workflow.nodes.map(node => stripWorkflowNodeData(node, aggressive))
+            }
+            : c.workflow
     }));
 };
 
@@ -259,7 +307,7 @@ const normalizeRecoveredPromptNode = (
     };
 };
 
-const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => ({
+const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => syncCanvasCompatibility({
     ...canvas,
     promptNodes: (canvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, canvas.imageNodes || [])),
     groups: canvas.groups || [],
@@ -689,7 +737,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 if (imageMap.size > 0) {
                     setState(prev => ({
                         ...prev,
-                        canvases: prev.canvases.map(c => ({
+                        canvases: prev.canvases.map(c => syncCanvasCompatibility({
                             ...c,
                             imageNodes: c.imageNodes.map(img => {
                                 const storedUrl = imageMap.get(img.storageId || img.id);
@@ -941,7 +989,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (hasUpdates) {
                 setState(prev => ({
                     ...prev,
-                    canvases: prev.canvases.map(c => ({
+                    canvases: prev.canvases.map(c => syncCanvasCompatibility({
                         ...c,
                         imageNodes: c.imageNodes.map(img =>
                             urlMap.has(img.id) ? { ...img, url: urlMap.get(img.id)! } : img
@@ -1069,13 +1117,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (hasUpdates) {
                 setState(prev => ({
                     ...prev,
-                    canvases: prev.canvases.map(c => c.id === prev.activeCanvasId ? {
-                        ...c,
-                        promptNodes: c.promptNodes.map(pn => {
-                            const update = updates.find(u => u.nodeId === pn.id);
-                            return update ? { ...pn, referenceImages: update.refs } : pn;
+                    canvases: prev.canvases.map(c => c.id === prev.activeCanvasId
+                        ? syncCanvasCompatibility({
+                            ...c,
+                            promptNodes: c.promptNodes.map(pn => {
+                                const update = updates.find(u => u.nodeId === pn.id);
+                                return update ? { ...pn, referenceImages: update.refs } : pn;
+                            })
                         })
-                    } : c)
+                        : c)
                 }));
             }
         };
@@ -1112,6 +1162,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             imageNodes: [],
             groups: [] as CanvasGroup[],
             drawings: [] as CanvasDrawing[],
+            workflow: createCanvasWorkflow(),
             lastModified: Date.now()
         };
         urgentSaveRef.current = true; // 鏂板缓鍚庡己鍒剁珛鍗充繚瀛?
@@ -1221,7 +1272,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setState(prev => ({
             ...prev,
             canvases: prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? { ...updater(c), lastModified: Date.now() } : c
+                c.id === prev.activeCanvasId
+                    ? syncCanvasCompatibility({ ...updater(c), lastModified: Date.now() })
+                    : c
             ),
             // Maintain existing history structure when updating canvas content
             history: prev.history

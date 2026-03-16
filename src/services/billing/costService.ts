@@ -60,6 +60,24 @@ export interface UsageStats {
     cost?: number; // Explicit cost from provider
 }
 
+export interface ResolveImageCostOptions {
+    model: string;
+    imageSize?: ImageSize;
+    count?: number;
+    prompt?: string;
+    promptLength?: number;
+    referenceImageCount?: number;
+    keySlotId?: string;
+    explicitCost?: unknown;
+    storedCost?: unknown;
+}
+
+export interface ResolvedImageCost {
+    cost: number;
+    source: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
+    usedPricingSnapshot: boolean;
+}
+
 // --- Storage Keys ---
 const HISTORY_STORAGE_KEY = 'kk_studio_cost_history';
 const BUDGET_STORAGE_KEY = 'kk_studio_daily_budget';
@@ -74,6 +92,15 @@ let syncTimer: any = null;
 function getTodayString(): string {
     const now = new Date();
     return now.toISOString().split('T')[0];
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
 }
 
 function loadHistory(): CostHistory {
@@ -216,6 +243,69 @@ function getPreferredGroupKey(
     }
 
     return Object.keys(map).find((key) => ['default', 'Default', 'DEFAULT'].includes(key)) || Object.keys(map)[0];
+}
+
+export function hasPricingSnapshotForKeySlot(keySlotId?: string): boolean {
+    if (!keySlotId) return false;
+    return Boolean(keyManager.getProviderForKeySlot(keySlotId)?.pricingSnapshot);
+}
+
+export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImageCost {
+    const imageSize = options.imageSize || ImageSize.SIZE_1K;
+    const count = Math.max(1, Number(options.count || 1));
+    const promptLength = typeof options.promptLength === 'number'
+        ? Math.max(0, options.promptLength)
+        : String(options.prompt || '').length;
+    const referenceImageCount = Math.max(0, Number(options.referenceImageCount || 0));
+    const explicitCost = toFiniteNumber(options.explicitCost);
+    const storedCost = toFiniteNumber(options.storedCost);
+    const usedPricingSnapshot = hasPricingSnapshotForKeySlot(options.keySlotId);
+
+    const estimateCost = (): number | undefined => {
+        try {
+            const estimate = calculateCost(
+                options.model,
+                imageSize,
+                count,
+                promptLength,
+                referenceImageCount,
+                options.keySlotId
+            );
+            return estimate.cost;
+        } catch {
+            return undefined;
+        }
+    };
+
+    if (usedPricingSnapshot) {
+        const snapshotCost = estimateCost();
+        if (snapshotCost !== undefined && snapshotCost > 0) {
+            return { cost: snapshotCost, source: 'snapshot', usedPricingSnapshot };
+        }
+    }
+
+    if (explicitCost !== undefined && (explicitCost > 0 || !options.keySlotId)) {
+        return { cost: explicitCost, source: 'explicit', usedPricingSnapshot };
+    }
+
+    if (storedCost !== undefined && (storedCost > 0 || !options.keySlotId)) {
+        return { cost: storedCost, source: 'stored', usedPricingSnapshot };
+    }
+
+    const estimatedCost = estimateCost();
+    if (estimatedCost !== undefined && (estimatedCost > 0 || (explicitCost === undefined && storedCost === undefined))) {
+        return { cost: estimatedCost, source: 'estimated', usedPricingSnapshot };
+    }
+
+    if (explicitCost !== undefined) {
+        return { cost: explicitCost, source: 'explicit', usedPricingSnapshot };
+    }
+
+    if (storedCost !== undefined) {
+        return { cost: storedCost, source: 'stored', usedPricingSnapshot };
+    }
+
+    return { cost: 0, source: 'none', usedPricingSnapshot };
 }
 
 // --- Core Logic ---

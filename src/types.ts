@@ -355,6 +355,88 @@ export interface CanvasDrawing {
   type: 'pen' | 'marker';
 }
 
+export interface AgentWorkflowData {
+  instruction?: string;
+  outputNodeIds?: string[];
+  [key: string]: unknown;
+}
+
+export interface PreviewWorkflowData {
+  sourceNodeIds?: string[];
+  [key: string]: unknown;
+}
+
+export interface SaveWorkflowData {
+  destination?: 'local' | 'project' | 'export';
+  format?: string;
+  [key: string]: unknown;
+}
+
+export interface VideoInputWorkflowData {
+  sourceUrl?: string;
+  assetId?: string;
+  thumbnailUrl?: string;
+  [key: string]: unknown;
+}
+
+export interface VideoAnalyzeWorkflowData {
+  sourceNodeId?: string;
+  analysisType?: 'summary' | 'shots' | 'objects' | 'motion';
+  [key: string]: unknown;
+}
+
+export interface StoryboardWorkflowData {
+  sourceNodeId?: string;
+  frameCount?: number;
+  style?: string;
+  [key: string]: unknown;
+}
+
+export type PromptWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'prompt',
+  PromptNode
+>;
+export type ImageWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'image',
+  GeneratedImage
+>;
+export type AgentWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'agent',
+  AgentWorkflowData
+>;
+export type PreviewWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'preview',
+  PreviewWorkflowData
+>;
+export type SaveWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'save',
+  SaveWorkflowData
+>;
+export type VideoInputWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'video-input',
+  VideoInputWorkflowData
+>;
+export type VideoAnalyzeWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'video-analyze',
+  VideoAnalyzeWorkflowData
+>;
+export type StoryboardWorkflowNode = import('./workflow/types').WorkflowNodeBase<
+  'storyboard',
+  StoryboardWorkflowData
+>;
+
+export type WorkflowNode =
+  | PromptWorkflowNode
+  | ImageWorkflowNode
+  | AgentWorkflowNode
+  | PreviewWorkflowNode
+  | SaveWorkflowNode
+  | VideoInputWorkflowNode
+  | VideoAnalyzeWorkflowNode
+  | StoryboardWorkflowNode;
+
+export type CanvasWorkflow = import('./workflow/types').WorkflowGraph<WorkflowNode>;
+
 export interface Canvas {
   id: string;
   name: string;
@@ -363,6 +445,7 @@ export interface Canvas {
   imageNodes: GeneratedImage[];
   groups: CanvasGroup[];
   drawings: CanvasDrawing[];
+  workflow?: CanvasWorkflow;
   lastModified: number;
 }
 

@@ -1786,7 +1786,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             <ModeSwitcherStyles />
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible w-[calc(100vw-32px)] sm:w-[min(95vw,960px)] md:w-[min(93vw,1080px)] lg:w-[min(92vw,1200px)] ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible w-[calc(100vw-32px)] max-w-[700px] ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -2965,7 +2965,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                 <ImageOptionsPanel
                                                     aspectRatio={config.aspectRatio}
                                                     imageSize={config.imageSize}
-                                                    networkOptions={[
+                                                    networkOptions={isMobile ? [
                                                         ...(groundingSupported ? [{
                                                             id: 'grounding',
                                                             label: '联网搜索',
@@ -2978,7 +2978,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             active: !!config.enableImageSearch,
                                                             onToggle: () => setConfig(prev => ({ ...prev, enableImageSearch: !prev.enableImageSearch })),
                                                         }] : []),
-                                                    ]}
+                                                    ] : []}
                                                     showThinkingMode={thinkingSupported}
                                                     thinkingMode={config.thinkingMode || 'minimal'}
                                                     onThinkingModeChange={(mode) => setConfig(prev => ({ ...prev, thinkingMode: mode }))}

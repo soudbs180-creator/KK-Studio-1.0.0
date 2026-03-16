@@ -16,6 +16,8 @@ export enum ImageQuality {
     ORIGINAL = 'original'   // 原图：完整尺寸，用于灯箱放大（>150%缩放）
 }
 
+export type ImageQualityBias = 'default' | 'thumbnail-preferred' | 'micro-only';
+
 export interface QualityConfig {
     maxSize: number;      // 最大边长
     quality: number;      // JPEG质量 0-1
@@ -59,7 +61,21 @@ export const QUALITY_CONFIGS: Record<ImageQuality, QualityConfig> = {
  *   ⚠️ [Fix] 之前 1.0-1.5 使用 PREVIEW 但 PREVIEW 被映射为 MICRO，导致 150% 缩放时模糊。
  *   现在降低 ORIGINAL 阈值到 0.8，确保正常查看(1.0)和放大查看(>1.0)都必须清晰。
  */
-export function getAppropriateQuality(scale: number): ImageQuality {
+export function getAppropriateQuality(
+    scale: number,
+    bias: ImageQualityBias = 'default'
+): ImageQuality {
+    if (bias === 'micro-only') {
+        return ImageQuality.MICRO;
+    }
+
+    if (bias === 'thumbnail-preferred') {
+        if (scale < 0.35) {
+            return ImageQuality.MICRO;
+        }
+        return ImageQuality.THUMBNAIL;
+    }
+
     if (scale < 0.5) {
         // 全局查看（缩小很多）→ 微缩图
         return ImageQuality.MICRO;

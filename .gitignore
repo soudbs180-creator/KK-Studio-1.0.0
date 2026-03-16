@@ -63,6 +63,7 @@ settings-panel-current.png
 
 # Local release artifacts
 release/
+workspace/
 
 # Payment sidecar local files
 payment-server/.env

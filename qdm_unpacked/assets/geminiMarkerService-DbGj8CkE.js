@@ -1,1 +1,0 @@
-import"./critical-features-BRmAK35m.js";import"./react-vendor-BdR1mPDY.js";import"./jszip-CXr7zspi.js";import"./vendor-DXn3GjvW.js";import"./icons-JEGxNKJM.js";function r(r,apiKey){}export{r as initGeminiMarkerService};
