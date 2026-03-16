@@ -1,10 +1,10 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { GeneratedImage, GenerationMode } from '../../types';
-import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
 import { InpaintModal } from './InpaintModal';
 import { notify } from '../../services/system/notificationService';
-import { writeTextToClipboard } from '../../utils/clipboard';
+import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -30,6 +30,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [isPanning, setIsPanning] = useState(false);
     const [showInpaint, setShowInpaint] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     // 锲剧墖锷犺浇钟舵€?
     const [displaySrc, setDisplaySrc] = useState<string | null>(null);
@@ -37,6 +40,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [hasError, setHasError] = useState(false);
     const triedSourcesRef = useRef<Set<string>>(new Set());
     const recoveringRef = useRef(false);
+    const displaySrcRef = useRef<string | null>(null);
+    const managedObjectUrlRef = useRef<string | null>(null);
+    const sourceSessionRef = useRef(0);
 
     const image = images[currentIndex];
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
@@ -72,26 +78,116 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return `https://corsproxy.io/?${encodeURIComponent(url)}`;
     }, []);
 
-    const trySwitchSource = useCallback((candidate: string | null | undefined): boolean => {
+    const releaseManagedObjectUrl = useCallback((nextUrl?: string | null) => {
+        const currentManagedUrl = managedObjectUrlRef.current;
+        if (currentManagedUrl && currentManagedUrl !== nextUrl) {
+            URL.revokeObjectURL(currentManagedUrl);
+            managedObjectUrlRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        displaySrcRef.current = displaySrc;
+    }, [displaySrc]);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            releaseManagedObjectUrl();
+        };
+    }, [releaseManagedObjectUrl]);
+
+    const applyDisplaySource = useCallback((nextSrc: string | null, options?: { loading?: boolean; managed?: boolean }) => {
+        releaseManagedObjectUrl(nextSrc);
+        if (options?.managed && nextSrc?.startsWith('blob:')) {
+            managedObjectUrlRef.current = nextSrc;
+        }
+        displaySrcRef.current = nextSrc;
+        setDisplaySrc(nextSrc);
+        if (typeof options?.loading === 'boolean') {
+            setIsLoading(options.loading);
+        }
+    }, [releaseManagedObjectUrl]);
+
+    const fetchSourceBlob = useCallback(async (candidate: string): Promise<Blob | null> => {
+        const normalized = sanitizeUrl(candidate);
+        if (!normalized) return null;
+
+        const requestUrls = /^https?:\/\//i.test(normalized) && !normalized.includes('corsproxy.io/?')
+            ? [normalized, toProxyUrl(normalized)]
+            : [normalized];
+
+        for (const requestUrl of requestUrls) {
+            try {
+                const response = await fetch(requestUrl);
+                if (!response.ok) continue;
+
+                const blob = await response.blob();
+                if (blob.size > 0) {
+                    return blob;
+                }
+            } catch {
+                // ignore and continue fallback chain
+            }
+        }
+
+        return null;
+    }, [sanitizeUrl, toProxyUrl]);
+
+    const materializeDisplaySource = useCallback(async (candidate: string): Promise<{ src: string; managed: boolean }> => {
+        const normalized = sanitizeUrl(candidate);
+        if (!normalized) {
+            throw new Error('INVALID_LIGHTBOX_SOURCE');
+        }
+
+        if (!/^https?:\/\//i.test(normalized)) {
+            return { src: normalized, managed: false };
+        }
+
+        const blob = await fetchSourceBlob(normalized);
+        if (!blob) {
+            return { src: normalized, managed: false };
+        }
+
+        return {
+            src: URL.createObjectURL(blob),
+            managed: true,
+        };
+    }, [fetchSourceBlob, sanitizeUrl]);
+
+    const trySwitchSource = useCallback(async (candidate: string | null | undefined, sessionId: number = sourceSessionRef.current): Promise<boolean> => {
         if (!candidate) return false;
         const normalized = sanitizeUrl(candidate);
         if (!normalized) return false;
-        if (normalized === displaySrc) return false;
+        if (normalized === sanitizeUrl(displaySrcRef.current)) return false;
         if (triedSourcesRef.current.has(normalized)) return false;
 
         triedSourcesRef.current.add(normalized);
-        setDisplaySrc(normalized);
+        const { src, managed } = await materializeDisplaySource(normalized);
+        if (sessionId !== sourceSessionRef.current) {
+            if (managed && src.startsWith('blob:')) {
+                URL.revokeObjectURL(src);
+            }
+            return false;
+        }
+        const nextIsVideo = image.mode === GenerationMode.VIDEO || src.startsWith('data:video') || src.endsWith('.mp4');
+        const nextIsAudio = image.mode === GenerationMode.AUDIO || src.endsWith('.mp3') || src.endsWith('.wav');
+        applyDisplaySource(src, { managed, loading: !(nextIsVideo || nextIsAudio) });
         setHasError(false);
-        setIsLoading(false);
         return true;
-    }, [displaySrc, sanitizeUrl]);
+    }, [applyDisplaySource, image.mode, materializeDisplaySource, sanitizeUrl]);
 
     const recoverLightboxSource = useCallback(async () => {
         if (recoveringRef.current) return;
         recoveringRef.current = true;
 
         try {
-            const current = sanitizeUrl(displaySrc || image.originalUrl || image.url || null);
+            const current = sanitizeUrl(displaySrcRef.current || image.originalUrl || image.url || null);
             if (current) {
                 triedSourcesRef.current.add(current);
             }
@@ -102,29 +198,27 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             for (const key of keyCandidates) {
                 try {
                     const original = await getStrictOriginalImage(key);
-                    if (trySwitchSource(original)) return;
+                    if (await trySwitchSource(original)) return;
                 } catch {
                     // ignore
                 }
 
                 try {
                     const cached = await getImage(key);
-                    if (trySwitchSource(cached)) return;
+                    if (await trySwitchSource(cached)) return;
                 } catch {
                     // ignore
                 }
             }
 
-            const remoteCandidates = Array.from(new Set(
-                [displaySrc, image.originalUrl, image.url]
+            const fallbackCandidates = Array.from(new Set(
+                [displaySrcRef.current, image.originalUrl, image.url]
                     .map((u) => sanitizeUrl(u || null))
-                    .filter((u): u is string => !!u && /^https?:\/\//i.test(u))
+                    .filter((u): u is string => !!u)
             ));
 
-            for (const remoteUrl of remoteCandidates) {
-                if (!remoteUrl.includes('corsproxy.io/?')) {
-                    if (trySwitchSource(toProxyUrl(remoteUrl))) return;
-                }
+            for (const source of fallbackCandidates) {
+                if (await trySwitchSource(source)) return;
             }
 
             setHasError(true);
@@ -132,22 +226,61 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         } finally {
             recoveringRef.current = false;
         }
-    }, [displaySrc, image.id, image.storageId, image.url, image.originalUrl, sanitizeUrl, toProxyUrl, trySwitchSource]);
+    }, [image.id, image.storageId, image.url, image.originalUrl, sanitizeUrl, trySwitchSource]);
+
+    const resolveOriginalBlob = useCallback(async (): Promise<Blob | null> => {
+        const { getStrictOriginalImage, getImage } = await import('../../services/storage/imageStorage');
+        const keyCandidates = Array.from(new Set([image.storageId, image.id].filter(Boolean) as string[]));
+
+        for (const key of keyCandidates) {
+            try {
+                const original = await getStrictOriginalImage(key);
+                if (original) {
+                    const blob = await fetchSourceBlob(original);
+                    if (blob) return blob;
+                }
+            } catch {
+                // ignore
+            }
+
+            try {
+                const cached = await getImage(key);
+                if (cached) {
+                    const blob = await fetchSourceBlob(cached);
+                    if (blob) return blob;
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        const fallbackCandidates = [image.originalUrl, displaySrcRef.current, image.url]
+            .map((value) => sanitizeUrl(value || null))
+            .filter((value): value is string => !!value);
+
+        for (const candidate of fallbackCandidates) {
+            const blob = await fetchSourceBlob(candidate);
+            if (blob) return blob;
+        }
+
+        return null;
+    }, [fetchSourceBlob, image.id, image.originalUrl, image.storageId, image.url, sanitizeUrl]);
 
     // 1. 加载原图链路（可显示优先，失败回退）
     useEffect(() => {
         let active = true;
+        const sessionId = sourceSessionRef.current + 1;
+        sourceSessionRef.current = sessionId;
         setHasError(false);
         triedSourcesRef.current.clear();
         recoveringRef.current = false;
         setRealDimensions(null);
         setZoom(1);
         setPan({ x: 0, y: 0 });
+        applyDisplaySource(null, { loading: true });
 
         const initialOriginalHint = sanitizeUrl(image.originalUrl || null);
         const initialFallbackSrc = sanitizeUrl(image.url || null);
-        setDisplaySrc(initialOriginalHint || null);
-        setIsLoading(true);
 
         const loadContent = async () => {
             try {
@@ -171,21 +304,19 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 if (!active) return;
 
                 if (original) {
-                    const cleanOriginal = sanitizeUrl(original);
-                    if (cleanOriginal !== initialOriginalHint) {
-                        setDisplaySrc(cleanOriginal);
-                        console.log('[Lightbox] upgraded to original source');
+                    if (await trySwitchSource(original, sessionId)) {
+                        if (sanitizeUrl(original) !== initialOriginalHint) {
+                            console.log('[Lightbox] upgraded to original source');
+                        }
+                        return;
                     }
-                    setIsLoading(false);
-                    return;
                 }
 
                 const bestAvailableSrc = initialOriginalHint || initialFallbackSrc;
                 if (!bestAvailableSrc) {
                     await recoverLightboxSource();
                 } else {
-                    setDisplaySrc(bestAvailableSrc);
-                    setIsLoading(false);
+                    await trySwitchSource(bestAvailableSrc, sessionId);
                 }
             } catch (e) {
                 console.error('[Lightbox] loadContent error:', e);
@@ -194,15 +325,14 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 if (!bestAvailableSrc) {
                     await recoverLightboxSource();
                 } else {
-                    setDisplaySrc(bestAvailableSrc);
-                    setIsLoading(false);
+                    await trySwitchSource(bestAvailableSrc, sessionId);
                 }
             }
         };
 
         void loadContent();
         return () => { active = false; };
-    }, [image]);
+    }, [applyDisplaySource, image, recoverLightboxSource, sanitizeUrl, trySwitchSource]);
 
     // 2. 浜嬩欢𬭼戝惉 (阌洏鎺у埗)
     useEffect(() => {
@@ -338,6 +468,23 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         void handleSingleDownload(e);
     };
 
+    const handleCopyOriginal = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        try {
+            const blob = await resolveOriginalBlob();
+            if (!blob) {
+                throw new Error('ORIGINAL_BLOB_UNAVAILABLE');
+            }
+
+            await writeImageToClipboard(blob);
+            notify.success('已复制', '原图已复制到剪贴板');
+        } catch (error) {
+            console.error('[Lightbox] copy original failed:', error);
+            notify.warning('复制失败', '当前环境无法直接复制原图，请改用下载。');
+        }
+    };
+
     // 6. 阒叉鍙屽向杩囧揩瀵艰𠰷镄勮瑙﹀叧闂?(600ms瀹夊叏链?- 鏀寔鎱㈤€熷弻鍑?
     const [isReady, setIsReady] = useState(false);
     useEffect(() => {
@@ -384,23 +531,32 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
     const isVideo = image.mode === GenerationMode.VIDEO || displaySrc?.startsWith('data:video') || displaySrc?.endsWith('.mp4');
     const isAudio = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
+    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
+    const iconActionButtonClass = 'shrink-0 inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-3 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
 
     return ReactDOM.createPortal(
         <div
-            className="fixed inset-0 z-[99999] bg-black/95 flex flex-col items-center justify-center animate-fadeIn select-none overflow-hidden"
+            className="fixed inset-0 z-[99999] flex flex-col bg-black/95 animate-fadeIn select-none overflow-hidden"
             onClick={handleBackgroundClick}
+            style={isMobile ? {
+                paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
+                paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
+            } : undefined}
         >
             {/* 椤舵爮: 鍏抽棴镌夐挳 */}
             <button
                 onClick={onClose}
-                className="absolute top-4 right-4 z-50 p-2 bg-white/10 hover:opacity-80 rounded-full text-white transition-opacity"
+                className="absolute z-50 rounded-full bg-white/10 p-2 text-white transition-opacity hover:opacity-80"
+                style={isMobile
+                    ? { top: 'max(12px, env(safe-area-inset-top, 0px))', right: 12 }
+                    : { top: 16, right: 16 }}
                 title="关闭"
             >
                 <X size={24} />
             </button>
 
             {/* 瀵艰埅鍖哄烟 (闅愬舰鎴栧井寮辨彁绀? */}
-            {images.length > 1 && (
+            {!isMobile && images.length > 1 && (
                 <>
                     <div
                         className="absolute left-0 top-0 bottom-0 w-[15%] z-40 flex items-center justify-start pl-4 cursor-pointer transition-colors group"
@@ -427,14 +583,17 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             {/* 涓诲唴瀹瑰尯锘?*/}
             {/* 楂桦害闄愬埗: 100vh - 100px (搴曢儴镙? */}
             <div
-                className="relative flex-1 w-full h-[calc(100vh-100px)] flex items-center justify-center overflow-hidden"
+                className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
                 onWheel={handleWheel}
                 onClick={(e) => e.stopPropagation()} // 阒叉镣瑰向鐢诲竷鍏抽棴
+                style={isMobile
+                    ? { padding: '56px 12px 8px' }
+                    : { padding: '24px 32px 16px' }}
             >
-                {isLoading ? (
+                {!displaySrc && isLoading ? (
                     <div className="text-white">加载中...</div>
-                ) : isAudio ? (
-                    <div className="flex flex-col items-center justify-center gap-6">
+                ) : displaySrc && isAudio ? (
+                    <div className="flex w-full max-w-[320px] flex-col items-center justify-center gap-6">
                         <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-400/60">
                             <path d="M9 18V5l12-2v13" />
                             <circle cx="6" cy="18" r="3" />
@@ -444,12 +603,12 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             src={displaySrc!}
                             controls
                             autoPlay
-                            className="w-80"
+                            className="w-full"
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                         />
                     </div>
-                ) : isVideo ? (
+                ) : displaySrc && isVideo ? (
                     <div
                         className="max-w-full max-h-full flex items-center justify-center"
                         style={{
@@ -477,17 +636,23 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             }}
                         />
                     </div>
-                ) : (
+                ) : displaySrc ? (
                     <img
                         src={displaySrc!}
                         alt={image.prompt}
                         referrerPolicy="strict-origin-when-cross-origin"
-                        className={`max-w-full max-h-full object-contain transition-transform duration-100 ${!displaySrc || hasError ? 'opacity-0' : ''}`}
+                        className={`max-w-full max-h-full object-contain transition-transform duration-100 ${!displaySrc || hasError || isLoading ? 'opacity-0 pointer-events-none' : ''}`}
                         draggable={false}
                         onLoad={handleImageLoad} // 馃殌 [Fix] Capture real dimensions
                         onMouseDown={handleMouseDown}
                         onDoubleClick={(e) => { e.preventDefault(); onClose(); }}
-                        onContextMenu={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                            if (isLoading) {
+                                e.preventDefault();
+                                return;
+                            }
+                            e.stopPropagation();
+                        }}
                         onError={() => {
                             void recoverLightboxSource();
                         }}
@@ -496,6 +661,13 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             cursor: isPanning ? 'grabbing' : 'grab'
                         }}
                     />
+                ) : null}
+                {displaySrc && isLoading && !hasError && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="rounded-full bg-black/50 px-4 py-2 text-sm text-white">
+                            加载原图...
+                        </div>
+                    </div>
                 )}
                 {/* Error Fallback */}
                 {hasError && (
@@ -511,7 +683,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             {/* 搴曢儴淇℃伅闱㈡澘 */}
             {/* 锲哄畾楂桦害锛屼綅浜庡浘鐗囦笅鏂癸纴阒叉阆尅 */}
             <div
-                className="min-h-[100px] w-full bg-[var(--bg-secondary)]/90 border-t border-[var(--border-light)] grid grid-cols-1 gap-4 px-4 py-4 sm:min-h-[100px] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8 z-50 text-[var(--text-primary)]"
+                className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex min-w-0 flex-col text-left justify-center">
@@ -542,9 +714,19 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     </div>
                 </div>
 
-                <div className="flex w-full items-center justify-end gap-2 self-center sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3">
+                <div className={`mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
+                    {isMobile && images.length > 1 && (
+                        <>
+                            <button onClick={handlePrev} className={iconActionButtonClass} title="上一张">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button onClick={handleNext} className={iconActionButtonClass} title="下一张">
+                                <ChevronRight size={16} />
+                            </button>
+                        </>
+                    )}
                     {/* 鎺у埗镙?*/}
-                    <div className="flex items-center bg-[var(--bg-tertiary)] rounded-lg p-1">
+                    <div className="flex shrink-0 items-center rounded-lg bg-[var(--bg-tertiary)] p-1">
                         <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="缩小"><ZoomOut size={16} /></button>
                         <span className="w-12 text-center text-xs">{Math.round(zoom * 100)}%</span>
                         <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="放大"><ZoomIn size={16} /></button>
@@ -558,7 +740,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                 e.stopPropagation();
                                 setShowInpaint(true);
                             }}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-purple-600/80 border border-[var(--border-medium)] hover:border-purple-500 rounded-lg text-sm font-medium transition-all"
+                            className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
                             title="局部重绘"
                         >
                             <Pen size={16} />
@@ -572,7 +754,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                 e.stopPropagation();
                                 onEditPptDeck(image);
                             }}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-emerald-600/80 border border-[var(--border-medium)] hover:border-emerald-500 rounded-lg text-sm font-medium transition-all"
+                            className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
                             title="Edit layered deck"
                         >
                             <Pen size={16} />
@@ -586,7 +768,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                 e.stopPropagation();
                                 onEditText(image);
                             }}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-sky-600/80 border border-[var(--border-medium)] hover:border-sky-500 rounded-lg text-sm font-medium transition-all"
+                            className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
                             title="编辑当前页文字"
                         >
                             <Pen size={16} />
@@ -594,10 +776,21 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         </button>
                     )}
 
+                    {!isVideo && !isAudio && (
+                        <button
+                            onClick={handleCopyOriginal}
+                            className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
+                            title="复制原图"
+                        >
+                            <Copy size={16} />
+                            复制
+                        </button>
+                    )}
+
                     <div className="relative" ref={downloadMenuRef}>
                         <button
                             onClick={handleDownload}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+                            className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-indigo-500"
                             title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
                         >
                             <Download size={16} />

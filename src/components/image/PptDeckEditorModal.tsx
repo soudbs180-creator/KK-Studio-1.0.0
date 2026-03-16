@@ -61,6 +61,9 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   onSave,
 }) => {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [pages, setPages] = useState<PptEditablePage[]>(() => (
     clonePptEditablePages(buildPptEditablePages(promptNode, images))
   ));
@@ -72,6 +75,12 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   useEffect(() => {
     setActiveIndex(Math.max(0, Math.min(initialIndex, Math.max(0, pages.length - 1))));
   }, [initialIndex, pages.length]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -206,12 +215,21 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   };
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      style={isMobile ? {
+        paddingTop: 'max(8px, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
+        paddingLeft: '8px',
+        paddingRight: '8px',
+      } : undefined}
+    >
       <div
-        className="absolute inset-[4%] overflow-hidden rounded-3xl border border-white/10 bg-[#0f172a] text-white shadow-2xl"
+        className={`overflow-hidden border border-white/10 bg-[#0f172a] text-white shadow-2xl ${isMobile ? 'h-full rounded-[24px]' : 'absolute inset-[4%] rounded-3xl'}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className={`flex items-center justify-between border-b border-white/10 ${isMobile ? 'px-4 py-3' : 'px-6 py-4'}`}>
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-sky-500/15 p-2 text-sky-300">
               <Layers3 size={18} />
@@ -241,7 +259,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
           </div>
         </div>
 
-        <div className="grid h-[calc(100%-73px)] grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className={`grid min-h-0 ${isMobile ? 'h-[calc(100%-65px)] grid-cols-1' : 'h-[calc(100%-73px)] grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
           <aside className="overflow-y-auto border-b border-white/10 bg-white/[0.03] p-4 xl:border-b-0 xl:border-r">
             <div className="mb-3 text-xs uppercase tracking-[0.16em] text-white/45">
               Slides
@@ -279,7 +297,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
             </div>
           </aside>
 
-          <section className="grid h-full grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_360px]">
+          <section className={`grid h-full grid-cols-1 ${isMobile ? '' : '2xl:grid-cols-[minmax(0,1.15fr)_360px]'}`}>
             <div className="overflow-y-auto p-6">
               {activePage ? (
                 <>

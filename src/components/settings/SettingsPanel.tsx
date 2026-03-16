@@ -1504,9 +1504,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span className="settings-sidebar-item__icon">
                   <Icon size={16} />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className="settings-sidebar-item__desc mt-1 block text-xs leading-5">{item.description}</span>
+                <span className="settings-sidebar-item__body">
+                  <span className="settings-sidebar-item__label">{item.label}</span>
+                  <span className="settings-sidebar-item__desc">{item.description}</span>
                 </span>
                 <ChevronRight size={15} className="settings-sidebar-item__arrow" />
               </button>
@@ -1519,19 +1519,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div
-      className={`settings-panel settings-shell-backdrop fixed inset-0 z-[10001] flex justify-center ${isMobile ? 'items-end px-2 pb-0 pt-8' : 'items-center px-3 py-3'}`}
+      className={`settings-panel settings-shell-backdrop fixed inset-0 z-[10001] flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-3'}`}
       onClick={onClose}
     >
       {isMobile ? (
         <div
-          className="settings-panel apple-glass-card settings-shell-mobile flex h-[min(100dvh,100svh)] max-h-[min(100dvh,100svh)] w-full flex-col overflow-hidden rounded-t-[30px] rounded-b-none ios-mobile-sheet shadow-2xl"
+          className="settings-panel apple-glass-card settings-shell-mobile mobile-sheet-viewport mobile-sheet-viewport--fill flex w-full flex-col overflow-hidden rounded-t-[30px] rounded-b-none ios-mobile-sheet shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="settings-shell-mobile__handle">
             <span />
           </div>
 
-          <div className="settings-shell-mobile__topbar">
+          <div className="settings-shell-mobile__topbar mobile-sheet-header-safe">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               {!mobileShowNav ? (
                 <button
@@ -1571,7 +1571,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </label>
               </div>
-              <main className="settings-shell-page settings-shell-page--mobile h-full overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
+              <main className="settings-shell-page settings-shell-page--mobile mobile-sheet-scroll h-full px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
                 <div className="settings-shell-content space-y-4">
                   <div className="rounded-[20px] border p-4" style={SETTINGS_PANEL_STYLE}>
                     <div className="flex items-center justify-between gap-3">
@@ -1592,7 +1592,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </section>
           ) : (
             <section className="settings-shell-main min-h-0 flex-1 overflow-hidden">
-              <main className="settings-shell-page settings-shell-page--mobile h-full overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-4">
+              <main className="settings-shell-page settings-shell-page--mobile mobile-sheet-scroll h-full px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-4">
                 {renderBody()}
               </main>
             </section>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { PromptNode, CanvasGroup } from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers, Hash } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -21,16 +21,19 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
-    const lastClickedIndexRef = useRef<number>(-1); // 🚀 记录上次点击位置用于Shift区间选择
+    const lastClickedIndexRef = useRef<number>(-1); // 馃殌 璁板綍涓婃鐐瑰嚮浣嶇疆鐢ㄤ簬Shift鍖洪棿閫夋嫨
 
     // Normalize query
     const lowerQuery = query.toLowerCase();
 
     // Filter results
-    // 🚀 Sorting Logic: Tag Match > Recency
+    // 馃殌 Sorting Logic: Tag Match > Recency
     const nodeResults: SearchResultItem[] = (() => {
         const matching = promptNodes.filter(node =>
             node.prompt.toLowerCase().includes(lowerQuery) ||
@@ -68,6 +71,12 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
             setTimeout(() => inputRef.current?.focus(), 50);
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     // Keyboard navigation
     useEffect(() => {
@@ -159,13 +168,13 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm animate-fadeIn">
+        <div className={`fixed inset-0 z-[100] flex justify-center bg-black/60 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}>
             {/* Click outside to close */}
             <div className="absolute inset-0" onClick={onClose} />
 
-            <div className="relative w-full max-w-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl shadow-2xl overflow-hidden animate-slideDown flex flex-col max-h-[60vh]">
+            <div className={`relative w-full bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-2xl overflow-hidden animate-slideDown flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'max-w-2xl rounded-xl max-h-[60vh]'}`}>
                 {/* Search Header */}
-                <div className="flex items-center px-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                <div className={`flex items-center px-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)] ${isMobile ? 'mobile-sheet-header-safe' : ''}`}>
                     <Search className="text-[var(--text-tertiary)] w-5 h-5 mr-3" />
                     <input
                         ref={inputRef}
@@ -175,7 +184,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             setQuery(e.target.value);
                             setSelectedIndex(0);
                         }}
-                        placeholder={isMultiSelectMode ? "多选模式: 点击选择多个，按 Ctrl+Enter 确认整理" : "搜索提示词、标签或编组..."}
+                        placeholder={isMultiSelectMode ? "澶氶€夋ā寮? 鐐瑰嚮閫夋嫨澶氫釜锛屾寜 Ctrl+Enter 纭鏁寸悊" : "鎼滅储鎻愮ず璇嶃€佹爣绛炬垨缂栫粍..."}
                         className="flex-1 bg-transparent border-none py-4 text-lg focus:outline-none transition-all"
                         style={{
                             color: 'var(--text-primary)',
@@ -196,9 +205,9 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                         className={`mr-2 px-2 py-1 rounded text-xs font-medium border transition-colors ${isMultiSelectMode
                             ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50'
                             : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:bg-[var(--toolbar-hover)]'}`}
-                        title="多选模式 (Ctrl+M)"
+                        title="澶氶€夋ā寮?(Ctrl+M)"
                     >
-                        {isMultiSelectMode ? '多选开启' : '多选'}
+                        {isMultiSelectMode ? '多选已开启' : '多选'}
                     </button>
 
                     <button
@@ -212,11 +221,11 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                 {/* Results List */}
                 <div
                     ref={listRef}
-                    className="overflow-y-auto custom-scrollbar flex-1 p-2"
+                    className={`custom-scrollbar flex-1 p-2 ${isMobile ? 'mobile-sheet-scroll' : 'overflow-y-auto'}`}
                 >
                     {results.length === 0 ? (
                         <div className="py-12 text-center text-[var(--text-tertiary)]">
-                            {query ? '未找到相关内容' : '输入关键词搜索...'}
+                            {query ? '未找到相关内容' : '输入关键词开始搜索...'}
                         </div>
                     ) : (
                         results.map((item, index) => {
@@ -228,7 +237,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                 <div
                                     key={item.data.id}
                                     onClick={(e) => {
-                                        // 🚀 Implicit Multi-Select Logic
+                                        // 馃殌 Implicit Multi-Select Logic
                                         const isModifierHeld = e.shiftKey || e.ctrlKey || e.metaKey;
 
                                         if (isMultiSelectMode || isModifierHeld) {
@@ -277,7 +286,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-400' : 'text-[var(--text-primary)]'}`}>
-                                            {item.type === 'group' ? (item.data.label || '未命名编组') : item.data.prompt}
+                                            {item.type === 'group' ? (item.data.label || '未命名分组') : item.data.prompt}
                                         </div>
 
                                         {item.type === 'node' && (
@@ -313,7 +322,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
                                         {isGroup && (
                                             <div className="text-xs text-[var(--text-tertiary)] mt-1">
-                                                包含了区域内的节点
+                                                鍖呭惈浜嗗尯鍩熷唴鐨勮妭鐐?
                                             </div>
                                         )}
                                     </div>
@@ -327,37 +336,39 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                 </div>
 
                 {/* Footer Tips */}
-                <div className="px-4 py-2 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
-                    <div className="flex gap-4">
+                <div className={`px-4 py-2 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] text-[var(--text-tertiary)] ${isMobile ? 'mobile-sheet-footer-safe' : ''}`}>
+                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between gap-4'}`}>
+                        <div className="flex flex-wrap gap-4">
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">↑↓</kbd> 导航
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">鈫戔啌</kbd> 瀵艰埅
                         </span>
                         {isMultiSelectMode ? (
                             <>
                                 <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Shift+点击</kbd> 区间选择
+                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Shift+鐐瑰嚮</kbd> 鍖洪棿閫夋嫨
                                 </span>
                                 <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
+                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Ctrl+Enter</kbd> 纭鏁寸悊 ({multiSelectedIds.size})
                                 </span>
                             </>
                         ) : (
                             <span className="flex items-center gap-1">
-                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Enter</kbd> 定位
+                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Enter</kbd> 瀹氫綅
                             </span>
                         )}
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 切换多选
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 鍒囨崲澶氶€?
                         </span>
+                        </div>
+                        <span className={isMobile ? 'text-right' : ''}>{results.length} 个结果</span>
                     </div>
-                    <span>{results.length} 个结果</span>
                 </div>
             </div>
 
             {/* Multi-Select Floating Confirmation */}
             {isMultiSelectMode && multiSelectedIds.size > 0 && (
                 <div className="absolute bottom-20 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 animate-bounce-in cursor-pointer hover:bg-indigo-500" onClick={handleConfirmMultiSelect}>
-                    <span>已选择 {multiSelectedIds.size} 项，点击整理</span>
+                    <span>宸查€夋嫨 {multiSelectedIds.size} 椤癸紝鐐瑰嚮鏁寸悊</span>
                     <CornerDownLeft size={14} />
                 </div>
             )}

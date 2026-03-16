@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FolderOpen, Globe, HardDrive, Loader2, Shield, Zap } from 'lucide-react';
 import { getLocalFolderHandle, isFileSystemAccessSupported, setStorageMode, type StorageMode } from '../../services/storage/storagePreference';
 import { useCanvas } from '../../context/CanvasContext';
@@ -29,8 +29,17 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
   const [selectingLocal, setSelectingLocal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
 
   const supportsLocal = isFileSystemAccessSupported();
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -85,12 +94,12 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/70 px-4 py-4 backdrop-blur-sm">
+    <div className={`fixed inset-0 z-[3000] flex justify-center bg-black/70 backdrop-blur-sm ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}>
       <div
-        className="w-full max-w-[640px] rounded-3xl border p-6 shadow-2xl"
+        className={`w-full border shadow-2xl ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none' : 'max-w-[640px] rounded-3xl p-6'}`}
         style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-light)' }}
       >
-        <div className="mb-5 text-center">
+        <div className={`${isMobile ? 'mobile-sheet-header-safe px-4 pb-4 pt-4 text-center' : 'mb-5 text-center'}`}>
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/20">
             <HardDrive size={24} />
           </div>
@@ -102,6 +111,7 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           </p>
         </div>
 
+        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-4' : ''}`}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <button
             onClick={() => void chooseBrowser()}
@@ -200,7 +210,9 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           </div>
         )}
 
-        <div className="mt-5 flex items-center justify-end gap-2">
+        </div>
+
+        <div className={`flex items-center justify-end gap-2 ${isMobile ? 'mobile-sheet-footer-safe px-4 pb-4 pt-3' : 'mt-5'}`}>
           <button
             onClick={handleConfirm}
             disabled={selectingLocal || saving}

@@ -368,6 +368,18 @@ const FormSelect: React.FC<{
   </div>
 );
 
+const ActionButtonIcon: React.FC<{
+  children: React.ReactNode;
+  compact?: boolean;
+}> = ({ children, compact = false }) => (
+  <span
+    aria-hidden="true"
+    className={`settings-button-icon-slot ${compact ? 'settings-button-icon-slot--sm' : ''}`.trim()}
+  >
+    {children}
+  </span>
+);
+
 const StatusBadge: React.FC<{
   label: string;
   tone: StatusTone;
@@ -375,7 +387,7 @@ const StatusBadge: React.FC<{
   compact?: boolean;
 }> = ({ label, tone, helper, compact = false }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-full border font-medium text-left leading-[1.35] ${compact ? 'px-2.5 py-1 text-[11px] sm:whitespace-nowrap' : 'px-3 py-1.5 text-xs'}`}
+    className={`api-settings-status-badge inline-flex max-w-full min-w-0 gap-1 rounded-full border font-medium text-left leading-[1.35] ${compact ? 'items-center px-2.5 py-1 text-[11px] sm:whitespace-nowrap' : 'flex-wrap items-start px-3 py-1.5 text-xs'}`}
     style={statusToneStyles[tone]}
   >
     <span>{label}</span>
@@ -866,26 +878,38 @@ const ApiSettingsModal: React.FC<{
   title?: string;
   subtitle?: string;
 }> = ({ children, onClose, title, subtitle }) => {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10020] flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-5 backdrop-blur-md sm:px-6 sm:py-6"
+      className={`fixed inset-0 z-[10020] flex justify-center overflow-y-auto bg-black/60 backdrop-blur-md ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-5 sm:px-6 sm:py-6'}`}
       onClick={onClose}
     >
       <div
-        className="flex min-h-0 w-full max-w-[920px] flex-col overflow-hidden rounded-[28px] border"
+        className={`flex min-h-0 w-full flex-col overflow-hidden border ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[28px] rounded-b-none' : 'max-w-[920px] rounded-[28px]'}`}
         style={{
           borderColor: 'var(--settings-border-subtle)',
           background: 'linear-gradient(180deg, var(--settings-section-bg) 0%, var(--settings-surface-elevated) 100%)',
           boxShadow: 'var(--settings-shell-shadow), var(--settings-inset-shadow)',
-          maxHeight: 'calc(100vh - 24px)',
+          maxHeight: isMobile
+            ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+            : 'calc(100vh - 24px)',
         }}
         onClick={(event) => event.stopPropagation()}
       >
         {(title || subtitle) && (
           <div
-            className="flex items-start justify-between border-b p-5 sm:p-6"
+            className={`flex items-start justify-between border-b ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-5 sm:p-6'}`}
             style={{
               borderColor: 'var(--settings-border-subtle)',
               backgroundColor: 'var(--settings-shell-header-bg)',
@@ -904,7 +928,7 @@ const ApiSettingsModal: React.FC<{
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-6 sm:p-6 sm:pb-7">
+        <div className={`min-h-0 flex-1 ${isMobile ? 'mobile-sheet-scroll p-4 pb-6' : 'overflow-y-auto p-5 pb-6 sm:p-6 sm:pb-7'}`}>
           {children}
         </div>
       </div>
@@ -3056,7 +3080,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     onClick={() => void handleFetchAndSyncPricing()}
                     disabled={advancedLoading || syncingProviderId === currentEditingProvider?.id}
                   >
-                    <RefreshCw size={14} className={advancedLoading || syncingProviderId === currentEditingProvider?.id ? 'animate-spin' : ''} />
+                    <ActionButtonIcon>
+                      <RefreshCw size={14} className={advancedLoading || syncingProviderId === currentEditingProvider?.id ? 'animate-spin' : ''} />
+                    </ActionButtonIcon>
                     {fetchPricingActionLabel}
                   </button>
                 ) : null}
@@ -3068,7 +3094,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     onClick={() => currentEditingProvider && void handleValidateProvider(currentEditingProvider)}
                     disabled={!canOperateOnCurrentProvider || detectingProviderId === currentEditingProvider?.id}
                   >
-                    <CheckCircle2 size={14} />
+                    <ActionButtonIcon>
+                      <CheckCircle2 size={14} />
+                    </ActionButtonIcon>
                     {validateActionLabel}
                   </button>
                 ) : null}
@@ -3251,7 +3279,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                       onClick={() => currentEditingProvider && void handleValidateProvider(currentEditingProvider)}
                       disabled={!canOperateOnCurrentProvider || detectingProviderId === currentEditingProvider?.id}
                     >
-                      <CheckCircle2 size={14} className={detectingProviderId === currentEditingProvider?.id ? 'animate-spin' : ''} />
+                      <ActionButtonIcon compact>
+                        <CheckCircle2 size={14} className={detectingProviderId === currentEditingProvider?.id ? 'animate-spin' : ''} />
+                      </ActionButtonIcon>
                       {validateActionLabel}
                     </button>
                   ) : null}
@@ -3556,7 +3586,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     onClick={() => void handleSaveProvider()}
                     disabled={savingProviderId === (providerForm.id || 'new')}
                   >
-                    <Save size={14} />
+                    <ActionButtonIcon compact>
+                      <Save size={14} />
+                    </ActionButtonIcon>
                     {savingProviderId === (providerForm.id || 'new') ? '保存中...' : (providerForm.id ? '保存供应商' : '添加供应商')}
                   </button>
                   <button className="apple-button-secondary h-9 px-4 text-sm transition-all active:scale-95 whitespace-nowrap" style={secondaryButtonStyle} onClick={() => resetThirdPartyForm(true)}>
@@ -3875,7 +3907,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                   handleToggleProvider(provider);
                                 }}
                               >
-                                {provider.isActive ? <Pause size={12} /> : <Play size={12} />}
+                                <ActionButtonIcon compact>
+                                  {provider.isActive ? <Pause size={12} /> : <Play size={12} />}
+                                </ActionButtonIcon>
                                 {provider.isActive ? '停用' : '启用'}
                               </button>
                               {providerCanScanPricing ? (
@@ -3888,7 +3922,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                     void handleSyncPricing(provider);
                                   }}
                                 >
-                                  <RefreshCw size={12} className={syncingProviderId === provider.id ? 'animate-spin' : ''} />
+                                  <ActionButtonIcon compact>
+                                    <RefreshCw size={12} className={syncingProviderId === provider.id ? 'animate-spin' : ''} />
+                                  </ActionButtonIcon>
                                   {syncingProviderId === provider.id ? '获取中...' : providerPriceActionLabel}
                                 </button>
                               ) : null}
@@ -3902,7 +3938,9 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                     void handleValidateProvider(provider);
                                   }}
                                 >
-                                  <CheckCircle2 size={12} className={detectingProviderId === provider.id ? 'animate-spin' : ''} />
+                                  <ActionButtonIcon compact>
+                                    <CheckCircle2 size={12} className={detectingProviderId === provider.id ? 'animate-spin' : ''} />
+                                  </ActionButtonIcon>
                                   {detectingProviderId === provider.id ? (providerWorkbenchMode === 'model-detect' ? '识别中...' : '校验中...') : providerValidateActionLabel}
                                 </button>
                               ) : null}

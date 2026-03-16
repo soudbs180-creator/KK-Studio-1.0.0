@@ -185,6 +185,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
     const [selectedPreset, setSelectedPreset] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [searchKeyword, setSearchKeyword] = useState('');
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     // Form states
     const [formName, setFormName] = useState('');
@@ -200,6 +203,12 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
 
     useEffect(() => {
         loadProviders();
+    }, []);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
     const loadProviders = () => {
@@ -1396,16 +1405,42 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
 
             {/* Add Modal - 高端模态框 */}
             {isAddModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10003] p-4">
-                    <div className="bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] border border-white/10 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/50">
-                        <div className="p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
-                                    <Plus className="w-5 h-5 text-indigo-400" />
+                <div className={`fixed inset-0 z-[10003] flex ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center justify-center p-4'}`}>
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => {
+                            setIsAddModalOpen(false);
+                            resetForm();
+                        }}
+                    />
+                    <div
+                        className={`relative flex w-full max-w-lg flex-col overflow-hidden border border-white/10 bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] shadow-2xl shadow-black/50 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}
+                        style={{
+                            maxHeight: isMobile
+                                ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+                                : '90vh',
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className={`min-h-0 flex-1 ${isMobile ? 'mobile-sheet-scroll p-4' : 'overflow-y-auto p-6'}`}>
+                            <div className="mb-6 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
+                                        <Plus className="w-5 h-5 text-indigo-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">
+                                        添加第三方服务商
+                                    </h3>
                                 </div>
-                                <h3 className="text-lg font-bold text-white">
-                                    添加第三方服务商
-                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setIsAddModalOpen(false);
+                                        resetForm();
+                                    }}
+                                    className="rounded-xl p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                                >
+                                    <X size={18} />
+                                </button>
                             </div>
 
                             {/* Preset Selection */}
@@ -1581,20 +1616,20 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                             </div>
 
                             {/* Actions */}
-                            <div className="flex gap-3 mt-6">
+                            <div className={`mt-6 flex gap-3 ${isMobile ? 'flex-col-reverse' : ''}`}>
                                 <button
                                     onClick={() => {
                                         setIsAddModalOpen(false);
                                         resetForm();
                                     }}
-                                    className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-white/70 text-sm font-medium hover:bg-white/5 transition-all duration-200"
+                                    className={`flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-white/70 text-sm font-medium hover:bg-white/5 transition-all duration-200 ${isMobile ? 'w-full' : ''}`}
                                 >
                                     取消
                                 </button>
                                 <button
                                     onClick={handleAddProvider}
                                     disabled={isLoading}
-                                    className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white text-sm font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className={`flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white text-sm font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 ${isMobile ? 'w-full' : ''}`}
                                 >
                                     {isLoading ? (
                                         <>
@@ -1613,16 +1648,22 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
 
             {/* Management Modal - 高端管理模态框 */}
             {isManagementModalOpen && managingProvider && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10004] p-4"
-                onClick={(e) => {
-                    if (e.target === e.currentTarget) {
-                        setIsManagementModalOpen(false);
-                    }
-                }}
-            >
-                    <div className="bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl shadow-black/50">
+                <div className={`fixed inset-0 z-[10004] flex ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center justify-center p-4'}`}>
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setIsManagementModalOpen(false)}
+                    />
+                    <div
+                        className={`relative flex w-full max-w-4xl flex-col overflow-hidden border border-white/10 bg-gradient-to-br from-[#1a1f2e] to-[#0f1419] shadow-2xl shadow-black/50 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}
+                        style={{
+                            maxHeight: isMobile
+                                ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+                                : '90vh',
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/[0.02]">
+                        <div className={`flex items-center justify-between border-b border-white/10 bg-white/[0.02] ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-6'}`}>
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
                                     <Settings className="w-5 h-5 text-indigo-400" />
@@ -1631,7 +1672,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                     <h3 className="text-lg font-bold text-white">
                                         管理 {managingProvider.name}
                                     </h3>
-                                    <p className="text-sm text-white/40 font-mono">
+                                    <p className={`font-mono text-white/40 ${isMobile ? 'text-xs break-all' : 'text-sm'}`}>
                                         {managingProvider.baseUrl}
                                     </p>
                                 </div>
@@ -1644,10 +1685,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                             </button>
                         </div>
 
-                        <div className="flex h-[70vh]">
+                        <div className={`min-h-0 flex ${isMobile ? 'flex-1 flex-col' : 'h-[70vh]'}`}>
                             {/* Sidebar - 高端导航 */}
-                            <div className="w-52 border-r border-white/10 bg-white/[0.02]">
-                                <nav className="p-3 space-y-1">
+                            <div className={`${isMobile ? 'w-full border-b' : 'w-52 border-r'} border-white/10 bg-white/[0.02]`}>
+                                <nav className={`${isMobile ? 'flex gap-2 overflow-x-auto p-3' : 'p-3 space-y-1'}`}>
                                     {(managingProvider.managementConfig?.enabled
                                         ? [
                                             { id: 'overview', label: '概览', icon: BarChart3 },
@@ -1664,7 +1705,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setManagementTab(tab.id as ManagementTab)}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                            className={`${isMobile ? 'shrink-0 whitespace-nowrap' : 'w-full'} flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                                                 managementTab === tab.id
                                                     ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-white border border-indigo-500/30'
                                                     : 'text-white/60 hover:bg-white/5 hover:text-white/90'
@@ -1678,7 +1719,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-white/[0.02] to-transparent">
+                            <div className={`flex-1 overflow-y-auto bg-gradient-to-br from-white/[0.02] to-transparent ${isMobile ? 'p-4' : 'p-6'}`}>
                                 {managementTab === 'overview' && renderManagementOverview(managingProvider)}
                                 {managementTab === 'channels' && renderChannels(managingProvider)}
                                 {managementTab === 'suppliers' && renderSuppliers(managingProvider)}

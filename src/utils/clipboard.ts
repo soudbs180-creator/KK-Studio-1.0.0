@@ -32,3 +32,16 @@ export async function writeTextToClipboard(text: string): Promise<void> {
     document.body.removeChild(textarea);
   }
 }
+
+export async function writeImageToClipboard(blob: Blob): Promise<void> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    throw new Error('Image Clipboard API unavailable');
+  }
+
+  const type = blob.type && blob.type.startsWith('image/') ? blob.type : 'image/png';
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      [type]: blob,
+    }),
+  ]);
+}

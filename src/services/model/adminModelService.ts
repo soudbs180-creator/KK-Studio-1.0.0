@@ -425,6 +425,16 @@ class AdminModelService {
     return this.sortModelsByRoutePriority(this.models.filter((model) => model.id === baseId));
   }
 
+  private getDisplayModelForContext(
+    context: AdminModelRouteSelectionContext
+  ): AdminModelConfig | null {
+    if (context.useMixedRouting && context.mixedModels.length > 1) {
+      return context.mixedModels[0] || context.matchedModels[0] || null;
+    }
+
+    return context.exactModel || context.matchedModels[0] || null;
+  }
+
   private pickRandomCandidate<T>(candidates: T[]): T | null {
     if (candidates.length === 0) return null;
     if (candidates.length === 1) return candidates[0];
@@ -544,25 +554,35 @@ class AdminModelService {
   }
 
   getModelDisplayInfo(modelId: string, imageSize?: string | null) {
+    const context = this.getRouteSelectionContext(modelId, imageSize);
     const resolved = this.getResolvedRoute(modelId, imageSize);
-    const model = resolved?.model || this.getModel(modelId);
-    if (!model) return null;
+    const displayModel =
+      this.getDisplayModelForContext(context) || resolved?.model || this.getModel(modelId);
+    if (!displayModel) return null;
+
+    const isMixedRoute = context.useMixedRouting && context.mixedModels.length > 1;
 
     return {
-      id: model.id,
-      name: model.displayName,
-      displayName: model.displayName,
-      provider: model.provider,
-      providerId: model.providerId,
-      providerName: model.providerName,
-      colorStart: model.colorStart,
-      colorEnd: model.colorEnd,
-      colorSecondary: model.colorSecondary,
-      textColor: model.textColor,
-      creditCost: resolved?.creditCost ?? model.creditCost,
-      billingType: model.billingType,
-      advantages: model.advantages,
+      id: isMixedRoute ? `${context.baseModelId}@system` : displayModel.id,
+      name: displayModel.displayName,
+      displayName: displayModel.displayName,
+      provider: isMixedRoute ? 'SystemProxy' : displayModel.provider,
+      providerId: isMixedRoute ? undefined : displayModel.providerId,
+      providerName: isMixedRoute ? 'Mixed Route' : displayModel.providerName,
+      resolvedProviderId: resolved?.model.providerId,
+      resolvedProviderName: resolved?.model.providerName,
+      colorStart: displayModel.colorStart,
+      colorEnd: displayModel.colorEnd,
+      colorSecondary: displayModel.colorSecondary,
+      textColor: displayModel.textColor,
+      creditCost: resolved?.creditCost ?? displayModel.creditCost,
+      billingType: displayModel.billingType,
+      advantages:
+        isMixedRoute && !displayModel.advantages
+          ? `Mixed routing enabled across ${context.mixedModels.length} matching routes`
+          : displayModel.advantages,
       isSystemModel: true,
+      isMixedRoute,
     };
   }
 

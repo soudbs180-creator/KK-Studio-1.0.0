@@ -22,6 +22,9 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
 }) => {
     const [step, setStep] = useState<'select' | 'configure'>('select');
     const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     // 表单状态
     const [name, setName] = useState('');
@@ -45,6 +48,12 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
             resetForm();
         }
     }, [editingProvider, isOpen]);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     const resetForm = () => {
         setStep('select');
@@ -145,7 +154,7 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className={`fixed inset-0 z-50 flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}>
             {/* 背景遮罩 */}
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -153,9 +162,9 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
             />
 
             {/* 模态框内容 */}
-            <div className="relative w-full max-w-lg mx-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-primary)] shadow-2xl overflow-hidden">
+            <div className={`relative w-full bg-[var(--bg-primary)] border border-[var(--border-primary)] shadow-2xl overflow-hidden ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-lg rounded-2xl'}`}>
                 {/* 头部 */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-secondary)]">
+                <div className={`flex items-center justify-between border-b border-[var(--border-secondary)] ${isMobile ? 'mobile-sheet-header-safe px-4 py-3' : 'px-6 py-4'}`}>
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                         {editingProvider ? '编辑服务商' : '添加 API 服务商'}
                     </h3>
@@ -170,7 +179,7 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
                 </div>
 
                 {/* 内容区域 */}
-                <div className="p-6">
+                <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 p-4' : 'p-6'}`}>
                     {step === 'select' && !editingProvider && (
                         <div className="space-y-4">
                             <p className="text-sm text-[var(--text-secondary)] mb-4">
@@ -302,7 +311,7 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
 
                 {/* 底部按钮 */}
                 {step === 'configure' && (
-                    <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-secondary)]">
+                    <div className={`flex justify-end gap-3 border-t border-[var(--border-secondary)] ${isMobile ? 'mobile-sheet-footer-safe px-4 py-4' : 'px-6 py-4'}`}>
                         <button
                             onClick={onClose}
                             className="px-4 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors"

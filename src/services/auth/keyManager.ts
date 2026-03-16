@@ -2975,7 +2975,7 @@ export class KeyManager {
             const mixedRoutes = routes.filter((route) => route.mixWithSameModel);
             const shouldExposeMixedOnly = mixedRoutes.length > 1;
             const primaryRoute = shouldExposeMixedOnly
-                ? mixedRoutes[mixedRoutes.length - 1]
+                ? mixedRoutes[0]
                 : routes[0];
             const modelType = MODEL_TYPE_MAP.get(baseId) || (() => {
                 const inferred = inferModelType(baseId);
@@ -2984,16 +2984,18 @@ export class KeyManager {
 
             if (shouldExposeMixedOnly) {
                 const mixedRouteId = `${baseId}@system`;
+                const mixedDisplay = adminModelService.getModelDisplayInfo(mixedRouteId);
                 if (!uniqueModels.has(mixedRouteId)) {
-                    // 使用同组混合路由的统一名称和颜色，优先采用当前组最后一条混合配置。
-                    const mixedColorStart = primaryRoute.colorStart || '#475569';
-                    const mixedColorEnd = primaryRoute.colorEnd || '#334155';
-                    const mixedColorSecondary = primaryRoute.colorSecondary || mixedColorEnd;
-                    const mixedTextColor = primaryRoute.textColor || 'white';
+                    // 使用同组混合路由里最高优先级的展示配置，避免不同页面出现不同名称/颜色。
+                    const mixedColorStart = mixedDisplay?.colorStart || primaryRoute.colorStart || '#475569';
+                    const mixedColorEnd = mixedDisplay?.colorEnd || primaryRoute.colorEnd || '#334155';
+                    const mixedColorSecondary =
+                        mixedDisplay?.colorSecondary || primaryRoute.colorSecondary || mixedColorEnd;
+                    const mixedTextColor = mixedDisplay?.textColor || primaryRoute.textColor || 'white';
 
                     uniqueModels.set(mixedRouteId, {
                         id: mixedRouteId,
-                        name: primaryRoute.displayName || baseId,
+                        name: mixedDisplay?.displayName || primaryRoute.displayName || baseId,
                         provider: 'SystemProxy',
                         providerLogo: undefined,
                         providerLabel: 'Mixed Route',
@@ -3001,12 +3003,12 @@ export class KeyManager {
                         isSystemInternal: true,
                         type: modelType,
                         icon: undefined,
-                        description: primaryRoute.advantages || `Mixed routing enabled across ${mixedRoutes.length} matching routes`,
+                        description: mixedDisplay?.advantages || primaryRoute.advantages || `Mixed routing enabled across ${mixedRoutes.length} matching routes`,
                         colorStart: mixedColorStart,
                         colorEnd: mixedColorEnd,
                         colorSecondary: mixedColorSecondary,
                         textColor: mixedTextColor,
-                        creditCost: primaryRoute.creditCost,
+                        creditCost: mixedDisplay?.creditCost ?? primaryRoute.creditCost,
                     });
                 }
 
@@ -3063,11 +3065,11 @@ export class KeyManager {
 
             return {
                 ...model,
-                name: (relatedAdminRoutes.filter((route) => route.mixWithSameModel).slice(-1)[0]?.displayName)
+                name: (relatedAdminRoutes.filter((route) => route.mixWithSameModel)[0]?.displayName)
                     || relatedAdminRoutes[0]?.displayName
                     || baseId,
                 providerLabel: 'Mixed Route',
-                description: (relatedAdminRoutes.filter((route) => route.mixWithSameModel).slice(-1)[0]?.advantages)
+                description: (relatedAdminRoutes.filter((route) => route.mixWithSameModel)[0]?.advantages)
                     || relatedAdminRoutes[0]?.advantages
                     || `Mixed routing enabled across ${relatedAdminRoutes.length} matching routes`,
             };

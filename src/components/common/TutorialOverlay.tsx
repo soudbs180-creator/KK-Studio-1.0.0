@@ -343,13 +343,23 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             {/* Content Box - GPU accelerated */}
             <div
                 ref={tooltipRef}
-                className="p-4 w-full max-w-[min(360px,90vw)] will-change-transform"
+                className="p-4 w-full max-w-[min(360px,calc(100vw-20px))] will-change-transform"
                 style={{
                     ...getTooltipTransform(),
                     transition: 'left 0.3s ease, top 0.3s ease'
                 }}
             >
-                <div className="max-h-[calc(100vh-32px)] overflow-y-auto bg-[var(--bg-secondary)]/90 backdrop-blur-2xl border border-[var(--border-light)] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] rounded-[28px] p-6 animate-in fade-in zoom-in-95 duration-300">
+                <div
+                    className="overflow-y-auto bg-[var(--bg-secondary)]/90 backdrop-blur-2xl border border-[var(--border-light)] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] rounded-[28px] p-6 animate-in fade-in zoom-in-95 duration-300"
+                    style={{
+                        maxHeight: isMobile
+                            ? 'calc(100dvh - max(16px, env(safe-area-inset-top, 0px)) - max(16px, env(safe-area-inset-bottom, 0px)))'
+                            : 'calc(100vh - 32px)',
+                        paddingBottom: isMobile
+                            ? 'max(24px, calc(16px + env(safe-area-inset-bottom, 0px)))'
+                            : undefined,
+                    }}
+                >
                     <div className="flex justify-between items-start mb-5">
                         <div className="flex items-center gap-2">
                             <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />

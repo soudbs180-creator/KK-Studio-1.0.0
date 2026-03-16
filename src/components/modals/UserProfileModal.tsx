@@ -248,13 +248,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   return (
     <div
       className={`fixed inset-0 z-[10002] flex justify-center bg-black/55 backdrop-blur-sm ${
-        isMobile ? 'items-end px-2 pt-8 pb-0' : 'items-center px-3 py-4'
+        isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
       }`}
+      onClick={resetAndClose}
     >
       <div
         className={`w-full overflow-hidden border shadow-2xl ${
           isMobile
-            ? 'ios-mobile-sheet max-h-[88dvh] rounded-t-[26px] rounded-b-none'
+            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none'
             : 'max-w-[860px] rounded-2xl'
         }`}
         style={{
@@ -264,7 +265,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div
-          className={`flex items-center justify-between border-b ${isMobile ? 'px-3 py-3' : 'px-4 py-3'}`}
+          className={`flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'}`}
           style={{ borderColor: 'var(--border-light)' }}
         >
           <div className="flex items-center gap-2">
@@ -294,7 +295,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </button>
         </div>
 
-        <div className={`${isMobile ? 'max-h-[74dvh] px-3 py-3' : 'max-h-[78vh] px-4 py-4'} overflow-y-auto`}>
+        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'}`}>
           {message && (
             <div
               className={`mb-4 rounded-lg border px-3 py-2 text-sm ${

@@ -79,6 +79,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [fetchedModels, setFetchedModels] = useState<Array<{
     id: string;
     name: string;
@@ -117,6 +120,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setFetchedModels(null);
     setTokenValid(null);
   }, [editSupplier, initialType, isOpen]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handlePresetChange = (value: string) => {
     const preset = getPresetByValue(value);
@@ -227,19 +236,22 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   if (!isOpen || typeof window === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4 py-5 sm:px-6 sm:py-6">
+    <div className={`fixed inset-0 z-[99999] flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-5 sm:px-6 sm:py-6'}`}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={onClose} />
 
       <div
-        className={modalShellClass}
+        className={`${modalShellClass} ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[28px] rounded-b-none' : ''}`}
         style={{
           borderColor: 'var(--border-light)',
           background: 'linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%)',
-          maxHeight: 'calc(100vh - 24px)',
+          maxHeight: isMobile
+            ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+            : 'calc(100vh - 24px)',
         }}
+        onClick={(event) => event.stopPropagation()}
       >
         <div
-          className="flex items-start justify-between gap-4 border-b p-5 sm:p-6"
+          className={`flex items-start justify-between gap-4 border-b ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-5 sm:p-6'}`}
           style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-surface)' }}
         >
           <div>
@@ -260,7 +272,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5 sm:p-6">
+          <div className={`min-h-0 flex-1 space-y-6 ${isMobile ? 'mobile-sheet-scroll p-4' : 'overflow-y-auto p-5 sm:p-6'}`}>
             <div>
               <label className={labelClass}>选择服务商类型</label>
               <div className="grid grid-cols-2 gap-2">
@@ -435,7 +447,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           </div>
 
           <div
-            className="flex shrink-0 flex-col gap-3 border-t p-5 sm:flex-row sm:justify-end sm:p-6"
+            className={`flex shrink-0 flex-col gap-3 border-t ${isMobile ? 'mobile-sheet-footer-safe p-4' : 'p-5 sm:flex-row sm:justify-end sm:p-6'}`}
             style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-surface)' }}
           >
             <button

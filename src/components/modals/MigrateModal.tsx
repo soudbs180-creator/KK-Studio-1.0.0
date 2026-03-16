@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Canvas } from '../../types';
 import { X, FolderOutput, Check, Plus } from 'lucide-react';
 
@@ -19,18 +19,27 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
     selectedCount,
     onMigrate
 }) => {
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
     if (!isOpen) return null;
 
     const availableCanvases = canvases.filter(c => c.id !== currentCanvasId);
 
     return (
         <div
-            className="fixed inset-0 z-[10001] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn"
+            className={`fixed inset-0 z-[10001] flex justify-center bg-black/60 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
             onClick={onClose}
         >
             <div
-                className="shadow-2xl w-full md:max-w-md overflow-hidden animate-scaleIn
-                           md:rounded-xl rounded-t-[24px] max-h-[85vh] md:max-h-[80vh] flex flex-col safe-inset-bottom"
+                className={`shadow-2xl w-full overflow-hidden animate-scaleIn flex flex-col safe-inset-bottom ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[24px] rounded-b-none' : 'md:max-w-md md:rounded-xl max-h-[80vh]'}`}
                 style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-light)', borderWidth: '1px' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -40,7 +49,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
                 </div>
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                <div className={`flex items-center justify-between px-5 py-4 border-b ${isMobile ? 'mobile-sheet-header-safe' : ''}`} style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
                     <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)' }}>
                             <FolderOutput size={20} style={{ color: '#fbbf24' }} />
@@ -62,7 +71,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="p-4 flex-1 overflow-y-auto smooth-scroll">
+                <div className={`p-4 flex-1 smooth-scroll ${isMobile ? 'mobile-sheet-scroll' : 'overflow-y-auto'}`}>
                     <div className="space-y-2">
                         {/* 🚀 新建项目选项 - 始终显示在最前面 */}
                         <button
@@ -126,7 +135,7 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                <div className={`px-5 py-4 border-t ${isMobile ? 'mobile-sheet-footer-safe' : ''}`} style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
                     <button
                         onClick={onClose}
                         className="w-full md:w-auto px-6 py-3 text-sm rounded-xl transition-colors touch-target haptic-press"

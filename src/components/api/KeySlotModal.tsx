@@ -114,25 +114,25 @@ export const KeySlotModal: React.FC<KeySlotModalProps> = ({
   return (
     <div
       className={`fixed inset-0 z-[1000] flex justify-center bg-black/60 backdrop-blur-sm ${
-        isMobile ? 'items-end px-2 pt-8 pb-0' : 'items-center p-4'
+        isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center p-4'
       }`}
       onClick={onClose}
     >
       <div
         className={`w-full overflow-hidden border shadow-2xl ${
-          isMobile ? 'ios-mobile-sheet max-h-[88dvh] rounded-t-[26px] rounded-b-none max-w-[720px]' : 'max-w-md rounded-2xl'
+          isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none max-w-[720px]' : 'max-w-md rounded-2xl'
         }`}
         style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-surface)' }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`flex items-center justify-between border-b ${isMobile ? 'px-4 py-3' : 'px-6 py-4'}`} style={{ borderColor: 'var(--border-light)' }}>
+        <div className={`flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-4 py-3' : 'px-6 py-4'}`} style={{ borderColor: 'var(--border-light)' }}>
           <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{editingSlot ? '编辑接口配置' : '添加接口配置'}</h3>
           <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-[var(--toolbar-hover)]" style={{ color: 'var(--text-secondary)' }}>
             <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className={`space-y-4 overflow-y-auto ${isMobile ? 'max-h-[74dvh] px-4 py-4 pb-6' : 'px-6 py-5'}`}>
+        <form onSubmit={handleSubmit} className={`space-y-4 ${isMobile ? 'mobile-sheet-scroll flex-1 px-4 py-4 pb-6' : 'overflow-y-auto px-6 py-5'}`}>
           <div>
             <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>显示名称</label>
             <div className="relative">

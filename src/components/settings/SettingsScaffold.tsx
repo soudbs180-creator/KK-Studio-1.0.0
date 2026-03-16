@@ -155,7 +155,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full border px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] [overflow-wrap:anywhere] sm:text-center sm:whitespace-nowrap ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full border px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] [overflow-wrap:anywhere] sm:text-left sm:whitespace-nowrap ${className}`.trim()}
     style={toneStyles[tone].badgeStyle}
   >
     {children}
@@ -332,11 +332,18 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
 }) => (
   <button
     type={type}
-    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 rounded-xl border text-center font-medium leading-tight transition duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 [overflow-wrap:anywhere] sm:whitespace-nowrap ${size === 'sm' ? 'min-h-9 px-3 py-2 text-xs' : 'min-h-10 px-4 py-2 text-sm'} ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 rounded-xl border text-left font-medium leading-tight transition duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 [overflow-wrap:anywhere] sm:whitespace-nowrap ${size === 'sm' ? 'min-h-9 px-3 py-2 text-xs' : 'min-h-10 px-4 py-2 text-sm'} ${className}`.trim()}
     style={{ ...buttonToneStyles[tone], ...style }}
     {...buttonProps}
   >
-    {Icon ? <Icon size={size === 'sm' ? 14 : 16} className={loading ? 'animate-spin' : undefined} /> : null}
+    {Icon ? (
+      <span
+        aria-hidden="true"
+        className={`settings-button-icon-slot ${size === 'sm' ? 'settings-button-icon-slot--sm' : ''}`.trim()}
+      >
+        <Icon size={size === 'sm' ? 14 : 16} className={loading ? 'animate-spin' : undefined} />
+      </span>
+    ) : null}
     {children}
   </button>
 );

@@ -181,15 +181,17 @@ const RechargeModal: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-[10020] flex justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 ${isMobile ? 'items-end px-2 pb-0 pt-10' : 'items-center p-4'
+      className={`fixed inset-0 z-[10020] flex justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center p-4'
         }`}
+      onClick={() => setShowRechargeModal(false)}
     >
       <div
-        className={`w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-200 dark:border-white/10 ${isMobile ? 'ios-mobile-sheet max-h-[90dvh] rounded-t-[26px] rounded-b-none max-w-[760px]' : 'max-w-[440px] rounded-[32px]'
+        className={`w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-200 dark:border-white/10 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none max-w-[760px]' : 'max-w-[440px] rounded-[32px]'
           }`}
         style={{ backgroundColor: 'var(--bg-surface, #ffffff)' }}
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className={`relative ${isMobile ? 'p-4 pb-3' : 'p-6 pb-4'}`}>
+        <div className={`relative ${isMobile ? 'mobile-sheet-header-safe p-4 pb-3' : 'p-6 pb-4'}`}>
           <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${theme.via} to-transparent`} />
           <div className="flex justify-between items-center mb-1">
             <div className="flex items-center gap-2">
@@ -209,7 +211,7 @@ const RechargeModal: React.FC = () => {
           </p>
         </div>
 
-        <div className={`${isMobile ? 'px-4 py-2 pb-4 space-y-4 max-h-[72dvh]' : 'px-6 py-2 space-y-6'} overflow-y-auto`}>
+        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-4 py-2 pb-4' : 'overflow-y-auto px-6 py-2'} space-y-4 md:space-y-6`}>
           {qrCodeResult ? (
             <div className="flex flex-col items-center justify-center py-6 gap-4">
               {paymentSuccess ? (
@@ -348,7 +350,7 @@ const RechargeModal: React.FC = () => {
         </div>
 
         {!qrCodeResult && (
-          <div className={`${isMobile ? 'p-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]' : 'p-6 pt-4'}`}>
+          <div className={`${isMobile ? 'mobile-sheet-footer-safe p-4 pt-3' : 'p-6 pt-4'}`}>
             <button
               onClick={handleRecharge}
               disabled={isProcessing}

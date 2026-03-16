@@ -67,6 +67,9 @@ const PRESET_PROVIDERS = [
 export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'assets' }) => {
     const [slots, setSlots] = useState<KeySlot[]>(keyManager.getSlots());
     const [strategy, setStrategy] = useState(keyManager.getStrategy());
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     const clampAndFormat = (value?: number) => {
         const v = Math.floor(value || 0);
@@ -177,6 +180,12 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
         };
         const unsub = keyManager.subscribe(update);
         return unsub;
+    }, []);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
     const handleStrategyChange = (newStrategy: 'round-robin' | 'sequential') => {
@@ -677,15 +686,27 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
             {/* Modal */}
             {
                 isModalOpen && createPortal(
-                    <div className="fixed inset-0 z-[10050] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-[var(--bg-secondary)] w-full max-w-md rounded-2xl border border-[var(--border-light)] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
-                            <div className="flex justify-between items-center p-5 border-b border-[var(--border-light)]">
+                    <div className={`fixed inset-0 z-[10050] flex justify-center animate-in fade-in duration-200 ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}>
+                        <div
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            onClick={() => setIsModalOpen(false)}
+                        />
+                        <div
+                            className={`relative flex w-full max-w-md flex-col overflow-hidden border border-[var(--border-light)] bg-[var(--bg-secondary)] shadow-2xl animate-in zoom-in-95 duration-200 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}
+                            style={{
+                                maxHeight: isMobile
+                                    ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+                                    : '90vh',
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className={`flex items-center justify-between border-b border-[var(--border-light)] ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-5'}`}>
                                 <h4 className="text-lg font-bold text-[var(--text-primary)]">{editingId ? '编辑信道' : '添加信道'}</h4>
                                 <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"><X size={20} /></button>
                             </div>
 
                             {/* Modal Content */}
-                            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+                            <div className={`min-h-0 flex-1 space-y-5 ${isMobile ? 'mobile-sheet-scroll p-4' : 'overflow-y-auto custom-scrollbar p-6'}`}>
 
                                 {/* Step 1: Connection Details */}
                                 <div className="space-y-4">
@@ -1204,17 +1225,17 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                             </div>
 
 
-                            <div className="p-5 border-t border-[var(--border-light)] flex justify-end gap-3 bg-[var(--bg-secondary)]">
+                            <div className={`flex shrink-0 gap-3 border-t border-[var(--border-light)] bg-[var(--bg-secondary)] ${isMobile ? 'mobile-sheet-footer-safe flex-col-reverse p-4' : 'justify-end p-5'}`}>
                                 <button
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors ${isMobile ? 'w-full' : ''}`}
                                 >
                                     取消
                                 </button>
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading}
-                                    className="px-6 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95"
+                                    className={`px-6 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95 ${isMobile ? 'w-full' : ''}`}
                                 >
                                     {loading ? '处理中...' : (editingId ? '保存修改' : '添加信道')}
                                 </button>
@@ -1228,9 +1249,21 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
             {/* Expanded Edit Modal */}
             {
                 expandedType && createPortal(
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-[var(--bg-secondary)] w-full max-w-2xl rounded-xl shadow-2xl border border-[var(--border-light)] flex flex-col max-h-[80vh] m-4 animate-in zoom-in-95 duration-200">
-                            <div className="p-4 border-b border-[var(--border-light)] flex items-center justify-between">
+                    <div className={`fixed inset-0 z-[10060] flex justify-center animate-in fade-in duration-200 ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}>
+                        <div
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            onClick={() => setExpandedType(null)}
+                        />
+                        <div
+                            className={`relative flex w-full max-w-2xl flex-col border border-[var(--border-light)] bg-[var(--bg-secondary)] shadow-2xl animate-in zoom-in-95 duration-200 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-2xl rounded-b-none' : 'm-4 rounded-xl'}`}
+                            style={{
+                                maxHeight: isMobile
+                                    ? 'calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)))'
+                                    : '80vh',
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className={`flex items-center justify-between border-b border-[var(--border-light)] ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-4'}`}>
                                 <h3 className="font-bold flex items-center gap-2">
                                     {expandedType === 'image' && '📸 编辑图像模型'}
                                     {expandedType === 'video' && '🎬 编辑视频模型'}
@@ -1241,10 +1274,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                     <X size={20} className="text-[var(--text-secondary)]" />
                                 </button>
                             </div>
-                            <div className="flex-1 p-4 flex flex-col min-h-0">
+                            <div className={`min-h-0 flex-1 flex flex-col ${isMobile ? 'mobile-sheet-scroll p-4' : 'p-4'}`}>
                                 <p className="text-xs text-[var(--text-tertiary)] mb-2">每行一个ID，或用逗号分隔。支持 "ID (别名)" 格式。</p>
                                 <textarea
-                                    className="flex-1 w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg p-3 text-sm font-mono outline-none focus:border-indigo-500/50 resize-none leading-relaxed"
+                                    className={`w-full flex-1 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg p-3 text-sm font-mono outline-none focus:border-indigo-500/50 resize-none leading-relaxed ${isMobile ? 'min-h-[320px]' : ''}`}
                                     value={
                                         expandedType === 'image' ? formImageModels :
                                             expandedType === 'video' ? formVideoModels :
@@ -1261,10 +1294,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                     autoFocus
                                 />
                             </div>
-                            <div className="p-4 border-t border-[var(--border-light)] flex justify-end">
+                            <div className={`flex shrink-0 justify-end border-t border-[var(--border-light)] ${isMobile ? 'mobile-sheet-footer-safe p-4' : 'p-4'}`}>
                                 <button
                                     onClick={() => setExpandedType(null)}
-                                    className="px-6 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                                    className={`px-6 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 ${isMobile ? 'w-full' : ''}`}
                                 >
                                     完成 (Done)
                                 </button>

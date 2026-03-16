@@ -29,6 +29,9 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
     const [tags, setTags] = useState<string[]>([]);
     const [input, setInput] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    );
 
     useEffect(() => {
         if (isOpen) {
@@ -37,6 +40,12 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
             setError(null);
         }
     }, [isOpen, initialTags]);
+
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     // 🚀 Suggestion list: All tags minus current tags and inherited tags
     const suggestions = useMemo(() => {
@@ -109,12 +118,12 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
 
     return (
         <div
-            className="fixed inset-0 flex items-center justify-center z-[10001] backdrop-blur-sm"
+            className={`fixed inset-0 z-[10001] flex justify-center backdrop-blur-sm ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
             onClick={onClose}
         >
             <div
-                className="w-full max-w-md shadow-2xl overflow-hidden animate-modal-in rounded-xl max-h-[85vh] flex flex-col mx-4"
+                className={`w-full shadow-2xl overflow-hidden animate-modal-in flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-md rounded-xl max-h-[85vh]'}`}
                 style={{
                     backgroundColor: 'var(--bg-surface)',
                     border: '1px solid var(--border-default)',
@@ -124,7 +133,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
             >
                 {/* Header */}
                 <div
-                    className="flex items-center justify-between p-4 border-b"
+                    className={`flex items-center justify-between border-b p-4 ${isMobile ? 'mobile-sheet-header-safe' : ''}`}
                     style={{
                         backgroundColor: 'var(--bg-secondary)',
                         borderColor: 'var(--border-default)'
@@ -149,7 +158,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                     </button>
                 </div>
 
-                <div className="p-4 space-y-4 overflow-y-auto">
+                <div className={`space-y-4 p-4 ${isMobile ? 'mobile-sheet-scroll flex-1' : 'overflow-y-auto'}`}>
                     {/* 🚀 Inherited Tags Section (Show Parent tags for Sub Cards) */}
                     {isSubCard && inheritedTags.length > 0 && (
                         <div className="space-y-1.5">
@@ -308,7 +317,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
 
                 {/* Footer */}
                 <div
-                    className="p-4 border-t flex justify-end gap-2"
+                    className={`border-t p-4 flex justify-end gap-2 ${isMobile ? 'mobile-sheet-footer-safe' : ''}`}
                     style={{
                         backgroundColor: 'var(--bg-secondary)',
                         borderColor: 'var(--border-default)'

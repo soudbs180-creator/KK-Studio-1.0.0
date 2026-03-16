@@ -826,6 +826,7 @@ input[type=number] {
 /* Settings panel button feedback */
 .settings-panel button {
   transition: transform 120ms ease, box-shadow 200ms ease, background-color 200ms ease, color 200ms ease;
+  line-height: 1.12;
 }
 
 .settings-panel button:active {
@@ -834,6 +835,58 @@ input[type=number] {
 
 .settings-panel button:disabled {
   transform: none;
+}
+
+.settings-panel svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.settings-panel .apple-button-primary,
+.settings-panel .apple-button-secondary,
+.settings-panel .apple-button-danger,
+.settings-panel .apple-icon-button,
+.settings-panel .settings-action-row > button,
+.settings-panel .settings-action-row > a,
+.settings-panel .api-settings-provider-action-row > button,
+.settings-panel .api-settings-editor-toolbar > button,
+.settings-panel .settings-shell-nav__search,
+.settings-panel .settings-inline-chip,
+.settings-panel .api-settings-provider-meta span,
+.settings-panel .settings-intent-card__title {
+  line-height: 1.12;
+}
+
+.settings-panel .settings-action-row > button,
+.settings-panel .settings-action-row > a,
+.settings-panel .api-settings-provider-action-row > button,
+.settings-panel .api-settings-editor-toolbar > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.settings-panel .apple-button-primary svg,
+.settings-panel .apple-button-secondary svg,
+.settings-panel .apple-button-danger svg,
+.settings-panel .apple-icon-button svg,
+.settings-panel .settings-action-row > button svg,
+.settings-panel .settings-action-row > a svg,
+.settings-panel .api-settings-provider-action-row > button svg,
+.settings-panel .api-settings-editor-toolbar > button svg {
+  transform: translateY(-0.5px);
+}
+
+.settings-panel .settings-shell-nav__search > svg,
+.settings-panel .settings-sidebar-item__icon > svg,
+.settings-panel .settings-sidebar-item__arrow,
+.settings-panel .settings-shell-toolbar__icon > svg,
+.settings-panel .settings-shell-nav__hero-icon > svg,
+.settings-panel .settings-dashboard-card__icon > svg,
+.settings-panel .settings-dashboard-row__icon > svg,
+.settings-panel .settings-intent-card__title > svg {
+  display: block;
 }
 
 /* Safe area helpers (mobile) */
@@ -2012,6 +2065,35 @@ body.dark-mode .input-bar {
   .ios-mobile-sheet {
     border-radius: var(--mobile-sheet-radius) var(--mobile-sheet-radius) 0 0;
     border-bottom: none;
+  }
+
+  .mobile-overlay-safe {
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-sheet-viewport {
+    width: min(100%, 760px);
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)));
+  }
+
+  .mobile-sheet-viewport--fill {
+    height: calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)));
+  }
+
+  .mobile-sheet-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-sheet-header-safe {
+    padding-top: 12px;
+  }
+
+  .mobile-sheet-footer-safe {
+    padding-bottom: 12px;
   }
 
   .mobile-card-deck {
@@ -6380,6 +6462,11 @@ body.dark-mode .settings-panel .apple-glass-card {
   box-shadow: none;
 }
 
+.settings-shell-nav__search > svg {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
 .settings-shell-nav__group-label {
   padding: 0 4px;
   font-size: 11px;
@@ -6389,14 +6476,33 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-sidebar-item {
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
   border-radius: 16px;
   border-color: var(--settings-border-subtle);
   background: var(--settings-surface-elevated);
   color: var(--text-primary);
   box-shadow: none;
+}
+
+.settings-sidebar-item__body {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  text-align: left;
+}
+
+.settings-sidebar-item__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.24;
+  color: inherit;
+  text-align: left;
 }
 
 .settings-sidebar-item:hover {
@@ -6423,12 +6529,32 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-sidebar-item__icon {
+  display: inline-flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
 }
 
+.settings-sidebar-item__desc {
+  display: block;
+  margin-top: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
 .settings-sidebar-item__arrow {
-  margin-top: 2px;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  margin-top: 0;
 }
 
 .settings-shell-main__topbar,
@@ -6438,7 +6564,13 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-shell-main__topbar {
+  align-items: center;
   padding: 20px 24px 16px;
+}
+
+.settings-shell-main__module {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .settings-shell-page--desktop,
@@ -6703,6 +6835,34 @@ body.dark-mode .settings-panel .apple-glass-card {
   min-width: 0;
 }
 
+.settings-panel .settings-button-icon-slot {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-panel .settings-button-icon-slot--sm {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+}
+
+.settings-panel .settings-button-icon-slot > svg,
+.settings-panel .apple-button-primary > svg,
+.settings-panel .apple-button-secondary > svg,
+.settings-panel .apple-button-danger > svg,
+.settings-panel .apple-icon-button > svg,
+.settings-panel .settings-action-row > button > svg,
+.settings-panel .settings-action-row > a > svg,
+.settings-panel .api-settings-provider-action-row > button > svg,
+.settings-panel .api-settings-editor-toolbar > button > svg {
+  display: block;
+  transform: none;
+}
+
 .settings-panel .settings-action-row,
 .settings-panel .api-settings-provider-shell,
 .settings-panel .api-settings-editor-toolbar,
@@ -6734,18 +6894,26 @@ body.dark-mode .settings-panel .apple-glass-card {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: flex-start;
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.settings-panel .api-settings-status-badge {
+  justify-content: flex-start;
 }
 
 .settings-panel .api-settings-provider-meta span {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   min-width: 0;
   border: 1px solid var(--border-light);
   border-radius: 999px;
   padding: 6px 10px;
   background: var(--bg-overlay);
+  text-align: left;
+  line-height: 1.35;
 }
 
 .settings-panel .api-settings-provider-budget {
@@ -6893,12 +7061,16 @@ body.dark-mode .settings-panel .apple-glass-card {
 .settings-panel .api-settings-provider-action-row > button {
   flex: 0 1 auto;
   min-width: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: left;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .settings-panel .settings-provider-footer {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
@@ -6911,6 +7083,8 @@ body.dark-mode .settings-panel .apple-glass-card {
 
 .settings-panel .settings-provider-footer > *:last-child {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   text-align: right;
 }
 
@@ -6918,10 +7092,14 @@ body.dark-mode .settings-panel .apple-glass-card {
   flex-wrap: wrap;
   row-gap: 8px;
   overflow-x: visible;
+  align-items: center;
   justify-content: flex-end;
 }
 
 .settings-panel .api-settings-editor-toolbar > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   max-width: 100%;
 }
