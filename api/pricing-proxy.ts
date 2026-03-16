@@ -9,6 +9,78 @@ type PricingRow = Record<string, any>;
 type ParsedPayload = { data: PricingRow[]; groupRatio: Record<string, number> };
 type DiscoveryTarget = { key: string; url: string; accept: string };
 
+const PRIVATE_IPV4_PATTERNS = [
+  /^0\./,
+  /^10\./,
+  /^127\./,
+  /^169\.254\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^192\.168\./,
+];
+
+const FORBIDDEN_HOSTNAME_SUFFIXES = [
+  '.internal',
+  '.local',
+  '.localdomain',
+  '.localhost',
+  '.home',
+  '.lan',
+];
+
+const normalizeHostForChecks = (hostname: string) =>
+  String(hostname || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .split('%')[0];
+
+const isPrivateIpAddress = (hostname: string) => {
+  const normalized = normalizeHostForChecks(hostname);
+
+  if (PRIVATE_IPV4_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  return normalized === '::'
+    || normalized === '::1'
+    || /^f[cd][0-9a-f]{0,2}:/i.test(normalized)
+    || /^fe[89ab][0-9a-f]?:/i.test(normalized)
+    || /^::ffff:(?:0:)?(?:10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/i.test(normalized);
+};
+
+const isForbiddenHostname = (hostname: string) => {
+  const lower = normalizeHostForChecks(hostname);
+  if (!lower) return true;
+  if (lower === 'localhost') return true;
+  if (lower.includes('localhost')) return true;
+  if (FORBIDDEN_HOSTNAME_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
+  if (lower.endsWith('.nip.io') || lower.endsWith('.sslip.io')) return true;
+  if (isPrivateIpAddress(lower)) return true;
+  return false;
+};
+
+const normalizeSupplierBaseUrl = (rawBaseUrl: string) => {
+  const parsed = new URL(String(rawBaseUrl || '').trim());
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http/https supplier URLs are allowed');
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error('Supplier URL must not contain embedded credentials');
+  }
+
+  if (isForbiddenHostname(parsed.hostname)) {
+    throw new Error('Private, local, or loopback supplier URLs are not allowed');
+  }
+
+  parsed.hash = '';
+  parsed.search = '';
+  parsed.pathname = parsed.pathname.replace(/\/v1\/?$/i, '').replace(/\/+$/, '') || '/';
+
+  return parsed.toString().replace(/\/$/, '');
+};
+
 const inferProviderFromModel = (model: string): string | undefined => {
   const raw = String(model || '').toLowerCase();
   if (!raw) return undefined;
@@ -471,19 +543,28 @@ const parsePayload = (text: string): ParsedPayload | null => {
 };
 
 const fetchText = async (url: string, accept: string) => {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: accept,
-      'User-Agent': 'KK-Studio-Pricing-Proxy/2.0',
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    text: await response.text(),
-  };
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: accept,
+        'User-Agent': 'KK-Studio-Pricing-Proxy/2.0',
+      },
+      redirect: 'error',
+      signal: controller.signal,
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      text: await response.text(),
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 const fetchAndParse = async (url: string, accept: string) => {
@@ -514,14 +595,15 @@ export default async function handler(request: Request) {
 
   try {
     const { baseUrl } = (await request.json()) as { baseUrl: string };
-    const cleanUrl = (baseUrl || '').replace(/\/v1\/?$/, '').replace(/\/$/, '');
 
-    if (!cleanUrl) {
+    if (!baseUrl) {
       return new Response(JSON.stringify({ error: '缺少 baseUrl' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
+
+    const cleanUrl = normalizeSupplierBaseUrl(baseUrl);
 
     const baseTargets: DiscoveryTarget[] = [
       {

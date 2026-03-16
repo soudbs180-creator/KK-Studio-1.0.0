@@ -21,5 +21,9 @@
     "express": "^5.2.1",
     "node-fetch": "^2.7.0",
     "wechatpay-node-v3": "^2.2.1"
+  },
+  "overrides": {
+    "hono": "^4.12.7",
+    "undici": "^7.24.0"
   }
 }

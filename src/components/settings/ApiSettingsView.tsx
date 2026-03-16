@@ -1998,7 +1998,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
       const proxyResponse = await fetch('/api/pricing-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: cleanUrl, apiKey }),
+        body: JSON.stringify({ baseUrl: cleanUrl }),
       });
 
       if (proxyResponse.ok) {

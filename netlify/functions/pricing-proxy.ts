@@ -1,102 +1,186 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 /**
- * 价格扫描代理端点
- * 用于绕过浏览器 CORS 限制，从供应商的 /api/pricing 端点获取价格数据
- * /pricing 是供应商的 SPA 网页，/api/pricing 是其背后的 JSON 数据源
+ * Pricing proxy endpoint
+ * Only proxies external supplier pricing catalogs and rejects localhost/private-network targets.
  */
 
-export default async (request: Request) => {
-    const corsHeaders = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    };
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+};
 
-    // 处理 CORS 预检请求
+const PRIVATE_IPV4_PATTERNS = [
+    /^0\./,
+    /^10\./,
+    /^127\./,
+    /^169\.254\./,
+    /^172\.(1[6-9]|2\d|3[0-1])\./,
+    /^192\.168\./,
+];
+
+const FORBIDDEN_HOSTNAME_SUFFIXES = [
+    ".internal",
+    ".local",
+    ".localdomain",
+    ".localhost",
+    ".home",
+    ".lan",
+];
+
+function normalizeHostForChecks(hostname: string): string {
+    return String(hostname || "")
+        .trim()
+        .toLowerCase()
+        .replace(/^\[|\]$/g, "")
+        .split("%")[0];
+}
+
+function isPrivateIpAddress(hostname: string): boolean {
+    const normalized = normalizeHostForChecks(hostname);
+    const ipVersion = isIP(normalized);
+
+    if (ipVersion === 4) {
+        return PRIVATE_IPV4_PATTERNS.some((pattern) => pattern.test(normalized));
+    }
+
+    if (ipVersion === 6) {
+        return normalized === "::"
+            || normalized === "::1"
+            || /^f[cd][0-9a-f]{0,2}:/i.test(normalized)
+            || /^fe[89ab][0-9a-f]?:/i.test(normalized)
+            || /^::ffff:(?:0:)?(?:10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/i.test(normalized);
+    }
+
+    return false;
+}
+
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), {
+        status,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            ...corsHeaders,
+        },
+    });
+
+function isForbiddenHostname(hostname: string): boolean {
+    const lower = normalizeHostForChecks(hostname);
+    if (!lower) return true;
+    if (lower === "localhost") return true;
+    if (lower.includes("localhost")) return true;
+    if (FORBIDDEN_HOSTNAME_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
+    if (lower.endsWith(".nip.io") || lower.endsWith(".sslip.io")) return true;
+    if (isPrivateIpAddress(lower)) return true;
+    return false;
+}
+
+async function assertResolvedHostIsPublic(hostname: string): Promise<void> {
+    const normalized = normalizeHostForChecks(hostname);
+    if (!normalized || isIP(normalized)) {
+        return;
+    }
+
+    const records = await lookup(normalized, { all: true, verbatim: true });
+    if (!records.length) {
+        throw new Error("Supplier hostname did not resolve");
+    }
+
+    // Block hostnames that resolve into loopback or private network ranges.
+    if (records.some((record) => isPrivateIpAddress(record.address))) {
+        throw new Error("Supplier hostname resolved to a private or loopback address");
+    }
+}
+
+async function buildPricingUrl(rawBaseUrl: string): Promise<string> {
+    const parsed = new URL(String(rawBaseUrl || "").trim());
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+        throw new Error("Only http/https supplier URLs are allowed");
+    }
+
+    if (parsed.username || parsed.password) {
+        throw new Error("Supplier URL must not contain embedded credentials");
+    }
+
+    if (isForbiddenHostname(parsed.hostname)) {
+        throw new Error("Private, local, or loopback supplier URLs are not allowed");
+    }
+
+    await assertResolvedHostIsPublic(parsed.hostname);
+
+    parsed.hash = "";
+    parsed.search = "";
+
+    const normalizedPath = parsed.pathname
+        .replace(/\/v1\/?$/i, "")
+        .replace(/\/+$/, "");
+
+    parsed.pathname = `${normalizedPath}/api/pricing`.replace(/\/{2,}/g, "/");
+    return parsed.toString();
+}
+
+export default async (request: Request) => {
     if (request.method === "OPTIONS") {
         return new Response(null, { status: 200, headers: corsHeaders });
     }
 
     if (request.method !== "POST") {
-        return new Response(JSON.stringify({ error: "仅支持 POST 方法" }), {
-            status: 405,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
+        return jsonResponse({ error: "Only POST is allowed" }, 405);
     }
 
     try {
-        const body = await request.json() as { baseUrl: string };
-        const baseUrl = (body.baseUrl || '').replace(/\/v1\/?$/, '').replace(/\/$/, '');
-
-        if (!baseUrl) {
-            return new Response(JSON.stringify({ error: "缺少 baseUrl 参数" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json", ...corsHeaders },
-            });
+        const body = await request.json() as { baseUrl?: string };
+        if (!body.baseUrl) {
+            return jsonResponse({ error: "Missing baseUrl" }, 400);
         }
 
-        // /pricing 网页的数据源就是 /api/pricing
-        const pricingUrl = `${baseUrl}/api/pricing`;
+        const pricingUrl = await buildPricingUrl(body.baseUrl);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
 
-        console.log(`[pricing-proxy] 正在请求: ${pricingUrl}`);
-
-        const response = await fetch(pricingUrl, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-        });
+        let response: Response;
+        try {
+            response = await fetch(pricingUrl, {
+                method: "GET",
+                headers: { Accept: "application/json" },
+                redirect: "error",
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
 
         if (!response.ok) {
-            return new Response(JSON.stringify({
-                error: `供应商返回 ${response.status}`,
+            return jsonResponse({
+                error: `Supplier returned ${response.status}`,
                 status: response.status,
-            }), {
-                status: 200, // 返回 200 让前端处理错误
-                headers: { "Content-Type": "application/json", ...corsHeaders },
             });
         }
 
         const text = await response.text();
-
-        // 检测是否为 HTML（SPA 页面）而非 JSON
-        if (text.trimStart().startsWith('<!') || text.trimStart().startsWith('<html')) {
-            return new Response(JSON.stringify({
-                error: "供应商返回了 HTML 页面而非 JSON 数据",
-            }), {
-                status: 200,
-                headers: { "Content-Type": "application/json", ...corsHeaders },
-            });
+        if (text.trimStart().startsWith("<!")) {
+            return jsonResponse({ error: "Supplier returned HTML instead of JSON" });
         }
 
-        // 尝试解析 JSON
         let data: any;
         try {
             data = JSON.parse(text);
         } catch {
-            return new Response(JSON.stringify({
-                error: "供应商返回的内容无法解析为 JSON",
-            }), {
-                status: 200,
-                headers: { "Content-Type": "application/json", ...corsHeaders },
-            });
+            return jsonResponse({ error: "Supplier response is not valid JSON" });
         }
 
-        // 直接透传供应商的 JSON 响应
-        return new Response(JSON.stringify({
+        return jsonResponse({
             success: true,
-            data: data.data || [],
+            data: Array.isArray(data.data) ? data.data : [],
             group_ratio: data.group_ratio || {},
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
         });
-
     } catch (error: any) {
-        console.error("[pricing-proxy] 错误:", error);
-        return new Response(JSON.stringify({
-            error: error.message || "代理请求失败",
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
+        console.error("[pricing-proxy] error:", error);
+        return jsonResponse({ error: error.message || "Pricing proxy request failed" }, 400);
     }
 };
 

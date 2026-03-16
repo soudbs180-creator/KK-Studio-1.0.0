@@ -1,16 +1,17 @@
 /**
- * User API Key Service
- * Keeps the legacy API surface, but routes CRUD operations through the
- * hardened secure-storage layer instead of storing browser-encoded keys.
+ * Compatibility facade for legacy user API key consumers.
+ *
+ * Canonical storage now lives in `profiles.user_apis`, so this service keeps
+ * the old shape while delegating all mutations to the profile-backed storage.
  */
 
-import { supabase } from '../../lib/supabase';
 import {
-  addUserApiKey as addSecureUserApiKey,
-  deleteApiKey as deleteSecureApiKey,
-  getUserApiKeys as getSecureUserApiKeys,
+  addUserApiKey as addProfileUserApiKey,
+  deleteApiKey as deleteProfileApiKey,
+  getUserApiKeys as getProfileUserApiKeys,
   type ApiProvider,
 } from '../security/apiKeySecureStorage';
+import { loadUserApiEntries, mutateUserApiEntries } from './userApiProfileStorage';
 
 export interface UserApiKey {
   id: string;
@@ -39,14 +40,14 @@ export interface ModelRoute {
 
 class UserApiKeyService {
   async getUserApiKeys(): Promise<UserApiKey[]> {
-    const keys = await getSecureUserApiKeys();
+    const keys = await getProfileUserApiKeys();
 
     return keys.map((key) => ({
       id: key.id,
       user_id: '',
       name: key.name,
       provider: key.provider,
-      api_key_encrypted: this.maskApiKey(key.key_status),
+      api_key_encrypted: key.key_status,
       base_url: key.base_url || undefined,
       is_active: key.is_active,
       call_count: 0,
@@ -60,13 +61,13 @@ class UserApiKeyService {
     name: string,
     provider: string,
     apiKey: string,
-    baseUrl?: string
+    baseUrl?: string,
   ): Promise<UserApiKey> {
-    const id = await addSecureUserApiKey(
+    const id = await addProfileUserApiKey(
       name,
       provider as ApiProvider,
       apiKey,
-      baseUrl
+      baseUrl,
     );
 
     const timestamp = new Date().toISOString();
@@ -75,7 +76,7 @@ class UserApiKeyService {
       user_id: '',
       name,
       provider,
-      api_key_encrypted: this.maskApiKey('***CONFIGURED***'),
+      api_key_encrypted: '***CONFIGURED***',
       base_url: baseUrl || undefined,
       is_active: true,
       call_count: 0,
@@ -87,69 +88,57 @@ class UserApiKeyService {
 
   async updateUserApiKey(
     id: string,
-    updates: Partial<Pick<UserApiKey, 'name' | 'is_active' | 'base_url'>>
+    updates: Partial<Pick<UserApiKey, 'name' | 'is_active' | 'base_url'>>,
   ): Promise<void> {
-    const { error } = await supabase
-      .from('user_api_keys')
-      .update(updates)
-      .eq('id', id);
-
-    if (error) {
-      console.error('[UserApiKeyService] Failed to update API key:', error);
-      throw error;
-    }
+    await mutateUserApiEntries((entries) =>
+      entries.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              name: updates.name ?? entry.name,
+              baseUrl: updates.base_url ?? entry.baseUrl,
+              disabled:
+                typeof updates.is_active === 'boolean'
+                  ? !updates.is_active
+                  : entry.disabled,
+              updatedAt: Date.now(),
+            }
+          : entry,
+      ),
+    );
   }
 
   async deleteUserApiKey(id: string): Promise<void> {
-    await deleteSecureApiKey(id);
+    await deleteProfileApiKey(id);
   }
 
   async getModelRoute(
     modelId: string,
-    requestedSize: string = '1K'
+    requestedSize = '1K',
   ): Promise<ModelRoute> {
-    const { data, error } = await supabase.rpc('get_model_route_for_user', {
-      p_user_id: (await supabase.auth.getUser()).data.user?.id,
-      p_model_id: modelId,
-      p_requested_size: requestedSize,
-    });
-
-    if (error) {
-      console.error('[UserApiKeyService] Failed to get model route:', error);
-      throw error;
-    }
-
-    if (!data || data.route_type === 'none') {
-      throw new Error('No available model route found');
-    }
-
-    return data as ModelRoute;
+    void modelId;
+    void requestedSize;
+    throw new Error('Direct model route retrieval is disabled. Use secure-model-proxy for model calls.');
   }
 
   async recordUsage(
     modelId: string,
     routeType: string,
     creditCost: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<boolean> {
-    const { data, error } = await supabase.rpc('record_model_usage', {
-      p_user_id: (await supabase.auth.getUser()).data.user?.id,
-      p_model_id: modelId,
-      p_route_type: routeType,
-      p_credit_cost: creditCost,
-      p_metadata: metadata || {},
-    });
-
-    if (error) {
-      console.error('[UserApiKeyService] Failed to record usage:', error);
-      throw error;
-    }
-
-    return data as boolean;
+    void modelId;
+    void routeType;
+    void creditCost;
+    void metadata;
+    return true;
   }
 
-  private maskApiKey(value: string): string {
-    return value || '***CONFIGURED***';
+  async hasConfiguredKey(provider: string): Promise<boolean> {
+    const entries = await loadUserApiEntries();
+    return entries.some(
+      (entry) => entry.provider === provider && !entry.disabled && Boolean(entry.key),
+    );
   }
 
   decryptApiKey(_encrypted: string): string {

@@ -40,42 +40,29 @@ type CreditModelRow = {
   quality_pricing?: Record<string, any> | null;
 };
 
-const CREDIT_MODEL_SELECT_BASE =
-  'provider_id, provider_name, base_url, api_keys, model_id, display_name, description, endpoint_type, credit_cost, is_active, call_count, color, color_secondary, text_color';
-const CREDIT_MODEL_SELECT_WITH_LIMIT = `${CREDIT_MODEL_SELECT_BASE}, max_calls_limit, advanced_enabled, mix_with_same_model, quality_pricing`;
-
-const CREDIT_MODEL_OPTIONAL_COLUMNS = ['max_calls_limit', 'advanced_enabled', 'mix_with_same_model', 'quality_pricing'] as const;
-type CreditModelOptionalColumn = typeof CREDIT_MODEL_OPTIONAL_COLUMNS[number];
-
-const getCreditModelSelect = (options: {
-  includeMaxCallsLimit: boolean;
-  includeAdvancedSettings: boolean;
-}): string => {
-  const parts = [CREDIT_MODEL_SELECT_BASE];
-  if (options.includeMaxCallsLimit) {
-    parts.push('max_calls_limit');
-  }
-  if (options.includeAdvancedSettings) {
-    parts.push('advanced_enabled', 'mix_with_same_model', 'quality_pricing');
-  }
-  return parts.join(', ');
+type CreditModelRpcModel = {
+  model_id?: string | null;
+  display_name?: string | null;
+  description?: string | null;
+  endpoint_type?: string | null;
+  credit_cost?: number | null;
+  is_active?: boolean | null;
+  call_count?: number | null;
+  max_calls_limit?: number | null;
+  color?: string | null;
+  color_secondary?: string | null;
+  text_color?: 'white' | 'black' | string | null;
+  advanced_enabled?: boolean | null;
+  mix_with_same_model?: boolean | null;
+  quality_pricing?: Record<string, any> | null;
 };
 
-const getMissingCreditModelColumns = (error: any): CreditModelOptionalColumn[] => {
-  const haystack = [error?.message, error?.details, error?.hint]
-    .map((item) => String(item || '').toLowerCase())
-    .join(' ');
-
-  const looksLikeMissingColumnError =
-    haystack.includes('does not exist') ||
-    haystack.includes('could not find') ||
-    haystack.includes('column');
-
-  if (!looksLikeMissingColumnError) {
-    return [];
-  }
-
-  return CREDIT_MODEL_OPTIONAL_COLUMNS.filter((column) => haystack.includes(column));
+type CreditModelRpcProvider = {
+  provider_id?: string | null;
+  provider_name?: string | null;
+  base_url?: string | null;
+  api_keys?: string[] | null;
+  models?: CreditModelRpcModel[] | null;
 };
 
 type EditableModel = {
@@ -167,6 +154,30 @@ const formatUsdEstimate = (value: number | null): string => {
   if (value === null || !Number.isFinite(value)) return '--';
   return value >= 1 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 };
+
+const normalizeAdminCreditModelRows = (providers: CreditModelRpcProvider[]): CreditModelRow[] =>
+  providers.flatMap((provider) =>
+    (provider.models || []).map((model) => ({
+      provider_id: String(provider.provider_id || '').trim(),
+      provider_name: String(provider.provider_name || provider.provider_id || '').trim(),
+      base_url: String(provider.base_url || '').trim(),
+      api_keys: Array.isArray(provider.api_keys) ? provider.api_keys.filter((key): key is string => typeof key === 'string') : [],
+      model_id: String(model.model_id || '').trim(),
+      display_name: String(model.display_name || model.model_id || '').trim(),
+      description: model.description || '',
+      endpoint_type: String(model.endpoint_type || 'openai').trim(),
+      credit_cost: Math.max(1, Number(model.credit_cost || 1)),
+      is_active: model.is_active !== false,
+      call_count: model.call_count ?? null,
+      max_calls_limit: model.max_calls_limit ?? null,
+      color: normalizeHexColor(model.color, '#3B82F6') || '#3B82F6',
+      color_secondary: normalizeHexColor(model.color_secondary) || null,
+      text_color: model.text_color === 'black' ? 'black' : 'white',
+      advanced_enabled: Boolean(model.advanced_enabled),
+      mix_with_same_model: Boolean(model.mix_with_same_model),
+      quality_pricing: model.quality_pricing ?? null,
+    }))
+  );
 
 const areQualityPricingEqual = (
   left: AdminModelQualityPricing,
@@ -368,67 +379,11 @@ const CreditModelSettings: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('admin_credit_models')
-        .select(CREDIT_MODEL_SELECT_WITH_LIMIT)
-        .order('provider_id', { ascending: true })
-        .order('priority', { ascending: false });
-
-      const missingColumns = getMissingCreditModelColumns(error);
-      if (error && missingColumns.length > 0) {
-        const fallbackSelect = getCreditModelSelect({
-          includeMaxCallsLimit: !missingColumns.includes('max_calls_limit'),
-          includeAdvancedSettings: !missingColumns.some((column) =>
-            ['advanced_enabled', 'mix_with_same_model', 'quality_pricing'].includes(column)
-          ),
-        });
-
-        const legacy = await supabase
-          .from('admin_credit_models')
-          .select(fallbackSelect)
-          .order('provider_id', { ascending: true })
-          .order('priority', { ascending: false });
-
-        if (legacy.error) throw legacy.error;
-
-        const normalized = ((legacy.data || []) as Array<Partial<CreditModelRow>>).map((row) => ({
-          ...row,
-          provider_id: row.provider_id || '',
-          provider_name: row.provider_name || '',
-          base_url: row.base_url || '',
-          api_keys: row.api_keys || [],
-          model_id: row.model_id || '',
-          display_name: row.display_name || '',
-          description: row.description || '',
-          endpoint_type: row.endpoint_type || 'openai',
-          credit_cost: Number(row.credit_cost || 1),
-          is_active: row.is_active !== false,
-          call_count: row.call_count ?? null,
-          max_calls_limit: !missingColumns.includes('max_calls_limit') ? row.max_calls_limit ?? null : null,
-          color: row.color || '#3B82F6',
-          color_secondary: row.color_secondary || null,
-          text_color: row.text_color === 'black' ? 'black' : 'white',
-          advanced_enabled: missingColumns.includes('advanced_enabled') ? false : Boolean(row.advanced_enabled),
-          mix_with_same_model: missingColumns.includes('mix_with_same_model') ? false : Boolean(row.mix_with_same_model),
-          quality_pricing: missingColumns.includes('quality_pricing') ? null : row.quality_pricing ?? null,
-        }));
-
-        setRows(normalized as CreditModelRow[]);
-        setSupportsMaxCallsLimit(!missingColumns.includes('max_calls_limit'));
-        setSupportsAdvancedSettings(
-          !missingColumns.includes('advanced_enabled') &&
-            !missingColumns.includes('mix_with_same_model') &&
-            !missingColumns.includes('quality_pricing')
-        );
-        notify.warning(
-          '已启用兼容模式',
-          `当前数据库缺少字段：${missingColumns.join('、')}。模型已正常加载，执行最新 Supabase 迁移后可启用对应能力。`
-        );
-        return;
-      }
-
+      const { data, error } = await supabase.rpc('get_admin_credit_models_full');
       if (error) throw error;
-      setRows((data || []) as CreditModelRow[]);
+
+      const normalized = normalizeAdminCreditModelRows((data || []) as CreditModelRpcProvider[]);
+      setRows(normalized);
       setSupportsMaxCallsLimit(true);
       setSupportsAdvancedSettings(true);
     } catch (error: any) {
@@ -441,111 +396,6 @@ const CreditModelSettings: React.FC = () => {
   useEffect(() => {
     void load();
   }, []);
-
-  const loadProviderRows = async (providerId: string): Promise<CreditModelRow[]> => {
-    const { data, error } = await supabase
-      .from('admin_credit_models')
-      .select(CREDIT_MODEL_SELECT_BASE)
-      .eq('provider_id', providerId)
-      .order('priority', { ascending: false });
-
-    if (error) throw error;
-    return (data || []) as CreditModelRow[];
-  };
-
-  const needsDirectStyleRepair = (
-    savedRows: CreditModelRow[],
-    payloadModels: Array<{
-      model_id: string;
-      color: string;
-      color_secondary: string | null;
-      text_color: 'white' | 'black';
-    }>
-  ) => {
-    const rowMap = new Map(
-      savedRows.map((row) => [normalizeBaseModelId(row.model_id), row] as const)
-    );
-
-    return payloadModels.some((model) => {
-      const saved = rowMap.get(normalizeBaseModelId(model.model_id));
-      if (!saved) return true;
-
-      const expectedPrimary = normalizeHexColor(model.color, '#3B82F6');
-      const savedPrimary = normalizeHexColor(saved.color, '#3B82F6');
-      if (savedPrimary !== expectedPrimary) return true;
-
-      const expectedSecondary = normalizeHexColor(model.color_secondary);
-      const savedSecondary = normalizeHexColor(saved.color_secondary);
-      if (expectedSecondary && savedSecondary !== expectedSecondary) return true;
-
-      const expectedText = model.text_color === 'black' ? 'black' : 'white';
-      const savedText = saved.text_color === 'black' ? 'black' : 'white';
-      if (savedText !== expectedText) return true;
-
-      return false;
-    });
-  };
-
-  const saveProviderDirect = async (
-    payloadModels: Array<{
-      model_id: string;
-      display_name: string;
-      description: string;
-      endpoint_type: string;
-      credit_cost: number;
-      priority: number;
-      weight: number;
-      is_active: boolean;
-      color: string;
-      color_secondary: string | null;
-      text_color: 'white' | 'black';
-      max_calls_limit?: number | null;
-      auto_pause_on_limit?: boolean;
-    }>
-  ) => {
-    const providerId = form.providerId.trim();
-    const providerName = form.providerName.trim();
-    const baseUrl = form.baseUrl.trim();
-    const apiKey = form.apiKey.trim();
-
-    const { error: deleteError } = await supabase
-      .from('admin_credit_models')
-      .delete()
-      .eq('provider_id', providerId);
-
-    if (deleteError) throw deleteError;
-
-    const rowsToInsert = payloadModels.map((item) => ({
-      provider_id: providerId,
-      provider_name: providerName,
-      base_url: baseUrl,
-      api_keys: [apiKey],
-      model_id: normalizeBaseModelId(item.model_id),
-      display_name: item.display_name.trim(),
-      description: item.description || '',
-      endpoint_type: item.endpoint_type,
-      credit_cost: Number(item.credit_cost || 1),
-      priority: item.priority,
-      weight: item.weight,
-      is_active: Boolean(item.is_active),
-      color: normalizeHexColor(item.color, '#3B82F6') || '#3B82F6',
-      color_secondary: normalizeHexColor(item.color_secondary) || null,
-      text_color: item.text_color === 'black' ? 'black' : 'white',
-      gradient: 'from-blue-500 to-indigo-600',
-      ...(supportsMaxCallsLimit
-        ? {
-            max_calls_limit: item.max_calls_limit ?? null,
-            auto_pause_on_limit: item.auto_pause_on_limit ?? true,
-          }
-        : {}),
-    }));
-
-    const { error: insertError } = await supabase
-      .from('admin_credit_models')
-      .insert(rowsToInsert);
-
-    if (insertError) throw insertError;
-  };
 
   const refreshAdminModelSync = async () => {
     await adminModelService.forceLoadAdminModels();

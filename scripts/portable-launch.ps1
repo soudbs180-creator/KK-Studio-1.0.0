@@ -6,6 +6,8 @@ $LogDir = Join-Path $ReleaseRoot 'logs'
 $NodeExe = Join-Path $ReleaseRoot 'runtime\node.exe'
 $AppDir = Join-Path $ReleaseRoot 'app'
 $WebScript = Join-Path $AppDir 'portable-app-server.cjs'
+$UpdateScript = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
+$UpdateConfig = Join-Path $ReleaseRoot 'support\update-config.json'
 $PaymentDir = Join-Path $AppDir 'payment-server'
 $PaymentScript = Join-Path $PaymentDir 'index.js'
 $PaymentEnv = Join-Path $PaymentDir '.env'
@@ -15,6 +17,14 @@ $PaymentPidFile = Join-Path $RunDir 'payment.pid'
 
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+if (Test-Path -LiteralPath $UpdateScript) {
+    try {
+        & $UpdateScript -ReleaseRoot $ReleaseRoot -ConfigPath $UpdateConfig | Out-Null
+    } catch {
+        Write-Warning ("Portable self-update check failed: " + $_.Exception.Message)
+    }
+}
 
 function Get-WebUrl {
     param([int]$Port)

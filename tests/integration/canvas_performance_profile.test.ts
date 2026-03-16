@@ -4,6 +4,7 @@ import { describe, test } from 'node:test'
 import {
   getCanvasPerformanceProfile,
   getCanvasProjectSize,
+  getCanvasTextSofteningProfile,
   getCanvasZoomBand,
   shouldSimplifyCard,
   shouldThrottleEdges,
@@ -101,5 +102,38 @@ describe('canvas performance profile', () => {
     assert.equal(profile.cardDetailLevel, 'thumbnail-shell')
     assert.equal(profile.renderMode, 'performance')
     assert.equal(shouldSimplifyCard(profile), true)
+  })
+
+  test('progressively softens text from 100% to 50% zoom', () => {
+    const fullScale = getCanvasTextSofteningProfile(1, true)
+    const midScale = getCanvasTextSofteningProfile(0.75, true)
+    const minimumScale = getCanvasTextSofteningProfile(0.5, true)
+
+    assert.equal(fullScale.active, false)
+    assert.equal(fullScale.primaryBlurPx, 0)
+    assert.equal(fullScale.primaryOpacity, 1)
+
+    assert.equal(midScale.active, true)
+    assert.ok(midScale.primaryBlurPx > 0)
+    assert.ok(midScale.primaryBlurPx < minimumScale.primaryBlurPx)
+    assert.ok(midScale.secondaryBlurPx < minimumScale.secondaryBlurPx)
+    assert.ok(midScale.primaryOpacity < 1)
+    assert.ok(midScale.primaryOpacity > minimumScale.primaryOpacity)
+
+    assert.equal(minimumScale.active, true)
+    assert.equal(minimumScale.primaryBlurPx, 0.72)
+    assert.equal(minimumScale.secondaryBlurPx, 0.96)
+    assert.equal(minimumScale.primaryOpacity, 0.9)
+    assert.equal(minimumScale.secondaryOpacity, 0.7)
+  })
+
+  test('disables text softening entirely when not requested', () => {
+    const profile = getCanvasTextSofteningProfile(0.5, false)
+
+    assert.equal(profile.active, false)
+    assert.equal(profile.primaryBlurPx, 0)
+    assert.equal(profile.secondaryBlurPx, 0)
+    assert.equal(profile.primaryOpacity, 1)
+    assert.equal(profile.secondaryOpacity, 1)
   })
 })

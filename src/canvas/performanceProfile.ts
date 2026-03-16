@@ -27,6 +27,15 @@ export interface CanvasPerformanceProfile {
   cardDetailLevel: CanvasCardDetailLevel;
 }
 
+export interface CanvasTextSofteningProfile {
+  active: boolean;
+  progress: number;
+  primaryBlurPx: number;
+  secondaryBlurPx: number;
+  primaryOpacity: number;
+  secondaryOpacity: number;
+}
+
 const PROJECT_OVERSCAN: Record<CanvasProjectSize, number> = {
   normal: 900,
   large: 500,
@@ -98,3 +107,34 @@ export const shouldSimplifyCard = (profile: CanvasPerformanceProfile): boolean =
 
 export const shouldThrottleEdges = (profile: CanvasPerformanceProfile): boolean =>
   profile.isInteracting || profile.projectSize !== 'normal' || profile.zoomBand === 'tiny';
+
+export const getCanvasTextSofteningProfile = (
+  scale: number,
+  enabled: boolean
+): CanvasTextSofteningProfile => {
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+  if (!enabled || safeScale >= 1) {
+    return {
+      active: false,
+      progress: 0,
+      primaryBlurPx: 0,
+      secondaryBlurPx: 0,
+      primaryOpacity: 1,
+      secondaryOpacity: 1,
+    };
+  }
+
+  const clampedScale = Math.max(0.5, Math.min(1, safeScale));
+  const linearProgress = (1 - clampedScale) / 0.5;
+  const progress = linearProgress * linearProgress * (3 - 2 * linearProgress);
+
+  return {
+    active: progress > 0.001,
+    progress,
+    primaryBlurPx: Number((0.72 * progress).toFixed(3)),
+    secondaryBlurPx: Number((0.96 * progress).toFixed(3)),
+    primaryOpacity: Number((1 - 0.1 * progress).toFixed(3)),
+    secondaryOpacity: Number((1 - 0.3 * progress).toFixed(3)),
+  };
+};

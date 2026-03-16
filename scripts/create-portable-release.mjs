@@ -14,6 +14,7 @@ const distSourceDir = path.join(rootDir, 'dist');
 const paymentSourceDir = path.join(rootDir, 'payment-server');
 const paymentTargetDir = path.join(appDir, 'payment-server');
 const includePaymentEnv = process.argv.includes('--include-payment-env') || process.env.KK_STUDIO_INCLUDE_PAYMENT_ENV === '1';
+const updateScriptSource = path.join(rootDir, 'scripts', 'portable-self-update.ps1');
 
 function ensureExists(targetPath, message) {
   if (!fs.existsSync(targetPath)) {
@@ -109,7 +110,19 @@ function buildReadme() {
     '- This folder is only for portable local distribution.',
     '- Keep deploying the main project source with your existing Netlify or Vercel setup.',
     '',
+    'Optional self-update setup',
+    '- Copy support/update-config.json.example to support/update-config.json.',
+    '- Set manifestUrl to the hosted portable manifest.json produced by npm run publish:portable.',
+    '- The launcher checks for updates before starting the local services.',
+    '',
   ].join('\r\n');
+}
+
+function buildUpdateConfigExample() {
+  return `${JSON.stringify({
+    enabled: true,
+    manifestUrl: 'https://example.com/kk-studio/portable/stable/manifest.json',
+  }, null, 2)}\r\n`;
 }
 
 async function main() {
@@ -118,6 +131,7 @@ async function main() {
   ensureExists(path.join(rootDir, 'scripts', 'portable-app-server.cjs'), 'scripts/portable-app-server.cjs was not found.');
   ensureExists(path.join(rootDir, 'scripts', 'portable-launch.ps1'), 'scripts/portable-launch.ps1 was not found.');
   ensureExists(path.join(rootDir, 'scripts', 'portable-stop.ps1'), 'scripts/portable-stop.ps1 was not found.');
+  ensureExists(updateScriptSource, 'scripts/portable-self-update.ps1 was not found.');
 
   await rm(releaseRoot, { recursive: true, force: true });
   await mkdir(runtimeDir, { recursive: true });
@@ -131,10 +145,12 @@ async function main() {
   await copyFile(path.join(rootDir, 'scripts', 'portable-app-server.cjs'), path.join(appDir, 'portable-app-server.cjs'));
   await copyFile(path.join(rootDir, 'scripts', 'portable-launch.ps1'), path.join(supportDir, 'portable-launch.ps1'));
   await copyFile(path.join(rootDir, 'scripts', 'portable-stop.ps1'), path.join(supportDir, 'portable-stop.ps1'));
+  await copyFile(updateScriptSource, path.join(supportDir, 'portable-self-update.ps1'));
 
   await writeFile(path.join(releaseRoot, 'Start KK Studio.bat'), buildStartBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'Stop KK Studio.bat'), buildStopBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'README-PORTABLE.txt'), buildReadme(), 'utf8');
+  await writeFile(path.join(supportDir, 'update-config.json.example'), buildUpdateConfigExample(), 'utf8');
 
   if (fs.existsSync(paymentSourceDir)) {
     const paymentFiles = [

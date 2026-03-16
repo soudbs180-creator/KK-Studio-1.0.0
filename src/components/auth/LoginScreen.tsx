@@ -49,6 +49,9 @@ function mapAuthError(error: unknown, view: AuthView): string {
   if (view === 'register' && (message.includes('User already registered') || message.includes('already registered'))) {
     return '该邮箱已注册，请直接登录。';
   }
+  if (view === 'register' && message.includes('Database error saving new user')) {
+    return '注册服务当前配置异常，用户资料初始化失败，请联系管理员执行最新的 Supabase 迁移。';
+  }
   if (message.includes('Invalid login credentials')) {
     return '邮箱或密码错误。';
   }

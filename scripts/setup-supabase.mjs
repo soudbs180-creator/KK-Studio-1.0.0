@@ -1,59 +1,49 @@
-﻿/**
- * Supabase Setup Script
- * Run: node scripts/setup-supabase.mjs
- */
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.join(__dirname, '..');
+const migrationsDir = path.join(repoRoot, 'supabase', 'migrations');
+const projectRefPath = path.join(repoRoot, 'supabase', '.temp', 'project-ref');
 
-const projectRef = process.env.SUPABASE_PROJECT_REF || '';
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const migrationFile = path.join(__dirname, '..', 'supabase', 'migrations', '20250303000000_complete_setup.sql');
+function getLatestMigrationFile() {
+  if (!fs.existsSync(migrationsDir)) return null;
+
+  return fs
+    .readdirSync(migrationsDir)
+    .filter((fileName) => fileName.endsWith('.sql'))
+    .sort()
+    .at(-1) || null;
+}
+
+const latestMigration = getLatestMigrationFile();
+const projectRef = fs.existsSync(projectRefPath)
+  ? fs.readFileSync(projectRefPath, 'utf8').trim()
+  : process.env.SUPABASE_PROJECT_REF || '';
 
 console.log('========================================');
 console.log('KK Studio Supabase Setup Guide');
-console.log('========================================\n');
-console.log(`Project URL: ${supabaseUrl || '(not set)'}`);
-console.log(`Project Ref: ${projectRef || '(not set)'}`);
-console.log(`Migration File: ${migrationFile}\n`);
-
-if (!fs.existsSync(migrationFile)) {
-  console.error('Migration file not found.');
-  process.exit(1);
-}
-
-console.log('Migration file found.\n');
-console.log('Method 1: Supabase CLI (recommended)');
-console.log('1. npm install -g supabase');
-console.log('2. supabase login');
-if (projectRef) {
-  console.log(`3. supabase link --project-ref ${projectRef}`);
-} else {
-  console.log('3. supabase link --project-ref <your-project-ref>');
-}
-console.log('4. supabase db push\n');
-
-console.log('Method 2: Supabase Dashboard (manual)');
-if (projectRef) {
-  console.log(`1. Visit: https://app.supabase.com/project/${projectRef}`);
-} else {
-  console.log('1. Visit: https://app.supabase.com/project/<your-project-ref>');
-}
-console.log('2. Open SQL Editor');
-console.log('3. Create New Query');
-console.log('4. Paste migration SQL below and run:\n');
-
-const sql = fs.readFileSync(migrationFile, 'utf8');
-console.log('-'.repeat(72));
-console.log(sql);
-console.log('-'.repeat(72));
-
-console.log('\nVerification checklist:');
-console.log('- profiles');
-console.log('- credit_transactions');
-console.log('- admin_providers');
-console.log('- provider_pricing_cache');
+console.log('========================================');
+console.log('');
+console.log(`Project ref: ${projectRef || '(missing)'}`);
+console.log(`Latest forward-only migration: ${latestMigration || '(missing)'}`);
+console.log('');
+console.log('Canonical runtime contract');
+console.log('- profiles: identity + user_apis');
+console.log('- user_credits: balance source of truth');
+console.log('- credit_transactions: canonical ledger');
+console.log('- admin_credit_models: system model routing');
+console.log('- temp_users: temporary identities');
+console.log('- secure-model-proxy: required edge runtime');
+console.log('');
+console.log('Recommended workflow');
+console.log('1. supabase link --project-ref <project-ref>');
+console.log('2. supabase db push');
+console.log('3. npm run supabase:audit');
+console.log('4. Deploy secure-model-proxy if the audit reports it missing');
+console.log('');
+console.log('Notes');
+console.log('- Do not replay the 2025 bootstrap SQL as a fresh setup source.');
+console.log('- The project now relies on forward-only consolidation migrations from the current remote state.');

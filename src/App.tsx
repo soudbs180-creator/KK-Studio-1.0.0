@@ -5318,7 +5318,8 @@ ${slideLayerXml.join('\n')}
   const connectorStroke = Math.max(1, Math.min(3, 1 / zoomForConnectors));
   const connectorDashA = Math.max(2, Math.min(10, 4 / zoomForConnectors));
   const connectorDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
-  const connectorStrokeDasharray = simplifiedConnectorMode ? undefined : `${connectorDashA} ${connectorDashB}`;
+  const connectorStrokeDasharray = `${connectorDashA} ${connectorDashB}`;
+  const connectorStrokeLinecap: 'butt' | 'round' = 'butt';
   const activeDragStroke = Math.max(2, Math.min(6, 3 / zoomForConnectors));
   const activeDragDashA = Math.max(3, Math.min(12, 6 / zoomForConnectors));
   const activeDragDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
@@ -5907,7 +5908,8 @@ ${slideLayerXml.join('\n')}
       >
         {/* 1. Connection Lines Layer (SVG) - Below all cards */}
         <svg
-          className="absolute top-0 left-0 pointer-events-none will-change-transform"
+          className="absolute top-0 left-0 pointer-events-none"
+          shapeRendering="geometricPrecision"
           style={{
             width: '10000px',
             height: '10000px',
@@ -5915,7 +5917,6 @@ ${slideLayerXml.join('\n')}
             top: '-5000px',
             overflow: 'visible',
             zIndex: CONNECTOR_LAYER_Z_INDEX,
-            transform: 'translateZ(0)' // 馃殌 [GPU鍔犻€焆 寮哄埗GPU娓叉煋鎻愬崌鎷栨嫿鎬ц兘
           }}
         >
           {/* Active Drag Line */}
@@ -5993,7 +5994,7 @@ ${slideLayerXml.join('\n')}
                     stroke="var(--connector-color, #6366f1)"
                     strokeWidth={connectorStroke}
                     strokeDasharray={connectorStrokeDasharray}
-                    strokeLinecap="round"
+                    strokeLinecap={connectorStrokeLinecap}
                     opacity="0.6"
                     className={showConnectorButtons ? 'group-hover:opacity-100' : undefined}
                   />
@@ -6053,7 +6054,7 @@ ${slideLayerXml.join('\n')}
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
                   strokeDasharray={connectorStrokeDasharray}
-                  strokeLinecap="round"
+                  strokeLinecap={connectorStrokeLinecap}
                   opacity="0.5"
                   className={showConnectorButtons ? `transition-opacity duration-200 ${hoverClass} group-hover:opacity-100` : undefined}
                 />
@@ -6145,7 +6146,7 @@ ${slideLayerXml.join('\n')}
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
                   strokeDasharray={connectorStrokeDasharray}
-                  strokeLinecap="round"
+                  strokeLinecap={connectorStrokeLinecap}
                   opacity="0.5"
                   className={showConnectorButtons ? `transition-opacity duration-200 ${hoverClass} group-hover:opacity-100` : undefined}
                 />

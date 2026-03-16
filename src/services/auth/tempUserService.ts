@@ -45,7 +45,7 @@ class TempUserService {
 
       return session;
     } catch (error) {
-      console.error('[TempUser] 读取本地临时用户缓存失败:', error);
+      console.error('[TempUser] Failed to read cached temp user:', error);
       this.clearCachedTempUser();
       return null;
     }
@@ -55,7 +55,7 @@ class TempUserService {
     try {
       localStorage.setItem(TEMP_USER_STORAGE_KEY, JSON.stringify(session));
     } catch (error) {
-      console.error('[TempUser] 写入本地临时用户缓存失败:', error);
+      console.error('[TempUser] Failed to cache temp user:', error);
     }
   }
 
@@ -71,42 +71,21 @@ class TempUserService {
     const nickname = buildTempNickname(tempUserId);
     const timestampIso = new Date(now).toISOString();
 
-    const payload = {
+    const { error } = await supabase.from('temp_users').insert({
       id: tempUserId,
-      email,
-      nickname,
       created_at: timestampIso,
       expires_at: new Date(expiresAt).toISOString(),
       is_active: true,
-      last_seen_at: timestampIso,
-      updated_at: timestampIso,
       metadata: {
-        createdAt: now,
+        email,
+        nickname,
+        lastSeenAt: timestampIso,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
       },
-    };
-
-    let { error } = await supabase.from('temp_users').insert(payload);
-
-    const missingColumn =
-      String(error?.message || '').includes('column') &&
-      (String(error?.message || '').includes('email') ||
-        String(error?.message || '').includes('nickname') ||
-        String(error?.message || '').includes('last_seen_at') ||
-        String(error?.message || '').includes('updated_at'));
-
-    if (missingColumn) {
-      ({ error } = await supabase.from('temp_users').insert({
-        id: tempUserId,
-        created_at: timestampIso,
-        expires_at: new Date(expiresAt).toISOString(),
-        is_active: true,
-        metadata: payload.metadata,
-      }));
-    }
+    });
 
     if (error) {
-      console.error('[TempUser] 创建 Supabase 临时用户记录失败:', error);
+      console.error('[TempUser] Failed to create Supabase temp user record:', error);
       throw new Error(`创建临时用户失败：${error.message || '未知错误'}`);
     }
 

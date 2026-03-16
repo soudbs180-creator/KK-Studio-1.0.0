@@ -65,3 +65,11 @@ If you only want to clean up local clutter later, check:
 2. `dist/`
 3. `release/`
 4. `.npm-cache/`
+
+### Maintenance helpers
+
+- `npm run organize:local`: safely moves obvious root-level temp artifacts into `workspace/`
+- It also moves nested `.bak` / backup files out of `src/`, `docs/`, and `scripts/` into `workspace/local-artifacts/source-backups/`
+- `npm run package:portable`: rebuilds the portable client bundle
+- `npm run publish:portable`: creates a hosted portable update archive + manifest under `release/publish/`
+- `docs/setup/AUTO_UPDATE_AND_DEPLOY.md`: setup guide for client self-updates and cloud auto-deploy

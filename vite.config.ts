@@ -1,5 +1,10 @@
+import fs from 'fs';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
+
+const VERSION_MANIFEST_FILENAME = 'app-version.json';
 
 const WORKSPACE_DATA_DIRS = new Set([
     'picture',
@@ -12,6 +17,97 @@ const WORKSPACE_DATA_DIRS = new Set([
     'cache',
     'images',
 ]);
+
+const PRIVATE_IPV4_PATTERNS = [
+    /^0\./,
+    /^10\./,
+    /^127\./,
+    /^169\.254\./,
+    /^172\.(1[6-9]|2\d|3[0-1])\./,
+    /^192\.168\./,
+];
+
+const FORBIDDEN_HOSTNAME_SUFFIXES = [
+    '.internal',
+    '.local',
+    '.localdomain',
+    '.localhost',
+    '.home',
+    '.lan',
+];
+
+function normalizeHostForChecks(hostname: string): string {
+    return String(hostname || '')
+        .trim()
+        .toLowerCase()
+        .replace(/^\[|\]$/g, '')
+        .split('%')[0];
+}
+
+function isPrivateIpAddress(hostname: string): boolean {
+    const normalized = normalizeHostForChecks(hostname);
+    const ipVersion = isIP(normalized);
+
+    if (ipVersion === 4) {
+        return PRIVATE_IPV4_PATTERNS.some((pattern) => pattern.test(normalized));
+    }
+
+    if (ipVersion === 6) {
+        return normalized === '::'
+            || normalized === '::1'
+            || /^f[cd][0-9a-f]{0,2}:/i.test(normalized)
+            || /^fe[89ab][0-9a-f]?:/i.test(normalized)
+            || /^::ffff:(?:0:)?(?:10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/i.test(normalized);
+    }
+
+    return false;
+}
+
+function isForbiddenHostname(hostname: string): boolean {
+    const lower = normalizeHostForChecks(hostname);
+    if (!lower) return true;
+    if (lower === 'localhost') return true;
+    if (lower.includes('localhost')) return true;
+    if (FORBIDDEN_HOSTNAME_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
+    if (lower.endsWith('.nip.io') || lower.endsWith('.sslip.io')) return true;
+    if (isPrivateIpAddress(lower)) return true;
+    return false;
+}
+
+async function normalizeSupplierBaseUrl(rawBaseUrl: string): Promise<string> {
+    const parsed = new URL(String(rawBaseUrl || '').trim());
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Only http/https supplier URLs are allowed');
+    }
+
+    if (parsed.username || parsed.password) {
+        throw new Error('Supplier URL must not contain embedded credentials');
+    }
+
+    if (isForbiddenHostname(parsed.hostname)) {
+        throw new Error('Private, local, or loopback supplier URLs are not allowed');
+    }
+
+    const normalizedHost = normalizeHostForChecks(parsed.hostname);
+    if (normalizedHost && !isIP(normalizedHost)) {
+        const records = await lookup(normalizedHost, { all: true, verbatim: true });
+        if (!records.length) {
+            throw new Error('Supplier hostname did not resolve');
+        }
+
+        // Block domains that resolve into loopback or private network ranges in local dev too.
+        if (records.some((record) => isPrivateIpAddress(record.address))) {
+            throw new Error('Supplier hostname resolved to a private or loopback address');
+        }
+    }
+
+    parsed.hash = '';
+    parsed.search = '';
+    parsed.pathname = parsed.pathname.replace(/\/v1\/?$/i, '').replace(/\/+$/, '') || '/';
+
+    return parsed.toString().replace(/\/$/, '');
+}
 
 const ALWAYS_IGNORE_SEGMENTS = new Set([
     '.agents',
@@ -136,6 +232,50 @@ function resolveManualChunk(id: string): string | undefined {
     return undefined;
 }
 
+function buildVersionManifestPlugin(): Plugin {
+    let projectRoot = process.cwd();
+
+    return {
+        name: 'kk-build-version-manifest',
+        apply: 'build',
+        configResolved(config) {
+            projectRoot = config.root;
+        },
+        generateBundle() {
+            const packageJsonPath = path.resolve(projectRoot, 'package.json');
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as {
+                name?: string;
+                version?: string;
+            };
+
+            const commitSha = process.env.VERCEL_GIT_COMMIT_SHA
+                || process.env.COMMIT_REF
+                || process.env.GITHUB_SHA
+                || process.env.CF_PAGES_COMMIT_SHA
+                || null;
+
+            const manifest = {
+                appName: 'KK Studio',
+                version: packageJson.version || '0.0.0',
+                buildTime: new Date().toISOString(),
+                channel: process.env.KK_STUDIO_RELEASE_CHANNEL || 'stable',
+                deploymentTarget: process.env.VERCEL_ENV
+                    || process.env.CONTEXT
+                    || process.env.NETLIFY_CONTEXT
+                    || process.env.NODE_ENV
+                    || 'production',
+                commitSha,
+            };
+
+            this.emitFile({
+                type: 'asset',
+                fileName: VERSION_MANIFEST_FILENAME,
+                source: JSON.stringify(manifest, null, 2),
+            });
+        },
+    };
+}
+
 /**
  * 开发环境价格扫描代理插件
  * 从服务端去爬取供应商的 /pricing 页面数据（实际请求 /api/pricing）
@@ -159,7 +299,7 @@ function pricingProxyPlugin(): Plugin {
 
                 try {
                     const { baseUrl } = JSON.parse(body);
-                    const cleanUrl = (baseUrl || '').replace(/\/v1\/?$/, '').replace(/\/$/, '');
+                    const cleanUrl = await normalizeSupplierBaseUrl(baseUrl);
 
                     if (!cleanUrl) {
                         res.statusCode = 400;
@@ -234,7 +374,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [pricingProxyPlugin()],
+        plugins: [pricingProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

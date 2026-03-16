@@ -225,11 +225,12 @@ class CreditService {
     newBalance?: number;
     message: string;
   }> {
+    void adminUserId;
+
     const { data, error } = await supabase.rpc('admin_recharge_credits', {
       p_target_user_id: targetUserId,
       p_amount: amount,
-      p_description: description,
-      p_admin_user_id: adminUserId
+      p_description: description
     });
 
     if (error) {

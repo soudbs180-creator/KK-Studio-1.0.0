@@ -9,54 +9,58 @@ interface GenerateRequest {
     apiKey?: string;
 }
 
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+};
+
+const jsonResponse = (body: Record<string, unknown>, status: number) =>
+    new Response(JSON.stringify(body), {
+        status,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            ...corsHeaders,
+        },
+    });
+
 export default async (request: Request) => {
     // Handle CORS preflight
     if (request.method === "OPTIONS") {
-        return new Response(null, {
-            status: 200,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-            },
-        });
+        return new Response(null, { status: 200, headers: corsHeaders });
     }
 
     if (request.method !== "POST") {
-        return new Response(JSON.stringify({ error: "Method not allowed" }), {
-            status: 405,
-            headers: { "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "Method not allowed" }, 405);
     }
 
     try {
         const body: GenerateRequest = await request.json();
         const { prompt, aspectRatio, imageSize, model, referenceImages, apiKey } = body;
+        const effectiveApiKey = String(apiKey || "").trim();
 
-        // Determine effective API Key with priority:
-        // 1. Frontend-provided key
-        // 2. Server environment variable (fallback)
-        let effectiveApiKey = apiKey;
-
+        // Never fall back to a server-side shared API key here.
+        // This endpoint is public and would otherwise become a spend-abuse proxy.
         if (!effectiveApiKey) {
-            effectiveApiKey = process.env.GEMINI_API_KEY;
-        }
-
-        if (!effectiveApiKey) {
-            return new Response(JSON.stringify({ error: "API key is required. Please configure your API key in settings." }), {
-                status: 400,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
+            return jsonResponse(
+                {
+                    error: "A user-scoped API key is required. Shared server fallback keys are disabled for security.",
                 },
-            });
+                400,
+            );
         }
 
         if (!prompt) {
-            return new Response(JSON.stringify({ error: "Prompt is required" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
+            return jsonResponse({ error: "Prompt is required" }, 400);
+        }
+
+        if (!model) {
+            return jsonResponse({ error: "Model is required" }, 400);
+        }
+
+        if (!aspectRatio) {
+            return jsonResponse({ error: "Aspect ratio is required" }, 400);
         }
 
         // Initialize Gemini client
@@ -99,32 +103,20 @@ export default async (request: Request) => {
             if (candidate.content?.parts) {
                 for (const part of candidate.content.parts) {
                     if (part.inlineData?.data) {
-                        return new Response(
-                            JSON.stringify({
+                        return jsonResponse(
+                            {
                                 success: true,
                                 imageData: part.inlineData.data,
                                 mimeType: part.inlineData.mimeType || "image/png",
-                            }),
-                            {
-                                status: 200,
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "Access-Control-Allow-Origin": "*",
-                                },
-                            }
+                            },
+                            200,
                         );
                     }
                 }
             }
         }
 
-        return new Response(
-            JSON.stringify({ error: "No image generated" }),
-            {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+        return jsonResponse({ error: "No image generated" }, 500);
 
     } catch (error: any) {
         console.error("Generation error:", error);
@@ -144,16 +136,7 @@ export default async (request: Request) => {
             statusCode = 403;
         }
 
-        return new Response(
-            JSON.stringify({ error: errorMessage }),
-            {
-                status: statusCode,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-            }
-        );
+        return jsonResponse({ error: errorMessage }, statusCode);
     }
 };
 

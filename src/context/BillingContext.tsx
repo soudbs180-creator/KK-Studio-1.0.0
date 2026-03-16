@@ -252,26 +252,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const recharge = useCallback(
     async (amount: number, currency: 'CNY' | 'USD') => {
-      if (!user) return;
-
-      const creditsToAdd = currency === 'CNY' ? amount * 5 : amount * 30;
-      const { error } = await supabase.rpc('process_payment_recharge', {
-        p_user_id: user.id,
-        p_transaction_id: `MOCK-TXN-${Date.now()}`,
-        p_amount: amount,
-        p_currency: currency,
-        p_credits_added: creditsToAdd,
-        p_payment_method: 'system_test',
-      });
-
-      if (error) {
-        console.error('[BillingContext] 充值失败:', error);
-        throw error;
-      }
-
-      await Promise.all([fetchBalance(), fetchLogs()]);
+      void amount;
+      void currency;
+      void user;
+      throw new Error('Direct client-side recharge is disabled. Use the payment gateway flow instead.');
     },
-    [user, fetchBalance, fetchLogs]
+    [user]
   );
 
   return (

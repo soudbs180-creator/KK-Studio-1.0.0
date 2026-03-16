@@ -123,7 +123,7 @@ export function mountTurnstileRoutes(app: any) {
   })
 
   // 受保护的登录端点示例
-  app.post('/api/auth/login', turnstileMiddleware(), async (req: any, res: any) => {
+  app.post('/api/examples/turnstile-login', turnstileMiddleware(), async (req: any, res: any) => {
     // 如果通过验证，执行登录逻辑
     const { username, password } = req.body
     

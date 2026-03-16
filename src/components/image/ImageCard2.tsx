@@ -13,7 +13,7 @@ import { loadImage, cancelImageLoad } from '../../services/image/imageLoader';
 import { ImageQuality, getAppropriateQuality, type ImageQualityBias } from '../../services/image/imageQuality';
 import { getModelThemeBgColor } from '../../services/model/modelCapabilities';
 import { getModelCredits, isCreditBasedModel } from '../../services/model/modelPricing';
-import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile';
+import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -1068,16 +1068,19 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const stackZIndex = stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex);
     const renderLeft = snapCanvasCoordinate(renderPos.x - nodeWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(renderPos.y - nodeHeight, zoomScale || 1);
-    const shouldSoftenText = (zoomScale || 1) < 1 && (detailLevel === 'compact' || isCanvasTransforming);
+    const textSoftening = getCanvasTextSofteningProfile(
+        zoomScale || 1,
+        detailLevel === 'compact' || isCanvasTransforming
+    );
     const textTransition = 'filter 140ms ease, opacity 140ms ease';
     const primaryTextRenderStyle = {
-        filter: shouldSoftenText ? 'blur(0.65px)' : 'none',
-        opacity: shouldSoftenText ? 0.9 : 1,
+        filter: textSoftening.active ? `blur(${textSoftening.primaryBlurPx}px)` : 'none',
+        opacity: textSoftening.primaryOpacity,
         transition: textTransition,
     };
     const secondaryTextRenderStyle = {
-        filter: shouldSoftenText ? 'blur(0.85px)' : 'none',
-        opacity: shouldSoftenText ? 0.72 : 1,
+        filter: textSoftening.active ? `blur(${textSoftening.secondaryBlurPx}px)` : 'none',
+        opacity: textSoftening.secondaryOpacity,
         transition: textTransition,
     };
 

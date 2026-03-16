@@ -5,6 +5,14 @@ const { AlipaySdk } = require('alipay-sdk');
 
 const router = express.Router();
 
+function getSupabaseServiceRoleKey() {
+    return String(
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+        || process.env.SUPABASE_SECRET_KEY
+        || ''
+    ).trim();
+}
+
 function formatKey(key, type) {
     const raw = String(key || '').trim();
     if (!raw) return '';
@@ -37,11 +45,11 @@ async function addCreditsToSupabase(userId, transactionId, amount, currency) {
     );
 
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+    const supabaseSecretKey = getSupabaseServiceRoleKey();
 
     if (!supabaseUrl || !supabaseSecretKey) {
         console.error(
-            '[payment-webhook] Missing Supabase config. Please set SUPABASE_URL and SUPABASE_SECRET_KEY.'
+            '[payment-webhook] Missing Supabase config. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
         );
         return false;
     }

@@ -6,28 +6,37 @@
 const VERSION_CHECK_INTERVAL = 60000; // Check every 60 seconds
 const UPDATE_CHECK_QUERY_KEY = '__kk_update_check__';
 const FORCE_REFRESH_QUERY_KEY = '__kk_update__';
+const VERSION_MANIFEST_PATH = '/app-version.json';
 let currentBuildHash: string | null = null;
 let updateAvailable = false;
 let updateListeners: ((available: boolean) => void)[] = [];
 let initPromise: Promise<void> | null = null;
 let intervalId: number | null = null;
 
-function isExplicitUpdateCheckEnabled(): boolean {
-    return import.meta.env.VITE_ENABLE_UPDATE_CHECK === 'true';
+type BuildManifest = {
+    version?: string;
+    buildTime?: string;
+    channel?: string;
+    commitSha?: string | null;
+    deploymentTarget?: string | null;
+};
+
+function isExplicitUpdateCheckDisabled(): boolean {
+    return import.meta.env.VITE_ENABLE_UPDATE_CHECK === 'false';
 }
 
 function isUpdateCheckDisabled(): boolean {
     const protocol = window.location.protocol;
 
-    return !isExplicitUpdateCheckEnabled()
+    return isExplicitUpdateCheckDisabled()
         || import.meta.env.DEV
         || protocol !== 'http:' && protocol !== 'https:'
         || window.location.hostname === 'localhost'
         || window.location.hostname === '127.0.0.1';
 }
 
-function buildNoCacheUrl(queryKey: string): string {
-    const url = new URL(window.location.href);
+function buildNoCacheUrl(target: string, queryKey: string): string {
+    const url = new URL(target, window.location.origin);
     url.searchParams.set(queryKey, Date.now().toString());
     return url.toString();
 }
@@ -47,9 +56,45 @@ async function clearRuntimeCaches(): Promise<void> {
  * Get the current build fingerprint from index.html script tags
  * This matches ANY script src change (bundled assets), making it robust for Vite/Webpack/etc.
  */
-async function fetchBuildHash(): Promise<string | null> {
+async function fetchBuildManifest(): Promise<BuildManifest | null> {
     try {
-        const response = await fetch(buildNoCacheUrl(UPDATE_CHECK_QUERY_KEY), {
+        const response = await fetch(buildNoCacheUrl(VERSION_MANIFEST_PATH, UPDATE_CHECK_QUERY_KEY), {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache',
+                Pragma: 'no-cache'
+            }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const manifest = await response.json() as BuildManifest;
+        if (!manifest.version) {
+            return null;
+        }
+
+        return manifest;
+    } catch (e) {
+        console.warn('[UpdateCheck] Failed to fetch version manifest:', e);
+        return null;
+    }
+}
+
+function buildFingerprintFromManifest(manifest: BuildManifest): string {
+    return [
+        manifest.version || '',
+        manifest.buildTime || '',
+        manifest.channel || '',
+        manifest.deploymentTarget || '',
+        manifest.commitSha || '',
+    ].join('|');
+}
+
+async function fetchBuildHashFromHtmlFallback(): Promise<string | null> {
+    try {
+        const response = await fetch(buildNoCacheUrl(window.location.href, UPDATE_CHECK_QUERY_KEY), {
             cache: 'no-store',
             headers: {
                 'Cache-Control': 'no-cache',
@@ -77,6 +122,15 @@ async function fetchBuildHash(): Promise<string | null> {
     }
 }
 
+async function fetchBuildHash(): Promise<string | null> {
+    const manifest = await fetchBuildManifest();
+    if (manifest) {
+        return buildFingerprintFromManifest(manifest);
+    }
+
+    return fetchBuildHashFromHtmlFallback();
+}
+
 /**
  * Initialize version checking
  */
@@ -91,7 +145,7 @@ export async function initUpdateCheck(): Promise<void> {
                 intervalId = null;
             }
             notifyListeners();
-            console.info('[UpdateCheck] Disabled unless VITE_ENABLE_UPDATE_CHECK=true to avoid disruptive reload prompts.');
+            console.info('[UpdateCheck] Disabled for local development or because VITE_ENABLE_UPDATE_CHECK=false.');
             return;
         }
 
@@ -150,7 +204,7 @@ export function applyUpdate(): void {
     updateAvailable = false;
     notifyListeners();
 
-    const targetUrl = buildNoCacheUrl(FORCE_REFRESH_QUERY_KEY);
+    const targetUrl = buildNoCacheUrl(window.location.href, FORCE_REFRESH_QUERY_KEY);
 
     void clearRuntimeCaches().finally(() => {
         window.location.replace(targetUrl);

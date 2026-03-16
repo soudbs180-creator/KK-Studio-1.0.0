@@ -9,7 +9,7 @@ import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from 
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import ImagePreview from '../image/ImagePreview';
-import type { CanvasCardDetailLevel } from '../../canvas/performanceProfile';
+import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -615,16 +615,19 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const stackZIndex = stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex);
     const renderLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1);
-    const shouldSoftenText = (zoomScale || 1) < 1 && (detailLevel === 'compact' || isCanvasTransforming);
+    const textSoftening = getCanvasTextSofteningProfile(
+        zoomScale || 1,
+        detailLevel === 'compact' || isCanvasTransforming
+    );
     const textTransition = 'filter 140ms ease, opacity 140ms ease';
     const primaryTextRenderStyle = {
-        filter: shouldSoftenText ? 'blur(0.65px)' : 'none',
-        opacity: shouldSoftenText ? 0.9 : 1,
+        filter: textSoftening.active ? `blur(${textSoftening.primaryBlurPx}px)` : 'none',
+        opacity: textSoftening.primaryOpacity,
         transition: textTransition,
     };
     const secondaryTextRenderStyle = {
-        filter: shouldSoftenText ? 'blur(0.85px)' : 'none',
-        opacity: shouldSoftenText ? 0.72 : 1,
+        filter: textSoftening.active ? `blur(${textSoftening.secondaryBlurPx}px)` : 'none',
+        opacity: textSoftening.secondaryOpacity,
         transition: textTransition,
     };
 

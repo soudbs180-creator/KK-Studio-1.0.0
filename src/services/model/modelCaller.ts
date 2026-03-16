@@ -126,9 +126,11 @@ class ModelCaller {
       return { success: false, error: '请先登录。' };
     }
 
+    const requiredCredits = Math.max(1, Math.ceil(Number(creditCost || 0)));
+
     const { data: hasCredits, error: checkError } = await supabase.rpc('check_user_credits', {
-      user_id: user.id,
-      required_credits: creditCost,
+      p_user_id: user.id,
+      p_required_credits: requiredCredits,
     });
 
     if (checkError || !hasCredits) {
@@ -148,7 +150,7 @@ class ModelCaller {
       });
 
       if (!response.deducted) {
-        await this.deductCredits(user.id, creditCost, options.modelId);
+        await this.deductCredits(user.id, requiredCredits, options.modelId);
       }
 
       return {
@@ -388,10 +390,12 @@ class ModelCaller {
   }
 
   private async deductCredits(userId: string, credits: number, modelId: string): Promise<void> {
+    const roundedCredits = Math.max(1, Math.ceil(Number(credits || 0)));
+
     const { error } = await supabase.rpc('deduct_user_credits', {
-      user_id: userId,
-      credits,
-      model_id: modelId,
+      p_user_id: userId,
+      p_credits: roundedCredits,
+      p_model_id: modelId,
     });
 
     if (error) {

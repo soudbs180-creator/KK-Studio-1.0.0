@@ -15,7 +15,19 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 -- 恢复 anon 对必要表的权限（用于注册/登录）
 -- profiles 表需要 anon 可以 INSERT（注册时创建）
 GRANT SELECT, INSERT ON public.profiles TO anon;
-GRANT USAGE ON SEQUENCE public.profiles_id_seq TO anon;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relname = 'profiles_id_seq'
+          AND c.relkind = 'S'
+    ) THEN
+        EXECUTE 'GRANT USAGE ON SEQUENCE public.profiles_id_seq TO anon';
+    END IF;
+END $$;
 
 -- 允许 authenticated 访问 profiles
 GRANT ALL ON public.profiles TO authenticated;
@@ -69,56 +81,108 @@ CREATE POLICY "profiles_update_own" ON public.profiles
 -- 4. 确保 user_api_keys 表对 anon 是安全的（继续禁止）
 -- =====================================================
 
--- user_api_keys 表保持严格权限，只允许 authenticated
-REVOKE ALL ON public.user_api_keys FROM anon;
-
--- 重新应用 user_api_keys 的严格策略
-DROP POLICY IF EXISTS "user_api_keys_isolation_select" ON public.user_api_keys;
-DROP POLICY IF EXISTS "user_api_keys_isolation_insert" ON public.user_api_keys;
-DROP POLICY IF EXISTS "user_api_keys_isolation_update" ON public.user_api_keys;
-DROP POLICY IF EXISTS "user_api_keys_isolation_delete" ON public.user_api_keys;
-
-CREATE POLICY "user_api_keys_isolation_select" ON public.user_api_keys
-    FOR SELECT TO authenticated
-    USING (user_id = auth.uid());
-
-CREATE POLICY "user_api_keys_isolation_insert" ON public.user_api_keys
-    FOR INSERT TO authenticated
-    WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "user_api_keys_isolation_update" ON public.user_api_keys
-    FOR UPDATE TO authenticated
-    USING (user_id = auth.uid());
-
-CREATE POLICY "user_api_keys_isolation_delete" ON public.user_api_keys
-    FOR DELETE TO authenticated
-    USING (user_id = auth.uid());
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'user_api_keys'
+    ) THEN
+        EXECUTE 'REVOKE ALL ON public.user_api_keys FROM anon';
+        EXECUTE 'DROP POLICY IF EXISTS "user_api_keys_isolation_select" ON public.user_api_keys';
+        EXECUTE 'DROP POLICY IF EXISTS "user_api_keys_isolation_insert" ON public.user_api_keys';
+        EXECUTE 'DROP POLICY IF EXISTS "user_api_keys_isolation_update" ON public.user_api_keys';
+        EXECUTE 'DROP POLICY IF EXISTS "user_api_keys_isolation_delete" ON public.user_api_keys';
+        EXECUTE '' ||
+          'CREATE POLICY "user_api_keys_isolation_select" ON public.user_api_keys ' ||
+          'FOR SELECT TO authenticated USING (user_id = auth.uid())';
+        EXECUTE '' ||
+          'CREATE POLICY "user_api_keys_isolation_insert" ON public.user_api_keys ' ||
+          'FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid())';
+        EXECUTE '' ||
+          'CREATE POLICY "user_api_keys_isolation_update" ON public.user_api_keys ' ||
+          'FOR UPDATE TO authenticated USING (user_id = auth.uid())';
+        EXECUTE '' ||
+          'CREATE POLICY "user_api_keys_isolation_delete" ON public.user_api_keys ' ||
+          'FOR DELETE TO authenticated USING (user_id = auth.uid())';
+    ELSE
+        RAISE NOTICE 'Skipping user_api_keys policy repair because the table does not exist';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 5. 修复其他核心表的权限
 -- =====================================================
 
 -- user_credits 表
-GRANT SELECT, INSERT, UPDATE ON public.user_credits TO authenticated;
-REVOKE ALL ON public.user_credits FROM anon;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'user_credits'
+    ) THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE ON public.user_credits TO authenticated';
+        EXECUTE 'REVOKE ALL ON public.user_credits FROM anon';
+    END IF;
+END $$;
 
 -- credit_transactions 表
-GRANT SELECT, INSERT ON public.credit_transactions TO authenticated;
-REVOKE ALL ON public.credit_transactions FROM anon;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'credit_transactions'
+    ) THEN
+        EXECUTE 'GRANT SELECT, INSERT ON public.credit_transactions TO authenticated';
+        EXECUTE 'REVOKE ALL ON public.credit_transactions FROM anon';
+    END IF;
+END $$;
 
 -- admin_credit_models 表（只读给 authenticated）
-GRANT SELECT ON public.admin_credit_models TO authenticated;
-REVOKE ALL ON public.admin_credit_models FROM anon;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'admin_credit_models'
+    ) THEN
+        EXECUTE 'GRANT SELECT ON public.admin_credit_models TO authenticated';
+        EXECUTE 'REVOKE ALL ON public.admin_credit_models FROM anon';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 6. 视图权限
 -- =====================================================
 
--- 安全视图 - authenticated 可以查看
-GRANT SELECT ON public.vw_user_api_keys TO authenticated;
-GRANT SELECT ON public.vw_available_models TO authenticated;
-REVOKE ALL ON public.vw_user_api_keys FROM anon;
-REVOKE ALL ON public.vw_available_models FROM anon;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.views
+        WHERE table_schema = 'public'
+          AND table_name = 'vw_user_api_keys'
+    ) THEN
+        EXECUTE 'GRANT SELECT ON public.vw_user_api_keys TO authenticated';
+        EXECUTE 'REVOKE ALL ON public.vw_user_api_keys FROM anon';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.views
+        WHERE table_schema = 'public'
+          AND table_name = 'vw_available_models'
+    ) THEN
+        EXECUTE 'GRANT SELECT ON public.vw_available_models TO authenticated';
+        EXECUTE 'REVOKE ALL ON public.vw_available_models FROM anon';
+    END IF;
+END $$;
 
 COMMIT;
 

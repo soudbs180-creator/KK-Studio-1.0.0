@@ -74,6 +74,14 @@ function sanitizePaymentUrl(raw) {
   return url;
 }
 
+function getSupabaseServiceRoleKey() {
+  return String(
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SECRET_KEY
+    || ''
+  ).trim();
+}
+
 const alipaySdk = new AlipaySdk({
   appId: process.env.AP_APP_ID || process.env.ALIPAY_APP_ID,
   privateKey: formatKey(process.env.AP_APP_KEY || process.env.ALIPAY_PRIVATE_KEY, 'PRIVATE KEY'),
@@ -94,7 +102,7 @@ if (!alipaySdk) {
 }
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ovdjhdofjysanamgkfng.supabase.co';
-const supabaseServiceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
 
 if (!supabaseServiceRoleKey) {
   throw new Error('[payment-server] 缺少 SUPABASE_SERVICE_ROLE_KEY，已拒绝以低权限密钥启动充值服务。');

@@ -1,17 +1,14 @@
 /**
  * Secure Model Caller Service
- * 
- * 核心安全特性：
- * 1. 用户只能使用自己的API密钥或管理员提供的公共模型
- * 2. API密钥完全隔离，无法跨用户查看
- * 3. 路由选择由服务端决定，防止前端破解
- * 4. 积分计费透明但后台价格隐藏
+ *
+ * All model invocations go through the secure server-side proxy so raw provider
+ * keys never need to reach the browser runtime.
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
 import { supabase } from '../../lib/supabase';
-import { userApiKeyService, type ModelRoute } from '../api/userApiKeyService';
-import { notify } from '../system/notificationService';
+import { userApiKeyService } from '../api/userApiKeyService';
+import { callSecureSystemProxyChat } from './secureModelProxy';
 
 export interface SecureCallOptions {
   modelId: string;
@@ -20,7 +17,7 @@ export interface SecureCallOptions {
   maxTokens?: number;
   stream?: boolean;
   onStream?: (chunk: string) => void;
-  imageSize?: string; // '0.5K' | '1K' | '2K' | '4K' - 用于计算积分
+  imageSize?: string;
 }
 
 export interface SecureCallResult {
@@ -39,66 +36,46 @@ export interface SecureCallResult {
   };
 }
 
+type PublicCreditModelRpcRow = {
+  provider_id?: string | null;
+  provider_name?: string | null;
+  models?: Array<{
+    model_id?: string | null;
+    display_name?: string | null;
+    description?: string | null;
+    credit_cost?: number | null;
+    is_active?: boolean | null;
+  }> | null;
+};
+
 class SecureModelCaller {
-  /**
-   * 调用模型的主入口
-   * 
-   * 流程：
-   * 1. 从服务端获取安全路由（包含解密后的临时密钥）
-   * 2. 使用路由信息调用模型
-   * 3. 记录使用并扣费
-   */
   async call(options: SecureCallOptions): Promise<SecureCallResult> {
     try {
-      // 1. 获取模型路由（服务端决定使用用户密钥还是管理员模型）
-      const route = await userApiKeyService.getModelRoute(
-        options.modelId,
-        options.imageSize || '1K'
-      );
+      const result = await callSecureSystemProxyChat({
+        modelId: options.modelId,
+        messages: options.messages.map((message) => ({
+          role: message.role === 'assistant' || message.role === 'system' ? message.role : 'user',
+          content: typeof message.content === 'string' ? message.content : String(message.content ?? ''),
+        })),
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        stream: false,
+      });
 
-      if (route.route_type === 'none' || !route.api_key) {
-        return {
-          success: false,
-          error: '没有找到可用的模型路由。请联系管理员配置模型或使用自己的API密钥。',
-        };
+      if (options.onStream && result.content) {
+        options.onStream(result.content);
       }
 
-      // 2. 检查积分（如果是管理员模型）
-      if (route.route_type === 'admin_model' && route.user_pays && route.user_pays > 0) {
-        const hasCredits = await this.checkCredits(route.user_pays);
-        if (!hasCredits) {
-          return {
-            success: false,
-            error: `积分不足，需要 ${route.user_pays} 积分。`,
-          };
-        }
-      }
-
-      // 3. 调用模型
-      const result = await this.executeCall(options, route);
-
-      // 4. 记录使用并计费
-      if (result.success) {
-        await userApiKeyService.recordUsage(
-          options.modelId,
-          route.route_type,
-          route.user_pays || 0,
-          {
-            prompt_tokens: result.usage?.promptTokens,
-            completion_tokens: result.usage?.completionTokens,
-            total_tokens: result.usage?.totalTokens,
-          }
-        );
-
-        // 添加路由信息到结果（用于前端显示）
-        result.routeInfo = {
-          type: route.route_type,
-          cost: route.user_pays || 0,
-          provider: route.provider_id || 'system',
-        };
-      }
-
-      return result;
+      return {
+        success: true,
+        content: result.content,
+        usage: result.usage,
+        routeInfo: {
+          type: result.deducted ? 'admin_model' : 'user_key',
+          cost: 0,
+          provider: result.endpointType || 'system',
+        },
+      };
     } catch (error: any) {
       console.error('[SecureModelCaller] 调用失败:', error);
       return {
@@ -108,108 +85,6 @@ class SecureModelCaller {
     }
   }
 
-  /**
-   * 执行实际的API调用
-   */
-  private async executeCall(
-    options: SecureCallOptions,
-    route: ModelRoute
-  ): Promise<SecureCallResult> {
-    const baseUrl = route.base_url || 'https://cdn.12ai.org';
-    const apiKey = route.api_key;
-
-    try {
-      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: options.modelId,
-          messages: options.messages,
-          max_tokens: options.maxTokens || 2048,
-          temperature: options.temperature ?? 0.7,
-          stream: options.stream || false,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        
-        // 隐藏真实API密钥的错误信息
-        const sanitizedError = apiKey 
-          ? this.sanitizeError(errorText, apiKey)
-          : errorText;
-        throw new Error(`API错误: ${response.status} - ${sanitizedError}`);
-      }
-
-      const data = await response.json();
-      
-      return {
-        success: true,
-        content: data.choices?.[0]?.message?.content || '',
-        usage: {
-          promptTokens: data.usage?.prompt_tokens || 0,
-          completionTokens: data.usage?.completion_tokens || 0,
-          totalTokens: data.usage?.total_tokens || 0,
-        },
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * 检查用户积分
-   */
-  private async checkCredits(requiredCredits: number): Promise<boolean> {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return false;
-
-    const { data: hasCredits, error } = await supabase.rpc('check_user_credits', {
-      user_id: user.user.id,
-      required_credits: requiredCredits,
-    });
-
-    if (error) {
-      console.error('[SecureModelCaller] 检查积分失败:', error);
-      return false;
-    }
-
-    return !!hasCredits;
-  }
-
-  /**
-   * 清理错误信息，防止泄露敏感信息
-   */
-  private sanitizeError(errorText: string, apiKey: string): string {
-    // 替换掉可能包含的API密钥
-    let sanitized = errorText;
-    if (apiKey && apiKey.length > 10) {
-      sanitized = sanitized.replace(apiKey, '***API_KEY_HIDDEN***');
-      // 也替换部分匹配
-      sanitized = sanitized.replace(apiKey.slice(0, 20), '***');
-    }
-    
-    // 限制长度
-    if (sanitized.length > 200) {
-      sanitized = sanitized.slice(0, 200) + '...';
-    }
-    
-    return sanitized;
-  }
-
-  /**
-   * 获取可用的模型列表（用户视角）
-   * 
-   * 返回：
-   * - 管理员配置的公共模型（隐藏价格和密钥）
-   * - 用户自己配置的模型
-   */
   async getAvailableModels(): Promise<Array<{
     id: string;
     name: string;
@@ -219,40 +94,42 @@ class SecureModelCaller {
     isActive: boolean;
   }>> {
     try {
-      // 1. 获取管理员配置的公共模型
-      const { data: adminModels, error: adminError } = await supabase
-        .from('available_models_for_users')
-        .select('*')
-        .eq('is_active', true);
+      const { data: providerGroups, error: adminError } = await supabase.rpc('get_active_credit_models');
 
       if (adminError) throw adminError;
 
-      // 2. 获取用户自己的API密钥
+      const adminModels = ((providerGroups || []) as PublicCreditModelRpcRow[]).flatMap((group) =>
+        (group.models || []).map((model) => ({
+          model_id: model.model_id,
+          display_name: model.display_name,
+          description: model.description,
+          credit_cost: model.credit_cost,
+          is_active: model.is_active !== false,
+        }))
+      );
+
       const userKeys = await userApiKeyService.getUserApiKeys();
 
-      // 3. 合并列表
-      const models = [
-        ...(adminModels || []).map((m: any) => ({
-          id: m.model_id,
-          name: m.display_name,
-          description: m.description,
-          creditCost: m.credit_cost,
+      return [
+        ...(adminModels || []).map((model: any) => ({
+          id: model.model_id,
+          name: model.display_name,
+          description: model.description,
+          creditCost: model.credit_cost,
           source: 'system' as const,
           isActive: true,
         })),
         ...userKeys
-          .filter(k => k.is_active)
-          .map(k => ({
-            id: `${k.provider.toLowerCase()}-custom-${k.id.slice(0, 8)}`,
-            name: `${k.name} (${k.provider})`,
-            description: '使用您自己的API密钥',
-            creditCost: 0, // 使用自己的密钥不收费
+          .filter((key) => key.is_active)
+          .map((key) => ({
+            id: `${key.provider.toLowerCase()}-custom-${key.id.slice(0, 8)}`,
+            name: `${key.name} (${key.provider})`,
+            description: '使用您自己的 API 密钥',
+            creditCost: 0,
             source: 'user' as const,
             isActive: true,
           })),
       ];
-
-      return models;
     } catch (error) {
       console.error('[SecureModelCaller] 获取模型列表失败:', error);
       return [];

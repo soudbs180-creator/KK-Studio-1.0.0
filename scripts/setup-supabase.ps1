@@ -2,7 +2,7 @@
 # Uses personal access token to execute migrations
 
 param(
-    [string]$Token = "sbp_032c975f2babdc99a850dcdea2bb5bee2e051399",
+    [string]$Token = "",
     [string]$ProjectRef = "ovdjhdofjysanamgkfng",
     [string]$MigrationFile = "../supabase/migrations/20250303000002_complete_schema.sql"
 )
@@ -23,6 +23,16 @@ try {
 
 Write-Host ""
 Write-Host "Step 1: Linking to project..." -ForegroundColor Yellow
+
+if (-not $Token) {
+    $Token = $env:SUPABASE_ACCESS_TOKEN
+}
+
+if (-not $Token) {
+    Write-Host "Missing Supabase access token." -ForegroundColor Red
+    Write-Host "Pass -Token <your PAT> or set SUPABASE_ACCESS_TOKEN before running this script." -ForegroundColor Yellow
+    exit 1
+}
 
 # Set the token as environment variable
 $env:SUPABASE_ACCESS_TOKEN = $Token
