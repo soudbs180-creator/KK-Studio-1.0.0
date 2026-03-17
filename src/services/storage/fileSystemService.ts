@@ -1,6 +1,7 @@
 import { Canvas } from '../../types';
 import { logError, logInfo, logWarning } from '../system/systemLogService';
 import { supabase } from '../../lib/supabase';
+import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer';
 
 /**
  * Service to handle Local File System Access API
@@ -161,7 +162,8 @@ function sanitizeCanvasesForProjectFile(canvases: Canvas[]): Canvas[] {
                 model: promptNode.errorDetails.model,
                 timestamp: promptNode.errorDetails.timestamp
             } : undefined
-        }))
+        })),
+        workflow: sanitizeWorkflowForStorage(canvas.workflow)
     }));
 }
 

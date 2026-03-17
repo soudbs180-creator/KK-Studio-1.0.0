@@ -22,6 +22,12 @@ import {
 import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
 import { resolveProviderKeyType, resolveProviderRuntime } from '../api/providerStrategy';
 import type { ChannelConfig } from '../api/channelConfig';
+import {
+    extractKeyManagerCloudSlots,
+    extractUserApiProvidersFromPayload,
+    isUserApisEnvelope,
+    mergeUserApisPayload,
+} from '../api/userApiPayload';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
 import { Provider } from '../../types';
@@ -108,7 +114,7 @@ function extractSlotRouteTarget(suffix: string | null | undefined): string | nul
     if (!decodedSuffix) return null;
     if (decodedSuffix.startsWith('slot_key_')) return decodedSuffix.slice(5);
     if (decodedSuffix.startsWith('slot_')) return decodedSuffix.slice(5);
-    if (decodedSuffix.startsWith('provider_')) return decodedSuffix.slice(9);
+    if (decodedSuffix.startsWith('provider_')) return decodedSuffix;
     return null;
 }
 
@@ -275,6 +281,12 @@ export interface ThirdPartyProvider {
 
     // 馃敟 [Feature] 鍚庡彴鎷夊彇 New API 浠锋牸琛ㄧ殑缂撳瓨
     pricingSnapshot?: ProviderPricingSnapshot;
+    activitySummary?: {
+        lastLatencyMs?: number | null;
+        lastTokens?: number | null;
+        lastAmount?: number | null;
+        updatedAt?: number | null;
+    };
 
     // 鐙珛璁¤垂
     usage: {
@@ -1195,6 +1207,11 @@ export class KeyManager {
             // Then hydrate cloud state asynchronously.
             setTimeout(() => {
                 this.loadFromCloud().then(() => {
+                    if (this.providers.length > 0) {
+                        void this.saveToCloud(this.state).catch((syncError) => {
+                            console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
+                        });
+                    }
                     this.subscribeRealtime(userId);
                 });
             }, 100);
@@ -1266,8 +1283,29 @@ export class KeyManager {
             }
 
             if (data && data.user_apis) {
-                let cloudSlots = data.user_apis as KeySlot[];
+                const rawPayload = data.user_apis;
+                const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
+                if (isUserApisEnvelope(rawPayload) && 'providers' in rawPayload) {
+                    this.providers = cloudProviders;
+                    this.persistProvidersLocal();
+                }
+
+                let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
                 if (Array.isArray(cloudSlots)) {
+                    const rawCloudSlots = cloudSlots;
+                    const validCloudSlots = rawCloudSlots.filter((slot: any) => {
+                        const key = String(slot?.key || '').trim();
+                        const id = String(slot?.id || '').trim();
+                        return Boolean(id && key);
+                    });
+
+                    if (rawCloudSlots.length > 0 && validCloudSlots.length === 0) {
+                        console.warn('[KeyManager] Cloud user_apis payload is not a key-slot structure, skipping overwrite.');
+                        return;
+                    }
+
+                    cloudSlots = validCloudSlots;
+
                     cloudSlots = cloudSlots.map(s => {
                         const provider = (s.provider as Provider) || 'Google';
                         const keyType = determineKeyType(provider, s.baseUrl);
@@ -1409,9 +1447,29 @@ export class KeyManager {
                 this.userId = user.id;
             }
 
+            const { data: existingProfile, error: existingError } = await supabase
+                .from('profiles')
+                .select('email, user_apis')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (existingError) {
+                throw existingError;
+            }
+
+            const persistedProviders = extractUserApiProvidersFromPayload(existingProfile?.user_apis);
+            const nextProviders =
+                this.providers.length > 0 || persistedProviders.length === 0
+                    ? this.providers
+                    : undefined;
+
             const uploadData = {
                 id: user.id,
-                user_apis: state.slots,
+                email: existingProfile?.email || user.email || null,
+                user_apis: mergeUserApisPayload(existingProfile?.user_apis, {
+                    slots: state.slots,
+                    providers: nextProviders,
+                }),
                 updated_at: new Date().toISOString()
             };
 
@@ -1422,11 +1480,10 @@ export class KeyManager {
 
             const { error } = await supabase
                 .from('profiles')
-                .update({
-                    user_apis: uploadData.user_apis,
-                    updated_at: uploadData.updated_at
-                })
-                .eq('id', user.id);
+                .upsert(uploadData, {
+                    onConflict: 'id',
+                    ignoreDuplicates: false,
+                });
 
             if (error) {
                 const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
@@ -1980,7 +2037,18 @@ export class KeyManager {
             return effectiveSlot;
         });
 
-        const allSlots = [...effectiveUserSlots, ...providerSlots];
+        const filteredLegacySlots = effectiveUserSlots.filter((slot) => {
+            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
+            const slotName = normalizeProviderLinkValue(slot.name);
+            if (!slotBaseUrl || !slotName) return true;
+
+            return !providerSlots.some((providerSlot) => (
+                normalizeProviderLinkValue(providerSlot.baseUrl) === slotBaseUrl
+                && normalizeProviderLinkValue(providerSlot.name) === slotName
+            ));
+        });
+
+        const allSlots = [...providerSlots, ...filteredLegacySlots];
 
         const modelSupportedBySlot = (slot: KeySlot) => {
             const supported = slot.supportedModels || [];
@@ -3493,13 +3561,38 @@ export class KeyManager {
         if (index === -1) return false;
 
         const previousProvider = { ...this.providers[index] };
+        const normalizedFormat = normalizeApiProtocolFormat(updates.format ?? previousProvider.format, 'auto');
+        const connectionFieldsChanged = (
+            (updates.baseUrl !== undefined
+                && normalizeProviderLinkValue(updates.baseUrl) !== normalizeProviderLinkValue(previousProvider.baseUrl))
+            || (updates.apiKey !== undefined
+                && String(updates.apiKey || '').trim() !== String(previousProvider.apiKey || '').trim())
+            || (updates.format !== undefined
+                && normalizedFormat !== normalizeApiProtocolFormat(previousProvider.format, 'auto'))
+        );
+        const hasExplicitHealthUpdate = (
+            Object.prototype.hasOwnProperty.call(updates, 'status')
+            || Object.prototype.hasOwnProperty.call(updates, 'lastError')
+            || Object.prototype.hasOwnProperty.call(updates, 'lastChecked')
+        );
 
-        this.providers[index] = {
-            ...this.providers[index],
+        const nextProvider: ThirdPartyProvider = {
+            ...previousProvider,
             ...updates,
-            format: normalizeApiProtocolFormat(updates.format ?? this.providers[index].format, 'auto'),
+            format: normalizedFormat,
             updatedAt: Date.now()
         };
+
+        if (connectionFieldsChanged && !hasExplicitHealthUpdate) {
+            nextProvider.lastError = undefined;
+            nextProvider.lastChecked = undefined;
+
+            if (nextProvider.status === 'error') {
+                nextProvider.status = 'active';
+            }
+        }
+
+        this.providers[index] = nextProvider;
 
         this.saveProviders();
         this.syncLegacySlotsWithProvider(this.providers[index], previousProvider);
@@ -3720,6 +3813,15 @@ export class KeyManager {
         const provider = this.providers.find(p => p.id === providerId);
         if (!provider || !provider.baseUrl) return false;
 
+        const runtime = resolveProviderRuntime({
+            baseUrl: provider.baseUrl,
+            format: provider.format,
+        });
+        if (runtime.pricingSupport !== 'native' || runtime.strategyId === '12ai') {
+            console.info(`[KeyManager] Skipping automatic pricing sync for ${provider.name}; use the pricing page flow instead.`);
+            return false;
+        }
+
         try {
             const result = await fetchRawPricingCatalog(
                 provider.baseUrl,
@@ -3754,16 +3856,70 @@ export class KeyManager {
     /**
      * 閿风姾娴囬摼宥呭閸熷棗鍨悰?
      */
+    private normalizeStoredProviders(rawProviders: unknown): ThirdPartyProvider[] {
+        if (!Array.isArray(rawProviders)) return [];
+
+        return rawProviders.map((provider, index) => {
+            const now = Date.now();
+            const raw = ((provider && typeof provider === 'object') ? provider : {}) as Partial<ThirdPartyProvider>;
+            const usage = raw.usage || {
+                totalTokens: 0,
+                totalCost: 0,
+                dailyTokens: 0,
+                dailyCost: 0,
+                lastReset: now,
+            };
+
+            return {
+                ...raw,
+                id: String(raw.id || `provider_${now}_${index}`),
+                name: String(raw.name || 'Custom Provider'),
+                baseUrl: String(raw.baseUrl || '').trim(),
+                apiKey: String(raw.apiKey || '').trim(),
+                models: normalizeModelList(Array.isArray(raw.models) ? raw.models : [], String(raw.name || 'Custom')),
+                format: normalizeApiProtocolFormat(raw.format, 'auto'),
+                isActive: raw.isActive !== false,
+                usage: {
+                    totalTokens: Number(usage.totalTokens || 0),
+                    totalCost: Number(usage.totalCost || 0),
+                    dailyTokens: Number(usage.dailyTokens || 0),
+                    dailyCost: Number(usage.dailyCost || 0),
+                    lastReset: Number(usage.lastReset || now),
+                },
+                status: raw.status === 'active' || raw.status === 'error' || raw.status === 'checking'
+                    ? raw.status
+                    : 'checking',
+                createdAt: Number(raw.createdAt || now),
+                updatedAt: Number(raw.updatedAt || now),
+                budgetLimit: raw.budgetLimit !== undefined ? Number(raw.budgetLimit) : raw.budgetLimit,
+                tokenLimit: raw.tokenLimit !== undefined ? Number(raw.tokenLimit) : raw.tokenLimit,
+                customCostValue: raw.customCostValue !== undefined ? Number(raw.customCostValue) : raw.customCostValue,
+                lastChecked: raw.lastChecked !== undefined ? Number(raw.lastChecked) : raw.lastChecked,
+                activitySummary: raw.activitySummary ? {
+                    lastLatencyMs: raw.activitySummary.lastLatencyMs !== undefined ? Number(raw.activitySummary.lastLatencyMs) : raw.activitySummary.lastLatencyMs,
+                    lastTokens: raw.activitySummary.lastTokens !== undefined ? Number(raw.activitySummary.lastTokens) : raw.activitySummary.lastTokens,
+                    lastAmount: raw.activitySummary.lastAmount !== undefined ? Number(raw.activitySummary.lastAmount) : raw.activitySummary.lastAmount,
+                    updatedAt: raw.activitySummary.updatedAt !== undefined ? Number(raw.activitySummary.updatedAt) : raw.activitySummary.updatedAt,
+                } : undefined,
+            };
+        });
+    }
+
+    private persistProvidersLocal(): void {
+        try {
+            localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(this.providers));
+        } catch (e) {
+            console.error('[KeyManager] Failed to save providers:', e);
+        }
+    }
+
     private loadProviders(): void {
         if (this.providers.length > 0) return; // Already loaded
 
         try {
             const stored = localStorage.getItem(PROVIDERS_STORAGE_KEY);
             if (stored) {
-                this.providers = JSON.parse(stored).map((provider: ThirdPartyProvider) => ({
-                    ...provider,
-                    format: normalizeApiProtocolFormat((provider as any).format, 'auto'),
-                }));
+                this.providers = this.normalizeStoredProviders(JSON.parse(stored));
             }
         } catch (e) {
             console.error('[KeyManager] Failed to load providers:', e);
@@ -3775,10 +3931,12 @@ export class KeyManager {
      * 娣囸８ｇ摠閾惧秴濮熼崯鍡楀灙鐞?
      */
     private saveProviders(): void {
-        try {
-            localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(this.providers));
-        } catch (e) {
-            console.error('[KeyManager] Failed to save providers:', e);
+        this.persistProvidersLocal();
+
+        if (this.userId && !this.isSyncing) {
+            void this.saveToCloud(this.state).catch((error) => {
+                console.error('[KeyManager] Failed to sync providers to cloud:', error);
+            });
         }
     }
 
@@ -4021,6 +4179,29 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
     }
 }
 
+function extractModelIdsFromPricingData(pricingData: any[]): string[] {
+    if (!Array.isArray(pricingData)) return [];
+
+    return Array.from(new Set(
+        pricingData
+            .map((item) => {
+                const candidates = [
+                    item?.model,
+                    item?.modelId,
+                    item?.id,
+                    item?.model_name,
+                    item?.modelName,
+                    item?.name,
+                ];
+
+                return candidates
+                    .map((value) => String(value || '').replace(/^models\//i, '').trim())
+                    .find(Boolean);
+            })
+            .filter((value): value is string => Boolean(value))
+    ));
+}
+
 /**
  * 闀婎亜濮珨勫棛琚Ο鈥崇€?- 婢х偛宸遍悧?
  * 闀屽绱崗鍫㈤獓皤攧鍡欒: 閿叉儳鍎?閳?鐟欏棝顣?閳?闀靛﹤銇?閳?閸忔湹绮?
@@ -4110,16 +4291,30 @@ export async function autoDetectAndConfigureModels(
         format: resolvedFormat === 'gemini' ? 'gemini' : preferredFormat,
     });
 
-    if (runtime.strategyId === 'wuyinkeji' && baseUrl) {
+    if (baseUrl && runtime.pricingSupport === 'native' && runtime.strategyId !== '12ai') {
+        try {
+            const pricingCatalog = await fetchRawPricingCatalog(baseUrl, apiKey, resolvedFormat);
+            const pricingModels = extractModelIdsFromPricingData(pricingCatalog?.pricingData || []);
+
+            if (pricingModels.length > 0) {
+                console.log(`[KeyManager] Loaded ${pricingModels.length} models from pricing endpoint ${pricingCatalog?.endpointUrl || '(unknown)'}`);
+                models = pricingModels;
+            }
+        } catch (error) {
+            console.warn('[KeyManager] Failed to derive models from pricing endpoint:', error);
+        }
+    }
+
+    if (models.length === 0 && runtime.strategyId === 'wuyinkeji' && baseUrl) {
         const catalog = selectWuyinCatalogModels(baseUrl, await fetchWuyinPricingCatalog(baseUrl));
         models = catalog.map((item) => item.modelId).filter(Boolean);
-    } else if (resolvedFormat === 'gemini') {
+    } else if (models.length === 0 && resolvedFormat === 'gemini') {
         models = await fetchGeminiCompatModels(apiKey, baseUrl);
-    } else if (apiType === 'google-official') {
+    } else if (models.length === 0 && apiType === 'google-official') {
         models = await fetchGoogleModels(apiKey);
-    } else if (apiType === 'proxy' && baseUrl) {
+    } else if (models.length === 0 && apiType === 'proxy' && baseUrl) {
         models = await fetchOpenAICompatModels(apiKey, baseUrl);
-    } else if (apiType === 'openai') {
+    } else if (models.length === 0 && apiType === 'openai') {
         // OpenAI鐎规ɑ鏌熼敍灞煎▏閻劌鍑￠惌銉δ侀崹瀚斿灙鐞?
         models = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
     }

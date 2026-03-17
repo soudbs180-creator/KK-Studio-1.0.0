@@ -146,7 +146,7 @@ export const SETTINGS_LABEL_CLASSNAME =
   'text-[11px] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="space-y-4 md:space-y-5">{children}</div>
+  <div className="settings-view-shell space-y-4 md:space-y-5">{children}</div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({
@@ -186,9 +186,9 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className="apple-soft-card rounded-[20px] border p-5 md:p-6" style={SETTINGS_PANEL_STYLE}>
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="apple-soft-card settings-hero-card rounded-[20px] border p-5 md:p-6" style={SETTINGS_PANEL_STYLE}>
+      <div className="settings-hero-card__content space-y-4">
+        <div className="settings-hero-card__top flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             {Icon ? (
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={toneStyle.iconStyle}>
@@ -216,10 +216,10 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
             </div>
           </div>
 
-          {actions ? <div className="flex max-w-full flex-wrap gap-2 lg:justify-end">{actions}</div> : null}
+          {actions ? <div className="settings-hero-card__actions flex max-w-full flex-wrap gap-2 lg:justify-end">{actions}</div> : null}
         </div>
 
-        {metrics ? <div className="grid auto-rows-fr gap-2.5 sm:grid-cols-2 xl:grid-cols-4">{metrics}</div> : null}
+        {metrics ? <div className="settings-hero-card__metrics grid auto-rows-fr gap-2.5 sm:grid-cols-2 xl:grid-cols-4">{metrics}</div> : null}
       </div>
     </section>
   );
@@ -243,7 +243,7 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <div className="h-full rounded-[18px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+    <div className="settings-metric-card h-full rounded-[18px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-tertiary)' }}>
@@ -285,10 +285,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   children,
 }) => (
   <section
-    className="apple-soft-card rounded-[20px] border p-5 md:p-6"
+    className="apple-soft-card settings-section-card rounded-[20px] border p-5 md:p-6"
     style={SETTINGS_PANEL_STYLE}
   >
-    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div className="settings-section-card__header mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="min-w-0 flex-1 space-y-1.5">
         {eyebrow ? (
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-tertiary)' }}>
@@ -360,7 +360,7 @@ export const SettingsDangerZone: React.FC<SettingsDangerZoneProps> = ({
   action,
 }) => (
   <div
-    className="rounded-[18px] border p-4 md:p-5"
+    className="settings-danger-zone rounded-[18px] border p-4 md:p-5"
     style={{
       borderColor: 'var(--state-danger-border)',
       backgroundColor: 'var(--state-danger-bg)',

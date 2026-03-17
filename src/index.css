@@ -180,6 +180,246 @@
   /* 长文阅读 */
 }
 
+.settings-panel .api-settings-secondary-nav__inner {
+  display: grid;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, transparent 100%),
+    var(--settings-surface-elevated);
+}
+
+@media (min-width: 960px) {
+  .settings-panel .api-settings-secondary-nav__inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.settings-panel .api-settings-secondary-nav__button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--text-secondary);
+  background: transparent;
+  transition:
+    transform 180ms var(--ease-default),
+    box-shadow 220ms var(--ease-default),
+    border-color 220ms var(--ease-default),
+    background-color 220ms var(--ease-default),
+    color 220ms var(--ease-default);
+}
+
+.settings-panel .api-settings-secondary-nav__button:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--settings-accent-rgb) / 0.12);
+  box-shadow: 0 10px 22px rgb(var(--settings-accent-rgb) / 0.08);
+}
+
+.settings-panel .api-settings-secondary-nav__button.is-active {
+  color: var(--text-primary);
+  border-color: rgb(var(--settings-accent-rgb) / 0.24);
+  background:
+    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.18) 0%, rgb(var(--settings-accent-soft-rgb) / 0.08) 100%),
+    rgb(255 255 255 / 0.72);
+  box-shadow:
+    0 0 0 1px rgb(var(--settings-accent-rgb) / 0.08),
+    0 14px 26px rgb(var(--settings-accent-rgb) / 0.12);
+}
+
+.settings-panel .api-settings-secondary-nav__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.settings-panel .api-settings-secondary-nav__meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.settings-panel .api-settings-provider-runtime {
+  letter-spacing: -0.01em;
+}
+
+.settings-panel .api-settings-provider-item,
+.settings-panel .api-settings-editor-card,
+.settings-panel .settings-dashboard-card,
+.settings-panel .settings-dashboard-priority,
+.settings-panel .settings-dashboard-log,
+.settings-panel .settings-dashboard-row,
+.settings-panel .apple-soft-card,
+.settings-panel .settings-section-card {
+  transition:
+    transform 180ms var(--ease-default),
+    box-shadow 220ms var(--ease-default),
+    border-color 220ms var(--ease-default),
+    background-color 220ms var(--ease-default),
+    opacity 220ms var(--ease-default);
+}
+
+.settings-panel .api-settings-provider-item:hover,
+.settings-panel .settings-dashboard-card:hover,
+.settings-panel .settings-dashboard-priority:hover,
+.settings-panel .settings-dashboard-log:hover,
+.settings-panel .settings-dashboard-row:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--settings-card-shadow);
+}
+
+.settings-panel .api-settings-editor-card {
+  animation: settings-panel-slide-in 220ms var(--ease-default);
+}
+
+.settings-panel .api-settings-view section {
+  animation: settings-fade-up 220ms var(--ease-default);
+}
+
+.settings-panel .apple-button-primary,
+.settings-panel .apple-button-secondary,
+.settings-panel .apple-button-danger,
+.settings-panel .apple-icon-button,
+.settings-panel .api-settings-provider-action-row > button,
+.settings-panel .api-settings-editor-toolbar > button,
+.settings-panel .api-settings-secondary-nav__button {
+  transition:
+    transform 180ms var(--ease-default),
+    box-shadow 220ms var(--ease-default),
+    background-color 220ms var(--ease-default),
+    border-color 220ms var(--ease-default),
+    color 220ms var(--ease-default),
+    opacity 220ms var(--ease-default);
+}
+
+.settings-panel .apple-button-primary:hover,
+.settings-panel .apple-button-secondary:hover,
+.settings-panel .apple-button-danger:hover,
+.settings-panel .apple-icon-button:hover,
+.settings-panel .api-settings-provider-action-row > button:hover,
+.settings-panel .api-settings-editor-toolbar > button:hover {
+  transform: translateY(-1px);
+}
+
+.settings-panel .apple-button-primary:active,
+.settings-panel .apple-button-secondary:active,
+.settings-panel .apple-button-danger:active,
+.settings-panel .apple-icon-button:active,
+.settings-panel .api-settings-provider-action-row > button:active,
+.settings-panel .api-settings-editor-toolbar > button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]),
+.settings-panel .api-settings-view textarea,
+.settings-panel .api-settings-view select {
+  transition:
+    border-color 180ms var(--ease-default),
+    box-shadow 220ms var(--ease-default),
+    background-color 220ms var(--ease-default),
+    transform 180ms var(--ease-default);
+}
+
+.settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]):focus,
+.settings-panel .api-settings-view textarea:focus,
+.settings-panel .api-settings-view select:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px var(--settings-focus-ring);
+}
+
+.settings-panel .api-settings-view input[type="checkbox"] {
+  appearance: none;
+  width: 44px;
+  height: 26px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 999px;
+  background: var(--settings-surface-overlay);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.08);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color 220ms var(--ease-default),
+    border-color 220ms var(--ease-default),
+    box-shadow 220ms var(--ease-default);
+}
+
+.settings-panel .api-settings-view input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.18);
+  transition: transform 220ms var(--ease-default);
+}
+
+.settings-panel .api-settings-view input[type="checkbox"]:checked {
+  background: rgb(var(--settings-accent-rgb) / 0.92);
+  border-color: rgb(var(--settings-accent-rgb) / 0.92);
+  box-shadow: 0 8px 20px rgb(var(--settings-accent-rgb) / 0.2);
+}
+
+.settings-panel .api-settings-view input[type="checkbox"]:checked::after {
+  transform: translateX(18px);
+}
+
+@keyframes settings-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes settings-panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-panel .api-settings-provider-item,
+  .settings-panel .api-settings-editor-card,
+  .settings-panel .settings-dashboard-card,
+  .settings-panel .settings-dashboard-priority,
+  .settings-panel .settings-dashboard-log,
+  .settings-panel .settings-dashboard-row,
+  .settings-panel .apple-button-primary,
+  .settings-panel .apple-button-secondary,
+  .settings-panel .apple-button-danger,
+  .settings-panel .apple-icon-button,
+  .settings-panel .api-settings-provider-action-row > button,
+  .settings-panel .api-settings-editor-toolbar > button,
+  .settings-panel .api-settings-secondary-nav__button,
+  .settings-panel .api-settings-view section {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .settings-panel .api-settings-view input[type="checkbox"]::after {
+    transition: none !important;
+  }
+}
+
 /* ===== 主题切换平滑过渡 ===== */
 body {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -4412,6 +4652,56 @@ body.dark-mode .settings-panel {
   box-shadow: var(--settings-card-shadow);
 }
 
+.settings-view-shell {
+  position: relative;
+}
+
+.settings-panel .settings-hero-card,
+.settings-panel .settings-section-card,
+.settings-panel .settings-metric-card,
+.settings-panel .settings-danger-zone {
+  position: relative;
+  overflow: visible;
+}
+
+.settings-panel .settings-hero-card {
+  border-color: var(--settings-border-subtle);
+  background: var(--settings-section-bg);
+}
+
+.settings-panel .settings-hero-card::before,
+.settings-panel .settings-section-card::before,
+.settings-panel .settings-metric-card::before {
+  content: none;
+}
+
+.settings-panel .settings-hero-card__content,
+.settings-panel .settings-section-card__header {
+  position: relative;
+  z-index: 1;
+}
+
+.settings-panel .settings-hero-card__metrics,
+.settings-panel .settings-section-card > :not(.settings-section-card__header) {
+  position: relative;
+  z-index: 1;
+}
+
+.settings-panel .settings-section-card {
+  border-color: var(--settings-border-subtle);
+  background: var(--settings-section-bg);
+}
+
+.settings-panel .settings-metric-card {
+  border-color: var(--settings-border-subtle);
+  background: var(--settings-surface-elevated);
+  box-shadow: var(--settings-card-shadow);
+}
+
+.settings-panel .settings-danger-zone {
+  box-shadow: none;
+}
+
 .settings-panel input:not([type="color"]),
 .settings-panel textarea,
 .settings-panel select {
@@ -4453,6 +4743,7 @@ body.dark-mode .settings-panel {
 
 .settings-shell-nav {
   gap: 14px;
+  background: var(--settings-shell-bg);
 }
 
 .settings-shell-nav__hero,
@@ -4472,6 +4763,10 @@ body.dark-mode .settings-panel {
 .settings-shell-mobile__topbar {
   border-radius: 24px;
   padding: 18px;
+}
+
+.settings-shell-nav__hero {
+  background: var(--settings-muted-surface);
 }
 
 .settings-shell-nav__search {
@@ -4538,7 +4833,7 @@ body.dark-mode .settings-panel {
   gap: 16px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-light);
-  background: linear-gradient(180deg, var(--settings-surface-start) 0%, var(--settings-soft-start) 100%);
+  background: transparent;
 }
 
 .settings-shell-main__module {
@@ -4550,7 +4845,7 @@ body.dark-mode .settings-panel {
 
 .settings-shell-page--desktop,
 .settings-shell-page--mobile {
-  background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.04) 0%, transparent 24%);
+  background: transparent;
 }
 
 .settings-shell-toolbar__icon {
@@ -6664,22 +6959,64 @@ body.dark-mode .settings-panel .apple-glass-card {
   flex-direction: column;
 }
 
-.settings-dashboard-banner {
+.settings-dashboard-workspace {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.settings-dashboard-panel {
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.05) 0%, transparent 34%),
+    var(--settings-section-bg);
+  box-shadow: var(--settings-card-shadow);
+}
+
+.settings-dashboard-panel--overview,
+.settings-dashboard-panel--recent {
+  grid-column: span 7;
+}
+
+.settings-dashboard-panel--priority,
+.settings-dashboard-panel--health {
+  grid-column: span 5;
+}
+
+.settings-dashboard-panel--logs {
+  grid-column: 1 / -1;
+}
+
+.settings-dashboard-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.settings-dashboard-banner__title {
+.settings-dashboard-panel__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-dashboard-panel__title {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.settings-dashboard-banner__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.settings-dashboard-panel__description {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-tertiary);
 }
 
 .settings-dashboard-grid {
@@ -6687,8 +7024,16 @@ body.dark-mode .settings-panel .apple-glass-card {
   gap: 12px;
 }
 
+.settings-dashboard-grid--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .settings-dashboard-grid--stacked {
   grid-template-columns: 1fr;
+}
+
+.settings-dashboard-grid--health {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .settings-dashboard-card {
@@ -6727,6 +7072,7 @@ body.dark-mode .settings-panel .apple-glass-card {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.35;
 }
 
 .settings-dashboard-card__description {
@@ -7088,6 +7434,166 @@ body.dark-mode .settings-panel .apple-glass-card {
   text-align: right;
 }
 
+.settings-panel .api-settings-workspace {
+  position: relative;
+}
+
+.settings-panel .api-settings-overview {
+  position: relative;
+  overflow: hidden;
+  border-color: rgb(var(--settings-accent-rgb) / 0.12);
+  background:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-soft-rgb) / 0.18), transparent 30%),
+    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.08) 0%, transparent 42%),
+    var(--settings-section-bg);
+}
+
+.settings-panel .api-settings-overview__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.settings-panel .api-settings-overview__kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-panel .api-settings-overview__title {
+  margin-top: 12px;
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 650;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.settings-panel .api-settings-overview__description {
+  margin-top: 12px;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+.settings-panel .api-settings-overview__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.settings-panel .api-settings-overview__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid rgb(var(--settings-accent-rgb) / 0.1);
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgb(255 255 255 / 0.44);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22);
+}
+
+.settings-panel .api-settings-overview__actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.settings-panel .api-settings-overview__stats {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-panel .api-settings-stat-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 16px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.18) 0%, transparent 100%),
+    var(--settings-surface-elevated);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 14px 28px rgb(15 23 42 / 0.06);
+}
+
+.settings-panel .api-settings-stat-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-panel .api-settings-stat-card__value {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.settings-panel .api-settings-stat-card__helper {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-tertiary);
+}
+
+.settings-panel .api-settings-workspace-card {
+  background:
+    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.04) 0%, transparent 24%),
+    var(--settings-section-bg);
+}
+
+.settings-panel .api-settings-workspace-card__header {
+  min-width: 0;
+}
+
+.settings-panel .api-settings-list-surface {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.16) 0%, transparent 100%),
+    var(--settings-surface-elevated);
+}
+
+.settings-panel .api-settings-mini-stat {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, transparent 100%),
+    var(--settings-surface-overlay);
+}
+
+.settings-panel .api-settings-provider-item--provider,
+.settings-panel .api-settings-provider-item--official {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.08) 0%, transparent 100%),
+    var(--settings-section-bg);
+}
+
+.settings-panel .api-settings-provider-runtime-card {
+  background:
+    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.05) 0%, transparent 100%),
+    var(--settings-surface-elevated);
+}
+
+.settings-panel .api-settings-editor-panel {
+  align-self: start;
+}
+
+.settings-panel .api-settings-editor-card {
+  background:
+    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.05) 0%, transparent 22%),
+    var(--settings-surface-elevated);
+}
+
 .settings-panel .api-settings-editor-toolbar {
   flex-wrap: wrap;
   row-gap: 8px;
@@ -7111,16 +7617,38 @@ body.dark-mode .settings-panel .apple-glass-card {
   }
 
   .settings-panel .api-settings-layout.is-browsing {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 20px;
   }
 
   .settings-panel .api-settings-layout.is-editing .api-settings-list-panel,
   .settings-panel .api-settings-layout.is-browsing .api-settings-list-panel {
     max-width: none;
   }
+
+  .settings-panel .api-settings-editor-panel {
+    position: sticky;
+    top: 0;
+  }
 }
 
 @media (max-width: 1180px) {
+  .settings-dashboard-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-dashboard-panel--overview,
+  .settings-dashboard-panel--priority,
+  .settings-dashboard-panel--recent,
+  .settings-dashboard-panel--health,
+  .settings-dashboard-panel--logs {
+    grid-column: 1 / -1;
+  }
+
+  .settings-panel .api-settings-overview__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .settings-panel .api-settings-provider-shell {
     flex-direction: column;
   }
@@ -7129,6 +7657,25 @@ body.dark-mode .settings-panel .apple-glass-card {
 @media (max-width: 767px) {
   .settings-shell-content {
     width: 100%;
+  }
+
+  .settings-dashboard-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-dashboard-panel {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .settings-dashboard-panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-dashboard-grid--compact,
+  .settings-dashboard-grid--health {
+    grid-template-columns: 1fr;
   }
 
   .settings-dashboard-row,
@@ -7146,6 +7693,23 @@ body.dark-mode .settings-panel .apple-glass-card {
   .settings-panel .api-settings-provider-action-row > button,
   .settings-panel .api-settings-summary-item {
     flex-basis: 100%;
+  }
+
+  .settings-panel .api-settings-overview__hero {
+    flex-direction: column;
+  }
+
+  .settings-panel .api-settings-overview__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .settings-panel .api-settings-overview__actions > button {
+    width: 100%;
+  }
+
+  .settings-panel .api-settings-overview__stats {
+    grid-template-columns: 1fr;
   }
 
   .settings-panel .settings-quiet-meta {

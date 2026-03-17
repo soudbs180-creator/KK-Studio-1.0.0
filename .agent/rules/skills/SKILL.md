@@ -11,7 +11,7 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 
 ## 🚨 当前项目基线（强制）
 
-- **当前项目版本**：`1.3.6`
+- **当前项目版本**：`1.3.7`
 - **版本源文件**：`package.json` + `src/config/appInfo.ts`
 - **文档基线文件**：`README.md`、`docs/development/session-handoff.md`、`docs/development/progress.md`
 - **规则基线文件**：`.agent/README.md` + 本文件
@@ -1846,7 +1846,7 @@ Last updated: 2026-03-09
 ## 📋 变更日志
 
 ### v2.2 (2026-03-09)
-- 新增项目版本基线说明（当前版本 `1.3.6`）
+- 新增项目版本基线说明（当前版本 `1.3.7`）
 - 新增版本同步源文件要求
 - 新增 `<project-root>` 路径规范，避免目录名与版本耦合
 - 新增文档同步与验证要求

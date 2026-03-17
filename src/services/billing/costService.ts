@@ -168,15 +168,25 @@ function getSnapshotNumber(
     return undefined;
 }
 
-function resolveSnapshotGroupRatio(groupRatio: unknown): number {
+function findDefaultGroupKey(map: Record<string, unknown> | undefined): string | undefined {
+    if (!map) return undefined;
+
+    return Object.keys(map).find((key) => key.trim().toLowerCase() === 'default');
+}
+
+function resolveSnapshotGroupRatio(
+    groupRatio: unknown,
+    options?: { allowArbitraryFallback?: boolean }
+): number {
     if (typeof groupRatio === 'number' && Number.isFinite(groupRatio)) return groupRatio;
     if (groupRatio && typeof groupRatio === 'object' && !Array.isArray(groupRatio)) {
         const map = groupRatio as Record<string, unknown>;
+        const defaultKey = findDefaultGroupKey(map);
         const direct =
-            map.default ??
-            map.Default ??
-            map.DEFAULT ??
-            Object.values(map).find((value) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== ''));
+            (defaultKey ? map[defaultKey] : undefined) ??
+            (options?.allowArbitraryFallback === false
+                ? undefined
+                : Object.values(map).find((value) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')));
 
         if (typeof direct === 'number' && Number.isFinite(direct)) return direct;
         if (typeof direct === 'string' && direct.trim() !== '') {
@@ -224,11 +234,6 @@ function resolveSizeRatio(sizeRatioMap: Record<string, number> | undefined, size
     return 1;
 }
 
-function getDefaultGroupEntry<T>(map: Record<string, T> | undefined): T | undefined {
-    if (!map) return undefined;
-    return map.default ?? map.Default ?? map.DEFAULT ?? Object.values(map)[0];
-}
-
 function getPreferredGroupKey(
     preferredGroup: string | undefined,
     map: Record<string, any> | undefined
@@ -240,9 +245,27 @@ function getPreferredGroupKey(
         const normalized = preferredGroup.trim().toLowerCase();
         const insensitive = Object.keys(map).find((key) => key.trim().toLowerCase() === normalized);
         if (insensitive) return insensitive;
+
+        return findDefaultGroupKey(map);
     }
 
-    return Object.keys(map).find((key) => ['default', 'Default', 'DEFAULT'].includes(key)) || Object.keys(map)[0];
+    return findDefaultGroupKey(map) || Object.keys(map)[0];
+}
+
+function getScopedGroupEntry<T>(
+    map: Record<string, T> | undefined,
+    preferredGroup: string | undefined
+): T | undefined {
+    if (!map) return undefined;
+
+    const groupKey = getPreferredGroupKey(preferredGroup, map);
+    if (groupKey) return map[groupKey];
+
+    if (preferredGroup && preferredGroup.trim() !== '') {
+        return undefined;
+    }
+
+    return Object.values(map)[0];
 }
 
 export function hasPricingSnapshotForKeySlot(keySlotId?: string): boolean {
@@ -333,26 +356,30 @@ export const calculateCost = (
         if (linkedProvider?.pricingSnapshot) {
             const snap = linkedProvider.pricingSnapshot;
             const preferredGroup = slot?.group || linkedProvider.group;
+            const hasExplicitPreferredGroup = Boolean(preferredGroup && preferredGroup.trim() !== '');
             const mPrice = getSnapshotNumber(snap.modelPrices, modelId) ?? getSnapshotNumber(snap.modelPrices, normalizedId);
             let mRatio = getSnapshotNumber(snap.modelRatios, modelId) ?? getSnapshotNumber(snap.modelRatios, normalizedId);
             const groupRatioKey = getPreferredGroupKey(preferredGroup, snap.groupRatioMap);
             const gRatio =
                 (groupRatioKey ? getSnapshotNumber(snap.groupRatioMap, groupRatioKey) : undefined) ??
-                resolveSnapshotGroupRatio(snap.groupRatio ?? snap.groupRatioMap);
+                (hasExplicitPreferredGroup && snap.groupRatioMap
+                    ? 1
+                    : resolveSnapshotGroupRatio(snap.groupRatioMap ?? snap.groupRatio, {
+                        allowArbitraryFallback: !hasExplicitPreferredGroup
+                    }));
             const groupModelRatioMap = snap.groupModelRatioMaps?.[modelId] || snap.groupModelRatioMaps?.[normalizedId];
             const groupModelRatioKey = getPreferredGroupKey(preferredGroup, groupModelRatioMap);
             const gmRatio =
                 (groupModelRatioKey ? getSnapshotNumber(groupModelRatioMap, groupModelRatioKey) : undefined) ??
-                getSnapshotNumber(snap.groupModelRatios, modelId) ??
-                getSnapshotNumber(snap.groupModelRatios, normalizedId) ??
+                (groupModelRatioMap && hasExplicitPreferredGroup
+                    ? undefined
+                    : getSnapshotNumber(snap.groupModelRatios, modelId) ??
+                      getSnapshotNumber(snap.groupModelRatios, normalizedId)) ??
                 1;
 
             const sRatioObj = snap.sizeRatios?.[modelId] || snap.sizeRatios?.[normalizedId];
             const groupSizeMap = snap.groupSizeRatios?.[modelId] || snap.groupSizeRatios?.[normalizedId];
-            const groupSizeKey = getPreferredGroupKey(preferredGroup, groupSizeMap);
-            const groupSizeObj =
-                (groupSizeKey ? groupSizeMap?.[groupSizeKey] : undefined) ||
-                getDefaultGroupEntry(groupSizeMap);
+            const groupSizeObj = getScopedGroupEntry(groupSizeMap, preferredGroup);
             const sRatio = Math.max(resolveSizeRatio(sRatioObj, size), resolveSizeRatio(groupSizeObj, size));
 
             // 濡傛灉鏄寜娆¤璐?
@@ -378,9 +405,7 @@ export const calculateCost = (
 
                 const groupPriceMap = snap.groupModelPrices?.[modelId] || snap.groupModelPrices?.[normalizedId];
                 const groupPriceKey = getPreferredGroupKey(preferredGroup, groupPriceMap);
-                const groupPriceOverride =
-                    (groupPriceKey ? groupPriceMap?.[groupPriceKey] : undefined) ||
-                    getDefaultGroupEntry(groupPriceMap);
+                const groupPriceOverride = getScopedGroupEntry(groupPriceMap, preferredGroup);
 
                 const overrideModelPrice = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelPrice');
                 const overrideModelRatio = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelRatio');
@@ -688,20 +713,7 @@ async function syncWithCloud() {
     if (!currentUserId || isSyncing || currentUserId.startsWith('dev-user-')) return;
     isSyncing = true;
     try {
-        const { data } = await supabase
-            .from('profiles')
-            .select('daily_cost_usd, daily_images, daily_tokens, daily_reset_date')
-            .eq('id', currentUserId)
-            .maybeSingle();
-
-        let localHistory = loadHistory();
         let todayStats = getTodayCosts(); // From updated logic
-
-        // Simple Sync Logic: If cloud has today's date and higher totals, we assume cloud is source of truth for TOTALS.
-        // Detailed syncing is skipped to avoid complexity for now.
-        if (data && data.daily_reset_date === getTodayString()) {
-            // Logic to merge if needed
-        }
 
         const slots = keyManager.getSlots();
         let totalBudget = 0;
@@ -711,14 +723,11 @@ async function syncWithCloud() {
             totalUsed += s.totalCost || 0;
         });
 
-        const apiBudgets = slots.map((s: KeySlot) => ({
-            id: s.id, name: s.name, budget: s.budgetLimit, used: s.totalCost || 0, status: s.status
-        }));
-
         const { data: { user } } = await supabase.auth.getUser();
 
         const profilePayload = {
             id: currentUserId,
+            email: user?.email || null,
             nickname: user?.user_metadata?.full_name || '',
             avatar_url: user?.user_metadata?.avatar_url || '',
             daily_cost_usd: todayStats.totalCostUsd,
@@ -726,27 +735,18 @@ async function syncWithCloud() {
             daily_reset_date: todayStats.date,
             total_budget: totalBudget || -1,
             total_used: totalUsed,
-            user_apis: apiBudgets,
             updated_at: new Date().toISOString()
         };
 
-        if (data) {
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update(profilePayload)
-                .eq('id', currentUserId);
+        const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert(profilePayload, {
+                onConflict: 'id',
+                ignoreDuplicates: false,
+            });
 
-            if (updateError) {
-                throw updateError;
-            }
-        } else {
-            const { error: insertError } = await supabase
-                .from('profiles')
-                .insert(profilePayload);
-
-            if (insertError) {
-                throw insertError;
-            }
+        if (upsertError) {
+            throw upsertError;
         }
 
     } catch (e) {

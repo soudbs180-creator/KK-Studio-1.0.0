@@ -58,7 +58,14 @@ const ApiSettingsView = lazy(() => import('./ApiSettingsView'));
 const AdminSystem = lazy(() => import('./AdminSystem'));
 const CostEstimation = lazy(() => import('../../pages/CostEstimation'));
 
-export type SettingsView = 'dashboard' | 'api-management' | 'cost-estimation' | 'storage-settings' | 'system-logs' | 'admin-system';
+export type SettingsView =
+  | 'dashboard'
+  | 'api-management'
+  | 'consumption-records'
+  | 'cost-estimation'
+  | 'storage-settings'
+  | 'system-logs'
+  | 'admin-system';
 type NavSectionId = 'workspace' | 'system';
 
 type NavItem = {
@@ -84,7 +91,7 @@ const navSections: Array<{ id: NavSectionId; label: string }> = [
 const navItems: NavItem[] = [
   { id: 'dashboard', label: '仪表盘', description: '查看当前状态与待处理事项。', icon: LayoutDashboard, section: 'workspace' },
   { id: 'api-management', label: 'API管理', description: '管理接口来源、供应商与价格同步。', icon: Key, section: 'workspace' },
-  { id: 'cost-estimation', label: '价格估算', description: '快速比对模型成本与分辨率。', icon: Calculator, section: 'workspace' },
+  { id: 'consumption-records', label: '消费记录', description: '查看 API 花费、积分消耗与最近记录。', icon: Calculator, section: 'workspace' },
   { id: 'storage-settings', label: '存储设置', description: '管理图片存储位置与空间占用。', icon: HardDrive, section: 'system' },
   { id: 'system-logs', label: '系统日志', description: '集中查看告警、错误与运行记录。', icon: ScrollText, section: 'system' },
   { id: 'admin-system', label: '管理员后台', description: '处理权限、后台维护与系统操作。', icon: Shield, section: 'system' },
@@ -414,44 +421,6 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
     });
   }
 
-  const overviewRows = [
-    {
-      key: 'balance',
-      icon: <DollarSign size={16} />,
-      title: '账户余额',
-      value: formatMetricNumber(balance, Number.isInteger(balance) ? 0 : 2),
-      description: latestRecharge ? `最近充值：${formatDateTime(latestRecharge.created_at)}` : '今天还没有新的充值记录',
-      tone: 'emerald' as DashboardTone,
-    },
-    {
-      key: 'cost',
-      icon: <Activity size={16} />,
-      title: '今日成本',
-      value: `$${todayCostUsd.toFixed(2)}`,
-      description: `Tokens ${formatMetricNumber(todayTokens)}，生成 ${formatMetricNumber(todayUsageCount)} 次`,
-      tone: 'amber' as DashboardTone,
-    },
-    {
-      key: 'routes',
-      icon: <Key size={16} />,
-      title: '接口接入',
-      value: `${officialCount + providerCount} 个入口`,
-      description:
-        providerCount > 0
-          ? `官方 ${officialCount} 个，第三方 ${providerCount} 个，在线 ${activeProviderCount} 个`
-          : `当前主要依赖官方接口，已识别 ${officialCount} 个入口`,
-      tone: 'indigo' as DashboardTone,
-    },
-    {
-      key: 'storage',
-      icon: <HardDrive size={16} />,
-      title: '存储方式',
-      value: storageModeLabel,
-      description: storageMode ? '图片保存位置已经明确。' : '建议先确认图片保存位置。',
-      tone: storageTone,
-    },
-  ];
-
   const recentRows = [
     {
       key: 'generation',
@@ -485,35 +454,176 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
     },
   ];
 
+  const healthRows: Array<{
+    key: string;
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    value: string;
+    tone: DashboardTone;
+    progress?: number;
+  }> = [
+    {
+      key: 'keys',
+      icon: <Key size={16} />,
+      title: '密钥池健康',
+      description:
+        stats.total > 0
+          ? `有效 ${stats.valid} / 总计 ${stats.total}，限流 ${stats.rateLimited}，失效 ${stats.invalid}`
+          : '当前还没有可统计的密钥，建议先补齐至少一个可调度入口。',
+      value: stats.total > 0 ? `${keyHealthPercent}%` : '未配置',
+      tone: keyTone,
+      progress: stats.total > 0 ? keyHealthPercent : undefined,
+    },
+    {
+      key: 'providers',
+      icon: <LayoutDashboard size={16} />,
+      title: '供应商连通',
+      description:
+        providerCount > 0
+          ? `在线 ${activeProviderCount} / ${providerCount}，第三方通道越完整，越适合长期工作。`
+          : officialCount > 0
+            ? '当前没有启用第三方供应商，主要使用官方接口。'
+            : '还没有任何供应商或官方接口入口。',
+      value: providerCount > 0 ? `${activeProviderCount}/${providerCount}` : '未接入',
+      tone: providerTone,
+      progress: providerCount > 0 ? Math.round((activeProviderCount / providerCount) * 100) : undefined,
+    },
+    {
+      key: 'storage',
+      icon: <HardDrive size={16} />,
+      title: '存储状态',
+      description:
+        storageMode
+          ? '图片存储位置已经明确，后续清理和迁移会更直接。'
+          : '存储方式未明确时，后续排查成本会更高。',
+      value: storageModeLabel,
+      tone: storageTone,
+    },
+    {
+      key: 'logs',
+      icon: <Activity size={16} />,
+      title: '日志风险',
+      description:
+        importantLogCount > 0
+          ? '今天有告警或错误，建议尽快检查。'
+          : '今天没有新的警告或错误。',
+      value: importantLogCount > 0 ? `${importantLogCount} 条` : '正常',
+      tone: logTone,
+    },
+  ] as const;
+
   return (
     <SettingsViewShell>
-      <SettingsSection
-        title="当前状态"
+      <SettingsHero
+        tone={readinessTone}
+        icon={LayoutDashboard}
+        eyebrow="DASHBOARD"
+        title="仪表盘"
         description={readinessDescription}
-        action={<SettingsBadge tone={readinessTone}>{readinessLabel}</SettingsBadge>}
-      >
-        <div className="settings-dashboard-banner">
-          <div className="settings-dashboard-banner__title">{readinessTitle}</div>
-          <div className="settings-dashboard-banner__actions">
-            <SettingsActionButton icon={Key} tone="primary" size="sm" onClick={() => onNavigate('api-management')}>
-              API 管理
-            </SettingsActionButton>
-            <SettingsActionButton icon={ScrollText} size="sm" onClick={() => onNavigate('system-logs')}>
-              系统日志
-            </SettingsActionButton>
-            <SettingsActionButton icon={HardDrive} size="sm" onClick={() => onNavigate('storage-settings')}>
-              存储设置
-            </SettingsActionButton>
+        badge={<SettingsBadge tone={readinessTone}>{readinessLabel}</SettingsBadge>}
+        metrics={(
+          <>
+            <SettingsMetricCard
+              label="可用链路"
+              value={hasAvailableRoute ? `${officialCount + activeProviderCount}` : '0'}
+              helper={hasAvailableRoute ? `官方 ${officialCount} / 在线供应商 ${activeProviderCount}` : '还没有可以直接工作的入口。'}
+              icon={Key}
+              tone={hasAvailableRoute ? 'indigo' : 'rose'}
+            />
+            <SettingsMetricCard
+              label="今日消费"
+              value={`$${todayCostUsd.toFixed(2)}`}
+              helper={`Tokens ${formatMetricNumber(todayTokens)} / 调用 ${formatMetricNumber(todayUsageCount)}`}
+              icon={Activity}
+              tone="amber"
+            />
+            <SettingsMetricCard
+              label="今日充值"
+              value={todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : '暂无'}
+              helper={latestRecharge ? `最近一笔 ${formatDateTime(latestRecharge.created_at)}` : '今天还没有新的充值记录。'}
+              icon={DollarSign}
+              tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}
+            />
+            <SettingsMetricCard
+              label="待处理"
+              value={priorityItems.length > 0 ? `${priorityItems.length} 项` : '稳定'}
+              helper={importantLogCount > 0 ? `重要日志 ${importantLogCount} 条` : '当前没有需要立刻处理的问题。'}
+              icon={ScrollText}
+              tone={priorityItems.length > 0 ? (hasCriticalLogs ? 'rose' : 'amber') : 'emerald'}
+            />
+          </>
+        )}
+      />
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr),minmax(320px,0.8fr)]">
+        <SettingsSection title="当前状态" description="只保留最关键的系统状态，避免继续堆信息。">
+          <div className="settings-dashboard-grid settings-dashboard-grid--health">
+            {healthRows.map((row) => (
+              <DashboardCheckCard
+                key={row.key}
+                icon={row.icon}
+                title={row.title}
+                description={row.description}
+                value={row.value}
+                tone={row.tone}
+                progress={row.progress}
+              />
+            ))}
           </div>
-        </div>
-      </SettingsSection>
+        </SettingsSection>
+
+        <SettingsSection
+          title="待处理"
+          description="这里只放真正影响继续使用的事项。"
+          action={
+            <SettingsBadge tone={priorityItems.length > 0 ? 'amber' : 'emerald'}>
+              {priorityItems.length > 0 ? `${priorityItems.length} 项` : '当前稳定'}
+            </SettingsBadge>
+          }
+        >
+          {priorityItems.length === 0 ? (
+            <div className="settings-dashboard-quiet" style={SETTINGS_SUCCESS_STYLE}>
+              <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                当前没有必须立刻处理的问题
+              </div>
+              <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-secondary)' }}>
+                可以继续使用；如果后续出现异常，再进入对应设置页处理。
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {priorityItems.map((item) => (
+                <div key={item.id} className="settings-dashboard-priority">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </div>
+                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-tertiary)' }}>
+                      {item.description}
+                    </div>
+                  </div>
+                  <SettingsActionButton size="sm" onClick={() => onNavigate(item.actionView)}>
+                    前往
+                  </SettingsActionButton>
+                </div>
+              ))}
+            </div>
+          )}
+        </SettingsSection>
+      </div>
 
       <SettingsSection
-        title="概览"
-        description="只保留今天最关键的四项状态，用统一卡片收紧信息密度。"
+        title="最近变化"
+        description="最近生成、充值和日志会集中在这里。"
+        action={
+          <SettingsBadge tone={todayUsageCount > 0 || todayRechargeCount > 0 ? 'indigo' : 'neutral'}>
+            {todayUsageCount > 0 || todayRechargeCount > 0 ? '有新变化' : '暂无新变化'}
+          </SettingsBadge>
+        }
       >
         <div className="settings-dashboard-grid">
-          {overviewRows.map((row) => (
+          {recentRows.map((row) => (
             <DashboardInfoCard
               key={row.key}
               icon={row.icon}
@@ -524,151 +634,16 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
             />
           ))}
         </div>
-      </SettingsSection>
 
-      <SettingsSection
-        title="需要处理"
-        description="真正影响继续工作的事项只放这里。"
-        action={
-          <SettingsBadge tone={priorityItems.length > 0 ? 'amber' : 'emerald'}>
-            {priorityItems.length > 0 ? `${priorityItems.length} 项待处理` : '当前稳定'}
-          </SettingsBadge>
-        }
-      >
-        {priorityItems.length === 0 ? (
-          <div className="settings-dashboard-quiet" style={SETTINGS_SUCCESS_STYLE}>
-            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              当前没有必须立刻处理的问题
-            </div>
-            <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-secondary)' }}>
-              可以继续使用，也可以去 API 管理、价格估算和存储设置做进一步微调。
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {priorityItems.map((item) => (
-              <div key={item.id} className="settings-dashboard-priority">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </div>
-                    <SettingsBadge tone={item.tone}>{item.actionLabel}</SettingsBadge>
-                  </div>
-                  <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-tertiary)' }}>
-                    {item.description}
-                  </div>
-                </div>
-                <SettingsActionButton size="sm" onClick={() => onNavigate(item.actionView)}>
-                  处理
-                </SettingsActionButton>
+        <div className="mt-4 space-y-3">
+          {latestImportantLogs.length === 0 ? (
+            <div className="settings-dashboard-quiet" style={SETTINGS_ELEVATED_STYLE}>
+              <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                今日暂无需要优先关注的告警或错误。
               </div>
-            ))}
-          </div>
-        )}
-      </SettingsSection>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <SettingsSection
-          title="最近变化"
-          description="只看最近一次生成、充值和系统反馈。"
-          action={
-            <SettingsBadge tone={todayUsageCount > 0 || todayRechargeCount > 0 ? 'indigo' : 'neutral'}>
-              {todayUsageCount > 0 || todayRechargeCount > 0 ? '有新变化' : '暂无新变化'}
-            </SettingsBadge>
-          }
-        >
-          <div className="settings-dashboard-grid settings-dashboard-grid--stacked">
-            {recentRows.map((row) => (
-              <DashboardInfoCard
-                key={row.key}
-                icon={row.icon}
-                title={row.title}
-                value={row.value}
-                description={row.description}
-                tone={row.tone}
-              />
-            ))}
-          </div>
-        </SettingsSection>
-
-        <SettingsSection
-          title="健康检查"
-          description="快速确认接口、供应商、存储和日志状态。"
-        >
-          <div className="settings-dashboard-grid">
-            <DashboardCheckCard
-              icon={<Key size={16} />}
-              title="密钥池健康"
-              description={
-                stats.total > 0
-                  ? `有效 ${stats.valid} / 总计 ${stats.total}，限流 ${stats.rateLimited}，失效 ${stats.invalid}`
-                  : '当前还没有可统计的密钥，建议先补齐至少一个可调度入口。'
-              }
-              value={stats.total > 0 ? `${keyHealthPercent}%` : '未配置'}
-              tone={keyTone}
-              progress={stats.total > 0 ? keyHealthPercent : undefined}
-            />
-            <DashboardCheckCard
-              icon={<LayoutDashboard size={16} />}
-              title="供应商连通"
-              description={
-                providerCount > 0
-                  ? `在线 ${activeProviderCount} / ${providerCount}，第三方通道越完整，越适合长期工作。`
-                  : officialCount > 0
-                    ? '当前没有启用第三方供应商，主要使用官方接口。'
-                    : '还没有任何供应商或官方接口入口。'
-              }
-              value={providerCount > 0 ? `${activeProviderCount}/${providerCount}` : '未接入'}
-              tone={providerTone}
-              progress={providerCount > 0 ? Math.round((activeProviderCount / providerCount) * 100) : undefined}
-            />
-            <DashboardCheckCard
-              icon={<HardDrive size={16} />}
-              title="存储状态"
-              description={
-                storageMode
-                  ? '图片存储位置已经明确，后续清理和迁移会更直接。'
-                  : '存储方式未明确时，后续排查成本会更高。'
-              }
-              value={storageModeLabel}
-              tone={storageTone}
-            />
-            <DashboardCheckCard
-              icon={<Activity size={16} />}
-              title="日志风险"
-              description={
-                importantLogCount > 0
-                  ? '今天有告警或错误，建议尽快检查。'
-                  : '今天没有新的警告或错误。'
-              }
-              value={importantLogCount > 0 ? `${importantLogCount} 条` : '正常'}
-              tone={logTone}
-            />
-          </div>
-        </SettingsSection>
-      </div>
-
-      <SettingsSection
-        title="重点日志"
-        description="只展示最近几条告警和错误。"
-        action={
-          importantLogCount > 0 ? (
-            <SettingsActionButton size="sm" icon={ScrollText} onClick={() => onNavigate('system-logs')}>
-              查看全部
-            </SettingsActionButton>
-          ) : undefined
-        }
-      >
-        {latestImportantLogs.length === 0 ? (
-          <div className="settings-dashboard-quiet" style={SETTINGS_ELEVATED_STYLE}>
-            <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              今日暂无需要优先关注的告警或错误。
             </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {latestImportantLogs.map((log) => {
+          ) : (
+            latestImportantLogs.map((log) => {
               const tone: DashboardTone =
                 log.level === LogLevel.ERROR || log.level === LogLevel.CRITICAL ? 'rose' : 'amber';
               const detailPreview = log.details.split('\n').find((line) => line.trim()) || log.details;
@@ -692,9 +667,9 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
+            })
+          )}
+        </div>
       </SettingsSection>
     </SettingsViewShell>
   );
@@ -1384,7 +1359,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   initialView = 'dashboard',
   initialSupplier = null,
 }) => {
-  const [activeView, setActiveView] = useState<SettingsView>(initialView);
+  const resolveView = (view: SettingsView): SettingsView =>
+    view === 'cost-estimation' ? 'consumption-records' : view;
+
+  const [activeView, setActiveView] = useState<SettingsView>(resolveView(initialView));
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
   const [navQuery, setNavQuery] = useState('');
   const [mobileShowNav, setMobileShowNav] = useState(() => initialView === 'dashboard');
@@ -1412,9 +1390,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setActiveView(initialView);
+      setActiveView(resolveView(initialView));
       setNavQuery('');
-      setMobileShowNav(initialView === 'dashboard');
+      setMobileShowNav(resolveView(initialView) === 'dashboard');
     }
   }, [initialView, isOpen]);
 
@@ -1467,7 +1445,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </Suspense>
       );
     }
-    if (activeView === 'cost-estimation') {
+    if (activeView === 'consumption-records' || activeView === 'cost-estimation') {
       return (
         <Suspense fallback={lazyFallback}>
           <CostEstimation embedded />
@@ -1605,13 +1583,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         >
           <aside className="w-[286px] flex-shrink-0">
             <div className="settings-panel apple-glass-card settings-shell-nav flex h-full flex-col rounded-[32px] p-4 shadow-2xl">
-              <div className="settings-shell-nav__title">
+              <div className="settings-shell-nav__hero">
                 <div className="settings-shell-kicker">Settings</div>
                 <div className="mt-1.5 text-[22px] font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
                   高级设置
                 </div>
                 <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-                  用统一的层级整理接口、存储、日志和后台维护。
+                  用统一层级整理接口、消费、存储、日志和后台维护。
                 </div>
               </div>
 
@@ -1626,23 +1604,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="settings-shell-nav__list flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
                 {navList}
-              </div>
-
-              <div className="rounded-[20px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-tertiary)' }}>
-                  Current View
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {activeNavItem.label}
-                    </div>
-                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-tertiary)' }}>
-                      {activeNavItem.description}
-                    </div>
-                  </div>
-                  <SettingsBadge tone="neutral">{activeSectionLabel}</SettingsBadge>
-                </div>
               </div>
             </div>
           </aside>

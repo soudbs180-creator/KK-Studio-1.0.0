@@ -35,6 +35,15 @@ const REQUIRED_EDGE_FUNCTIONS = [
   'secure-model-proxy',
 ];
 
+const PLACEHOLDER_SECRET_PATTERNS = [
+  'your-',
+  'example',
+  'replace',
+  'changeme',
+  '<',
+  'todo',
+];
+
 function parseEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
 
@@ -83,6 +92,12 @@ function functionsBaseUrl(url) {
   return ref ? `https://${ref}.functions.supabase.co` : '';
 }
 
+function isPlaceholderSecret(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return false;
+  return PLACEHOLDER_SECRET_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
 function restHeaders(apiKey, bearerToken = apiKey) {
   return {
     apikey: apiKey,
@@ -113,27 +128,64 @@ async function probeRestObject(supabaseUrl, apiKey, objectName) {
   return { exists: response.status !== 404, status: response.status, detail };
 }
 
-async function probeRpc(supabaseUrl, apiKey, rpcName) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpcName}`, {
-    method: 'POST',
-    headers: restHeaders(apiKey),
-    body: JSON.stringify({}),
-  });
-
-  if (response.status === 404) {
-    return { exists: false, status: response.status, detail: 'missing' };
+async function loadSchemaCatalog(supabaseUrl, apiKey) {
+  if (!supabaseUrl || !apiKey) {
+    return {
+      ok: false,
+      detail: 'missing service-role key',
+      spec: null,
+    };
   }
 
+  if (isPlaceholderSecret(apiKey)) {
+    return {
+      ok: false,
+      detail: 'placeholder service-role key detected',
+      spec: null,
+    };
+  }
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+    method: 'GET',
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/openapi+json',
+    },
+  }).catch((error) => ({
+    ok: false,
+    status: 0,
+    json: async () => null,
+    text: async () => error.message,
+  }));
+
   if (response.ok) {
-    return { exists: true, status: response.status, detail: 'ok' };
+    return {
+      ok: true,
+      detail: 'openapi schema loaded',
+      spec: await response.json(),
+    };
   }
 
   const detail = await response.text().catch(() => '');
   return {
-    exists: response.status !== 404,
-    status: response.status,
-    detail: detail || 'rpc responded with validation/auth error',
+    ok: false,
+    detail: `${response.status} ${detail || 'failed to load schema metadata'}`.trim(),
+    spec: null,
   };
+}
+
+function probeCatalogPath(spec, pathName) {
+  const exists = Boolean(spec?.paths && Object.prototype.hasOwnProperty.call(spec.paths, pathName));
+  return {
+    exists,
+    status: exists ? 200 : 404,
+    detail: exists ? 'openapi schema' : 'missing from openapi schema',
+  };
+}
+
+function probeRpcFromCatalog(spec, rpcName) {
+  return probeCatalogPath(spec, `/rpc/${rpcName}`);
 }
 
 async function probeEdgeFunction(supabaseUrl, apiKey, functionName) {
@@ -169,11 +221,19 @@ async function probeEdgeFunction(supabaseUrl, apiKey, functionName) {
 }
 
 async function checkConnection(supabaseUrl) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/`, {
     method: 'GET',
-  });
+  }).catch((error) => ({
+    status: 0,
+    text: async () => error.message,
+  }));
 
-  return response.ok;
+  const detail = await response.text().catch(() => '');
+  return {
+    ok: response.status > 0,
+    status: response.status,
+    detail: detail ? detail.slice(0, 120) : 'reachable',
+  };
 }
 
 function logCheck(label, ok, detail = '') {
@@ -181,15 +241,17 @@ function logCheck(label, ok, detail = '') {
   console.log(`${prefix} ${label}${detail ? ` - ${detail}` : ''}`);
 }
 
+function logNote(label, detail = '') {
+  console.log(`[INFO] ${label}${detail ? ` - ${detail}` : ''}`);
+}
+
 export async function runAudit() {
   const rootEnv = {
     ...parseEnvFile(path.join(repoRoot, '.env')),
     ...parseEnvFile(path.join(repoRoot, '.env.local')),
   };
-  const paymentEnv = {
-    ...parseEnvFile(path.join(repoRoot, 'payment-server', '.env.example')),
-    ...parseEnvFile(path.join(repoRoot, 'payment-server', '.env')),
-  };
+  const paymentEnvExample = parseEnvFile(path.join(repoRoot, 'payment-server', '.env.example'));
+  const paymentEnv = parseEnvFile(path.join(repoRoot, 'payment-server', '.env'));
   const builtin = extractBuiltinSupabaseConfig();
   const projectRef = readProjectRef();
 
@@ -201,17 +263,38 @@ export async function runAudit() {
     rootEnv.SUPABASE_ANON_KEY ||
     rootEnv.VITE_SUPABASE_ANON_KEY ||
     builtin.key;
-  const paymentSupabaseUrl = paymentEnv.SUPABASE_URL || '';
-  const serviceRoleKey =
+  const paymentSupabaseUrl = paymentEnv.SUPABASE_URL || paymentEnvExample.SUPABASE_URL || '';
+  const paymentServiceRoleKey =
     paymentEnv.SUPABASE_SERVICE_ROLE_KEY ||
     paymentEnv.SUPABASE_SECRET_KEY ||
+    '';
+  const paymentServiceRoleKeyFromExample =
+    paymentEnvExample.SUPABASE_SERVICE_ROLE_KEY ||
+    paymentEnvExample.SUPABASE_SECRET_KEY ||
+    '';
+  const auditServiceRoleKey =
+    paymentServiceRoleKey ||
     rootEnv.SUPABASE_SERVICE_ROLE_KEY ||
+    rootEnv.SUPABASE_SECRET_KEY ||
     '';
 
   const expectedRef = projectRef || projectRefFromUrl(supabaseUrl);
   const currentRef = projectRefFromUrl(supabaseUrl);
   const builtinRef = projectRefFromUrl(builtin.url);
   const paymentRef = projectRefFromUrl(paymentSupabaseUrl);
+  const schemaCatalog = supabaseUrl
+    ? await loadSchemaCatalog(supabaseUrl, auditServiceRoleKey)
+    : { ok: false, detail: 'missing supabase url', spec: null };
+
+  const paymentServiceRoleConfigured =
+    Boolean(paymentServiceRoleKey) && !isPlaceholderSecret(paymentServiceRoleKey);
+  const paymentServiceRoleDetail = paymentServiceRoleConfigured
+    ? 'configured in payment-server/.env'
+    : paymentServiceRoleKeyFromExample
+      ? 'missing in payment-server/.env (only placeholder remains in payment-server/.env.example)'
+      : 'missing in payment-server/.env';
+  const paymentServiceRoleMatchesProject =
+    schemaCatalog.ok && paymentServiceRoleConfigured && paymentRef === expectedRef;
 
   console.log('========================================');
   console.log('Supabase Runtime Audit');
@@ -223,9 +306,11 @@ export async function runAudit() {
 
   let hasFailures = false;
 
-  const connectionOk = Boolean(supabaseUrl) && (await checkConnection(supabaseUrl).catch(() => false));
-  logCheck('Public Supabase endpoint reachable', connectionOk);
-  hasFailures ||= !connectionOk;
+  const connection = Boolean(supabaseUrl)
+    ? await checkConnection(supabaseUrl)
+    : { ok: false, status: 0, detail: 'missing supabase url' };
+  logCheck('Public Supabase endpoint reachable', connection.ok, `${connection.status} ${connection.detail}`.trim());
+  hasFailures ||= !connection.ok;
 
   const builtinAligned = Boolean(builtin.url) && builtinRef === expectedRef;
   logCheck('Built-in client config matches project ref', builtinAligned, builtin.url || 'missing built-in config');
@@ -243,29 +328,56 @@ export async function runAudit() {
   logCheck('Publishable key configured', hasPublishableKey);
   hasFailures ||= !hasPublishableKey;
 
-  const hasServiceRoleKey = Boolean(serviceRoleKey);
-  logCheck('Service-role key available for server-side checks', hasServiceRoleKey, hasServiceRoleKey ? 'configured' : 'missing');
+  logCheck('payment-server service-role key configured', paymentServiceRoleConfigured, paymentServiceRoleDetail);
+  hasFailures ||= !paymentServiceRoleConfigured;
+
+  logCheck('Server-side schema introspection available', schemaCatalog.ok, schemaCatalog.detail);
+  hasFailures ||= !schemaCatalog.ok;
+
+  logCheck(
+    'payment-server service-role key matches current project',
+    paymentServiceRoleMatchesProject,
+    paymentServiceRoleMatchesProject
+      ? 'schema metadata loaded for current project'
+      : 'cannot verify without a valid payment-server service-role key',
+  );
+  hasFailures ||= !paymentServiceRoleMatchesProject;
 
   if (supabaseUrl && publishableKey) {
     console.log('');
     console.log('Objects');
 
+    const probeTableOrView = async (name) => {
+      if (schemaCatalog.ok) {
+        return probeCatalogPath(schemaCatalog.spec, `/${name}`);
+      }
+      return probeRestObject(supabaseUrl, publishableKey, name);
+    };
+
     for (const tableName of REQUIRED_TABLES) {
-      const result = await probeRestObject(supabaseUrl, publishableKey, tableName);
+      const result = await probeTableOrView(tableName);
       logCheck(`table:${tableName}`, result.exists, `${result.status} ${result.detail}`);
       hasFailures ||= !result.exists;
     }
 
     for (const viewName of REQUIRED_VIEWS) {
-      const result = await probeRestObject(supabaseUrl, publishableKey, viewName);
+      const result = await probeTableOrView(viewName);
       logCheck(`view:${viewName}`, result.exists, `${result.status} ${result.detail}`);
       hasFailures ||= !result.exists;
     }
 
-    for (const rpcName of REQUIRED_RPCS) {
-      const result = await probeRpc(supabaseUrl, publishableKey, rpcName);
-      logCheck(`rpc:${rpcName}`, result.exists, `${result.status} ${result.detail}`);
-      hasFailures ||= !result.exists;
+    if (schemaCatalog.ok) {
+      for (const rpcName of REQUIRED_RPCS) {
+        const result = probeRpcFromCatalog(schemaCatalog.spec, rpcName);
+        logCheck(`rpc:${rpcName}`, result.exists, `${result.status} ${result.detail}`);
+        hasFailures ||= !result.exists;
+      }
+    } else {
+      logCheck('rpc-catalog', false, 'requires valid service-role key for non-destructive RPC audit');
+      hasFailures = true;
+      for (const rpcName of REQUIRED_RPCS) {
+        logNote(`rpc:${rpcName}`, 'not checked');
+      }
     }
 
     for (const functionName of REQUIRED_EDGE_FUNCTIONS) {

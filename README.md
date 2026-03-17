@@ -1,7 +1,7 @@
-# KK Studio v1.3.6
+# KK Studio v1.3.7
 A visual-first, node-based prompt engineering and generation IDE.
 
-![Version](https://img.shields.io/badge/version-1.3.6-indigo.svg)
+![Version](https://img.shields.io/badge/version-1.3.7-indigo.svg)
 ![React](https://img.shields.io/badge/React-19-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
 ![Vite](https://img.shields.io/badge/Vite-6-purple)
@@ -13,7 +13,7 @@ A visual-first, node-based prompt engineering and generation IDE.
 
 KK Studio 是一款面向图像与多模态创作的专业级 AI 工作台，基于 **无限画布（Infinite Canvas）** 进行可视化创作编排，并兼容 **Google Gemini / NewAPI / OpenAI Compatible** 等多渠道接入方式。
 
-当前 `v1.3.6` 版本以 **大画布性能分级渲染、工作流兼容底座、图像成本口径修正与卡片信息密度优化** 为核心目标，重点强化：
+当前 `v1.3.7` 版本以 **大画布性能分级渲染、工作流兼容底座、图像成本口径修正与卡片信息密度优化** 为核心目标，重点强化：
 - 根据缩放层级与节点规模动态切换完整卡片 / 紧凑卡片 / 缩略外壳，降低大画布拖拽、缩放与连线渲染负担
 - 为现有 Prompt / Image 卡片补齐可选 `workflow` 数据结构与兼容同步逻辑，为后续工作流节点化演进预留底座
 - 图像卡与移动聊天流统一优先读取供应商价格快照，修正显式成本、存量成本与 4K 尺寸别名的展示优先级
@@ -189,7 +189,7 @@ kk-studio/
 
 ## 🆕 当前版本说明
 
-### v1.3.6 (2026-03-10)
+### v1.3.7 (2026-03-10)
 
 #### 当前基线
 - **画布性能分级渲染**：新增 `performanceProfile`，按节点规模、缩放层级与交互状态动态调整 overscan、连线节流与卡片细节等级，减少大画布缩放和拖拽抖动

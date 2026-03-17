@@ -5,6 +5,8 @@ import type {
   PromptNode,
   WorkflowNode,
 } from '../../types';
+import { isLegacyWorkflowNodeKind } from '../schema';
+import { normalizeWorkflowGraph } from '../persistence/workflowSerializer';
 import { createEmptyWorkflowGraph } from '../types';
 
 const toPromptWorkflowNode = (node: PromptNode): WorkflowNode => ({
@@ -29,9 +31,17 @@ const toImageWorkflowNode = (node: GeneratedImage): WorkflowNode => ({
   data: node,
 });
 
-export const canvasToWorkflow = (canvas: Canvas): CanvasWorkflow => {
+const mergeLegacyNodesIntoWorkflow = (
+  canvas: Canvas,
+  existingWorkflow?: CanvasWorkflow,
+): CanvasWorkflow => {
   const graph = createEmptyWorkflowGraph<WorkflowNode>();
   const edges = new Map<string, CanvasWorkflow['edges'][number]>();
+  const normalizedExistingWorkflow = normalizeWorkflowGraph(existingWorkflow);
+  const legacyNodeIds = new Set<string>([
+    ...canvas.promptNodes.map((node) => node.id),
+    ...canvas.imageNodes.map((node) => node.id),
+  ]);
 
   canvas.promptNodes.forEach((node) => {
     graph.nodes.push(toPromptWorkflowNode(node));
@@ -72,20 +82,50 @@ export const canvasToWorkflow = (canvas: Canvas): CanvasWorkflow => {
     }
   });
 
+  (normalizedExistingWorkflow?.nodes || []).forEach((node) => {
+    if (!isLegacyWorkflowNodeKind(node.kind)) {
+      graph.nodes.push(node);
+    }
+  });
+
+  const validNodeIds = new Set(graph.nodes.map((node) => node.id));
+  (normalizedExistingWorkflow?.edges || []).forEach((edge) => {
+    const fromIsLegacy = legacyNodeIds.has(edge.from);
+    const toIsLegacy = legacyNodeIds.has(edge.to);
+    const isLegacyOnlyEdge = fromIsLegacy && toIsLegacy;
+
+    if (isLegacyOnlyEdge && edge.role !== 'control' && edge.role !== 'sequence') {
+      const fromIsUtility = graph.nodes.some((node) => node.id === edge.from && !isLegacyWorkflowNodeKind(node.kind));
+      const toIsUtility = graph.nodes.some((node) => node.id === edge.to && !isLegacyWorkflowNodeKind(node.kind));
+      if (!fromIsUtility && !toIsUtility) {
+        return;
+      }
+    }
+
+    if (validNodeIds.has(edge.from) && validNodeIds.has(edge.to)) {
+      edges.set(edge.id, edge);
+    }
+  });
+
   graph.edges = Array.from(edges.values());
   graph.metadata = {
-    source: 'legacy-canvas',
+    ...normalizedExistingWorkflow?.metadata,
+    source: normalizedExistingWorkflow?.metadata?.source || 'legacy-canvas',
     generatedAt: Date.now(),
-    featureFlag: 'experimentalWorkflowGraph',
+    featureFlag: normalizedExistingWorkflow?.metadata?.featureFlag || 'experimentalWorkflowGraph',
   };
 
   return graph;
 };
 
+export const canvasToWorkflow = (canvas: Canvas): CanvasWorkflow => (
+  mergeLegacyNodesIntoWorkflow(canvas, canvas.workflow)
+);
+
 export const syncCanvasWorkflow = (canvas: Canvas, enabled: boolean): Canvas =>
-  enabled
+  (enabled || !!canvas.workflow)
     ? {
         ...canvas,
-        workflow: canvasToWorkflow(canvas),
+        workflow: mergeLegacyNodesIntoWorkflow(canvas, canvas.workflow),
       }
     : canvas;

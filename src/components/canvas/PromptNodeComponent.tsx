@@ -10,6 +10,7 @@ import { writeTextToClipboard } from '../../utils/clipboard';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import ImagePreview from '../image/ImagePreview';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
+import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -187,26 +188,32 @@ const ReferenceThumbnail: React.FC<{
 // ⚠️ 200-400s: 黄色 - "等待时间过长"
 // 🔴 400-600s: 红色 - "建议重新生成"
 // ❌ >600s: 自动取消并转为错误卡
+const MAX_GENERATION_MS = 600000;
+
 const GenerationTimer: React.FC<{ start: number; onTimeout?: () => void }> = ({ start, onTimeout }) => {
-    const [elapsed, setElapsed] = useState(0);
+    const [elapsed, setElapsed] = useState(() => Math.min(MAX_GENERATION_MS, Math.max(0, Date.now() - start)));
     const timeoutTriggered = useRef(false);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            const now = Date.now() - start;
-            setElapsed(now);
+        timeoutTriggered.current = false;
+
+        const tick = () => {
+            const now = Math.max(0, Date.now() - start);
+            setElapsed(Math.min(now, MAX_GENERATION_MS));
 
             // 🚀 超过600秒自动取消
-            if (now > 600000 && !timeoutTriggered.current && onTimeout) {
+            if (now >= MAX_GENERATION_MS && !timeoutTriggered.current && onTimeout) {
                 timeoutTriggered.current = true;
                 onTimeout();
             }
-        }, 100);
+        };
+        tick();
+        const interval = setInterval(tick, 250);
         return () => clearInterval(interval);
     }, [start, onTimeout]);
 
-    const seconds = Math.floor(elapsed / 1000);
-    const displayTime = (elapsed / 1000).toFixed(1);
+    const seconds = Math.min(600, Math.floor(elapsed / 1000));
+    const displayTime = (Math.min(elapsed, MAX_GENERATION_MS) / 1000).toFixed(1);
 
     // 计算颜色和状态信息
     let colorClass: string;
@@ -850,7 +857,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     />
                 )}
                 {/* Header (Status & Actions) */}
-                <div className="flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', ...secondaryTextRenderStyle }}>
                     {/* Left: Status Icon and Text */}
                     <div className="flex flex-1 items-center gap-2 min-w-0">
                         {showError ? (
@@ -862,7 +869,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <line x1="12" y1="16" x2="12.01" y2="16"></line>
                                     </svg>
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error} style={secondaryTextRenderStyle}>
+                                <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error}>
                                     生成失败{(() => {
                                         // 🚀 [Fix] 只有 SystemProxy 或者明确带有 @system 后缀才是积分模型
                                         const lowerModelId = node.model?.toLowerCase() || '';
@@ -880,7 +887,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-blue-500/15">
                                     <Sparkles size={12} className="text-blue-400 animate-pulse" />
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate text-blue-400" style={secondaryTextRenderStyle}>
+                                <span className="text-[13px] font-medium tracking-wide truncate text-blue-400">
                                     正在生成 {node.parallelCount || 1} 张
                                 </span>
                             </>
@@ -889,7 +896,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-amber-500/10`}>
                                     <Sparkles size={12} className="text-amber-400" />
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate" style={secondaryTextRenderStyle}>
+                                <span className="text-[13px] font-medium tracking-wide truncate">
                                     {renderedSuccessCount > 0 ? (
                                         <span className="text-[var(--text-secondary)]">
                                             {renderedFailCount > 0
@@ -1216,7 +1223,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
 
                     {node.mode === GenerationMode.PPT && !node.isGenerating && (node.childImageIds?.length || 0) > 0 && onRetryPptPage && (
-                        <div className="mt-2 p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                        <div className="mt-2 p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)', ...secondaryTextRenderStyle }}>
                             <div className="text-[10px] mb-1 text-[var(--text-tertiary)]">单页重生</div>
                             <div className="flex flex-wrap gap-1">
                                 {Array.from({ length: Math.min(20, node.childImageIds.length) }).map((_, idx) => (
@@ -1251,7 +1258,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* 🚀 Main Card Tags: Centered Layout with Hover Blur + X Delete */}
                     {node.tags && node.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3 mb-1 px-2 w-full box-border justify-center">
+                        <div className="flex flex-wrap gap-2 mt-3 mb-1 px-2 w-full box-border justify-center" style={secondaryTextRenderStyle}>
                             {node.tags.slice(0, 8).map(tag => {
                                 const colors = generateTagColor(tag);
                                 return (
@@ -1551,7 +1558,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                         {(() => {
                                                             const modelId = node.model || '';
                                                             const modelText = node.modelLabel || getModelDisplayName(modelId);
-                                                            const providerText = node.providerLabel || node.provider || (modelId.includes('@') ? modelId.split('@')[1] : 'Google');
+                                                            const providerText = resolveDisplayedProviderLabel(node) || (modelId.includes('@') ? modelId.split('@')[1] : 'Google');
                                                             const modelBadge = getModelBadgeInfo({
                                                                 id: modelId,
                                                                 label: modelText,

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
@@ -444,17 +444,55 @@ interface PromptBarProps {
     isMobile?: boolean;
     onOpenSettings?: (view?: 'api-management') => void;
     onInteract?: () => void;
+    onUiBusyChange?: (busy: boolean) => void;
     onFocus?: () => void;  // 输入框获取焦点时调用
     onBlur?: () => void;   // 输入框失去焦点时调用
     onOpenMore?: () => void; // [NEW] Mobile More Menu
 }
 
-const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, isGenerating, onFilesDrop, activeSourceImage, onClearSource, onCancel, isMobile = false, onOpenSettings, onInteract, onFocus, onBlur, onOpenMore }) => {
+const MODEL_LIST_VIRTUALIZE_THRESHOLD = 40;
+const MODEL_LIST_ITEM_HEIGHT = 74;
+const MODEL_LIST_OVERSCAN = 6;
+
+const getModelDisplayGroupKey = (model: ActiveModel) => {
+    const displayName = String(getModelDisplayInfo(model).displayName || model.label || model.id || '')
+        .trim()
+        .toLowerCase();
+    const providerKey = String(model.provider || model.providerLabel || '').trim().toLowerCase();
+    return `${model.isSystemInternal ? 'system' : 'user'}:${displayName}:${providerKey}`;
+};
+
+const pickPreferredDisplayModel = (current: ActiveModel, candidate: ActiveModel) => {
+    const currentDescription = String(current?.description || '').trim();
+    const candidateDescription = String(candidate?.description || '').trim();
+    const currentProviderLabel = String(current?.providerLabel || current?.provider || '').trim();
+    const candidateProviderLabel = String(candidate?.providerLabel || candidate?.provider || '').trim();
+
+    if (!currentDescription && candidateDescription) return candidate;
+    if (candidateDescription.length > currentDescription.length) return candidate;
+    if (!currentProviderLabel && candidateProviderLabel) return candidate;
+    return current;
+};
+
+const getFallbackDescription = (model: ActiveModel) => {
+    if (model.provider) return `由 ${model.provider} 信道提供的可用模型`;
+    return '外部集成的第三方语言模型';
+};
+
+type PromptBarModelOption = ActiveModel & {
+    advantage: string;
+    isExclusive: boolean;
+    isPinned: boolean;
+};
+
+const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, isGenerating, onFilesDrop, activeSourceImage, onClearSource, onCancel, isMobile = false, onOpenSettings, onInteract, onUiBusyChange, onFocus, onBlur, onOpenMore }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [modelSearch, setModelSearch] = useState('');
+    const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
+    const [modelListScrollTop, setModelListScrollTop] = useState(0);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -551,6 +589,16 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const modelListScrollRef = useRef<HTMLDivElement>(null); // Model list scroll container ref
     const modelListScrollPos = useRef<number>(0); // Save scroll position
 
+    const transitionConfigUpdate = useCallback((updater: React.SetStateAction<GenerationConfig>) => {
+        startTransition(() => {
+            setConfig(updater);
+        });
+    }, [setConfig]);
+
+    const updateConfigFields = useCallback((patch: Partial<GenerationConfig>) => {
+        transitionConfigUpdate(prev => ({ ...prev, ...patch }));
+    }, [transitionConfigUpdate]);
+
     // [NEW] Click outside to close options panel
     useEffect(() => {
         if (!showOptionsPanel) return;
@@ -586,6 +634,32 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         return () => window.removeEventListener('click', closeMenu);
     }, []);
 
+    useEffect(() => {
+        const busy = Boolean(
+            activeMenu
+            || showOptionsPanel
+            || contextMenu
+            || modelSettingsModal
+            || showPromptLibrary
+            || showPptOutlinePanel
+        );
+        onUiBusyChange?.(busy);
+    }, [
+        activeMenu,
+        contextMenu,
+        modelSettingsModal,
+        onUiBusyChange,
+        showOptionsPanel,
+        showPromptLibrary,
+        showPptOutlinePanel,
+    ]);
+
+    useEffect(() => {
+        return () => {
+            onUiBusyChange?.(false);
+        };
+    }, [onUiBusyChange]);
+
     // [NEW] Click outside to close model dropdown
     useEffect(() => {
         if (activeMenu !== 'model') return;
@@ -610,6 +684,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             if (modelListScrollRef.current && modelListScrollPos.current > 0) {
                 modelListScrollRef.current.scrollTop = modelListScrollPos.current;
             }
+            setModelListScrollTop(modelListScrollPos.current);
         }, 100);
 
         return () => {
@@ -844,6 +919,74 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         return filterAndSortModels(availableModels, '', modelCustomizations);
         // 🚀 [Fix] 加入 pinnedVersion 依赖，确保顶置变化时重新排序
     }, [availableModels, modelCustomizations, pinnedVersion]);
+
+    const pinnedModels = useMemo(() => getPinnedModels(), [pinnedVersion]);
+
+    const filteredDisplayModels = useMemo<PromptBarModelOption[]>(() => {
+        const rawModels = filterAndSortModels(availableModels, deferredModelSearch, modelCustomizations);
+        const uniqueModelMap = new Map<string, ActiveModel>();
+
+        rawModels.forEach((model) => {
+            const groupKey = getModelDisplayGroupKey(model);
+            const existing = uniqueModelMap.get(groupKey);
+            uniqueModelMap.set(groupKey, existing ? pickPreferredDisplayModel(existing, model) : model);
+        });
+
+        const uniqueModels = Array.from(uniqueModelMap.values());
+        uniqueModels.sort((left, right) => {
+            const leftExclusive = !!left.isSystemInternal;
+            const rightExclusive = !!right.isSystemInternal;
+            if (leftExclusive !== rightExclusive) {
+                return leftExclusive ? -1 : 1;
+            }
+
+            const leftPinnedIndex = pinnedModels.indexOf(left.id);
+            const rightPinnedIndex = pinnedModels.indexOf(right.id);
+            if (leftPinnedIndex !== -1 || rightPinnedIndex !== -1) {
+                if (leftPinnedIndex === -1) return 1;
+                if (rightPinnedIndex === -1) return -1;
+                return leftPinnedIndex - rightPinnedIndex;
+            }
+
+            return 0;
+        });
+
+        return uniqueModels.map((model) => {
+            const custom = modelCustomizations[model.id] || {};
+            return {
+                ...model,
+                advantage: custom.description || model.description || getFallbackDescription(model),
+                isExclusive: !!model.isSystemInternal,
+                isPinned: pinnedModels.includes(model.id),
+            };
+        });
+    }, [availableModels, deferredModelSearch, modelCustomizations, pinnedModels]);
+
+    const modelListViewport = useMemo(() => {
+        const shouldWindow = filteredDisplayModels.length > MODEL_LIST_VIRTUALIZE_THRESHOLD;
+        if (!shouldWindow) {
+            return {
+                shouldWindow: false,
+                items: filteredDisplayModels,
+                startIndex: 0,
+                totalHeight: filteredDisplayModels.length * MODEL_LIST_ITEM_HEIGHT,
+            };
+        }
+
+        const baseVisibleCount = isMobile ? 8 : 9;
+        const startIndex = Math.max(0, Math.floor(modelListScrollTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN);
+        const endIndex = Math.min(
+            filteredDisplayModels.length,
+            startIndex + baseVisibleCount + MODEL_LIST_OVERSCAN * 2
+        );
+
+        return {
+            shouldWindow: true,
+            items: filteredDisplayModels.slice(startIndex, endIndex),
+            startIndex,
+            totalHeight: filteredDisplayModels.length * MODEL_LIST_ITEM_HEIGHT,
+        };
+    }, [filteredDisplayModels, isMobile, modelListScrollTop]);
 
     const getDefaultImageSizeForModel = useCallback((modelId: string): ImageSize => {
         const caps = getModelCapabilities(modelId);
@@ -1432,7 +1575,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             icon: Camera,
             color: '#8b5cf6',
             activeBg: 'rgba(139,92,246,0.18)',
-            onSelect: () => setConfig(prev => ({ ...prev, mode: GenerationMode.IMAGE, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.IMAGE, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.VIDEO,
@@ -1440,7 +1583,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             icon: Video,
             color: '#a855f7',
             activeBg: 'rgba(168,85,247,0.18)',
-            onSelect: () => setConfig(prev => ({ ...prev, mode: GenerationMode.VIDEO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.VIDEO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.AUDIO,
@@ -1448,7 +1591,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             icon: Mic,
             color: '#ec4899',
             activeBg: 'rgba(236,72,153,0.18)',
-            onSelect: () => setConfig(prev => ({ ...prev, mode: GenerationMode.AUDIO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.AUDIO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.PPT,
@@ -1456,9 +1599,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             icon: LayoutDashboard,
             color: '#0ea5e9',
             activeBg: 'rgba(14,165,233,0.18)',
-            onSelect: () => setConfig(prev => ({ ...prev, mode: GenerationMode.PPT, parallelCount: Math.min(20, Math.max(1, prev.parallelCount || 6)), pptStyleLocked: prev.pptStyleLocked !== false }))
+            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.PPT, parallelCount: Math.min(20, Math.max(1, prev.parallelCount || 6)), pptStyleLocked: prev.pptStyleLocked !== false }))
         }
-    ]), [setConfig]);
+    ]), [transitionConfigUpdate]);
 
     const activeModeIndex = useMemo(() => {
         const idx = modeOptions.findIndex(item => item.mode === config.mode);
@@ -1664,8 +1807,20 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         }
     }, [applyPromptTemplate, processFiles]);
 
+    const selectedModelMeta = useMemo(() => {
+        const currentModel = availableModels.find(m => m.id === config.model) || null;
+        const resolvedCurrentSystemDisplay = currentModel?.isSystemInternal
+            ? adminModelService.getModelDisplayInfo(currentModel.id, config.imageSize)
+            : null;
+
+        return {
+            currentModel,
+            resolvedCurrentSystemDisplay,
+        };
+    }, [availableModels, config.imageSize, config.model]);
+
     const isModelListEmpty = availableModels.length === 0;
-    const currentModel = availableModels.find(m => m.id === config.model);
+    const currentModel = selectedModelMeta.currentModel;
 
     // 🚀 [Fix] 判断是否为系统积分模型
     const isNanoBanana2 = !!currentModel?.isSystemInternal;
@@ -1677,9 +1832,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
     // 🚀 [NEW] 计算总成本 (单价 * 数量)
     const totalCreditCost = currentCreditCost * (config.parallelCount || 1);
-    const resolvedCurrentSystemDisplay = currentModel?.isSystemInternal
-        ? adminModelService.getModelDisplayInfo(currentModel.id, config.imageSize)
-        : null;
+    const resolvedCurrentSystemDisplay = selectedModelMeta.resolvedCurrentSystemDisplay;
     const currentModelPrimaryColor = normalizeColor(
         resolvedCurrentSystemDisplay?.colorStart || currentModel?.colorStart,
         '#3B82F6'
@@ -2599,7 +2752,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             : { left: '50%', transform: 'translateX(-50%)' }}
                                     >
                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                        {sortedAvailableModels.length > 1 && (
+                                        {filteredDisplayModels.length > 1 && (
                                             <div className="mb-2 p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-medium)] rounded-2xl shadow-xl animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
                                                 <div className="relative flex items-center">
                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2630,86 +2783,41 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                                         <div
                                             ref={modelListScrollRef}
-                                            className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4 flex flex-col gap-2"
+                                            className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
                                             style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-xl)', borderRadius: '1rem' }}
                                             onScroll={(e) => {
-                                                // 保存滚动位置
-                                                modelListScrollPos.current = e.currentTarget.scrollTop;
+                                                const nextTop = e.currentTarget.scrollTop;
+                                                modelListScrollPos.current = nextTop;
+                                                setModelListScrollTop(nextTop);
                                             }}
                                         >
                                             {(() => {
-                                                const rawModels = filterAndSortModels(availableModels, modelSearch, modelCustomizations);
-                                                // 🚀 [修正] 使用复合键 (ID + Provider) 去重，确保积分模型和第三方模型能共存
-                                                const getModelDisplayGroupKey = (model: any) => {
-                                                    const displayName = String(getModelDisplayInfo(model).displayName || model.label || model.id || '')
-                                                        .trim()
-                                                        .toLowerCase();
-                                                    const providerKey = String(model.provider || model.providerLabel || '').trim().toLowerCase();
-                                                    return `${model.isSystemInternal ? 'system' : 'user'}:${displayName}:${providerKey}`;
-                                                };
+                                                const visibleModels = modelListViewport.items;
+                                                const topSpacerHeight = modelListViewport.shouldWindow
+                                                    ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                                                    : 0;
+                                                const bottomSpacerHeight = modelListViewport.shouldWindow
+                                                    ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                                                    : 0;
 
-                                                const pickPreferredDisplayModel = (current: any, candidate: any) => {
-                                                    const currentDescription = String(current?.description || '').trim();
-                                                    const candidateDescription = String(candidate?.description || '').trim();
-                                                    const currentProviderLabel = String(current?.providerLabel || current?.provider || '').trim();
-                                                    const candidateProviderLabel = String(candidate?.providerLabel || candidate?.provider || '').trim();
-
-                                                    if (!currentDescription && candidateDescription) return candidate;
-                                                    if (candidateDescription.length > currentDescription.length) return candidate;
-                                                    if (!currentProviderLabel && candidateProviderLabel) return candidate;
-                                                    return current;
-                                                };
-
-                                                const uniqueModelMap = new Map<string, any>();
-                                                rawModels.forEach((model: any) => {
-                                                    const groupKey = getModelDisplayGroupKey(model);
-                                                    const existing = uniqueModelMap.get(groupKey);
-                                                    uniqueModelMap.set(groupKey, existing ? pickPreferredDisplayModel(existing, model) : model);
-                                                });
-                                                let uniqueModels = Array.from(uniqueModelMap.values());
-
-                                                const getIsExclusive = (m: any) => {
-                                                    // 🚀 [Style Isolation] 严格判断：必须是系统内置模型
-                                                    // 用户添加的第三方API即使模型ID相同，也不应该使用胶囊样式
-                                                    return !!m.isSystemInternal;
-                                                };
-
-                                                uniqueModels.sort((a, b) => {
-                                                    const aExclusive = getIsExclusive(a);
-                                                    const bExclusive = getIsExclusive(b);
-                                                    if (aExclusive && !bExclusive) return -1;
-                                                    if (!aExclusive && bExclusive) return 1;
-
-                                                    const pinnedModels = getPinnedModels();
-                                                    const aPinned = pinnedModels.includes(a.id);
-                                                    const bPinned = pinnedModels.includes(b.id);
-                                                    if (aPinned && !bPinned) return -1;
-                                                    if (!aPinned && bPinned) return 1;
-
-                                                    return 0; // 同层级保持原始排序
-                                                });
-
-                                                return uniqueModels.map((model: any, index: number) => {
-                                                    const isLast = index === uniqueModels.length - 1;
+                                                return (
+                                                    <>
+                                                        {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                                                        {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                                            const isLast = index === visibleModels.length - 1;
                                                     const lowerId = model.id.toLowerCase();
-                                                    const custom = modelCustomizations[model.id] || {};
-                                                    const baseName = custom.alias || (model.label || model.id);
+                                                    const baseName = model.label || model.id;
 
                                                     // 🚀 [修正] 增强 Exclusive 判定逻辑
-                                                    const isExclusive = getIsExclusive(model);
+                                                    const isExclusive = model.isExclusive;
 
                                                     // 🚀 [添加] 区分标识：系统积分模型 vs 用户API模型
                                                     const isSystemCreditModel = isExclusive;
                                                     const isUserApiModel = !isExclusive && (model.provider === 'Google' || model.provider === 'Custom' || model.provider === 'OpenAI');
 
 
-                                                    const getFallbackDescription = (m: any) => {
-                                                        if (m.provider) return `由 ${m.provider} 信道提供的可用模型`;
-                                                        if (m.group) return `隶属于 ${m.group} 分组的引擎模型`;
-                                                        return '外部集成的第三方语言模型';
-                                                    };
-                                                    const advantage = custom.description || model.description || getFallbackDescription(model);
-                                                    const isPinned = getPinnedModels().includes(model.id);
+                                                    const advantage = model.advantage;
+                                                    const isPinned = model.isPinned;
 
                                                     const isActive = config.model === model.id;
                                                     // 🚀 [Fix] 使用统一的 normalizeColor 函数处理颜色
@@ -2756,7 +2864,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             }}
                                                             onClick={() => {
                                                                 setModelManualLock(true); // 🚀 用户手动点击，开启锁定
-                                                                setConfig(prev => {
+                                                                transitionConfigUpdate(prev => {
                                                                     // 🚀 [Fix] 智能参数保持：获取新模型支持的参数
                                                                     const newModelCaps = getModelCapabilities(model.id);
                                                                     const supportedSizes = newModelCaps?.supportedSizes?.length ? newModelCaps.supportedSizes : Object.values(ImageSize);
@@ -2769,7 +2877,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                     return { ...prev, model: model.id, imageSize: newImageSize, aspectRatio: newAspectRatio };
                                                                 });
                                                                 setActiveMenu(null);
-                                                                setModelSearch(''); // Clear search on selection
+                                                                setModelSearch('');
+                                                                modelListScrollPos.current = 0;
+                                                                setModelListScrollTop(0);
                                                             }}
                                                             onContextMenu={(e) => {
                                                                 if (isExclusive) {
@@ -2864,7 +2974,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             })()}
                                                         </button >
                                                     );
-                                                })
+                                                        })}
+                                                        {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                                                    </>
+                                                );
                                             })()}
                                         </div>
                                     </div >
@@ -2954,7 +3067,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                     ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
                                                                     : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
                                                                     }`}
-                                                                onClick={() => setConfig(prev => ({ ...prev, audioDuration: dur === '自动' ? undefined : dur }))}
+                                                                onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                                                             >
                                                                 {dur}
                                                             </button>
@@ -2970,20 +3083,20 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             id: 'grounding',
                                                             label: '联网搜索',
                                                             active: !!config.enableGrounding,
-                                                            onToggle: () => setConfig(prev => ({ ...prev, enableGrounding: !prev.enableGrounding })),
+                                                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
                                                         }] : []),
                                                         ...(imageSearchSupported ? [{
                                                             id: 'image-search',
                                                             label: '图片搜索',
                                                             active: !!config.enableImageSearch,
-                                                            onToggle: () => setConfig(prev => ({ ...prev, enableImageSearch: !prev.enableImageSearch })),
+                                                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
                                                         }] : []),
                                                     ] : []}
                                                     showThinkingMode={thinkingSupported}
                                                     thinkingMode={config.thinkingMode || 'minimal'}
-                                                    onThinkingModeChange={(mode) => setConfig(prev => ({ ...prev, thinkingMode: mode }))}
-                                                    onAspectRatioChange={(ratio) => setConfig(prev => ({ ...prev, aspectRatio: ratio }))}
-                                                    onImageSizeChange={(size) => setConfig(prev => ({ ...prev, imageSize: size }))}
+                                                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                                                     availableRatios={availableRatios}
                                                     availableSizes={availableSizes}
                                                 />
@@ -2993,10 +3106,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     resolution={config.videoResolution || '720p'}
                                                     duration={config.videoDuration || '4s'}
                                                     audio={config.videoAudio || false}
-                                                    onAspectRatioChange={(ratio) => setConfig(prev => ({ ...prev, aspectRatio: ratio }))}
-                                                    onResolutionChange={(res) => setConfig(prev => ({ ...prev, videoResolution: res }))}
-                                                    onDurationChange={(dur) => setConfig(prev => ({ ...prev, videoDuration: dur }))}
-                                                    onAudioChange={(audio) => setConfig(prev => ({ ...prev, videoAudio: audio }))}
+                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
                                                     availableRatios={availableRatios}
                                                     supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
                                                 />
@@ -3029,7 +3142,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     ? 'bg-indigo-500/15 text-indigo-500 shadow-sm'
                                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]'
                                                     }`}
-                                                onClick={() => setConfig(prev => ({ ...prev, enableGrounding: !prev.enableGrounding }))}
+                                                onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
                                                 title="Google 搜索 (实时信息)"
                                             >
                                                 <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3053,7 +3166,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     ? 'bg-indigo-500/15 text-indigo-500 shadow-sm'
                                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]'
                                                     }`}
-                                                onClick={() => setConfig(prev => ({ ...prev, enableImageSearch: !prev.enableImageSearch }))}
+                                                onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
                                                 title="图片搜索 (参考网络图片)"
                                             >
                                                 <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3093,7 +3206,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             ? Array.from({ length: 20 }, (_, i) => i + 1)
                                                             : [1, 2, 3, 4]
                                                         ).map(count => (
-                                                            <button key={count} className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`} onClick={() => { setConfig(prev => ({ ...prev, parallelCount: count })); setActiveMenu(null); }}>
+                                                            <button key={count} className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`} onClick={() => { updateConfigFields({ parallelCount: count }); setActiveMenu(null); }}>
                                                                 <span>{count} 张</span>
                                                             </button>
                                                         ))}
@@ -3200,8 +3313,8 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 creditCost={totalCreditCost}
                                 balance={balance}
                                 hasPrompt={!!config.prompt}
-                                colorStart={availableModels.find((m: any) => m.id === config.model)?.colorStart}
-                                colorEnd={availableModels.find((m: any) => m.id === config.model)?.colorEnd}
+                                colorStart={currentModel?.colorStart}
+                                colorEnd={currentModel?.colorEnd}
                                 onClick={() => {
                                     if (isNanoBanana2 && totalCreditCost > 0 && balance < totalCreditCost) {
                                         notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额: ${balance}，请充值。`);

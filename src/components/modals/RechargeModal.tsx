@@ -1,26 +1,37 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
-import { X, Zap, ShieldCheck, Globe, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Globe, Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
+import {
+  DEFAULT_CREDIT_EXCHANGE_RATES,
+  getCreditExchangeRateMap,
+  type CreditExchangeRate,
+  type SupportedRechargeCurrency,
+} from '../../services/billing/creditExchangeRateService';
 import { notify } from '../../services/system/notificationService';
 import alipayIcon from '../../assets/payment/alipay.png';
-import wechatIcon from '../../assets/payment/wechat.png';
 import cardIcon from '../../assets/payment/card.png';
+import wechatIcon from '../../assets/payment/wechat.png';
+
+const initialRateMap: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
+  CNY: { ...DEFAULT_CREDIT_EXCHANGE_RATES.CNY },
+  USD: { ...DEFAULT_CREDIT_EXCHANGE_RATES.USD },
+};
 
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal } = useBilling();
   const { user } = useAuth();
 
-  const [currency, setCurrency] = useState<'CNY' | 'USD'>('CNY');
+  const [currency, setCurrency] = useState<SupportedRechargeCurrency>('CNY');
   const [amount, setAmount] = useState<number>(20);
   const [selectedChannel, setSelectedChannel] = useState<'alipay' | 'wechat' | 'paypal'>('alipay');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [qrCodeResult, setQrCodeResult] = useState<{ qrCode: string; outTradeNo: string } | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+  const [loadingRates, setLoadingRates] = useState(false);
+  const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(initialRateMap);
 
+  const currentRate = exchangeRates[currency] || initialRateMap[currency];
+  const minAmount = currentRate.minAmount ?? (currency === 'CNY' ? 5 : 1);
+  const maxAmount = currentRate.maxAmount ?? (currency === 'CNY' ? 500 : 100);
   const isCny = currency === 'CNY';
 
   useEffect(() => {
@@ -29,11 +40,52 @@ const RechargeModal: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const calculateCredits = (amt: number, curr: 'CNY' | 'USD') => {
-    return curr === 'CNY' ? amt * 5 : amt * 30;
-  };
+  useEffect(() => {
+    let alive = true;
 
-  const credits = useMemo(() => calculateCredits(amount, currency), [amount, currency]);
+    const loadRates = async () => {
+      setLoadingRates(true);
+      try {
+        const rateMap = await getCreditExchangeRateMap();
+        if (alive) {
+          setExchangeRates(rateMap);
+        }
+      } finally {
+        if (alive) {
+          setLoadingRates(false);
+        }
+      }
+    };
+
+    if (showRechargeModal) {
+      void loadRates();
+    }
+
+    return () => {
+      alive = false;
+    };
+  }, [showRechargeModal]);
+
+  useEffect(() => {
+    setAmount((current) => {
+      if (current < minAmount) return minAmount;
+      if (current > maxAmount) return maxAmount;
+      return current;
+    });
+  }, [minAmount, maxAmount]);
+
+  const credits = useMemo(
+    () => Math.max(0, Math.round(Math.max(0, amount) * currentRate.creditsPerUnit)),
+    [amount, currentRate.creditsPerUnit]
+  );
+  const availableCurrencies = useMemo(
+    () =>
+      (['CNY', 'USD'] as SupportedRechargeCurrency[]).filter(
+        (code) => (exchangeRates[code] || initialRateMap[code]).isActive
+      ),
+    [exchangeRates]
+  );
+  const hasAvailableCurrency = availableCurrencies.length > 0;
 
   const theme = useMemo(() => {
     if (currency === 'USD') {
@@ -74,13 +126,36 @@ const RechargeModal: React.FC = () => {
     };
   }, [currency, selectedChannel]);
 
+  const handleCurrencyChange = (nextCurrency: SupportedRechargeCurrency) => {
+    const rate = exchangeRates[nextCurrency] || initialRateMap[nextCurrency];
+    setCurrency(nextCurrency);
+    setSelectedChannel(nextCurrency === 'CNY' ? 'alipay' : 'paypal');
+    setAmount(
+      Math.min(
+        rate.maxAmount ?? (nextCurrency === 'CNY' ? 500 : 100),
+        Math.max(rate.minAmount ?? (nextCurrency === 'CNY' ? 5 : 1), nextCurrency === 'CNY' ? 20 : 5)
+      )
+    );
+  };
+
+  useEffect(() => {
+    if (!hasAvailableCurrency) return;
+    if (!availableCurrencies.includes(currency)) {
+      handleCurrencyChange(availableCurrencies[0]);
+    }
+  }, [availableCurrencies, currency, hasAvailableCurrency]);
+
   const handleRecharge = async () => {
     if (!user) {
-      notify.error(isCny ? '请先登录' : 'Please sign in first', isCny ? '登录后才能发起支付。' : 'You need to sign in before payment.');
+      notify.error('请先登录', '登录后才能发起支付。');
       return;
     }
 
-    // 支付通道未开通提示 - 根据选择的支付方式显示对应颜色
+    if (!hasAvailableCurrency || !currentRate.isActive) {
+      notify.error('充值暂不可用', '当前没有启用的充值币种，请稍后再试或联系管理员。');
+      return;
+    }
+
     const paymentChannel = isCny ? selectedChannel : 'paypal';
     if (paymentChannel === 'alipay') {
       notify.alipay('充值通道维护中', '请联系管理员，目前支付宝支付功能暂未开通');
@@ -89,90 +164,6 @@ const RechargeModal: React.FC = () => {
     } else {
       notify.paypal('充值通道维护中', '请联系管理员，目前国际支付功能暂未开通');
     }
-    return;
-
-    /* [暂停使用] 原支付逻辑
-    setIsProcessing(true);
-    setQrCodeResult(null);
-    setPaymentSuccess(false);
-
-    try {
-      const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isFileProtocol = window.location.protocol === 'file:' || window.location.origin === 'null';
-      const baseUrl = import.meta.env.VITE_PAYMENT_GATEWAY_URL || ((isLocalHost || isFileProtocol) ? 'http://localhost:8080/api/pay' : `${window.location.origin}/api/pay`);
-      const safeUserId = encodeURIComponent(user.id);
-
-      const targetUrl = `${baseUrl}/qrcode?method=${selectedChannel}&userId=${safeUserId}&amount=${amount}&currency=${currency}`;
-
-      const res = await fetch(targetUrl);
-      const data = await res.json();
-
-      if (data.qrCode && data.outTradeNo) {
-        setQrCodeResult({ qrCode: data.qrCode, outTradeNo: data.outTradeNo });
-        // Auto-open the payment link
-        window.open(data.qrCode, '_blank', 'noopener,noreferrer');
-      } else {
-        throw new Error(data.error || '获取支付二维码失败');
-      }
-    } catch (err: any) {
-      notify.error('支付发起失败', err.message);
-    } finally {
-      setIsProcessing(false);
-    }
-    */
-  };
-
-  useEffect(() => {
-    if (!showRechargeModal || !qrCodeResult || paymentSuccess) return;
-
-    let timer: NodeJS.Timeout;
-    let isSubscribed = true;
-
-    const checkStatus = async () => {
-      try {
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const isFileProtocol = window.location.protocol === 'file:' || window.location.origin === 'null';
-        const baseUrl = import.meta.env.VITE_PAYMENT_GATEWAY_URL || ((isLocalHost || isFileProtocol) ? 'http://localhost:8080/api/pay' : `${window.location.origin}/api/pay`);
-        const safeUserId = user ? encodeURIComponent(user.id) : '';
-
-        const res = await fetch(`${baseUrl}/status?outTradeNo=${qrCodeResult.outTradeNo}&userId=${safeUserId}`);
-        const data = await res.json();
-
-        if (data.tradeStatus === 'TRADE_SUCCESS' || data.tradeStatus === 'TRADE_FINISHED') {
-          if (isSubscribed) {
-            setPaymentSuccess(true);
-            notify.success('支付成功', '积分已自动到账，无需刷新页面。');
-            setTimeout(() => {
-              if (isSubscribed) {
-                setShowRechargeModal(false);
-                setQrCodeResult(null);
-                setPaymentSuccess(false);
-              }
-            }, 3000);
-          }
-          return;
-        }
-      } catch (err) {
-        console.error('Polling error', err);
-      }
-
-      if (isSubscribed) {
-        timer = setTimeout(checkStatus, 3000); // 3 seconds poll
-      }
-    };
-
-    timer = setTimeout(checkStatus, 3000);
-    return () => {
-      isSubscribed = false;
-      clearTimeout(timer);
-    };
-  }, [showRechargeModal, qrCodeResult, paymentSuccess, setShowRechargeModal]);
-
-  const handleCurrencyChange = (curr: 'CNY' | 'USD') => {
-    setCurrency(curr);
-    setAmount(curr === 'CNY' ? 20 : 5);
-    setSelectedChannel(curr === 'CNY' ? 'alipay' : 'paypal');
-    setQrCodeResult(null);
   };
 
   if (!showRechargeModal) {
@@ -181,195 +172,220 @@ const RechargeModal: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-[10020] flex justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center p-4'
-        }`}
+      className={`fixed inset-0 z-[10020] flex justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 ${
+        isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center p-4'
+      }`}
       onClick={() => setShowRechargeModal(false)}
     >
       <div
-        className={`w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-200 dark:border-white/10 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none max-w-[760px]' : 'max-w-[440px] rounded-[32px]'
-          }`}
+        className={`w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-200 dark:border-white/10 ${
+          isMobile
+            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none max-w-[760px]'
+            : 'max-w-[460px] rounded-[32px]'
+        }`}
         style={{ backgroundColor: 'var(--bg-surface, #ffffff)' }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`relative ${isMobile ? 'mobile-sheet-header-safe p-4 pb-3' : 'p-6 pb-4'}`}>
-          <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${theme.via} to-transparent`} />
-          <div className="flex justify-between items-center mb-1">
-            <div className="flex items-center gap-2">
-              <div className={`p-1.5 rounded-lg ${theme.light} ${theme.text}`}>
+        <div className={`${isMobile ? 'mobile-sheet-header-safe p-4 pb-3' : 'p-6 pb-4'} relative`}>
+          <div className={`absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-transparent ${theme.via} to-transparent`} />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-xl p-2 ${theme.light} ${theme.text}`}>
                 <Zap size={18} fill="currentColor" />
               </div>
-              <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
-                {isCny ? '积分充值' : '积分充值'}
-              </h3>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">积分充值</h3>
+                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
+                  Recharge Credits
+                </p>
+              </div>
             </div>
-            <button onClick={() => setShowRechargeModal(false)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-gray-500 dark:text-zinc-400">
+            <button
+              onClick={() => setShowRechargeModal(false)}
+              className="rounded-full p-2 text-gray-500 transition hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/5"
+            >
               <X size={20} />
             </button>
           </div>
-          <p className="text-gray-400 dark:text-zinc-500 text-[10px] font-bold uppercase tracking-widest pl-9">
-            {isCny ? '积分充值系统' : '积分充值系统'}
-          </p>
         </div>
 
-        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-4 py-2 pb-4' : 'overflow-y-auto px-6 py-2'} space-y-4 md:space-y-6`}>
-          {qrCodeResult ? (
-            <div className="flex flex-col items-center justify-center py-6 gap-4">
-              {paymentSuccess ? (
-                <div className="flex flex-col items-center justify-center text-emerald-500 animate-in zoom-in slide-in-from-bottom-2">
-                  <ShieldCheck size={80} className="mb-4 drop-shadow-lg" />
-                  <h3 className="text-xl font-bold">支付成功</h3>
-                  <p className="text-sm opacity-80 mt-1">积分已到账，正在返回...</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center animate-in zoom-in slide-in-from-bottom-2">
-                  <div className="bg-blue-50 dark:bg-blue-500/10 p-6 rounded-2xl border border-blue-100 dark:border-blue-500/20 mb-4 flex flex-col items-center">
-                    <Loader2 size={32} className="animate-spin text-blue-500 mb-4" />
-                    <p className="text-gray-900 dark:text-gray-100 font-bold text-center">
-                      已在安全窗口打开支付宝收银台
-                    </p>
-                      <p className="text-gray-500 dark:text-zinc-400 text-sm mt-2 text-center">
-                        请在新窗口完成付款，支付成功后会自动更新积分状态
-                      </p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      window.open(qrCodeResult.qrCode, '_blank', 'noopener,noreferrer');
-                    }}
-                    className="mt-2 text-sm font-bold text-blue-500 hover:text-blue-600 underline underline-offset-4 transition-colors"
-                  >
-                    没有看到弹出的窗口？点击这里重新打开
-                  </button>
-                  <button
-                    onClick={() => setQrCodeResult(null)}
-                    className="mt-6 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-4 transition-colors"
-                  >
-                    返回更换金额或方式
-                  </button>
-                </div>
-              )}
+        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-4 py-2 pb-4' : 'overflow-y-auto px-6 py-2 pb-6'} space-y-5`}>
+          {availableCurrencies.length > 0 ? (
+            <div className="flex rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-white/5 dark:bg-zinc-900">
+              {availableCurrencies.map((code) => (
+                <button
+                  key={code}
+                  onClick={() => handleCurrencyChange(code)}
+                  className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                    currency === code
+                      ? `${theme.primary} text-white shadow-lg`
+                      : 'text-gray-500 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {code === 'CNY' ? '人民币支付 (CNY)' : 'USD Payment (USD)'}
+                </button>
+              ))}
             </div>
           ) : (
-            <>
-              <div className="flex p-1 bg-gray-100 dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-white/5">
-                <button
-                  onClick={() => handleCurrencyChange('CNY')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black transition-all ${currency === 'CNY' ? `${theme.primary} text-white shadow-lg` : 'text-gray-500 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300'}`}
-                >
-                  <span>人民币支付 (CNY)</span>
-                </button>
-                <button
-                  onClick={() => handleCurrencyChange('USD')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black transition-all ${currency === 'USD' ? `${theme.primary} text-white shadow-lg` : 'text-gray-500 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300'}`}
-                >
-                  <Globe size={12} />
-                  <span>USD Payment (USD)</span>
-                </button>
-              </div>
-
-              <div className="py-6 bg-gray-50 dark:bg-zinc-900/50 rounded-3xl border border-gray-200 dark:border-white/5 relative overflow-hidden">
-                <div className={`absolute top-1/2 -right-4 -translate-y-1/2 opacity-[0.03] dark:opacity-[0.05] ${theme.text} pointer-events-none`}>
-                  <Zap size={120} fill="currentColor" />
-                </div>
-                <div className="flex flex-col items-start gap-1 relative z-10 px-8">
-                  <span className="text-[10px] font-black text-gray-500 dark:text-zinc-500 uppercase tracking-widest mb-1">
-                    {isCny ? '本次可获得积分' : '本次可获得积分'}
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-5xl font-black ${theme.text} tracking-tighter`}>{credits}</span>
-                    <span className="text-xs font-bold text-gray-500 dark:text-zinc-600">积分</span>
-                  </div>
-                  <div className="mt-3 text-sm font-bold text-gray-500 dark:text-zinc-400 flex items-center gap-1.5">
-                    <span className="opacity-50 font-medium">{isCny ? '支付金额:' : '支付金额:'}</span>
-                    <span className="text-gray-900 dark:text-white text-base">{isCny ? '¥' : '$'}{amount}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 px-2">
-                <div className="flex justify-between items-center text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
-                  <span>{isCny ? '充值汇率' : 'Exchange Rate'}</span>
-                  <span className={theme.text}>{isCny ? '¥1 = 5 积分' : '$1 = 30 积分'}</span>
-                </div>
-                <div className="relative h-12 flex items-center">
-                  <input
-                    type="range"
-                    min={isCny ? '5' : '1'}
-                    max={isCny ? '500' : '100'}
-                    step={isCny ? '5' : '1'}
-                    value={amount}
-                    onChange={(e) => setAmount(Number(e.target.value))}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-200 dark:bg-zinc-800"
-                    style={{
-                      accentColor: theme.accent,
-                      backgroundImage: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${(amount / (isCny ? 500 : 100)) * 100}%, var(--border-default, #e5e5e5) ${(amount / (isCny ? 500 : 100)) * 100}%, var(--border-default, #e5e5e5) 100%)`,
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] font-bold text-gray-500 dark:text-zinc-600 italic">
-                  <span>{isCny ? '最低 ¥5' : 'MIN $1'}</span>
-                  <span>{isCny ? '最高 ¥500' : 'MAX $100'}</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-500 dark:text-zinc-500 uppercase tracking-wider ml-1">
-                  {isCny ? '支付方式' : 'Payment Method'}
-                </label>
-                <div className="flex gap-3">
-                  {isCny ? (
-                    <>
-                      <button
-                        onClick={() => setSelectedChannel('alipay')}
-                        className={`flex-1 flex items-center justify-center gap-3 p-3 rounded-xl border transition-all ${selectedChannel === 'alipay' ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_4px_12px_rgba(59,130,246,0.1)]` : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-white/5 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-white/10'}`}
-                      >
-                        <img src={alipayIcon} className="h-6 w-6 object-contain" alt="alipay" />
-                        <span className="text-sm font-bold">支付宝</span>
-                      </button>
-                      <button
-                        onClick={() => setSelectedChannel('wechat')}
-                        className={`flex-1 flex items-center justify-center gap-3 p-3 rounded-xl border transition-all ${selectedChannel === 'wechat' ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_4px_12px_rgba(34,197,94,0.1)]` : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-white/5 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-white/10'}`}
-                      >
-                        <img src={wechatIcon} className="h-6 w-6 object-contain" alt="wechat" />
-                        <span className="text-sm font-bold">微信支付</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      className={`flex-1 flex items-center justify-center gap-3 p-3 rounded-xl border transition-all ${selectedChannel === 'paypal' ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_4px_12px_rgba(251,191,36,0.1)]` : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-white/5 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-white/10'}`}
-                      onClick={() => setSelectedChannel('paypal')}
-                    >
-                      <img src={cardIcon} className="h-6 w-6 object-contain" alt="card" />
-                      <span className="text-sm font-bold">Card / PayPal</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
+            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-white/10 dark:text-zinc-400">
+              当前暂未开放可用充值币种，请联系管理员检查汇率配置。
+            </div>
           )}
-        </div>
 
-        {!qrCodeResult && (
-          <div className={`${isMobile ? 'mobile-sheet-footer-safe p-4 pt-3' : 'p-6 pt-4'}`}>
-            <button
-              onClick={handleRecharge}
-              disabled={isProcessing}
-              className={`w-full h-14 rounded-2xl font-black text-white text-lg shadow-xl transition-all flex items-center justify-center gap-3 ${isProcessing ? 'bg-gray-300 dark:bg-zinc-800 cursor-not-allowed' : `bg-gradient-to-r ${theme.gradient} ${theme.shadow} hover:brightness-110 active:scale-[0.98]`}`}
-            >
-              {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <ShieldCheck size={24} />}
-              {isProcessing
-                ? (isCny ? '处理中...' : '处理中...')
-                : (isCny ? `确认支付 ¥${amount}` : `确认支付 $${amount}`)}
-            </button>
-            <div className="mt-4 flex items-center justify-center gap-1.5 opacity-40">
-              <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-zinc-500" />
-              <span className="text-[9px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
-                SECURE PAYMENT POWERED BY KK STUDIO
-              </span>
-              <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-zinc-500" />
+          <div className="rounded-[28px] border border-gray-200 bg-gray-50 px-6 py-6 dark:border-white/5 dark:bg-zinc-900/60">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
+                  本次可获得积分
+                </div>
+                <div className={`mt-3 text-5xl font-black tracking-tight ${theme.text}`}>{credits}</div>
+                <div className="mt-2 text-sm text-gray-500 dark:text-zinc-400">
+                  支付金额 {isCny ? '¥' : '$'}
+                  {amount}
+                </div>
+              </div>
+
+              <div className={`rounded-2xl border px-3 py-2 text-xs ${theme.light} ${theme.border} ${theme.text}`}>
+                {loadingRates ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    同步中
+                  </span>
+                ) : (
+                  <span>
+                    {isCny ? '¥1' : '$1'} = {currentRate.creditsPerUnit} 积分
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
+                <span>{isCny ? '充值金额' : 'Amount'}</span>
+                <span>
+                  {isCny ? `最低 ¥${minAmount}` : `MIN $${minAmount}`} / {isCny ? `最高 ¥${maxAmount}` : `MAX $${maxAmount}`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={String(minAmount)}
+                max={String(maxAmount)}
+                step={isCny ? '5' : '1'}
+                value={amount}
+                onChange={(event) => setAmount(Number(event.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 dark:bg-zinc-800"
+                style={{
+                  accentColor: theme.accent,
+                  backgroundImage: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${
+                    ((amount - minAmount) / Math.max(1, maxAmount - minAmount)) * 100
+                  }%, var(--border-default, #e5e5e5) ${
+                    ((amount - minAmount) / Math.max(1, maxAmount - minAmount)) * 100
+                  }%, var(--border-default, #e5e5e5) 100%)`,
+                }}
+              />
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+                <div className="text-xs leading-5 text-gray-500 dark:text-zinc-400">
+                  汇率、最小金额和最大金额由管理员后台统一配置，充值页会自动同步显示。
+                </div>
+                <input
+                  type="number"
+                  min={minAmount}
+                  max={maxAmount}
+                  step={isCny ? 5 : 1}
+                  value={amount}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!Number.isFinite(nextValue)) return;
+                    setAmount(Math.min(maxAmount, Math.max(minAmount, nextValue)));
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                />
+              </div>
             </div>
           </div>
-        )}
+
+          <div className="space-y-3">
+            <div className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
+              {isCny ? '支付方式' : 'Payment Method'}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {isCny ? (
+                <>
+                  <button
+                    onClick={() => setSelectedChannel('alipay')}
+                    className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+                      selectedChannel === 'alipay'
+                        ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_10px_24px_rgba(59,130,246,0.12)]`
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-white/5 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white/10'
+                    }`}
+                  >
+                    <img src={alipayIcon} className="h-8 w-8 object-contain" alt="alipay" />
+                    <div>
+                      <div className="text-sm font-semibold">支付宝</div>
+                      <div className="mt-1 text-xs text-current/70">适合人民币充值</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setSelectedChannel('wechat')}
+                    className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+                      selectedChannel === 'wechat'
+                        ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_10px_24px_rgba(16,185,129,0.12)]`
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-white/5 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white/10'
+                    }`}
+                  >
+                    <img src={wechatIcon} className="h-8 w-8 object-contain" alt="wechat" />
+                    <div>
+                      <div className="text-sm font-semibold">微信支付</div>
+                      <div className="mt-1 text-xs text-current/70">适合移动端扫码</div>
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setSelectedChannel('paypal')}
+                  className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
+                    selectedChannel === 'paypal'
+                      ? `${theme.light} ${theme.border} ${theme.text} shadow-[0_10px_24px_rgba(245,158,11,0.12)]`
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-white/5 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white/10'
+                  }`}
+                >
+                  <img src={cardIcon} className="h-8 w-8 object-contain" alt="card" />
+                  <div>
+                    <div className="text-sm font-semibold">Card / PayPal</div>
+                    <div className="mt-1 text-xs text-current/70">适合国际支付</div>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600 dark:border-white/5 dark:bg-zinc-900/50 dark:text-zinc-400">
+            <div className="flex items-start gap-3">
+              <div className={`rounded-xl p-2 ${theme.light} ${theme.text}`}>
+                <ShieldCheck size={16} />
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-white">当前充值说明</div>
+                <div className="mt-1">
+                  汇率和金额范围来自后台配置；支付通道恢复后，这里会直接按当前配置计算可获得积分。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleRecharge}
+            className={`flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-lg font-semibold text-white shadow-xl transition-all ${
+              loadingRates || !hasAvailableCurrency
+                ? 'cursor-not-allowed bg-gray-300 dark:bg-zinc-800'
+                : `bg-gradient-to-r ${theme.gradient} ${theme.shadow} hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]`
+            }`}
+            disabled={loadingRates || !hasAvailableCurrency}
+          >
+            {loadingRates ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
+            {loadingRates ? '同步汇率中...' : hasAvailableCurrency ? '发起充值' : '当前不可充值'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import { supabase } from '../../lib/supabase';
 import type { ApiProtocolFormat } from './apiConfig';
+import {
+  extractUserApiEntriesFromPayload,
+  mergeUserApisPayload,
+} from './userApiPayload';
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
@@ -193,7 +197,7 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     return [];
   }
 
-  return normalizeEntries(data.user_apis);
+  return normalizeEntries(extractUserApiEntriesFromPayload(data.user_apis));
 }
 
 export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise<void> {
@@ -206,11 +210,25 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
     }),
   );
 
+  const { data: existingProfile, error: existingError } = await supabase
+    .from('profiles')
+    .select('user_apis')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const mergedPayload = mergeUserApisPayload(existingProfile?.user_apis, {
+    entries: normalizedEntries,
+  });
+
   const { error } = await supabase.from('profiles').upsert(
     {
       id: user.id,
       email: user.email || null,
-      user_apis: normalizedEntries,
+      user_apis: mergedPayload,
       updated_at: timestamp,
     },
     {

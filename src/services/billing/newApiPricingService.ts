@@ -167,6 +167,18 @@ function extractPricingPayload(payload: any): { pricingData: any[]; groupRatio: 
     return { pricingData, groupRatio };
 }
 
+function resolvePricingRequestRuntime(baseUrl: string, format: ApiProtocolFormat = 'auto') {
+    const runtime = resolveProviderRuntime({ baseUrl, format, fallbackFormat: 'openai' });
+
+    // Pricing endpoints are management routes and typically expect the provider's
+    // default auth scheme, even when generation is configured in Gemini mode.
+    if (runtime.pricingSupport === 'native' && runtime.protocolFamily === 'gemini-native') {
+        return resolveProviderRuntime({ baseUrl, format: 'openai', fallbackFormat: 'openai' });
+    }
+
+    return runtime;
+}
+
 function buildPricingHeaders(baseUrl: string, apiKey?: string, format: ApiProtocolFormat = 'auto'): Record<string, string> {
     const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -176,7 +188,7 @@ function buildPricingHeaders(baseUrl: string, apiKey?: string, format: ApiProtoc
     const token = String(apiKey || '').trim();
     if (!token) return headers;
 
-    const runtime = resolveProviderRuntime({ baseUrl, format });
+    const runtime = resolvePricingRequestRuntime(baseUrl, format);
     if (runtime.authMethod === 'query') {
         return headers;
     }
@@ -193,7 +205,7 @@ function buildPricingRequestUrl(endpointUrl: string, baseUrl: string, apiKey?: s
     const token = String(apiKey || '').trim();
     if (!token) return endpointUrl;
 
-    const runtime = resolveProviderRuntime({ baseUrl, format });
+    const runtime = resolvePricingRequestRuntime(baseUrl, format);
     if (runtime.authMethod !== 'query') {
         return endpointUrl;
     }
@@ -227,6 +239,11 @@ export async function fetchRawPricingCatalog(
     if (!cleanUrl) return null;
 
     const runtime = resolveProviderRuntime({ baseUrl: cleanUrl, format });
+    if (runtime.strategyId === '12ai') {
+        console.info('[NewApiPricing] Skipping direct 12AI pricing probe because /pricing is a page, not a browser-safe JSON endpoint.');
+        return null;
+    }
+
     if (runtime.strategyId === 'wuyinkeji') {
         const pricingList = selectWuyinCatalogModels(cleanUrl, await fetchWuyinPricingCatalog(cleanUrl));
         const rootUrl = runtime.host === 'api.wuyinkeji.com' ? 'https://api.wuyinkeji.com' : cleanUrl;

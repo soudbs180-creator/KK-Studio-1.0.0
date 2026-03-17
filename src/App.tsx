@@ -7,7 +7,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type AppSurface, type MobilePrimaryTab, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type AgentWorkflowNode, type AppSurface, type MobilePrimaryTab, type PreviewWorkflowNode, type SaveWorkflowNode, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -23,6 +23,7 @@ import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 馃殌 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
+import { clampGenerationDurationMs } from './utils/timeUtils';
 
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
@@ -52,9 +53,41 @@ type ImageRenderItem = {
   groupLayerZIndex: number;
   stackZIndexOverride?: number;
   detailLevel: CanvasCardDetailLevel;
+  loadPriority: number;
+  loadBand: 0 | 1 | 2 | 3;
 };
 
-type CanvasRenderItem = PromptGroupRenderItem | ImageRenderItem;
+type PreviewRenderItem = {
+  id: string;
+  kind: 'preview';
+  node: PreviewWorkflowNode;
+};
+
+type SaveRenderItem = {
+  id: string;
+  kind: 'save';
+  node: SaveWorkflowNode;
+};
+
+type AgentRenderItem = {
+  id: string;
+  kind: 'agent';
+  node: AgentWorkflowNode;
+};
+
+type WorkflowUtilityCanvasNode = PreviewWorkflowNode | SaveWorkflowNode | AgentWorkflowNode;
+
+type CanvasRenderItem =
+  | PromptGroupRenderItem
+  | ImageRenderItem
+  | PreviewRenderItem
+  | SaveRenderItem
+  | AgentRenderItem;
+type ScheduledImageLoadState = {
+  loadBand: 0 | 1 | 2 | 3;
+  loadPriority: number;
+  prefetchQuality: ImageQuality;
+};
 
 // Lucide icons replaced with SVGs
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
@@ -72,6 +105,8 @@ import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 // import { syncService } from './services/system/syncService'; // [FIX] Dynamic Import
 import { saveImage, saveOriginalImage } from './services/storage/imageStorage';
+import { cancelImageLoad, loadImage } from './services/image/imageLoader';
+import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
 import { optimizePromptForImage } from './services/llm/promptOptimizerService';
 import {
@@ -111,6 +146,17 @@ import {
   createWorkflowNodeRendererRegistry,
   renderWorkflowNode,
 } from './workflow/renderers/nodeRendererRegistry';
+import PreviewNodeCard from './workflow/nodes/PreviewNodeCard';
+import SaveNodeCard from './workflow/nodes/SaveNodeCard';
+import AgentNodeCard from './workflow/nodes/AgentNodeCard';
+import {
+  WORKFLOW_TEMPLATES,
+  type WorkflowTemplateId,
+  createAgentWorkflowNode,
+  createPreviewWorkflowNode,
+  createSaveWorkflowNode,
+} from './workflow/templates/workflowTemplates';
+import { isWorkflowUtilityNodeKind } from './workflow/schema';
 import {
   getCanvasPerformanceProfile,
   shouldThrottleEdges,
@@ -178,6 +224,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     setNodeTags,
     arrangeAllNodes,
     moveSelectedNodes,
+    addWorkflowNode,
+    updateWorkflowNode,
+    updateWorkflowNodePosition,
+    deleteWorkflowNode,
     isReady,
     setViewportCenter, // 馃殌 瑙嗗彛涓績鍔ㄦ€佷紭鍏堢骇
     state, // 馃殌 杩佺Щ闇€瑕佽闂甤anvases鍒楄〃
@@ -241,19 +291,45 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
   }, []);
 
+  const shouldPreferRouteProviderDisplay = useCallback((
+    node: Pick<PromptNode, 'model' | 'provider' | 'providerLabel'>,
+    routeDisplay: { provider?: string; providerLabel?: string }
+  ) => {
+    const currentLabel = String(node.providerLabel || '').trim();
+    const routeLabel = String(routeDisplay.providerLabel || '').trim();
+
+    if (!routeLabel || !currentLabel || currentLabel === routeLabel) {
+      return !currentLabel && !!routeLabel;
+    }
+
+    const modelMeta = getModelMetadata(node.model || '') as { provider?: string; providerLabel?: string } | undefined;
+    const genericLabels = new Set(
+      [node.providerLabel, node.provider, modelMeta?.providerLabel, modelMeta?.provider]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => value.trim().toLowerCase())
+    );
+
+    return genericLabels.has(currentLabel.toLowerCase());
+  }, []);
+
   const resolveNodeRouteState = useCallback((node: Pick<PromptNode, 'model' | 'keySlotId' | 'provider' | 'providerLabel'>) => {
     const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
     const resolvedKeySlotId = resolvedKey?.id || node.keySlotId;
-    const resolvedDisplay = resolvedKeySlotId
+    const routeDisplay = resolvedKeySlotId
       ? resolveProviderDisplay(resolvedKeySlotId)
       : resolveProviderDisplay(undefined, node.providerLabel, node.provider);
+    const preferRouteProviderDisplay = shouldPreferRouteProviderDisplay(node, routeDisplay);
 
     return {
       keySlotId: resolvedKeySlotId,
-      provider: resolvedDisplay.provider || node.provider,
-      providerLabel: resolvedDisplay.providerLabel || node.providerLabel,
+      provider: preferRouteProviderDisplay
+        ? (routeDisplay.provider || node.provider)
+        : (node.provider || routeDisplay.provider),
+      providerLabel: preferRouteProviderDisplay
+        ? (routeDisplay.providerLabel || node.providerLabel)
+        : (node.providerLabel || routeDisplay.providerLabel),
     };
-  }, [resolveProviderDisplay]);
+  }, [resolveProviderDisplay, shouldPreferRouteProviderDisplay]);
 
   // Track reserved regions for rapid-fire generation to prevent overlaps (before React update reflects)
   const reservedRegionsRef = useRef<{ bounds: { x: number; y: number; width: number; height: number }; timestamp: number; }[]>([]);
@@ -367,12 +443,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [isStorageChecked, showStorageModal, showSettingsPanel, isReady]);
 
-  const [settingsInitialView, setSettingsInitialView] = useState<'dashboard' | 'api-management' | 'storage-settings' | 'system-logs'>('dashboard');
+  const [settingsInitialView, setSettingsInitialView] = useState<'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs'>('dashboard');
   const [settingsInitialSupplier, setSettingsInitialSupplier] = useState<Supplier | null>(null);
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
+  const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
   const openSettingsPanel = useCallback((
-    view: 'dashboard' | 'api-management' | 'storage-settings' | 'system-logs' = 'api-management',
+    view: 'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs' = 'api-management',
     supplier: Supplier | null = null
   ) => {
     setSettingsPanelSessionKey((prev) => prev + 1);
@@ -1496,6 +1573,20 @@ const AppContent: React.FC<AppContentProps> = () => {
         hasNodes = true;
       });
 
+    (activeCanvas.workflow?.nodes || [])
+      .filter((node): node is WorkflowUtilityCanvasNode => (
+        nodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
+      ))
+      .forEach((node) => {
+        const width = node.width || 284;
+        const height = node.height || 176;
+        minX = Math.min(minX, node.position.x - width / 2);
+        maxX = Math.max(maxX, node.position.x + width / 2);
+        minY = Math.min(minY, node.position.y - height);
+        maxY = Math.max(maxY, node.position.y);
+        hasNodes = true;
+      });
+
     if (!hasNodes) return null;
 
     // Convert canvas coords to screen coords
@@ -1517,11 +1608,17 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 鎵惧埌閫変腑鐨勬彁绀鸿瘝鑺傜偣鍜屽浘鐗囪妭鐐?
       const selectedPrompts = activeCanvas.promptNodes.filter(p => selectedNodeIds.includes(p.id));
       const selectedImages = activeCanvas.imageNodes.filter(img => selectedNodeIds.includes(img.id));
+      const selectedWorkflowNodes = (activeCanvas.workflow?.nodes || []).filter(
+        (node): node is WorkflowUtilityCanvasNode => (
+          selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
+        )
+      );
 
       // 璁＄畻閫変腑鑺傜偣鐨勪腑蹇冧綅缃?
       const allPositions = [
         ...selectedPrompts.map(p => p.position),
-        ...selectedImages.map(img => img.position)
+        ...selectedImages.map(img => img.position),
+        ...selectedWorkflowNodes.map(node => node.position),
       ];
 
       if (allPositions.length > 0) {
@@ -1716,7 +1813,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, []);
 
   const openSettingsSurface = useCallback((
-    view: 'dashboard' | 'api-management' | 'storage-settings' | 'system-logs' = 'dashboard',
+    view: 'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs' = 'dashboard',
     supplier: Supplier | null = null
   ) => {
     setWorkspaceSurface('workspace');
@@ -2730,8 +2827,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       const previewModelMeta = keyManager.getGlobalModelList().find((model) => model.id === config.model);
       const previewModelLabel = previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview;
       const selectedKey = keyManager.getNextKey(config.model, getPreferredKeyForMode(config.mode));
-      const previewProvider = previewModelMeta?.provider || selectedKey?.provider || (modelSuffixForPreview ? 'Custom' : 'Google');
-      const previewProviderLabel = previewModelMeta?.providerLabel || selectedKey?.name || modelSuffixForPreview || 'Google';
+      const previewProvider = selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google');
+      const previewProviderLabel = selectedKey?.name || previewModelMeta?.providerLabel || modelSuffixForPreview || 'Google';
       const pptCount = config.mode === GenerationMode.PPT
         ? Math.min(20, Math.max(1, config.parallelCount || 1))
         : Math.min(4, Math.max(1, config.parallelCount || 1));
@@ -3211,9 +3308,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             originalUrl = b64;
           }
 
-          const generationTime = (apiDurationMs && apiDurationMs > 0)
+          const generationTime = clampGenerationDurationMs((apiDurationMs && apiDurationMs > 0)
             ? apiDurationMs
-            : (Date.now() - startTime);
+            : (Date.now() - startTime));
 
           // Calculate Hash/StorageID
           const storageId = await calculateImageHash(url);
@@ -3679,12 +3776,12 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
 
       updateImageNode(target.id, {
-        ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, target.providerLabel || result.providerName, target.provider || result.provider),
+        ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, result.providerName || target.providerLabel, result.provider || target.provider),
         url: result.url,
         originalUrl: result.url,
         prompt: taskPrompt,
         timestamp: Date.now(),
-        generationTime: Date.now() - startTime,
+        generationTime: clampGenerationDurationMs(Date.now() - startTime),
         model: result.model || executionNode.model,
         modelLabel: result.modelName || target.modelLabel,
         modelColorStart: target.modelColorStart,
@@ -4766,9 +4863,15 @@ ${slideLayerXml.join('\n')}
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
-  const { visiblePromptNodes, visibleImageNodes, visibleGroups, nowTimestamp } = React.useMemo(() => {
+  const { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp } = React.useMemo(() => {
     if (!activeCanvas) {
-      return { visiblePromptNodes: [], visibleImageNodes: [], visibleGroups: [] };
+      return {
+        visiblePromptNodes: [],
+        visibleImageNodes: [],
+        visibleWorkflowUtilityNodes: [],
+        visibleGroups: [],
+        nowTimestamp: Date.now(),
+      };
     }
 
     // Buffer: Load 2 screens worth of content around the viewport to prevent flash on drag
@@ -4842,9 +4945,24 @@ ${slideLayerXml.join('\n')}
       });
 
     // 馃殌 Cache timestamp
+    const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
+      .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
+      .filter((node) => {
+        const width = node.width || 284;
+        const height = node.height || 176;
+        const x = node.position.x - width / 2;
+        const y = node.position.y - height;
+        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
+      })
+      .sort((left, right) => {
+        const zDiff = (left.zIndex ?? 0) - (right.zIndex ?? 0);
+        if (zDiff !== 0) return zDiff;
+        return left.id.localeCompare(right.id);
+      });
+
     const nowTimestamp = Date.now();
 
-    return { visiblePromptNodes, visibleImageNodes, visibleGroups, nowTimestamp };
+    return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
   }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
 
   const actualChildImagesByPromptId = React.useMemo(() => {
@@ -4914,6 +5032,163 @@ ${slideLayerXml.join('\n')}
     () => visibleImageNodes.filter((imageNode) => !imageNode.parentPromptId || !visiblePromptNodeIds.has(imageNode.parentPromptId)),
     [visibleImageNodes, visiblePromptNodeIds]
   );
+
+  const workflowUtilityNodesById = React.useMemo(
+    () => new Map(
+      (activeCanvas?.workflow?.nodes || [])
+        .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
+        .map((node) => [node.id, node])
+    ),
+    [activeCanvas]
+  );
+
+  const visibleWorkflowUtilityNodesById = React.useMemo(
+    () => new Map(visibleWorkflowUtilityNodes.map((node) => [node.id, node])),
+    [visibleWorkflowUtilityNodes]
+  );
+
+  const imageLoadSchedulingById = React.useMemo(() => {
+    const scheduling = new Map<string, ScheduledImageLoadState>();
+    if (!activeCanvas) return scheduling;
+
+    const scale = canvasTransform.scale || 1;
+    const viewportLeft = -canvasTransform.x / scale;
+    const viewportTop = -canvasTransform.y / scale;
+    const viewportRight = (window.innerWidth - canvasTransform.x) / scale;
+    const viewportBottom = (window.innerHeight - canvasTransform.y) / scale;
+    const viewportCenterX = (viewportLeft + viewportRight) / 2;
+    const viewportCenterY = (viewportTop + viewportBottom) / 2;
+
+    const viewportImages: Array<{ node: GeneratedImage; distance: number }> = [];
+    const aboveViewportImages: Array<{ node: GeneratedImage; distance: number }> = [];
+    const belowViewportImages: GeneratedImage[] = [];
+    const lateralImages: Array<{ node: GeneratedImage; distance: number }> = [];
+
+    activeCanvas.imageNodes.forEach((node) => {
+      const width = 800;
+      const height = 1200;
+      const left = node.position.x - width / 2;
+      const top = node.position.y - height;
+      const right = left + width;
+      const bottom = top + height;
+      const intersectsViewport = !(left > viewportRight || right < viewportLeft || top > viewportBottom || bottom < viewportTop);
+
+      if (intersectsViewport) {
+        viewportImages.push({
+          node,
+          distance: Math.abs(node.position.x - viewportCenterX) + Math.abs(node.position.y - viewportCenterY),
+        });
+        return;
+      }
+
+      if (bottom < viewportTop) {
+        aboveViewportImages.push({
+          node,
+          distance: viewportTop - bottom,
+        });
+        return;
+      }
+
+      if (top > viewportBottom) {
+        belowViewportImages.push(node);
+        return;
+      }
+
+      lateralImages.push({
+        node,
+        distance: Math.min(
+          Math.abs(left - viewportRight),
+          Math.abs(right - viewportLeft)
+        ),
+      });
+    });
+
+    viewportImages
+      .sort((left, right) => left.distance - right.distance)
+      .forEach(({ node }, index) => {
+        scheduling.set(node.id, {
+          loadBand: 0,
+          loadPriority: 1400 - index,
+          prefetchQuality: ImageQuality.PREVIEW,
+        });
+      });
+
+    aboveViewportImages
+      .sort((left, right) => left.distance - right.distance)
+      .forEach(({ node }, index) => {
+        scheduling.set(node.id, {
+          loadBand: 1,
+          loadPriority: 1100 - index,
+          prefetchQuality: ImageQuality.THUMBNAIL,
+        });
+      });
+
+    lateralImages
+      .sort((left, right) => left.distance - right.distance)
+      .forEach(({ node }, index) => {
+        scheduling.set(node.id, {
+          loadBand: 1,
+          loadPriority: 1000 - index,
+          prefetchQuality: ImageQuality.THUMBNAIL,
+        });
+      });
+
+    const orderedBelowViewportImages = [...belowViewportImages].sort((left, right) => left.position.y - right.position.y);
+    const belowSegmentSize = Math.max(1, Math.ceil(orderedBelowViewportImages.length / 3));
+
+    orderedBelowViewportImages.forEach((node, index) => {
+      const segment = Math.min(2, Math.floor(index / belowSegmentSize));
+      const loadBand = (segment === 0 ? 1 : segment === 1 ? 2 : 3) as 1 | 2 | 3;
+      const priorityBase = segment === 0 ? 900 : segment === 1 ? 700 : 500;
+
+      scheduling.set(node.id, {
+        loadBand,
+        loadPriority: priorityBase - (index % belowSegmentSize),
+        prefetchQuality: loadBand === 1 ? ImageQuality.THUMBNAIL : ImageQuality.MICRO,
+      });
+    });
+
+    return scheduling;
+  }, [activeCanvas, canvasTransform.scale, canvasTransform.x, canvasTransform.y]);
+
+  useEffect(() => {
+    if (!activeCanvas) return;
+    if (isCanvasTransforming || promptBarUiBusy || selectionBox?.active || dragConnection?.active) {
+      return;
+    }
+
+    let queuedKeys: string[] = [];
+    const timer = window.setTimeout(() => {
+      queuedKeys = Array.from(imageLoadSchedulingById.entries())
+        .filter(([, scheduling]) => scheduling.loadBand === 1)
+        .sort((left, right) => right[1].loadPriority - left[1].loadPriority)
+        .slice(0, 8)
+        .map(([imageId, scheduling]) => {
+          const imageNode = imageNodesById.get(imageId);
+          const imageKey = imageNode?.storageId || imageNode?.id;
+          if (!imageKey) return null;
+
+          void loadImage(imageKey, scheduling.prefetchQuality, scheduling.loadPriority);
+          return imageKey;
+        })
+        .filter((imageKey): imageKey is string => Boolean(imageKey));
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      queuedKeys.forEach((imageKey) => {
+        cancelImageLoad(imageKey);
+      });
+    };
+  }, [
+    activeCanvas,
+    dragConnection?.active,
+    imageLoadSchedulingById,
+    imageNodesById,
+    isCanvasTransforming,
+    promptBarUiBusy,
+    selectionBox?.active,
+  ]);
 
   const [connectorPromptNodes, setConnectorPromptNodes] = useState<PromptNode[]>(visiblePromptNodes);
   const [connectorVisibleImageNodes, setConnectorVisibleImageNodes] = useState<GeneratedImage[]>(visibleImageNodes);
@@ -4989,6 +5264,11 @@ ${slideLayerXml.join('\n')}
     [connectorVisibleImageNodes]
   );
 
+  const connectorPromptNodesById = React.useMemo(
+    () => new Map(connectorPromptNodes.map((node) => [node.id, node])),
+    [connectorPromptNodes]
+  );
+
   const connectorVisibleImageNodeIds = React.useMemo(
     () => new Set(connectorVisibleImageNodes.map((node) => node.id)),
     [connectorVisibleImageNodes]
@@ -5043,6 +5323,519 @@ ${slideLayerXml.join('\n')}
     }
   }, [getSelectionScreenCenter, selectNodes]);
 
+  const notifyWorkflowCard = useCallback((
+    level: 'success' | 'warning' | 'info' | 'error',
+    title: string,
+    message: string,
+  ) => {
+    import('./services/system/notificationService').then(({ notify }) => {
+      notify[level](title, message);
+    });
+  }, []);
+
+  const getPromptChildrenForWorkflow = useCallback((promptNode: PromptNode | undefined | null) => {
+    if (!promptNode || !activeCanvas) return [] as GeneratedImage[];
+
+    const orderedIds = (promptNode.childImageIds || []).filter((id): id is string => Boolean(id));
+    const orderedImages = orderedIds
+      .map((imageId) => activeCanvas.imageNodes.find((imageNode) => imageNode.id === imageId))
+      .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode));
+
+    if (orderedImages.length > 0) {
+      return orderedImages;
+    }
+
+    return activeCanvas.imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+  }, [activeCanvas]);
+
+  const resolveWorkflowSourceIdsFromSelection = useCallback(() => {
+    const explicitIds = selectedNodeIds.filter((nodeId) => (
+      Boolean(activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId))
+      || Boolean(activeCanvas?.imageNodes.some((imageNode) => imageNode.id === nodeId))
+    ));
+
+    if (explicitIds.length > 0) {
+      return Array.from(new Set(explicitIds));
+    }
+
+    return activeSourceImage ? [activeSourceImage] : [];
+  }, [activeCanvas, activeSourceImage, selectedNodeIds]);
+
+  const resolveCanvasNodePosition = useCallback((nodeId?: string | null) => {
+    if (!nodeId || !activeCanvas) return null;
+
+    const promptNode = activeCanvas.promptNodes.find((node) => node.id === nodeId);
+    if (promptNode) return promptNode.position;
+
+    const imageNode = activeCanvas.imageNodes.find((node) => node.id === nodeId);
+    if (imageNode) return imageNode.position;
+
+    const workflowNode = workflowUtilityNodesById.get(nodeId);
+    return workflowNode?.position || null;
+  }, [activeCanvas, workflowUtilityNodesById]);
+
+  const getWorkflowInsertPosition = useCallback((options?: {
+    anchorNodeId?: string | null;
+    anchorPosition?: { x: number; y: number } | null;
+    offsetX?: number;
+    offsetY?: number;
+    width?: number;
+    height?: number;
+  }) => {
+    const width = options?.width || 284;
+    const height = options?.height || 176;
+    const anchorPosition = options?.anchorPosition
+      || resolveCanvasNodePosition(options?.anchorNodeId)
+      || getViewportPreferredPosition(
+        canvasRef.current?.getCurrentTransform() || canvasTransform,
+        canvasRef.current?.getCanvasRect() || null,
+        180,
+        getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth),
+      );
+
+    return findSmartPosition(
+      anchorPosition.x + (options?.offsetX || 0),
+      anchorPosition.y + (options?.offsetY || 0),
+      width,
+      height,
+      32,
+    );
+  }, [
+    canvasTransform,
+    chatSidebarWidth,
+    findSmartPosition,
+    isChatOpen,
+    isMobile,
+    isSidebarOpen,
+    resolveCanvasNodePosition,
+  ]);
+
+  const resolvePrimaryWorkflowSourcePrompt = useCallback((sourceNodeIds?: string[]) => {
+    if (!activeCanvas) return null;
+
+    const directPrompt = (sourceNodeIds || [])
+      .map((nodeId) => activeCanvas.promptNodes.find((node) => node.id === nodeId))
+      .find((node): node is PromptNode => Boolean(node));
+    if (directPrompt) return directPrompt;
+
+    const parentPrompt = (sourceNodeIds || [])
+      .map((nodeId) => activeCanvas.imageNodes.find((node) => node.id === nodeId))
+      .map((imageNode) => (
+        imageNode?.parentPromptId
+          ? activeCanvas.promptNodes.find((promptNode) => promptNode.id === imageNode.parentPromptId)
+          : null
+      ))
+      .find((node): node is PromptNode => Boolean(node));
+    if (parentPrompt) return parentPrompt;
+
+    const fallbackId = resolveWorkflowSourceIdsFromSelection()[0];
+    if (!fallbackId) return null;
+
+    return activeCanvas.promptNodes.find((node) => node.id === fallbackId)
+      || activeCanvas.promptNodes.find((node) => node.id === (activeCanvas.imageNodes.find((imageNode) => imageNode.id === fallbackId)?.parentPromptId || ''))
+      || null;
+  }, [activeCanvas, resolveWorkflowSourceIdsFromSelection]);
+
+  const resolvePrimaryWorkflowSourceImage = useCallback((sourceNodeIds?: string[]) => {
+    if (!activeCanvas) return null;
+
+    const directImage = (sourceNodeIds || [])
+      .map((nodeId) => activeCanvas.imageNodes.find((node) => node.id === nodeId))
+      .find((node): node is GeneratedImage => Boolean(node));
+    if (directImage) return directImage;
+
+    const promptResultImage = (sourceNodeIds || [])
+      .map((nodeId) => activeCanvas.promptNodes.find((node) => node.id === nodeId))
+      .find((node): node is PromptNode => Boolean(node));
+    if (promptResultImage) {
+      const children = getPromptChildrenForWorkflow(promptResultImage);
+      if (children.length > 0) return children[0];
+    }
+
+    if (activeSourceImage) {
+      return activeCanvas.imageNodes.find((node) => node.id === activeSourceImage) || null;
+    }
+
+    const fallbackId = resolveWorkflowSourceIdsFromSelection()[0];
+    if (!fallbackId) return null;
+    return activeCanvas.imageNodes.find((node) => node.id === fallbackId) || null;
+  }, [activeCanvas, activeSourceImage, getPromptChildrenForWorkflow, resolveWorkflowSourceIdsFromSelection]);
+
+  const exportWorkflowImagesAsZip = useCallback(async (images: GeneratedImage[], nameHint: string) => {
+    const validImages = images.filter((imageNode) => Boolean(imageNode.originalUrl || imageNode.url));
+    if (validImages.length === 0) {
+      notifyWorkflowCard('warning', '暂无可导出图片', '当前卡片还没有可下载的图片结果。');
+      return false;
+    }
+
+    try {
+      const zip = new JSZip();
+      const safeFolderName = (nameHint || 'kk-studio-export').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'kk-studio-export';
+      const folder = zip.folder(safeFolderName) || zip;
+
+      let exportedCount = 0;
+      for (let index = 0; index < validImages.length; index += 1) {
+        const imageNode = validImages[index];
+        try {
+          const response = await fetch(imageNode.originalUrl || imageNode.url);
+          const blob = await response.blob();
+          const mimeExtension = blob.type.split('/')[1] || imageNode.mimeType?.split('/')[1] || 'png';
+          const fileStem = (imageNode.alias || imageNode.fileName || `image_${index + 1}`)
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .trim()
+            || `image_${index + 1}`;
+          folder.file(`${String(index + 1).padStart(2, '0')}_${fileStem}.${mimeExtension}`, blob);
+          exportedCount += 1;
+        } catch (error) {
+          console.error('[workflow.save] Failed to export image', error);
+        }
+      }
+
+      if (exportedCount === 0) {
+        notifyWorkflowCard('error', '导出失败', '没有成功获取到可导出的图片数据。');
+        return false;
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `${safeFolderName}.zip`);
+      notifyWorkflowCard('success', '导出完成', `已导出 ${exportedCount} 张图片。`);
+      return true;
+    } catch (error: any) {
+      console.error('[workflow.save] Export failed', error);
+      notifyWorkflowCard('error', '导出失败', error?.message || '请稍后重试。');
+      return false;
+    }
+  }, [notifyWorkflowCard]);
+
+  const createTemplatePromptNode = useCallback((options: {
+    position: { x: number; y: number };
+    prompt: string;
+    mode?: GenerationMode;
+    sourceImageId?: string;
+  }): PromptNode => {
+    const promptText = options.prompt.trim();
+    const mode = options.mode || config.mode;
+    const slideCount = Math.max(config.parallelCount || 1, config.pptSlides?.length || 0, mode === GenerationMode.PPT ? 4 : 1);
+
+    return {
+      id: `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      prompt: promptText,
+      originalPrompt: promptText,
+      promptOptimizationEnabled: !!config.enablePromptOptimization,
+      thinkingMode: config.thinkingMode || 'minimal',
+      enableGrounding: !!config.enableGrounding,
+      enableImageSearch: !!config.enableImageSearch,
+      position: options.position,
+      aspectRatio: mode === GenerationMode.PPT ? AspectRatio.LANDSCAPE_16_9 : config.aspectRatio,
+      imageSize: config.imageSize,
+      model: config.model,
+      childImageIds: [],
+      referenceImages: options.sourceImageId ? [] : [...config.referenceImages],
+      timestamp: Date.now(),
+      sourceImageId: options.sourceImageId,
+      parallelCount: slideCount,
+      mode,
+      tags: [],
+      videoResolution: config.videoResolution,
+      videoDuration: config.videoDuration,
+      videoAudio: config.videoAudio,
+      audioDuration: config.audioDuration,
+      audioLyrics: config.audioLyrics,
+      pptSlides: mode === GenerationMode.PPT
+        ? normalizePptSlidesForCount(config.pptSlides, promptText, slideCount)
+        : config.pptSlides,
+      pptStyleLocked: config.pptStyleLocked !== false,
+      maskUrl: config.maskUrl,
+    };
+  }, [config]);
+
+  const handleWorkflowPreviewAction = useCallback((node: PreviewWorkflowNode) => {
+    const sourceImage = resolvePrimaryWorkflowSourceImage(node.data.sourceNodeIds);
+    if (sourceImage) {
+      setWorkspaceSurface('workspace');
+      handleOpenPreview(sourceImage.id);
+      return;
+    }
+
+    const sourcePrompt = resolvePrimaryWorkflowSourcePrompt(node.data.sourceNodeIds);
+    if (sourcePrompt) {
+      selectNodes([sourcePrompt.id], 'replace');
+      handleNavigateToNode(sourcePrompt.position.x, sourcePrompt.position.y, sourcePrompt.id);
+      return;
+    }
+
+    notifyWorkflowCard('info', '预览卡未连接结果', '先把它挂到图片卡或主卡上，再从这里快速查看。');
+  }, [
+    handleNavigateToNode,
+    handleOpenPreview,
+    notifyWorkflowCard,
+    resolvePrimaryWorkflowSourceImage,
+    resolvePrimaryWorkflowSourcePrompt,
+    selectNodes,
+  ]);
+
+  const handleWorkflowSaveAction = useCallback(async (node: SaveWorkflowNode) => {
+    const sourcePrompt = resolvePrimaryWorkflowSourcePrompt(node.data.sourceNodeIds);
+    const linkedImages = Array.from(new Set([
+      ...((node.data.sourceNodeIds || [])
+        .map((nodeId) => activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId))
+        .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode))),
+      ...(sourcePrompt ? getPromptChildrenForWorkflow(sourcePrompt) : []),
+    ]));
+
+    if ((node.data.format || 'zip').toLowerCase() === 'pptx') {
+      if (sourcePrompt && sourcePrompt.mode === GenerationMode.PPT) {
+        await handleExportPptxEditable(sourcePrompt);
+        return;
+      }
+
+      notifyWorkflowCard('warning', '缺少 PPT 主卡', '保存卡已设为 PPTX 导出，但当前没有连接到 PPT 主卡。');
+      return;
+    }
+
+    const fallbackImages = linkedImages.length > 0
+      ? linkedImages
+      : (activeCanvas?.imageNodes || []);
+
+    await exportWorkflowImagesAsZip(
+      fallbackImages,
+      sourcePrompt?.prompt.slice(0, 24) || activeCanvas?.name || 'kk-studio-export',
+    );
+  }, [
+    activeCanvas,
+    exportWorkflowImagesAsZip,
+    getPromptChildrenForWorkflow,
+    handleExportPptxEditable,
+    notifyWorkflowCard,
+    resolvePrimaryWorkflowSourcePrompt,
+  ]);
+
+  const handleWorkflowAgentAction = useCallback((node: AgentWorkflowNode) => {
+    const nextPrompt = String(node.data.instruction || node.data.notes || '').trim();
+    if (!nextPrompt) {
+      notifyWorkflowCard('warning', '增强卡暂时为空', '先给这张卡写一点提示增强说明，再一键填入输入栏。');
+      return;
+    }
+
+    const sourceImage = resolvePrimaryWorkflowSourceImage(node.data.sourceNodeIds);
+    if (sourceImage) {
+      setActiveSourceImage(sourceImage.id);
+      selectNodes([sourceImage.id], 'replace');
+    }
+
+    setWorkspaceSurface('workspace');
+    setConfig((prev) => ({
+      ...prev,
+      prompt: nextPrompt,
+      referenceImages: sourceImage ? [] : prev.referenceImages,
+    }));
+
+    notifyWorkflowCard(
+      'success',
+      '已填入提示增强',
+      sourceImage ? '已保留关联图片作为 follow-up 起点。' : '增强提示已写入输入栏，可继续微调后再生成。',
+    );
+  }, [
+    notifyWorkflowCard,
+    resolvePrimaryWorkflowSourceImage,
+    selectNodes,
+    setConfig,
+  ]);
+
+  const handleAddWorkflowUtilityCard = useCallback((kind: 'preview' | 'save' | 'agent') => {
+    const sourceNodeIds = resolveWorkflowSourceIdsFromSelection();
+    const anchorId = sourceNodeIds[0];
+    const basePosition = getWorkflowInsertPosition({
+      anchorNodeId: anchorId,
+      offsetX: anchorId ? 360 : 0,
+      offsetY: anchorId ? 24 : 0,
+      width: 284,
+      height: 176,
+    });
+
+    if (kind === 'preview') {
+      const previewNode = createPreviewWorkflowNode(basePosition, {
+        title: '预览卡',
+        summary: sourceNodeIds.length > 0 ? '聚合上游结果，方便快速检查画面。' : '先连接一张图片卡或主卡，再从这里统一预览结果。',
+        sourceNodeIds,
+      });
+      addWorkflowNode(previewNode);
+      selectNodes([previewNode.id], 'replace');
+      bringNodesToFront([previewNode.id]);
+      return;
+    }
+
+    if (kind === 'save') {
+      const sourcePrompt = resolvePrimaryWorkflowSourcePrompt(sourceNodeIds);
+      const saveNode = createSaveWorkflowNode(basePosition, {
+        title: '保存卡',
+        format: sourcePrompt?.mode === GenerationMode.PPT ? 'pptx' : 'zip',
+        sourceNodeIds,
+      });
+      addWorkflowNode(saveNode);
+      selectNodes([saveNode.id], 'replace');
+      bringNodesToFront([saveNode.id]);
+      return;
+    }
+
+    const agentNode = createAgentWorkflowNode(basePosition, {
+      title: '提示增强卡',
+      instruction: '保持主体一致，补足镜头语言、材质细节和画面氛围，再继续生成。',
+      sourceNodeIds,
+    });
+    addWorkflowNode(agentNode);
+    selectNodes([agentNode.id], 'replace');
+    bringNodesToFront([agentNode.id]);
+  }, [
+    addWorkflowNode,
+    bringNodesToFront,
+    getWorkflowInsertPosition,
+    resolvePrimaryWorkflowSourcePrompt,
+    resolveWorkflowSourceIdsFromSelection,
+    selectNodes,
+  ]);
+
+  const handleApplyWorkflowTemplate = useCallback(async (templateId: WorkflowTemplateId) => {
+    if (!activeCanvas) {
+      notifyWorkflowCard('warning', '当前没有可用画布', '请先打开一个项目，再插入模板。');
+      return;
+    }
+
+    if (templateId === 'image-follow-up-image') {
+      const sourceImage = resolvePrimaryWorkflowSourceImage(resolveWorkflowSourceIdsFromSelection());
+      if (!sourceImage) {
+        notifyWorkflowCard('warning', '需要先选一张图片', '这个模板会围绕现有图片创建 follow-up 主卡。');
+        return;
+      }
+
+      const promptPosition = getWorkflowInsertPosition({
+        anchorPosition: sourceImage.position,
+        offsetX: 360,
+        offsetY: 28,
+        width: 380,
+        height: 220,
+      });
+      const promptNode = createTemplatePromptNode({
+        position: promptPosition,
+        prompt: config.prompt.trim() || '继续延展这张图，保持主体与风格一致，补充新的镜头或细节。',
+        sourceImageId: sourceImage.id,
+      });
+
+      await addPromptNode(promptNode);
+
+      const previewNode = createPreviewWorkflowNode(
+        getWorkflowInsertPosition({
+          anchorPosition: promptPosition,
+          offsetX: 360,
+          offsetY: 0,
+          width: 284,
+          height: 176,
+        }),
+        {
+          title: '预览卡',
+          summary: '挂在 follow-up 链路旁，快速核对上游图片与后续结果。',
+          sourceNodeIds: [sourceImage.id, promptNode.id],
+        },
+      );
+      const agentNode = createAgentWorkflowNode(
+        getWorkflowInsertPosition({
+          anchorPosition: promptPosition,
+          offsetX: 680,
+          offsetY: 12,
+          width: 284,
+          height: 176,
+        }),
+        {
+          title: '提示增强卡',
+          instruction: '保持主体一致，延续构图与材质风格，只扩展新的动作、镜头或场景细节。',
+          sourceNodeIds: [sourceImage.id, promptNode.id],
+        },
+      );
+
+      addWorkflowNode(previewNode);
+      addWorkflowNode(agentNode);
+      selectNodes([promptNode.id], 'replace');
+      bringNodesToFront([promptNode.id, previewNode.id, agentNode.id]);
+      notifyWorkflowCard('success', '已插入 follow-up 模板', '原有图片链路没变，只额外挂上了预览卡和提示增强卡。');
+      return;
+    }
+
+    if (templateId === 'ppt-prompt-export') {
+      const promptText = config.prompt.trim() || '为这个主题生成一套可直接导出的 PPT 多页画面方案。';
+      const promptPosition = getWorkflowInsertPosition({
+        width: 380,
+        height: 220,
+      });
+      const promptNode = createTemplatePromptNode({
+        position: promptPosition,
+        prompt: promptText,
+        mode: GenerationMode.PPT,
+      });
+      const saveNode = createSaveWorkflowNode(
+        getWorkflowInsertPosition({
+          anchorPosition: promptPosition,
+          offsetX: 360,
+          offsetY: 20,
+          width: 284,
+          height: 176,
+        }),
+        {
+          title: 'PPT 导出卡',
+          format: 'pptx',
+          sourceNodeIds: [promptNode.id],
+        },
+      );
+
+      await addPromptNode(promptNode);
+      addWorkflowNode(saveNode);
+      selectNodes([promptNode.id], 'replace');
+      bringNodesToFront([promptNode.id, saveNode.id]);
+      notifyWorkflowCard('success', '已插入 PPT 模板', '模板仍然使用你现有的 PPT 主卡与导出链路。');
+      return;
+    }
+
+    const promptPosition = getWorkflowInsertPosition({
+      width: 380,
+      height: 220,
+    });
+    const promptNode = createTemplatePromptNode({
+      position: promptPosition,
+      prompt: config.prompt.trim() || '在这里填写要生成的主提示词。',
+    });
+    const saveNode = createSaveWorkflowNode(
+      getWorkflowInsertPosition({
+        anchorPosition: promptPosition,
+        offsetX: 360,
+        offsetY: 20,
+        width: 284,
+        height: 176,
+      }),
+      {
+        title: '保存卡',
+        format: 'zip',
+        sourceNodeIds: [promptNode.id],
+      },
+    );
+
+    await addPromptNode(promptNode);
+    addWorkflowNode(saveNode);
+    selectNodes([promptNode.id], 'replace');
+    bringNodesToFront([promptNode.id, saveNode.id]);
+    notifyWorkflowCard('success', '已插入卡片模板', '主卡还是你原来的主卡，只在旁边补了一个导出入口。');
+  }, [
+    activeCanvas,
+    addPromptNode,
+    addWorkflowNode,
+    bringNodesToFront,
+    config,
+    createTemplatePromptNode,
+    getWorkflowInsertPosition,
+    notifyWorkflowCard,
+    resolvePrimaryWorkflowSourceImage,
+    resolveWorkflowSourceIdsFromSelection,
+    selectNodes,
+  ]);
+
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
     const imageDetailLevel = node.parentPromptId ? 'full' : item.detailLevel;
@@ -5051,6 +5844,8 @@ ${slideLayerXml.join('\n')}
       <ImageNode
         image={node}
         detailLevel={imageDetailLevel}
+        loadPriority={item.loadPriority}
+        loadBand={item.loadBand}
         groupLayerZIndex={item.groupLayerZIndex}
         stackZIndexOverride={item.stackZIndexOverride}
         position={node.position}
@@ -5110,12 +5905,13 @@ ${slideLayerXml.join('\n')}
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
     const node = item.node;
+    const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
 
     return (
       <>
         <PromptNodeComponent
           node={node}
-          detailLevel={item.detailLevel}
+          detailLevel={promptDetailLevel}
           groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
           stackZIndexOverride={promptGroupStackZIndexById.get(node.id)}
           actualChildImageCount={(actualChildImagesByPromptId.get(node.id) || []).length}
@@ -5189,6 +5985,8 @@ ${slideLayerXml.join('\n')}
               detailLevel: item.detailLevel,
               groupLayerZIndex: promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0,
               stackZIndexOverride: promptGroupStackZIndexById.get(node.id),
+              loadPriority: 1200,
+              loadBand: 0,
             })}
           </React.Fragment>
         ))}
@@ -5225,12 +6023,92 @@ ${slideLayerXml.join('\n')}
     updatePromptNodePosition,
   ]);
 
+  const renderPreviewWorkflowItem = useCallback((item: PreviewRenderItem) => (
+    <PreviewNodeCard
+      node={item.node}
+      isSelected={selectedNodeIds.includes(item.node.id)}
+      highlighted={highlightedId === item.node.id}
+      zoomScale={canvasTransform.scale}
+      onSelect={() => handleCanvasNodeSelect(item.node.id)}
+      onBringToFront={() => bringNodesToFront([item.node.id])}
+      onDelete={deleteWorkflowNode}
+      onPositionChange={updateWorkflowNodePosition}
+      onAction={handleWorkflowPreviewAction}
+    />
+  ), [
+    bringNodesToFront,
+    canvasTransform.scale,
+    deleteWorkflowNode,
+    handleCanvasNodeSelect,
+    handleWorkflowPreviewAction,
+    highlightedId,
+    selectedNodeIds,
+    updateWorkflowNodePosition,
+  ]);
+
+  const renderSaveWorkflowItem = useCallback((item: SaveRenderItem) => (
+    <SaveNodeCard
+      node={item.node}
+      isSelected={selectedNodeIds.includes(item.node.id)}
+      highlighted={highlightedId === item.node.id}
+      zoomScale={canvasTransform.scale}
+      onSelect={() => handleCanvasNodeSelect(item.node.id)}
+      onBringToFront={() => bringNodesToFront([item.node.id])}
+      onDelete={deleteWorkflowNode}
+      onPositionChange={updateWorkflowNodePosition}
+      onAction={(node) => {
+        void handleWorkflowSaveAction(node);
+      }}
+    />
+  ), [
+    bringNodesToFront,
+    canvasTransform.scale,
+    deleteWorkflowNode,
+    handleCanvasNodeSelect,
+    handleWorkflowSaveAction,
+    highlightedId,
+    selectedNodeIds,
+    updateWorkflowNodePosition,
+  ]);
+
+  const renderAgentWorkflowItem = useCallback((item: AgentRenderItem) => (
+    <AgentNodeCard
+      node={item.node}
+      isSelected={selectedNodeIds.includes(item.node.id)}
+      highlighted={highlightedId === item.node.id}
+      zoomScale={canvasTransform.scale}
+      onSelect={() => handleCanvasNodeSelect(item.node.id)}
+      onBringToFront={() => bringNodesToFront([item.node.id])}
+      onDelete={deleteWorkflowNode}
+      onPositionChange={updateWorkflowNodePosition}
+      onAction={handleWorkflowAgentAction}
+    />
+  ), [
+    bringNodesToFront,
+    canvasTransform.scale,
+    deleteWorkflowNode,
+    handleCanvasNodeSelect,
+    handleWorkflowAgentAction,
+    highlightedId,
+    selectedNodeIds,
+    updateWorkflowNodePosition,
+  ]);
+
   const canvasNodeRendererRegistry = React.useMemo(
     () => createWorkflowNodeRendererRegistry<CanvasRenderItem>({
       'prompt-group': renderPromptGroupWorkflowItem,
       image: renderImageWorkflowItem,
+      preview: renderPreviewWorkflowItem,
+      save: renderSaveWorkflowItem,
+      agent: renderAgentWorkflowItem,
     }),
-    [renderImageWorkflowItem, renderPromptGroupWorkflowItem]
+    [
+      renderAgentWorkflowItem,
+      renderImageWorkflowItem,
+      renderPreviewWorkflowItem,
+      renderPromptGroupWorkflowItem,
+      renderSaveWorkflowItem,
+    ]
   );
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => ([
@@ -5246,6 +6124,8 @@ ${slideLayerXml.join('\n')}
       kind: 'image' as const,
       node,
       detailLevel: canvasPerformanceProfile.cardDetailLevel,
+      loadPriority: imageLoadSchedulingById.get(node.id)?.loadPriority ?? 0,
+      loadBand: imageLoadSchedulingById.get(node.id)?.loadBand ?? 0,
       groupLayerZIndex: node.parentPromptId
         ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
         : (node.zIndex ?? 0),
@@ -5253,15 +6133,94 @@ ${slideLayerXml.join('\n')}
         ? promptGroupStackZIndexById.get(node.parentPromptId)
         : standaloneImageStackZIndexById.get(node.id),
     })),
+    ...visibleWorkflowUtilityNodes.flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
+      if (node.kind === 'preview') {
+        return [{
+          id: node.id,
+          kind: 'preview',
+          node,
+        }];
+      }
+
+      if (node.kind === 'save') {
+        return [{
+          id: node.id,
+          kind: 'save',
+          node,
+        }];
+      }
+
+      if (node.kind === 'agent') {
+        return [{
+          id: node.id,
+          kind: 'agent',
+          node,
+        }];
+      }
+
+      return [];
+    }),
   ]), [
     promptGroupLayerById,
     promptGroupStackZIndexById,
     standaloneImageStackZIndexById,
     standaloneVisibleImageNodes,
     canvasPerformanceProfile.cardDetailLevel,
+    imageLoadSchedulingById,
     visibleChildImagesByPromptId,
     visiblePromptNodes,
+    visibleWorkflowUtilityNodes,
   ]);
+
+  const renderedVisibleGroups = React.useMemo(() => (
+    visibleGroups.map((group) => (
+      <CanvasGroupComponent
+        key={group.id}
+        group={group}
+        zoom={canvasTransform.scale}
+        highlighted={highlightedId === group.id}
+        onUngroup={removeGroup}
+        onDragStart={(id, event) => {
+          const nodeIds = group.nodeIds;
+          const isMultiSelect = event.shiftKey || event.ctrlKey || event.metaKey;
+          const alreadySelected = selectedNodeIds || [];
+          const allNodesSelected = nodeIds.every((nodeId) => alreadySelected.includes(nodeId));
+
+          if (isMultiSelect) {
+            selectNodes(nodeIds, 'replace');
+            return;
+          }
+
+          if (alreadySelected.length > 0 && allNodesSelected) {
+            return;
+          }
+
+          selectNodes(nodeIds, 'toggle');
+        }}
+        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodes(delta, sourceNodeIds)}
+        onUpdateGroup={updateGroup}
+        computedBounds={getComputedGroupBounds(group)}
+      />
+    ))
+  ), [
+    canvasTransform.scale,
+    getComputedGroupBounds,
+    highlightedId,
+    moveSelectedNodes,
+    removeGroup,
+    selectNodes,
+    selectedNodeIds,
+    updateGroup,
+    visibleGroups,
+  ]);
+
+  const renderedCanvasItems = React.useMemo(() => (
+    canvasRenderItems.map((item) => (
+      <React.Fragment key={item.id}>
+        {renderWorkflowNode(canvasNodeRendererRegistry, item)}
+      </React.Fragment>
+    ))
+  ), [canvasNodeRendererRegistry, canvasRenderItems]);
 
   useEffect(() => {
     if (!isReady || !activeCanvas || !canvasRef.current) return;
@@ -5340,6 +6299,19 @@ ${slideLayerXml.join('\n')}
     typeof user?.user_metadata?.avatar_url === 'string' && user?.user_metadata?.avatar_url.length > 0
       ? user?.user_metadata?.avatar_url
       : undefined;
+  const backgroundMode = (
+    promptBarUiBusy
+    || isCanvasTransforming
+    || Boolean(selectionBox?.active)
+    || Boolean(dragConnection?.active)
+    || showSettingsPanel
+    || showProfileModal
+    || showStorageModal
+    || showMigrateModal
+    || isSearchOpen
+  )
+    ? 'interactive-throttled'
+    : 'normal';
 
   const desktopChromeRight = isChatOpen
     ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))`
@@ -5454,6 +6426,12 @@ ${slideLayerXml.join('\n')}
       onMouseUp={handleRootMouseUp}
       chrome={workspaceChrome}
     >
+      <GpuBackground
+        opacity={0.4}
+        showConnections={true}
+        mode={backgroundMode}
+      />
+
       {/* Top Left Credits Display */}
       {!isMobile && (
         <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
@@ -5681,8 +6659,14 @@ ${slideLayerXml.join('\n')}
               if (activeCanvas) {
                 const prompts = activeCanvas.promptNodes.filter(n => selectedNodeIds.includes(n.id));
                 const images = activeCanvas.imageNodes.filter(n => selectedNodeIds.includes(n.id));
+                const workflowNodes = (activeCanvas.workflow?.nodes || []).filter(
+                  (node): node is WorkflowUtilityCanvasNode => (
+                    selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
+                  )
+                );
                 prompts.forEach(n => deletePromptNode(n.id));
                 images.forEach(n => deleteImageNode(n.id));
+                workflowNodes.forEach(n => deleteWorkflowNode(n.id));
                 clearSelection();
               }
               setSelectionMenuPosition(null);
@@ -6186,13 +7170,56 @@ ${slideLayerXml.join('\n')}
             );
           })()}
 
+          {/* C. Workflow Utility Connections */}
+          {(activeCanvas?.workflow?.edges || []).map((edge) => {
+            const targetNode = visibleWorkflowUtilityNodesById.get(edge.to);
+            if (!targetNode) return null;
+
+            const sourcePrompt = connectorPromptNodesById.get(edge.from);
+            const sourceImage = connectorVisibleImageNodesById.get(edge.from);
+            const sourceUtility = visibleWorkflowUtilityNodesById.get(edge.from);
+            if (!sourcePrompt && !sourceImage && !sourceUtility) return null;
+
+            const startX = (sourcePrompt?.position.x || sourceImage?.position.x || sourceUtility?.position.x || 0) + 5000;
+            const startY = (sourcePrompt?.position.y || sourceImage?.position.y || sourceUtility?.position.y || 0) + 5000;
+            const targetHeight = targetNode.height || 176;
+            const endX = targetNode.position.x + 5000;
+            const endY = (targetNode.position.y - targetHeight) + 5000;
+            const distY = Math.abs(endY - startY);
+            const handleLen = Math.min(distY * 0.4, 150);
+            const controlY1 = startY + handleLen;
+            const controlY2 = endY - handleLen;
+            const d = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+            const strokeColor = targetNode.kind === 'preview'
+              ? '#38bdf8'
+              : targetNode.kind === 'save'
+                ? '#34d399'
+                : '#f59e0b';
+
+            return (
+              <g key={`workflow-edge-${edge.id}`}>
+                <circle cx={startX} cy={startY} r={connectorDotStart} fill={strokeColor} opacity="0.4" />
+                <path
+                  d={d}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={connectorStroke}
+                  strokeDasharray={connectorStrokeDasharray}
+                  strokeLinecap={connectorStrokeLinecap}
+                  opacity="0.45"
+                />
+                <circle cx={endX} cy={endY} r={connectorDotEnd} fill={strokeColor} opacity="0.55" />
+              </g>
+            );
+          })}
+
         </svg>
 
 
 
 
         {/* 2. 缂栫粍灞?(浣嶄簬鍗＄墖鍚庢柟) */}
-        {visibleGroups.map(group => (
+        {false && visibleGroups.map(group => (
           <CanvasGroupComponent
             key={group.id}
             group={group}
@@ -6226,12 +7253,9 @@ ${slideLayerXml.join('\n')}
         ))}
 
         {/* 3. 鎸佷箙鍖栨彁绀鸿瘝鑺傜偣 */}
-        {false && canvasRenderItems.map((item) => (
-          <React.Fragment key={item.id}>
-            {renderWorkflowNode(canvasNodeRendererRegistry, item)}
-          </React.Fragment>
-        ))}
-        {visiblePromptNodes.map(node => (
+        {renderedVisibleGroups}
+        {renderedCanvasItems}
+        {false && visiblePromptNodes.map(node => (
           <React.Fragment key={node.id}>
             <PromptNodeComponent
               node={node}
@@ -6380,7 +7404,7 @@ ${slideLayerXml.join('\n')}
             ))}
           </React.Fragment>
         ))}
-        {standaloneVisibleImageNodes.map(node => (
+        {false && standaloneVisibleImageNodes.map(node => (
           <ImageNode
             key={node.id}
             image={node}
@@ -6461,6 +7485,7 @@ ${slideLayerXml.join('\n')}
           config={config}
           setConfig={setConfig}
           isGenerating={isGenerating}
+          onUiBusyChange={setPromptBarUiBusy}
           onGenerate={handleGenerate}
           onCancel={handleCancelGeneration}
           onFilesDrop={handleFilesDrop}
@@ -6610,6 +7635,11 @@ ${slideLayerXml.join('\n')}
           onAutoArrange={handleAutoArrange}
           onToggleChat={toggleChatPanel}
           isChatOpen={isChatOpen}
+          workflowTemplates={WORKFLOW_TEMPLATES}
+          onApplyWorkflowTemplate={(templateId) => {
+            void handleApplyWorkflowTemplate(templateId);
+          }}
+          onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
         />
       )}
 
@@ -6942,7 +7972,6 @@ const App: React.FC = () => {
     <ThemeProvider>
       <BillingProvider>
         <CanvasProvider>
-          <GpuBackground opacity={0.4} showConnections={true} />
           <NotificationToast />
           {/* <UpdateNotification /> moved to InfiniteCanvas */}
           <AppContent

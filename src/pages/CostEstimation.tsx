@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Calculator, DollarSign, Info, RefreshCw } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { creditService } from '../services/billing/creditService';
+import { ArrowLeft, Coins, DollarSign, History, RefreshCw, Wallet } from 'lucide-react';
+import { useBilling, type CreditTransactionLog } from '../context/BillingContext';
 import {
   getHistorySummary,
   getRecentEntries,
@@ -9,8 +8,7 @@ import {
   type CostBreakdownItem,
   type CostEntry,
 } from '../services/billing/costService';
-import { adminModelService, type AdminModelConfig } from '../services/model/adminModelService';
-import type { AdminModelQualityKey } from '../services/model/adminModelQuality';
+import { adminModelService } from '../services/model/adminModelService';
 import {
   SETTINGS_ELEVATED_STYLE,
   SettingsActionButton,
@@ -26,23 +24,30 @@ interface CostEstimationProps {
   embedded?: boolean;
 }
 
-type CreditModelDisplayRow = {
+type ConsumptionTab = 'api' | 'credits';
+
+export interface ConsumptionRecord {
+  id: string;
+  source: 'api' | 'credits';
+  modelId: string;
+  modelName: string;
+  providerId?: string | null;
+  tokens?: number | null;
+  amountUsd?: number | null;
+  credits?: number | null;
+  timestamp: number;
+  status?: string | null;
+  description?: string | null;
+}
+
+type CreditConsumptionSummary = {
   key: string;
-  displayName: string;
-  systemModelId: string;
-  providerLabel: string;
-  qualitySummary: string[];
+  modelName: string;
+  providerId?: string | null;
+  totalCredits: number;
+  totalCount: number;
+  latestTimestamp: number;
 };
-
-const formatUsd = (value: number) => `$${Number(value || 0).toFixed(2)}`;
-
-const formatDateTime = (value: number) =>
-  new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
 const tableWrapperStyle = {
   borderColor: 'var(--border-light)',
@@ -50,9 +55,13 @@ const tableWrapperStyle = {
 } as const;
 
 const tableHeaderCellClassName =
-  'px-4 py-2.5 text-left text-[11px] font-semibold tracking-[0.06em] text-[var(--text-tertiary)] whitespace-nowrap';
+  'px-4 py-2.5 text-left align-middle text-[11px] font-semibold tracking-[0.06em] text-[var(--text-tertiary)] whitespace-nowrap';
 
+const tableClassName = 'w-full min-w-[720px] table-fixed border-collapse';
 const tableCellClassName = 'px-4 py-3.5 align-top text-sm';
+const tableTextCellClassName = `${tableCellClassName} min-w-0`;
+const tableNumberCellClassName = `${tableCellClassName} whitespace-nowrap text-right tabular-nums`;
+const tableTimeCellClassName = `${tableCellClassName} whitespace-nowrap tabular-nums`;
 
 const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div
@@ -67,141 +76,111 @@ const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-const InfoPanel: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section className="rounded-2xl border p-4" style={SETTINGS_ELEVATED_STYLE}>
-    <div className="flex items-start gap-3">
-      <Info className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--state-info-text)' }} />
-      <div className="text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-        <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
-          {title}
-        </div>
-        <div className="mt-1">{children}</div>
-      </div>
-    </div>
-  </section>
-);
+const formatUsd = (value: number) => `$${Number(value || 0).toFixed(value >= 1 ? 2 : 4)}`;
 
-const CREDIT_QUALITY_DISPLAY_ORDER: AdminModelQualityKey[] = ['1K', '2K', '4K', '0.5K'];
-
-const sortAdminModelsForDisplay = (models: AdminModelConfig[]) =>
-  [...models].sort((left, right) => {
-    const priorityDiff = Number(right.priority || 0) - Number(left.priority || 0);
-    if (priorityDiff !== 0) return priorityDiff;
-
-    const weightDiff = Number(right.weight || 0) - Number(left.weight || 0);
-    if (weightDiff !== 0) return weightDiff;
-
-    return String(left.providerName || left.provider || '').localeCompare(
-      String(right.providerName || right.provider || ''),
-      'zh-CN'
-    );
+const formatDateTime = (value: number) =>
+  new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 
-const buildQualitySummary = (model: AdminModelConfig): string[] => {
-  if (!model.advancedEnabled || !model.qualityPricing) {
-    return [`1K/${model.creditCost}积分`];
-  }
-
-  const enabledQualities = CREDIT_QUALITY_DISPLAY_ORDER.filter(
-    (quality) => model.qualityPricing?.[quality]?.enabled !== false
-  );
-
-  if (enabledQualities.length === 0) {
-    return [`1K/${model.creditCost}积分`];
-  }
-
-  return enabledQualities.map(
-    (quality) => `${quality}/${model.qualityPricing?.[quality]?.creditCost ?? model.creditCost}积分`
-  );
+const toConsumptionRecordFromApi = (entry: CostEntry): ConsumptionRecord => {
+  const parsed = parseModelSource(entry.model);
+  return {
+    id: entry.id,
+    source: 'api',
+    modelId: parsed.modelId,
+    modelName: parsed.modelId,
+    providerId: parsed.source,
+    tokens: entry.tokens || 0,
+    amountUsd: entry.costUsd || 0,
+    credits: null,
+    timestamp: entry.timestamp,
+    description: entry.details || null,
+    status: 'completed',
+  };
 };
 
-const buildCreditModelDisplayRows = (models: AdminModelConfig[]): CreditModelDisplayRow[] => {
-  const grouped = new Map<string, AdminModelConfig[]>();
+const toConsumptionRecordFromCreditLog = (log: CreditTransactionLog): ConsumptionRecord => ({
+  id: log.id,
+  source: 'credits',
+  modelId: log.model_id || log.model_name || log.description || '积分消耗',
+  modelName: log.model_name || log.model_id || log.description || '积分消耗',
+  providerId: log.provider_id || null,
+  tokens: typeof log.metadata?.tokens === 'number' ? log.metadata.tokens : null,
+  amountUsd: typeof log.metadata?.amountUsd === 'number' ? log.metadata.amountUsd : null,
+  credits: Math.abs(Number(log.amount || 0)),
+  timestamp: new Date(log.created_at).getTime(),
+  description: log.description || null,
+  status: log.status || null,
+});
 
-  models.forEach((model) => {
-    if (!grouped.has(model.id)) {
-      grouped.set(model.id, []);
-    }
-    grouped.get(model.id)!.push(model);
-  });
+const buildCreditSummary = (logs: CreditTransactionLog[]): CreditConsumptionSummary[] => {
+  const grouped = new Map<string, CreditConsumptionSummary>();
 
-  const rows: CreditModelDisplayRow[] = [];
+  logs
+    .filter((log) => log.type === 'consumption')
+    .forEach((log) => {
+      const modelName = log.model_name || log.model_id || log.description || '积分消耗';
+      const key = `${modelName}::${log.provider_id || ''}`;
+      const current = grouped.get(key) || {
+        key,
+        modelName,
+        providerId: log.provider_id || null,
+        totalCredits: 0,
+        totalCount: 0,
+        latestTimestamp: 0,
+      };
 
-  grouped.forEach((items, modelId) => {
-    const sortedItems = sortAdminModelsForDisplay(items);
-    const mixedItems = sortedItems.filter((item) => item.mixWithSameModel);
-
-    if (mixedItems.length > 1) {
-      const primary = mixedItems[0];
-      rows.push({
-        key: `mixed:${modelId}`,
-        displayName: primary.displayName,
-        systemModelId: `${modelId}@system`,
-        providerLabel: `混合路由 · ${mixedItems.length} 个供应商`,
-        qualitySummary: buildQualitySummary(primary),
-      });
-      return;
-    }
-
-    sortedItems.forEach((item) => {
-      rows.push({
-        key: `${item.providerId || item.provider}:${item.id}`,
-        displayName: item.displayName,
-        systemModelId: `${item.id}@system`,
-        providerLabel: item.providerName || item.provider || '系统模型',
-        qualitySummary: buildQualitySummary(item),
-      });
+      current.totalCredits += Math.abs(Number(log.amount || 0));
+      current.totalCount += 1;
+      current.latestTimestamp = Math.max(current.latestTimestamp, new Date(log.created_at).getTime());
+      grouped.set(key, current);
     });
-  });
 
-  return rows.sort((left, right) => left.displayName.localeCompare(right.displayName, 'zh-CN'));
+  return Array.from(grouped.values()).sort((left, right) => right.latestTimestamp - left.latestTimestamp);
 };
 
 export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded = false }) => {
-  const [activeTab, setActiveTab] = useState<'records' | 'credits'>('records');
-  const [userBalance, setUserBalance] = useState<number | null>(null);
-  const [adminModels, setAdminModels] = useState<AdminModelConfig[]>([]);
+  const { balance, usageLogs, fetchLogs } = useBilling();
+
+  const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
   const [summaryRows, setSummaryRows] = useState<CostBreakdownItem[]>([]);
   const [recentRows, setRecentRows] = useState<CostEntry[]>([]);
+  const [creditModelCount, setCreditModelCount] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
-
-  useEffect(() => {
-    const fetchBalance = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const credits = await creditService.getUserCredits(user.id);
-        setUserBalance(credits?.balance ?? 0);
-      }
-    };
-
-    const updateAdminModels = () => {
-      const models = adminModelService.getModels().filter((item) => item.creditCost !== undefined && item.creditCost > 0);
-      setAdminModels(models);
-    };
-
-    void fetchBalance();
-    updateAdminModels();
-    void adminModelService.loadAdminModels().then(updateAdminModels);
-
-    const unsubscribeAdmin = adminModelService.subscribe(updateAdminModels);
-    return unsubscribeAdmin;
-  }, []);
 
   useEffect(() => {
     setSummaryRows(getHistorySummary(30));
     setRecentRows(getRecentEntries(50));
-  }, [refreshTick, activeTab]);
+  }, [refreshTick]);
 
   useEffect(() => {
-    const handleFocus = () => setRefreshTick((value) => value + 1);
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    const updateAdminModels = () => {
+      const models = adminModelService.getModels().filter((item) => item.creditCost !== undefined && item.creditCost > 0);
+      setCreditModelCount(models.length);
+    };
+
+    updateAdminModels();
+    void adminModelService.loadAdminModels().then(updateAdminModels);
+
+    const unsubscribe = adminModelService.subscribe(updateAdminModels);
+    return unsubscribe;
   }, []);
 
-  const recordsOverview = useMemo(() => {
+  const refreshAll = async () => {
+    setRefreshTick((value) => value + 1);
+    await fetchLogs();
+  };
+
+  const apiRecords = useMemo(() => recentRows.map(toConsumptionRecordFromApi), [recentRows]);
+  const creditLogs = useMemo(() => usageLogs.filter((log) => log.type === 'consumption'), [usageLogs]);
+  const creditRecords = useMemo(() => creditLogs.map(toConsumptionRecordFromCreditLog), [creditLogs]);
+  const creditSummaryRows = useMemo(() => buildCreditSummary(creditLogs), [creditLogs]);
+
+  const apiOverview = useMemo(() => {
     const totalCost = summaryRows.reduce((sum, item) => sum + (item.cost || 0), 0);
     const totalTokens = summaryRows.reduce((sum, item) => sum + (item.tokens || 0), 0);
     const totalCount = summaryRows.reduce((sum, item) => sum + (item.count || 0), 0);
@@ -213,37 +192,47 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
     };
   }, [summaryRows]);
 
-  const creditModelDisplayRows = useMemo(() => buildCreditModelDisplayRows(adminModels), [adminModels]);
+  const creditOverview = useMemo(() => {
+    const totalCredits = creditRecords.reduce((sum, item) => sum + Math.abs(Number(item.credits || 0)), 0);
+    const totalCount = creditRecords.length;
+    const totalAmountUsd = creditRecords.reduce((sum, item) => sum + Number(item.amountUsd || 0), 0);
+
+    return {
+      totalCredits,
+      totalCount,
+      totalAmountUsd,
+    };
+  }, [creditRecords]);
 
   const heroMetrics =
-    activeTab === 'records' ? (
+    activeTab === 'api' ? (
       <>
         <SettingsMetricCard
-          label="累计成本"
-          value={formatUsd(recordsOverview.totalCost)}
-          helper="基于近 30 天成本记录汇总，帮助判断主要消耗方向。"
+          label="累计 API 花费"
+          value={formatUsd(apiOverview.totalCost)}
+          helper="近 30 天本地记录汇总。"
           icon={DollarSign}
           tone="amber"
         />
         <SettingsMetricCard
           label="累计调用"
-          value={recordsOverview.totalCount.toLocaleString('zh-CN')}
-          helper="统计所有成功写入的费用记录。"
-          icon={RefreshCw}
+          value={apiOverview.totalCount.toLocaleString('zh-CN')}
+          helper="仅统计已写入消费记录的调用。"
+          icon={History}
           tone="indigo"
         />
         <SettingsMetricCard
           label="累计 Tokens"
-          value={recordsOverview.totalTokens.toLocaleString('zh-CN')}
-          helper="用于识别高消耗模型和长期使用趋势。"
-          icon={Calculator}
+          value={apiOverview.totalTokens.toLocaleString('zh-CN')}
+          helper="用于识别高消耗模型。"
+          icon={Wallet}
           tone="sky"
         />
         <SettingsMetricCard
-          label="最近一条"
-          value={recentRows.length > 0 ? formatDateTime(recentRows[0].timestamp) : '暂无'}
-          helper="展示最近一次费用记录的时间。"
-          icon={Info}
+          label="最近一笔"
+          value={apiRecords.length > 0 ? formatDateTime(apiRecords[0].timestamp) : '暂无'}
+          helper="最近一次 API 价格消费。"
+          icon={RefreshCw}
           tone="neutral"
         />
       </>
@@ -251,30 +240,30 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
       <>
         <SettingsMetricCard
           label="当前积分"
-          value={userBalance !== null ? userBalance.toString() : '--'}
-          helper="当前账号还可直接使用的积分余额。"
-          icon={Calculator}
+          value={balance.toLocaleString('zh-CN')}
+          helper="当前账号可直接使用的积分余额。"
+          icon={Coins}
           tone="emerald"
         />
         <SettingsMetricCard
           label="积分模型"
-          value={creditModelDisplayRows.length.toString()}
-          helper="由后台统一配置，前台可直接调用。"
-          icon={DollarSign}
+          value={creditModelCount.toLocaleString('zh-CN')}
+          helper="后台统一维护、前台直接使用。"
+          icon={Wallet}
           tone="indigo"
         />
         <SettingsMetricCard
-          label="计费方式"
-          value="按模型扣减"
-          helper="调用积分模型时会直接扣除对应积分。"
-          icon={RefreshCw}
-          tone="sky"
+          label="累计积分消耗"
+          value={creditOverview.totalCredits.toLocaleString('zh-CN')}
+          helper="按消费流水聚合的积分总消耗。"
+          icon={Coins}
+          tone="amber"
         />
         <SettingsMetricCard
-          label="补充方式"
-          value="联系管理员"
-          helper="当积分不足时，可通过后台完成充值或补量。"
-          icon={Info}
+          label="最近一笔"
+          value={creditRecords.length > 0 ? formatDateTime(creditRecords[0].timestamp) : '暂无'}
+          helper="最近一次积分模型消费。"
+          icon={RefreshCw}
           tone="neutral"
         />
       </>
@@ -283,59 +272,66 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
   const content = (
     <SettingsViewShell>
       <SettingsHero
-        tone={activeTab === 'records' ? 'indigo' : 'emerald'}
-        icon={activeTab === 'records' ? DollarSign : Calculator}
-        eyebrow="COST CENTER"
-        title="价格估算"
+        tone={activeTab === 'api' ? 'indigo' : 'emerald'}
+        icon={activeTab === 'api' ? DollarSign : Coins}
+        eyebrow="CONSUMPTION CENTER"
+        title="消费记录"
         description={
-          activeTab === 'records'
-            ? '把累计成本、最近记录和模型来源整理到一个视图里，方便快速定位费用变化。'
-            : '积分模式保留最关键的信息：余额、可用模型和补充方式，减少不必要的后台干扰。'
+          activeTab === 'api'
+            ? '聚合用户自定义 API 的费用记录、模型累计花费与最近调用明细。'
+            : '聚合系统积分模型的消费流水、模型总消耗与最近扣费记录。'
         }
-        badge={<SettingsBadge tone={activeTab === 'records' ? 'amber' : 'emerald'}>{activeTab === 'records' ? '费用记录' : '积分系统'}</SettingsBadge>}
-        actions={
+        badge={<SettingsBadge tone={activeTab === 'api' ? 'amber' : 'emerald'}>{activeTab === 'api' ? 'API 消费' : '积分消耗'}</SettingsBadge>}
+        actions={(
           <>
             {!embedded && onBack ? (
               <SettingsActionButton icon={ArrowLeft} onClick={onBack}>
                 返回
               </SettingsActionButton>
             ) : null}
-            <SettingsActionButton icon={RefreshCw} onClick={() => setRefreshTick((value) => value + 1)}>
+            <SettingsActionButton icon={RefreshCw} onClick={() => void refreshAll()}>
               刷新
             </SettingsActionButton>
-            <div className="apple-pill-group">
+            <div className="apple-pill-group consumption-pill-group">
               <button
-                onClick={() => setActiveTab('records')}
-                className={`apple-pill-button ${activeTab === 'records' ? 'active' : ''}`}
+                onClick={() => setActiveTab('api')}
+                className={`apple-pill-button ${activeTab === 'api' ? 'active' : ''}`}
               >
                 <DollarSign className="h-4 w-4" />
-                费用记录
+                API 消费
               </button>
               <button
                 onClick={() => setActiveTab('credits')}
                 className={`apple-pill-button ${activeTab === 'credits' ? 'active' : ''}`}
               >
-                <Calculator className="h-4 w-4" />
-                积分系统
+                <Coins className="h-4 w-4" />
+                积分消耗
               </button>
             </div>
           </>
-        }
+        )}
         metrics={heroMetrics}
       />
 
-      {activeTab === 'records' ? (
+      {activeTab === 'api' ? (
         <>
           <SettingsSection
             eyebrow="MODEL SUMMARY"
-            title="按模型汇总"
-            description="查看每个模型在近 30 天内的调用次数、Token 消耗和费用表现。"
+            title="模型总消耗"
+            description="查看近 30 天内每个模型的累计调用、Tokens 和费用。"
             action={<SettingsBadge tone="neutral">近 30 天</SettingsBadge>}
           >
             {summaryRows.length > 0 ? (
               <div className="overflow-hidden rounded-2xl border" style={tableWrapperStyle}>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
+                  <table className={tableClassName}>
+                    <colgroup>
+                      <col style={{ width: '34%' }} />
+                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '16%' }} />
+                    </colgroup>
                     <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>模型</th>
@@ -350,24 +346,24 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                         const parsed = parseModelSource(item.model);
                         return (
                           <tr key={`${item.model}_${item.imageSize}_${index}`} className="border-t" style={{ borderColor: 'var(--border-light)' }}>
-                            <td className={tableCellClassName}>
-                              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            <td className={tableTextCellClassName}>
+                              <div className="min-w-0 break-words font-medium" style={{ color: 'var(--text-primary)' }}>
                                 {parsed.modelId}
                               </div>
-                              <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              <div className="mt-1 break-words text-xs" style={{ color: 'var(--text-tertiary)' }}>
                                 {item.imageSize}
                               </div>
                             </td>
-                            <td className={tableCellClassName}>
+                            <td className={tableTextCellClassName}>
                               <SettingsBadge tone="neutral">{parsed.source}</SettingsBadge>
                             </td>
-                            <td className={`${tableCellClassName} text-right`} style={{ color: 'var(--text-secondary)' }}>
+                            <td className={tableNumberCellClassName} style={{ color: 'var(--text-secondary)' }}>
                               {item.count.toLocaleString('zh-CN')}
                             </td>
-                            <td className={`${tableCellClassName} text-right`} style={{ color: 'var(--text-secondary)' }}>
+                            <td className={tableNumberCellClassName} style={{ color: 'var(--text-secondary)' }}>
                               {item.tokens.toLocaleString('zh-CN')}
                             </td>
-                            <td className={`${tableCellClassName} text-right font-semibold`} style={{ color: 'var(--state-success-text)' }}>
+                            <td className={`${tableNumberCellClassName} font-semibold`} style={{ color: 'var(--state-success-text)' }}>
                               {formatUsd(item.cost)}
                             </td>
                           </tr>
@@ -378,120 +374,176 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                 </div>
               </div>
             ) : (
-              <EmptyState>暂无累计费用记录，完成生成后这里会逐步汇总每个模型的成本。</EmptyState>
+              <EmptyState>暂无 API 消费记录，完成生成后这里会逐步汇总各模型的费用。</EmptyState>
             )}
           </SettingsSection>
 
           <SettingsSection
-            eyebrow="RECENT ENTRIES"
-            title="最近记录"
-            description="保留最近 50 条单次费用记录，方便快速回看和排查。"
+            eyebrow="RECENT RECORDS"
+            title="最近消费"
+            description="保留最近 50 条单次 API 消费记录，方便快速回看和排查。"
           >
-            {recentRows.length > 0 ? (
+            {apiRecords.length > 0 ? (
               <div className="overflow-hidden rounded-2xl border" style={tableWrapperStyle}>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
+                  <table className={tableClassName}>
+                    <colgroup>
+                      <col style={{ width: '20%' }} />
+                      <col style={{ width: '40%' }} />
+                      <col style={{ width: '20%' }} />
+                      <col style={{ width: '20%' }} />
+                    </colgroup>
                     <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>时间</th>
                         <th className={tableHeaderCellClassName}>模型</th>
-                        <th className={`${tableHeaderCellClassName} text-right`}>本次调用</th>
                         <th className={`${tableHeaderCellClassName} text-right`}>本次 Tokens</th>
                         <th className={`${tableHeaderCellClassName} text-right`}>本次费用</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {recentRows.map((entry) => {
-                        const parsed = parseModelSource(entry.model);
-                        return (
-                          <tr key={entry.id} className="border-t" style={{ borderColor: 'var(--border-light)' }}>
-                            <td className={tableCellClassName} style={{ color: 'var(--text-secondary)' }}>
-                              {formatDateTime(entry.timestamp)}
-                            </td>
-                            <td className={tableCellClassName}>
-                              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                                {parsed.modelId}
-                              </div>
-                              <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                {parsed.source}
-                              </div>
-                            </td>
-                            <td className={`${tableCellClassName} text-right`} style={{ color: 'var(--text-secondary)' }}>
-                              {entry.count.toLocaleString('zh-CN')}
-                            </td>
-                            <td className={`${tableCellClassName} text-right`} style={{ color: 'var(--text-secondary)' }}>
-                              {(entry.tokens || 0).toLocaleString('zh-CN')}
-                            </td>
-                            <td className={`${tableCellClassName} text-right font-semibold`} style={{ color: 'var(--state-success-text)' }}>
-                              {formatUsd(entry.costUsd)}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {apiRecords.map((entry) => (
+                        <tr key={entry.id} className="border-t" style={{ borderColor: 'var(--border-light)' }}>
+                          <td className={tableTimeCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {formatDateTime(entry.timestamp)}
+                          </td>
+                          <td className={tableTextCellClassName}>
+                            <div className="min-w-0 break-words font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {entry.modelName}
+                            </div>
+                            <div className="mt-1 break-words text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              {entry.providerId || '自定义 API'}
+                            </div>
+                          </td>
+                          <td className={tableNumberCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {(entry.tokens || 0).toLocaleString('zh-CN')}
+                          </td>
+                          <td className={`${tableNumberCellClassName} font-semibold`} style={{ color: 'var(--state-success-text)' }}>
+                            {formatUsd(entry.amountUsd || 0)}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
             ) : (
-              <EmptyState>暂无单次费用记录。</EmptyState>
+              <EmptyState>暂无 API 消费明细。</EmptyState>
             )}
           </SettingsSection>
-
-          <InfoPanel title="费用说明">
-            “按模型汇总”会持续累计模型总成本；“最近记录”只展示单次调用本身的消耗，两者分别用于长期观察和短期排查。
-          </InfoPanel>
         </>
       ) : (
         <>
           <SettingsSection
-            eyebrow="CREDIT MODELS"
-            title="积分模型列表"
-            description="积分模型由后台统一维护，用户在前台可直接使用，不需要单独配置 API Key。"
-            action={<SettingsBadge tone="neutral">{creditModelDisplayRows.length} 个模型</SettingsBadge>}
+            eyebrow="CREDIT SUMMARY"
+            title="模型总消耗"
+            description="按积分模型聚合最近的扣费流水，查看累计积分消耗和调用次数。"
+            action={<SettingsBadge tone="neutral">{creditOverview.totalCount} 条流水</SettingsBadge>}
           >
-            {creditModelDisplayRows.length > 0 ? (
-              <div className="grid gap-3">
-                {creditModelDisplayRows.map((model) => (
-                  <div key={model.key} className="rounded-2xl border px-4 py-3" style={SETTINGS_ELEVATED_STYLE}>
-                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {model.displayName}
-                          </div>
-                          <SettingsBadge tone="neutral">{model.providerLabel}</SettingsBadge>
-                        </div>
-                        <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {model.systemModelId}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {model.qualitySummary.map((summary) => (
-                          <span
-                            key={`${model.key}:${summary}`}
-                            className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium"
-                            style={{
-                              borderColor: 'rgba(245, 158, 11, 0.24)',
-                              backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                              color: 'var(--state-warning-text)',
-                            }}
-                          >
-                            {summary}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            {creditSummaryRows.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border" style={tableWrapperStyle}>
+                <div className="overflow-x-auto">
+                  <table className={tableClassName}>
+                    <colgroup>
+                      <col style={{ width: '30%' }} />
+                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '20%' }} />
+                    </colgroup>
+                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                      <tr>
+                        <th className={tableHeaderCellClassName}>模型</th>
+                        <th className={tableHeaderCellClassName}>供应商</th>
+                        <th className={`${tableHeaderCellClassName} text-right`}>累计扣费</th>
+                        <th className={`${tableHeaderCellClassName} text-right`}>调用次数</th>
+                        <th className={`${tableHeaderCellClassName} text-right`}>最近时间</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creditSummaryRows.map((item) => (
+                        <tr key={item.key} className="border-t" style={{ borderColor: 'var(--border-light)' }}>
+                          <td className={tableTextCellClassName}>
+                            <div className="min-w-0 break-words font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {item.modelName}
+                            </div>
+                          </td>
+                          <td className={tableTextCellClassName}>
+                            <SettingsBadge tone="neutral">{item.providerId || '系统路由'}</SettingsBadge>
+                          </td>
+                          <td className={`${tableNumberCellClassName} font-semibold`} style={{ color: 'var(--state-warning-text)' }}>
+                            {item.totalCredits.toLocaleString('zh-CN')} 积分
+                          </td>
+                          <td className={tableNumberCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {item.totalCount.toLocaleString('zh-CN')}
+                          </td>
+                          <td className={tableTimeCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {formatDateTime(item.latestTimestamp)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
-              <EmptyState>暂无积分模型，或仍在加载中。</EmptyState>
+              <EmptyState>暂无积分消费流水。</EmptyState>
             )}
           </SettingsSection>
 
-          <InfoPanel title="关于积分系统">
-            积分模型通过系统代理调用，用户无需维护对应的 API Key；当积分不足时，可以通过后台完成充值或补量。
-          </InfoPanel>
+          <SettingsSection
+            eyebrow="RECENT RECORDS"
+            title="最近消费"
+            description="按积分流水展示最近一次次扣费，帮助确认最新消耗和模型来源。"
+          >
+            {creditRecords.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border" style={tableWrapperStyle}>
+                <div className="overflow-x-auto">
+                  <table className={tableClassName}>
+                    <colgroup>
+                      <col style={{ width: '20%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '34%' }} />
+                      <col style={{ width: '20%' }} />
+                    </colgroup>
+                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                      <tr>
+                        <th className={tableHeaderCellClassName}>时间</th>
+                        <th className={tableHeaderCellClassName}>模型</th>
+                        <th className={tableHeaderCellClassName}>说明</th>
+                        <th className={`${tableHeaderCellClassName} text-right`}>积分</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creditRecords.map((entry) => (
+                        <tr key={entry.id} className="border-t" style={{ borderColor: 'var(--border-light)' }}>
+                          <td className={tableTimeCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {formatDateTime(entry.timestamp)}
+                          </td>
+                          <td className={tableTextCellClassName}>
+                            <div className="min-w-0 break-words font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {entry.modelName}
+                            </div>
+                            <div className="mt-1 break-words text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              {entry.providerId || '系统路由'}
+                            </div>
+                          </td>
+                          <td className={tableTextCellClassName} style={{ color: 'var(--text-secondary)' }}>
+                            {entry.description || '系统积分模型消费'}
+                          </td>
+                          <td className={`${tableNumberCellClassName} font-semibold`} style={{ color: 'var(--state-warning-text)' }}>
+                            {Math.abs(Number(entry.credits || 0)).toLocaleString('zh-CN')} 积分
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <EmptyState>暂无积分消费明细。</EmptyState>
+            )}
+          </SettingsSection>
         </>
       )}
     </SettingsViewShell>

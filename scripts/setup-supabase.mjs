@@ -47,3 +47,4 @@ console.log('');
 console.log('Notes');
 console.log('- Do not replay the 2025 bootstrap SQL as a fresh setup source.');
 console.log('- The project now relies on forward-only consolidation migrations from the current remote state.');
+console.log('- `payment-server/.env` must contain a real `SUPABASE_SERVICE_ROLE_KEY`; the placeholder in `.env.example` is not enough.');

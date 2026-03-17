@@ -2,6 +2,26 @@
  * 时间格式化工具
  */
 
+export const MAX_GENERATION_DURATION_MS = 600000;
+
+export function clampGenerationDurationMs(value?: number | string | null): number {
+  const numericValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : NaN;
+
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 0;
+  }
+
+  return Math.min(MAX_GENERATION_DURATION_MS, Math.max(0, numericValue));
+}
+
+export function formatGenerationDurationSeconds(value?: number | string | null, digits: number = 1): string {
+  return (clampGenerationDurationMs(value) / 1000).toFixed(digits);
+}
+
 export function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();

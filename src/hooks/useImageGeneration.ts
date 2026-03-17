@@ -7,7 +7,7 @@ import { useBilling } from '../context/BillingContext';
 import { calculateCost, resolveImageCost } from '../services/billing/costService';
 import { saveImage, saveOriginalImage, getImage } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
-import { keyManager } from '../services/auth/keyManager';
+import { keyManager, getModelMetadata } from '../services/auth/keyManager';
 import { isCreditBasedModel } from '../services/model/modelPricing';
 import { 
   normalizePptSlidesForCount, 
@@ -15,6 +15,7 @@ import {
   buildPptPageAlias 
 } from '../utils/pptUtils';
 import { clearSyncImageBridgeRequest, getSyncImageBridgeRequest, isSyncImageBridgeSupported } from '../services/llm/syncImageBridge';
+import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -155,6 +156,27 @@ export const useImageGeneration = (options: {
       if (keySlot) return { provider: String(keySlot.provider || ''), providerLabel: keySlot.name || String(keySlot.provider || 'Official') };
     }
     return { provider: fallbackProvider, providerLabel: fallbackProviderLabel || fallbackProvider };
+  }, []);
+
+  const shouldPreferRouteProviderDisplay = useCallback((
+    node: Pick<PromptNode, 'model' | 'provider' | 'providerLabel'>,
+    routeDisplay: { provider?: string; providerLabel?: string }
+  ) => {
+    const currentLabel = String(node.providerLabel || '').trim();
+    const routeLabel = String(routeDisplay.providerLabel || '').trim();
+
+    if (!routeLabel || !currentLabel || currentLabel === routeLabel) {
+      return !currentLabel && !!routeLabel;
+    }
+
+    const modelMeta = getModelMetadata(node.model || '') as { provider?: string; providerLabel?: string } | undefined;
+    const genericLabels = new Set(
+      [node.providerLabel, node.provider, modelMeta?.providerLabel, modelMeta?.provider]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => value.trim().toLowerCase())
+    );
+
+    return genericLabels.has(currentLabel.toLowerCase());
   }, []);
 
   // --- Task State Helpers ---
@@ -685,10 +707,10 @@ export const useImageGeneration = (options: {
                 sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
-                provider: latestNode.provider || (result as any).provider,
-                providerLabel: latestNode.providerLabel || (result as any).providerName,
+                provider: (result as any).provider || latestNode.provider,
+                providerLabel: (result as any).providerName || latestNode.providerLabel,
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
-                generationTime: (result as any).generationTime || 0,
+                generationTime: clampGenerationDurationMs((result as any).generationTime),
                 tokens: splitMetricAcrossItems(recoveredUsage.tokens, imageUrls.length),
                 cost: splitMetricAcrossItems(recoveredUsage.cost, imageUrls.length),
                 alias: latestNode.mode === GenerationMode.PPT ? buildPptPageAlias(latestNode.pptSlides?.[layoutIndex], layoutIndex) : undefined,
@@ -796,14 +818,19 @@ export const useImageGeneration = (options: {
       }
       const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
       const effectiveKeySlotId = resolvedKey?.id || node.keySlotId;
-      const resolvedProviderDisplay = effectiveKeySlotId
+      const routeProviderDisplay = effectiveKeySlotId
         ? resolveProviderDisplay(effectiveKeySlotId)
         : resolveProviderDisplay(undefined, node.providerLabel, node.provider);
+      const preferRouteProviderDisplay = shouldPreferRouteProviderDisplay(node, routeProviderDisplay);
       const executionNode: PromptNode = {
         ...node,
         keySlotId: effectiveKeySlotId,
-        provider: resolvedProviderDisplay.provider || node.provider,
-        providerLabel: resolvedProviderDisplay.providerLabel || node.providerLabel,
+        provider: preferRouteProviderDisplay
+          ? (routeProviderDisplay.provider || node.provider)
+          : (node.provider || routeProviderDisplay.provider),
+        providerLabel: preferRouteProviderDisplay
+          ? (routeProviderDisplay.providerLabel || node.providerLabel)
+          : (node.providerLabel || routeProviderDisplay.providerLabel),
       };
 
       if (
@@ -927,7 +954,7 @@ export const useImageGeneration = (options: {
 
           return { 
             index, url: isVideo || isAudio ? videoUrl : generatedBase64, originalUrl: isVideo || isAudio ? videoUrl : generatedBase64, 
-            generationTime: Date.now() - startTime, base64: generatedBase64, mode, 
+            generationTime: clampGenerationDurationMs(Date.now() - startTime), base64: generatedBase64, mode, 
             taskId: taskIdForRecovery, taskPrompt, keySlotId: resolvedResultKeySlotId, requestId: currentRequestId,
             provider: resolvedProvider, providerName: resolvedProviderName, modelName: resolvedModelName, model: resolvedModelId,
             imageSize: resolvedImageSize, tokens: resolvedTokens, cost: resolvedCost,
@@ -962,7 +989,7 @@ export const useImageGeneration = (options: {
             providerLabel: item.providerName || executionNode.providerLabel,
             parentPromptId: promptNodeId, position: getGeneratedImagePosition(executionNode.position, executionNode.aspectRatio, executionNode.mode, idx, actualCount),
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
-            generationTime: item.generationTime, keySlotId: item.keySlotId, mode,
+            generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
             tokens: item.tokens, cost: item.cost,
           };
         });
@@ -976,7 +1003,7 @@ export const useImageGeneration = (options: {
         const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
         const firstSuccess = validImageData[0];
         const resolvedSuccessDisplay = firstSuccess?.keySlotId
-          ? resolveProviderDisplay(firstSuccess.keySlotId)
+          ? resolveProviderDisplay(firstSuccess.keySlotId, firstSuccess.providerName, firstSuccess.provider)
           : resolveProviderDisplay(undefined, executionNode.providerLabel, executionNode.provider);
         
         const updatedNode = {
@@ -1053,6 +1080,7 @@ export const useImageGeneration = (options: {
     rememberPreferredKeyForMode,
     refundCredits,
     resolveProviderDisplay,
+    shouldPreferRouteProviderDisplay,
     clearSyncBridgeRecoveryTimer
   ]);
 

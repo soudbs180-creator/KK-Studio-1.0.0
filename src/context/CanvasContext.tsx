@@ -10,7 +10,11 @@ import { supabase } from '../lib/supabase'; // Import supabase for auth check
 import { notify } from '../services/system/notificationService';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
-import { syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
+import { canvasToWorkflow, syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
+import { workflowToLegacyCanvas } from '../workflow/adapters/workflowToLegacy';
+import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
+import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer';
+import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 const MAX_CANVASES = 10;
 
@@ -109,6 +113,10 @@ interface CanvasContextType {
         promptNodes?: { id: string, updates: Partial<PromptNode> }[],
         imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
     }) => void;
+    addWorkflowNode: (node: WorkflowNode) => void;
+    updateWorkflowNode: (id: string, updates: Partial<WorkflowNode>) => void;
+    updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
+    deleteWorkflowNode: (id: string) => void;
 }
 
 const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
@@ -159,31 +167,6 @@ const stripReferenceImageData = (
     })
 );
 
-const stripWorkflowNodeData = (node: WorkflowNode, aggressive: boolean): WorkflowNode => {
-    if (node.kind === 'image') {
-        return {
-            ...node,
-            data: {
-                ...node.data,
-                url: '',
-                originalUrl: ''
-            }
-        };
-    }
-
-    if (node.kind === 'prompt') {
-        return {
-            ...node,
-            data: {
-                ...node.data,
-                referenceImages: stripReferenceImageData(node.data.referenceImages, aggressive)
-            }
-        };
-    }
-
-    return node;
-};
-
 const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
     syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph);
 
@@ -200,12 +183,7 @@ const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas
             ...pn,
             referenceImages: stripReferenceImageData(pn.referenceImages, aggressive)
         })),
-        workflow: c.workflow
-            ? {
-                ...c.workflow,
-                nodes: c.workflow.nodes.map(node => stripWorkflowNodeData(node, aggressive))
-            }
-            : c.workflow
+        workflow: sanitizeWorkflowForStorage(c.workflow, aggressive)
     }));
 };
 
@@ -273,6 +251,23 @@ const resolvePromptChildImageIds = (
     return orderedIds;
 };
 
+const getWorkflowSourceNodeIds = (node: WorkflowNode): string[] => {
+    if (!isWorkflowUtilityNodeKind(node.kind)) {
+        return [];
+    }
+
+    const rawSourceIds = (node.data as { sourceNodeIds?: unknown } | undefined)?.sourceNodeIds;
+    if (!Array.isArray(rawSourceIds)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        rawSourceIds.filter((sourceId): sourceId is string => (
+            typeof sourceId === 'string' && sourceId.trim().length > 0
+        ))
+    ));
+};
+
 const normalizeRecoveredPromptNode = (
     node: PromptNode,
     imageNodes: GeneratedImage[] = []
@@ -307,12 +302,16 @@ const normalizeRecoveredPromptNode = (
     };
 };
 
-const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => syncCanvasCompatibility({
-    ...canvas,
-    promptNodes: (canvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, canvas.imageNodes || [])),
-    groups: canvas.groups || [],
-    drawings: canvas.drawings || []
-});
+const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => {
+    const legacyReadyCanvas = workflowToLegacyCanvas(canvas);
+
+    return syncCanvasCompatibility({
+        ...legacyReadyCanvas,
+        promptNodes: (legacyReadyCanvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, legacyReadyCanvas.imageNodes || [])),
+        groups: legacyReadyCanvas.groups || [],
+        drawings: legacyReadyCanvas.drawings || []
+    });
+};
 
 const markInterruptedSyncPromptGenerations = (state: CanvasState): CanvasState => ({
     ...state,
@@ -410,7 +409,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     imageNodes: (canvas.imageNodes || []).map(img => ({
                         ...img,
                         // 纭繚鏂板瓧娈靛瓨鍦?
-                        generationTime: img.generationTime || Date.now(),
+                        generationTime: clampGenerationDurationMs(img.generationTime),
                         canvasId: img.canvasId || canvas.id,
                         parentPromptId: img.parentPromptId || 'unknown',
                         prompt: img.prompt || '',
@@ -1935,6 +1934,153 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return changed ? { ...c, promptNodes: nextPromptNodes, imageNodes: nextImageNodes } : c;
         });
     }, [updateCanvas]);
+
+    const addWorkflowNode = useCallback((node: WorkflowNode) => {
+        if (!isWorkflowUtilityNodeKind(node.kind)) {
+            console.warn('[CanvasContext.addWorkflowNode] Legacy workflow nodes are derived from canvas data and should not be inserted directly.', node.kind);
+            return;
+        }
+
+        pushToHistory();
+        updateCanvas(c => {
+            const workflow = canvasToWorkflow(c);
+            const existingNode = workflow.nodes.find(existing => existing.id === node.id);
+            if (existingNode) {
+                return c;
+            }
+
+            return {
+                ...c,
+                workflow: {
+                    ...workflow,
+                    nodes: [...workflow.nodes, node],
+                    edges: dedupeWorkflowEdges([
+                        ...workflow.edges,
+                        ...getWorkflowSourceNodeIds(node)
+                            .filter(sourceId => workflow.nodes.some(existingNode => existingNode.id === sourceId))
+                            .map(sourceId => ({
+                                id: `edge:${sourceId}:control:${node.id}`,
+                                from: sourceId,
+                                to: node.id,
+                                role: 'control' as const,
+                            })),
+                    ]),
+                },
+            };
+        });
+    }, [pushToHistory, updateCanvas]);
+
+    const updateWorkflowNode = useCallback((id: string, updates: Partial<WorkflowNode>) => {
+        updateCanvas(c => {
+            const workflow = canvasToWorkflow(c);
+            if (!workflow.nodes.length && !workflow.edges.length) return c;
+            let changed = false;
+
+            const nextNodes = workflow.nodes.map((node) => {
+                if (node.id !== id) return node;
+                changed = true;
+                return {
+                    ...node,
+                    ...updates,
+                    id: node.id,
+                    kind: node.kind,
+                } as WorkflowNode;
+            });
+
+            if (!changed) return c;
+
+            const updatedNode = nextNodes.find(node => node.id === id);
+            const validNodeIds = new Set(nextNodes.map(node => node.id));
+            const nextEdges = dedupeWorkflowEdges([
+                ...workflow.edges.filter((edge) => {
+                    if (!validNodeIds.has(edge.from) || !validNodeIds.has(edge.to)) {
+                        return false;
+                    }
+
+                    if (edge.to !== id) {
+                        return true;
+                    }
+
+                    return edge.from === id;
+                }),
+                ...(updatedNode
+                    ? getWorkflowSourceNodeIds(updatedNode)
+                        .filter(sourceId => validNodeIds.has(sourceId))
+                        .map(sourceId => ({
+                            id: `edge:${sourceId}:control:${id}`,
+                            from: sourceId,
+                            to: id,
+                            role: 'control' as const,
+                        }))
+                    : []),
+            ]);
+
+            return {
+                ...c,
+                workflow: {
+                    ...workflow,
+                    nodes: nextNodes,
+                    edges: nextEdges,
+                },
+            };
+        });
+    }, [updateCanvas]);
+
+    const updateWorkflowNodePosition = useCallback((id: string, pos: { x: number; y: number }) => {
+        updateCanvas(c => {
+            if (!c.workflow) return c;
+            let changed = false;
+
+            const nextNodes = c.workflow.nodes.map((node) => {
+                if (node.id !== id) return node;
+                changed = true;
+                return {
+                    ...node,
+                    position: pos,
+                };
+            });
+
+            if (!changed) return c;
+
+            return {
+                ...c,
+                workflow: {
+                    ...c.workflow,
+                    nodes: nextNodes,
+                },
+            };
+        });
+    }, [updateCanvas]);
+
+    const deleteWorkflowNode = useCallback((id: string) => {
+        pushToHistory();
+        updateCanvas(c => {
+            const workflow = canvasToWorkflow(c);
+            if (!workflow.nodes.length && !workflow.edges.length) return c;
+
+            const nextNodes = workflow.nodes.filter((node) => node.id !== id);
+            if (nextNodes.length === workflow.nodes.length) {
+                return c;
+            }
+
+            const validNodeIds = new Set(nextNodes.map((node) => node.id));
+            const nextEdges = workflow.edges.filter((edge) => (
+                edge.from !== id
+                && edge.to !== id
+                && validNodeIds.has(edge.from)
+                && validNodeIds.has(edge.to)
+            ));
+
+            return {
+                ...c,
+                workflow: {
+                    ...workflow,
+                    nodes: nextNodes,
+                    edges: nextEdges,
+                },
+            };
+        });
+    }, [pushToHistory, updateCanvas]);
 
 
     const deleteImageNode = useCallback((id: string) => {
@@ -3920,6 +4066,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             const promptById = new Map(currentCanvas.promptNodes.map(node => [node.id, node]));
             const imageById = new Map(currentCanvas.imageNodes.map(node => [node.id, node]));
+            const workflowById = new Map(
+                (currentCanvas.workflow?.nodes || [])
+                    .filter(node => isWorkflowUtilityNodeKind(node.kind))
+                    .map(node => [node.id, node])
+            );
             const canvasGroupsByNodeId = new Map<string, CanvasGroup[]>();
             currentCanvas.groups.forEach(group => {
                 group.nodeIds.forEach(id => {
@@ -4008,6 +4159,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
 
+                if (workflowById.has(id)) {
+                    pushNodeId(id);
+                    return;
+                }
+
                 pushNodeId(id);
             });
 
@@ -4017,6 +4173,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const allZIndices = [
                 ...currentCanvas.promptNodes.map(n => n.zIndex ?? 0),
                 ...currentCanvas.imageNodes.map(n => n.zIndex ?? 0),
+                ...(currentCanvas.workflow?.nodes || []).map(n => n.zIndex ?? 0),
                 ...currentCanvas.groups.map(g => g.zIndex ?? 0)
             ];
             let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
@@ -4071,6 +4228,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return n;
             });
 
+            const newWorkflow = currentCanvas.workflow
+                ? {
+                    ...currentCanvas.workflow,
+                    nodes: currentCanvas.workflow.nodes.map(node => {
+                        const nextZIndex = nextZIndexById.get(node.id);
+                        if (nextZIndex !== undefined) {
+                            return { ...node, zIndex: nextZIndex };
+                        }
+                        return node;
+                    })
+                }
+                : currentCanvas.workflow;
+
             // Also bring groups to front if they contain any of the selected nodes
             const newGroups = currentCanvas.groups.map(g => {
                 const hasSelectedNode = g.nodeIds.some(id => nodeIdSet.has(id));
@@ -4082,7 +4252,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             const newCanvases = prev.canvases.map(c =>
                 c.id === prev.activeCanvasId
-                    ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, groups: newGroups }
+                    ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, workflow: newWorkflow, groups: newGroups }
                     : c
             );
 
@@ -4179,8 +4349,23 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return n;
             });
 
+            const newWorkflow = currentCanvas.workflow
+                ? {
+                    ...currentCanvas.workflow,
+                    nodes: currentCanvas.workflow.nodes.map(node => {
+                        if (selectedSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)) {
+                            return {
+                                ...node,
+                                position: { x: node.position.x + delta.x, y: node.position.y + delta.y }
+                            };
+                        }
+                        return node;
+                    })
+                }
+                : currentCanvas.workflow;
+
             const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes } : c
+                c.id === prev.activeCanvasId ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, workflow: newWorkflow } : c
             );
 
             return { ...prev, canvases: newCanvases };
@@ -4320,6 +4505,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 if (myX < ix + iW + buffer && myX + width + buffer > ix &&
                     myY < iy + iH + buffer && myY + height + buffer > iy) {
+                    return true;
+                }
+            }
+
+            for (const workflowNode of currentCanvas.workflow?.nodes || []) {
+                if (!isWorkflowUtilityNodeKind(workflowNode.kind)) continue;
+
+                const nodeWidth = workflowNode.width || 280;
+                const nodeHeight = workflowNode.height || 180;
+                const nodeX = workflowNode.position.x - nodeWidth / 2;
+                const nodeY = workflowNode.position.y - nodeHeight;
+                const myX = cx - width / 2;
+                const myY = cy - height;
+
+                if (myX < nodeX + nodeWidth + buffer && myX + width + buffer > nodeX &&
+                    myY < nodeY + nodeHeight + buffer && myY + height + buffer > nodeY) {
                     return true;
                 }
             }
@@ -4707,13 +4908,67 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return true;
             });
 
+            const workflow = canvasToWorkflow(targetCanvas);
+            const validLegacyNodeIds = new Set<string>([
+                ...nextPromptNodes.map(node => node.id),
+                ...nextImageNodes.map(node => node.id),
+            ]);
+            const nextWorkflowNodes = workflow.nodes.map((node): WorkflowNode => {
+                if (!isWorkflowUtilityNodeKind(node.kind)) {
+                    return node;
+                }
+
+                const sourceNodeIds = getWorkflowSourceNodeIds(node).filter(sourceId => validLegacyNodeIds.has(sourceId));
+                const outputNodeIds = Array.isArray((node.data as { outputNodeIds?: unknown } | undefined)?.outputNodeIds)
+                    ? ((node.data as { outputNodeIds?: unknown[] }).outputNodeIds || []).filter((outputId): outputId is string => (
+                        typeof outputId === 'string' && validLegacyNodeIds.has(outputId)
+                    ))
+                    : undefined;
+
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        sourceNodeIds,
+                        ...(outputNodeIds ? { outputNodeIds } : {}),
+                    },
+                } as WorkflowNode;
+            });
+            const validWorkflowNodeIds = new Set(nextWorkflowNodes.map(node => node.id));
+            const nextWorkflowEdges = dedupeWorkflowEdges(
+                workflow.edges.filter(edge => (
+                    validWorkflowNodeIds.has(edge.from)
+                    && validWorkflowNodeIds.has(edge.to)
+                    && !promptIdsToRemove.has(edge.from)
+                    && !promptIdsToRemove.has(edge.to)
+                    && !imageIdsToRemove.has(edge.from)
+                    && !imageIdsToRemove.has(edge.to)
+                ))
+            );
+
+            const syncedCanvas = syncCanvasCompatibility({
+                ...targetCanvas,
+                promptNodes: nextPromptNodes,
+                imageNodes: nextImageNodes,
+                groups: (targetCanvas.groups || []).filter(group =>
+                    (group.nodeIds || []).some(nodeId => (
+                        validLegacyNodeIds.has(nodeId) || validWorkflowNodeIds.has(nodeId)
+                    ))
+                ),
+                workflow: {
+                    ...workflow,
+                    nodes: nextWorkflowNodes,
+                    edges: nextWorkflowEdges,
+                },
+                lastModified: Date.now(),
+            });
+
             const remainingNodeIds = new Set<string>([
                 ...nextPromptNodes.map(node => node.id),
-                ...nextImageNodes.map(node => node.id)
+                ...nextImageNodes.map(node => node.id),
+                ...((syncedCanvas.workflow?.nodes || []).map(node => node.id)),
             ]);
-            const nextGroups = (targetCanvas.groups || []).filter(group =>
-                (group.nodeIds || []).some(nodeId => remainingNodeIds.has(nodeId))
-            );
+            const nextGroups = syncedCanvas.groups || [];
 
             summary = {
                 removedPrompts: targetCanvas.promptNodes.length - nextPromptNodes.length,
@@ -4729,13 +4984,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ...prev,
                 canvases: prev.canvases.map(canvas =>
                     canvas.id === targetCanvasId
-                        ? {
-                            ...canvas,
-                            promptNodes: nextPromptNodes,
-                            imageNodes: nextImageNodes,
-                            groups: nextGroups,
-                            lastModified: Date.now()
-                        }
+                        ? syncedCanvas
                         : canvas
                 ),
                 selectedNodeIds: prev.selectedNodeIds.filter(nodeId => remainingNodeIds.has(nodeId))
@@ -4750,6 +4999,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes, // 馃殌 Batch Update
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
@@ -4776,6 +5026,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
         updateNodes,
+        addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,

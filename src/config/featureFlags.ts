@@ -1,5 +1,6 @@
 export const featureFlags = {
   experimentalWorkflowGraph: false,
+  experimentalWorkflowHighRiskNodes: false,
 } as const;
 
 export type FeatureFlagName = keyof typeof featureFlags;

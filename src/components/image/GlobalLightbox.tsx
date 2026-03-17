@@ -5,6 +5,7 @@ import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen
 import { InpaintModal } from './InpaintModal';
 import { notify } from '../../services/system/notificationService';
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
+import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -45,6 +46,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const sourceSessionRef = useRef(0);
 
     const image = images[currentIndex];
+    const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const panStartRef = useRef({ x: 0, y: 0 });
@@ -710,7 +712,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         <span>{image.model.split('/').pop()}</span>
                         {/* 馃殌 [Fix] Show REAL dimensions from loaded image, fallback to metadata */}
                         <span>{realDimensions || image.dimensions || '加载中...'}</span>
-                        {image.generationTime && <span>{(image.generationTime / 1000).toFixed(1)}s</span>}
+                        {clampedGenerationTime > 0 && <span>{formatGenerationDurationSeconds(clampedGenerationTime)}s</span>}
                     </div>
                 </div>
 

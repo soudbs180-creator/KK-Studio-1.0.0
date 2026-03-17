@@ -356,19 +356,30 @@ export interface CanvasDrawing {
 }
 
 export interface AgentWorkflowData {
+  title?: string;
   instruction?: string;
+  notes?: string;
+  mode?: 'prompt-assist' | 'organize' | 'archive';
+  sourceNodeIds?: string[];
   outputNodeIds?: string[];
+  actionLabel?: string;
   [key: string]: unknown;
 }
 
 export interface PreviewWorkflowData {
+  title?: string;
   sourceNodeIds?: string[];
+  summary?: string;
+  actionLabel?: string;
   [key: string]: unknown;
 }
 
 export interface SaveWorkflowData {
+  title?: string;
   destination?: 'local' | 'project' | 'export';
-  format?: string;
+  format?: 'zip' | 'pptx' | 'project' | string;
+  sourceNodeIds?: string[];
+  actionLabel?: string;
   [key: string]: unknown;
 }
 

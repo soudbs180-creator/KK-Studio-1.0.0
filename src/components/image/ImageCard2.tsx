@@ -14,6 +14,8 @@ import { ImageQuality, getAppropriateQuality, type ImageQualityBias } from '../.
 import { getModelThemeBgColor } from '../../services/model/modelCapabilities';
 import { getModelCredits, isCreditBasedModel } from '../../services/model/modelPricing';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
+import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
+import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -55,6 +57,8 @@ type FooterDensity = 'normal' | 'compact' | 'tight';
 interface ImageNodeProps {
     image: GeneratedImage;
     detailLevel?: CanvasCardDetailLevel;
+    loadPriority?: number;
+    loadBand?: 0 | 1 | 2 | 3;
     groupLayerZIndex?: number;
     stackZIndexOverride?: number;
     position: { x: number; y: number };
@@ -86,6 +90,8 @@ interface ImageNodeProps {
 const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     image,
     detailLevel = 'full',
+    loadPriority = 0,
+    loadBand = 0,
     groupLayerZIndex,
     stackZIndexOverride,
     position,
@@ -113,11 +119,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false // 🚀 [New] 垂直聊天流标识
 }) => {
-    const qualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
+    const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
         : detailLevel === 'compact'
             ? 'thumbnail-preferred'
             : 'default';
+    const qualityBias: ImageQualityBias = loadBand >= 2
+        ? 'micro-only'
+        : loadBand === 1 && detailQualityBias === 'default'
+            ? 'thumbnail-preferred'
+            : detailQualityBias;
     const containerRef = useRef<HTMLDivElement>(null);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const dragCleanupRef = useRef<(() => void) | null>(null); // 🚀 [Fix] Drag Cleanup Ref
@@ -582,7 +593,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [displayCost, image.cost, image.id, isCreditModel, onUpdate]);
 
     const modelText = image.modelLabel || image.model || image.id;
-    const providerText = image.providerLabel || image.provider || '';
+    const providerText = resolveDisplayedProviderLabel(image);
     const modelBadge = useMemo(() => getModelBadgeInfo({
         id: image.model || '',
         label: modelText,
@@ -594,7 +605,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const providerBadgeStyle = useMemo(() => getProviderBadgeStyle(providerText), [providerText]);
     const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
     const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
-    const footerTimeLabel = image.generationTime ? `耗时 ${(image.generationTime / 1000).toFixed(1)}s` : '耗时 --';
+    const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
+    const footerTimeLabel = clampedGenerationTime > 0
+        ? `耗时 ${formatGenerationDurationSeconds(clampedGenerationTime)}s`
+        : '耗时 --';
     const footerTokenLabel = `令牌 ${image.tokens || 0}`;
     const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
     const footerCreditsLabel = `✨${getModelCredits(image.model || '', image.imageSize)}`;
@@ -673,7 +687,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 const scale = currentZoom;
                 const quality = getAppropriateQuality(scale, qualityBias);
 
-                const priority = isNew ? 999 : Math.round(100 - Math.abs(scale - 1) * 50);
+                const priority = Math.max(
+                    loadPriority,
+                    isNew ? 999 : Math.round(100 - Math.abs(scale - 1) * 50)
+                );
                 const url = await loadImage(imageStorageKey, quality, priority);
 
                 // 🚀 检查是否已被取代
@@ -760,11 +777,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         const qualityChangeDelayMs = !displaySrc
             ? 100
-            : detailLevel === 'thumbnail-shell'
-                ? 160
-                : detailLevel === 'compact'
-                    ? 320
-                    : 700;
+            : loadBand >= 2
+                ? 180
+                : loadBand === 1
+                    ? 220
+                    : detailLevel === 'thumbnail-shell'
+                        ? 160
+                        : detailLevel === 'compact'
+                            ? 320
+                            : 700;
 
         qualityDebounceRef.current = setTimeout(() => {
             loadQualityImage();
@@ -777,7 +798,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 clearTimeout(qualityDebounceRef.current);
             }
         };
-    }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew]); // Re-evaluate when performance detail mode changes
+    }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew, loadBand, loadPriority]); // Re-evaluate when performance detail mode changes
 
     const handleRetryLoad = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -1560,7 +1581,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                             >
                                 {/* 状态1: 孤独副卡（从外面拖入的图片）- 只有一层 */}
                                 {image.orphaned && (
-                                    <div className="flex items-center justify-between h-5">
+                                    <div className="flex items-center justify-between h-5" style={secondaryTextRenderStyle}>
                                         {/* 左侧：文档名 + 像素尺寸 */}
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
                                             {isEditingAlias ? (
@@ -1576,7 +1597,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             ) : (
                                                 <span
                                                     className="text-xs font-medium text-[var(--text-secondary)] truncate cursor-text hover:text-[var(--text-primary)]"
-                                                    style={secondaryTextRenderStyle}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setAliasValue(image.alias || image.fileName || 'Image');
@@ -1589,7 +1609,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             )}
                                             {/* 像素尺寸 */}
                                             {image.dimensions && (
-                                                <span className="text-2xs text-[var(--text-tertiary)] whitespace-nowrap" style={secondaryTextRenderStyle}>
+                                                <span className="text-2xs text-[var(--text-tertiary)] whitespace-nowrap">
                                                     {image.dimensions}
                                                 </span>
                                             )}
@@ -1607,16 +1627,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                 {/* 状态2: 生成过程中 - 只有一层，居中显示 */}
                                 {!image.orphaned && image.isGenerating && (
-                                    <div className={joinClasses('flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')}>
+                                    <div className={joinClasses('flex items-center justify-center flex-nowrap group relative', isCompactFooter ? 'gap-1.5 h-[18px]' : 'gap-2 h-5')} style={secondaryTextRenderStyle}>
                                         <div className={joinClasses(`flex items-center gap-1 rounded-lg border min-w-0 ${isCreditModel ? getModelThemeBgColor(image.model || '') : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`, generatingBadgeMaxWidthClass, capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
-                                            <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'text-white drop-shadow-sm' : modelBadge.colorClass}`)} title={modelText || 'AI'} style={secondaryTextRenderStyle}>
+                                            <span className={joinClasses(modelCapsuleTextClass, `leading-none font-medium whitespace-nowrap truncate ${isCreditModel ? 'text-white drop-shadow-sm' : modelBadge.colorClass}`)} title={modelText || 'AI'}>
                                                 {truncateByChars(modelText || 'AI', 15)}
                                             </span>
                                             {!isCreditModel && providerText && (
                                                 <span
                                                     className={joinClasses(providerCapsuleTextClass, `leading-none px-1 py-0.5 rounded whitespace-nowrap border shrink-0 ${getProviderBadgeColor(providerText)}`)}
                                                     title={providerText}
-                                                    style={{ ...providerBadgeStyle, ...secondaryTextRenderStyle }}
+                                                    style={providerBadgeStyle}
                                                 >
                                                     {truncateByChars(providerText, 12)}
                                                 </span>
@@ -1624,7 +1644,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         </div>
                                         {/* 参数也加框 */}
                                         <div className={joinClasses('flex items-center gap-1 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-light)]', capsulePaddingClass, isCompactFooter ? 'h-[18px]' : 'h-5')}>
-                                            <span className={joinClasses(modelCapsuleTextClass, 'leading-none text-[var(--text-secondary)] whitespace-nowrap')} style={secondaryTextRenderStyle}>
+                                            <span className={joinClasses(modelCapsuleTextClass, 'leading-none text-[var(--text-secondary)] whitespace-nowrap')}>
                                                 {aspectSizeLabel}
                                             </span>
                                         </div>
@@ -1652,12 +1672,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 {!image.orphaned && !image.isGenerating && (
                                     <>
                                         {/* 第一层：模型/供应商 + 参数/操作 */}
-                                        <div ref={topMetaRowRef} className={joinClasses('flex items-center justify-between w-full min-h-[20px] overflow-hidden', metaRowGapClass)}>
+                                        <div ref={topMetaRowRef} className={joinClasses('flex items-center justify-between w-full min-h-[20px] overflow-hidden', metaRowGapClass)} style={secondaryTextRenderStyle}>
                                             {/* 左侧：模型名 + 供应商（积分模型不显示供应商） */}
                                             <div className={joinClasses('min-w-0 flex items-center overflow-hidden', metaLeftGapClass)}>
                                                 {(() => {
                                                     const modelText = image.modelLabel || image.model || image.id;
-                                                    const providerText = image.providerLabel || image.provider || '';
+                                                    const providerText = resolveDisplayedProviderLabel(image);
                                                     const modelBadge = getModelBadgeInfo({
                                                         id: image.model || '',
                                                         label: modelText,
@@ -1670,7 +1690,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     if (isCreditModel) {
                                                         // 积分模型：保持与Prompt加载占位符一样的外观 (胶囊带有系统设置颜色作为字体颜色/透明背景)
                                                         return (
-                                                            <span className={joinClasses(`inline-flex items-center rounded font-medium border border-[var(--border-light)] bg-[var(--bg-tertiary)] truncate ${modelBadge.colorClass}`, creditModelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText} style={secondaryTextRenderStyle}>
+                                                            <span className={joinClasses(`inline-flex items-center rounded font-medium border border-[var(--border-light)] bg-[var(--bg-tertiary)] truncate ${modelBadge.colorClass}`, creditModelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText}>
                                                                 {truncateByChars(modelText, 18)}
                                                             </span>
                                                         );
@@ -1679,11 +1699,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     // 用户 API：普通灰色框 + 普通文本 + 供应商标签
                                                     return (
                                                         <>
-                                                            <span className={joinClasses(`inline-flex items-center rounded-md font-medium bg-[var(--bg-tertiary)] border border-[var(--border-light)] truncate ${modelBadge.colorClass}`, modelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText} style={secondaryTextRenderStyle}>
+                                                            <span className={joinClasses(`inline-flex items-center rounded-md font-medium bg-[var(--bg-tertiary)] border border-[var(--border-light)] truncate ${modelBadge.colorClass}`, modelBadgeMaxWidthClass, modelCapsulePaddingClass, modelCapsuleTextClass)} title={modelText}>
                                                                 {truncateByChars(modelText, 14)}
                                                             </span>
                                                             {providerText && (
-                                                                <span className={joinClasses(`inline-flex max-w-[72px] truncate px-1 py-0.5 rounded border shrink-0 ${getProviderBadgeColor(providerText)}`, providerCapsuleTextClass)} title={providerText} style={{ ...providerBadgeStyle, ...secondaryTextRenderStyle }}>
+                                                                <span className={joinClasses(`inline-flex max-w-[72px] truncate px-1 py-0.5 rounded border shrink-0 ${getProviderBadgeColor(providerText)}`, providerCapsuleTextClass)} title={providerText} style={providerBadgeStyle}>
                                                                     {truncateByChars(providerText, 12)}
                                                                 </span>
                                                             )}
@@ -1695,7 +1715,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             {/* 右侧：参数胶囊 + 下载 + 删除 */}
                                             <div className={joinClasses('flex items-center shrink-0', metaRightGapClass)}>
                                                 {/* 参数胶囊 */}
-                                                <span className={joinClasses('inline-flex items-center rounded-md font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap', capsulePaddingClass, modelCapsuleTextClass)} style={secondaryTextRenderStyle}>
+                                                <span className={joinClasses('inline-flex items-center rounded-md font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap', capsulePaddingClass, modelCapsuleTextClass)}>
                                                     {aspectSizeLabel}
                                                 </span>
                                                 <div className="relative" ref={downloadMenuRef}>
