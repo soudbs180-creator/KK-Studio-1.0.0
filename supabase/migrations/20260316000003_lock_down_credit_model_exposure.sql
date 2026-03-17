@@ -182,7 +182,7 @@ BEGIN
     m.provider_id,
     COALESCE(MAX(m.provider_name), m.provider_id) AS provider_name,
     MAX(m.base_url) AS base_url,
-    COALESCE((ARRAY_AGG(m.api_keys) FILTER (WHERE m.api_keys IS NOT NULL))[1], ARRAY[]::TEXT[]) AS api_keys,
+    COALESCE(MAX(m.api_keys), ARRAY[]::TEXT[]) AS api_keys,
     jsonb_agg(
       jsonb_build_object(
         'id', m.id,

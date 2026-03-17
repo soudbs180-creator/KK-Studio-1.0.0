@@ -6,6 +6,7 @@
  * NOW SUPPORTS: Supabase Cloud Sync & Third-Party API Proxies
  */
 import { supabase } from '../../lib/supabase';
+import { tempUserService } from './tempUserService';
 import {
     type ApiProtocolFormat,
     AuthMethod,
@@ -1417,6 +1418,11 @@ export class KeyManager {
     private async saveToCloud(state: KeyManagerState) {
         if (!this.userId || this.userId.startsWith('dev-user-')) {
             console.log('[KeyManager] Skip cloud upload (missing userId or dev user)');
+            return;
+        }
+
+        if (tempUserService.getCachedTempUser()) {
+            console.log('[KeyManager] Skip cloud upload for temp user');
             return;
         }
 

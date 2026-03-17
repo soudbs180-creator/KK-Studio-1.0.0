@@ -8,6 +8,7 @@ import { ModelType, ImageSize } from '../../types';
 import { getModelPricing, getRefImageTokenEstimate, getImageTokenEstimate } from '../model/modelPricing';
 import { keyManager, type KeySlot } from '../auth/keyManager';
 import { supabase } from '../../lib/supabase';
+import { tempUserService } from '../auth/tempUserService';
 import { notify } from '../system/notificationService';
 
 // --- Interfaces ---
@@ -711,6 +712,7 @@ function scheduleSync() {
 
 async function syncWithCloud() {
     if (!currentUserId || isSyncing || currentUserId.startsWith('dev-user-')) return;
+    if (tempUserService.getCachedTempUser()) return;
     isSyncing = true;
     try {
         let todayStats = getTodayCosts(); // From updated logic

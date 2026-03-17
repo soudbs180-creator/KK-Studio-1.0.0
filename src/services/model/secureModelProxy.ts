@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { tempUserService } from '../auth/tempUserService';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -87,7 +88,29 @@ export interface SecureProxyTaskStatusResponse {
   deducted?: boolean;
 }
 
+async function ensureCloudSession(feature: string): Promise<void> {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw new Error(error.message || `Unable to verify login state for ${feature}.`);
+  }
+
+  if (session?.access_token) {
+    return;
+  }
+
+  if (tempUserService.getCachedTempUser()) {
+    throw new Error('Temporary guest mode has no real Supabase session, so cloud sync and system credit models are unavailable.');
+  }
+
+  throw new Error('Please sign in before using this feature.');
+}
+
 export async function cancelSecureSystemProxyTask(taskId: string): Promise<boolean> {
+  await ensureCloudSession('task cancel');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'cancel_task',
@@ -107,6 +130,7 @@ export async function cancelSecureSystemProxyTask(taskId: string): Promise<boole
 }
 
 export async function deleteSecureSystemProxyTask(taskId: string): Promise<boolean> {
+  await ensureCloudSession('task delete');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'delete_task',
@@ -126,6 +150,7 @@ export async function deleteSecureSystemProxyTask(taskId: string): Promise<boole
 }
 
 export async function downloadSecureSystemProxyTaskContent(taskId: string): Promise<string> {
+  await ensureCloudSession('task download');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'download_task',
@@ -158,6 +183,7 @@ function normalizeMessageContent(content: unknown): string {
 export async function callSecureSystemProxyChat(
   payload: SecureProxyChatRequest
 ): Promise<SecureProxyChatResponse> {
+  await ensureCloudSession('chat generation');
   const normalizedMessages = payload.messages.map((message) => ({
     role: message.role,
     content: normalizeMessageContent(message.content),
@@ -193,6 +219,7 @@ export async function callSecureSystemProxyChat(
 export async function callSecureSystemProxyImage(
   payload: SecureProxyImageRequest
 ): Promise<SecureProxyImageResponse> {
+  await ensureCloudSession('image generation');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'image',
@@ -224,6 +251,7 @@ export async function callSecureSystemProxyImage(
 export async function callSecureSystemProxyVideo(
   payload: SecureProxyVideoRequest
 ): Promise<SecureProxyVideoResponse> {
+  await ensureCloudSession('video generation');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'video',
@@ -258,6 +286,7 @@ export async function callSecureSystemProxyVideo(
 export async function callSecureSystemProxyAudio(
   payload: SecureProxyAudioRequest
 ): Promise<SecureProxyAudioResponse> {
+  await ensureCloudSession('audio generation');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'audio',
@@ -283,6 +312,7 @@ export async function callSecureSystemProxyAudio(
 }
 
 export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<SecureProxyTaskStatusResponse> {
+  await ensureCloudSession('task status');
   const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
     body: {
       mode: 'task_status',

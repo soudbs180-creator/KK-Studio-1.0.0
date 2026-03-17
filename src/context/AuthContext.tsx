@@ -46,8 +46,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let active = true;
         const settleAuthState = (nextSession: Session | null) => {
             if (!active) return;
-            setSession(nextSession);
-            setUser(nextSession?.user ?? null);
+
+            if (nextSession?.user) {
+                tempUserService.clearCachedTempUser();
+                setTempUserSession(null);
+                setSession(nextSession);
+                setUser(nextSession.user);
+                setLoading(false);
+                return;
+            }
+
+            const cachedTempUser = tempUserService.getCachedTempUser();
+            if (cachedTempUser) {
+                setTempUserSession(cachedTempUser);
+                setSession(null);
+                setUser(cachedTempUser.user);
+                setLoading(false);
+                return;
+            }
+
+            setTempUserSession(null);
+            setSession(null);
+            setUser(null);
             setLoading(false);
         };
 
@@ -93,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const tempSession = await tempUserService.getOrCreateTempUser();
             setTempUserSession(tempSession);
+            setSession(null);
             setUser(tempSession.user);
             setLoading(false);
             console.log('[AuthContext] Temp user login successful, expires at:', new Date(tempSession.expiresAt).toISOString());

@@ -355,12 +355,6 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
       : 'emerald';
   const readinessLabel =
     readinessTone === 'emerald' ? '已就绪' : readinessTone === 'amber' ? '需留意' : '待补齐';
-  const readinessTitle =
-    readinessTone === 'emerald'
-      ? '当前设置状态良好'
-      : readinessTone === 'amber'
-        ? '还有几项配置值得先检查'
-        : '开始前建议先补齐关键入口';
   const readinessDescription =
     readinessTone === 'emerald'
       ? '接口、存储和日志状态基本正常，可以直接继续使用。'
@@ -515,46 +509,42 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
 
   return (
     <SettingsViewShell>
-      <SettingsHero
-        tone={readinessTone}
-        icon={LayoutDashboard}
-        eyebrow="DASHBOARD"
+      <SettingsSection
         title="仪表盘"
         description={readinessDescription}
-        badge={<SettingsBadge tone={readinessTone}>{readinessLabel}</SettingsBadge>}
-        metrics={(
-          <>
-            <SettingsMetricCard
-              label="可用链路"
-              value={hasAvailableRoute ? `${officialCount + activeProviderCount}` : '0'}
-              helper={hasAvailableRoute ? `官方 ${officialCount} / 在线供应商 ${activeProviderCount}` : '还没有可以直接工作的入口。'}
-              icon={Key}
-              tone={hasAvailableRoute ? 'indigo' : 'rose'}
-            />
-            <SettingsMetricCard
-              label="今日消费"
-              value={`$${todayCostUsd.toFixed(2)}`}
-              helper={`Tokens ${formatMetricNumber(todayTokens)} / 调用 ${formatMetricNumber(todayUsageCount)}`}
-              icon={Activity}
-              tone="amber"
-            />
-            <SettingsMetricCard
-              label="今日充值"
-              value={todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : '暂无'}
-              helper={latestRecharge ? `最近一笔 ${formatDateTime(latestRecharge.created_at)}` : '今天还没有新的充值记录。'}
-              icon={DollarSign}
-              tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}
-            />
-            <SettingsMetricCard
-              label="待处理"
-              value={priorityItems.length > 0 ? `${priorityItems.length} 项` : '稳定'}
-              helper={importantLogCount > 0 ? `重要日志 ${importantLogCount} 条` : '当前没有需要立刻处理的问题。'}
-              icon={ScrollText}
-              tone={priorityItems.length > 0 ? (hasCriticalLogs ? 'rose' : 'amber') : 'emerald'}
-            />
-          </>
-        )}
-      />
+        action={<SettingsBadge tone={readinessTone}>{readinessLabel}</SettingsBadge>}
+      >
+        <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SettingsMetricCard
+            label="可用链路"
+            value={hasAvailableRoute ? `${officialCount + activeProviderCount}` : '0'}
+            helper={hasAvailableRoute ? `官方 ${officialCount} / 在线供应商 ${activeProviderCount}` : '还没有可以直接工作的入口。'}
+            icon={Key}
+            tone={hasAvailableRoute ? 'indigo' : 'rose'}
+          />
+          <SettingsMetricCard
+            label="今日消费"
+            value={`$${todayCostUsd.toFixed(2)}`}
+            helper={`Tokens ${formatMetricNumber(todayTokens)} / 调用 ${formatMetricNumber(todayUsageCount)}`}
+            icon={Activity}
+            tone="amber"
+          />
+          <SettingsMetricCard
+            label="今日充值"
+            value={todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : '暂无'}
+            helper={latestRecharge ? `最近一笔 ${formatDateTime(latestRecharge.created_at)}` : '今天还没有新的充值记录。'}
+            icon={DollarSign}
+            tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}
+          />
+          <SettingsMetricCard
+            label="待处理"
+            value={priorityItems.length > 0 ? `${priorityItems.length} 项` : '稳定'}
+            helper={importantLogCount > 0 ? `重要日志 ${importantLogCount} 条` : '当前没有需要立刻处理的问题。'}
+            icon={ScrollText}
+            tone={priorityItems.length > 0 ? (hasCriticalLogs ? 'rose' : 'amber') : 'emerald'}
+          />
+        </div>
+      </SettingsSection>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr),minmax(320px,0.8fr)]">
         <SettingsSection title="当前状态" description="只保留最关键的系统状态，避免继续堆信息。">
@@ -1578,14 +1568,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       ) : (
         <div
-          className="settings-shell-desktop flex h-[88vh] max-h-[960px] w-full max-w-[1360px] items-stretch gap-5"
+          className="settings-shell-desktop flex h-[90vh] max-h-[980px] w-full max-w-[1440px] items-stretch gap-5"
           onClick={(e) => e.stopPropagation()}
         >
           <aside className="w-[286px] flex-shrink-0">
             <div className="settings-panel apple-glass-card settings-shell-nav flex h-full flex-col rounded-[32px] p-4 shadow-2xl">
               <div className="settings-shell-nav__hero">
                 <div className="settings-shell-kicker">Settings</div>
-                <div className="mt-1.5 text-[22px] font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
+                <div className="mt-1.5 text-[22px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                   高级设置
                 </div>
                 <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
@@ -1613,7 +1603,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="settings-shell-main__module">
                 <div className="min-w-0">
                   <div className="settings-shell-kicker">{activeSectionLabel}</div>
-                  <div className="mt-2 text-[28px] font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
+                  <div className="mt-2 text-[28px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                     {activeNavItem.label}
                   </div>
                   <div className="settings-shell-toolbar__description mt-2">

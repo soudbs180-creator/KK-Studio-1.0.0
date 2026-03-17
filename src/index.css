@@ -4207,8 +4207,11 @@ iframe,
 
 .settings-shell-nav__hero {
   display: flex;
-  gap: 14px;
+  flex-direction: column;
+  gap: 6px;
   align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .settings-shell-nav__hero-icon,
@@ -4449,12 +4452,10 @@ iframe,
   --settings-layer-hover: #edf2fb;
   --settings-page-bg: #eef2f7;
   --settings-shell-bg: rgba(255, 255, 255, 0.92);
-  --settings-shell-header-bg:
-    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.06) 0%, transparent 100%),
-    rgba(255, 255, 255, 0.88);
-  --settings-section-bg: rgba(255, 255, 255, 0.9);
+  --settings-shell-header-bg: rgba(248, 250, 252, 0.96);
+  --settings-section-bg: rgba(255, 255, 255, 0.94);
   --settings-surface-elevated: #ffffff;
-  --settings-surface-overlay: #f6f8fc;
+  --settings-surface-overlay: #f4f6fb;
   --settings-surface-muted: #ecf1f8;
   --settings-input-bg: var(--settings-layer-input);
   --settings-input-border: rgba(15, 23, 42, 0.08);
@@ -4463,8 +4464,8 @@ iframe,
   --settings-focus-border: rgba(68, 110, 255, 0.42);
   --settings-focus-ring: rgba(68, 110, 255, 0.16);
   --settings-text-main: #182033;
-  --settings-text-sub: rgba(24, 32, 51, 0.74);
-  --settings-text-muted: rgba(24, 32, 51, 0.5);
+  --settings-text-sub: rgba(24, 32, 51, 0.8);
+  --settings-text-muted: rgba(24, 32, 51, 0.62);
   --settings-icon-main: #6a7387;
   --settings-icon-accent: rgb(var(--settings-accent-rgb));
   --settings-button-primary-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%);
@@ -4545,22 +4546,20 @@ body.dark-mode .settings-panel {
   --settings-layer-hover: #263243;
   --settings-page-bg: #0d1117;
   --settings-shell-bg: rgba(19, 24, 33, 0.94);
-  --settings-shell-header-bg:
-    linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.08) 0%, transparent 100%),
-    rgba(18, 24, 34, 0.92);
-  --settings-section-bg: rgba(21, 28, 40, 0.92);
-  --settings-surface-elevated: #161d28;
-  --settings-surface-overlay: #1d2634;
-  --settings-surface-muted: #202a39;
+  --settings-shell-header-bg: rgba(20, 27, 38, 0.98);
+  --settings-section-bg: #141c27;
+  --settings-surface-elevated: #18212d;
+  --settings-surface-overlay: #1f2a38;
+  --settings-surface-muted: #243040;
   --settings-input-bg: var(--settings-layer-input);
   --settings-input-border: rgba(255, 255, 255, 0.08);
-  --settings-border-subtle: rgba(255, 255, 255, 0.08);
-  --settings-border-strong: rgba(255, 255, 255, 0.14);
+  --settings-border-subtle: rgba(255, 255, 255, 0.1);
+  --settings-border-strong: rgba(255, 255, 255, 0.18);
   --settings-focus-border: rgba(130, 167, 255, 0.48);
   --settings-focus-ring: rgba(130, 167, 255, 0.18);
   --settings-text-main: rgba(246, 249, 255, 0.96);
-  --settings-text-sub: rgba(230, 236, 249, 0.76);
-  --settings-text-muted: rgba(196, 206, 224, 0.62);
+  --settings-text-sub: rgba(236, 242, 252, 0.88);
+  --settings-text-muted: rgba(205, 215, 231, 0.76);
   --settings-icon-main: #b6c3d8;
   --settings-icon-accent: rgb(var(--settings-accent-rgb));
   --settings-button-primary-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%);
@@ -4830,6 +4829,7 @@ body.dark-mode .settings-panel {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-light);
@@ -6771,7 +6771,7 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-sidebar-item {
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
   border-radius: 16px;
@@ -6839,6 +6839,8 @@ body.dark-mode .settings-panel .apple-glass-card {
   line-height: 1.45;
   color: var(--text-secondary);
   text-align: left;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .settings-sidebar-item__arrow {
@@ -6859,8 +6861,9 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-shell-main__topbar {
-  align-items: center;
-  padding: 20px 24px 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 18px 22px 14px;
 }
 
 .settings-shell-main__module {
@@ -6879,8 +6882,9 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 .settings-shell-content {
-  width: min(100%, 1120px);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .settings-panel .apple-button-primary,

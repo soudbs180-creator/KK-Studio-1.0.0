@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Globe, Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
+import { Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -17,6 +17,9 @@ const initialRateMap: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
   CNY: { ...DEFAULT_CREDIT_EXCHANGE_RATES.CNY },
   USD: { ...DEFAULT_CREDIT_EXCHANGE_RATES.USD },
 };
+
+const formatCurrencySymbol = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '¥' : '$');
+const formatRateValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal } = useBilling();
@@ -78,6 +81,7 @@ const RechargeModal: React.FC = () => {
     () => Math.max(0, Math.round(Math.max(0, amount) * currentRate.creditsPerUnit)),
     [amount, currentRate.creditsPerUnit]
   );
+
   const availableCurrencies = useMemo(
     () =>
       (['CNY', 'USD'] as SupportedRechargeCurrency[]).filter(
@@ -85,6 +89,7 @@ const RechargeModal: React.FC = () => {
       ),
     [exchangeRates]
   );
+
   const hasAvailableCurrency = availableCurrencies.length > 0;
 
   const theme = useMemo(() => {
@@ -95,9 +100,9 @@ const RechargeModal: React.FC = () => {
         border: 'border-amber-500',
         light: 'bg-amber-500/10',
         gradient: 'from-amber-600 to-amber-500',
-        shadow: 'shadow-amber-500/50',
+        shadow: 'shadow-amber-500/40',
         accent: '#f59e0b',
-        via: 'via-amber-500/50',
+        via: 'via-amber-500/40',
       };
     }
 
@@ -108,9 +113,9 @@ const RechargeModal: React.FC = () => {
         border: 'border-emerald-500',
         light: 'bg-emerald-500/10',
         gradient: 'from-emerald-600 to-emerald-500',
-        shadow: 'shadow-emerald-500/50',
+        shadow: 'shadow-emerald-500/40',
         accent: '#10b981',
-        via: 'via-emerald-500/50',
+        via: 'via-emerald-500/40',
       };
     }
 
@@ -120,9 +125,9 @@ const RechargeModal: React.FC = () => {
       border: 'border-blue-500',
       light: 'bg-blue-500/10',
       gradient: 'from-blue-600 to-blue-500',
-      shadow: 'shadow-blue-500/50',
+      shadow: 'shadow-blue-500/40',
       accent: '#3b82f6',
-      via: 'via-blue-500/50',
+      via: 'via-blue-500/40',
     };
   }, [currency, selectedChannel]);
 
@@ -147,22 +152,23 @@ const RechargeModal: React.FC = () => {
 
   const handleRecharge = async () => {
     if (!user) {
-      notify.error('请先登录', '登录后才能发起支付。');
+      notify.error('请先登录', '登录后才能发起充值。');
       return;
     }
 
     if (!hasAvailableCurrency || !currentRate.isActive) {
-      notify.error('充值暂不可用', '当前没有启用的充值币种，请稍后再试或联系管理员。');
+      notify.error('充值暂不可用', '当前没有启用中的充值币种，请稍后再试或联系管理员。');
       return;
     }
 
     const paymentChannel = isCny ? selectedChannel : 'paypal';
+
     if (paymentChannel === 'alipay') {
-      notify.alipay('充值通道维护中', '请联系管理员，目前支付宝支付功能暂未开通');
+      notify.alipay('支付宝通道维护中', '当前暂未开放在线支付，请联系管理员处理。');
     } else if (paymentChannel === 'wechat') {
-      notify.wechat('充值通道维护中', '请联系管理员，目前微信支付功能暂未开通');
+      notify.wechat('微信支付维护中', '当前暂未开放在线支付，请联系管理员处理。');
     } else {
-      notify.paypal('充值通道维护中', '请联系管理员，目前国际支付功能暂未开通');
+      notify.paypal('国际支付维护中', '当前暂未开放在线支付，请联系管理员处理。');
     }
   };
 
@@ -178,17 +184,17 @@ const RechargeModal: React.FC = () => {
       onClick={() => setShowRechargeModal(false)}
     >
       <div
-        className={`w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border border-gray-200 dark:border-white/10 ${
+        className={`w-full overflow-hidden border border-gray-200 shadow-2xl animate-in zoom-in-95 duration-300 dark:border-white/10 ${
           isMobile
-            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none max-w-[760px]'
-            : 'max-w-[460px] rounded-[32px]'
+            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 max-w-[760px] flex-col rounded-t-[26px] rounded-b-none'
+            : 'max-w-[460px] rounded-[30px]'
         }`}
         style={{ backgroundColor: 'var(--bg-surface, #ffffff)' }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={`${isMobile ? 'mobile-sheet-header-safe p-4 pb-3' : 'p-6 pb-4'} relative`}>
-          <div className={`absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-transparent ${theme.via} to-transparent`} />
-          <div className="flex items-center justify-between">
+          <div className={`absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent ${theme.via} to-transparent`} />
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`rounded-xl p-2 ${theme.light} ${theme.text}`}>
                 <Zap size={18} fill="currentColor" />
@@ -196,7 +202,7 @@ const RechargeModal: React.FC = () => {
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">积分充值</h3>
                 <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
-                  Recharge Credits
+                  Managed Exchange Rate
                 </p>
               </div>
             </div>
@@ -222,25 +228,25 @@ const RechargeModal: React.FC = () => {
                       : 'text-gray-500 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-300'
                   }`}
                 >
-                  {code === 'CNY' ? '人民币支付 (CNY)' : 'USD Payment (USD)'}
+                  {code === 'CNY' ? '人民币 (CNY)' : '美元 (USD)'}
                 </button>
               ))}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-white/10 dark:text-zinc-400">
-              当前暂未开放可用充值币种，请联系管理员检查汇率配置。
+              当前没有启用中的充值币种，请先在管理员后台检查汇率配置。
             </div>
           )}
 
-          <div className="rounded-[28px] border border-gray-200 bg-gray-50 px-6 py-6 dark:border-white/5 dark:bg-zinc-900/60">
+          <div className="rounded-[26px] border border-gray-200 bg-gray-50 px-6 py-6 dark:border-white/5 dark:bg-zinc-900/60">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
-                  本次可获得积分
+                  预计到账
                 </div>
                 <div className={`mt-3 text-5xl font-black tracking-tight ${theme.text}`}>{credits}</div>
                 <div className="mt-2 text-sm text-gray-500 dark:text-zinc-400">
-                  支付金额 {isCny ? '¥' : '$'}
+                  支付金额 {formatCurrencySymbol(currency)}
                   {amount}
                 </div>
               </div>
@@ -253,7 +259,7 @@ const RechargeModal: React.FC = () => {
                   </span>
                 ) : (
                   <span>
-                    {isCny ? '¥1' : '$1'} = {currentRate.creditsPerUnit} 积分
+                    {formatCurrencySymbol(currency)}1 = {formatRateValue(currentRate.creditsPerUnit)} 积分
                   </span>
                 )}
               </div>
@@ -263,9 +269,10 @@ const RechargeModal: React.FC = () => {
               <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
                 <span>{isCny ? '充值金额' : 'Amount'}</span>
                 <span>
-                  {isCny ? `最低 ¥${minAmount}` : `MIN $${minAmount}`} / {isCny ? `最高 ¥${maxAmount}` : `MAX $${maxAmount}`}
+                  {isCny ? `最小 ¥${minAmount}` : `MIN $${minAmount}`} / {isCny ? `最大 ¥${maxAmount}` : `MAX $${maxAmount}`}
                 </span>
               </div>
+
               <input
                 type="range"
                 min={String(minAmount)}
@@ -283,9 +290,10 @@ const RechargeModal: React.FC = () => {
                   }%, var(--border-default, #e5e5e5) 100%)`,
                 }}
               />
+
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
                 <div className="text-xs leading-5 text-gray-500 dark:text-zinc-400">
-                  汇率、最小金额和最大金额由管理员后台统一配置，充值页会自动同步显示。
+                  汇率、最小金额和最大金额由管理员统一配置，充值页会自动同步显示。
                 </div>
                 <input
                   type="number"
@@ -308,6 +316,7 @@ const RechargeModal: React.FC = () => {
             <div className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
               {isCny ? '支付方式' : 'Payment Method'}
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               {isCny ? (
                 <>
@@ -325,6 +334,7 @@ const RechargeModal: React.FC = () => {
                       <div className="mt-1 text-xs text-current/70">适合人民币充值</div>
                     </div>
                   </button>
+
                   <button
                     onClick={() => setSelectedChannel('wechat')}
                     className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
@@ -367,7 +377,7 @@ const RechargeModal: React.FC = () => {
               <div>
                 <div className="font-medium text-gray-900 dark:text-white">当前充值说明</div>
                 <div className="mt-1">
-                  汇率和金额范围来自后台配置；支付通道恢复后，这里会直接按当前配置计算可获得积分。
+                  汇率和金额范围直接来自后台配置。支付通道恢复后，这里会按当前配置实时计算可获得积分。
                 </div>
               </div>
             </div>

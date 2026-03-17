@@ -47,7 +47,7 @@ const BillingContext = createContext<BillingContextType>({
 export const useBilling = () => useContext(BillingContext);
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isTempUser } = useAuth();
 
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [showRechargeModal, setShowRechargeModal] = useState(false);
 
   const fetchBalance = useCallback(async () => {
-    if (!user) {
+    if (!user || isTempUser) {
       setBalance(0);
       return;
     }
@@ -90,10 +90,10 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error) {
       console.error('[BillingContext] 读取余额异常:', error);
     }
-  }, [user]);
+  }, [user, isTempUser]);
 
   const fetchLogs = useCallback(async () => {
-    if (!user) {
+    if (!user || isTempUser) {
       setBillingLogs([]);
       setUsageLogs([]);
       return;
@@ -121,13 +121,21 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error) {
       console.error('[BillingContext] 读取交易记录异常:', error);
     }
-  }, [user]);
+  }, [user, isTempUser]);
 
   useEffect(() => {
     let cancelled = false;
 
     const init = async () => {
       if (!user) {
+        setBalance(0);
+        setBillingLogs([]);
+        setUsageLogs([]);
+        setLoading(false);
+        return;
+      }
+
+      if (isTempUser) {
         setBalance(0);
         setBillingLogs([]);
         setUsageLogs([]);
@@ -144,7 +152,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     void init();
 
-    if (!user) {
+    if (!user || isTempUser) {
       return () => {
         cancelled = true;
       };
@@ -189,7 +197,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       void supabase.removeChannel(balanceChannel);
       void supabase.removeChannel(transactionChannel);
     };
-  }, [user, fetchBalance, fetchLogs]);
+  }, [user, isTempUser, fetchBalance, fetchLogs]);
 
   const consumeCredits = useCallback(
     async (modelId: string, count: number, details: any = {}) => {
