@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turnstile Diagnostic</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #08111f;
+      color: #e8eefc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(86, 178, 255, 0.2), transparent 28%),
+        linear-gradient(180deg, #0a1324 0%, #07101d 100%);
+      padding: 32px 18px 48px;
+    }
+
+    .page {
+      width: min(100%, 960px);
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(9, 18, 34, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    .hero {
+      display: grid;
+      gap: 10px;
+    }
+
+    .hero p {
+      color: #b7c6e0;
+      line-height: 1.6;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      color: #d8e5ff;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #8aa4cb;
+    }
+
+    .status-ok .status-dot {
+      background: #4ade80;
+    }
+
+    .status-warn .status-dot {
+      background: #fbbf24;
+    }
+
+    .status-error .status-dot {
+      background: #f87171;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .meta {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      color: #c8d6ef;
+    }
+
+    .meta strong {
+      color: #fff;
+    }
+
+    .widget-shell {
+      display: grid;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .widget-box {
+      min-height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+    }
+
+    .logs {
+      max-height: 420px;
+      overflow: auto;
+      padding: 14px;
+      border-radius: 14px;
+      background: #060c16;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font: 12px/1.55 Consolas, "SFMono-Regular", Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #c7d5f2;
+    }
+
+    .hint {
+      color: #9eb1d3;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="card hero">
+      <h1>Turnstile 严格诊断页</h1>
+      <p>这个页面不走登录表单，也不依赖 React 状态，只做一件事：加载并渲染 Cloudflare Turnstile。它可以帮助我们把问题明确区分为脚本加载失败、初始化失败，还是 Cloudflare 返回了具体错误码。</p>
+      <div id="overall-status" class="status status-warn">
+        <span class="status-dot"></span>
+        <span>等待开始诊断</span>
+      </div>
+    </section>
+
+    <section class="card grid">
+      <div class="meta">
+        <div><strong>当前地址:</strong> <span id="meta-location"></span></div>
+        <div><strong>当前 hostname:</strong> <span id="meta-hostname"></span></div>
+        <div><strong>Turnstile Site Key:</strong> <span id="meta-sitekey"></span></div>
+        <div><strong>Key 来源:</strong> <span id="meta-sitekey-source"></span></div>
+        <div><strong>User Agent:</strong> <span id="meta-ua"></span></div>
+      </div>
+      <div class="meta">
+        <div><strong>脚本 URL:</strong> <span id="meta-script-url"></span></div>
+        <div><strong>脚本标签状态:</strong> <span id="meta-script-state">未创建</span></div>
+        <div><strong>window.turnstile:</strong> <span id="meta-global-state">未检测</span></div>
+        <div><strong>最新 token:</strong> <span id="meta-token">无</span></div>
+      </div>
+    </section>
+
+    <section class="card widget-shell">
+      <h2>组件渲染结果</h2>
+      <div class="widget-box">
+        <div id="widget"></div>
+      </div>
+      <p class="hint">如果这里没有成功显示组件，下面的日志会告诉我们究竟是脚本没下来、初始化超时，还是已经走到 Cloudflare 并拿到了明确错误码。像 `400020` 这种错误，说明脚本和初始化其实都已经成功了，问题在 site key 或 widget 配置。</p>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-bottom: 12px;">详细日志</h2>
+      <div id="logs" class="logs"></div>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_TURNSTILE_SITE_KEY = '%VITE_TURNSTILE_SITE_KEY%'.trim();
+    const SITE_KEY_OVERRIDE = new URLSearchParams(window.location.search).get('sitekey')?.trim() || '';
+    const TURNSTILE_SITE_KEY = SITE_KEY_OVERRIDE || DEFAULT_TURNSTILE_SITE_KEY;
+    const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    const LOGS = document.getElementById('logs');
+
+    function appendLog(message) {
+      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      LOGS.textContent += `[${time}] ${message}\n`;
+      LOGS.scrollTop = LOGS.scrollHeight;
+    }
+
+    function setOverallStatus(type, text) {
+      const el = document.getElementById('overall-status');
+      el.className = `status status-${type}`;
+      el.innerHTML = `<span class="status-dot"></span><span>${text}</span>`;
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = value;
+      }
+    }
+
+    function formatError(error) {
+      if (!error) return 'unknown';
+      if (error instanceof Error) return `${error.name}: ${error.message}`;
+      return String(error);
+    }
+
+    function describeTurnstileError(code) {
+      const normalized = String(code || '');
+
+      if (normalized.startsWith('110100') || normalized.startsWith('400020')) {
+        return `Turnstile 返回 Invalid sitekey（${normalized}）`;
+      }
+
+      if (normalized.startsWith('110110')) {
+        return `Turnstile 返回 Sitekey not found（${normalized}）`;
+      }
+
+      if (normalized.startsWith('400070')) {
+        return `Turnstile 返回 Sitekey disabled（${normalized}）`;
+      }
+
+      if (normalized.startsWith('110200')) {
+        return `Turnstile 返回 Domain not authorized（${normalized}）`;
+      }
+
+      if (normalized.startsWith('200500')) {
+        return `Turnstile iframe 加载失败（${normalized}）`;
+      }
+
+      return `Turnstile 返回错误码 ${normalized || 'unknown'}`;
+    }
+
+    async function waitForTurnstile(timeoutMs) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (window.turnstile) {
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error(`window.turnstile 在 ${timeoutMs}ms 内没有初始化完成`);
+    }
+
+    async function startDiagnostic() {
+      setText('meta-location', window.location.href);
+      setText('meta-hostname', window.location.hostname || '(empty)');
+      setText('meta-sitekey', TURNSTILE_SITE_KEY || '(empty)');
+      setText('meta-sitekey-source', SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : '.env');
+      setText('meta-ua', navigator.userAgent);
+      setText('meta-script-url', TURNSTILE_SCRIPT_URL);
+
+      appendLog('开始诊断');
+      appendLog(`当前使用的 site key 来源: ${SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : '.env'}`);
+
+      if (!TURNSTILE_SITE_KEY) {
+        setOverallStatus('error', '未配置 Site Key');
+        appendLog('VITE_TURNSTILE_SITE_KEY 为空，无法继续');
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = TURNSTILE_SCRIPT_URL;
+      script.async = true;
+      script.defer = true;
+
+      script.addEventListener('load', async () => {
+        appendLog(`脚本 load 事件触发: ${script.src}`);
+        setText('meta-script-state', 'load');
+
+        try {
+          await waitForTurnstile(10000);
+          setText('meta-global-state', '已初始化');
+          appendLog('window.turnstile 已出现，开始 render');
+
+          const widgetId = window.turnstile.render('#widget', {
+            sitekey: TURNSTILE_SITE_KEY,
+            theme: 'dark',
+            appearance: 'always',
+            callback: (token) => {
+              setOverallStatus('ok', 'Turnstile 加载并验证成功');
+              setText('meta-token', token ? `${token.slice(0, 16)}...` : '(empty)');
+              appendLog(`callback: 收到 token，长度 ${token?.length || 0}`);
+            },
+            'error-callback': (code) => {
+              const description = describeTurnstileError(code);
+              setOverallStatus('error', description);
+              appendLog(`error-callback: ${code}`);
+              appendLog(`错误解释: ${description}`);
+              return true;
+            },
+            'expired-callback': () => {
+              setOverallStatus('warn', 'Turnstile token 已过期');
+              appendLog('expired-callback');
+            },
+            'timeout-callback': () => {
+              setOverallStatus('error', 'Turnstile 验证超时');
+              appendLog('timeout-callback');
+            },
+            'unsupported-callback': () => {
+              setOverallStatus('error', '当前浏览器环境不支持 Turnstile');
+              appendLog('unsupported-callback');
+            },
+          });
+
+          setOverallStatus('warn', `脚本已加载，widget id: ${widgetId}`);
+          appendLog(`render 成功，widget id: ${widgetId}`);
+        } catch (error) {
+          setOverallStatus('error', '脚本已下载，但未成功初始化');
+          appendLog(`初始化失败: ${formatError(error)}`);
+        }
+      }, { once: true });
+
+      script.addEventListener('error', (event) => {
+        setOverallStatus('error', '脚本标签触发 error');
+        setText('meta-script-state', 'error');
+        appendLog(`script error: ${formatError(event)}`);
+      }, { once: true });
+
+      window.addEventListener('error', (event) => {
+        appendLog(`window error: ${event.message || '(empty message)'}`);
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        appendLog(`unhandledrejection: ${formatError(event.reason)}`);
+      });
+
+      document.head.appendChild(script);
+      setText('meta-script-state', '已插入 script 标签');
+      appendLog(`已插入 script: ${script.src}`);
+      setOverallStatus('warn', '等待脚本 load / error');
+    }
+
+    startDiagnostic().catch((error) => {
+      setOverallStatus('error', '诊断页自身执行失败');
+      appendLog(`fatal: ${formatError(error)}`);
+    });
+  </script>
+</body>
+
+</html>
