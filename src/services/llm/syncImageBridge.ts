@@ -223,7 +223,19 @@ export async function waitForSyncImageBridgeResult(
     }
   }
 
-  throw new Error('Timed out waiting for sync image bridge result');
+  try {
+    const finalResult = await getSyncImageBridgeRequest(requestId);
+    if (finalResult.status === 'success' || finalResult.status === 'error') {
+      return finalResult;
+    }
+  } catch (error) {
+    console.warn('[syncImageBridge] Final status check failed after timeout:', error);
+  }
+
+  const timeoutError = new Error('Timed out waiting for sync image bridge result') as Error & { code?: string; requestId?: string };
+  timeoutError.code = 'SYNC_BRIDGE_TIMEOUT';
+  timeoutError.requestId = requestId;
+  throw timeoutError;
 }
 
 export async function executeSyncImageBridgeRequest(params: StartJobPayload & { signal?: AbortSignal }): Promise<SyncImageBridgeResult> {

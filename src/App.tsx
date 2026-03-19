@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, startTransition } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import PromptBar from './components/layout/PromptBar';
 import ImageNode from './components/image/ImageCard';
@@ -21,6 +21,7 @@ import { getModelCapabilities } from './services/model/modelCapabilities';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
+import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
@@ -239,7 +240,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     switchCanvas  // 🎯 切换项目
   } = useCanvas();
 
-  const { balance, loading: balanceLoading, showRechargeModal, setShowRechargeModal, consumeCredits, refundCredits } = useBilling();
+  const { balance, loading: balanceLoading, showRechargeModal, setShowRechargeModal, consumeCredits, refundCredits, adjustBalanceOptimistically } = useBilling();
 
   // Canvas Ref for Zoom/Pan Controls
   const canvasRef = useRef<InfiniteCanvasHandle>(null);
@@ -253,7 +254,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Ref to access fresh state in async functions (fixing Stale Closure issue)
   const activeCanvasRef = useRef(activeCanvas);
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeCanvasRef.current = activeCanvas;
   }, [activeCanvas]);
 
@@ -313,6 +314,20 @@ const AppContent: React.FC<AppContentProps> = () => {
     );
 
     return genericLabels.has(currentLabel.toLowerCase());
+  }, []);
+
+  const resolveCreditCostForModel = useCallback((modelId: string, imageSize?: ImageSize | string) => {
+    const globalModel = keyManager.getGlobalModelList().find((model) => model.id === modelId);
+    const systemDisplay = globalModel?.isSystemInternal
+      ? adminModelService.getModelDisplayInfo(modelId, imageSize)
+      : null;
+    const resolvedCreditCost = Number(systemDisplay?.creditCost ?? globalModel?.creditCost ?? 0);
+
+    if (Number.isFinite(resolvedCreditCost) && resolvedCreditCost > 0) {
+      return resolvedCreditCost;
+    }
+
+    return getModelCredits(modelId, imageSize);
   }, []);
 
   const resolveNodeRouteState = useCallback((node: Pick<PromptNode, 'model' | 'keySlotId' | 'provider' | 'providerLabel'>) => {
@@ -747,7 +762,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             ...img,
             data: undefined // data 闇€瑕佷粠 IndexedDB hydrate锛屼笉浠?localStorage 恢复
           })),
-          model: parsed.model || KnownModel.IMAGEN_3,
+          model: parsed.model || KnownModel.IMAGEN_4,
           enableGrounding: parsed.enableGrounding || false,
           enableImageSearch: parsed.enableImageSearch || false,
           thinkingMode: (parsed.thinkingMode === 'high' || parsed.thinkingMode === 'deep') ? 'high' : 'minimal',
@@ -770,7 +785,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       imageSize: ImageSize.SIZE_1K,
       parallelCount: 1,
       referenceImages: [],
-      model: KnownModel.IMAGEN_3,
+      model: KnownModel.IMAGEN_4,
       enableGrounding: false,
       enableImageSearch: false,
       thinkingMode: 'minimal',
@@ -1030,7 +1045,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       if (sourceImage) {
         // 🎯 杩介棶模式锛氭柊涓诲崱鏀惧湪鍘熺埗鍗＄粍下方
         const parentPromptId = sourceImage.parentPromptId;
-        const parentPrompt = activeCanvas.promptNodes.find(p => p.id === parentPromptId);
+        const parentPromptRaw = activeCanvas.promptNodes.find(p => p.id === parentPromptId);
+        const parentPrompt = parentPromptRaw
+          ? { ...parentPromptRaw, position: { ...parentPromptRaw.position, x: sourceImage.position.x } }
+          : undefined;
 
         if (parentPrompt) {
           // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝计算鏈€澶位置
@@ -1443,6 +1461,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       if (config.prompt.trim()) {
         const node = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
         if (node) {
+          const nextSourceImageId = activeSourceImage || undefined;
+          const referenceImagesChanged = node.referenceImages !== config.referenceImages;
           // Detect changes to avoid loop
           const hasChanged = node.prompt !== config.prompt ||
             node.model !== config.model ||
@@ -1451,8 +1471,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             (node.thinkingMode || 'minimal') !== (config.thinkingMode || 'minimal') ||
             !!node.enableGrounding !== !!config.enableGrounding ||
             !!node.enableImageSearch !== !!config.enableImageSearch ||
-            JSON.stringify(node.referenceImages) !== JSON.stringify(config.referenceImages) ||
-            node.sourceImageId !== (activeSourceImage || undefined);
+            node.mode !== config.mode ||
+            referenceImagesChanged ||
+            node.sourceImageId !== nextSourceImageId;
 
           const shouldAutoCenter = !node.userMoved && !node.sourceImageId;
 
@@ -1470,7 +1491,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             const isPositionDifferent = Math.abs(node.position.x - liveCenter.x) > 1 || Math.abs(node.position.y - liveCenter.y) > 1;
 
             if (hasChanged || (shouldAutoCenter && isPositionDifferent)) {
-              updatePromptNode({
+              const nextDraftNode: PromptNode = {
                 ...node,
                 prompt: config.prompt,
                 aspectRatio: config.aspectRatio,
@@ -1479,11 +1500,13 @@ const AppContent: React.FC<AppContentProps> = () => {
                 thinkingMode: config.thinkingMode || 'minimal',
                 enableGrounding: !!config.enableGrounding,
                 enableImageSearch: !!config.enableImageSearch,
-                referenceImages: config.referenceImages,
-                sourceImageId: activeSourceImage || undefined,
+                referenceImages: referenceImagesChanged ? config.referenceImages : undefined,
+                sourceImageId: nextSourceImageId,
                 mode: config.mode,
                 position: shouldAutoCenter ? liveCenter : node.position
-              });
+              };
+
+              updatePromptNode(nextDraftNode);
             }
           }
         } else {
@@ -1500,7 +1523,26 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       }
     }
-  }, [config, draftNodeId, activeCanvas, addPromptNode, updatePromptNode, pendingPosition, activeSourceImage, isSidebarOpen, isChatOpen, canvasTransform]);
+  }, [
+    activeCanvas,
+    activeSourceImage,
+    canvasTransform,
+    config.aspectRatio,
+    config.enableGrounding,
+    config.enableImageSearch,
+    config.imageSize,
+    config.mode,
+    config.model,
+    config.prompt,
+    config.referenceImages,
+    config.thinkingMode,
+    deletePromptNode,
+    draftNodeId,
+    isChatOpen,
+    isMobile,
+    isSidebarOpen,
+    updatePromptNode,
+  ]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -2518,14 +2560,15 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Extracted Execution Logic
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(async (promptOverride?: string) => {
     const now = Date.now();
     const cooldownRemaining = GENERATE_TRIGGER_COOLDOWN_MS - (now - lastGenerateAtRef.current);
     if (cooldownRemaining > 0) {
       console.warn('[handleGenerate] blocked duplicate trigger');
       return;
     }
-    const trimmedPrompt = config.prompt.trim();
+    const promptText = promptOverride ?? config.prompt;
+    const trimmedPrompt = promptText.trim();
     if (!trimmedPrompt) return;
     const submitSignature = JSON.stringify({
       prompt: trimmedPrompt,
@@ -2576,6 +2619,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
 
     let requiredCredits = 0;
+    let perImageCreditCost = 0;
     const useServerSideCreditSettlement = isCreditModel && config.model.toLowerCase().includes('@system');
     if (isCreditModel) {
       if (authLoading) {
@@ -2592,11 +2636,11 @@ const AppContent: React.FC<AppContentProps> = () => {
         return;
       }
 
-      const perImageCost = getModelCredits(config.model, config.imageSize);
+      perImageCreditCost = resolveCreditCostForModel(config.model, config.imageSize);
       if (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) {
-        requiredCredits = (config.parallelCount || 1) * perImageCost;
+        requiredCredits = (config.parallelCount || 1) * perImageCreditCost;
       } else {
-        requiredCredits = perImageCost || 1;
+        requiredCredits = perImageCreditCost || 1;
       }
 
       if (requiredCredits > 0 && balance < requiredCredits) {
@@ -2745,7 +2789,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // setDraftNodeId(null); // Moved to end to prevent flicker
 
       // Legacy calculation reference, but we used currentPos above.
-      const promptHeight = getPromptHeight(config.prompt);
+      const promptHeight = getPromptHeight(promptText);
 
       // 🚀 [Performance Fix] 立即创建卡片，参考图异步加载
       // 先使用现有的参考图数据（可能有 storageId 但没有 data），在 executeGeneration 中再加载
@@ -2788,7 +2832,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       const isNewAnim = true; // 🎯 Always set for standard generation
 
-      const rawPrompt = config.prompt.trim();
+      const rawPrompt = trimmedPrompt;
       let optimizedPromptEn: string | undefined;
       let optimizedPromptZh: string | undefined;
       let promptOptimizerResult: any | undefined; // 🎯 [New] 提示璇嶇紪璇戝櫒结果
@@ -2842,10 +2886,19 @@ const AppContent: React.FC<AppContentProps> = () => {
       const baseModelIdForPreview = config.model.split('@')[0];
       const modelSuffixForPreview = config.model.split('@')[1];
       const previewModelMeta = keyManager.getGlobalModelList().find((model) => model.id === config.model);
+      const previewSystemDisplay = previewModelMeta?.isSystemInternal
+        ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
+        : null;
       const previewModelLabel = previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview;
-      const selectedKey = keyManager.getNextKey(config.model, getPreferredKeyForMode(config.mode));
-      const previewProvider = selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google');
-      const previewProviderLabel = selectedKey?.name || previewModelMeta?.providerLabel || modelSuffixForPreview || 'Google';
+      const selectedKey = useServerSideCreditSettlement
+        ? null
+        : keyManager.getNextKey(config.model, getPreferredKeyForMode(config.mode));
+      const previewProvider = useServerSideCreditSettlement
+        ? 'SystemProxy'
+        : (selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google'));
+      const previewProviderLabel = useServerSideCreditSettlement
+        ? (previewSystemDisplay?.providerName || previewSystemDisplay?.provider || previewModelMeta?.providerLabel || 'System Proxy')
+        : (selectedKey?.name || previewModelMeta?.providerLabel || modelSuffixForPreview || 'Google');
       const pptCount = config.mode === GenerationMode.PPT
         ? Math.min(20, Math.max(1, config.parallelCount || 1))
         : Math.min(4, Math.max(1, config.parallelCount || 1));
@@ -2876,7 +2929,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         enableImageSearch: !!config.enableImageSearch,
         provider: previewProvider,
         providerLabel: previewProviderLabel,
-        keySlotId: selectedKey?.id,
+        keySlotId: useServerSideCreditSettlement ? 'system_proxy_slot' : selectedKey?.id,
         childImageIds: [],
         lastGenerationSuccessCount: undefined,
         lastGenerationFailCount: undefined,
@@ -2887,6 +2940,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         error: undefined,
         errorDetails: undefined,
         refundStatus: undefined,
+        creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
         isNew: isNewAnim, // 🎯 启用鍔ㄧ敾标记
         parallelCount: pptCount,
         sourceImageId: activeSourceImage || undefined,
@@ -2898,7 +2952,9 @@ const AppContent: React.FC<AppContentProps> = () => {
         pptSlides: effectivePptSlides,
         pptStyleLocked: config.pptStyleLocked !== false,
         cost: requiredCredits,
-        isPaymentProcessed: requiredCredits > 0 && !useServerSideCreditSettlement,
+        billingMode: isCreditModel ? 'credits' : 'currency',
+        creditCost: isCreditModel ? perImageCreditCost : undefined,
+        isPaymentProcessed: requiredCredits > 0,
         generationMetadata: {
           pendingTaskIds: [],
         },
@@ -3007,6 +3063,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       setActiveSourceImage(null);
 
       // Execute immediately after save completed
+      if (useServerSideCreditSettlement && requiredCredits > 0) {
+        adjustBalanceOptimistically(-requiredCredits);
+      }
       await executeGeneration(generatingNode);
     } catch (e: any) {
       console.error('[handleGenerate] failed:', e);
@@ -3017,7 +3076,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 🎯 [Fix] 涓嶅湪姝ゅ setIsGenerating(false)锛屽洜涓?executeGeneration 内部宸茬鐞嗘状态
       // 鍙戦€佽妭娴佺敱 lastGenerateAtRef 控制锛屼笉鍐嶄緷璧栨暣杞敓鎴愮粨鏉熸墠瑙ｉ攣
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCredits, balance, setShowRechargeModal, user, isTempUser, authLoading]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCredits, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -3401,6 +3460,8 @@ const AppContent: React.FC<AppContentProps> = () => {
             modelLabel: actualModelLabel,
             provider: actualProvider,
             providerLabel: actualProviderLabel,
+            billingMode: executionNode.billingMode,
+            creditCost: executionNode.creditCost,
             keySlotId: actualKeySlotId,
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean),
             alias: currentMode === GenerationMode.PPT ? buildPptPageAlias(executionNode.pptSlides?.[index], index) : undefined,
@@ -3486,23 +3547,44 @@ const AppContent: React.FC<AppContentProps> = () => {
           const row = Math.floor(i / cols);
           const itemsInRow = Math.min(cols, count - row * cols);
 
-          // Calculate grid width for centering
-          const currentGridWidth = itemsInRow * cardWidth + (itemsInRow - 1) * gap;
-          const startX = -currentGridWidth / 2;
+          // Get actual dimensions for this specific image
+          let actualCardWidth = cardWidth;
+          let actualCardHeight = cardHeight;
+          
+          // Calculate actual width based on image dimensions (matching ImageCard2 logic)
+          if (img.dimensions) {
+            const match = img.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
+            if (match && match[1] && match[2]) {
+              const w = parseInt(match[1], 10);
+              const h = parseInt(match[2], 10);
+              if (w > 0 && h > 0) {
+                const aspect = w / h;
+                const { width: baseWidth } = getCardDimensions(executionNode.aspectRatio, false);
+                actualCardWidth = baseWidth;
+                actualCardHeight = (baseWidth / aspect) + 40; // 40px for footer
+              }
+            }
+          }
 
-          // X: Center relative to Prompt X
-          const offsetX = startX + col * (cardWidth + gap) + cardWidth / 2;
+          // For single image, always center it relative to prompt
+          if (count === 1) {
+            // 🎯 [Fix] 单列时直接居中：x = basePosition.x (主卡中心点)
+            x = executionNode.position.x;
+            y = executionNode.position.y + gapToImages + actualCardHeight;
+          } else {
+            // Multiple images: use grid layout with the first image's width for consistent grid
+            const gridCardWidth = cardWidth;
+            const currentGridWidth = itemsInRow * gridCardWidth + (itemsInRow - 1) * gap;
+            const startX = executionNode.position.x - currentGridWidth / 2;
+            const offsetX = startX + col * (gridCardWidth + gap) + gridCardWidth / 2 - executionNode.position.x;
+            
+            const rowHeight = exactImageHeight;
+            const rowOffsetY = row * (rowHeight + gap);
+            const offsetY = gapToImages + exactImageHeight + rowOffsetY;
 
-          // Y: Prompt Bottom + Gap + Image Height
-          // 🎯 [Fix] node.position.y is already bottom anchor. Do NOT add promptCardHeight!
-          const rowHeight = exactImageHeight;
-          const rowOffsetY = row * (rowHeight + gap);
-
-          // Final Y (Bottom Anchor) = PromptBottom + Gap + ImageHeight + RowOffset
-          const offsetY = gapToImages + exactImageHeight + rowOffsetY;
-
-          x = executionNode.position.x + offsetX;
-          y = executionNode.position.y + offsetY;
+            x = executionNode.position.x + offsetX;
+            y = executionNode.position.y + offsetY;
+          }
         }
         return {
           ...img,
@@ -3510,31 +3592,51 @@ const AppContent: React.FC<AppContentProps> = () => {
         };
       });
 
+      const alignedImageNodes = (() => {
+        const latestLayoutPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === executionNode.id) || executionNode;
+        const generatedPositions = buildGeneratedImageBatchPositions({
+          basePosition: latestLayoutPrompt.position || executionNode.position,
+          items: newImageNodes.map((img) => ({
+            aspectRatio: img.aspectRatio,
+            exactDimensions: (typeof img.width === 'number' && typeof img.height === 'number' && img.width > 0 && img.height > 0)
+              ? { width: img.width, height: img.height }
+              : undefined,
+          })),
+          mode: executionNode.mode,
+          isMobile,
+        });
+
+        return newImageNodes.map((img, index) => ({
+          ...img,
+          position: generatedPositions[index] || img.position,
+        }));
+      })();
+
       // Add to canvas atomically with parent linking
-      addImageNodes(newImageNodes, {
+      addImageNodes(alignedImageNodes, {
         [node.id]: {
           isGenerating: false,
           isDraft: false, // 🎯 [Fix] Ensure persistence
-          childImageIds: newImageNodes.map(n => n.id),
+          childImageIds: alignedImageNodes.map(n => n.id),
           error: undefined,
           errorDetails: undefined,
-          keySlotId: newImageNodes[0]?.keySlotId || executionNode.keySlotId,
-          provider: newImageNodes[0]?.provider || executionNode.provider,
-          providerLabel: newImageNodes[0]?.providerLabel || executionNode.providerLabel,
-          modelLabel: newImageNodes[0]?.modelLabel || executionNode.modelLabel
+          keySlotId: alignedImageNodes[0]?.keySlotId || executionNode.keySlotId,
+          provider: alignedImageNodes[0]?.provider || executionNode.provider,
+          providerLabel: alignedImageNodes[0]?.providerLabel || executionNode.providerLabel,
+          modelLabel: alignedImageNodes[0]?.modelLabel || executionNode.modelLabel
         }
       });
 
       // Record cost
       // 🎯 [Fair Billing] Use the computed/effective size from the first result (assuming all in batch are same)
-      const effectiveSize = newImageNodes[0]?.imageSize || executionNode.imageSize; // fallback
+      const effectiveSize = alignedImageNodes[0]?.imageSize || executionNode.imageSize; // fallback
 
       import('./services/billing/costService').then(({ recordCost }) => {
         const firstDebug = (results as any[])[0] || {};
         recordCost(
           executionNode.model,
           effectiveSize as any, // Cast to ImageSize
-          newImageNodes.length,
+          alignedImageNodes.length,
           executionNode.prompt,
           executionNode.referenceImages?.length || 0,
           undefined,
@@ -3543,7 +3645,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             requestBodyPreview: firstDebug.requestBodyPreview,
             pythonSnippet: firstDebug.pythonSnippet
           },
-          newImageNodes[0]?.keySlotId || executionNode.keySlotId
+          alignedImageNodes[0]?.keySlotId || executionNode.keySlotId
         );
       });
       import('./services/system/notificationService').then(({ notify }) => {
@@ -3559,7 +3661,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         errorDetails: extractErrorDetails(error, executionNode.model)
       });
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('閲嶈瘯失败', error.message);
+        notify.error('重试失败', error.message);
       });
     }
   }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration]);
@@ -3805,6 +3907,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         modelColorEnd: target.modelColorEnd,
         modelColorSecondary: target.modelColorSecondary,
         modelTextColor: target.modelTextColor,
+        billingMode: executionNode.billingMode,
+        creditCost: executionNode.creditCost,
         keySlotId: result.keySlotId || executionNode.keySlotId,
         imageSize: result.imageSize || executionNode.imageSize,
         aspectRatio: result.aspectRatio || executionNode.aspectRatio,
@@ -4687,7 +4791,7 @@ ${slideLayerXml.join('\n')}
         });
 
         draftPos = {
-          x: parentPrompt.position.x,
+          x: sourceImage.position.x,
           y: maxY + 80  // 鍦ㄦ渶底部鐨勫崱鐗囦笅鏂?0px
         };
       }
@@ -4955,6 +5059,10 @@ ${slideLayerXml.join('\n')}
     // 1. Filter Groups
     const visibleGroups = activeCanvas.groups
       .filter(g => {
+        // 🎯 [Fix] 过滤掉空的分组（没有包含任何节点）
+        if (!g.nodeIds || g.nodeIds.length === 0) {
+          return false;
+        }
         const { x, y, width, height } = g.bounds;
         return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
       })
@@ -7746,7 +7854,7 @@ ${slideLayerXml.join('\n')}
               if (parentPrompt && activeCanvas) {
                 const siblingImages = activeCanvas.imageNodes.filter(img => img.parentPromptId === parentPromptId);
                 const maxY = siblingImages.reduce((acc, img) => Math.max(acc, img.position.y), parentPrompt.position.y);
-                nodePos = { x: parentPrompt.position.x, y: maxY + 80 };
+                nodePos = { x: sourceImage.position.x, y: maxY + 80 };
               }
 
               const promptNodeId = `${Date.now()}_inpaint_prompt`;

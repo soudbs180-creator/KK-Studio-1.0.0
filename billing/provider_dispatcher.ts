@@ -1,9 +1,9 @@
-import { BillingRequest } from './router'
-import { PointsChargeHandler } from './points/charge_points'
-import { TokenUsageHandler } from './token/usage_token'
-import { GoogleOfficialEngine } from './engines/google_official'
-import { ProxyVendorEngine } from './engines/proxy_vendor'
-import { ThirdPartyEngine } from './engines/third_party'
+import type { BillingRequest } from './router.ts'
+import { PointsChargeHandler } from './points/charge_points.ts'
+import { TokenUsageHandler } from './token/usage_token.ts'
+import { GoogleOfficialEngine } from './engines/google_official.ts'
+import { ProxyVendorEngine } from './engines/proxy_vendor.ts'
+import { ThirdPartyEngine } from './engines/third_party.ts'
 
 export type ProviderId = string
 
@@ -35,14 +35,14 @@ export class ProviderDispatcher {
         return this.googleEngine.handleChargePoints(req)
       case 'proxy_vendor':
         return this.proxyVendorEngine.handleChargePoints(req)
-      default:
-        // 处理第三方供应商，逐个注册引擎实例
+      default: {
         let engine = this.thirdPartyEngines.get(providerId)
         if (!engine) {
           engine = new ThirdPartyEngine(providerId)
           this.thirdPartyEngines.set(providerId, engine)
         }
         return engine.handleChargePoints(req)
+      }
     }
   }
 }

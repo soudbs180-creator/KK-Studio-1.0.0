@@ -184,7 +184,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             setQuery(e.target.value);
                             setSelectedIndex(0);
                         }}
-                        placeholder={isMultiSelectMode ? "澶氶€夋ā寮? 鐐瑰嚮閫夋嫨澶氫釜锛屾寜 Ctrl+Enter 纭鏁寸悊" : "鎼滅储鎻愮ず璇嶃€佹爣绛炬垨缂栫粍..."}
+                        placeholder={isMultiSelectMode ? "多选模式：点击选择多个，按 Ctrl+Enter 确认整理" : "搜索提示词、标签或分组..."}
                         className="flex-1 bg-transparent border-none py-4 text-lg focus:outline-none transition-all"
                         style={{
                             color: 'var(--text-primary)',
@@ -205,7 +205,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                         className={`mr-2 px-2 py-1 rounded text-xs font-medium border transition-colors ${isMultiSelectMode
                             ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50'
                             : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:bg-[var(--toolbar-hover)]'}`}
-                        title="澶氶€夋ā寮?(Ctrl+M)"
+                        title="多选模式 (Ctrl+M)"
                     >
                         {isMultiSelectMode ? '多选已开启' : '多选'}
                     </button>
@@ -345,19 +345,19 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                         {isMultiSelectMode ? (
                             <>
                                 <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Shift+鐐瑰嚮</kbd> 鍖洪棿閫夋嫨
+                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Shift+点击</kbd> 区间选择
                                 </span>
                                 <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Ctrl+Enter</kbd> 纭鏁寸悊 ({multiSelectedIds.size})
+                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
                                 </span>
                             </>
                         ) : (
                             <span className="flex items-center gap-1">
-                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Enter</kbd> 瀹氫綅
+                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Enter</kbd> 定位
                             </span>
                         )}
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 鍒囨崲澶氶€?
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 切换多选
                         </span>
                         </div>
                         <span className={isMobile ? 'text-right' : ''}>{results.length} 个结果</span>
@@ -368,7 +368,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
             {/* Multi-Select Floating Confirmation */}
             {isMultiSelectMode && multiSelectedIds.size > 0 && (
                 <div className="absolute bottom-20 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 animate-bounce-in cursor-pointer hover:bg-indigo-500" onClick={handleConfirmMultiSelect}>
-                    <span>宸查€夋嫨 {multiSelectedIds.size} 椤癸紝鐐瑰嚮鏁寸悊</span>
+                    <span>已选择 {multiSelectedIds.size} 项，点击整理</span>
                     <CornerDownLeft size={14} />
                 </div>
             )}

@@ -1,13 +1,13 @@
-import { BillingRequest } from '../router'
+import type { BillingRequest } from '../router.ts'
 
 export class ProxyVendorEngine {
   async handleChargePoints(_req: BillingRequest): Promise<any> {
-    // 简单占位实现，实际对接代理服务商的积分扣除逻辑
+    // Placeholder for proxy-vendor points billing.
     return { ok: true, engine_type: 'points', provider: 'proxy_vendor' }
   }
 
   async handleTokenUsage(_req: BillingRequest): Promise<any> {
-    // 代理服务商的 token 计费路径占位
+    // Placeholder for proxy-vendor token billing.
     return { ok: true, engine_type: 'token', provider: 'proxy_vendor' }
   }
 }

@@ -20,8 +20,9 @@ export const MODEL_REGISTRY: Record<string, ModelCapability> = {
     'gemini-2.0-flash-exp': { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash', provider: 'Google', type: 'chat', contextWindow: 1048576, isVision: true },
     'gemini-1.5-pro-latest': { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro', provider: 'Google', type: 'chat', contextWindow: 2097152, isVision: true },
     'gemini-1.5-flash-latest': { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash', provider: 'Google', type: 'chat', contextWindow: 1048576, isVision: true },
-    'imagen-3.0-generate-001': { id: 'imagen-3.0-generate-001', name: 'Imagen 3', provider: 'Google', type: 'image' },
-    'imagen-3.0-fast-generate-001': { id: 'imagen-3.0-fast-generate-001', name: 'Imagen 3 Fast', provider: 'Google', type: 'image' },
+    'imagen-3.0-generate-001': { id: 'imagen-3.0-generate-001', name: 'Imagen 3 (Legacy)', provider: 'Google', type: 'image' },
+    'imagen-3.0-fast-generate-001': { id: 'imagen-3.0-fast-generate-001', name: 'Imagen 3 Fast (Legacy)', provider: 'Google', type: 'image' },
+    'imagen-3.0-generate-002': { id: 'imagen-3.0-generate-002', name: 'Imagen 3 (Legacy)', provider: 'Google', type: 'image' },
     'imagen-4.0-generate-001': { id: 'imagen-4.0-generate-001', name: 'Imagen 4', provider: 'Google', type: 'image' },
     'imagen-4.0-fast-generate-001': { id: 'imagen-4.0-fast-generate-001', name: 'Imagen 4 Fast', provider: 'Google', type: 'image' },
     'imagen-4.0-ultra-generate-001': { id: 'imagen-4.0-ultra-generate-001', name: 'Imagen 4 Ultra', provider: 'Google', type: 'image' },
@@ -30,7 +31,7 @@ export const MODEL_REGISTRY: Record<string, ModelCapability> = {
     'gemini-2.5-flash-image': { id: 'gemini-2.5-flash-image', name: 'Nano Banana', provider: 'Google', type: 'image' },
     'veo-2.0-generate-001': { id: 'veo-2.0-generate-001', name: 'Veo 2.0', provider: 'Google', type: 'video' },
     'lyria-realtime-v1': { id: 'lyria-realtime-v1', name: 'Lyria Music', provider: 'Google', type: 'audio', isSystemInternal: true },
-    'gemini-2.0-flash-audio': { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Audio', provider: 'Google', type: 'audio' },
+    'gemini-2.0-flash-audio': { id: 'gemini-2.0-flash-audio', name: 'Gemini 2.0 Audio', provider: 'Google', type: 'audio' },
     
     // --- Audio/Music Models ---
     'suno-v4': { id: 'suno-v4', name: 'Suno V4', provider: 'Custom', type: 'audio' },
@@ -85,8 +86,14 @@ export const MODEL_REGISTRY: Record<string, ModelCapability> = {
     'luma-dream-machine': { id: 'luma-dream-machine', name: 'Luma Dream Machine', provider: 'Custom', type: 'video' },
 };
 
+const HIDDEN_MODEL_IDS = new Set<string>([
+    'imagen-3.0-generate-001',
+    'imagen-3.0-fast-generate-001',
+    'imagen-3.0-generate-002',
+]);
+
 export const getModelsByProvider = (provider: Provider): ModelCapability[] => {
-    return Object.values(MODEL_REGISTRY).filter(m => m.provider === provider);
+    return Object.values(MODEL_REGISTRY).filter(m => m.provider === provider && !HIDDEN_MODEL_IDS.has(m.id));
 };
 
 export const getModelInfo = (modelId: string): ModelCapability | undefined => {
@@ -124,14 +131,16 @@ export interface ActiveModel {
  */
 export const modelRegistry = {
     getModels: (): ActiveModel[] => {
-        return Object.values(MODEL_REGISTRY).map(m => ({
+        return Object.values(MODEL_REGISTRY)
+            .filter((model) => !HIDDEN_MODEL_IDS.has(model.id))
+            .map(m => ({
             id: m.id,
             label: m.name,
             provider: m.provider,
             type: m.type,
             enabled: true,
             isSystemInternal: m.isSystemInternal
-        }));
+            }));
     }
 };
 

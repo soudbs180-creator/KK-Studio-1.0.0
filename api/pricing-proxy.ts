@@ -250,10 +250,18 @@ const normalizePricingRow = (value: PricingRow): PricingRow | null => {
     provider,
     provider_label: providerLabel,
     provider_logo: String(value.provider_logo ?? value.providerLogo ?? value.logo ?? value.icon ?? '').trim() || undefined,
+    description: String(value.description ?? '').trim() || undefined,
     tags: normalizeStringArray(value.tags ?? value.tag ?? value.labels ?? value.label),
+    available_groups: normalizeStringArray(value.available_groups ?? value.availableGroups ?? value.enable_groups ?? value.enableGroups),
     token_group: String(value.token_group ?? value.tokenGroup ?? value.group_name ?? value.groupName ?? value.tokenGroupName ?? '').trim() || undefined,
     billing_type: normalizeBillingType(value.billing_type ?? value.billingType ?? value.type, quotaType),
-    endpoint_type: normalizeEndpointType(value.endpoint_type ?? value.endpointType ?? value.endpoint, modelName),
+    endpoint_type: normalizeEndpointType(
+      value.endpoint_type ?? value.endpointType ?? value.supported_endpoint_types?.[0] ?? value.supportedEndpointTypes?.[0] ?? value.endpoint,
+      modelName
+    ),
+    endpoint_types: normalizeStringArray(
+      value.endpoint_types ?? value.endpointTypes ?? value.supported_endpoint_types ?? value.supportedEndpointTypes
+    ),
     model_ratio: toNumber(value.model_ratio ?? value.modelRatio ?? value.price_ratio ?? value.priceRatio),
     model_price: toNumber(value.model_price ?? value.modelPrice ?? value.price ?? value.per_request_price),
     completion_ratio: toNumber(value.completion_ratio ?? value.completionRatio ?? value.output_ratio ?? value.outputRatio),
@@ -395,6 +403,14 @@ const parseRatioMapFromText = (text: string) => {
   return Object.keys(result).length ? result : undefined;
 };
 
+const extractFirstNumericValue = (text: string) => {
+  const normalized = stripTags(text).replace(/,/g, '');
+  if (!normalized) return undefined;
+
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  return match ? toNumber(match[0]) : undefined;
+};
+
 const extractTableRows = (html: string): PricingRow[] => {
   const tables = Array.from(html.matchAll(/<table[\s\S]*?<\/table>/gi)).map((match) => match[0]);
   const rows: PricingRow[] = [];
@@ -433,12 +449,13 @@ const extractTableRows = (html: string): PricingRow[] => {
       const quotaType = /按次|per.?request|fixed/i.test(quotaRaw) ? 1 : undefined;
       const row = normalizePricingRow({
         model_name: cells[modelIndex],
-        model_price: basePriceIndex >= 0 ? toNumber(cells[basePriceIndex].replace(/[^\d.]/g, '')) : undefined,
-        model_ratio: modelRatioIndex >= 0 ? toNumber(cells[modelRatioIndex].replace(/[^\d.]/g, '')) : undefined,
-        completion_ratio: completionRatioIndex >= 0 ? toNumber(cells[completionRatioIndex].replace(/[^\d.]/g, '')) : undefined,
+        model_price: basePriceIndex >= 0 ? extractFirstNumericValue(cells[basePriceIndex]) : undefined,
+        model_ratio: modelRatioIndex >= 0 ? extractFirstNumericValue(cells[modelRatioIndex]) : undefined,
+        completion_ratio: completionRatioIndex >= 0 ? extractFirstNumericValue(cells[completionRatioIndex]) : undefined,
         size_ratio: sizeRatioIndex >= 0 ? parseRatioMapFromText(cells[sizeRatioIndex]) : undefined,
         group_model_ratio: groupRatioIndex >= 0 ? parseRatioMapFromText(cells[groupRatioIndex]) : undefined,
         provider: providerIndex >= 0 ? cells[providerIndex] : undefined,
+        available_groups: tokenGroupIndex >= 0 ? cells[tokenGroupIndex] : undefined,
         token_group: tokenGroupIndex >= 0 ? cells[tokenGroupIndex] : undefined,
         endpoint_type: endpointTypeIndex >= 0 ? cells[endpointTypeIndex] : undefined,
         tags: tagsIndex >= 0 ? cells[tagsIndex] : undefined,

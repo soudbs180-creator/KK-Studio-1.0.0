@@ -1,5 +1,5 @@
 import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM, { flushSync } from 'react-dom';
 import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
 import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; // Added getter
@@ -47,6 +47,13 @@ const ModeSwitcherStyles = () => (
         }
     `}</style>
 );
+
+const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
+const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
+const PROMPT_TEXTAREA_MIN_ROWS = 2;
+const PROMPT_TEXTAREA_MAX_ROWS = 6;
+const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
+const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 
 // [FIX] Robust Image Component that self-heals from Storage if data is missing
 const ReferenceThumbnail: React.FC<{
@@ -244,6 +251,7 @@ interface CreditSendButtonProps {
     hasPrompt: boolean;
     colorStart?: string;
     colorEnd?: string;
+    textColor?: 'white' | 'black';
     onClick: () => void;
 }
 
@@ -254,6 +262,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     hasPrompt,
     colorStart,
     colorEnd,
+    textColor = 'white',
     onClick
 }) => {
     // 判断积分是否不足
@@ -287,7 +296,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             const start = normalizeColor(colorStart, '#3B82F6');
             const end = normalizeColor(colorEnd, '#2563EB');
             return {
-                className: 'text-white shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl',
+                className: `${textColor === 'black' ? 'text-black' : 'text-white'} shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl`,
                 style: {
                     background: `linear-gradient(135deg, color-mix(in srgb, ${start} 72%, rgba(255,255,255,0.18)) 0%, color-mix(in srgb, ${end} 82%, rgba(255,255,255,0.08)) 100%)`,
                     boxShadow: `0 16px 32px -18px ${start}85, inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.08)`
@@ -295,7 +304,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             };
         }
         return {
-            className: 'text-white shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl',
+            className: `${textColor === 'black' ? 'text-black' : 'text-white'} shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl`,
             style: {
                 background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.92) 0%, rgba(59, 130, 246, 0.88) 45%, rgba(29, 78, 216, 0.82) 100%)',
                 boxShadow: '0 16px 32px -18px rgba(37, 99, 235, 0.88), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.08)'
@@ -326,6 +335,9 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
     // 如果是积分模型且有提示词，使用胶囊渐变样式
     if (isCreditModel && hasPrompt && !isInsufficient) {
+        const textColorClass = textColor === 'black' ? 'text-black' : 'text-white';
+        const textColorStyle = textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' };
+        
         return (
             <>
                 <style>{arrowAnimStyle}</style>
@@ -335,17 +347,19 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                     style={getGradientStyle()}
                 >
                     {/* 积分消耗显示 */}
-                    <div className="flex items-center gap-1 text-white/95">
+                    <div className="flex items-center gap-1" style={{ color: textColor === 'black' ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)' }}>
                         <Sparkles size={14} className="animate-pulse" fill="currentColor" />
                         <span className="text-sm font-bold tabular-nums">{creditCost}</span>
                     </div>
 
                     {/* 分隔线 */}
-                    <div className="w-px h-4 bg-white/25" />
+                    <div className="w-px h-4" style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)' }} />
 
                     {/* 发送箭头按钮 - 内嵌圆形按钮 🚀 箭头朝右 + 滑动动画 */}
-                    <div className="w-7 h-7 rounded-full bg-white/25 flex items-center justify-center transition-all duration-200 group-hover:bg-white/35 group-hover:scale-105 backdrop-blur-sm overflow-hidden">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white transition-transform duration-300 group-hover:translate-x-0.5" style={{ animation: 'arrow-slide-right 1.5s ease-in-out infinite' }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105 backdrop-blur-sm overflow-hidden"
+                         style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.25)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" 
+                             style={{ color: textColor === 'black' ? '#000000' : '#ffffff', animation: 'arrow-slide-right 1.5s ease-in-out infinite' }}>
                             <line x1="5" y1="12" x2="19" y2="12" />
                             <polyline points="12 5 19 12 12 19" />
                         </svg>
@@ -397,13 +411,13 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <div className="relative z-[1] flex items-center gap-2 px-3">
                     {isCreditModel && creditCost > 0 ? (
                         <div className="flex items-center gap-1.5">
-                            <Sparkles size={14} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-white'} />
-                            <span className={`text-sm font-bold ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-white'}`}>
+                            <Sparkles size={14} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black' : 'text-white'} />
+                            <span className={`text-sm font-bold ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black' : 'text-white'}`}>
                                 {isInsufficient ? '积分不足' : creditCost}
                             </span>
                         </div>
                     ) : (
-                        <span className={`text-sm font-bold tracking-[0.01em] ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-white drop-shadow-[0_1px_10px_rgba(255,255,255,0.28)]'}`}>
+                        <span className={`text-sm font-bold tracking-[0.01em] ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black drop-shadow-[0_1px_10px_rgba(0,0,0,0.28)]' : 'text-white drop-shadow-[0_1px_10px_rgba(255,255,255,0.28)]'}`}>
                             发送
                         </span>
                     )}
@@ -416,7 +430,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                         ? 'bg-gray-300 dark:bg-zinc-700 text-gray-500'
                         : isInsufficient
                             ? 'bg-red-500 text-white'
-                            : 'border border-white/20 bg-white/22 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.36),inset_0_-1px_0_rgba(255,255,255,0.08),0_6px_14px_rgba(15,23,42,0.14)] backdrop-blur-md group-hover:scale-[1.08] group-hover:translate-x-[1px] group-hover:bg-white/30'
+                            : `border ${textColor === 'black' ? 'border-black/20 bg-black/10 text-black' : 'border-white/20 bg-white/22 text-white'} shadow-[inset_0_1px_0_rgba(255,255,255,0.36),inset_0_-1px_0_rgba(255,255,255,0.08),0_6px_14px_rgba(15,23,42,0.14)] backdrop-blur-md group-hover:scale-[1.08] group-hover:translate-x-[1px] group-hover:bg-white/30`
                     }
                 `}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -435,7 +449,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 interface PromptBarProps {
     config: GenerationConfig;
     setConfig: React.Dispatch<React.SetStateAction<GenerationConfig>>;
-    onGenerate: () => void;
+    onGenerate: (promptOverride?: string) => void;
     isGenerating: boolean;
     onFilesDrop?: (files: File[]) => void;
     activeSourceImage?: { id: string; url: string; prompt: string } | null;
@@ -488,6 +502,8 @@ type PromptBarModelOption = ActiveModel & {
 const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, isGenerating, onFilesDrop, activeSourceImage, onClearSource, onCancel, isMobile = false, onOpenSettings, onInteract, onUiBusyChange, onFocus, onBlur, onOpenMore }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // Track composition state so IME input is not interrupted by background sync.
+    const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
@@ -559,6 +575,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     });
     const [isInputAreaHovered, setIsInputAreaHovered] = useState(false); // Phase 3: hover state
     const [uploadingCount, setUploadingCount] = useState(0); // [NEW] Uploading indicator count
+    const pendingReferenceUploads = useMemo(() => {
+        return (config.referenceImages || []).filter(img => !img?.storageId).length;
+    }, [config.referenceImages]);
+    const uploadingSkeletonCount = Math.max(0, uploadingCount - pendingReferenceUploads);
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
     const canAccessSystemCreditModels = !!user && !isTempUser;
@@ -596,6 +616,59 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             setConfig(updater);
         });
     }, [setConfig]);
+
+    const [promptDraft, setPromptDraft] = useState(config.prompt || '');
+    const promptDraftRef = useRef(promptDraft);
+    const deferredPromptDraft = useDeferredValue(promptDraft);
+
+    useEffect(() => {
+        promptDraftRef.current = promptDraft;
+    }, [promptDraft]);
+
+    const commitPromptToConfig = useCallback((nextPrompt: string, options?: { immediate?: boolean }) => {
+        const normalizedPrompt = nextPrompt ?? '';
+
+        if (options?.immediate) {
+            flushSync(() => {
+                setConfig(prev => prev.prompt === normalizedPrompt ? prev : { ...prev, prompt: normalizedPrompt });
+            });
+            return;
+        }
+
+        transitionConfigUpdate(prev => prev.prompt === normalizedPrompt ? prev : { ...prev, prompt: normalizedPrompt });
+    }, [setConfig, transitionConfigUpdate]);
+
+    useEffect(() => {
+        const externalPrompt = config.prompt || '';
+        if (externalPrompt === promptDraftRef.current) {
+            return;
+        }
+        promptDraftRef.current = externalPrompt;
+        setPromptDraft(externalPrompt);
+    }, [config.prompt]);
+
+    useEffect(() => {
+        const committedPrompt = config.prompt || '';
+        if (isComposingRef.current || deferredPromptDraft === committedPrompt) {
+            return;
+        }
+
+        const timerId = window.setTimeout(() => {
+            commitPromptToConfig(promptDraftRef.current);
+        }, PROMPT_CONFIG_SYNC_DELAY_MS);
+
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [commitPromptToConfig, config.prompt, deferredPromptDraft]);
+
+    const flushPromptDraftToConfig = useCallback(() => {
+        const nextPrompt = promptDraftRef.current;
+        if ((config.prompt || '') !== nextPrompt) {
+            commitPromptToConfig(nextPrompt, { immediate: true });
+        }
+        return nextPrompt;
+    }, [commitPromptToConfig, config.prompt]);
 
     const updateConfigFields = useCallback((patch: Partial<GenerationConfig>) => {
         transitionConfigUpdate(prev => ({ ...prev, ...patch }));
@@ -705,14 +778,14 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             setPptOutlineDraft(slides.join('\n'));
             return;
         }
-        const fromPrompt = (config.prompt || '')
+        const fromPrompt = (promptDraft || '')
             .split('\n')
             .map(line => line.trim())
             .filter(Boolean)
             .map(line => line.replace(/^[-*\d.)、\s]+/, '').trim())
             .filter(Boolean);
         setPptOutlineDraft(fromPrompt.join('\n'));
-    }, [config.mode, config.pptSlides, config.prompt]);
+    }, [config.mode, config.pptSlides, promptDraft]);
 
     useEffect(() => {
         if (config.mode !== GenerationMode.PPT) return;
@@ -728,7 +801,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             .slice(0, 20);
         if (currentDraftSlides.length > 1) return;
 
-        const topic = String(config.prompt || '').trim() || '主题演示';
+        const topic = String(promptDraft || '').trim() || '主题演示';
         const basePool = [
             `背景与问题定义：${topic}`,
             `行业趋势与机会：${topic}`,
@@ -758,7 +831,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         if (nextDraft !== pptOutlineDraft) {
             setPptOutlineDraft(nextDraft);
         }
-    }, [config.mode, config.parallelCount, config.pptSlides, config.prompt, pptOutlineDraft]);
+    }, [config.mode, config.parallelCount, config.pptSlides, pptOutlineDraft, promptDraft]);
 
     // Cleanup hover timer on unmount
     useEffect(() => {
@@ -1127,32 +1200,39 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         }
     }, [availableModels, config.model, setConfig]);
 
-    const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setConfig(prev => ({ ...prev, prompt: e.target.value }));
-        // Auto-resize up to 6 lines, then scroll
-        e.target.style.height = 'auto';
-        const lineHeight = 22.5; // 1.5 * 15px (text-[15px] with line-height: 1.5)
-        const maxHeight = lineHeight * 6; // 6 lines max
-        const newHeight = Math.max(36, Math.min(e.target.scrollHeight, maxHeight));
-        e.target.style.height = `${newHeight}px`;
-    }, [setConfig]);
+    const resizePromptTextarea = useCallback((target: HTMLTextAreaElement) => {
+        target.style.height = 'auto';
+        const newHeight = Math.max(
+            PROMPT_TEXTAREA_MIN_HEIGHT_PX,
+            Math.min(target.scrollHeight, PROMPT_TEXTAREA_MAX_HEIGHT_PX)
+        );
+        target.style.height = `${newHeight}px`;
+    }, []);
 
-    // Auto-resize height when prompt changes (handles paste, select, clear)
+    const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const target = e.target;
+        promptDraftRef.current = target.value;
+        setPromptDraft(target.value);
+        resizePromptTextarea(target);
+    }, [resizePromptTextarea]);
+
     useEffect(() => {
         if (textareaRef.current) {
-            // Reset to auto to get correct scrollHeight for shrinkage
-            textareaRef.current.style.height = 'auto';
-
-            if (config.prompt) {
-                // detailed check: if it has content, expand up to max
-                const newHeight = Math.max(36, Math.min(textareaRef.current.scrollHeight, 200));
-                textareaRef.current.style.height = `${newHeight}px`;
-            } else {
-                // empty content - shrink to 1 row
-                textareaRef.current.style.height = '36px';
+            if (document.activeElement === textareaRef.current) {
+                return;
             }
+            resizePromptTextarea(textareaRef.current);
         }
-    }, [config.prompt]);
+    }, [promptDraft, resizePromptTextarea]);
+
+    const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLTextAreaElement>) => {
+        const nextValue = e.currentTarget.value;
+        isComposingRef.current = false;
+        promptDraftRef.current = nextValue;
+        setPromptDraft(nextValue);
+        resizePromptTextarea(e.currentTarget);
+        commitPromptToConfig(nextValue);
+    }, [commitPromptToConfig, resizePromptTextarea]);
 
     const processFiles = useCallback(async (files: FileList | File[]) => {
         // 🚀 [修复] 根据模型动态获取最大参考图数量
@@ -1315,12 +1395,16 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [setConfig]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (isComposingRef.current || (e.nativeEvent as KeyboardEvent).isComposing) {
+            return;
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             // 始终允许发送新请求，即使正在生成中
-            onGenerate();
+            flushPromptDraftToConfig();
+            onGenerate(promptDraftRef.current);
         }
-    }, [onGenerate]);
+    }, [flushPromptDraftToConfig, onGenerate]);
 
     const handlePaste = useCallback((e: React.ClipboardEvent) => {
         const imageFiles: File[] = [];
@@ -1425,14 +1509,15 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [favoritePromptIds, saveFavoritePromptIds]);
 
     const applyPromptTemplate = useCallback((templatePrompt: string) => {
-        const current = (config.prompt || '').trim();
+        const current = promptDraft.trim();
         const nextPrompt = current
-            ? `${config.prompt.replace(/\s+$/, '')}\n${templatePrompt}`
+            ? `${promptDraft.replace(/\s+$/, '')}\n${templatePrompt}`
             : templatePrompt;
-        setConfig(prev => ({ ...prev, prompt: nextPrompt }));
+        setPromptDraft(nextPrompt);
+        commitPromptToConfig(nextPrompt);
         setShowPromptLibrary(false);
         notify.success('提示词已插入', '已追加到输入框，可继续编辑后发送');
-    }, [config.prompt, setConfig]);
+    }, [commitPromptToConfig, promptDraft]);
 
     const parsePptSlides = useCallback((text: string) => {
         return text
@@ -1443,7 +1528,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, []);
 
     const generatePptOutlineByTopic = useCallback(() => {
-        const topic = (config.prompt || '').trim() || '主题演示';
+        const topic = promptDraft.trim() || '主题演示';
         const total = Math.min(20, Math.max(1, Number(config.parallelCount) || 1));
         const pages = Array.from({ length: total }).map((_, idx) => {
             const pageNo = idx + 1;
@@ -1452,7 +1537,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             return `${topic} - 第${pageNo}页内核内容`;
         });
         setPptOutlineDraft(pages.join('\n'));
-    }, [config.parallelCount, config.prompt]);
+    }, [config.parallelCount, promptDraft]);
 
     const applyPptOutlineDraft = useCallback(() => {
         const slides = parsePptSlides(pptOutlineDraft);
@@ -1468,7 +1553,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const exportPptOutlineJson = useCallback(() => {
         const slides = parsePptSlides(pptOutlineDraft);
         const payload = {
-            topic: (config.prompt || '').trim(),
+            topic: promptDraft.trim(),
             pageCount: slides.length,
             pages: slides.map((text, idx) => ({ page: idx + 1, text })),
             exportedAt: new Date().toISOString()
@@ -1480,7 +1565,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         a.download = `ppt-outline-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
-    }, [config.prompt, parsePptSlides, pptOutlineDraft]);
+    }, [parsePptSlides, pptOutlineDraft, promptDraft]);
 
     const movePptSlide = useCallback((index: number, direction: -1 | 1) => {
         const slides = parsePptSlides(pptOutlineDraft);
@@ -1510,7 +1595,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const appendPptTemplateSlide = useCallback((template: 'cover' | 'agenda' | 'section' | 'summary') => {
         const slides = parsePptSlides(pptOutlineDraft);
         if (slides.length >= 20) return;
-        const topic = (config.prompt || '').trim() || '主题演示';
+        const topic = promptDraft.trim() || '主题演示';
         const text = template === 'cover'
             ? `封面：${topic}`
             : template === 'agenda'
@@ -1519,7 +1604,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     ? `章节过渡页：${topic} - 阶段重点`
                     : `总结页：${topic} 结论与下一步行动`;
         setPptOutlineDraft([...slides, text].join('\n'));
-    }, [config.prompt, parsePptSlides, pptOutlineDraft]);
+    }, [parsePptSlides, pptOutlineDraft, promptDraft]);
 
     const dropPptSlide = useCallback(() => {
         if (pptDragIndex === null || pptDropIndex === null) return;
@@ -2601,7 +2686,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 })}
 
                                 {/* [NEW] Uploading Skeletons */}
-                                {Array.from({ length: uploadingCount }).map((_, idx) => (
+                                {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
                                     <div key={`uploading-${idx}`} className="relative w-12 h-12 rounded-lg border-2 border-dashed border-gray-400/30 dark:border-zinc-500/30 flex items-center justify-center bg-gray-100/50 dark:bg-zinc-800/50 overflow-hidden flex-shrink-0 animate-pulse">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-gray-500 dark:text-zinc-400">
                                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -2660,7 +2745,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                         {/* Text Input Area */}
                         <textarea
                             ref={textareaRef}
-                            value={config.prompt}
+                            value={promptDraft}
                             onChange={handleInput}
                             onKeyDown={handleKeyDown}
                             onPaste={handlePaste}
@@ -2669,17 +2754,20 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 onFocus?.(); // 通知侧边栏: 输入框有焦点,不要自动隐藏
                             }}
                             onBlur={() => {
+                                flushPromptDraftToConfig();
                                 onBlur?.(); // 通知侧边栏: 输入框失去焦点,可以自动隐藏
                             }}
+                            onCompositionStart={() => { isComposingRef.current = true; }}
+                            onCompositionEnd={handleCompositionEnd}
                             placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音乐风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : "描述你想要生成的图片..."}
                             className="input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none mt-1 py-1 px-3 box-border overflow-y-auto"
                             style={{
                                 color: 'var(--text-primary)', // 使用 CSS 变量适配主题
-                                minHeight: '36px',
-                                maxHeight: '135px', // 6 lines * 22.5px line-height
-                                lineHeight: '1.5'
+                                minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
+                                maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
+                                lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
                             }}
-                            rows={1}
+                            rows={PROMPT_TEXTAREA_MIN_ROWS}
                         />
                     </div> {/* End of input area hover wrapper */}
 
@@ -2728,13 +2816,19 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                     {!isModelListEmpty && !isMobile && (
                                         currentModel?.isSystemInternal ? (
                                             // 积分模型：仅显示 ✨积分，不显示供应商
-                                            <span
-                                                className="text-[10px] px-2 py-0.5 rounded-full bg-sky-400/20 text-sky-200 border border-sky-300/25 font-semibold flex-shrink-0"
-                                                style={{ marginLeft: '6px' }}
-                                                title="系统积分模型"
-                                            >
-                                                ✨{Math.max(1, currentCreditCost)}
-                                            </span>
+                                            // 根据模型主题色动态调整积分标签颜色
+                                            (() => {
+                                                const isBlackText = currentModel?.textColor === 'black';
+                                                return (
+                                                    <span
+                                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${isBlackText ? 'bg-black/10 text-black border-black/20' : 'bg-sky-400/20 text-sky-200 border-sky-300/25'} border`}
+                                                        style={{ marginLeft: '6px' }}
+                                                        title="系统积分模型"
+                                                    >
+                                                        ✨{Math.max(1, currentCreditCost)}
+                                                    </span>
+                                                );
+                                            })()
                                         ) : currentModel?.provider ? (
                                             // 用户API模型：显示Provider标签
                                             <span
@@ -2810,6 +2904,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     <>
                                                         {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
                                                         {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                                            // 🚀 [Debug] 打印模型 textColor 和 id
+                                                            console.log(`[PromptBar Model Debug] id: ${model.id}, textColor: ${model.textColor}`);
+                                                            
                                                             const isLast = index === visibleModels.length - 1;
                                                     const lowerId = model.id.toLowerCase();
                                                     const baseName = model.label || model.id;
@@ -2833,6 +2930,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     // 🚀 [Fix] 积分模型：选中或悬停时显示彩色渐变，否则使用灰色调
                                                     const isModelActive = config.model === model.id;
 
+                                                    // 获取模型文本颜色
+                                                    const modelTextColor = model.textColor || 'white';
+                                                    const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
+
                                                     // 默认使用的统一灰色渐变底板
                                                     const inactiveGradientStyle = {
                                                         background: `linear-gradient(180deg, rgba(75, 85, 99, 0.4) 0%, rgba(55, 65, 81, 0.4) 100%)`,
@@ -2850,7 +2951,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                             key={model.id}
                                                             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
                                                             ${isExclusive
-                                                                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 text-white shadow-md active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${isModelActive ? 'ring-2 ring-white/50 shadow-lg scale-[1.02]' : 'hover:scale-[1.02] hover:shadow-lg opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`
+                                                                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} shadow-md active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${isModelActive ? 'ring-2 ring-white/50 shadow-lg scale-[1.02]' : 'hover:scale-[1.02] hover:shadow-lg opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`
                                                                     : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-all border-2 ${isModelActive ? 'bg-blue-50 dark:bg-white/10 ring-2 ring-blue-500 dark:ring-white/40 border-blue-500 dark:border-white/20 shadow-md' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
                                                             `}
                                                             style={isExclusive ? (isModelActive ? activeGradientStyle : inactiveGradientStyle) : undefined}
@@ -2903,6 +3004,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                                                                 if (isExclusive) {
                                                                     // 🚀 [Fix] 积分模型：胶囊样式，图标+名称左对齐，积分标识右对齐
+                                                                    const textColorStyle = model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' };
+                                                                    const badgeBgStyle = model.textColor === 'black' ? 'bg-black/10' : 'bg-white/25';
+                                                                    const badgeBorderStyle = model.textColor === 'black' ? 'border-black/20' : 'border-white/30';
+                                                                    
                                                                     return (
                                                                         <div className="flex items-center justify-between w-full h-full">
                                                                             <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -2914,12 +3019,12 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                                         active={isActive}
                                                                                     />
                                                                                 </div>
-                                                                                <span className="text-sm font-semibold truncate text-white text-left">
+                                                                                <span className="text-sm font-semibold truncate text-left" style={textColorStyle}>
                                                                                     {displayName}
                                                                                 </span>
                                                                             </div>
                                                                             <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-                                                                                <span className="text-xs px-2.5 py-1 rounded-full bg-white/25 text-white border border-white/30 font-semibold flex items-center gap-1">
+                                                                                <span className={`text-xs px-2.5 py-1 rounded-full ${badgeBgStyle} ${badgeBorderStyle} border font-semibold flex items-center gap-1`} style={textColorStyle}>
                                                                                     ✨{model.isSystemInternal
                                                                                         ? getModelCredits((model.id || '').split('@')[0], config.imageSize)
                                                                                         : (model.creditCost !== undefined ? model.creditCost : getModelCredits((model.id || '').split('@')[0], config.imageSize))}
@@ -3318,9 +3423,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 isCreditModel={isNanoBanana2}
                                 creditCost={totalCreditCost}
                                 balance={balance}
-                                hasPrompt={!!config.prompt}
+                                hasPrompt={!!promptDraft.trim()}
                                 colorStart={currentModel?.colorStart}
                                 colorEnd={currentModel?.colorEnd}
+                                textColor={currentModel?.textColor}
                                 onClick={() => {
                                     if (isNanoBanana2 && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
@@ -3335,7 +3441,8 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         setShowRechargeModal(true);
                                         return;
                                     }
-                                    onGenerate();
+                                    flushPromptDraftToConfig();
+                                    onGenerate(promptDraftRef.current);
                                 }}
                             />
                         </div>

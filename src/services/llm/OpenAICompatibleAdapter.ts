@@ -1,6 +1,7 @@
 import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, AudioGenerationOptions, AudioGenerationResult, extractRefImageData } from './LLMAdapter';
 import { KeySlot, keyManager } from '../auth/keyManager';
 import {
+    buildOpenAIEndpoint,
     buildGeminiEndpoint,
     buildGeminiHeaders,
     formatAuthorizationHeaderValue,
@@ -8,10 +9,17 @@ import {
     normalizeGeminiBaseUrl,
     normalizeGeminiModelId,
 } from '../api/apiConfig';
+import {
+    buildResponsesPayload,
+    extractOpenAITextPayload,
+    extractResponsesStreamDelta,
+    modelPrefersResponsesApi,
+    shouldRetryWithResponsesApi,
+} from '../api/openaiResponses';
 import { resolveProviderRuntime } from '../api/providerStrategy';
 import { ImageSize, AspectRatio, GenerationMode } from '../../types';
 import { logError, logWarning, addLog, LogLevel } from '../system/systemLogService';
-import { GoogleAdapter, convertImageToBase64, buildInlineImagePart } from './GoogleAdapter';
+import { GoogleAdapter, convertImageToBase64, buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
 import { RegionService } from '../system/RegionService';
 import {
     SyncImageBridgeParserType,
@@ -1060,7 +1068,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
     private resolveChannelRuntime(baseUrl: string, keySlot: KeySlot, modelId?: string, format?: string) {
         return resolveProviderRuntime({
-            provider: keySlot.provider,
+            provider: this.getResolvedProviderName(keySlot),
             baseUrl,
             format: format ?? keySlot.format,
             authMethod: keySlot.authMethod,
@@ -1406,7 +1414,292 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         formData.append(fieldName, blob, fileName);
     }
 
+    private getResolvedProviderName(keySlot: KeySlot): string {
+        if (keySlot.provider === 'Custom' && keySlot.name) {
+            return keySlot.name;
+        }
+        return keySlot.provider;
+    }
+
+    private buildOpenAICompatibleBaseUrl(baseUrl?: string): string {
+        return String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+    }
+
+    private buildOpenAICompatibleMessages(options: ChatOptions): any[] {
+        const messages: any[] = options.messages.map((message) => ({
+            role: message.role,
+            content: message.content,
+        }));
+
+        if (options.inlineData && options.inlineData.length > 0) {
+            const lastUserIdx = messages.map((message) => message.role).lastIndexOf('user');
+            if (lastUserIdx >= 0) {
+                const textContent = messages[lastUserIdx].content;
+                const contentParts: any[] = [{ type: 'text', text: textContent }];
+
+                options.inlineData.forEach((media) => {
+                    contentParts.push({
+                        type: 'image_url',
+                        image_url: { url: `data:${media.mimeType};base64,${media.data}` }
+                    });
+                });
+                messages[lastUserIdx].content = contentParts;
+            }
+        }
+
+        if (options.systemPrompt) {
+            messages.unshift({ role: 'system', content: options.systemPrompt });
+        }
+
+        return messages;
+    }
+
+    private buildOpenAICompatibleHeaders(keySlot: KeySlot): Record<string, string> {
+        let headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot),
+        };
+
+        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
+            headers[keySlot.headerName] = keySlot.key;
+        }
+
+        return this.applyCustomHeaders(headers, keySlot);
+    }
+
+    private buildChatCompletionsBody(options: ChatOptions, messages: any[]): any {
+        let body: any = {
+            model: options.modelId,
+            messages,
+            temperature: options.temperature,
+            max_tokens: options.maxTokens || 20480,
+            stream: false,
+        };
+
+        if (options.extraBody) {
+            Object.assign(body, options.extraBody);
+        }
+
+        return body;
+    }
+
+    private buildResponsesApiBody(options: ChatOptions, messages: any[], stream: boolean, keySlot: KeySlot): any {
+        const body = buildResponsesPayload({
+            model: options.modelId,
+            messages,
+            temperature: options.temperature,
+            maxOutputTokens: options.maxTokens || 20480,
+            stream,
+            extraBody: options.extraBody,
+        });
+
+        return this.applyCustomBody(body, keySlot);
+    }
+
+    private async parseOpenAIJsonResponse(
+        response: Response,
+        url: string,
+        keySlot: KeySlot,
+        requestBody: any,
+    ): Promise<any> {
+        const rawText = await response.text().catch(() => '');
+        const requestPath = this.getRequestPathFromUrl(url);
+        const requestBodyPreview = this.buildSafeRequestBodyPreview(requestBody);
+
+        if (!response.ok) {
+            let errMsg = `HTTP ${response.status}`;
+            try {
+                const err = JSON.parse(rawText || '{}');
+                errMsg = err.error?.message || err.message || errMsg;
+            } catch {
+                errMsg = rawText.substring(0, 500) || errMsg;
+            }
+
+            throw this.buildHttpError({
+                message: errMsg,
+                status: response.status,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: rawText.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        if (!rawText.trim()) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(rawText);
+        } catch {
+            throw this.buildHttpError({
+                message: 'Invalid JSON response from provider',
+                status: response.status,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: rawText.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+    }
+
+    private async chatWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
+        const chatUrl = buildOpenAIEndpoint(baseUrl, '/chat/completions');
+        const responsesUrl = buildOpenAIEndpoint(baseUrl, '/responses');
+        const messages = this.buildOpenAICompatibleMessages(options);
+        const headers = this.buildOpenAICompatibleHeaders(keySlot);
+        const chatBody = this.applyCustomBody(this.buildChatCompletionsBody(options, messages), keySlot);
+        const responsesBody = this.buildResponsesApiBody(options, messages, false, keySlot);
+        const preferResponses = modelPrefersResponsesApi(options.modelId);
+
+        const executeJsonRequest = async (url: string, body: any): Promise<any> => {
+            const payloadStr = JSON.stringify(body);
+            if (payloadStr.length > 48 * 1024 * 1024) {
+                console.error(`[OpenAICompatibleAdapter] Chat request payload (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) is close to the 50MB limit.`);
+            }
+
+            const response = await this.fetchWithTimeout(url, {
+                method: 'POST',
+                headers,
+                body: payloadStr,
+                signal: options.signal
+            }, this.getTimeoutMs(keySlot, 120000), 1);
+
+            return this.parseOpenAIJsonResponse(response, url, keySlot, body);
+        };
+
+        try {
+            const data = preferResponses
+                ? await executeJsonRequest(responsesUrl, responsesBody)
+                : await executeJsonRequest(chatUrl, chatBody);
+            keyManager.reportCallResult(keySlot.id, true);
+            return extractOpenAITextPayload(data) || '';
+        } catch (error: any) {
+            const combinedErrorText = [error?.message, error?.responseBody].filter(Boolean).join('\n');
+
+            if (!preferResponses && shouldRetryWithResponsesApi(error?.status, combinedErrorText)) {
+                try {
+                    const data = await executeJsonRequest(responsesUrl, responsesBody);
+                    keyManager.reportCallResult(keySlot.id, true);
+                    return extractOpenAITextPayload(data) || '';
+                } catch (responsesError: any) {
+                    const finalMessage = responsesError?.message || error?.message || 'Request failed';
+                    keyManager.reportCallResult(keySlot.id, false, finalMessage);
+                    logError(
+                        'OpenAIAdapter',
+                        responsesError instanceof Error ? responsesError : new Error(finalMessage),
+                        `URL: ${responsesUrl}\nStatus: ${responsesError?.status ?? 'unknown'}\nRaw Response: ${String(responsesError?.responseBody || '').slice(0, 500)}`,
+                    );
+                    throw responsesError;
+                }
+            }
+
+            const errMsg = error?.message || 'Request failed';
+            keyManager.reportCallResult(keySlot.id, false, errMsg);
+            logError(
+                'OpenAIAdapter',
+                error instanceof Error ? error : new Error(errMsg),
+                `URL: ${preferResponses ? responsesUrl : chatUrl}\nStatus: ${error?.status ?? 'unknown'}\nRaw Response: ${String(error?.responseBody || '').slice(0, 500)}`,
+            );
+            throw error;
+        }
+    }
+
+    private async chatStreamWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
+        const chatUrl = buildOpenAIEndpoint(baseUrl, '/chat/completions');
+        const responsesUrl = buildOpenAIEndpoint(baseUrl, '/responses');
+        const messages = this.buildOpenAICompatibleMessages(options);
+        const headers = this.buildOpenAICompatibleHeaders(keySlot);
+        const chatBody = this.applyCustomBody({
+            ...this.buildChatCompletionsBody(options, messages),
+            stream: true
+        }, keySlot);
+        const responsesBody = this.buildResponsesApiBody(options, messages, true, keySlot);
+        const preferResponses = modelPrefersResponsesApi(options.modelId);
+
+        const streamRequest = async (url: string, body: any, mode: 'chat' | 'responses'): Promise<void> => {
+            const response = await this.fetchWithTimeout(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+                signal: options.signal
+            }, this.getTimeoutMs(keySlot, 120000), 1);
+
+            if (!response.ok || !response.body) {
+                const text = await response.text().catch(() => '');
+                throw this.buildHttpError({
+                    message: text || `HTTP ${response.status}`,
+                    status: response.status,
+                    requestPath: this.getRequestPathFromUrl(url),
+                    requestBody: this.buildSafeRequestBodyPreview(body),
+                    responseBody: text.slice(0, 1600),
+                    provider: keySlot.provider,
+                });
+            }
+
+            keyManager.reportCallResult(keySlot.id, true);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const rawLine of lines) {
+                    const line = rawLine.trim();
+                    if (!line || !line.startsWith('data:')) continue;
+
+                    const payload = line.slice(5).trim();
+                    if (payload === '[DONE]') return;
+
+                    try {
+                        const json = JSON.parse(payload);
+                        const chunk = mode === 'responses'
+                            ? extractResponsesStreamDelta(json)
+                            : json.choices?.[0]?.delta?.content;
+                        if (chunk) {
+                            options.onStream?.(chunk);
+                        }
+                    } catch {
+                        // ignore malformed stream chunks
+                    }
+                }
+            }
+        };
+
+        try {
+            await streamRequest(
+                preferResponses ? responsesUrl : chatUrl,
+                preferResponses ? responsesBody : chatBody,
+                preferResponses ? 'responses' : 'chat',
+            );
+        } catch (error: any) {
+            const combinedErrorText = [error?.message, error?.responseBody].filter(Boolean).join('\n');
+            if (!preferResponses && shouldRetryWithResponsesApi(error?.status, combinedErrorText)) {
+                try {
+                    await streamRequest(responsesUrl, responsesBody, 'responses');
+                    return;
+                } catch (responsesError: any) {
+                    keyManager.reportCallResult(keySlot.id, false, responsesError?.message || error?.message || 'Streaming request failed');
+                    throw responsesError;
+                }
+            }
+
+            keyManager.reportCallResult(keySlot.id, false, error?.message || 'Streaming request failed');
+            throw error;
+        }
+    }
+
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        return this.chatWithCompatibleResponses(options, keySlot);
+        /*
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : baseUrl + '/v1';
         const url = cleanBase + '/chat/completions';
@@ -1498,9 +1791,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const data = await response.json();
         keyManager.reportCallResult(keySlot.id, true);
         return data.choices?.[0]?.message?.content || '';
+        */
     }
 
     async chatStream(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        return this.chatStreamWithCompatibleResponses(options, keySlot);
+        /*
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
@@ -1598,6 +1894,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 }
             }
         }
+        */
     }
 
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
@@ -2648,22 +2945,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        const googleSearchTool = options.providerConfig?.google?.tools?.find((tool: any) => tool.googleSearch);
-        if (googleSearchTool) {
-            const searchTypes: Record<string, Record<string, never>> = {};
-            if (googleSearchTool.googleSearch?.searchTypes?.webSearch || !googleSearchTool.googleSearch?.searchTypes) {
-                searchTypes.webSearch = {};
-            }
-            if (googleSearchTool.googleSearch?.searchTypes?.imageSearch) {
-                searchTypes.imageSearch = {};
-            }
-            payload.tools = [{
-                googleSearch: Object.keys(searchTypes).length > 0 ? { searchTypes } : {}
-            }];
+        const groundingTools = buildGeminiNativeGroundingTools(options.providerConfig?.google?.tools, false);
+        if (groundingTools?.length) {
+            payload.tools = groundingTools;
         }
 
         const payloadStr = JSON.stringify(payload);
         const requestPath = `/v1beta/models/${is12AIChannel ? options.modelId : effectiveModelId}:generateContent`;
+        const requestTimeoutMs = this.getTimeoutMs(keySlot, 400000);
         let headers: Record<string, string> = is12AIChannel
             ? {
                 'Content-Type': 'application/json',
@@ -2691,7 +2980,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             url,
             headers,
             body: payloadStr,
-            timeoutMs: this.getTimeoutMs(keySlot, 120000),
+            timeoutMs: requestTimeoutMs,
             requestPath,
             requestBodyPreview: this.buildSafeRequestBodyPreview(payload),
             provider: keySlot.provider,
@@ -2714,7 +3003,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             headers,
             body: payloadStr,
             signal: options.signal
-        }, this.getTimeoutMs(keySlot, 120000), 1);
+        }, requestTimeoutMs, 1);
 
         const duration = Date.now() - startTime;
 

@@ -6,12 +6,16 @@ export interface ProviderPricingSnapshot {
       provider?: string;
       providerLabel?: string;
       providerLogo?: string;
+      description?: string;
       tags?: string[];
       tokenGroup?: string;
       billingType?: string;
       endpointType?: string;
       endpointUrl?: string;
       endpointPath?: string;
+      endpointTypes?: string[];
+      endpointTargets?: Record<string, { path?: string; method?: string }>;
+      availableGroups?: string[];
       modelRatio?: number;
       modelPrice?: number;
       perRequestPrice?: number;
@@ -39,12 +43,16 @@ export interface ProviderPricingSnapshot {
     provider?: string;
     providerLabel?: string;
     providerLogo?: string;
+    description?: string;
     tags?: string[];
     tokenGroup?: string;
     billingType?: string;
     endpointType?: string;
     endpointUrl?: string;
     endpointPath?: string;
+    endpointTypes?: string[];
+    endpointTargets?: Record<string, { path?: string; method?: string }>;
+    availableGroups?: string[];
   }>;
   _rawData?: any[];
 }
@@ -66,6 +74,51 @@ const normalizeRatioMap = (value: unknown): Record<string, number> | undefined =
     if (parsed !== undefined) {
       acc[String(key)] = parsed;
     }
+    return acc;
+  }, {});
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+};
+
+const normalizeStringArray = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean);
+
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value
+      .split(/[\s,|/]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+  }
+
+  return undefined;
+};
+
+const normalizeEndpointTargets = (
+  value: unknown
+): Record<string, { path?: string; method?: string }> | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const normalized = Object.entries(value as Record<string, unknown>).reduce<
+    Record<string, { path?: string; method?: string }>
+  >((acc, [key, raw]) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return acc;
+
+    const entry = raw as Record<string, unknown>;
+    const path = typeof entry.path === 'string' ? entry.path.trim() : undefined;
+    const method = typeof entry.method === 'string' ? entry.method.trim().toUpperCase() : undefined;
+
+    if (path || method) {
+      acc[String(key)] = { path, method };
+    }
+
     return acc;
   }, {});
 
@@ -166,18 +219,28 @@ export const buildProviderPricingSnapshot = (
     const provider = typeof item?.provider === 'string' ? item.provider.trim() : undefined;
     const providerLabel = typeof item?.provider_label === 'string' ? item.provider_label.trim() : undefined;
     const providerLogo = typeof item?.provider_logo === 'string' ? item.provider_logo.trim() : undefined;
+    const description = typeof item?.description === 'string' ? item.description.trim() : undefined;
     const tags = Array.isArray(item?.tags)
       ? item.tags.map((value: unknown) => String(value || '').trim()).filter(Boolean)
-      : undefined;
+      : normalizeStringArray(item?.tags);
     const tokenGroup = typeof item?.token_group === 'string' ? item.token_group.trim() : undefined;
     const billingType = typeof item?.billing_type === 'string' ? item.billing_type.trim() : undefined;
-    const endpointType = typeof item?.endpoint_type === 'string' ? item.endpoint_type.trim() : undefined;
+    const endpointTypes = normalizeStringArray(
+      item?.endpoint_types ?? item?.endpointTypes ?? item?.supported_endpoint_types ?? item?.supportedEndpointTypes
+    );
+    const endpointType = typeof item?.endpoint_type === 'string'
+      ? item.endpoint_type.trim()
+      : (typeof item?.endpointType === 'string' ? item.endpointType.trim() : endpointTypes?.[0]);
     const endpointUrl = typeof item?.endpoint_url === 'string'
       ? item.endpoint_url.trim()
       : (typeof item?.endpointUrl === 'string' ? item.endpointUrl.trim() : undefined);
     const endpointPath = typeof item?.endpoint_path === 'string'
       ? item.endpoint_path.trim()
       : (typeof item?.endpointPath === 'string' ? item.endpointPath.trim() : undefined);
+    const endpointTargets = normalizeEndpointTargets(item?.endpoint_targets ?? item?.endpointTargets);
+    const availableGroups = normalizeStringArray(
+      item?.available_groups ?? item?.availableGroups ?? item?.enable_groups ?? item?.enableGroups
+    );
     const currency = typeof item?.currency === 'string' ? item.currency.trim() : undefined;
     const billingUnit = typeof item?.pay_unit === 'string'
       ? item.pay_unit.trim()
@@ -193,12 +256,16 @@ export const buildProviderPricingSnapshot = (
       provider,
       providerLabel,
       providerLogo,
+      description,
       tags,
       tokenGroup,
       billingType,
       endpointType,
       endpointUrl,
       endpointPath,
+      endpointTypes,
+      endpointTargets,
+      availableGroups,
       modelRatio,
       modelPrice,
       perRequestPrice,
@@ -227,17 +294,35 @@ export const buildProviderPricingSnapshot = (
       snapshot.completionRatios![model] = completionRatio;
     }
 
-    if (provider || providerLabel || providerLogo || tags?.length || tokenGroup || billingType || endpointType || endpointUrl || endpointPath) {
+    if (
+      provider
+      || providerLabel
+      || providerLogo
+      || description
+      || tags?.length
+      || tokenGroup
+      || billingType
+      || endpointType
+      || endpointUrl
+      || endpointPath
+      || endpointTypes?.length
+      || endpointTargets
+      || availableGroups?.length
+    ) {
       snapshot.modelMeta![model] = {
         provider,
         providerLabel,
         providerLogo,
+        description,
         tags,
         tokenGroup,
         billingType,
         endpointType,
         endpointUrl,
         endpointPath,
+        endpointTypes,
+        endpointTargets,
+        availableGroups,
       };
     }
 

@@ -15,6 +15,13 @@ import {
   buildProxyHeaders,
   type ApiProtocolFormat,
 } from '../api/apiConfig';
+import {
+  buildResponsesPayload,
+  extractOpenAITextPayload,
+  extractOpenAIUsage,
+  modelPrefersResponsesApi,
+  shouldRetryWithResponsesApi,
+} from '../api/openaiResponses';
 import { resolveProviderRuntime } from '../api/providerStrategy';
 import { keyManager, type ThirdPartyProvider } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';
@@ -77,7 +84,7 @@ class ModelCaller {
         return {
           baseUrl: provider.baseUrl,
           apiKey: provider.apiKey,
-          provider: undefined,
+          provider: provider.name,
           format: provider.format,
         };
       }
@@ -202,33 +209,74 @@ class ModelCaller {
         provider: config.provider,
         baseUrl: config.baseUrl,
         format: config.format,
+        modelId: options.modelId,
       });
-      const response = await fetch(buildOpenAIEndpoint(config.baseUrl, 'chat/completions'), {
-        method: 'POST',
-        headers: buildProxyHeaders(runtime.authMethod as 'header' | 'query', config.apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat),
-        body: JSON.stringify({
-          model: options.modelId,
-          messages: options.messages,
-          max_tokens: options.maxTokens || 2048,
-          temperature: options.temperature ?? 0.7,
-          stream: false,
-        }),
+      const headers = buildProxyHeaders(
+        runtime.authMethod as 'header' | 'query',
+        config.apiKey,
+        runtime.headerName,
+        undefined,
+        runtime.authorizationValueFormat,
+      );
+      const chatUrl = buildOpenAIEndpoint(config.baseUrl, 'chat/completions');
+      const responsesUrl = buildOpenAIEndpoint(config.baseUrl, 'responses');
+      const chatBody = {
+        model: options.modelId,
+        messages: options.messages,
+        max_tokens: options.maxTokens || 2048,
+        temperature: options.temperature ?? 0.7,
+        stream: false,
+      };
+      const responsesBody = buildResponsesPayload({
+        model: options.modelId,
+        messages: options.messages,
+        maxOutputTokens: options.maxTokens || 2048,
+        temperature: options.temperature ?? 0.7,
+        stream: false,
       });
 
+      let response: Response;
+      let responseText = '';
+      const preferResponses = modelPrefersResponsesApi(options.modelId);
+
+      if (preferResponses) {
+        response = await fetch(responsesUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(responsesBody),
+        });
+      } else {
+        response = await fetch(chatUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(chatBody),
+        });
+
+        if (!response.ok) {
+          responseText = await response.text();
+          if (shouldRetryWithResponsesApi(response.status, responseText)) {
+            response = await fetch(responsesUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(responsesBody),
+            });
+          }
+        }
+      }
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`API error: ${response.status} - ${error}`);
+        if (!responseText) {
+          responseText = await response.text();
+        }
+        throw new Error(`API error: ${response.status} - ${responseText}`);
       }
 
       const data = await response.json();
+      const usage = extractOpenAIUsage(data);
       return {
         success: true,
-        content: data.choices?.[0]?.message?.content || '',
-        usage: {
-          promptTokens: data.usage?.prompt_tokens || 0,
-          completionTokens: data.usage?.completion_tokens || 0,
-          totalTokens: data.usage?.total_tokens || 0,
-        },
+        content: extractOpenAITextPayload(data) || '',
+        usage,
       };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -380,7 +428,7 @@ class ModelCaller {
         return {
           baseUrl: supplier.baseUrl,
           apiKey: supplier.apiKey,
-          provider: undefined,
+          provider: supplier.name,
           format: supplier.format || 'auto',
         };
       }

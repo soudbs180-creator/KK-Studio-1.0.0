@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock3, Loader2, Lock, Settings, ShieldAlert, ShieldCheck, UserCog } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAdminRole } from '../../hooks/useAdminRole';
@@ -6,6 +6,15 @@ import { notify } from '../../services/system/notificationService';
 import CreditModelSettings from './CreditModelSettings';
 import AdminConsoleSettings from './AdminConsoleSettings';
 import { ExchangeRateSettingsView } from './views/ExchangeRateSettingsView';
+import {
+  MetricCard,
+  PrimaryButton,
+  SecondaryButton,
+  SegmentedControlMulti,
+  SettingCard,
+  SettingInput,
+  StatusBadge,
+} from './ui/index';
 import {
   SETTINGS_ELEVATED_STYLE,
   SETTINGS_INPUT_CLASSNAME,
@@ -19,8 +28,11 @@ import {
 
 type AdminTab = 'credit-models' | 'exchange-rates' | 'admin-console';
 
-const SESSION_UNLOCK_KEY = 'admin_panel_unlocked_at';
+const SESSION_UNLOCK_KEY = 'kk_admin_panel_unlocked_at';
 const SESSION_UNLOCK_TTL_MS = 30 * 60 * 1000;
+
+// 全局变量：跟踪是否已经完成初始检查，避免切换标签页时重复显示 loading
+let globalHasInitiallyChecked = false;
 
 type AdminUnlockSession = {
   unlockedAt: number;
@@ -29,13 +41,13 @@ type AdminUnlockSession = {
 
 function clearUnlockSession() {
   if (typeof window === 'undefined') return;
-  sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+  localStorage.removeItem(SESSION_UNLOCK_KEY);
 }
 
 function readUnlockSession(): AdminUnlockSession | null {
   if (typeof window === 'undefined') return null;
 
-  const raw = sessionStorage.getItem(SESSION_UNLOCK_KEY);
+  const raw = localStorage.getItem(SESSION_UNLOCK_KEY);
   if (!raw) return null;
 
   const ts = Number(raw);
@@ -99,7 +111,7 @@ function persistUnlockSession(userId?: string) {
     userId: userId ?? null,
   };
 
-  sessionStorage.setItem(SESSION_UNLOCK_KEY, JSON.stringify(payload));
+  localStorage.setItem(SESSION_UNLOCK_KEY, JSON.stringify(payload));
 }
 
 const infoCardStyle: React.CSSProperties = {
@@ -164,6 +176,7 @@ const AdminAccessCard: React.FC<{
 export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 'credit-models' }) => {
   const { user, authLoading, checkingAdmin, isAdmin } = useAdminRole();
   const [unlocked, setUnlocked] = useState(isSessionUnlocked());
+  const hasInitiallyCheckedRef = useRef(globalHasInitiallyChecked);
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
@@ -189,10 +202,14 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
       setUnlocked(false);
       setMustChangeDefaultPassword(false);
       clearUnlockSession();
+      hasInitiallyCheckedRef.current = true;
+      globalHasInitiallyChecked = true;
       return;
     }
 
     setUnlocked(isSessionUnlocked(user.id));
+    hasInitiallyCheckedRef.current = true;
+    globalHasInitiallyChecked = true;
   }, [authLoading, checkingAdmin, isAdmin, user]);
 
   useEffect(() => {
@@ -276,7 +293,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
     setMustChangeDefaultPassword(false);
   };
 
-  if (authLoading || checkingAdmin) {
+  if ((authLoading || checkingAdmin) && !hasInitiallyCheckedRef.current) {
     return (
       <SettingsViewShell>
         <AdminAccessCard
@@ -404,80 +421,64 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
 
   return (
     <SettingsViewShell>
-      <section className="rounded-[24px] border p-5 md:p-6" style={SETTINGS_ELEVATED_STYLE}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
+      <div className="space-y-4 p-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard value="已验证" label="后台状态" helper={mustChangeDefaultPassword ? '建议先修改默认密码' : '当前会话已解锁'} tone={mustChangeDefaultPassword ? 'amber' : 'emerald'} />
+          <MetricCard value="30 分钟" label="会话时长" helper="到期后需要重新验证" tone="neutral" />
+          <MetricCard value={user?.email || '管理员'} label="当前账号" helper="仅管理员可见" tone="indigo" />
+          <MetricCard value={activeTab === 'credit-models' ? '积分模型' : activeTab === 'exchange-rates' ? '汇率设置' : '后台管理'} label="当前模块" helper="可在下方切换" tone="neutral" />
+        </div>
+
+        <SettingCard
+          title="管理员后台"
+          action={
+            <SecondaryButton onClick={lockNow}>
+              <Lock size={14} className="mr-1 inline-block" />立即锁定
+            </SecondaryButton>
+          }
+        >
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-                管理员后台
-              </div>
-              <SettingsBadge tone="emerald">已验证</SettingsBadge>
-              {mustChangeDefaultPassword ? <SettingsBadge tone="amber">请修改默认密码</SettingsBadge> : null}
-            </div>
-            <p className="max-w-3xl text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-              页面只保留必要入口。登录后在这里切换积分模型和后台管理模块，不再展示大块说明和统计卡片。
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5" style={infoCardStyle}>
+              <StatusBadge status="online" label="已验证" />
+              {mustChangeDefaultPassword ? <StatusBadge status="warning" label="请修改默认密码" /> : null}
+              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
                 <UserCog size={12} />
                 {userLabel}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5" style={infoCardStyle}>
+              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
                 <Clock3 size={12} />
                 会话 30 分钟
               </span>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <SettingsActionButton icon={Lock} onClick={lockNow}>
-              立即锁定
-            </SettingsActionButton>
-          </div>
-        </div>
-      </section>
+            <div className="text-[13px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+              这里只保留后台真正需要的模块入口，避免和普通用户设置内容冲突。
+            </div>
 
-      {mustChangeDefaultPassword ? (
-        <section className="rounded-2xl border p-4" style={SETTINGS_WARNING_STYLE}>
-          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            默认密码仍然有效
+            <SegmentedControlMulti
+              options={['积分模型', '汇率设置', '后台管理']}
+              value={activeTab === 'credit-models' ? '积分模型' : activeTab === 'exchange-rates' ? '汇率设置' : '后台管理'}
+              onChange={(value) =>
+                setActiveTab(value === '积分模型' ? 'credit-models' : value === '汇率设置' ? 'exchange-rates' : 'admin-console')
+              }
+            />
           </div>
-          <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-            建议先到“后台管理”里修改默认密码 `123456`，再继续执行其他后台操作。
-          </div>
-        </section>
-      ) : null}
+        </SettingCard>
 
-      <SettingsSection
-        eyebrow="ADMIN MODULES"
-        title="后台模块"
-        description="只保留必要切换，避免后台入口本身塞入过多解释信息。"
-        action={
-          <div className="apple-pill-group">
-            <button
-              onClick={() => setActiveTab('credit-models')}
-              className={`apple-pill-button ${activeTab === 'credit-models' ? 'active' : ''}`}
-            >
-              <Settings size={14} />
-              积分模型
-            </button>
-            <button
-              onClick={() => setActiveTab('exchange-rates')}
-              className={`apple-pill-button ${activeTab === 'exchange-rates' ? 'active' : ''}`}
-            >
-              <ShieldCheck size={14} />
-              汇率设置
-            </button>
-            <button
-              onClick={() => setActiveTab('admin-console')}
-              className={`apple-pill-button ${activeTab === 'admin-console' ? 'active' : ''}`}
-            >
-              <ShieldCheck size={14} />
-              后台管理
-            </button>
-          </div>
-        }
-      >
+        {mustChangeDefaultPassword ? (
+          <SettingCard title="安全提醒">
+            <div className="rounded-xl border p-3" style={SETTINGS_WARNING_STYLE}>
+              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                默认密码仍然有效
+              </div>
+              <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
+                建议先到"后台管理"里修改默认密码 `123456`，再继续执行其他后台操作。
+              </div>
+            </div>
+          </SettingCard>
+        ) : null}
+
+        <SettingCard title="后台模块">
         {activeTab === 'credit-models' ? (
           <CreditModelSettings />
         ) : activeTab === 'exchange-rates' ? (
@@ -485,7 +486,8 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
         ) : (
           <AdminConsoleSettings />
         )}
-      </SettingsSection>
+        </SettingCard>
+      </div>
     </SettingsViewShell>
   );
 };

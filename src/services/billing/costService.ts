@@ -406,16 +406,29 @@ export const calculateCost = (
             const groupSizeMap = snap.groupSizeRatios?.[modelId] || snap.groupSizeRatios?.[normalizedId];
             const groupSizeObj = getScopedGroupEntry(groupSizeMap, preferredGroup);
             const sRatio = Math.max(resolveSizeRatio(sRatioObj, size), resolveSizeRatio(groupSizeObj, size));
+            const groupPriceMap = snap.groupModelPrices?.[modelId] || snap.groupModelPrices?.[normalizedId];
+            const groupPriceKey = getPreferredGroupKey(preferredGroup, groupPriceMap);
+            const groupPriceOverride = getScopedGroupEntry(groupPriceMap, preferredGroup);
+            const overrideModelPrice = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelPrice');
+            const overrideModelRatio = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelRatio');
+            const overrideCompletionRatio = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'completionRatio');
+            const hasGroupTokenOverride = overrideModelRatio !== undefined || overrideCompletionRatio !== undefined;
+
+            if (overrideModelPrice !== undefined) {
+                cost = overrideModelPrice * gRatio * sRatio * count;
+                details = `API按次(分组覆盖): $${overrideModelPrice}/img | 组=${preferredGroup || groupPriceKey || 'default'} | 尺寸×${sRatio} | 分组×${gRatio}`;
+                return { cost, details, tokens: 0 };
+            }
 
             // 濡傛灉鏄寜娆¤璐?
-            if (mPrice !== undefined) {
+            if (mPrice !== undefined && !hasGroupTokenOverride) {
                 cost = mPrice * gRatio * gmRatio * sRatio * count;
                 details = `API按次: $${mPrice}/img | 组=${preferredGroup || groupRatioKey || 'default'} | 尺寸×${sRatio} | 分组×${gRatio} | 模型组×${gmRatio}`;
                 return { cost, details, tokens: 0 };
             }
 
             // 鍚﹀垯灏濊瘯鎸?token 娣峰悎璁¤垂
-            if (mRatio !== undefined) {
+            if (mRatio !== undefined || hasGroupTokenOverride) {
                 const textTokens = Math.ceil(promptLen / 4);
                 const refTokens = refCount * 560;
                 const inputTokens = textTokens + refTokens;
@@ -427,20 +440,6 @@ export const calculateCost = (
                     getSnapshotNumber(snap.completionRatios, modelId) ??
                     getSnapshotNumber(snap.completionRatios, normalizedId) ??
                     1;
-
-                const groupPriceMap = snap.groupModelPrices?.[modelId] || snap.groupModelPrices?.[normalizedId];
-                const groupPriceKey = getPreferredGroupKey(preferredGroup, groupPriceMap);
-                const groupPriceOverride = getScopedGroupEntry(groupPriceMap, preferredGroup);
-
-                const overrideModelPrice = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelPrice');
-                const overrideModelRatio = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'modelRatio');
-                const overrideCompletionRatio = getSnapshotNumber(groupPriceOverride as Record<string, any> | undefined, 'completionRatio');
-
-                if (overrideModelPrice !== undefined) {
-                    cost = overrideModelPrice * gRatio * sRatio * count;
-                    details = `API按次(分组覆盖): $${overrideModelPrice}/img | 组=${preferredGroup || groupPriceKey || 'default'} | 尺寸×${sRatio} | 分组×${gRatio}`;
-                    return { cost, details, tokens: 0 };
-                }
 
                 if (overrideModelRatio !== undefined) {
                     mRatio = overrideModelRatio;
@@ -454,12 +453,13 @@ export const calculateCost = (
                 // 鍏蜂綋璁′环甯告暟鍥犵珯鑰屽紓锛屽鏋滄病鏈夊畾涔夛紝绯荤粺鐩墠浣跨敤鍏滃簳浠锋牸锛?.002 / 1000 => 2 / 1000000
                 const baseRate = 2.0 / 1000000; // $0.002 per 1k ratio
 
-                const inputCost = inputTokens * baseRate * mRatio * gRatio * gmRatio;
-                const outputCost = outputTokens * baseRate * mRatio * cRatio * sRatio * gRatio * gmRatio;
+                const effectiveModelRatio = mRatio ?? 1;
+                const inputCost = inputTokens * baseRate * effectiveModelRatio * gRatio * gmRatio;
+                const outputCost = outputTokens * baseRate * effectiveModelRatio * cRatio * sRatio * gRatio * gmRatio;
 
                 cost = Math.max(0.000001, inputCost + outputCost);
                 tokens = inputTokens + outputTokens;
-                details = `API按量: ${tokens} Toks | 组=${preferredGroup || groupRatioKey || 'default'} | 模型×${mRatio} | 补全×${cRatio} | 尺寸×${sRatio} | 分组×${gRatio} | 模型组×${gmRatio}`;
+                details = `API按量: ${tokens} Toks | 组=${preferredGroup || groupPriceKey || groupRatioKey || 'default'} | 模型×${effectiveModelRatio} | 补全×${cRatio} | 尺寸×${sRatio} | 分组×${gRatio} | 模型组×${gmRatio}`;
                 return { cost, details, tokens };
             }
         }

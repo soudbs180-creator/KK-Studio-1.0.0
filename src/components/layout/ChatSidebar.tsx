@@ -1956,6 +1956,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
                                 }}
                                 onKeyDown={e => {
+                                    if ((e.nativeEvent as KeyboardEvent).isComposing) {
+                                        return;
+                                    }
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
                                         handleSend();

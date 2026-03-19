@@ -24,6 +24,8 @@ interface BillingContextType {
   recharge: (amount: number, currency: 'CNY' | 'USD') => Promise<void>;
   consumeCredits: (modelId: string, count: number, details?: any) => Promise<boolean>;
   refundCredits: (amount: number, reason: string) => Promise<boolean>;
+  refreshBilling: () => Promise<void>;
+  adjustBalanceOptimistically: (delta: number) => void;
   billingLogs: CreditTransactionLog[];
   usageLogs: CreditTransactionLog[];
   fetchLogs: () => Promise<void>;
@@ -37,6 +39,8 @@ const BillingContext = createContext<BillingContextType>({
   recharge: async () => {},
   consumeCredits: async () => false,
   refundCredits: async () => false,
+  refreshBilling: async () => {},
+  adjustBalanceOptimistically: () => {},
   billingLogs: [],
   usageLogs: [],
   fetchLogs: async () => {},
@@ -123,6 +127,15 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user, isTempUser]);
 
+  const refreshBilling = useCallback(async () => {
+    await Promise.all([fetchBalance(), fetchLogs()]);
+  }, [fetchBalance, fetchLogs]);
+
+  const adjustBalanceOptimistically = useCallback((delta: number) => {
+    if (!Number.isFinite(delta) || delta === 0) return;
+    setBalance((current) => Math.max(0, Number(current || 0) + delta));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -144,7 +157,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       setLoading(true);
-      await Promise.all([fetchBalance(), fetchLogs()]);
+      await refreshBilling();
       if (!cancelled) {
         setLoading(false);
       }
@@ -197,7 +210,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       void supabase.removeChannel(balanceChannel);
       void supabase.removeChannel(transactionChannel);
     };
-  }, [user, isTempUser, fetchBalance, fetchLogs]);
+  }, [user, isTempUser, refreshBilling]);
 
   const consumeCredits = useCallback(
     async (modelId: string, count: number, details: any = {}) => {
@@ -227,14 +240,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (error) throw error;
         if (!success) return false;
 
-        await Promise.all([fetchBalance(), fetchLogs()]);
+        await refreshBilling();
         return true;
       } catch (error) {
         console.error('[BillingContext] 扣减积分失败:', error);
         return false;
       }
     },
-    [user, balance, fetchBalance, fetchLogs]
+    [user, balance, refreshBilling]
   );
 
   const refundCredits = useCallback(
@@ -248,14 +261,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
 
         if (error) throw error;
-        await Promise.all([fetchBalance(), fetchLogs()]);
+        await refreshBilling();
         return Boolean(success);
       } catch (error) {
         console.error('[BillingContext] 退还积分失败:', reason, error);
         return false;
       }
     },
-    [user, fetchBalance, fetchLogs]
+    [user, refreshBilling]
   );
 
   const recharge = useCallback(
@@ -276,6 +289,8 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         recharge,
         consumeCredits,
         refundCredits,
+        refreshBilling,
+        adjustBalanceOptimistically,
         billingLogs,
         usageLogs,
         fetchLogs,

@@ -73,7 +73,6 @@ class TempUserService {
 
     const { error } = await supabase.from('temp_users').insert({
       id: tempUserId,
-      created_at: timestampIso,
       expires_at: new Date(expiresAt).toISOString(),
       is_active: true,
       metadata: {

@@ -85,16 +85,16 @@ interface SettingsPanelProps {
 
 const navSections: Array<{ id: NavSectionId; label: string }> = [
   { id: 'workspace', label: '工作台' },
-  { id: 'system', label: '系统与维护' },
+  { id: 'system', label: '系统' },
 ];
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: '仪表盘', description: '查看当前状态与待处理事项。', icon: LayoutDashboard, section: 'workspace' },
-  { id: 'api-management', label: 'API管理', description: '管理接口来源、供应商与价格同步。', icon: Key, section: 'workspace' },
-  { id: 'consumption-records', label: '消费记录', description: '查看 API 花费、积分消耗与最近记录。', icon: Calculator, section: 'workspace' },
-  { id: 'storage-settings', label: '存储设置', description: '管理图片存储位置与空间占用。', icon: HardDrive, section: 'system' },
-  { id: 'system-logs', label: '系统日志', description: '集中查看告警、错误与运行记录。', icon: ScrollText, section: 'system' },
-  { id: 'admin-system', label: '管理员后台', description: '处理权限、后台维护与系统操作。', icon: Shield, section: 'system' },
+  { id: 'dashboard', label: '仪表盘', description: '查看链路、消费和待处理。', icon: LayoutDashboard, section: 'workspace' },
+  { id: 'api-management', label: 'API管理', description: '管理接口、供应商与价格。', icon: Key, section: 'workspace' },
+  { id: 'consumption-records', label: '消费记录', description: '查看消费与积分记录。', icon: Calculator, section: 'workspace' },
+  { id: 'storage-settings', label: '存储设置', description: '管理存储、缓存和整理。', icon: HardDrive, section: 'system' },
+  { id: 'system-logs', label: '系统日志', description: '查看告警、错误与运行记录。', icon: ScrollText, section: 'system' },
+  { id: 'admin-system', label: '管理员后台', description: '处理模型、汇率和权限。', icon: Shield, section: 'system' },
 ];
 
 type DashboardTone = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose' | 'slate' | 'neutral';
@@ -1414,7 +1414,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const lazyFallback = (
     <div className="flex min-h-[280px] items-center justify-center">
-      <div className="settings-shell-loading-card rounded-[10px]">
+      <div className="settings-shell-loading-card rounded-2xl">
         <div className="settings-shell-kicker text-[11px]">Loading</div>
         <div className="mt-2 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
           正在加载设置内容
@@ -1541,7 +1541,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
               <main className="settings-shell-page settings-shell-page--mobile mobile-sheet-scroll h-full px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
                 <div className="settings-shell-content space-y-4">
-                  <div className="rounded-[10px] border p-4" style={SETTINGS_PANEL_STYLE}>
+                  <div className="rounded-2xl border p-4" style={SETTINGS_PANEL_STYLE}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>

@@ -85,9 +85,26 @@ export const buildGeneratedImageBatchPositions = ({
         });
     }
 
-    const safeColumns = Math.max(1, columns);
+    // Desktop: Grid Layout
+    const safeColumns = items.length === 1 ? 1 : Math.max(1, columns);
     const positions: Array<{ x: number; y: number }> = new Array(metrics.length);
     let currentTop = basePosition.y + gapToImages;
+
+    // 🎯 [Fix] 单列时直接返回居中位置，不使用复杂计算
+    if (items.length === 1) {
+        const metric = metrics[0];
+        const position = {
+            x: basePosition.x,
+            y: currentTop + metric.height
+        };
+        console.log('[DEBUG] Single image layout:', {
+            basePosition,
+            metric,
+            position,
+            'metric.width': metric.width
+        });
+        return [position];
+    }
 
     for (let rowStart = 0; rowStart < metrics.length; rowStart += safeColumns) {
         const rowMetrics = metrics.slice(rowStart, rowStart + safeColumns);

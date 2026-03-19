@@ -126,6 +126,8 @@ export interface GeneratedImage {
   tokens?: number; // New: Token usage
   cost?: number; // New: Estimated cost
   costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
+  billingMode?: 'credits' | 'currency';
+  creditCost?: number;
   orphaned?: boolean; // 瀛ょ嫭鍓崱锛堟棤鐖惰妭鐐癸級
   fileName?: string; // 原始文档鍚?
   fileSize?: number; // 文档大小锛堝瓧鑺傦級
@@ -298,6 +300,7 @@ export interface PromptNode {
   };
   // 🎯 [添加] 绉垎閫€鍥炵姸鎬侊紝鐢ㄤ簬显示"鐢熸垚失败锛岀Н鍒嗗凡閫€鍥?
   refundStatus?: 'pending' | 'success' | 'failed';
+  creditSettlement?: 'client' | 'server';
 
   mode?: GenerationMode; // New
   width?: number; // Dynamic width for layout calculation
@@ -326,6 +329,8 @@ export interface PromptNode {
 
   // Analytics
   cost?: number; // Estimated or actual cost
+  billingMode?: 'credits' | 'currency';
+  creditCost?: number;
   isPaymentProcessed?: boolean; // 🎯 [New] 鏄惁宸叉垚鍔熸墽琛屾墸璐癸紝鐢ㄤ簬失败閫€鍥炲垽瀹?
 
   // 🎯 [Persistence Management]

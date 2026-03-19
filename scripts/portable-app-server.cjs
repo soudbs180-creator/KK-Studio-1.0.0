@@ -90,19 +90,33 @@ function normalizePricingBaseUrl(baseUrl) {
   }
 }
 
+function buildPricingCandidates(baseUrl) {
+  const cleanUrl = normalizePricingBaseUrl(baseUrl);
+  if (!cleanUrl) return [];
+
+  const rootUrl = cleanUrl.replace(/\/v1$/i, '');
+  let originUrl = cleanUrl;
+
+  try {
+    const parsed = new URL(cleanUrl);
+    originUrl = `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    originUrl = rootUrl;
+  }
+
+  const baseCandidates = Array.from(new Set([cleanUrl, rootUrl, originUrl].filter(Boolean)));
+  const suffixes = ['/pricing', '/pricing.html', '/models', '/api/pricing', '/api/price', '/price'];
+
+  return Array.from(new Set(baseCandidates.flatMap((candidate) => suffixes.map((suffix) => `${candidate}${suffix}`))));
+}
+
 async function fetchPricingPayload(baseUrl) {
   const cleanUrl = normalizePricingBaseUrl(baseUrl);
 
   if (!cleanUrl) {
     return { error: 'Missing baseUrl.' };
   }
-
-  const candidates = [
-    `${cleanUrl}/pricing`,
-    `${cleanUrl}/pricing.html`,
-    `${cleanUrl}/models`,
-    `${cleanUrl}/api/pricing`,
-  ];
+  const candidates = buildPricingCandidates(cleanUrl);
 
   let lastError = 'No pricing endpoint returned JSON.';
 

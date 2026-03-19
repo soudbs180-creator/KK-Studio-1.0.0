@@ -255,15 +255,15 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             {/* 副占位卡 - 2x2 宫格布局 */}
             <div className="relative" style={{ height: 0 }}>
                 {Array.from({ length: parallelCount }).map((_, i) => {
-                    const col = i % COLS;
                     const row = Math.floor(i / COLS);
+                    const indexInRow = i - row * COLS;
 
                     // 计算居中: 实际列数 = min(COLS, parallelCount)
-                    const actualCols = Math.min(COLS, parallelCount);
+                    const actualCols = Math.min(COLS, parallelCount - row * COLS);
                     const totalW = actualCols * cardWidth + (actualCols - 1) * GAP;
 
                     // 每个卡片的left偏移 (相对于中心点)
-                    const offsetX = -totalW / 2 + col * (cardWidth + GAP) + cardWidth / 2;
+                    const offsetX = -totalW / 2 + indexInRow * (cardWidth + GAP) + cardWidth / 2;
 
                     // 每个卡片的top偏移
                     const offsetY = gapToPlaceholders + row * (cardHeight + GAP);

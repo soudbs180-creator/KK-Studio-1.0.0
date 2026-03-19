@@ -18,6 +18,14 @@ import { adminModelService } from '../../services/model/adminModelService';
 import { getModelCapabilities } from '../../services/model/modelCapabilities';
 import { unifiedModelService } from '../../services/model/unifiedModelService';
 import { ImageSize } from '../../types';
+import {
+  DangerButton,
+  EmptyState,
+  MetricCard,
+  PrimaryButton,
+  SecondaryButton,
+  SettingCard,
+} from './ui/index';
 
 type CreditModelRow = {
   provider_id: string;
@@ -101,13 +109,38 @@ const normalizeBaseModelId = (value: string): string => {
   return (value || '').split('@')[0].trim();
 };
 
-const normalizeHexColor = (value?: string | null, fallback = ''): string => {
-  let color = (value || fallback || '').trim();
-  if (!color) return '';
-  if (/^[A-Fa-f0-9]{3,8}$/.test(color)) {
-    color = `#${color}`;
+const normalizeHexColor = (value?: string | null, fallback = '#3B82F6'): string => {
+  let color = (value || fallback || '#3B82F6').trim();
+  if (!color) return fallback || '#3B82F6';
+  
+  // Remove # prefix for processing
+  let hexPart = color.startsWith('#') ? color.slice(1) : color;
+  
+  // Check if it's valid hex characters
+  if (!/^[0-9a-fA-F]+$/.test(hexPart)) {
+    return fallback || '#3B82F6';
   }
-  return color.toUpperCase();
+  
+  // Expand 3-char hex to 6-char (e.g., ABC -> AABBCC)
+  if (hexPart.length === 3) {
+    hexPart = hexPart[0] + hexPart[0] + hexPart[1] + hexPart[1] + hexPart[2] + hexPart[2];
+  }
+  
+  // Handle edge cases: pad to 6 chars or truncate to 6/8 chars
+  if (hexPart.length < 6) {
+    hexPart = hexPart.padEnd(6, '0');
+  } else if (hexPart.length === 7) {
+    hexPart = hexPart.slice(0, 6);
+  } else if (hexPart.length > 8) {
+    hexPart = hexPart.slice(0, 8);
+  }
+  
+  // If not 6 or 8 chars, force to 6
+  if (hexPart.length !== 6 && hexPart.length !== 8) {
+    hexPart = '3B82F6';
+  }
+  
+  return `#${hexPart.toUpperCase()}`;
 };
 
 const newModel = (): EditableModel => ({
@@ -178,6 +211,11 @@ const normalizeAdminCreditModelRows = (providers: CreditModelRpcProvider[]): Cre
       quality_pricing: model.quality_pricing ?? null,
     }))
   );
+
+const getConfiguredKeyCount = (apiKeys?: string[] | null): number =>
+  Array.isArray(apiKeys)
+    ? apiKeys.filter((key): key is string => typeof key === 'string' && key.trim().length > 0).length
+    : 0;
 
 const areQualityPricingEqual = (
   left: AdminModelQualityPricing,
@@ -255,6 +293,23 @@ const CreditModelSettings: React.FC = () => {
     }
     return Array.from(grouped.entries()).map(([providerId, items]) => ({ providerId, items }));
   }, [rows]);
+
+  const selectedProviderKeyCount = useMemo(() => {
+    if (!selectedProviderId) return 0;
+    const entry = providers.find((item) => item.providerId === selectedProviderId);
+    if (!entry) return 0;
+    return getConfiguredKeyCount(entry.items[0]?.api_keys);
+  }, [providers, selectedProviderId]);
+
+  const activeModelCount = useMemo(
+    () => rows.filter((row) => row.is_active).length,
+    [rows]
+  );
+
+  const advancedModelCount = useMemo(
+    () => rows.filter((row) => row.advanced_enabled).length,
+    [rows]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -411,7 +466,8 @@ const CreditModelSettings: React.FC = () => {
       providerId: first.provider_id,
       providerName: first.provider_name,
       baseUrl: first.base_url,
-      apiKey: first.api_keys?.[0] || '',
+      // Existing upstream keys are intentionally never hydrated back into the client UI.
+      apiKey: '',
       models: entry.items.map((row) => ({
         modelId: normalizeBaseModelId(row.model_id),
         displayName: row.display_name,
@@ -523,11 +579,16 @@ const CreditModelSettings: React.FC = () => {
   };
 
   const saveProvider = async () => {
+    const providerId = form.providerId.trim();
+    const nextApiKey = form.apiKey.trim();
+    const canKeepExistingApiKeys =
+      selectedProviderId === providerId && selectedProviderKeyCount > 0;
+
     if (!form.providerId.trim() || !form.providerName.trim() || !form.baseUrl.trim()) {
       notify.error('缺少字段', '供应商 ID、名称和基础 地址 为必填项');
       return;
     }
-    if (!form.apiKey.trim()) {
+    if (!nextApiKey && !canKeepExistingApiKeys) {
       notify.error('缺少 接口密钥', '请填写上游 接口密钥');
       return;
     }
@@ -559,8 +620,8 @@ const CreditModelSettings: React.FC = () => {
         priority: 10 - index,
         weight: 1,
         is_active: Boolean(item.isActive),
-        color: item.color || '#3B82F6',
-        color_secondary: item.colorSecondary || null,
+        color: normalizeHexColor(item.color, '#3B82F6'),
+        color_secondary: item.colorSecondary ? normalizeHexColor(item.colorSecondary) : null,
         text_color: item.textColor,
         ...(supportsMaxCallsLimit
           ? {
@@ -570,12 +631,11 @@ const CreditModelSettings: React.FC = () => {
           : {}),
       }));
 
-      const providerId = form.providerId.trim();
       const { error } = await supabase.rpc('save_credit_provider', {
         p_provider_id: providerId,
         p_provider_name: form.providerName.trim(),
         p_base_url: form.baseUrl.trim(),
-        p_api_keys: [form.apiKey.trim()],
+        p_api_keys: nextApiKey ? [nextApiKey] : [],
         p_models: payloadModels,
       });
 
@@ -583,7 +643,10 @@ const CreditModelSettings: React.FC = () => {
         throw error;
       }
 
-      notify.success('保存成功', '积分模型配置已更新');
+      notify.success(
+        '保存成功',
+        nextApiKey ? '积分模型配置已更新' : '积分模型配置已更新，并保留了现有上游密钥'
+      );
       await load();
       setSelectedProviderId(providerId);
       await refreshAdminModelSync();
@@ -611,40 +674,60 @@ const CreditModelSettings: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="settings-intent-card settings-intent-card--warning">
-        <div className="settings-intent-card__title">
-          <ShieldAlert className="h-4 w-4" />
-          积分模型配置（全局）
-        </div>
-        <p className="settings-intent-card__body">
-          这里配置的是管理员全局积分模型，会同步给所有用户。用户自己的接口配置不在本页面修改。
-        </p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          value={`${providers.length}`}
+          label="供应商配置"
+          helper="按供应商维护积分模型"
+          tone="indigo"
+        />
+        <MetricCard
+          value={`${rows.length}`}
+          label="模型总数"
+          helper={`${activeModelCount} 个启用中`}
+          tone={activeModelCount > 0 ? 'emerald' : 'neutral'}
+        />
+        <MetricCard
+          value={`${advancedModelCount}`}
+          label="高级模型"
+          helper="开启高级混合或画质矩阵"
+          tone={advancedModelCount > 0 ? 'amber' : 'neutral'}
+        />
+        <MetricCard
+          value={`${creditsPerUsd.toFixed(1)}`}
+          label="积分系数"
+          helper="$1 估算换算后的积分成本"
+          tone="neutral"
+        />
       </div>
 
-      <div className="settings-action-row">
-        <button
-          onClick={() => void load()}
-          disabled={loading}
-          className="apple-button-secondary min-h-10 px-3 text-xs"
-        >
-          {loading ? '刷新中...' : '刷新'}
-        </button>
-        <button
-          onClick={resetForm}
-          className="apple-button-secondary min-h-10 px-3 text-xs"
-        >
-          新建供应商
-        </button>
-      </div>
+      <SettingCard
+        title="积分模型配置（全局）"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <SecondaryButton onClick={() => void load()}>
+              {loading ? '刷新中...' : '刷新'}
+            </SecondaryButton>
+            <PrimaryButton onClick={resetForm}>新建供应商</PrimaryButton>
+          </div>
+        }
+      >
+        <div className="rounded-xl border p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--warning) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--warning) 26%, transparent)' }}>
+          <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
+            <ShieldAlert className="h-4 w-4" />
+            这里配置的是管理员全局积分模型
+          </div>
+          <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+            修改后会同步影响所有用户看到的积分模型，不会改动用户自己的接口配置。
+          </p>
+        </div>
+      </SettingCard>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px,minmax(0,1fr)]">
-        <div className="settings-section-card self-start p-3 xl:sticky xl:top-4">
-          <div className="mb-2 text-xs text-[var(--text-tertiary)]">已配置供应商</div>
+        <SettingCard title="已配置供应商" className="self-start xl:sticky xl:top-4">
           <div className="settings-scroll-region space-y-2 pr-1">
             {providers.length === 0 ? (
-              <div className="apple-empty-state rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-tertiary)]">
-                暂无积分供应商配置。
-              </div>
+              <EmptyState title="暂无积分供应商配置" description="先创建一个供应商后再添加模型。" />
             ) : (
               providers.map((item) => {
                 const first = item.items[0];
@@ -672,9 +755,9 @@ const CreditModelSettings: React.FC = () => {
               })
             )}
           </div>
-        </div>
+        </SettingCard>
 
-        <div className="settings-section-card space-y-4 p-4">
+        <div className="settings-section-card space-y-4 p-4 rounded-2xl border border-[var(--border-light)]" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}>
           <div>
             <div className="mb-2 text-xs font-semibold text-[var(--text-primary)]">供应商基础信息</div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -711,9 +794,19 @@ const CreditModelSettings: React.FC = () => {
                   type="password"
                   value={form.apiKey}
                   onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-                  placeholder="请输入上游 接口密钥"
+                  autoComplete="new-password"
+                  placeholder={
+                    selectedProviderId && selectedProviderId === form.providerId.trim() && selectedProviderKeyCount > 0
+                      ? '留空则保留现有密钥，填写则替换'
+                      : '请输入上游 接口密钥'
+                  }
                   className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm"
                 />
+                <div className="text-[11px] leading-5 text-[var(--text-tertiary)]">
+                  {selectedProviderId && selectedProviderId === form.providerId.trim() && selectedProviderKeyCount > 0
+                    ? `当前已配置 ${selectedProviderKeyCount} 个上游密钥。为了安全，前端不会回显真实值；留空将保留现有密钥。`
+                    : '为了安全，已有上游密钥不会回显到前端。新增或轮换时请输入新的密钥。'}
+                </div>
               </label>
             </div>
           </div>
@@ -800,14 +893,12 @@ const CreditModelSettings: React.FC = () => {
                                 {item.suggestion.matchedModel ? ` · 匹配 ${item.suggestion.matchedModel}` : ''}
                               </div>
                             </div>
-                            <button
-                              type="button"
+                            <SecondaryButton
                               onClick={() => applySuggestionToModel(item.index)}
-                              disabled={!item.hasSuggestedChange}
-                              className="apple-button-secondary min-h-9 px-3 text-[11px] disabled:opacity-60"
+                              className={!item.hasSuggestedChange ? 'pointer-events-none opacity-60' : ''}
                             >
                               套用建议
-                            </button>
+                            </SecondaryButton>
                           </div>
                           <div className="mt-2 text-[11px] leading-5 text-[var(--text-tertiary)]">
                             {item.suggestion.note}
@@ -831,15 +922,23 @@ const CreditModelSettings: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-[var(--text-primary)]">模型配置</div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">模型配置</div>
+                <div className="mt-1 text-[12px] text-[var(--text-tertiary)]">每个模型都能单独配置积分、颜色、上限和高级策略。</div>
+              </div>
+              <SecondaryButton onClick={addModel}>
+                <Plus size={12} className="mr-1 inline-block" />添加模型
+              </SecondaryButton>
+            </div>
             {!supportsMaxCallsLimit && (
-              <div className="settings-intent-card settings-intent-card--warning px-3 py-2 text-[11px]">
+              <div className="rounded-xl border px-3 py-2 text-[11px] leading-5" style={{ backgroundColor: 'color-mix(in srgb, var(--warning) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--warning) 26%, transparent)', color: 'var(--text-secondary)' }}>
                 当前数据库未包含总调用上限字段（`max_calls_limit`），已自动降级兼容。
                 执行最新 Supabase 迁移后，可启用“总调用上限/自动暂停”能力。
               </div>
             )}
             {!supportsAdvancedSettings && (
-              <div className="settings-intent-card settings-intent-card--warning px-3 py-2 text-[11px]">
+              <div className="rounded-xl border px-3 py-2 text-[11px] leading-5" style={{ backgroundColor: 'color-mix(in srgb, var(--warning) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--warning) 26%, transparent)', color: 'var(--text-secondary)' }}>
                 当前数据库未包含高级设置字段（`advanced_enabled / mix_with_same_model / quality_pricing`），
                 已自动隐藏画质定价与混合路由配置。执行最新 Supabase 迁移后即可启用。
               </div>
@@ -855,6 +954,30 @@ const CreditModelSettings: React.FC = () => {
 
               return (
                 <div key={`${model.modelId}-${index}`} className="rounded-xl border border-[var(--border-light)] p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-light)] px-3 py-2" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)' }}>
+                    <div>
+                      <div className="text-sm font-medium text-[var(--text-primary)]">
+                        {model.displayName || model.modelId || `模型 ${index + 1}`}
+                      </div>
+                      <div className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                        {model.modelId || '先填写模型编号'}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <span className="rounded-full border border-[var(--border-light)] px-2 py-1 text-[var(--text-secondary)]">
+                        {model.endpointType === 'auto' ? '自动' : model.endpointType}
+                      </span>
+                      <span className="rounded-full border border-[var(--border-light)] px-2 py-1 text-[var(--text-secondary)]">
+                        {model.creditCost} 积分
+                      </span>
+                      {supportsAdvancedSettings ? (
+                        <span className="rounded-full border border-[var(--border-light)] px-2 py-1 text-[var(--text-secondary)]">
+                          {model.advancedEnabled ? '高级已开' : '标准模式'}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <label className="space-y-1">
                       <span className="text-[11px] text-[var(--text-tertiary)]">模型编号</span>
@@ -1044,27 +1167,27 @@ const CreditModelSettings: React.FC = () => {
                   </label>
 
                   {supportsAdvancedSettings && (
-                    <div className="credit-advanced-panel">
-                      <div className="credit-advanced-panel__header">
-                        <div className="credit-advanced-panel__intro">
-                          <div className="credit-advanced-panel__icon">
+                    <div className="rounded-2xl border border-[var(--border-light)] p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 22%, transparent)' }}>
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-hover)_92%,transparent)] text-[var(--text-primary)]">
                             <SlidersHorizontal size={16} />
                           </div>
                           <div className="min-w-0">
-                            <div className="credit-advanced-panel__eyebrow">Advanced Controls</div>
-                            <div className="credit-advanced-panel__title-row">
-                              <div className="credit-advanced-panel__title">高级设置</div>
-                              <span className={`credit-advanced-panel__status ${model.advancedEnabled ? 'is-on' : ''}`}>
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Advanced Controls</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <div className="text-[15px] font-medium text-[var(--text-primary)]">高级设置</div>
+                              <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${model.advancedEnabled ? 'border-emerald-500/30 bg-emerald-500/12 text-emerald-300' : 'border-[var(--border-light)] text-[var(--text-tertiary)]'}`}>
                                 {model.advancedEnabled ? '已启用' : '未启用'}
                               </span>
                             </div>
-                            <div className="credit-advanced-panel__description">
+                            <div className="mt-1 text-[13px] leading-6 text-[var(--text-secondary)]">
                               把复杂配置收敛成两件事：混合路由和分辨率定价。
                             </div>
                           </div>
                         </div>
-                        <div className="credit-advanced-panel__control">
-                          <div className="credit-advanced-panel__control-label">启用高级策略</div>
+                        <div className="rounded-xl border border-[var(--border-light)] px-3 py-2" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 28%, transparent)' }}>
+                          <div className="mb-2 text-[11px] text-[var(--text-tertiary)]">启用高级策略</div>
                           <AdvancedToggle
                             checked={model.advancedEnabled}
                             label="启用高级设置"
@@ -1080,22 +1203,22 @@ const CreditModelSettings: React.FC = () => {
                       </div>
 
                       {model.advancedEnabled && (
-                        <div className="credit-advanced-panel__body">
-                          <div className="credit-advanced-grid">
-                            <div className="credit-advanced-card">
-                              <div className="credit-advanced-card__head">
-                                <div className="credit-advanced-card__icon-badge credit-advanced-card__icon-badge--emerald">
+                        <div className="mt-4 space-y-4">
+                          <div className="grid gap-3 lg:grid-cols-2">
+                            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)' }}>
+                              <div className="flex items-start gap-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-300">
                                   <ArrowRightLeft size={15} />
                                 </div>
                                 <div>
-                                  <div className="credit-advanced-card__title">多供应商混合</div>
-                                  <div className="credit-advanced-card__description">
+                                  <div className="text-[15px] font-medium text-[var(--text-primary)]">多供应商混合</div>
+                                  <div className="mt-1 text-[13px] leading-6 text-[var(--text-secondary)]">
                                     自动均衡同模型下的请求量，优先使用调用次数较少的供应商。
                                   </div>
                                 </div>
                               </div>
-                              <div className="credit-advanced-card__footer">
-                                <span className={`credit-advanced-card__pill ${model.mixWithSameModel ? 'is-on' : ''}`}>
+                              <div className="mt-3 flex items-center justify-between gap-3">
+                                <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${model.mixWithSameModel ? 'bg-emerald-500/12 text-emerald-300' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'}`}>
                                   {model.mixWithSameModel ? '自动均衡已开启' : '保持单供应商'}
                                 </span>
                                 <AdvancedToggle
@@ -1107,46 +1230,46 @@ const CreditModelSettings: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="credit-advanced-card">
-                              <div className="credit-advanced-card__head">
-                                <div className="credit-advanced-card__icon-badge credit-advanced-card__icon-badge--indigo">
+                            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)' }}>
+                              <div className="flex items-start gap-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/12 text-indigo-300">
                                   <Sparkles size={15} />
                                 </div>
                                 <div>
-                                  <div className="credit-advanced-card__title">画质定价</div>
-                                  <div className="credit-advanced-card__description">
+                                  <div className="text-[15px] font-medium text-[var(--text-primary)]">画质定价</div>
+                                  <div className="mt-1 text-[13px] leading-6 text-[var(--text-secondary)]">
                                     按分辨率单独设置积分成本，方便把高质量出图与默认费率区分开。
                                   </div>
                                 </div>
                               </div>
-                              <div className="credit-advanced-card__stats">
-                                <div className="credit-advanced-card__stat">
-                                  <span className="credit-advanced-card__stat-label">可配置规格</span>
-                                  <span className="credit-advanced-card__stat-value">{qualitiesToShow.length}</span>
+                              <div className="mt-3 grid grid-cols-3 gap-2">
+                                <div className="rounded-xl border border-[var(--border-light)] px-3 py-2 text-center">
+                                  <div className="text-[10px] text-[var(--text-tertiary)]">可配置规格</div>
+                                  <div className="mt-1 text-sm font-medium text-[var(--text-primary)]">{qualitiesToShow.length}</div>
                                 </div>
-                                <div className="credit-advanced-card__stat">
-                                  <span className="credit-advanced-card__stat-label">当前启用</span>
-                                  <span className="credit-advanced-card__stat-value">{enabledQualityCount}</span>
+                                <div className="rounded-xl border border-[var(--border-light)] px-3 py-2 text-center">
+                                  <div className="text-[10px] text-[var(--text-tertiary)]">当前启用</div>
+                                  <div className="mt-1 text-sm font-medium text-[var(--text-primary)]">{enabledQualityCount}</div>
                                 </div>
-                                <div className="credit-advanced-card__stat">
-                                  <span className="credit-advanced-card__stat-label">默认积分</span>
-                                  <span className="credit-advanced-card__stat-value">{model.creditCost}</span>
+                                <div className="rounded-xl border border-[var(--border-light)] px-3 py-2 text-center">
+                                  <div className="text-[10px] text-[var(--text-tertiary)]">默认积分</div>
+                                  <div className="mt-1 text-sm font-medium text-[var(--text-primary)]">{model.creditCost}</div>
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          <div className="credit-quality-section">
-                            <div className="credit-quality-section__header">
+                          <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 32%, transparent)' }}>
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                               <div>
-                                <div className="credit-quality-section__eyebrow">Pricing Matrix</div>
-                                <div className="credit-quality-section__title">按画质单独定价</div>
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Pricing Matrix</div>
+                                <div className="mt-1 text-[15px] font-medium text-[var(--text-primary)]">按画质单独定价</div>
                               </div>
-                              <div className="credit-quality-section__summary">
+                              <div className="rounded-full border border-[var(--border-light)] px-2 py-1 text-[11px] text-[var(--text-secondary)]">
                                 已启用 {enabledQualityCount} / {qualitiesToShow.length}
                               </div>
                             </div>
-                            <div className="credit-quality-grid">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                               {qualitiesToShow.map((quality) => {
                                 const rule = model.qualityPricing[quality];
                                 const isEnabled = rule.enabled !== false;
@@ -1155,15 +1278,16 @@ const CreditModelSettings: React.FC = () => {
                                 return (
                                   <div
                                     key={quality}
-                                    className={`credit-quality-card ${isEnabled ? 'is-enabled' : 'is-disabled'}`}
+                                    className="rounded-xl border border-[var(--border-light)] p-3"
+                                    style={{ backgroundColor: isEnabled ? 'color-mix(in srgb, var(--bg-hover) 55%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)' }}
                                   >
-                                    <div className="credit-quality-card__top">
+                                    <div className="flex items-start justify-between gap-3">
                                       <div>
-                                        <div className="credit-quality-card__label-row">
-                                          <div className="credit-quality-card__name">{quality}</div>
-                                          <span className="credit-quality-card__resolution">{qualityMeta.resolution}</span>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <div className="text-sm font-medium text-[var(--text-primary)]">{quality}</div>
+                                          <span className="rounded-full border border-[var(--border-light)] px-2 py-0.5 text-[10px] text-[var(--text-tertiary)]">{qualityMeta.resolution}</span>
                                         </div>
-                                        <div className="credit-quality-card__hint">{qualityMeta.hint}</div>
+                                        <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{qualityMeta.hint}</div>
                                       </div>
                                       <AdvancedToggle
                                         checked={isEnabled}
@@ -1173,11 +1297,11 @@ const CreditModelSettings: React.FC = () => {
                                       />
                                     </div>
 
-                                    <label className="credit-quality-card__field">
-                                      <span className="credit-quality-card__field-label">
+                                    <label className="mt-3 block">
+                                      <span className="text-[11px] text-[var(--text-tertiary)]">
                                         {isEnabled ? '单次积分' : '当前已停用'}
                                       </span>
-                                      <div className="credit-quality-card__input-wrap">
+                                      <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--border-light)] px-3 py-2">
                                         <input
                                           type="number"
                                           min={1}
@@ -1188,9 +1312,9 @@ const CreditModelSettings: React.FC = () => {
                                               creditCost: Math.max(1, Number(e.target.value || model.creditCost || 1)),
                                             })
                                           }
-                                          className="credit-quality-input"
+                                          className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none"
                                         />
-                                        <span className="credit-quality-card__suffix">积分</span>
+                                        <span className="text-[11px] text-[var(--text-tertiary)]">积分</span>
                                       </div>
                                     </label>
                                   </div>
@@ -1199,7 +1323,7 @@ const CreditModelSettings: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="credit-advanced-note">
+                          <div className="flex gap-2 rounded-xl border border-[var(--border-light)] px-3 py-2 text-[var(--text-secondary)]" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 20%, transparent)' }}>
                             <Info className="mt-0.5 h-4 w-4 shrink-0" />
                             <div className="text-[11px] leading-5">
                               <span className="font-semibold">混合路由策略：</span>
@@ -1211,7 +1335,7 @@ const CreditModelSettings: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-light)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)' }}>
                     <div className="text-[11px] text-[var(--text-tertiary)]">
                       已调用：{callsUsed ?? 0}
                       {model.maxCallsLimit ? ` / ${model.maxCallsLimit}` : ' / 无限'}
@@ -1232,9 +1356,9 @@ const CreditModelSettings: React.FC = () => {
                         />
                         启用
                       </label>
-                      <button onClick={() => removeModel(index)} className="settings-danger-text text-xs">
+                      <DangerButton onClick={() => removeModel(index)} className="px-3 py-2 text-xs">
                         删除模型
-                      </button>
+                      </DangerButton>
                     </div>
                   </div>
                 </div>
@@ -1242,18 +1366,13 @@ const CreditModelSettings: React.FC = () => {
             })}
           </div>
 
-          <div className="settings-action-row">
-            <button onClick={addModel} className="apple-button-secondary min-h-10 px-3 text-xs">
-              <Plus size={12} />
-              添加模型
-            </button>
-            <button
-              onClick={() => void saveProvider()}
-              disabled={saving}
-              className="apple-button-primary min-h-10 px-3 text-xs disabled:opacity-60"
-            >
+          <div className="flex flex-wrap gap-2">
+            <SecondaryButton onClick={addModel}>
+              <Plus size={12} className="mr-1 inline-block" />添加模型
+            </SecondaryButton>
+            <PrimaryButton onClick={() => void saveProvider()} loading={saving}>
               {saving ? '保存中...' : '保存供应商'}
-            </button>
+            </PrimaryButton>
           </div>
         </div>
       </div>

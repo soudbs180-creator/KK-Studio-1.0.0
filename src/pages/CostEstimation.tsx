@@ -51,7 +51,7 @@ type CreditConsumptionSummary = {
 
 const tableWrapperStyle = {
   borderColor: 'var(--border-light)',
-  backgroundColor: 'var(--bg-elevated)',
+  backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
 } as const;
 
 const tableHeaderCellClassName =
@@ -68,7 +68,7 @@ const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm leading-6"
     style={{
       borderColor: 'var(--border-light)',
-      backgroundColor: 'var(--bg-elevated)',
+      backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
       color: 'var(--text-tertiary)',
     }}
   >
@@ -332,7 +332,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                       <col style={{ width: '16%' }} />
                       <col style={{ width: '16%' }} />
                     </colgroup>
-                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                    <thead style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>模型</th>
                         <th className={tableHeaderCellClassName}>来源</th>
@@ -393,7 +393,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                       <col style={{ width: '20%' }} />
                       <col style={{ width: '20%' }} />
                     </colgroup>
-                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                    <thead style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>时间</th>
                         <th className={tableHeaderCellClassName}>模型</th>
@@ -451,7 +451,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                       <col style={{ width: '14%' }} />
                       <col style={{ width: '20%' }} />
                     </colgroup>
-                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                    <thead style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>模型</th>
                         <th className={tableHeaderCellClassName}>供应商</th>
@@ -506,7 +506,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({ onBack, embedded
                       <col style={{ width: '34%' }} />
                       <col style={{ width: '20%' }} />
                     </colgroup>
-                    <thead style={{ backgroundColor: 'var(--bg-overlay)' }}>
+                    <thead style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }}>
                       <tr>
                         <th className={tableHeaderCellClassName}>时间</th>
                         <th className={tableHeaderCellClassName}>模型</th>

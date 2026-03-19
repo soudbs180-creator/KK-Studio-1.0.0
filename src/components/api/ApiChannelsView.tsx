@@ -53,7 +53,7 @@ const DEFAULT_GOOGLE_MODELS = [
 // Preset Providers Configuration
 const PRESET_PROVIDERS = [
     { label: 'Cherry Studio', url: 'https://future-api.vodeshop.com', provider: 'OpenAI', mode: 'chat', models: 'flux-schnell(Flux Fast), flux-dev(Flux Dev), flux-pro(Flux Pro), ideogram(Ideogram), midjourney(Midjourney), suno-v3.5(Suno Music), luma-video(Luma Video), pika-video(Pika), veo-2(Veo Video), gpt-4o-image(GPT-4o Image), gemini-2.5-flash-image(Gemini 2.5 Flash Image), seedream-v4(Seedream)' },
-    { label: 'Gemini-API.cn', url: 'https://gemini-api.cn', provider: 'OpenAI', mode: 'standard', models: 'gemini-2.5-flash-image, gemini-3-pro-image-preview, imagen-3.0-generate-001' },
+    { label: 'Gemini-API.cn', url: 'https://gemini-api.cn', provider: 'OpenAI', mode: 'standard', models: 'gemini-2.5-flash-image, gemini-3-pro-image-preview, imagen-4.0-generate-001' },
     { label: 'SiliconFlow (硅基流动)', url: 'https://api.siliconflow.cn/v1', provider: 'SiliconFlow', mode: 'chat', models: 'deepseek-ai/DeepSeek-V3, deepseek-ai/DeepSeek-R1, black-forest-labs/FLUX.1-schnell, stabilityai/stable-diffusion-3-medium' },
     { label: 'Volcengine (火山引擎)', url: 'https://ark.cn-beijing.volces.com/api/v3', provider: 'Volcengine', mode: 'chat', models: 'doubao-pro-32k, doubao-lite-32k, doubao-pro-128k' },
     { label: 'Aliyun (阿里云百炼)', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', provider: 'Aliyun', mode: 'chat', models: 'qwen-max, qwen-plus, qwen-turbo, wanx-v1' },
@@ -525,7 +525,9 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                 icon: <Zap size={14} />,
                                 colorClass: 'text-blue-500',
                                 bgClass: 'bg-blue-500/10',
-                                borderClass: 'border-blue-500/20'
+                                borderClass: 'border-blue-500/20',
+                                hoverStateClass: 'hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5',
+                                dragStateClass: 'border-blue-500'
                             },
                             {
                                 title: '代理服务器 (Proxy)',
@@ -533,7 +535,9 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                 icon: <Server size={14} />,
                                 colorClass: 'text-emerald-500', // Different color for Proxy
                                 bgClass: 'bg-emerald-500/10',
-                                borderClass: 'border-emerald-500/20'
+                                borderClass: 'border-emerald-500/20',
+                                hoverStateClass: 'hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5',
+                                dragStateClass: 'border-emerald-500'
                             },
                             {
                                 title: '第三方 API (Third-Party)',
@@ -541,7 +545,9 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                 icon: <Globe size={14} />,
                                 colorClass: 'text-purple-500',
                                 bgClass: 'bg-purple-500/10',
-                                borderClass: 'border-purple-500/20'
+                                borderClass: 'border-purple-500/20',
+                                hoverStateClass: 'hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5',
+                                dragStateClass: 'border-purple-500'
                             }
                         ].map((section) => (
                             section.keys.length > 0 && (
@@ -568,10 +574,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                     transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
                                                     ${slot.disabled
                                                         ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border-medium)]/50 opacity-60'
-                                                        : `bg-[var(--bg-secondary)] border-[var(--border-light)] hover:border-${section.colorClass.split('-')[1]}-500/30 hover:shadow-lg hover:shadow-${section.colorClass.split('-')[1]}-500/5`
+                                                        : `bg-[var(--bg-secondary)] border-[var(--border-light)] ${section.hoverStateClass}`
                                                     }
                                                     p-4 w-full
-                                                    ${draggedId === slot.id ? `opacity-20 border-dashed border-${section.colorClass.split('-')[1]}-500 scale-[0.98]` : 'hover:-translate-y-1 hover:z-10 relative'}
+                                                    ${draggedId === slot.id ? `opacity-20 border-dashed ${section.dragStateClass} scale-[0.98]` : 'hover:-translate-y-1 hover:z-10 relative'}
                                                 `}
                                             >
                                                 {/* Sequential Order Badge */}
@@ -756,19 +762,19 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                     type="button"
                                                     onClick={handleTestConnection}
                                                     disabled={testStatus === 'testing'}
-                                                    className={`text - [10px] px - 3 py - 1.5 rounded border flex items - center gap - 2 transition - colors ${testStatus === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                    className={`text-[10px] px-3 py-1.5 rounded border flex items-center gap-2 transition-colors ${testStatus === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
                                                         testStatus === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                                                             'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border-[var(--border-medium)] hover:text-[var(--text-secondary)]'
-                                                        } `}
+                                                        }`}
                                                 >
                                                     {testStatus === 'testing' ? <Globe size={12} className="animate-spin" /> : <Terminal size={12} />}
                                                     {testStatus === 'testing' ? '测试中...' : '测试连接 (Test Connection)'}
                                                 </button>
                                             </div>
                                             {testMessage && (
-                                                <div className={`text - [10px] mt - 2 p - 2 rounded text - right ${testStatus === 'success' ? 'text-emerald-400' :
+                                                <div className={`text-[10px] mt-2 p-2 rounded text-right ${testStatus === 'success' ? 'text-emerald-400' :
                                                     testStatus === 'error' ? 'text-red-400' : 'text-[var(--text-tertiary)]'
-                                                    } `}>
+                                                    }`}>
                                                     {testMessage}
                                                 </div>
                                             )}

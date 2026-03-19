@@ -1,7 +1,7 @@
 import { KeySlot } from '../auth/keyManager';
 import { formatAuthorizationHeaderValue } from '../api/apiConfig';
+import { resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy';
 import { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter';
-import { resolveProviderRuntime } from '../api/providerStrategy';
 
 export class VideoCompatibleAdapter implements LLMAdapter {
     id = 'video-compatible-adapter';
@@ -9,43 +9,40 @@ export class VideoCompatibleAdapter implements LLMAdapter {
 
     supports(modelId: string): boolean {
         const lower = modelId.toLowerCase();
-        return lower.includes('runway') ||
-            lower.includes('luma') ||
-            lower.includes('kling') ||
-            lower.includes('wan') ||
-            lower.includes('pika') ||
-            lower.includes('minimax') ||
-            lower.includes('vidu') ||
-            lower.includes('sora') ||
-            lower.includes('veo') ||
-            lower.includes('seedance') ||
-            lower.includes('higgsfield') ||
-            lower.includes('pixverse') ||
-            lower.includes('cogvideo') ||
-            lower.includes('zhipu') ||
-            lower.includes('qwen-video') ||
-            lower.includes('hailuo');
+        return lower.includes('runway')
+            || lower.includes('luma')
+            || lower.includes('kling')
+            || lower.includes('wan')
+            || lower.includes('pika')
+            || lower.includes('minimax')
+            || lower.includes('vidu')
+            || lower.includes('sora')
+            || lower.includes('veo')
+            || lower.includes('seedance')
+            || lower.includes('higgsfield')
+            || lower.includes('pixverse')
+            || lower.includes('cogvideo')
+            || lower.includes('zhipu')
+            || lower.includes('qwen-video')
+            || lower.includes('hailuo');
     }
 
     async chat(): Promise<string> {
-        throw new Error('视频适配器不支持聊天');
+        throw new Error('Video adapter does not support chat');
     }
 
     async generateImage(): Promise<any> {
-        throw new Error('视频适配器不支持图像生成');
+        throw new Error('Video adapter does not support image generation');
     }
 
     async generateVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
-        const cleanBase = this.normalizeBaseUrl(keySlot.baseUrl);
-        const runtime = resolveProviderRuntime({
-            provider: keySlot.provider,
-            baseUrl: cleanBase,
-            format: keySlot.format,
-            authMethod: keySlot.authMethod,
-            headerName: keySlot.headerName,
-            compatibilityMode: keySlot.compatibilityMode,
-            modelId: options.modelId,
-        });
+        const rawBase = String(keySlot.baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        const runtime = this.resolveRuntime(rawBase, keySlot, options.modelId);
+        const cleanBase = this.normalizeBaseUrl(rawBase, runtime.videoApiStyle);
+
+        if (runtime.videoApiStyle === 'unified-v2-generations') {
+            return this.generateVideoViaUnifiedV2(options, keySlot, cleanBase);
+        }
 
         if (runtime.videoApiStyle === 'openai-v1-videos') {
             return this.generateVideoViaNewApi(options, keySlot, cleanBase);
@@ -61,43 +58,72 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         }
     }
 
-    private normalizeBaseUrl(baseUrl?: string): string {
-        const clean = (baseUrl || 'https://api.openai.com').replace(/\/+$/, '');
-        return clean.endsWith('/v1') ? clean : `${clean}/v1`;
+    private getResolvedProviderName(keySlot: KeySlot): string {
+        if (keySlot.provider === 'Custom' && keySlot.name) {
+            return keySlot.name;
+        }
+        return keySlot.provider;
     }
 
-    private isNewApiCompatibilityError(error: any): boolean {
-        const message = String(error?.message || '').toLowerCase();
-        return message.includes('/videos') ||
-            message.includes('not found') ||
-            message.includes('404') ||
-            message.includes('405') ||
-            message.includes('415') ||
-            message.includes('unsupported') ||
-            message.includes('invalid request');
-    }
-
-    private buildHeaders(keySlot: KeySlot, includeJsonContentType: boolean): Record<string, string> {
-        const token = String(keySlot.key || '').trim();
-        const runtime = resolveProviderRuntime({
-            provider: keySlot.provider,
-            baseUrl: this.normalizeBaseUrl(keySlot.baseUrl),
+    private resolveRuntime(baseUrl: string, keySlot: KeySlot, modelId?: string) {
+        return resolveProviderRuntime({
+            provider: this.getResolvedProviderName(keySlot),
+            baseUrl,
             format: keySlot.format,
             authMethod: keySlot.authMethod,
             headerName: keySlot.headerName,
             compatibilityMode: keySlot.compatibilityMode,
+            modelId,
         });
-        const headers: Record<string, string> = {
-            'Authorization': formatAuthorizationHeaderValue(token, runtime.authorizationValueFormat)
-        };
+    }
+
+    private normalizeBaseUrl(baseUrl: string, style: ProviderStrategyVideoApiStyle): string {
+        let clean = String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        clean = clean
+            .replace(/\/v2\/videos\/generations(?:\/[^/?#]+)?$/i, '')
+            .replace(/\/v1\/videos(?:\/[^/?#]+)?$/i, '')
+            .replace(/\/v1\/videos\/generations(?:\/[^/?#]+)?$/i, '')
+            .replace(/\/videos(?:\/generations)?(?:\/[^/?#]+)?$/i, '')
+            .replace(/\/video\/generations(?:\/[^/?#]+)?$/i, '')
+            .replace(/\/+$/, '');
+
+        if (style === 'unified-v2-generations') {
+            return clean.replace(/\/v2$/i, '').replace(/\/+$/, '');
+        }
+
+        const withoutVersion = clean.replace(/\/v1$/i, '').replace(/\/+$/, '');
+        return `${withoutVersion}/v1`;
+    }
+
+    private isNewApiCompatibilityError(error: any): boolean {
+        const message = String(error?.message || '').toLowerCase();
+        return message.includes('/videos')
+            || message.includes('not found')
+            || message.includes('404')
+            || message.includes('405')
+            || message.includes('415')
+            || message.includes('unsupported')
+            || message.includes('invalid request');
+    }
+
+    private buildHeaders(
+        keySlot: KeySlot,
+        includeJsonContentType: boolean,
+        cleanBase: string,
+        modelId?: string,
+    ): Record<string, string> {
+        const token = String(keySlot.key || '').trim();
+        const runtime = this.resolveRuntime(cleanBase, keySlot, modelId);
+        const headerName = keySlot.headerName || runtime.headerName || 'Authorization';
+        const headers: Record<string, string> = {};
 
         if (includeJsonContentType) {
             headers['Content-Type'] = 'application/json';
         }
 
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            headers[keySlot.headerName] = keySlot.key;
-        }
+        headers[headerName] = headerName === 'Authorization'
+            ? formatAuthorizationHeaderValue(token, runtime.authorizationValueFormat)
+            : keySlot.key;
 
         return headers;
     }
@@ -141,72 +167,136 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             '480p': {
                 '16:9': '854x480',
                 '9:16': '480x854',
-                '1:1': '480x480'
+                '1:1': '480x480',
             },
             '720p': {
                 '16:9': '1280x720',
                 '9:16': '720x1280',
-                '1:1': '720x720'
+                '1:1': '720x720',
             },
             '1080p': {
                 '16:9': '1920x1080',
                 '9:16': '1080x1920',
-                '1:1': '1080x1080'
+                '1:1': '1080x1080',
             },
             '4k': {
                 '16:9': '3840x2160',
                 '9:16': '2160x3840',
-                '1:1': '2160x2160'
-            }
+                '1:1': '2160x2160',
+            },
         };
 
         return sizeMap[resolution]?.[aspectRatio];
     }
 
     private extractTaskId(payload: any): string | undefined {
-        return payload?.task_id ||
-            payload?.id ||
-            payload?.data?.task_id ||
-            payload?.data?.id;
+        return payload?.task_id
+            || payload?.id
+            || payload?.data?.task_id
+            || payload?.data?.id;
     }
 
     private extractStatus(payload: any): string {
         return String(
-            payload?.status ||
-            payload?.data?.status ||
-            payload?.state ||
-            payload?.data?.state ||
-            ''
+            payload?.status
+            || payload?.data?.status
+            || payload?.state
+            || payload?.data?.state
+            || '',
         );
     }
 
     private extractVideoUrl(payload: any): string {
-        return payload?.video_url ||
-            payload?.url ||
-            payload?.output ||
-            payload?.data?.video_url ||
-            payload?.data?.url ||
-            payload?.data?.output ||
-            payload?.video?.url ||
-            payload?.data?.video?.url ||
-            payload?.data?.outputs?.[0] ||
-            '';
+        const candidates = [
+            payload?.video_url,
+            payload?.url,
+            payload?.output,
+            payload?.video?.url,
+            payload?.data?.video_url,
+            payload?.data?.url,
+            payload?.data?.output,
+            payload?.data?.video?.url,
+            payload?.outputs?.[0],
+            payload?.outputs?.[0]?.url,
+            payload?.data?.outputs?.[0],
+            payload?.data?.outputs?.[0]?.url,
+        ];
+
+        const match = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim());
+        return typeof match === 'string' ? match.trim() : '';
     }
 
     private isSuccessStatus(status: string): boolean {
         const normalized = status.trim().toUpperCase();
-        return normalized === 'SUCCESS' ||
-            normalized === 'SUCCEEDED' ||
-            normalized === 'COMPLETED' ||
-            normalized === 'DONE';
+        return normalized === 'SUCCESS'
+            || normalized === 'SUCCEEDED'
+            || normalized === 'COMPLETED'
+            || normalized === 'DONE'
+            || normalized === 'FINISHED';
     }
 
     private isFailureStatus(status: string): boolean {
         const normalized = status.trim().toUpperCase();
-        return normalized === 'FAILURE' ||
-            normalized === 'FAILED' ||
-            normalized === 'ERROR' ||
-            normalized === 'CANCELLED';
+        return normalized === 'FAILURE'
+            || normalized === 'FAILED'
+            || normalized === 'ERROR'
+            || normalized === 'CANCELLED'
+            || normalized === 'REJECTED';
+    }
+
+    private buildResult(
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+        params: { url: string; taskId?: string; status: 'processing' | 'success' | 'failed' },
+    ): VideoGenerationResult {
+        return {
+            url: params.url,
+            taskId: params.taskId,
+            status: params.status,
+            provider: this.provider,
+            providerName: keySlot.name || this.provider,
+            model: options.modelId,
+        };
+    }
+
+    private async delay(ms: number): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    private buildUnifiedV2Body(options: VideoGenerationOptions): Record<string, any> {
+        const body: Record<string, any> = {
+            model: options.modelId,
+            prompt: options.prompt,
+        };
+
+        if (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto') {
+            body.aspect_ratio = options.aspectRatio;
+        }
+        if (options.resolution) {
+            body.resolution = options.resolution;
+        }
+        if (options.size) {
+            body.size = options.size;
+        }
+
+        const duration = this.getDurationSeconds(options);
+        if (duration) {
+            body.duration = duration;
+        }
+
+        const images = [options.imageUrl, options.imageTailUrl].filter((value): value is string => Boolean(value));
+        if (images.length > 0) {
+            body.images = images;
+        }
+
+        if (options.videoUrl) {
+            body.videos = [options.videoUrl];
+        }
+        if (options.watermark !== undefined) {
+            body.watermark = options.watermark;
+        }
+
+        return body;
     }
 
     private async appendInputReference(formData: FormData, imageSource: string): Promise<void> {
@@ -227,8 +317,8 @@ export class VideoCompatibleAdapter implements LLMAdapter {
                 formData.append('input_reference', blob, fileName);
                 return;
             }
-        } catch (error) {
-            console.warn('[VideoCompatibleAdapter] 远程参考图转文件失败，回退到兼容字段 image');
+        } catch {
+            console.warn('[VideoCompatibleAdapter] Falling back to raw image URL for input_reference.');
         }
 
         formData.append('image', imageSource);
@@ -238,16 +328,16 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         cleanBase: string,
         taskId: string,
         headers: Record<string, string>,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ): Promise<string> {
         const contentUrls = [
             `${cleanBase}/videos/${encodeURIComponent(taskId)}/content`,
-            `${cleanBase}/video/generations/${encodeURIComponent(taskId)}/content`
+            `${cleanBase}/video/generations/${encodeURIComponent(taskId)}/content`,
         ];
 
         for (const contentUrl of contentUrls) {
             const response = await fetch(contentUrl, { headers, signal });
-            if (!response || !response.ok) {
+            if (!response.ok) {
                 continue;
             }
 
@@ -275,10 +365,10 @@ export class VideoCompatibleAdapter implements LLMAdapter {
     private async generateVideoViaNewApi(
         options: VideoGenerationOptions,
         keySlot: KeySlot,
-        cleanBase: string
+        cleanBase: string,
     ): Promise<VideoGenerationResult> {
         const submitUrl = `${cleanBase}/videos`;
-        const headers = this.buildHeaders(keySlot, false);
+        const headers = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
         const formData = new FormData();
 
         formData.append('model', options.modelId);
@@ -298,20 +388,16 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             await this.appendInputReference(formData, options.imageUrl);
         }
 
-        if (options.aspectRatio || options.resolution || options.size || options.imageTailUrl || options.videoUrl) {
-            console.warn('[VideoCompatibleAdapter] new-api 严格模式仅转发文档字段 model / prompt / seconds / input_reference，其他视频字段不再私自改写。');
-        }
-
         const response = await fetch(submitUrl, {
             method: 'POST',
             headers,
             body: formData,
-            signal: options.signal
+            signal: options.signal,
         });
 
         if (!response.ok) {
             const errText = await response.text().catch(() => '');
-            throw new Error(`视频 API 错误 ${response.status}: ${errText.slice(0, 300)}`);
+            throw new Error(`Video API error ${response.status}: ${errText.slice(0, 300)}`);
         }
 
         const payload = await response.json().catch(() => ({}));
@@ -324,18 +410,11 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         }
 
         if (directUrl && (!status || this.isSuccessStatus(status))) {
-            return {
-                url: directUrl,
-                taskId,
-                status: 'success',
-                provider: this.provider,
-                providerName: keySlot.name || this.provider,
-                model: options.modelId
-            };
+            return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
         }
 
         if (!taskId) {
-            throw new Error('视频接口返回成功，但未提供任务 ID 或可用视频地址');
+            throw new Error('Video API returned success without a task id or output URL.');
         }
 
         return this.pollNewApiTask(taskId, options, keySlot, cleanBase);
@@ -345,12 +424,12 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         taskId: string,
         options: VideoGenerationOptions,
         keySlot: KeySlot,
-        cleanBase: string
+        cleanBase: string,
     ): Promise<VideoGenerationResult> {
-        const headers = this.buildHeaders(keySlot, false);
+        const headers = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
         const pollUrls = [
             `${cleanBase}/videos/${encodeURIComponent(taskId)}`,
-            `${cleanBase}/video/generations/${encodeURIComponent(taskId)}`
+            `${cleanBase}/video/generations/${encodeURIComponent(taskId)}`,
         ];
         const maxDurationMs = 30 * 60 * 1000;
         const startTime = Date.now();
@@ -359,42 +438,39 @@ export class VideoCompatibleAdapter implements LLMAdapter {
 
         while (Date.now() - startTime < maxDurationMs) {
             if (options.signal?.aborted) {
-                throw new Error('视频生成已取消');
+                throw new Error('Video generation was aborted.');
             }
 
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            await this.delay(pollInterval);
             pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
 
-            let response!: Response;
+            let response: Response | null = null;
             let fatalError: Error | null = null;
 
             for (const pollUrl of pollUrls) {
-                response = await fetch(pollUrl, {
+                const candidate = await fetch(pollUrl, {
                     headers,
-                    signal: options.signal
+                    signal: options.signal,
                 });
 
-                if (!response.ok) {
-                    const errText = await response.text().catch(() => '');
-                    if (response.status >= 500 || response.status === 404) {
+                if (!candidate.ok) {
+                    const errText = await candidate.text().catch(() => '');
+                    if (candidate.status >= 500 || candidate.status === 404) {
                         continue;
                     }
-                    fatalError = new Error(`视频杞错误 ${response.status}: ${errText.slice(0, 200)}`);
+                    fatalError = new Error(`Video poll error ${candidate.status}: ${errText.slice(0, 200)}`);
                     break;
                 }
 
+                response = candidate;
                 break;
             }
 
-            if (!response || !response.ok) {
-                const errText = response ? await response.text().catch(() => '') : '';
-                if (response?.status >= 500 || response?.status === 404) {
-                    continue;
-                }
+            if (!response) {
                 if (fatalError) {
                     throw fatalError;
                 }
-                throw new Error(`视频轮询错误 ${response.status}: ${errText.slice(0, 200)}`);
+                continue;
             }
 
             const payload = await response.json().catch(() => ({}));
@@ -402,89 +478,46 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             const directUrl = this.extractVideoUrl(payload);
 
             if (directUrl && this.isSuccessStatus(status || 'SUCCESS')) {
-                return {
-                    url: directUrl,
-                    taskId,
-                    status: 'success',
-                    provider: this.provider,
-                    providerName: keySlot.name || this.provider,
-                    model: options.modelId
-                };
+                return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
             }
 
             if (this.isSuccessStatus(status)) {
                 const contentUrl = await this.fetchContentUrl(cleanBase, taskId, headers, options.signal);
                 if (contentUrl) {
-                    return {
-                        url: contentUrl,
-                        taskId,
-                        status: 'success',
-                        provider: this.provider,
-                        providerName: keySlot.name || this.provider,
-                        model: options.modelId
-                    };
+                    return this.buildResult(options, keySlot, { url: contentUrl, taskId, status: 'success' });
                 }
 
-                throw new Error('视频任务已成功完成，但未取回可用的视频内容');
+                throw new Error('Video task completed without a usable output URL.');
             }
 
             if (this.isFailureStatus(status)) {
                 const reason = payload?.error || payload?.message || payload?.data?.error || JSON.stringify(payload);
-                throw new Error(`视频生成失败: ${reason}`);
+                throw new Error(`Video generation failed: ${reason}`);
             }
         }
 
-        throw new Error('视频生成超时（30 分钟）');
+        throw new Error('Video generation timed out after 30 minutes.');
     }
 
-    private async generateVideoViaLegacyProxy(
+    private async generateVideoViaUnifiedV2(
         options: VideoGenerationOptions,
         keySlot: KeySlot,
-        cleanBase: string
+        cleanBase: string,
     ): Promise<VideoGenerationResult> {
-        const submitUrl = `${cleanBase}/videos/generations`;
-        const headers = this.buildHeaders(keySlot, true);
-        const body: any = {
-            model: options.modelId,
-            prompt: options.prompt,
-        };
-
-        if (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto') {
-            body.aspect_ratio = options.aspectRatio;
-        }
-        if (options.resolution) {
-            body.resolution = options.resolution;
-        }
-        if (options.size) {
-            body.size = options.size;
-        }
-        if (this.getDurationSeconds(options)) {
-            body.duration = this.getDurationSeconds(options);
-        }
-        if (options.imageUrl) {
-            body.images = [options.imageUrl];
-        }
-        if (options.imageTailUrl) {
-            body.images = Array.isArray(body.images) ? body.images : [];
-            body.images.push(options.imageTailUrl);
-        }
-        if (options.videoUrl) {
-            body.videos = [options.videoUrl];
-        }
-        if (options.watermark !== undefined) {
-            body.watermark = options.watermark;
-        }
+        const submitUrl = `${cleanBase}/v2/videos/generations`;
+        const headers = this.buildHeaders(keySlot, true, cleanBase, options.modelId);
+        const body = this.buildUnifiedV2Body(options);
 
         const response = await fetch(submitUrl, {
             method: 'POST',
             headers,
             body: JSON.stringify(body),
-            signal: options.signal
+            signal: options.signal,
         });
 
         if (!response.ok) {
             const errText = await response.text().catch(() => '');
-            throw new Error(`视频 API 错误 ${response.status}: ${errText.slice(0, 300)}`);
+            throw new Error(`Video API error ${response.status}: ${errText.slice(0, 300)}`);
         }
 
         const payload = await response.json().catch(() => ({}));
@@ -497,27 +530,116 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         }
 
         if (directUrl && (!status || this.isSuccessStatus(status))) {
-            return {
-                url: directUrl,
-                taskId,
-                status: 'success',
-                provider: this.provider,
-                providerName: keySlot.name || this.provider,
-                model: options.modelId
-            };
+            return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
         }
 
         if (!taskId) {
-            return {
+            return this.buildResult(options, keySlot, {
                 url: directUrl || '',
                 status: directUrl ? 'success' : 'processing',
-                provider: this.provider,
-                providerName: keySlot.name || this.provider,
-                model: options.modelId
-            };
+            });
         }
 
-        const pollHeaders = this.buildHeaders(keySlot, false);
+        return this.pollUnifiedV2Task(taskId, options, keySlot, cleanBase);
+    }
+
+    private async pollUnifiedV2Task(
+        taskId: string,
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+        cleanBase: string,
+    ): Promise<VideoGenerationResult> {
+        const pollUrl = `${cleanBase}/v2/videos/generations/${encodeURIComponent(taskId)}`;
+        const headers = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
+        const maxDurationMs = 30 * 60 * 1000;
+        const startTime = Date.now();
+        let pollInterval = 3000;
+        const maxInterval = 15000;
+
+        while (Date.now() - startTime < maxDurationMs) {
+            if (options.signal?.aborted) {
+                throw new Error('Video generation was aborted.');
+            }
+
+            await this.delay(pollInterval);
+            pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
+
+            const response = await fetch(pollUrl, {
+                headers,
+                signal: options.signal,
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                if (response.status >= 500 || response.status === 404) {
+                    continue;
+                }
+                throw new Error(`Video poll error ${response.status}: ${errText.slice(0, 200)}`);
+            }
+
+            const payload = await response.json().catch(() => ({}));
+            const status = this.extractStatus(payload);
+            const directUrl = this.extractVideoUrl(payload);
+
+            if (directUrl && this.isSuccessStatus(status || 'SUCCESS')) {
+                return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
+            }
+
+            if (this.isSuccessStatus(status)) {
+                throw new Error('Video task completed without a usable output URL.');
+            }
+
+            if (this.isFailureStatus(status)) {
+                const reason = payload?.error || payload?.message || payload?.data?.error || JSON.stringify(payload);
+                throw new Error(`Video generation failed: ${reason}`);
+            }
+        }
+
+        throw new Error('Video generation timed out after 30 minutes.');
+    }
+
+    private async generateVideoViaLegacyProxy(
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+        cleanBase: string,
+    ): Promise<VideoGenerationResult> {
+        const submitUrl = `${cleanBase}/videos/generations`;
+        const headers = this.buildHeaders(keySlot, true, cleanBase, options.modelId);
+        const body = this.buildUnifiedV2Body(options);
+
+        const response = await fetch(submitUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: options.signal,
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Video API error ${response.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const taskId = this.extractTaskId(payload);
+        const directUrl = this.extractVideoUrl(payload);
+        const status = this.extractStatus(payload);
+
+        if (taskId) {
+            options.onTaskId?.(taskId);
+        }
+
+        if (directUrl && (!status || this.isSuccessStatus(status))) {
+            return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
+        }
+
+        if (!taskId) {
+            return this.buildResult(options, keySlot, {
+                url: directUrl || '',
+                status: directUrl ? 'success' : 'processing',
+            });
+        }
+
+        const pollHeaders = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
         const pollUrl = `${submitUrl}/${encodeURIComponent(taskId)}`;
         const maxDurationMs = 30 * 60 * 1000;
         const startTime = Date.now();
@@ -526,15 +648,15 @@ export class VideoCompatibleAdapter implements LLMAdapter {
 
         while (Date.now() - startTime < maxDurationMs) {
             if (options.signal?.aborted) {
-                throw new Error('视频生成已取消');
+                throw new Error('Video generation was aborted.');
             }
 
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            await this.delay(pollInterval);
             pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
 
             const pollResponse = await fetch(pollUrl, {
                 headers: pollHeaders,
-                signal: options.signal
+                signal: options.signal,
             });
 
             if (!pollResponse.ok) {
@@ -542,7 +664,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
                     continue;
                 }
                 const errText = await pollResponse.text().catch(() => '');
-                throw new Error(`视频轮询错误 ${pollResponse.status}: ${errText.slice(0, 200)}`);
+                throw new Error(`Video poll error ${pollResponse.status}: ${errText.slice(0, 200)}`);
             }
 
             const pollPayload = await pollResponse.json().catch(() => ({}));
@@ -550,22 +672,15 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             const pollVideoUrl = this.extractVideoUrl(pollPayload);
 
             if (pollVideoUrl && this.isSuccessStatus(pollStatus || 'SUCCESS')) {
-                return {
-                    url: pollVideoUrl,
-                    taskId,
-                    status: 'success',
-                    provider: this.provider,
-                    providerName: keySlot.name || this.provider,
-                    model: options.modelId
-                };
+                return this.buildResult(options, keySlot, { url: pollVideoUrl, taskId, status: 'success' });
             }
 
             if (this.isFailureStatus(pollStatus)) {
                 const reason = pollPayload?.error || pollPayload?.message || pollPayload?.data?.error || JSON.stringify(pollPayload);
-                throw new Error(`视频生成失败: ${reason}`);
+                throw new Error(`Video generation failed: ${reason}`);
             }
         }
 
-        throw new Error('视频生成超时（30 分钟）');
+        throw new Error('Video generation timed out after 30 minutes.');
     }
 }

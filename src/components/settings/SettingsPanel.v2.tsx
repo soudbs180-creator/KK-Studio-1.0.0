@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
   {
     id: 'dashboard',
     label: '仪表盘',
-    description: '纯展示当前链路、消费、充值和待处理状态。',
+    description: '查看链路、消费和待处理。',
     icon: LayoutDashboard,
     section: 'workspace',
     path: '',
@@ -73,7 +73,7 @@ const navItems: NavItem[] = [
   {
     id: 'api-management',
     label: 'API 管理',
-    description: '统一管理官方接口与第三方供应商。',
+    description: '管理官方接口与供应商。',
     icon: KeyRound,
     section: 'workspace',
     path: 'api-management',
@@ -81,7 +81,7 @@ const navItems: NavItem[] = [
   {
     id: 'consumption-records',
     label: '消费记录',
-    description: '查看消费、充值和账单明细。',
+    description: '查看消费与充值明细。',
     icon: Coins,
     section: 'workspace',
     path: 'consumption-records',
@@ -89,7 +89,7 @@ const navItems: NavItem[] = [
   {
     id: 'storage-settings',
     label: '储存设置',
-    description: '管理本地与浏览器存储、清理缓存和项目整理。',
+    description: '管理存储、缓存和项目整理。',
     icon: HardDrive,
     section: 'system',
     path: 'storage-settings',
@@ -97,7 +97,7 @@ const navItems: NavItem[] = [
   {
     id: 'system-logs',
     label: '系统日志',
-    description: '集中查看警告、错误与运行风险。',
+    description: '查看警告、错误与运行风险。',
     icon: ScrollText,
     section: 'system',
     path: 'system-logs',
@@ -105,7 +105,7 @@ const navItems: NavItem[] = [
   {
     id: 'admin-console',
     label: '管理员后台',
-    description: '集中处理积分模型、汇率设置和后台权限。',
+    description: '处理积分模型、汇率和权限。',
     icon: Shield,
     section: 'admin',
     path: 'admin-console',
@@ -185,7 +185,7 @@ const SettingsNavList: React.FC<{
         <input
           value={navQuery}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="搜索设置项"
+          placeholder="搜索"
           aria-label="搜索设置项"
         />
       </label>
@@ -252,7 +252,7 @@ const SettingsDesktopShell: React.FC<{
           <div className="settings-shell-kicker">Settings</div>
           <div className="settings-shell-nav__title">高级设置</div>
           <div className="settings-shell-nav__description">
-            用更清晰的层级整理工作台、系统维护和管理员配置。
+            用更清晰的层级整理工作台、系统和管理员配置。
           </div>
         </div>
 
@@ -342,7 +342,7 @@ const SettingsMobileShell: React.FC<{
             <div className="settings-shell-kicker">{showNav ? 'Settings' : activeSection}</div>
             <div className="settings-shell-mobile__title">{showNav ? '高级设置' : activeNavItem.label}</div>
             <div className="settings-shell-mobile__description">
-              {showNav ? '先选择一个设置项，再进入对应详情。' : activeNavItem.description}
+              {showNav ? '先选一个设置项。' : activeNavItem.description}
             </div>
           </div>
         </div>

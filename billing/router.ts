@@ -1,9 +1,13 @@
-import { PointsChargeHandler } from './points/charge_points'
-export interface BillingRequest { headers: Record<string, string>; body: any; }
-import { TokenUsageHandler } from './token/usage_token'
-import { GoogleOfficialEngine } from './engines/google_official'
-import { ProxyVendorEngine } from './engines/proxy_vendor'
-import { ProviderGate } from './provider_gate'
+import { PointsChargeHandler } from './points/charge_points.ts'
+import { TokenUsageHandler } from './token/usage_token.ts'
+import { GoogleOfficialEngine } from './engines/google_official.ts'
+import { ProxyVendorEngine } from './engines/proxy_vendor.ts'
+import { ProviderGate } from './provider_gate.ts'
+
+export interface BillingRequest {
+  headers: Record<string, string>
+  body: any
+}
 
 export type BillingMode = 'points' | 'token'
 
@@ -24,29 +28,36 @@ export class BillingRouter {
     this.pointsEngine = pointsEngine
     this.tokenEngine = tokenEngine
     this.providerGate = new ProviderGate(
-      pointsEngine as any,
-      new GoogleOfficialEngine() as any,
-      new ProxyVendorEngine() as any
+      pointsEngine as PointsChargeHandler,
+      new GoogleOfficialEngine(),
+      new ProxyVendorEngine()
     )
   }
 
   async route(req: BillingRequest): Promise<any> {
-    const providerHeader = (req.headers?.['x-provider-id'] || req.headers?.['X-Provider-Id'] || (req.body && (req.body as any).provider_id))
+    const providerHeader = req.headers?.['x-provider-id']
+      || req.headers?.['X-Provider-Id']
+      || req.body?.provider_id
+
     if (providerHeader) {
-      return this.providerGate.dispatchCharge(req, providerHeader as any)
+      return this.providerGate.dispatchCharge(req, providerHeader)
     }
+
     const mode = this.extractMode(req)
+
     if (mode === 'points') return this.pointsEngine.handleChargePoints(req)
     if (mode === 'token') return this.tokenEngine.handleTokenUsage(req)
+
     throw new Error('Invalid billing mode. Must be "points" or "token".')
   }
 
   private extractMode(req: BillingRequest): BillingMode | undefined {
-    const h = req.headers || {}
-    const modeHeader = h['x-billing-mode'] || h['X-Billing-Mode']
+    const modeHeader = req.headers?.['x-billing-mode'] || req.headers?.['X-Billing-Mode']
     if (modeHeader === 'points' || modeHeader === 'token') return modeHeader
-    const body = req.body || {}
-    if ((body as any).billing_mode === 'points' || (body as any).billing_mode === 'token') return (body as any).billing_mode
+
+    const mode = req.body?.billing_mode
+    if (mode === 'points' || mode === 'token') return mode
+
     return undefined
   }
 }

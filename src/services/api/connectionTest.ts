@@ -22,6 +22,13 @@ import {
   buildUserFacingApiErrorMessage,
   classifyApiFailure,
 } from './errorClassification';
+import {
+  buildResponsesPayload,
+  extractOpenAITextPayload,
+  isResponsesPayload,
+  modelPrefersResponsesApi,
+  shouldRetryWithResponsesApi,
+} from './openaiResponses';
 import { resolveProviderRuntime } from './providerStrategy';
 import keyManager from '../auth/keyManager';
 
@@ -118,6 +125,11 @@ function buildFailureResult(params: {
   };
 }
 
+type OpenAITestResponse = {
+  response: Response;
+  responseFormat: 'chat-completions' | 'responses';
+};
+
 async function runGeminiGenerateContentTest(
   cleanBase: string,
   config: ConnectionConfig,
@@ -146,28 +158,78 @@ async function runGeminiGenerateContentTest(
   });
 }
 
-async function runOpenAIChatTest(cleanBase: string, config: ConnectionConfig): Promise<Response> {
+async function runOpenAIChatTest(cleanBase: string, config: ConnectionConfig): Promise<OpenAITestResponse> {
   const resolved = resolveConfig(config);
   const base = cleanBase || 'https://api.openai.com';
-  const apiUrl = buildOpenAIEndpoint(base, '/chat/completions');
   const runtime = resolveConnectionRuntime(resolved, cleanBase);
+  const headers = buildProxyHeaders(
+    runtime.authMethod as AuthMethod,
+    resolved.apiKey,
+    runtime.headerName,
+    undefined,
+    runtime.authorizationValueFormat,
+  );
+  const modelId = getModelId(resolved);
+  const chatUrl = buildOpenAIEndpoint(base, '/chat/completions');
+  const responsesUrl = buildOpenAIEndpoint(base, '/responses');
+  const chatBody = {
+    model: modelId,
+    stream: false,
+    messages: [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Test connection' }],
+      },
+    ],
+    max_tokens: 10,
+  };
+  const responsesBody = buildResponsesPayload({
+    model: modelId,
+    messages: [{ role: 'user', content: 'Test connection' }],
+    maxOutputTokens: 10,
+    stream: false,
+  });
 
-  return fetch(apiUrl, {
+  const preferResponses = modelPrefersResponsesApi(modelId);
+  if (preferResponses) {
+    const response = await fetch(responsesUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(responsesBody),
+      signal: AbortSignal.timeout(30000),
+    });
+    return { response, responseFormat: 'responses' };
+  }
+
+  const response = await fetch(chatUrl, {
     method: 'POST',
-    headers: buildProxyHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat),
-    body: JSON.stringify({
-      model: getModelId(resolved),
-      stream: false,
-      messages: [
-        {
-          role: 'user',
-          content: [{ type: 'text', text: 'Test connection' }],
-        },
-      ],
-      max_tokens: 10,
-    }),
+    headers,
+    body: JSON.stringify(chatBody),
     signal: AbortSignal.timeout(30000),
   });
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => '');
+    if (shouldRetryWithResponsesApi(response.status, responseText)) {
+      const fallbackResponse = await fetch(responsesUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(responsesBody),
+        signal: AbortSignal.timeout(30000),
+      });
+      return { response: fallbackResponse, responseFormat: 'responses' };
+    }
+
+    return {
+      response: new Response(responseText, {
+        status: response.status,
+        headers: response.headers,
+      }),
+      responseFormat: 'chat-completions',
+    };
+  }
+
+  return { response, responseFormat: 'chat-completions' };
 }
 
 async function runClaudeMessagesTest(cleanBase: string, config: ConnectionConfig): Promise<Response> {
@@ -263,11 +325,14 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
       };
     }
 
+    const openAITest = !nativeGemini && !nativeClaude
+      ? await runOpenAIChatTest(cleanBase, resolved)
+      : null;
     const response = nativeGemini
       ? await runGeminiGenerateContentTest(cleanBase, resolved)
       : nativeClaude
         ? await runClaudeMessagesTest(cleanBase, resolved)
-        : await runOpenAIChatTest(cleanBase, resolved);
+        : openAITest!.response;
 
     const elapsed = responseTime();
     const responseText = await response.text();
@@ -323,6 +388,8 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
       };
     }
 
+    const openAIText = extractOpenAITextPayload(result);
+
     if (Array.isArray(result.choices) && result.choices.length > 0) {
       return {
         success: true,
@@ -331,6 +398,19 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
           model: modelId,
           responseFormat: 'chat-completions',
           responsePreview: `${String(result.choices[0].message?.content || '').slice(0, 100)}...`,
+        },
+        responseTime: elapsed,
+      };
+    }
+
+    if (openAITest?.responseFormat === 'responses' || isResponsesPayload(result)) {
+      return {
+        success: true,
+        message: 'API 连接成功',
+        details: {
+          model: modelId,
+          responseFormat: 'responses',
+          responsePreview: openAIText ? `${openAIText.slice(0, 100)}...` : 'Responses API responded successfully.',
         },
         responseTime: elapsed,
       };

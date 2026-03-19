@@ -45,9 +45,33 @@ export interface RawPricingCatalogResult {
     groupRatio: Record<string, number>;
     source: 'direct' | 'wuyinkeji';
     supportsGroups: boolean;
+    error?: string;
+    attemptedUrls?: string[];
 }
 
-const normalizePricingBaseUrl = (baseUrl: string) => baseUrl.replace(/\/+$/, '');
+type PricingVendorInfo = {
+    name?: string;
+    icon?: string;
+};
+
+type PricingEndpointInfo = {
+    path?: string;
+    method?: string;
+};
+
+const MARKETING_PAGE_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
+
+const MODEL_KEYWORDS = ['model', 'model_id', 'modelId', 'model_name', 'modelName', 'id'];
+const PRICE_KEYWORDS = ['price', 'input', 'output', 'ratio', 'quota', 'per_request', 'cost'];
+const JSON_ASSIGNMENT_MARKERS = ['window.__NUXT__', 'window.__NEXT_DATA__', 'window.__INITIAL_STATE__'];
+
+const normalizePricingBaseUrl = (baseUrl: string) => {
+    const raw = String(baseUrl || '').trim();
+    if (!raw) return '';
+    const trimmed = raw.replace(/\/+$/, '');
+    const sanitized = trimmed.replace(MARKETING_PAGE_SUFFIX_RE, '');
+    return sanitized || trimmed;
+};
 const WUYIN_DEFAULT_ROOT_URL = 'https://api.wuyinkeji.com';
 const WUYIN_ASYNC_ENDPOINT_RE = /^\/api\/async\/([a-z0-9_.-]+)$/i;
 
@@ -55,6 +79,288 @@ export type WuyinAsyncEndpointDetails = {
     endpointUrl: string;
     endpointPath: string;
     modelId: string;
+};
+
+const safeJsonParse = (raw: string): any | null => {
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+const toTrimmedString = (value: unknown): string | undefined => {
+    if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+    const trimmed = String(value).trim();
+    return trimmed || undefined;
+};
+
+const normalizeStringList = (value: unknown): string[] | undefined => {
+    if (Array.isArray(value)) {
+        const items = value.map((entry) => toTrimmedString(entry)).filter((entry): entry is string => Boolean(entry));
+        return items.length > 0 ? Array.from(new Set(items)) : undefined;
+    }
+
+    const text = toTrimmedString(value);
+    if (!text) return undefined;
+
+    const items = text
+        .split(/[\s,|/]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+    return items.length > 0 ? Array.from(new Set(items)) : undefined;
+};
+
+const normalizeEndpointInfo = (value: unknown): PricingEndpointInfo | undefined => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+    const entry = value as Record<string, unknown>;
+    const path = toTrimmedString(entry.path);
+    const method = toTrimmedString(entry.method)?.toUpperCase();
+
+    if (!path && !method) return undefined;
+    return { path, method };
+};
+
+const buildVendorLookup = (payload: any): Record<string, PricingVendorInfo> => {
+    if (!Array.isArray(payload?.vendors)) return {};
+
+    const vendors = payload.vendors as Array<Record<string, unknown>>;
+    return vendors.reduce((acc: Record<string, PricingVendorInfo>, item: Record<string, unknown>) => {
+        const key = toTrimmedString(item?.id);
+        if (!key) return acc;
+
+        acc[key] = {
+            name: toTrimmedString(item?.name),
+            icon: toTrimmedString(item?.icon),
+        };
+        return acc;
+    }, {});
+};
+
+const buildEndpointLookup = (payload: any): Record<string, PricingEndpointInfo> => {
+    const source = payload?.supported_endpoint ?? payload?.supportedEndpoint;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+
+    return Object.entries(source as Record<string, unknown>).reduce<Record<string, PricingEndpointInfo>>((acc, [key, value]) => {
+        const normalizedKey = toTrimmedString(key);
+        const endpoint = normalizeEndpointInfo(value);
+        if (!normalizedKey || !endpoint) return acc;
+        acc[normalizedKey] = endpoint;
+        return acc;
+    }, {});
+};
+
+const extractEndpointTypes = (item: any): string[] | undefined =>
+    normalizeStringList(
+        item?.endpoint_types
+        ?? item?.endpointTypes
+        ?? item?.supported_endpoint_types
+        ?? item?.supportedEndpointTypes
+        ?? item?.endpoint_type
+        ?? item?.endpointType
+    );
+
+const buildEndpointTargets = (
+    endpointTypes: string[] | undefined,
+    lookup: Record<string, PricingEndpointInfo>
+): Record<string, PricingEndpointInfo> | undefined => {
+    if (!endpointTypes?.length) return undefined;
+
+    const targets = endpointTypes.reduce<Record<string, PricingEndpointInfo>>((acc, type) => {
+        const normalizedType = toTrimmedString(type);
+        if (!normalizedType) return acc;
+
+        const endpoint = lookup[normalizedType];
+        if (endpoint) {
+            acc[normalizedType] = endpoint;
+        }
+        return acc;
+    }, {});
+
+    return Object.keys(targets).length > 0 ? targets : undefined;
+};
+
+const normalizePricingCatalogRows = (pricingData: any[], payload?: any): any[] => {
+    const vendorLookup = buildVendorLookup(payload);
+    const endpointLookup = buildEndpointLookup(payload);
+
+    return pricingData.map((item) => {
+        if (!item || typeof item !== 'object') return item;
+
+        const vendor = vendorLookup[toTrimmedString(item?.vendor_id ?? item?.vendorId) || ''];
+        const endpointTypes = extractEndpointTypes(item);
+        const endpointTargets = buildEndpointTargets(endpointTypes, endpointLookup);
+        const provider = toTrimmedString(item?.provider ?? item?.provider_name ?? item?.providerName ?? vendor?.name);
+        const providerLabel = toTrimmedString(item?.provider_label ?? item?.providerLabel ?? provider ?? vendor?.name);
+        const providerLogo = toTrimmedString(item?.provider_logo ?? item?.providerLogo ?? vendor?.icon ?? item?.icon);
+        const endpointType = toTrimmedString(item?.endpoint_type ?? item?.endpointType ?? endpointTypes?.[0]);
+        const availableGroups = normalizeStringList(item?.available_groups ?? item?.availableGroups ?? item?.enable_groups ?? item?.enableGroups);
+        const tags = normalizeStringList(item?.tags ?? item?.tag ?? item?.labels ?? item?.label);
+        const description = toTrimmedString(item?.description);
+
+        return {
+            ...item,
+            provider,
+            provider_label: providerLabel,
+            provider_logo: providerLogo,
+            endpoint_type: endpointType,
+            endpoint_types: endpointTypes,
+            endpoint_targets: endpointTargets,
+            available_groups: availableGroups,
+            tags,
+            description,
+        };
+    });
+};
+
+const isPricingLikeObject = (item: any): boolean => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const keys = Object.keys(item).map((key) => key.toLowerCase());
+    const hasModel = keys.some((key) => MODEL_KEYWORDS.some((token) => key.includes(token)));
+    const hasPrice = keys.some((key) => PRICE_KEYWORDS.some((token) => key.includes(token)));
+    return hasModel && hasPrice;
+};
+
+const collectPricingRowsFromPayload = (payload: any): any[][] => {
+    const results: any[][] = [];
+    const visited = new Set<any>();
+    const stack: any[] = [payload];
+
+    while (stack.length > 0) {
+        const current = stack.pop();
+        if (!current) continue;
+
+        if (typeof current === 'object') {
+            if (visited.has(current)) continue;
+            visited.add(current);
+        }
+
+        if (Array.isArray(current)) {
+            if (current.some(isPricingLikeObject)) {
+                results.push(current);
+                continue;
+            }
+            current.forEach((entry) => stack.push(entry));
+        } else if (typeof current === 'object') {
+            Object.values(current).forEach((value) => stack.push(value));
+        }
+    }
+
+    return results;
+};
+
+const extractJsonAssignments = (scriptContent: string): string[] => {
+    const blocks: string[] = [];
+    for (const marker of JSON_ASSIGNMENT_MARKERS) {
+        let cursor = scriptContent.indexOf(marker);
+        while (cursor !== -1) {
+            const equalsIndex = scriptContent.indexOf('=', cursor + marker.length);
+            if (equalsIndex === -1) break;
+
+            let start = equalsIndex + 1;
+            while (start < scriptContent.length && /\s/.test(scriptContent[start])) start++;
+            const firstChar = scriptContent[start];
+            if (firstChar !== '{' && firstChar !== '[') {
+                cursor = scriptContent.indexOf(marker, cursor + marker.length);
+                continue;
+            }
+
+            let depth = 0;
+            let end = start;
+            let inString = false;
+            let stringChar = '';
+
+            while (end < scriptContent.length) {
+                const char = scriptContent[end];
+                if (inString) {
+                    if (char === '\\') {
+                        end += 2;
+                        continue;
+                    }
+                    if (char === stringChar) {
+                        inString = false;
+                    }
+                } else {
+                    if (char === '"' || char === "'") {
+                        inString = true;
+                        stringChar = char;
+                    } else if (char === '{' || char === '[') {
+                        depth++;
+                    } else if (char === '}' || char === ']') {
+                        depth--;
+                        if (depth === 0) {
+                            end++;
+                            break;
+                        }
+                    }
+                }
+                end++;
+            }
+
+            if (depth === 0) {
+                const raw = scriptContent.slice(start, end).trim();
+                if (raw) {
+                    blocks.push(raw);
+                }
+            }
+
+            cursor = scriptContent.indexOf(marker, end);
+        }
+    }
+    return blocks;
+};
+
+const extractEmbeddedJsonBlocks = (html: string): string[] => {
+    const blocks: string[] = [];
+    const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = scriptRegex.exec(html)) !== null) {
+        const attrs = match[1] || '';
+        const content = (match[2] || '').trim();
+        if (!content) continue;
+
+        if (/id\s*=\s*"__NEXT_DATA__"/i.test(attrs) || /type\s*=\s*"application\/json"/i.test(attrs)) {
+            blocks.push(content);
+            continue;
+        }
+
+        if (JSON_ASSIGNMENT_MARKERS.some((marker) => content.includes(marker))) {
+            blocks.push(...extractJsonAssignments(content));
+        }
+    }
+
+    return blocks;
+};
+
+const scrapePricingFromHtml = (html: string): any[] => {
+    const jsonBlocks = extractEmbeddedJsonBlocks(html);
+    for (const block of jsonBlocks) {
+        const parsed = safeJsonParse(block);
+        if (!parsed) continue;
+        const rows = collectPricingRowsFromPayload(parsed);
+        if (rows.length > 0) {
+            const flattened: any[] = [];
+            const seen = new Set<string>();
+            rows.forEach((row) => {
+                if (!Array.isArray(row)) return;
+                row.forEach((item) => {
+                    if (!item || typeof item !== 'object') return;
+                    const modelId = String((item as any).model || (item as any).model_id || (item as any).modelId || (item as any).id || '');
+                    const key = modelId ? `${modelId}-${Object.keys(item).length}` : JSON.stringify(item).slice(0, 200);
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    flattened.push(item);
+                });
+            });
+            if (flattened.length > 0) {
+                return flattened;
+            }
+        }
+    }
+    return [];
 };
 
 export function extractWuyinAsyncEndpointDetails(value: string): WuyinAsyncEndpointDetails | null {
@@ -138,18 +444,27 @@ export function buildPricingEndpointCandidates(baseUrl: string): string[] {
     if (!cleanUrl) return [];
 
     const rootUrl = cleanUrl.replace(/\/v1$/i, '');
-    const candidates = [
-        `${cleanUrl}/pricing`,
-        `${cleanUrl}/api/pricing`,
-        `${cleanUrl}/price`,
-        `${cleanUrl}/api/price`,
-        cleanUrl !== rootUrl ? `${rootUrl}/pricing` : '',
-        cleanUrl !== rootUrl ? `${rootUrl}/api/pricing` : '',
-        cleanUrl !== rootUrl ? `${rootUrl}/price` : '',
-        cleanUrl !== rootUrl ? `${rootUrl}/api/price` : '',
-    ].filter(Boolean);
+    let originUrl = cleanUrl;
 
-    return Array.from(new Set(candidates));
+    try {
+        const parsed = new URL(cleanUrl);
+        originUrl = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+        originUrl = rootUrl;
+    }
+
+    const baseCandidates = Array.from(new Set([
+        cleanUrl,
+        rootUrl,
+        originUrl,
+    ].filter(Boolean)));
+
+    const suffixes = ['/pricing', '/pricing.html', '/models', '/api/pricing', '/price', '/api/price'];
+    const candidates = baseCandidates.flatMap((candidate) =>
+        suffixes.map((suffix) => `${candidate}${suffix}`)
+    );
+
+    return Array.from(new Set(candidates.filter(Boolean)));
 }
 
 function extractPricingPayload(payload: any): { pricingData: any[]; groupRatio: Record<string, number> } {
@@ -164,7 +479,10 @@ function extractPricingPayload(payload: any): { pricingData: any[]; groupRatio: 
                     : [];
 
     const groupRatio = (payload?.group_ratio || payload?.groupRatio || payload?.data?.group_ratio || {}) as Record<string, number>;
-    return { pricingData, groupRatio };
+    return {
+        pricingData: normalizePricingCatalogRows(pricingData, payload),
+        groupRatio,
+    };
 }
 
 function resolvePricingRequestRuntime(baseUrl: string, format: ApiProtocolFormat = 'auto') {
@@ -214,6 +532,64 @@ function buildPricingRequestUrl(endpointUrl: string, baseUrl: string, apiKey?: s
     return `${endpointUrl}${separator}key=${encodeURIComponent(getApiKeyToken(token))}`;
 }
 
+async function fetchPricingViaProxy(baseUrl: string): Promise<RawPricingCatalogResult | null> {
+    if (typeof window === 'undefined') return null;
+
+    const proxyUrl = '/api/pricing-proxy';
+    const normalizedBaseUrl = normalizePricingBaseUrl(baseUrl);
+
+    try {
+        const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ baseUrl }),
+        });
+
+        const text = await response.text();
+        const payload = safeJsonParse(text);
+        const pricingData = Array.isArray(payload?.data) ? payload.data : [];
+        if (!response.ok || pricingData.length === 0) {
+            return {
+                endpointUrl: `${normalizedBaseUrl}/pricing`,
+                pricingData: [],
+                groupRatio: {},
+                source: 'direct',
+                supportsGroups: false,
+                error: typeof payload?.error === 'string' && payload.error.trim()
+                    ? payload.error.trim()
+                    : (response.ok ? '价格代理没有返回任何模型数据。' : `价格代理返回 ${response.status}`),
+                attemptedUrls: [proxyUrl],
+            };
+        }
+
+        const groupRatio = payload?.group_ratio && typeof payload.group_ratio === 'object'
+            ? payload.group_ratio as Record<string, number>
+            : {};
+
+        return {
+            endpointUrl: `${normalizePricingBaseUrl(baseUrl)}/pricing`,
+            pricingData: normalizePricingCatalogRows(pricingData, payload),
+            groupRatio,
+            source: 'direct',
+            supportsGroups: true,
+            attemptedUrls: [proxyUrl],
+        };
+    } catch (error) {
+        console.warn('[NewApiPricing] Pricing proxy fallback failed:', error);
+        return {
+            endpointUrl: `${normalizedBaseUrl}/pricing`,
+            pricingData: [],
+            groupRatio: {},
+            source: 'direct',
+            supportsGroups: false,
+            error: error instanceof Error ? error.message : '价格代理请求失败。',
+            attemptedUrls: [proxyUrl],
+        };
+    }
+}
+
 function toWuyinPricingRows(pricingList: ModelPricingInfo[]): any[] {
     return pricingList.map((item) => ({
         model: item.modelId,
@@ -239,10 +615,6 @@ export async function fetchRawPricingCatalog(
     if (!cleanUrl) return null;
 
     const runtime = resolveProviderRuntime({ baseUrl: cleanUrl, format });
-    if (runtime.strategyId === '12ai') {
-        console.info('[NewApiPricing] Skipping direct 12AI pricing probe because /pricing is a page, not a browser-safe JSON endpoint.');
-        return null;
-    }
 
     if (runtime.strategyId === 'wuyinkeji') {
         const pricingList = selectWuyinCatalogModels(cleanUrl, await fetchWuyinPricingCatalog(cleanUrl));
@@ -256,10 +628,27 @@ export async function fetchRawPricingCatalog(
         };
     }
 
+    let lastError = '';
+    const attemptedUrls: string[] = [];
+
+    if (typeof window !== 'undefined') {
+        const proxied = await fetchPricingViaProxy(cleanUrl);
+        if (proxied?.pricingData?.length) {
+            return proxied;
+        }
+        if (proxied?.attemptedUrls?.length) {
+            attemptedUrls.push(...proxied.attemptedUrls);
+        }
+        if (proxied?.error) {
+            lastError = proxied.error;
+        }
+    }
+
     const candidateUrls = buildPricingEndpointCandidates(cleanUrl);
     const headers = buildPricingHeaders(cleanUrl, apiKey, format);
 
     for (const endpointUrl of candidateUrls) {
+        attemptedUrls.push(endpointUrl);
         try {
             const response = await fetch(buildPricingRequestUrl(endpointUrl, cleanUrl, apiKey, format), {
                 method: 'GET',
@@ -268,19 +657,59 @@ export async function fetchRawPricingCatalog(
 
             if (!response.ok) {
                 console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned ${response.status}`);
+                lastError = `${endpointUrl} 返回 ${response.status}`;
                 continue;
             }
 
             const text = await response.text();
-            if (text.trimStart().startsWith('<!') || text.trimStart().startsWith('<html')) {
-                console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned HTML`);
+            const trimmed = text.trimStart();
+            if (!trimmed) {
+                console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned empty payload`);
+                lastError = `${endpointUrl} 返回空响应`;
                 continue;
             }
 
-            const payload = JSON.parse(text);
+            if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+                const scraped = normalizePricingCatalogRows(scrapePricingFromHtml(text));
+                if (scraped.length > 0) {
+                    console.info(`[NewApiPricing] Scraped ${scraped.length} pricing entries from ${endpointUrl} markup.`);
+                    return {
+                        endpointUrl,
+                        pricingData: scraped,
+                        groupRatio: {},
+                        source: 'direct',
+                        supportsGroups: false,
+                        attemptedUrls,
+                    };
+                }
+                console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned HTML without embedded pricing data`);
+                lastError = `${endpointUrl} 返回了 HTML 页面，但页面里没有可解析的价格数据`;
+                continue;
+            }
+
+            const payload = safeJsonParse(trimmed);
+            if (!payload) {
+                console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned invalid JSON`);
+                const scraped = normalizePricingCatalogRows(scrapePricingFromHtml(text));
+                if (scraped.length > 0) {
+                    console.info(`[NewApiPricing] Scraped ${scraped.length} pricing entries from ${endpointUrl} fallback markup.`);
+                    return {
+                        endpointUrl,
+                        pricingData: scraped,
+                        groupRatio: {},
+                        source: 'direct',
+                        supportsGroups: false,
+                        attemptedUrls,
+                    };
+                }
+                lastError = `${endpointUrl} 返回内容不是有效 JSON`;
+                continue;
+            }
+
             const { pricingData, groupRatio } = extractPricingPayload(payload);
             if (!pricingData.length) {
                 console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} returned empty pricing data`);
+                lastError = `${endpointUrl} 没有返回任何价格模型`;
                 continue;
             }
 
@@ -290,13 +719,36 @@ export async function fetchRawPricingCatalog(
                 groupRatio,
                 source: 'direct',
                 supportsGroups: true,
+                attemptedUrls,
             };
         } catch (error) {
             console.warn(`[NewApiPricing] Pricing endpoint ${endpointUrl} failed:`, error);
+            lastError = `${endpointUrl} 请求失败：${error instanceof Error ? error.message : '未知错误'}`;
         }
     }
 
-    return null;
+    if (typeof window !== 'undefined') {
+        const proxied = await fetchPricingViaProxy(cleanUrl);
+        if (proxied?.pricingData?.length) {
+            return proxied;
+        }
+        if (proxied?.attemptedUrls?.length) {
+            attemptedUrls.push(...proxied.attemptedUrls.filter((url) => !attemptedUrls.includes(url)));
+        }
+        if (proxied?.error) {
+            lastError = proxied.error;
+        }
+    }
+
+    return {
+        endpointUrl: `${cleanUrl}/pricing`,
+        pricingData: [],
+        groupRatio: {},
+        source: 'direct',
+        supportsGroups: false,
+        error: lastError || '未找到可用的价格接口或页面数据。',
+        attemptedUrls,
+    };
 }
 
 /**

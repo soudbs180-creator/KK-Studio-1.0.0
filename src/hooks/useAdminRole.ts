@@ -28,9 +28,8 @@ export const useAdminRole = (): UseAdminRoleResult => {
         return;
       }
 
-      const metadataRole =
-        (user.user_metadata?.role as string | undefined) ||
-        (user.app_metadata?.role as string | undefined);
+      // Only trust server-controlled metadata. user_metadata can be edited by the user.
+      const metadataRole = user.app_metadata?.role as string | undefined;
 
       if (metadataRole === 'admin') {
         if (alive) {

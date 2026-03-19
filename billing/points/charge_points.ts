@@ -1,66 +1,99 @@
-// Points 引擎：处理内置积分扣除逻辑，物理分离友好实现
-import { BillingRequest } from '../router'
-import { logBillingEvent } from '../observability'
-import { pointsPool } from '../../config/db'
+import type { BillingRequest } from '../router.ts'
+import { logBillingEvent } from '../observability.ts'
+import { pointsPool } from '../../config/db.ts'
 
 export class PointsChargeHandler {
+  private db: any
+
   constructor(db?: any) {
-    // 物理分离：默认使用独立的连接池 pointsPool
     this.db = db || pointsPool
   }
-  private db: any
 
   async handleChargePoints(req: BillingRequest): Promise<any> {
     const body = req.body || {}
-    const provider = (req.headers?.['x-provider-id'] || req.headers?.['X-Provider-Id'] || (body as any).provider_id) || 'unknown'
+    const provider = req.headers?.['x-provider-id']
+      || req.headers?.['X-Provider-Id']
+      || body.provider_id
+      || 'unknown'
     const idempotentKey = this.extractIdempotentKey(req)
-    const account_id = body.account_id
-    const amount_points = body.amount_points
+    const accountId = body.account_id
+    const amountPoints = body.amount_points
     const action = body.action || 'points_deduction'
-    const reference_id = body.reference_id || null
+    const referenceId = body.reference_id || null
 
-    if (!account_id || typeof amount_points !== 'number') {
+    if (!accountId || typeof amountPoints !== 'number') {
       throw new Error('Missing required fields: account_id and numeric amount_points')
     }
 
-    let newBalance: any = null
-    const client = await (this.db as any).connect()
+    let newBalance: number | null = null
+    const client = await this.db.connect()
+
     try {
-      // Observability: log initiation
-      logBillingEvent('points_charge_initiated', { provider, account_id, amount_points, idempotentKey, mode: 'points' })
+      logBillingEvent('points_charge_initiated', {
+        provider,
+        account_id: accountId,
+        amount_points: amountPoints,
+        idempotentKey,
+        mode: 'points'
+      })
+
       await client.query('BEGIN')
-      const upd = await client.query(
-        `UPDATE billing_points.points_accounts SET balance_points = balance_points + $1, updated_at = NOW() WHERE id = $2 RETURNING balance_points`,
-        [amount_points, account_id]
+
+      const updateResult = await client.query(
+        `UPDATE billing_points.points_accounts
+         SET balance_points = balance_points + $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING balance_points`,
+        [amountPoints, accountId]
       )
-      if (!upd || upd.rows.length === 0) {
+
+      if (!updateResult || updateResult.rows.length === 0) {
         throw new Error('Points account not found')
       }
-      newBalance = upd.rows[0].balance_points
+
+      newBalance = updateResult.rows[0].balance_points
+
       await client.query(
-        `INSERT INTO billing_points.points_transactions (account_id, amount_points, reason, reference_id, timestamp, engine_type) VALUES ($1, $2, $3, $4, NOW(), 'points')`,
-        [account_id, amount_points, action, reference_id]
+        `INSERT INTO billing_points.points_transactions
+           (account_id, amount_points, reason, reference_id, timestamp, engine_type)
+         VALUES ($1, $2, $3, $4, NOW(), 'points')`,
+        [accountId, amountPoints, action, referenceId]
       )
+
       await client.query('COMMIT')
-      logBillingEvent('points_charge_completed', { provider, account_id, amount_points, new_balance_points: newBalance, mode: 'points' })
+
+      logBillingEvent('points_charge_completed', {
+        provider,
+        account_id: accountId,
+        amount_points: amountPoints,
+        new_balance_points: newBalance,
+        mode: 'points'
+      })
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Ignore rollback failures so we can rethrow the original error.
+      }
+      throw error
+    } finally {
       client.release()
-    } catch (e) {
-      try { await client.query('ROLLBACK') } catch { /* ignore */ }
-      client.release()
-      throw e
     }
+
     return {
       ok: true,
       engine_type: 'points',
       id: idempotentKey,
-      new_balance_points: newBalance,
+      new_balance_points: newBalance
     }
   }
 
   private extractIdempotentKey(req: BillingRequest): string {
     const body = req.body || {}
     if (body.points_request_id) return body.points_request_id
-    const h = req.headers || {}
-    return h['x-points-request-id'] || h['X-Points-Request-Id'] || 'unknown'
+
+    return req.headers?.['x-points-request-id']
+      || req.headers?.['X-Points-Request-Id']
+      || 'unknown'
   }
 }

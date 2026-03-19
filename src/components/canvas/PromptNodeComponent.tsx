@@ -11,6 +11,7 @@ import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/
 import ImagePreview from '../image/ImagePreview';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
+import { isCreditBillingTarget } from '../../utils/creditBilling';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -870,14 +871,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     </svg>
                                 </div>
                                 <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error}>
-                                    生成失败{(() => {
-                                        // 🚀 [Fix] 只有 SystemProxy 或者明确带有 @system 后缀才是积分模型
-                                        const lowerModelId = node.model?.toLowerCase() || '';
-                                        const isCreditModel = node.provider === 'SystemProxy' || lowerModelId.includes('@system') || lowerModelId.includes('@systemproxy');
+                                    {'\u751f\u6210\u5931\u8d25'}{(() => {
+                                        // Keep refund messaging aligned with the same credit-billing detection used by subcards.
+                                        const isCreditModel = isCreditBillingTarget(node);
                                         if (!isCreditModel) return '';
-                                        if (node.refundStatus === 'success') return '，积分已退回';
-                                        if (node.refundStatus === 'failed') return '，积分退回失败';
-                                        if (node.isPaymentProcessed) return '，积分已退回';
+                                        if (node.refundStatus === 'success') return '\uff0c\u79ef\u5206\u5df2\u9000\u56de';
+                                        if (node.refundStatus === 'failed') return '\uff0c\u79ef\u5206\u9000\u6b3e\u5931\u8d25';
                                         return '';
                                     })()}
                                 </span>
@@ -1548,7 +1547,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                                 textColor: node.modelTextColor,
                                                             });
 
-                                                            const isCreditModel = modelId.toLowerCase().includes('@system');
+                                                            const isCreditModel = isCreditBillingTarget(node);
 
                                                             return (
                                                                 <>

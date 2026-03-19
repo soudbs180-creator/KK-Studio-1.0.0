@@ -3,9 +3,7 @@ import { afterEach, describe, test } from 'node:test'
 import { BillingRouter } from '../../billing/router.ts'
 import { PointsChargeHandler } from '../../billing/points/charge_points.ts'
 import { TokenUsageHandler } from '../../billing/token/usage_token.ts'
-import { keyManager } from '../../src/services/auth/keyManager.ts'
-import { calculateCost, resolveImageCost } from '../../src/services/billing/costService.ts'
-import { ImageSize } from '../../src/types.ts'
+import { calculateSnapshotCost, resolveImageCostWithResolver, type ImageCostResolver } from '../../src/services/billing/imageCostCore.ts'
 
 class MockDb {
   query(_text: string, _params?: any[]) { return Promise.resolve({ rows: [] }) }
@@ -51,20 +49,19 @@ describe('Billing Physical Separation - Routing', () => {
 })
 
 describe('Billing Physical Separation - Image Cost Resolution', () => {
-  const originalGetEffectiveKey = keyManager.getEffectiveKey
-  const originalGetKey = keyManager.getKey
-  const originalGetProviderForKeySlot = keyManager.getProviderForKeySlot
+  const createResolver = (): ImageCostResolver => ({
+    getEffectiveKey: () => ({ id: 'slot-1', group: 'default' } as any),
+    getKey: () => ({ id: 'slot-1', group: 'default' } as any),
+    getProviderForKeySlot: () => undefined,
+  })
 
   afterEach(() => {
-    ;(keyManager as any).getEffectiveKey = originalGetEffectiveKey
-    ;(keyManager as any).getKey = originalGetKey
-    ;(keyManager as any).getProviderForKeySlot = originalGetProviderForKeySlot
+    // No shared singleton state to reset when using the pure resolver.
   })
 
   test('prefers pricing snapshot over upstream or stored subcard cost', () => {
-    ;(keyManager as any).getEffectiveKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getProviderForKeySlot = () => ({
+    const resolver = createResolver()
+    resolver.getProviderForKeySlot = () => ({
       pricingSnapshot: {
         modelPrices: { 'nano-banana': 0.13 },
         sizeRatios: {
@@ -75,41 +72,38 @@ describe('Billing Physical Separation - Image Cost Resolution', () => {
       },
     })
 
-    const resolved = resolveImageCost({
+    const resolved = resolveImageCostWithResolver({
       model: 'nano-banana',
-      imageSize: ImageSize.SIZE_4K,
+      imageSize: '4K',
       prompt: 'prompt',
       keySlotId: 'slot-1',
       explicitCost: 0.195,
       storedCost: 0.195,
-    })
+    }, resolver)
 
     assert.equal(resolved.source, 'snapshot')
     assert.equal(resolved.cost, 0.13)
   })
 
   test('falls back to explicit upstream cost when no pricing snapshot is available', () => {
-    ;(keyManager as any).getEffectiveKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getProviderForKeySlot = () => undefined
+    const resolver = createResolver()
 
-    const resolved = resolveImageCost({
+    const resolved = resolveImageCostWithResolver({
       model: 'nano-banana',
-      imageSize: ImageSize.SIZE_4K,
+      imageSize: '4K',
       prompt: 'prompt',
       keySlotId: 'slot-1',
       explicitCost: 0.195,
       storedCost: 0.13,
-    })
+    }, resolver)
 
     assert.equal(resolved.source, 'explicit')
     assert.equal(resolved.cost, 0.195)
   })
 
   test('matches 4K aliases when applying snapshot size ratios', () => {
-    ;(keyManager as any).getEffectiveKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getKey = () => ({ id: 'slot-1', group: 'default' })
-    ;(keyManager as any).getProviderForKeySlot = () => ({
+    const resolver = createResolver()
+    resolver.getProviderForKeySlot = () => ({
       pricingSnapshot: {
         modelPrices: { 'nano-banana': 0.13 },
         sizeRatios: {
@@ -121,12 +115,12 @@ describe('Billing Physical Separation - Image Cost Resolution', () => {
       },
     })
 
-    const normalized4k = calculateCost('nano-banana', ImageSize.SIZE_4K, 1, 0, 0, 'slot-1')
-    const raw4096 = calculateCost('nano-banana', '4096x4096' as any, 1, 0, 0, 'slot-1')
-    const lowercase4k = calculateCost('nano-banana', '4k' as any, 1, 0, 0, 'slot-1')
+    const normalized4k = calculateSnapshotCost('nano-banana', '4K', 1, 0, 0, 'slot-1', resolver)
+    const raw4096 = calculateSnapshotCost('nano-banana', '4096x4096' as any, 1, 0, 0, 'slot-1', resolver)
+    const lowercase4k = calculateSnapshotCost('nano-banana', '4k' as any, 1, 0, 0, 'slot-1', resolver)
 
-    assert.equal(normalized4k.cost, 0.13)
-    assert.equal(raw4096.cost, 0.13)
-    assert.equal(lowercase4k.cost, 0.13)
+    assert.equal(normalized4k?.cost, 0.13)
+    assert.equal(raw4096?.cost, 0.13)
+    assert.equal(lowercase4k?.cost, 0.13)
   })
 })

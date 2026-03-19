@@ -98,6 +98,14 @@ type CloudSessionResolution = {
   accessToken: string;
 };
 
+async function clearExpiredCloudSession(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 function buildCloudSessionError(feature: string): Error {
   if (tempUserService.getCachedTempUser()) {
     return new Error('Guest mode does not have a real Supabase session, so cloud sync and system credit models are unavailable.');
@@ -131,6 +139,7 @@ async function resolveCloudSession(feature: string): Promise<CloudSessionResolut
   }
 
   if (!activeSession?.access_token) {
+    await clearExpiredCloudSession();
     throw buildCloudSessionError(feature);
   }
 
@@ -157,6 +166,7 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
+    await clearExpiredCloudSession();
     message = `System credit ${feature} failed because your login session expired. Please sign in again and retry.`;
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;

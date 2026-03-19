@@ -110,15 +110,18 @@ const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties
 };
 
 export const SETTINGS_PANEL_STYLE = {
-  backgroundColor: 'var(--settings-section-bg)',
+  borderColor: 'var(--border-light)',
+  backgroundColor: 'var(--bg-secondary)',
 } as const;
 
 export const SETTINGS_ELEVATED_STYLE = {
-  backgroundColor: 'var(--settings-surface-elevated)',
+  borderColor: 'var(--border-light)',
+  backgroundColor: 'var(--bg-tertiary)',
 } as const;
 
 export const SETTINGS_OVERLAY_STYLE = {
-  backgroundColor: 'var(--settings-surface-overlay)',
+  borderColor: 'var(--border-light)',
+  backgroundColor: 'var(--bg-secondary)',
 } as const;
 
 export const SETTINGS_SUCCESS_STYLE = {
@@ -183,7 +186,7 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className="settings-hero-card rounded-[10px] p-4" style={SETTINGS_PANEL_STYLE}>
+    <section className="settings-hero-card rounded-2xl border p-4" style={SETTINGS_PANEL_STYLE}>
       <div className="settings-hero-card__content space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -232,7 +235,7 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <div className="settings-metric-card h-full rounded-[10px] p-3" style={SETTINGS_ELEVATED_STYLE}>
+    <div className="settings-metric-card h-full rounded-xl border p-3" style={SETTINGS_ELEVATED_STYLE}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
@@ -279,7 +282,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       </h3>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
     </div>
-    <div className="settings-section-card rounded-[10px] p-4" style={SETTINGS_PANEL_STYLE}>
+    <div className="settings-section-card rounded-2xl border p-4" style={SETTINGS_PANEL_STYLE}>
       {children}
     </div>
     {description ? (

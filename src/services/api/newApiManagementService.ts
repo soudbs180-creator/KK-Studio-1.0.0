@@ -66,23 +66,42 @@ function extractModelIds(channel: Channel): string[] {
         .filter(Boolean);
 }
 
+const MARKETING_PAGE_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
+
 function normalizePricingBaseUrl(baseUrl?: string): string {
-    return String(baseUrl || DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
+    const raw = String(baseUrl || DEFAULT_BASE_URL).trim();
+    if (!raw) return '';
+    const trimmed = raw.replace(/\/+$/, '');
+    const sanitized = trimmed.replace(MARKETING_PAGE_SUFFIX_RE, '');
+    return sanitized || trimmed;
 }
 
 function buildPricingCandidateUrls(baseUrl?: string): string[] {
     const cleanBaseUrl = normalizePricingBaseUrl(baseUrl);
+    if (!cleanBaseUrl) return [];
+
     const rootBaseUrl = cleanBaseUrl.replace(/\/v1$/i, '');
-    return Array.from(new Set([
-        `${cleanBaseUrl}/api/pricing`,
-        `${cleanBaseUrl}/pricing`,
-        `${cleanBaseUrl}/api/price`,
-        `${cleanBaseUrl}/price`,
-        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/api/pricing` : '',
-        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/pricing` : '',
-        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/api/price` : '',
-        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/price` : '',
+    let originBaseUrl = cleanBaseUrl;
+
+    try {
+        const parsed = new URL(cleanBaseUrl);
+        originBaseUrl = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+        originBaseUrl = rootBaseUrl;
+    }
+
+    const baseCandidates = Array.from(new Set([
+        cleanBaseUrl,
+        rootBaseUrl,
+        originBaseUrl,
     ].filter(Boolean)));
+
+    const suffixes = ['/api/pricing', '/pricing', '/pricing.html', '/models', '/api/price', '/price'];
+    const endpoints = baseCandidates.flatMap((candidate) =>
+        suffixes.map((suffix) => `${candidate}${suffix}`)
+    );
+
+    return Array.from(new Set(endpoints.filter(Boolean)));
 }
 
 function parsePricingNumber(value: unknown): number | undefined {

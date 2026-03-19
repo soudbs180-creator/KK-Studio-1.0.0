@@ -103,14 +103,62 @@ export function buildInlineImagePart(base64Data: string, mimeType: string, useSn
 }
 
 function normalizeToolsForGateway(tools: any[] | undefined, useSnakeCase: boolean): any[] | undefined {
+    return buildGeminiNativeGroundingTools(tools, useSnakeCase);
+}
+
+export function extractGoogleSearchToolIntent(tools: any[] | undefined): {
+    enabled: boolean;
+    wantsImageSearch: boolean;
+    wantsWebSearch: boolean;
+} {
+    if (!tools || tools.length === 0) {
+        return {
+            enabled: false,
+            wantsImageSearch: false,
+            wantsWebSearch: false,
+        };
+    }
+
+    for (const tool of tools) {
+        const googleSearch = tool?.googleSearch || tool?.google_search;
+        if (!googleSearch) continue;
+
+        const searchTypes = googleSearch?.searchTypes || googleSearch?.search_types;
+        const wantsImageSearch = Boolean(searchTypes?.imageSearch || searchTypes?.image_search);
+        const wantsWebSearch = !searchTypes || Boolean(searchTypes?.webSearch || searchTypes?.web_search);
+
+        return {
+            enabled: true,
+            wantsImageSearch,
+            wantsWebSearch,
+        };
+    }
+
+    return {
+        enabled: false,
+        wantsImageSearch: false,
+        wantsWebSearch: false,
+    };
+}
+
+export function buildGeminiNativeGroundingTools(
+    tools: any[] | undefined,
+    useSnakeCase: boolean = false
+): any[] | undefined {
     if (!tools || tools.length === 0) return tools;
-    if (!useSnakeCase) return tools;
-    return tools.map(tool => {
-        if (tool?.googleSearch) {
-            return { google_search: tool.googleSearch };
-        }
-        return tool;
-    });
+
+    const intent = extractGoogleSearchToolIntent(tools);
+    if (!intent.enabled) return tools;
+
+    const passthroughTools = tools.filter((tool) => !tool?.googleSearch && !tool?.google_search);
+    const toolKey = useSnakeCase ? 'google_search' : 'googleSearch';
+
+    // Gemini native image grounding is stable with a plain Google Search tool.
+    // The older structured searchTypes payload can trigger INVALID_ARGUMENT on current routes.
+    return [
+        ...passthroughTools,
+        { [toolKey]: {} },
+    ];
 }
 
 function buildSafeRequestBodyPreview(payload: any): string {

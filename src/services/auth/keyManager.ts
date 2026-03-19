@@ -37,6 +37,8 @@ import { adminModelService } from '../model/adminModelService'; // 完成 [API K
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot';
 import { fetchRawPricingCatalog, fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
 
+const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
+
 /**
  * Helper: Parse "id(name, description)" format
  */
@@ -413,6 +415,13 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
         ],
         format: 'gemini',
         icon: '\u{1F34C}'
+    },
+    'gpt-best': {
+        name: 'GPT-Best',
+        baseUrl: '',
+        models: ['gpt-4o', 'gpt-4o-mini', 'o3-pro', 'codex-mini-latest', 'o3-deep-research-2025-06-26'],
+        format: 'openai',
+        icon: '\u{1F3AF}'
     },
     'custom': {
         name: '\u81EA\u5B9A\u4E49\u4F9B\u5E94\u5546',
@@ -1810,7 +1819,12 @@ export class KeyManager {
 
                             // 鉁?[NEW] 灏濊瘯闈欓粯鑾峰彇 /pricing 绔偣骞跺姩鎬佹洿鏂板叏灞€浠锋牸
                             try {
-                                const pricingUrl = cleanUrl.endsWith('/v1') ? cleanUrl.replace(/\/v1$/, '') + '/pricing' : cleanUrl + '/pricing';
+                                const sanitizedPricingBase = cleanUrl.replace(PROVIDER_MARKETING_SUFFIX_RE, '') || cleanUrl;
+                                const normalizedPricingBase = sanitizedPricingBase.replace(/\/+$/, '') || cleanUrl;
+                                const pricingBase = normalizedPricingBase.endsWith('/v1')
+                                    ? normalizedPricingBase.replace(/\/v1$/, '')
+                                    : normalizedPricingBase;
+                                const pricingUrl = `${pricingBase}/pricing`;
                                 // We don't want to block the models return, so do this asynchronously but catch errors locally.
                                 // It runs in the background.
                                 fetch(pricingUrl, {
@@ -1951,6 +1965,8 @@ export class KeyManager {
         // Parse the requested ID to separate base model and suffix
         // Format: modelId@Suffix or just modelId
         const [baseIdPart, suffix] = modelId.split('@');
+        const normalizedSuffix = decodeRouteSuffix(suffix);
+        const isSystemRouteSuffix = normalizedSuffix.startsWith('system') || normalizedSuffix === 'systemproxy';
 
         // Normalize the requested model ID and apply migration mapping
         let normalizedModelId = baseIdPart.replace(/^models\//, '');
@@ -2090,7 +2106,16 @@ export class KeyManager {
                 const slotIdLower = String(s.id || '').trim().toLowerCase();
                 return slotIdLower === normalizedPreferredKeyId || (!!preferredRouteTarget && slotIdLower === preferredRouteTarget);
             });
-            if (preferred && isSlotHealthy(preferred) && modelSupportedBySlot(preferred) && matchesRequestedRoute(preferred)) {
+            const canHonorPreferredExternalRoute = !!preferred
+                && preferred.provider !== 'SystemProxy'
+                && (!suffix || isSystemRouteSuffix);
+            if (preferred && isSlotHealthy(preferred) && modelSupportedBySlot(preferred)
+                && (matchesRequestedRoute(preferred) || canHonorPreferredExternalRoute)) {
+                if (!matchesRequestedRoute(preferred) && canHonorPreferredExternalRoute) {
+                    console.log(
+                        `[KeyManager] Honoring preferred external key for model=${normalizedModelId} despite route suffix='${normalizedSuffix || '(none)'}': ${preferred.name}[${preferred.id}]`
+                    );
+                }
                 return this.prepareKeyResult(preferred);
             }
             if (!suffix) {
@@ -2118,7 +2143,6 @@ export class KeyManager {
         } else {
             // [Proxy / Channel Connection]
             // Strategy: find keys matching the selected suffix.
-            const normalizedSuffix = String(suffix || '').trim().toLowerCase();
             const isSystemRoute = normalizedSuffix.startsWith('system') || normalizedSuffix === 'systemproxy';
             const proxyAliasSet = new Set(['custom', 'proxy', 'proxied', 'system', 'builtin']);
             if (isSystemRoute) {
@@ -3115,7 +3139,7 @@ export class KeyManager {
                         isSystemInternal: false,
                         type: MODEL_TYPE_MAP.get(id) || inferModelType(id),
                         icon: provider.icon || registryInfo?.icon || meta?.icon,
-                        description: description || registryInfo?.description || meta?.description || '',
+                        description: description || pricingMeta?.description || registryInfo?.description || meta?.description || '',
                         tags: Array.isArray(pricingMeta?.tags) ? pricingMeta.tags : undefined,
                         tokenGroup: pricingMeta?.tokenGroup,
                         billingType: pricingMeta?.billingType,
@@ -3814,18 +3838,30 @@ export class KeyManager {
     /**
      * 鑷姩浠庝緵搴斿晢鐨?/api/pricing 鎺ュ彛鎷夊彇浠锋牸琛ㄥ苟淇濆瓨蹇収
      */
-    async syncProviderPricing(providerId: string): Promise<boolean> {
+    async syncProviderPricingDetailed(providerId: string): Promise<{
+        ok: boolean;
+        message?: string;
+        endpointUrl?: string;
+        attemptedUrls?: string[];
+        count?: number;
+    }> {
         this.loadProviders();
         const provider = this.providers.find(p => p.id === providerId);
-        if (!provider || !provider.baseUrl) return false;
+        if (!provider) {
+            return { ok: false, message: '未找到对应的供应商配置。' };
+        }
+        if (!provider.baseUrl) {
+            return { ok: false, message: '当前供应商还没有填写基础地址。' };
+        }
 
         const runtime = resolveProviderRuntime({
             baseUrl: provider.baseUrl,
             format: provider.format,
         });
-        if (runtime.pricingSupport !== 'native' || runtime.strategyId === '12ai') {
-            console.info(`[KeyManager] Skipping automatic pricing sync for ${provider.name}; use the pricing page flow instead.`);
-            return false;
+        if (runtime.pricingSupport === 'none') {
+            const message = `供应商 ${provider.name} 当前未暴露可抓取的价格端点，需要手动录入价格。`;
+            console.info(`[KeyManager] ${message}`);
+            return { ok: false, message };
         }
 
         try {
@@ -3836,8 +3872,17 @@ export class KeyManager {
             );
 
             if (!result?.pricingData?.length) {
-                console.warn(`[KeyManager] Pricing API not available for ${provider.name}`);
-                return false;
+                const message = result?.error || `未能从 ${provider.baseUrl} 解析到可用价格数据。`;
+                console.warn(`[KeyManager] Pricing API not available for ${provider.name}: ${message}`);
+                if (result?.attemptedUrls?.length) {
+                    console.warn(`[KeyManager] Attempted pricing URLs for ${provider.name}:`, result.attemptedUrls);
+                }
+                return {
+                    ok: false,
+                    message,
+                    endpointUrl: result?.endpointUrl,
+                    attemptedUrls: result?.attemptedUrls,
+                };
             }
 
             console.log(`[KeyManager] Syncing pricing for ${provider.name} from ${result.endpointUrl}...`);
@@ -3852,11 +3897,23 @@ export class KeyManager {
             this.saveProviders();
             this.notifyListeners();
             console.log(`[KeyManager] Successfully synced pricing for ${provider.name}. Models found: ${result.pricingData.length}`);
-            return true;
+            return {
+                ok: true,
+                message: `已同步 ${result.pricingData.length} 条价格数据。`,
+                endpointUrl: result.endpointUrl,
+                attemptedUrls: result.attemptedUrls,
+                count: result.pricingData.length,
+            };
         } catch (e) {
+            const message = e instanceof Error ? e.message : '价格同步请求失败。';
             console.warn(`[KeyManager] Failed or timed out syncing pricing for ${provider.name}:`, e);
-            return false;
+            return { ok: false, message };
         }
+    }
+
+    async syncProviderPricing(providerId: string): Promise<boolean> {
+        const result = await this.syncProviderPricingDetailed(providerId);
+        return result.ok;
     }
 
     /**

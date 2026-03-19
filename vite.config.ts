@@ -104,7 +104,10 @@ async function normalizeSupplierBaseUrl(rawBaseUrl: string): Promise<string> {
 
     parsed.hash = '';
     parsed.search = '';
-    parsed.pathname = parsed.pathname.replace(/\/v1\/?$/i, '').replace(/\/+$/, '') || '/';
+    parsed.pathname = parsed.pathname
+        .replace(/\/(pricing(?:\.html)?|models)(\/.*)?$/i, '')
+        .replace(/\/v1\/?$/i, '')
+        .replace(/\/+$/, '') || '/';
 
     return parsed.toString().replace(/\/$/, '');
 }
@@ -276,6 +279,55 @@ function buildVersionManifestPlugin(): Plugin {
     };
 }
 
+function getRequestPath(rawUrl: string | undefined): string {
+    try {
+        return new URL(rawUrl || '/', 'http://localhost').pathname;
+    } catch {
+        return rawUrl || '/';
+    }
+}
+
+function createProxyRequestHeaders(headers: Record<string, string | string[] | undefined>): Headers {
+    const proxyHeaders = new Headers();
+
+    Object.entries(headers).forEach(([key, value]) => {
+        if (!value) return;
+        if (key.toLowerCase() === 'host' || key.toLowerCase() === 'connection') return;
+
+        if (Array.isArray(value)) {
+            proxyHeaders.set(key, value.join(', '));
+            return;
+        }
+
+        proxyHeaders.set(key, value);
+    });
+
+    return proxyHeaders;
+}
+
+async function readIncomingBody(req: AsyncIterable<Buffer | string>): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    return Buffer.concat(chunks);
+}
+
+async function writeFetchResponse(
+    res: {
+        statusCode: number;
+        setHeader: (name: string, value: string) => void;
+        end: (chunk?: Uint8Array | string) => void;
+    },
+    response: Response,
+) {
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.end(Buffer.from(await response.arrayBuffer()));
+}
+
 /**
  * 开发环境价格扫描代理插件
  * 从服务端去爬取供应商的 /pricing 页面数据（实际请求 /api/pricing）
@@ -374,6 +426,35 @@ function pricingProxyPlugin(): Plugin {
     };
 }
 
+function nutrientDocumentProxyPlugin(): Plugin {
+    return {
+        name: 'nutrient-document-proxy',
+        configureServer(server) {
+            server.middlewares.use(async (req, res, next) => {
+                const requestPath = getRequestPath(req.url);
+                if (requestPath !== '/api/nutrient-document') {
+                    return next();
+                }
+
+                if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+                    return next();
+                }
+
+                const body = req.method === 'POST' ? await readIncomingBody(req) : undefined;
+                const { default: nutrientDocumentHandler } = await import('./api/nutrient-document.ts');
+
+                const response = await nutrientDocumentHandler(new Request(`http://localhost${req.url || '/api/nutrient-document'}`, {
+                    method: req.method,
+                    headers: createProxyRequestHeaders(req.headers),
+                    body,
+                }));
+
+                await writeFetchResponse(res, response);
+            });
+        },
+    };
+}
+
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
@@ -390,7 +471,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [pricingProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [pricingProxyPlugin(), nutrientDocumentProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

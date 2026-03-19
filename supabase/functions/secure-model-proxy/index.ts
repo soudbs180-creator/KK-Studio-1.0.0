@@ -708,6 +708,11 @@ Deno.serve(async (req) => {
           message: refundError?.message || refundResult?.message,
         };
       };
+      const taskResultNotReady = (message = 'Task result is not ready yet') => (
+        body.mode === 'download_task'
+          ? json({ success: false, error: message }, 409)
+          : json({ success: true, status: 'pending', deducted: true })
+      );
 
       const baseUrl = String(creditModel.base_url || '').replace(/\/$/, '');
       if (body.mode === 'delete_task') {
@@ -788,8 +793,12 @@ Deno.serve(async (req) => {
           return json({ success: true, status: 'pending', deducted: true });
         }
 
-        const videoUri = statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
-        if (!videoUri) {
+        const taskErrorMessage = String(
+          statusData?.error?.message ||
+          statusData?.response?.error?.message ||
+          ''
+        ).trim();
+        if (taskErrorMessage) {
           const refundResult = await refundTaskCredits('video_generation_failed');
           if (!refundResult.success) {
             return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
@@ -797,9 +806,23 @@ Deno.serve(async (req) => {
           return json({ success: true, status: 'failed', deducted: true });
         }
 
-        const dataUrl = await downloadVideoAsDataUrl(videoUri, {
-          'x-goog-api-key': selectedKey,
-        });
+        const videoUri =
+          statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri ||
+          statusData.response?.generatedSamples?.[0]?.video?.uri ||
+          statusData.response?.video?.uri ||
+          statusData.response?.result?.video?.uri;
+        if (!videoUri) {
+          return taskResultNotReady('Task result is still being finalized');
+        }
+
+        let dataUrl = '';
+        try {
+          dataUrl = await downloadVideoAsDataUrl(videoUri, {
+            'x-goog-api-key': selectedKey,
+          });
+        } catch (_downloadError) {
+          return taskResultNotReady('Generated video is still processing');
+        }
         await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
         return json({
           success: true,
@@ -845,6 +868,7 @@ Deno.serve(async (req) => {
           `${openaiBase}/videos/${taskPayload.operationName}/content`,
           `${openaiBase}/videos/generations/${taskPayload.operationName}/content`,
         ];
+        let sawRetryableContent = false;
         for (const contentUrl of contentCandidates) {
           const contentResponse = await fetch(contentUrl, {
             headers: {
@@ -852,9 +876,15 @@ Deno.serve(async (req) => {
             },
           });
           if (!contentResponse.ok) continue;
-          const base64Video = await downloadVideoAsDataUrl(contentUrl, {
-            Authorization: `Bearer ${selectedKey}`,
-          });
+          let base64Video = '';
+          try {
+            base64Video = await downloadVideoAsDataUrl(contentUrl, {
+              Authorization: `Bearer ${selectedKey}`,
+            });
+          } catch (_downloadError) {
+            sawRetryableContent = true;
+            continue;
+          }
           await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
           return json({
             success: true,
@@ -862,6 +892,9 @@ Deno.serve(async (req) => {
             url: base64Video,
             deducted: true,
           });
+        }
+        if (sawRetryableContent) {
+          return taskResultNotReady('Generated video is still processing');
         }
       }
 
@@ -874,7 +907,7 @@ Deno.serve(async (req) => {
       }
 
       if (body.mode === 'download_task') {
-        return json({ success: false, error: 'Task content is not ready yet' }, 409);
+        return taskResultNotReady('Task content is not ready yet');
       }
 
       return json({ success: true, status: 'pending', deducted: true });

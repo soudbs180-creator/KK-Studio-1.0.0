@@ -11,6 +11,8 @@ import type {
 import type { KeySlot } from '../auth/keyManager';
 import { GoogleAdapter } from './GoogleAdapter';
 import { OpenAICompatibleAdapter } from './OpenAICompatibleAdapter';
+import { VideoCompatibleAdapter } from './VideoCompatibleAdapter';
+import { AudioCompatibleAdapter } from './AudioCompatibleAdapter';
 import { resolveProviderRuntime } from '../api/providerStrategy';
 import { GenerationMode } from '../../types';
 import {
@@ -25,6 +27,8 @@ export class GeminiNativeAdapter implements LLMAdapter {
 
     private googleAdapter = new GoogleAdapter();
     private openAICompatibleAdapter = new OpenAICompatibleAdapter();
+    private videoCompatibleAdapter = new VideoCompatibleAdapter();
+    private audioCompatibleAdapter = new AudioCompatibleAdapter();
 
     supports(modelId: string): boolean {
         return this.googleAdapter.supports(modelId);
@@ -45,6 +49,14 @@ export class GeminiNativeAdapter implements LLMAdapter {
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
         const runtime = this.resolveRuntime(keySlot, options.modelId);
         const authMethod = runtime.authMethod as AuthMethod;
+        const systemInstructionTexts = [
+            options.systemPrompt,
+            ...options.messages
+                .filter((message) => message.role === 'system')
+                .map((message) => typeof message.content === 'string' ? message.content : JSON.stringify(message.content)),
+        ]
+            .map((value) => String(value || '').trim())
+            .filter((value) => value.length > 0);
         const endpoint = buildGeminiEndpoint(
             keySlot.baseUrl,
             options.modelId,
@@ -58,14 +70,17 @@ export class GeminiNativeAdapter implements LLMAdapter {
             method: 'POST',
             headers: buildGeminiHeaders(authMethod, keySlot.key, runtime.headerName, runtime.authorizationValueFormat),
             body: JSON.stringify({
+                ...(systemInstructionTexts.length > 0
+                    ? {
+                        systemInstruction: {
+                            parts: systemInstructionTexts.map((text) => ({ text })),
+                        },
+                    }
+                    : {}),
                 contents: [
-                    ...(options.systemPrompt
-                        ? [{
-                            role: 'user',
-                            parts: [{ text: options.systemPrompt }],
-                        }]
-                        : []),
-                    ...options.messages.map((message) => ({
+                    ...options.messages
+                        .filter((message) => message.role !== 'system')
+                        .map((message) => ({
                         role: message.role === 'assistant' ? 'model' : 'user',
                         parts: [{ text: typeof message.content === 'string' ? message.content : JSON.stringify(message.content) }],
                     })),
@@ -100,14 +115,33 @@ export class GeminiNativeAdapter implements LLMAdapter {
     }
 
     async generateVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
-        return this.googleAdapter.generateVideo!(options, keySlot);
+        const runtime = this.resolveRuntime(keySlot, options.modelId);
+        if (runtime.providerFamily === 'google-official') {
+            return this.googleAdapter.generateVideo!(options, keySlot);
+        }
+
+        return this.videoCompatibleAdapter.generateVideo!(options, keySlot);
     }
 
     async generateAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
-        return this.googleAdapter.generateAudio!(options, keySlot);
+        const runtime = this.resolveRuntime(keySlot, options.modelId);
+        if (runtime.providerFamily === 'google-official') {
+            return this.googleAdapter.generateAudio!(options, keySlot);
+        }
+
+        return this.audioCompatibleAdapter.generateAudio!(options, keySlot);
     }
 
     async checkTaskStatus(taskId: string, mode: GenerationMode, keySlot: KeySlot): Promise<any> {
-        return this.googleAdapter.checkTaskStatus!(taskId, mode, keySlot);
+        const runtime = this.resolveRuntime(keySlot);
+        if (runtime.providerFamily === 'google-official') {
+            return this.googleAdapter.checkTaskStatus!(taskId, mode, keySlot);
+        }
+
+        if (mode === GenerationMode.IMAGE) {
+            return this.openAICompatibleAdapter.checkTaskStatus!(taskId, mode, keySlot);
+        }
+
+        throw new Error(`Polling not supported for ${mode} on non-Google Gemini-native channels`);
     }
 }

@@ -12,10 +12,10 @@ import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from 
 import { loadImage, cancelImageLoad } from '../../services/image/imageLoader';
 import { ImageQuality, getAppropriateQuality, type ImageQualityBias } from '../../services/image/imageQuality';
 import { getModelThemeBgColor } from '../../services/model/modelCapabilities';
-import { getModelCredits, isCreditBasedModel } from '../../services/model/modelPricing';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
+import { getResolvedCreditCost, isCreditBillingTarget } from '../../utils/creditBilling';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -497,30 +497,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const showTokenInfo = displayTokens > 0;
     const hasResolvedDisplayCost = resolvedDisplayCost.source !== 'none' && displayCost > 0;
 
-    // 🚀 [UI Optimization] 判断是否为内置积分加速模型
-    const isCreditModel = useMemo(() => {
-        const modelId = image.model || '';
-        const lowerModelId = modelId.toLowerCase();
-
-        // 1. 明确的系统路由
-        if (image.provider === 'SystemProxy' || lowerModelId.includes('@system') || lowerModelId.includes('@systemproxy')) {
-            return true;
-        }
-
-        // 2. 有代币或金额必然是用户 API (系统积分不记录此值，且前面已拦截)
-        if ((image.tokens && image.tokens > 0) || displayCost > 0) {
-            return false;
-        }
-
-        // 3. 有明确的特定提供商（且非 SystemProxy），认为是外部渠道
-        if (image.provider && image.provider !== 'SystemProxy') {
-            return false;
-        }
-
-        // 4. 兜底猜测历史数据
-        return isCreditBasedModel(modelId, image.provider);
-    }, [image.provider, image.model, image.tokens, displayCost]);
-
+    // Prefer explicit credit metadata so subcards keep the right billing UI even on recovered history.
+    const isCreditModel = useMemo(
+        () => isCreditBillingTarget(image),
+        [image.billingMode, image.creditCost, image.model, image.provider]
+    );
+    const resolvedCreditCost = useMemo(
+        () => getResolvedCreditCost(image),
+        [image.creditCost, image.imageSize, image.model]
+    );
     const isCompactFooter = footerDensity !== 'normal';
     const isTightFooter = footerDensity === 'tight';
     const minimumFooterDensity: FooterDensity = nodeWidth < 260 ? 'compact' : 'normal';
@@ -584,6 +569,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         };
     }, [displayCost, image.generationTime, image.id, image.isGenerating, image.model, image.modelLabel, image.orphaned, image.provider, image.providerLabel, image.tokens, minimumFooterDensity]);
 
+    const creditFooterLabel = resolvedCreditCost > 0
+        ? `消耗 ${resolvedCreditCost} 积分`
+        : '消耗 -- 积分';
+    const modelText = image.modelLabel || image.model || image.id;
+    const providerText = resolveDisplayedProviderLabel(image);
+    const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
+    const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
+    const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
+    const footerTimeLabel = clampedGenerationTime > 0
+        ? `耗时 ${formatGenerationDurationSeconds(clampedGenerationTime)}s`
+        : '耗时 --';
+
     useEffect(() => {
         if (!onUpdate) return;
         if (isCreditModel) return;
@@ -602,8 +599,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         onUpdate(image.id, { cost: displayCost, costSource: resolvedDisplayCost.source });
     }, [displayCost, image.cost, image.costSource, image.id, isCreditModel, onUpdate, resolvedDisplayCost.source]);
 
-    const modelText = image.modelLabel || image.model || image.id;
-    const providerText = resolveDisplayedProviderLabel(image);
     const modelBadge = useMemo(() => getModelBadgeInfo({
         id: image.model || '',
         label: modelText,
@@ -613,17 +608,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         textColor: image.modelTextColor,
     }), [image.model, modelText, providerText, image.modelColorStart, image.modelColorEnd, image.modelTextColor]);
     const providerBadgeStyle = useMemo(() => getProviderBadgeStyle(providerText), [providerText]);
-    const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
-    const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
-    const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
-    const footerTimeLabel = clampedGenerationTime > 0
-        ? `耗时 ${formatGenerationDurationSeconds(clampedGenerationTime)}s`
-        : '耗时 --';
     const footerTokenLabel = showTokenInfo ? `令牌 ${displayTokens}` : '';
     const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
-    const footerCreditsLabel = `✨${getModelCredits(image.model || '', image.imageSize)}`;
     const footerSummaryTitle = isCreditModel
-        ? `${footerTimeLabel} | ${footerCreditsLabel}`
+        ? `${footerTimeLabel} | ${creditFooterLabel}`
         : `${footerTimeLabel} | 令牌 ${image.tokens || 0} | ${footerCostLabel}`;
 
     // 🚀 根据画布缩放自动选择合适质量 - 使用队列加载优化
@@ -916,7 +904,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     };
 
     const wasDraggingRef = useRef(false);
+    const suppressClickUntilRef = useRef(0);
     const lastMousePos = useRef<{ x: number; y: number } | null>(null); // To track previous mouse position for delta
+
+    const canHandleCardClick = useCallback(() => Date.now() >= suppressClickUntilRef.current, []);
+
+    const stopMediaPointerPropagation = useCallback((e: React.MouseEvent<HTMLElement>) => {
+        wasDraggingRef.current = false;
+        suppressClickUntilRef.current = 0;
+        e.stopPropagation();
+    }, []);
 
     useEffect(() => {
         return () => {
@@ -931,6 +928,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         if (isChatMode) return; // 🚀 聊天模式禁用拖拽
         const target = e.target as HTMLElement | null;
         if (target?.closest?.('[data-native-drag-source="true"]')) {
+            wasDraggingRef.current = false;
+            suppressClickUntilRef.current = 0;
             e.stopPropagation();
             return;
         }
@@ -952,6 +951,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         setIsDragging(true);
         wasDraggingRef.current = false;
+        suppressClickUntilRef.current = 0;
 
         // 🚀 [添加] 触发自定义事件通知 ImagePreview 关闭
         window.dispatchEvent(new CustomEvent('kk-drag-start'));
@@ -1026,6 +1026,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         };
 
         const handleMouseUp = () => {
+            const didDrag = wasDraggingRef.current;
             setIsDragging(false);
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
@@ -1033,6 +1034,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             window.removeEventListener('touchend', handleMouseUp);
             dragCleanupRef.current = null;
             latestPointerRef.current = null;
+            lastMousePos.current = null;
+
+            if (didDrag) {
+                suppressClickUntilRef.current = Date.now() + 220;
+            }
+            wasDraggingRef.current = false;
 
             // 🚀 拖拽结束 - 位置已经通过left/top实时更新，无需重置transform
             // 但确保最终位置正确
@@ -1076,21 +1083,21 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         }
     };
 
-    const handleImageClick = (e: React.MouseEvent) => {
+    const handleImageClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
 
         // 忽略按钮点击 (如删除/下载)
         if ((e.target as HTMLElement).closest('button')) return;
         if ((e.target as HTMLElement).closest('input')) return; // Ignore input clicks
 
-        // 如果刚刚拖拽过,忽略点击(防止拖拽结束时误触发)
-        if (wasDraggingRef.current && e.type !== 'dblclick' && e.detail !== 2) return;
+        // 如果刚刚拖拽结束，短暂抑制点击，避免落点误触发灯箱。
+        if (!canHandleCardClick()) return;
 
         // 🚀 [修复] 单击/双击均打开灯箱
-        if (!wasDraggingRef.current && onPreview) {
+        if (onPreview) {
             onPreview(image.id);
         }
-    };
+    }, [canHandleCardClick, image.id, onPreview]);
 
     const borderScale = zoomScale || 1;
     const adaptiveBorderWidth = Math.max(1, 1.5 / borderScale);
@@ -1220,7 +1227,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         className={`${isThumbnailShell ? 'px-3 py-2.5' : 'px-3 py-3'} border-t border-[var(--border-light)] bg-[var(--bg-elevated)] cursor-pointer`}
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (!wasDraggingRef.current) onClick?.(image.id);
+                            if (canHandleCardClick()) onClick?.(image.id);
                         }}
                     >
                         <div className="flex items-center justify-between gap-2">
@@ -1273,7 +1280,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 onTouchStart={handleMouseDown}
                 onClick={(e) => {
                     e.stopPropagation();
-                    if (!wasDraggingRef.current) onClick?.(image.id);
+                    if (canHandleCardClick()) onClick?.(image.id);
                 }}
             >
                 {/* 🚀 统一容器 - 图片和信息模块在同一卡片内 */}
@@ -1364,7 +1371,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     onPause={(e) => { e.stopPropagation(); setIsPlaying(false); }}
                                                     onClick={(e) => e.stopPropagation()}
                                                     onDoubleClick={(e) => e.stopPropagation()}
-                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                    onMouseDown={stopMediaPointerPropagation}
                                                 />
                                             </div>
                                         ) : (image.mode === GenerationMode.VIDEO || displaySrc.startsWith('data:video') || displaySrc.endsWith('.mp4')) ? (
@@ -1434,9 +1441,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 className="w-full h-full block select-none"
                                                 data-native-drag-source="true"
                                                 draggable={true}
-                                                onMouseDown={(e) => {
-                                                    e.stopPropagation();
-                                                }}
+                                                onMouseDown={stopMediaPointerPropagation}
                                                 onDragStart={(e) => {
                                                     // HTML5 Drag for Data Transfer (to PromptBar)
                                                     e.stopPropagation();
@@ -1586,7 +1591,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!wasDraggingRef.current) onClick?.(image.id);
+                                    if (canHandleCardClick()) onClick?.(image.id);
                                 }}
                             >
                                 {/* 状态1: 孤独副卡（从外面拖入的图片）- 只有一层 */}
@@ -1788,7 +1793,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             {isCreditModel ? (
                                                 <>
                                                     <span className={footerSeparatorClass}>|</span>
-                                                    <span title="\u79ef\u5206\u6d88\u8017" className="text-blue-400 font-medium shrink-0">{footerCreditsLabel}</span>
+                                                    <span title="\u79ef\u5206\u6d88\u8017" className="text-blue-400 font-medium shrink-0">{creditFooterLabel}</span>
                                                 </>
                                             ) : (
                                                 <>

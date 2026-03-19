@@ -4,10 +4,10 @@ import { saveAs } from 'file-saver';
 import { ChevronRight, Download, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { GeneratedImage, GenerationMode, ImageSize, PromptNode } from '../types';
 import { getModelDisplayName } from '../services/model/modelCapabilities';
-import { getModelCredits, isCreditBasedModel } from '../services/model/modelPricing';
 import { resolveImageCost } from '../services/billing/costService';
 import { notify } from '../services/system/notificationService';
 import { generateTagColor } from '../utils/colorUtils';
+import { getResolvedCreditCost, isCreditBillingTarget } from '../utils/creditBilling';
 
 interface MobileCardGroup {
   id: string;
@@ -177,8 +177,9 @@ const getDisplayCost = (image: GeneratedImage) => {
 };
 
 const getImageAmountLabel = (image: GeneratedImage): string => {
-  if (isCreditBasedModel(image.model || '', image.provider)) {
-    return `${COPY.pointsPrefix} ${getModelCredits(image.model || '', image.imageSize)}`;
+  if (isCreditBillingTarget(image)) {
+    const creditCost = getResolvedCreditCost(image);
+    return `消耗 ${creditCost} 积分`;
   }
 
   const resolvedCost = getDisplayCost(image);

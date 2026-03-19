@@ -65,6 +65,23 @@ export class LLMService {
         return baseModelId.trim();
     }
 
+    private isSystemKeySelection(preferredKeyId?: string): boolean {
+        const normalized = String(preferredKeyId || '').trim().toLowerCase();
+        if (!normalized) {
+            return false;
+        }
+
+        if (normalized === 'system_proxy_slot' || normalized.startsWith('backend_proxy_')) {
+            return true;
+        }
+
+        return normalized === 'system'
+            || normalized === 'systemproxy'
+            || normalized === 'slot_systemproxy'
+            || normalized === 'slot_system_proxy_slot'
+            || normalized === 'provider_systemproxy';
+    }
+
     public getProviderProfile(provider: Provider): ProviderCapabilityProfile | null {
         return getProviderCapability(provider);
     }
@@ -285,7 +302,8 @@ export class LLMService {
 
         if (isSystemRoute) {
             // For system credit models, return a virtual slot
-            // The actual API key will be fetched by the adapter using modelCaller
+            // Never honor a persisted external preferredKeyId here, otherwise
+            // system credit models can silently bypass server-side billing.
             const now = Date.now();
             return {
                 id: 'system_proxy_slot',

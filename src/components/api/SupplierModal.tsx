@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -13,6 +13,30 @@ interface SupplierModalProps {
   editSupplier?: Supplier | null;
 }
 
+type SupplierDraftFormData = {
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  format: ApiProtocolFormat;
+  systemToken: string;
+  budgetLimit: string;
+};
+
+type SupplierDraftModel = {
+  id: string;
+  name: string;
+  billingType: string;
+  inputPrice?: number;
+  outputPrice?: number;
+};
+
+type SupplierDraftPayload = {
+  formData: SupplierDraftFormData;
+  fetchedModels: SupplierDraftModel[] | null;
+  tokenValid: boolean | null;
+  savedAt: string;
+};
+
 const modalShellClass =
   'relative z-[1] flex w-full max-w-[920px] flex-col overflow-hidden rounded-[28px] border shadow-[0_28px_80px_rgba(0,0,0,0.42)]';
 const fieldClass =
@@ -23,6 +47,73 @@ const labelClass = 'mb-2 block text-sm font-medium text-[var(--text-secondary)]'
 const helperTextClass = 'mt-1 text-xs text-[var(--text-tertiary)]';
 const secondaryButtonClass =
   'inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)] disabled:opacity-50';
+const SUPPLIER_DRAFT_STORAGE_KEY = 'kk_supplier_modal_draft_v1';
+
+const createDefaultFormData = (): SupplierDraftFormData => ({
+  name: '',
+  baseUrl: 'https://ai.newapi.pro',
+  apiKey: '',
+  format: 'auto',
+  systemToken: '',
+  budgetLimit: '',
+});
+
+const loadSupplierDraft = (): SupplierDraftPayload | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(SUPPLIER_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<SupplierDraftPayload>;
+    if (!parsed.formData) return null;
+
+    return {
+      formData: {
+        ...createDefaultFormData(),
+        ...parsed.formData,
+        format: parsed.formData.format ?? 'auto',
+      },
+      fetchedModels: Array.isArray(parsed.fetchedModels) ? parsed.fetchedModels : null,
+      tokenValid:
+        parsed.tokenValid === true || parsed.tokenValid === false ? parsed.tokenValid : null,
+      savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date().toISOString(),
+    };
+  } catch (error) {
+    console.warn('[SupplierModal] Failed to load draft:', error);
+    return null;
+  }
+};
+
+const saveSupplierDraft = (
+  formData: SupplierDraftFormData,
+  fetchedModels: SupplierDraftModel[] | null,
+  tokenValid: boolean | null
+) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const payload: SupplierDraftPayload = {
+      formData,
+      fetchedModels,
+      tokenValid,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(SUPPLIER_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn('[SupplierModal] Failed to save draft:', error);
+  }
+};
+
+const clearSupplierDraft = () => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(SUPPLIER_DRAFT_STORAGE_KEY);
+  } catch (error) {
+    console.warn('[SupplierModal] Failed to clear draft:', error);
+  }
+};
 
 export const SupplierModal: React.FC<SupplierModalProps> = ({ 
   isOpen, 
@@ -32,18 +123,12 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+  const [isDraftReady, setIsDraftReady] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
   
-  const [formData, setFormData] = useState({
-    name: '',
-    baseUrl: 'https://ai.newapi.pro',
-    apiKey: '',
-    format: 'auto' as ApiProtocolFormat,
-    systemToken: '',
-    budgetLimit: '',
-  });
+  const [formData, setFormData] = useState<SupplierDraftFormData>(() => createDefaultFormData());
 
   const [fetchedModels, setFetchedModels] = useState<Array<{
     id: string;
@@ -53,9 +138,45 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
     outputPrice?: number;
   }> | null>(null);
 
+  const persistDraft = useCallback(
+    (
+      nextFormData: SupplierDraftFormData,
+      nextFetchedModels: SupplierDraftModel[] | null = fetchedModels,
+      nextTokenValid: boolean | null = tokenValid
+    ) => {
+      if (!isOpen || editSupplier || !isDraftReady) return;
+      saveSupplierDraft(nextFormData, nextFetchedModels, nextTokenValid);
+    },
+    [editSupplier, fetchedModels, isDraftReady, isOpen, tokenValid]
+  );
+
+  const updateFormData = useCallback(
+    (
+      updater:
+        | Partial<SupplierDraftFormData>
+        | ((previous: SupplierDraftFormData) => SupplierDraftFormData)
+    ) => {
+      setFormData((previous) => {
+        const next =
+          typeof updater === 'function'
+            ? updater(previous)
+            : { ...previous, ...updater };
+        persistDraft(next);
+        return next;
+      });
+    },
+    [persistDraft]
+  );
+
   // Load edit data
   useEffect(() => {
+    if (!isOpen) {
+      setIsDraftReady(false);
+      return;
+    }
+
     if (editSupplier) {
+      setIsDraftReady(false);
       setFormData({
         name: editSupplier.name,
         baseUrl: editSupplier.baseUrl,
@@ -71,19 +192,26 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
         inputPrice: m.inputPrice,
         outputPrice: m.outputPrice,
       })));
+      setTokenValid(editSupplier.systemToken ? true : null);
     } else {
-      setFormData({
-        name: '',
-        baseUrl: 'https://ai.newapi.pro',
-        apiKey: '',
-        format: 'auto' as ApiProtocolFormat,
-        systemToken: '',
-        budgetLimit: '',
-      });
-      setFetchedModels(null);
-      setTokenValid(null);
+      const draft = loadSupplierDraft();
+      if (draft) {
+        setFormData(draft.formData);
+        setFetchedModels(draft.fetchedModels);
+        setTokenValid(draft.tokenValid);
+      } else {
+        setFormData(createDefaultFormData());
+        setFetchedModels(null);
+        setTokenValid(null);
+      }
+      setIsDraftReady(true);
     }
   }, [editSupplier, isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || editSupplier || !isDraftReady) return;
+    saveSupplierDraft(formData, fetchedModels, tokenValid);
+  }, [editSupplier, fetchedModels, formData, isDraftReady, isOpen, tokenValid]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -184,6 +312,10 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
         notify.success('供应商已更新', '供应商信息已保存');
       } else {
         supplierService.create(data);
+        clearSupplierDraft();
+        setFormData(createDefaultFormData());
+        setFetchedModels(null);
+        setTokenValid(null);
         notify.success('供应商已添加', '新供应商已保存到列表');
       }
       
@@ -206,7 +338,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
         const content = reader.result as string;
         const lines = content.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length > 0) {
-          setFormData(prev => ({ ...prev, apiKey: lines[0] }));
+          updateFormData({ apiKey: lines[0] });
           notify.success('API Key 已加载', `从文档 ${file.name}`, 'API Key 已从文档读取');
         }
       };
@@ -273,7 +405,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
             <input
               type="text"
               value={formData.name}
-              onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={e => updateFormData({ name: e.target.value })}
               placeholder="例如：My AI Provider"
               className={fieldClass}
             />
@@ -287,7 +419,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
             <input
               type="text"
               value={formData.baseUrl}
-              onChange={e => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
+              onChange={e => updateFormData({ baseUrl: e.target.value })}
               placeholder="https://api.example.com/v1"
               className={fieldClass}
             />
@@ -298,7 +430,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
             <label className={labelClass}>协议格式</label>
             <select
               value={formData.format}
-              onChange={e => setFormData(prev => ({ ...prev, format: e.target.value as ApiProtocolFormat }))}
+              onChange={e => updateFormData({ format: e.target.value as ApiProtocolFormat })}
               className={fieldClass}
             >
               <option value="openai">OpenAI 兼容</option>
@@ -317,7 +449,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
               <input
                 type="password"
                 value={formData.apiKey}
-                onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                onChange={e => updateFormData({ apiKey: e.target.value })}
                 placeholder="sk-..."
                 className={compactFieldClass}
               />
@@ -343,7 +475,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                 type="password"
                 value={formData.systemToken}
                 onChange={e => {
-                  setFormData(prev => ({ ...prev, systemToken: e.target.value }));
+                  updateFormData({ systemToken: e.target.value });
                   setTokenValid(null);
                 }}
                 placeholder="用于获取模型价格信息"
@@ -401,7 +533,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
             <input
               type="number"
               value={formData.budgetLimit}
-              onChange={e => setFormData(prev => ({ ...prev, budgetLimit: e.target.value }))}
+              onChange={e => updateFormData({ budgetLimit: e.target.value })}
               placeholder="0.00"
               min="0"
               step="0.01"

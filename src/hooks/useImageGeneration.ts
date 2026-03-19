@@ -18,6 +18,7 @@ import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout
 import { clearSyncImageBridgeRequest, getSyncImageBridgeRequest, isSyncImageBridgeSupported } from '../services/llm/syncImageBridge';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { hasNetworkErrorMarkers, hasTimeoutMarkers } from '../services/api/errorClassification';
+import { useTaskRecovery, persistTask, markTaskCompleted, markTaskFailed } from './useTaskRecovery';
 
 const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -780,6 +781,13 @@ export const useImageGeneration = (options: {
                 generationMetadata: nextGenerationMetadata
               }
             });
+
+            void markTaskCompleted(
+              targetTaskId,
+              imageUrls,
+              recoveredUsage.cost,
+              recoveredUsage.tokens
+            );
             
             if (nextPendingTaskIds.length > 0) {
               setTimeout(() => {
@@ -791,6 +799,8 @@ export const useImageGeneration = (options: {
         } else {
           // Failed
           urgentUpdatePromptNode({ ...latestNode, isGenerating: nextPendingTaskIds.length > 0, jobId: nextJobId, generationMetadata: nextGenerationMetadata, error: nextPendingTaskIds.length === 0 ? 'Task failed on backend' : undefined });
+          // 轮询失败，更新数据库状态
+          void markTaskFailed(targetTaskId, 'Task failed on backend');
         }
       } else {
         // Still pending
@@ -821,6 +831,8 @@ export const useImageGeneration = (options: {
       }, 15000);
     }
   }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails]);
+
+  useTaskRecovery(pollTaskStatus);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1008,6 +1020,8 @@ export const useImageGeneration = (options: {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
                 if (fresh) urgentUpdatePromptNode(registerPendingTaskId(fresh, taskId));
+                // 持久化任务到数据库
+                void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
               }
             });
             videoUrl = videoResult.url;
@@ -1027,6 +1041,8 @@ export const useImageGeneration = (options: {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
                 if (fresh) urgentUpdatePromptNode(clearPendingSyncRequests(registerPendingTaskId(fresh, taskId), [currentRequestId]));
+                // 持久化任务到数据库
+                void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
               },
               onSyncBridgeRegistered: (requestId: string) => {
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
@@ -1101,6 +1117,13 @@ export const useImageGeneration = (options: {
         typeof item.requestId === 'string' && recoverableSyncFailureRequestIds.has(item.requestId)
       )).length;
       const nonRecoverableFailureCount = Math.max(0, failedImageData.length - recoverableSyncFailureCount);
+
+      failedImageData.forEach((item) => {
+        if (typeof item.taskId !== 'string' || item.taskId.trim().length === 0) return;
+        if (typeof item.requestId === 'string' && recoverableSyncFailureRequestIds.has(item.requestId)) return;
+
+        void markTaskFailed(item.taskId, item.error || 'Generation failed');
+      });
       
       if (validImageData.length > 0) {
         const generatedPositions = buildGeneratedImageBatchPositions({
@@ -1166,6 +1189,12 @@ export const useImageGeneration = (options: {
         };
         
         addImageNodes(results as any, { [updatedNode.id]: updatedNode });
+        validImageData.forEach((item) => {
+          if (typeof item.taskId !== 'string' || item.taskId.trim().length === 0) return;
+          if (typeof item.url !== 'string' || item.url.trim().length === 0) return;
+
+          void markTaskCompleted(item.taskId, [item.url], item.cost, item.tokens);
+        });
         completedSyncRequestIds.forEach((requestId) => {
           void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
           clearSyncBridgeRecoveryTimer(requestId);

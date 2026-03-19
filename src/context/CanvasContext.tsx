@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, type WorkflowNode } from '../types';
+import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
 import { saveImage, getImage, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
@@ -277,12 +277,29 @@ const normalizeRecoveredPromptNode = (
     const pendingTaskIds = getPendingTaskIdsFromPrompt(node);
     const pendingSyncRequests = getPendingSyncRequestsFromPrompt(node);
     const expectedImageCount = getExpectedPromptImageCount(node);
+    const hasRecoverablePendingState = pendingTaskIds.length > 0
+        || pendingSyncRequests.length > 0
+        || (typeof node.jobId === 'string' && node.jobId.trim().length > 0);
     const isEffectivelyComplete = resolvedChildImageIds.length > 0 && (
         resolvedChildImageIds.length >= expectedImageCount || (pendingTaskIds.length === 0 && pendingSyncRequests.length === 0)
     );
+    const shouldMarkInterrupted = Boolean(node.isGenerating)
+        && resolvedChildImageIds.length === 0
+        && !hasRecoverablePendingState;
     const nextPendingTaskIds = isEffectivelyComplete ? [] : pendingTaskIds;
     const nextPendingSyncRequests = isEffectivelyComplete ? [] : pendingSyncRequests;
-    const shouldPersistGenerationMetadata = !!node.generationMetadata || pendingTaskIds.length > 0 || pendingSyncRequests.length > 0 || isEffectivelyComplete;
+    const shouldPersistGenerationMetadata = !!node.generationMetadata || pendingTaskIds.length > 0 || pendingSyncRequests.length > 0 || isEffectivelyComplete || shouldMarkInterrupted;
+    const nextErrorDetails = isEffectivelyComplete
+        ? undefined
+        : shouldMarkInterrupted
+            ? {
+                ...(node.errorDetails || {}),
+                code: node.errorDetails?.code || 'SYNC_REQUEST_INTERRUPTED',
+                responseBody: node.errorDetails?.responseBody || SYNC_GENERATION_INTERRUPTED_ERROR,
+                model: node.errorDetails?.model || node.model,
+                timestamp: node.errorDetails?.timestamp || Date.now()
+            }
+            : node.errorDetails;
 
     return {
         ...node,
@@ -290,8 +307,8 @@ const normalizeRecoveredPromptNode = (
         referenceImages: node.referenceImages || [],
         parallelCount: node.parallelCount || 1,
         tags: node.tags || [],
-        isGenerating: Boolean(node.isGenerating) && !isEffectivelyComplete,
-        jobId: isEffectivelyComplete ? undefined : (nextPendingTaskIds[0] || node.jobId),
+        isGenerating: Boolean(node.isGenerating) && !isEffectivelyComplete && !shouldMarkInterrupted,
+        jobId: isEffectivelyComplete || shouldMarkInterrupted ? undefined : (nextPendingTaskIds[0] || node.jobId),
         generationMetadata: shouldPersistGenerationMetadata
             ? {
                 ...(node.generationMetadata || {}),
@@ -299,7 +316,8 @@ const normalizeRecoveredPromptNode = (
                 pendingSyncRequests: nextPendingSyncRequests
             }
             : node.generationMetadata,
-        error: isEffectivelyComplete ? undefined : node.error,
+        error: isEffectivelyComplete ? undefined : (shouldMarkInterrupted ? (node.error || SYNC_GENERATION_INTERRUPTED_ERROR) : node.error),
+        errorDetails: nextErrorDetails,
     };
 };
 
@@ -416,7 +434,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         prompt: img.prompt || '',
                         dimensions: img.dimensions || "1024x1024", // 榛樿瀛楃涓?
                         aspectRatio: img.aspectRatio || AspectRatio.SQUARE,
-                        model: img.model || 'imagen-3.0-generate-001' // 鍥為€€鍒伴粯璁ゆā鍨?
+                        model: img.model || KnownModel.IMAGEN_4 // 回退到当前默认官方模型
                     })),
                 })).map(normalizeCanvasPromptRecovery);
 
@@ -480,7 +498,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 e.preventDefault();
                 e.returnValue = hasRiskySyncGeneration
                     ? '当前有同步图片生成正在返回结果，刷新或离开会导致项目收不到最终图片。'
-                    : '鍥剧墖姝ｅ湪淇濆瓨涓紝绂诲紑鍙兘瀵艰嚧鏁版嵁涓㈠け';
+                    : '图片正在保存中，离开可能会导致数据丢失。';
                 return e.returnValue;
             }
         };

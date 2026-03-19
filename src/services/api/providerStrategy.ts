@@ -17,7 +17,10 @@ export type ProviderStrategyImageProfile =
     | 'gpt-best-extended'
     | 'antigravity'
     | 'chat-preferred';
-export type ProviderStrategyVideoApiStyle = 'openai-v1-videos' | 'legacy-video-generations';
+export type ProviderStrategyVideoApiStyle =
+    | 'openai-v1-videos'
+    | 'legacy-video-generations'
+    | 'unified-v2-generations';
 
 export interface ProviderStrategy {
     id: string;
@@ -366,17 +369,24 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
     {
         id: 'gpt-best',
         label: 'GPT-Best',
-        known: false,
+        known: true,
         providerFamily: 'newapi-family',
+        providerPatterns: [/^gpt-best$/i, /^gptbest$/i],
         basePatterns: [/gpt-best/i, /gptbest/i],
         defaultFormat: 'openai',
-        supportedFormats: ['openai'],
+        supportedFormats: ['openai', 'gemini', 'claude'],
         defaultAuthMethod: 'header',
+        geminiAuthMethod: 'header',
+        claudeAuthMethod: 'header',
         defaultHeaderName: AUTHORIZATION_HEADER,
+        geminiHeaderName: AUTHORIZATION_HEADER,
+        claudeHeaderName: AUTHORIZATION_HEADER,
         authorizationValueFormat: 'bearer',
+        geminiAuthorizationValueFormat: 'bearer',
+        claudeAuthorizationValueFormat: 'bearer',
         defaultCompatibilityMode: 'standard',
         imageProfile: 'gpt-best-extended',
-        videoApiStyle: 'legacy-video-generations',
+        videoApiStyle: 'unified-v2-generations',
         pricingSupport: 'native',
         managementSupport: 'native',
         respectProviderOnCustomHost: true,
