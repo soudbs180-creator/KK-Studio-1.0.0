@@ -163,7 +163,7 @@ export const SystemLogsView: React.FC = () => {
         {importantLogs.length === 0 ? (
           <div
             className="rounded-2xl border border-dashed px-5 py-10 text-center"
-            style={{ borderColor: 'var(--settings-border-subtle)', color: 'var(--text-tertiary)' }}
+            style={{ color: 'var(--text-tertiary)' }}
           >
             今日暂无重要日志，当前系统状态稳定。
           </div>

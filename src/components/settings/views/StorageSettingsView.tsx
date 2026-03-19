@@ -502,7 +502,7 @@ export const StorageSettingsView: React.FC = () => {
               </SettingsActionButton>
             </div>
 
-            <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+            <div className="mt-5 border-t pt-5" style={{ }}>
               <div className="space-y-2">
                 <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   清理错误卡片

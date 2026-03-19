@@ -9691,3 +9691,273 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-hero-card {
   border-radius: 10px;
 }
+
+/* ============================================
+   iOS 暗色模式修复 — 去掉白色线框
+   ============================================ */
+
+/* 暗色模式：卡片无边框，靠背景色差区分层级 */
+body.dark-mode .settings-panel .settings-hero-card,
+body.dark-mode .settings-panel .settings-section-card,
+body.dark-mode .settings-panel .settings-metric-card,
+body.dark-mode .settings-panel .settings-danger-zone,
+body.dark-mode .settings-panel .apple-soft-card,
+body.dark-mode .settings-panel .apple-glass-card {
+  border-color: transparent !important;
+}
+
+/* 亮色模式：也去掉边框，用微妙的阴影代替 */
+.settings-panel .settings-hero-card,
+.settings-panel .settings-section-card,
+.settings-panel .settings-metric-card,
+.settings-panel .apple-soft-card {
+  border-color: transparent !important;
+}
+
+/* 暗色模式：输入框/表单行保留极微弱边框 */
+body.dark-mode .settings-panel input,
+body.dark-mode .settings-panel select,
+body.dark-mode .settings-panel textarea {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 暗色模式：侧边栏区域无边框 */
+body.dark-mode .settings-panel .settings-sidebar-item {
+  border-color: transparent !important;
+}
+
+/* 暗色模式：供应商卡片/列表行无边框 */
+body.dark-mode .settings-panel .api-settings-provider-item {
+  border-color: transparent !important;
+}
+
+/* 暗色模式：badge 保留微弱边框 */
+body.dark-mode .settings-panel .api-settings-status-badge {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 暗色模式：按钮无边框 */
+body.dark-mode .settings-panel button {
+  border-color: transparent;
+}
+body.dark-mode .settings-panel .apple-button-primary,
+body.dark-mode .settings-panel .apple-button-secondary,
+body.dark-mode .settings-panel .apple-icon-button {
+  border-color: transparent !important;
+}
+
+/* 导航壳体无边框 */
+body.dark-mode .settings-shell-nav,
+body.dark-mode .settings-shell-main {
+  border-color: transparent !important;
+}
+
+/* 侧边栏分隔线更隐蔽 */
+body.dark-mode .settings-panel hr,
+body.dark-mode .settings-panel .settings-ios-separator {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+
+/* ============================================
+   iOS 卡片层级修复 — 背景色对比区分
+   ============================================ */
+
+/* === 全局：设置面板内容区用纯黑/浅灰底色 === */
+.settings-panel .settings-shell-page,
+.settings-panel .settings-shell-main,
+.settings-panel .settings-view-shell,
+.settings-panel .api-settings-view {
+  background: transparent;
+}
+
+/* === 亮色模式：内容区 #F2F2F7，卡片纯白 === */
+.settings-panel .settings-hero-card,
+.settings-panel .settings-section-card,
+.settings-panel .settings-metric-card,
+.settings-panel .apple-soft-card,
+.settings-panel .apple-glass-card,
+.settings-panel .settings-danger-zone {
+  background-color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+}
+
+/* === 暗色模式：内容区 #000，卡片 #1C1C1E === */
+body.dark-mode .settings-panel .settings-hero-card,
+body.dark-mode .settings-panel .settings-section-card,
+body.dark-mode .settings-panel .settings-metric-card,
+body.dark-mode .settings-panel .apple-soft-card,
+body.dark-mode .settings-panel .apple-glass-card {
+  background-color: #1C1C1E !important;
+  border: none !important;
+  border-radius: 10px;
+}
+
+body.dark-mode .settings-panel .settings-danger-zone {
+  background-color: rgba(255, 69, 58, 0.08) !important;
+  border: none !important;
+  border-radius: 10px;
+}
+
+/* === 暗色模式：内容滚动区 — 纯黑 === */
+body.dark-mode .settings-panel .settings-shell-page {
+  background-color: #000000;
+}
+
+body.dark-mode .settings-panel .settings-shell-main {
+  background-color: #000000 !important;
+}
+
+/* === 暗色模式：侧边栏 — 纯黑底 === */
+body.dark-mode .settings-panel .settings-shell-nav {
+  background-color: #000000 !important;
+}
+
+/* === API管理：自定义section（未用SettingsSection组件的） === */
+.settings-panel .api-settings-view > section,
+.settings-panel .api-settings-view > div > section {
+  background-color: var(--settings-section-bg);
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+body.dark-mode .settings-panel .api-settings-view > section,
+body.dark-mode .settings-panel .api-settings-view > div > section {
+  background-color: #1C1C1E !important;
+}
+
+/* === API管理：hero区域单独处理 === */
+body.dark-mode .settings-panel .api-settings-view > section:first-child {
+  background-color: #1C1C1E !important;
+}
+
+/* === API管理：secondary nav === */
+body.dark-mode .settings-panel .api-settings-secondary-nav {
+  background-color: #1C1C1E !important;
+  border: none !important;
+}
+
+/* === 供应商卡片/列表项 — 暗色模式下稍微提亮 === */
+body.dark-mode .settings-panel .api-settings-provider-item {
+  background-color: #2C2C2E;
+  border: none !important;
+  border-radius: 10px;
+}
+
+body.dark-mode .settings-panel .api-settings-provider-item:hover {
+  background-color: #3A3A3C;
+}
+
+/* === MetricCard — 暗色下用提亮背景 === */
+body.dark-mode .settings-panel .settings-metric-card {
+  background-color: #2C2C2E !important;
+}
+
+/* === 输入框 — 暗色下不用白色边框 === */
+body.dark-mode .settings-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+body.dark-mode .settings-panel textarea,
+body.dark-mode .settings-panel select {
+  background-color: #2C2C2E;
+  border: none;
+  color: #FFFFFF;
+}
+
+body.dark-mode .settings-panel input:focus,
+body.dark-mode .settings-panel textarea:focus,
+body.dark-mode .settings-panel select:focus {
+  outline: 2px solid rgba(10, 132, 255, 0.5);
+  outline-offset: -1px;
+}
+
+/* === Badge/Tag — 暗色 === */
+body.dark-mode .settings-panel .api-settings-status-badge,
+body.dark-mode .settings-panel .api-settings-provider-meta span {
+  border: none !important;
+  background-color: #2C2C2E;
+}
+
+/* === 按钮 — 统一无边框 === */
+body.dark-mode .settings-panel button {
+  border-color: transparent;
+}
+
+body.dark-mode .settings-panel .apple-button-primary {
+  border: none !important;
+}
+
+body.dark-mode .settings-panel .apple-button-secondary,
+body.dark-mode .settings-panel .apple-icon-button {
+  background-color: #2C2C2E !important;
+  border: none !important;
+}
+
+/* === 搜索框 === */
+body.dark-mode .settings-panel .settings-shell-nav__search {
+  background-color: #1C1C1E !important;
+  border: none !important;
+}
+
+/* === 侧边栏导航项 === */
+body.dark-mode .settings-panel .settings-sidebar-item {
+  border: none !important;
+}
+
+body.dark-mode .settings-panel .settings-sidebar-item.active {
+  background-color: rgba(10, 132, 255, 0.15) !important;
+}
+
+body.dark-mode .settings-panel .settings-sidebar-item:hover {
+  background-color: #1C1C1E !important;
+}
+
+/* === topbar 底部分隔 — 极细极暗 === */
+body.dark-mode .settings-panel .settings-shell-main__topbar {
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06) !important;
+  background: transparent !important;
+}
+
+/* === 亮色模式：内容区 #F2F2F7 === */
+.settings-panel .settings-shell-page {
+  background-color: #F2F2F7;
+}
+
+.settings-panel .settings-shell-main {
+  background-color: #F2F2F7;
+}
+
+.settings-panel .settings-shell-nav {
+  background-color: #F2F2F7;
+}
+
+/* === 亮色模式：输入框 === */
+.settings-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.settings-panel textarea,
+.settings-panel select {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+/* === 亮色模式：按钮无边框 === */
+.settings-panel .apple-button-secondary,
+.settings-panel .apple-icon-button {
+  border: none;
+}
+
+/* === 移动端壳体 === */
+body.dark-mode .settings-panel .settings-shell-mobile {
+  background-color: #000000 !important;
+  border: none !important;
+}
+
+.settings-panel .settings-shell-mobile {
+  background-color: #F2F2F7;
+  border: none;
+}
+
+/* === 统一：所有 .settings-panel 内的 rounded-2xl+ 降为 10px === */
+.settings-panel [class*="rounded-[2"],
+.settings-panel [class*="rounded-[3"] {
+  border-radius: 10px !important;
+}

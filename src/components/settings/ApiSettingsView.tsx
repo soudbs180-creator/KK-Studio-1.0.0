@@ -179,22 +179,18 @@ const providerColorPalette = [
 ];
 
 const elevatedPanelStyle = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-surface-elevated)',
 } as const;
 
 const overlayPanelStyle = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-surface-overlay)',
 } as const;
 
 const sectionPanelStyle = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-section-bg)',
 } as const;
 
 const headerPanelStyle = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-shell-header-bg)',
 } as const;
 
@@ -205,7 +201,7 @@ const formFieldStyle = {
 } as const;
 
 const secondaryButtonStyle = {
-  borderColor: 'var(--settings-button-secondary-border)',
+  borderColor: 'transparent',
   color: 'var(--settings-button-secondary-text)',
   backgroundColor: 'var(--settings-button-secondary-bg)',
 } as const;
@@ -227,7 +223,7 @@ const statusToneStyles: Record<StatusTone, { borderColor: string; backgroundColo
     color: 'var(--state-danger-text)',
   },
   slate: {
-    borderColor: 'var(--settings-border-subtle)',
+    borderColor: 'transparent',
     backgroundColor: 'var(--settings-surface-elevated)',
     color: 'var(--text-secondary)',
   },
@@ -356,7 +352,7 @@ const FormSelect: React.FC<{
 }> = ({ value, onChange, options, disabled = false }) => (
   <div className="relative">
     <select
-      className="h-10 w-full appearance-none rounded-xl border bg-transparent pl-3 pr-10 text-sm outline-none"
+      className="h-10 w-full appearance-none rounded-[10px] bg-transparent pl-3 pr-10 text-sm outline-none"
       style={formFieldStyle}
       value={value}
       onChange={(event) => onChange(event.target.value)}
@@ -996,7 +992,6 @@ const ApiSettingsModal: React.FC<{
       <div
         className={`flex min-h-0 w-full flex-col overflow-hidden border ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[28px] rounded-b-none' : 'max-w-[920px] rounded-[28px]'}`}
         style={{
-          borderColor: 'var(--settings-border-subtle)',
           background: 'linear-gradient(180deg, var(--settings-section-bg) 0%, var(--settings-surface-elevated) 100%)',
           boxShadow: 'var(--settings-shell-shadow), var(--settings-inset-shadow)',
           maxHeight: isMobile
@@ -1009,7 +1004,6 @@ const ApiSettingsModal: React.FC<{
           <div
             className={`flex items-start justify-between border-b ${isMobile ? 'mobile-sheet-header-safe p-4' : 'p-5 sm:p-6'}`}
             style={{
-              borderColor: 'var(--settings-border-subtle)',
               backgroundColor: 'var(--settings-shell-header-bg)',
             }}
           >
@@ -2618,7 +2612,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
           {costMode === 'amount' ? '金额额度' : costMode === 'tokens' ? 'Token 额度' : '额度'}
         </div>
         <input
-          className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+          className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
           style={formFieldStyle}
           type="number"
           min={0}
@@ -2633,7 +2627,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
   const renderOfficialDetailCard = () => {
     if (!showOfficialCreateForm) {
       return (
-        <div className="api-settings-editor-card overflow-hidden rounded-[24px] border" style={elevatedPanelStyle}>
+        <div className="api-settings-editor-card overflow-hidden rounded-[10px]" style={elevatedPanelStyle}>
           <div className="border-b px-5 py-4" style={headerPanelStyle}>
             <div className="text-base font-semibold text-[var(--text-primary)]">官方接口工作区</div>
             <div className="mt-1 text-xs leading-5 text-[var(--text-tertiary)]">
@@ -2643,7 +2637,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
           <div className="p-5">
             <div className="space-y-4">
-              <div className="rounded-2xl border p-5" style={overlayPanelStyle}>
+              <div className="rounded-[10px] p-5" style={overlayPanelStyle}>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">未选择官方接口</div>
                 <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                   官方接口的模型地址和价格是内置的，所以这里只保留最必要的配置项。
@@ -2676,7 +2670,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
       officialForm.name.trim() || currentOfficialSlot?.name || buildOfficialAutoName(officialEntries.length + (officialForm.id ? 0 : 1));
 
     return (
-      <div className="settings-section-card space-y-4 rounded-[24px] border p-5" style={elevatedPanelStyle}>
+      <div className="settings-section-card space-y-4 rounded-[24px] p-5" style={elevatedPanelStyle}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="text-base font-semibold text-[var(--text-primary)]">
@@ -2688,13 +2682,13 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 : '创建时只需录入 API Key 即可启用，名称会自动生成，后续如有需要再进入详情调整。'}
             </div>
             <div className="mt-3 settings-quiet-meta">
-              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                 {mode === 'edit' ? '已选择已保存接口' : '正在创建新接口'}
               </span>
-              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                 额度模式 {costModeText[officialForm.costMode]}
               </span>
-              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+              <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                 {mode === 'edit' ? officialStatusLabel : `默认名称 ${officialAutoName}`}
               </span>
             </div>
@@ -2703,12 +2697,12 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
           <StatusBadge label={officialStatusLabel} tone={officialStatusTone} compact />
         </div>
 
-        <div className="grid gap-4 rounded-2xl border p-4" style={overlayPanelStyle}>
+        <div className="grid gap-4 rounded-[10px] p-4" style={overlayPanelStyle}>
           {mode === 'edit' ? (
             <div>
               <div className="mb-1 text-xs text-[var(--text-tertiary)]">名称</div>
               <input
-                className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                 style={formFieldStyle}
                 value={officialForm.name}
                 onChange={(event) => setOfficialForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -2716,7 +2710,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               />
             </div>
           ) : (
-            <div className="rounded-xl border px-3 py-3 text-sm" style={elevatedPanelStyle}>
+            <div className="rounded-[10px] px-3 py-3 text-sm" style={elevatedPanelStyle}>
               <div className="text-[11px] text-[var(--text-tertiary)]">默认名称</div>
               <div className="mt-1 font-medium text-[var(--text-primary)]">{officialAutoName}</div>
             </div>
@@ -2725,7 +2719,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
           <div>
             <div className="mb-1 text-xs text-[var(--text-tertiary)]">API Key</div>
             <input
-              className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+              className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
               style={formFieldStyle}
               value={officialForm.key}
               onChange={(event) => setOfficialForm((prev) => ({ ...prev, key: event.target.value }))}
@@ -2734,7 +2728,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
           </div>
 
           {currentOfficialSlot ? (
-            <div className="rounded-xl border p-3" style={elevatedPanelStyle}>
+            <div className="rounded-[10px] p-3" style={elevatedPanelStyle}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-[var(--text-primary)]">运行状态</div>
@@ -2766,7 +2760,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
           </div>
 
           {currentOfficialSlot ? (
-            <div className="api-settings-summary-list rounded-xl border p-3" style={elevatedPanelStyle}>
+            <div className="api-settings-summary-list rounded-[10px] p-3" style={elevatedPanelStyle}>
               <div className="api-settings-summary-item">
                 <span className="api-settings-summary-item__label">当前总额度</span>
                 <span className="api-settings-summary-item__value">{currentOfficialBudgetPreview.total}</span>
@@ -3039,7 +3033,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border p-4" style={overlayPanelStyle}>
+        <div className="rounded-[10px] p-4" style={overlayPanelStyle}>
           <div className="flex flex-col gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -3065,22 +3059,22 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     : '先补齐基础连接并保存，再继续校验模型和同步价格。'}
               </div>
 
-              <div className="mt-3 rounded-xl border px-3 py-3 text-xs leading-5 text-[var(--text-secondary)]" style={elevatedPanelStyle}>
+              <div className="mt-3 rounded-[10px] px-3 py-3 text-xs leading-5 text-[var(--text-secondary)]" style={elevatedPanelStyle}>
                 {workbenchLead}
               </div>
 
               <div className="mt-3 settings-quiet-meta">
                 <StatusBadge label={currentProviderWorkbenchMeta.label} tone={currentProviderWorkbenchMeta.tone} compact />
-                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   额度模式 {costModeText[providerForm.costMode]}
                 </span>
-                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   {providerForm.apiKey.trim() ? 'API Key 已填写' : 'API Key 待填写'}
                 </span>
-                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   {providerForm.isActive ? '当前启用' : '当前停用'}
                 </span>
-                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <span className="settings-inline-chip rounded-full border px-3 py-1.5 text-xs text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   {nextPendingStep ? `下一步：${nextPendingStep.label}` : workbenchReadyText}
                 </span>
               </div>
@@ -3088,7 +3082,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
             <div className="grid gap-2 sm:grid-cols-2">
               {workbenchSummaryCards.map((row) => (
-                <div key={row.label} className="rounded-xl border p-3" style={elevatedPanelStyle}>
+                <div key={row.label} className="rounded-[10px] p-3" style={elevatedPanelStyle}>
                   <div className="text-[11px] text-[var(--text-tertiary)]">{row.label}</div>
                   <div className="mt-1 min-w-0 break-words text-sm font-medium text-[var(--text-primary)]">{row.value}</div>
                 </div>
@@ -3099,7 +3093,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
         <div className="space-y-4">
           <div className="space-y-4">
-            <div className="rounded-2xl border p-4" style={overlayPanelStyle}>
+            <div className="rounded-[10px] p-4" style={overlayPanelStyle}>
               <div className="mb-3">
                 <div className="text-sm font-semibold text-[var(--text-primary)]">基础连接</div>
                 <div className="mt-1 text-xs text-[var(--text-tertiary)]">{connectionSectionDescription}</div>
@@ -3108,17 +3102,17 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr),minmax(280px,0.9fr)]">
                 <div>
                   <div className="mb-1 text-xs text-[var(--text-tertiary)]">供应商名称</div>
-                  <input className="h-10 w-full rounded-xl border px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.name} onChange={(event) => setProviderForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="例如：12AI" />
+                  <input className="h-10 w-full rounded-[10px] px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.name} onChange={(event) => setProviderForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="例如：12AI" />
                 </div>
 
                 <div>
                   <div className="mb-1 text-xs text-[var(--text-tertiary)]">供应商颜色</div>
                   <div className="grid gap-3 sm:grid-cols-[72px,minmax(0,1fr),auto]">
-                    <input className="h-10 w-16 rounded-xl border p-1" style={{ borderColor: 'var(--settings-input-border)', backgroundColor: 'var(--settings-input-bg)' }} type="color" value={providerForm.providerColor} onChange={(event) => setProviderForm((prev) => ({ ...prev, providerColor: event.target.value }))} />
-                    <input className="h-10 flex-1 rounded-xl border px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.providerColor} onChange={(event) => setProviderForm((prev) => ({ ...prev, providerColor: event.target.value }))} />
+                    <input className="h-10 w-16 rounded-[10px] p-1" style={{ borderColor: 'var(--settings-input-border)', backgroundColor: 'var(--settings-input-bg)' }} type="color" value={providerForm.providerColor} onChange={(event) => setProviderForm((prev) => ({ ...prev, providerColor: event.target.value }))} />
+                    <input className="h-10 flex-1 rounded-[10px] px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.providerColor} onChange={(event) => setProviderForm((prev) => ({ ...prev, providerColor: event.target.value }))} />
                     <button
                       type="button"
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-3 text-sm"
                       style={secondaryButtonStyle}
                       onClick={() => applyRandomProviderColor(providerForm.id)}
                       title="随机分配一个和其他供应商尽量不重复的颜色"
@@ -3133,7 +3127,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 <div className="lg:col-span-2">
                   <div className="mb-1 text-xs text-[var(--text-tertiary)]">{connectionAddressLabel}</div>
                   <input
-                    className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                    className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                     style={formFieldStyle}
                     value={providerForm.baseUrl}
                     onChange={(event) => setProviderForm((prev) => ({ ...prev, baseUrl: event.target.value }))}
@@ -3147,14 +3141,14 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
                 <div>
                   <div className="mb-1 text-xs text-[var(--text-tertiary)]">API Key</div>
-                  <input className="h-10 w-full rounded-xl border px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.apiKey} onChange={(event) => setProviderForm((prev) => ({ ...prev, apiKey: event.target.value }))} placeholder="输入第三方供应商 API Key" />
+                  <input className="h-10 w-full rounded-[10px] px-3 text-sm outline-none" style={formFieldStyle} value={providerForm.apiKey} onChange={(event) => setProviderForm((prev) => ({ ...prev, apiKey: event.target.value }))} placeholder="输入第三方供应商 API Key" />
                 </div>
 
                 {supportsProtocolSelection && mode === 'edit' ? (
                   <div>
                     <div className="mb-1 text-xs text-[var(--text-tertiary)]">协议格式</div>
                     <select
-                      className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                      className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                       style={formFieldStyle}
                       value={providerForm.format}
                       onChange={(event) => setProviderForm((prev) => ({ ...prev, format: event.target.value as ApiProtocolFormat }))}
@@ -3167,7 +3161,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 ) : null}
               </div>
               {supportsProtocolSelection && mode === 'create' ? (
-                <div className="mt-3 rounded-xl border border-dashed px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <div className="mt-3 rounded-[10px] border border-dashed px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   创建时会先自动识别协议格式，保存后再开放协议调整，避免在首轮录入时出现多余选项。
                 </div>
               ) : null}
@@ -3176,7 +3170,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               </div>
             </div>
 
-            <div className="rounded-2xl border p-4" style={overlayPanelStyle}>
+            <div className="rounded-[10px] p-4" style={overlayPanelStyle}>
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text-primary)]">
@@ -3197,7 +3191,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               <div className={`grid gap-2 ${isEndpointModelMode ? 'sm:grid-cols-1' : 'sm:grid-cols-2'}`}>
                 {currentProviderCanScanPricing ? (
                   <button
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                     style={secondaryButtonStyle}
                     onClick={() => void handleFetchAndSyncPricing()}
                     disabled={advancedLoading || syncingProviderId === currentEditingProvider?.id}
@@ -3211,7 +3205,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
                 {currentProviderCanValidateModels ? (
                   <button
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                     style={secondaryButtonStyle}
                     onClick={() => currentEditingProvider && void handleValidateProvider(currentEditingProvider)}
                     disabled={!canOperateOnCurrentProvider || detectingProviderId === currentEditingProvider?.id}
@@ -3226,7 +3220,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 {isEndpointModelMode && currentWuyinEndpointModelId ? (
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] px-3 text-sm"
                     style={secondaryButtonStyle}
                     onClick={handleUseEndpointModelAsManual}
                   >
@@ -3235,10 +3229,10 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 ) : null}
               </div>
 
-              <div className="api-settings-summary-list mt-3 rounded-xl border p-3" style={elevatedPanelStyle}>
+              <div className="api-settings-summary-list mt-3 rounded-[10px] p-3" style={elevatedPanelStyle}>
                 <div className={`grid gap-2 ${workbenchSummaryRows.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                   {workbenchSummaryRows.map((row) => (
-                    <div key={row.label} className="rounded-xl border px-3 py-3" style={overlayPanelStyle}>
+                    <div key={row.label} className="rounded-[10px] px-3 py-3" style={overlayPanelStyle}>
                       <div className="text-[11px] text-[var(--text-tertiary)]">{row.label}</div>
                       <div className="mt-1 min-w-0 break-words text-sm font-medium text-[var(--text-primary)]">{row.value}</div>
                     </div>
@@ -3247,7 +3241,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               </div>
 
               {!canOperateOnCurrentProvider ? (
-                <div className="mt-3 rounded-xl border border-dashed px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                <div className="mt-3 rounded-[10px] border border-dashed px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                   {isPricingSyncMode
                     ? '新供应商在保存前可以先尝试读取价格，但模型识别会在保存后解锁。'
                     : isModelDetectMode
@@ -3256,7 +3250,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 </div>
               ) : currentEditingProvider?.status === 'error' && currentEditingProvider.lastError ? (
                 <div
-                  className="mt-3 rounded-xl border px-3 py-3 text-xs leading-5"
+                  className="mt-3 rounded-[10px] px-3 py-3 text-xs leading-5"
                   style={{
                     borderColor: 'var(--state-danger-border)',
                     backgroundColor: 'var(--state-danger-bg)',
@@ -3266,14 +3260,14 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                   最近错误：{currentEditingProvider.lastError}
                 </div>
               ) : (
-                <div className="mt-3 rounded-xl border px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={elevatedPanelStyle}>
+                <div className="mt-3 rounded-[10px] px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={elevatedPanelStyle}>
                   {workbenchPriceStatus.helper} {workbenchReadyText}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-2xl border p-4" style={overlayPanelStyle}>
+          <div className="rounded-[10px] p-4" style={overlayPanelStyle}>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">{currentProviderSupportsGroups ? '分组、额度与启用状态' : '额度与启用状态'}</div>
@@ -3291,7 +3285,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 <div>
                   <div className="mb-1 text-xs text-[var(--text-tertiary)]">默认分组</div>
                   <input
-                    className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                    className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                     style={formFieldStyle}
                     value={providerForm.group}
                     onChange={(event) => setProviderForm((prev) => ({ ...prev, group: event.target.value }))}
@@ -3313,7 +3307,6 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                               color: 'rgb(var(--settings-accent-rgb))',
                             }
                           : {
-                              borderColor: 'var(--settings-border-subtle)',
                               color: 'var(--text-secondary)',
                             }}
                         onClick={() => setProviderForm((prev) => ({ ...prev, group }))}
@@ -3323,23 +3316,23 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-dashed px-3 py-3 text-xs text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                  <div className="mt-3 rounded-[10px] border border-dashed px-3 py-3 text-xs text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                     暂未扫描到可选分组，可以先手动填写默认分组。
                   </div>
                 )}
               </>
             ) : (
-              <div className="rounded-xl border border-dashed px-3 py-3 text-xs text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+              <div className="rounded-[10px] border border-dashed px-3 py-3 text-xs text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                 当前供应商不使用分组，保存后会按单接口或手动模型价格直接计费。
               </div>
             )}
 
-            <div className="mt-4 rounded-xl border p-3" style={elevatedPanelStyle}>
+            <div className="mt-4 rounded-[10px] p-3" style={elevatedPanelStyle}>
               <div className="mb-3 text-xs text-[var(--text-tertiary)]">额度设置</div>
               {renderCostEditor(providerForm.costMode, providerForm.costValue, (costMode) => setProviderForm((prev) => ({ ...prev, costMode })), (costValue) => setProviderForm((prev) => ({ ...prev, costValue })))}
             </div>
 
-            <label className="mt-4 flex items-center justify-between rounded-xl border px-3 py-3 text-sm text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+            <label className="mt-4 flex items-center justify-between rounded-[10px] px-3 py-3 text-sm text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
               <span className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: providerForm.isActive ? 'var(--state-success-text)' : 'var(--text-tertiary)' }} />
                 启用该供应商
@@ -3347,7 +3340,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               <input type="checkbox" checked={providerForm.isActive} onChange={(event) => setProviderForm((prev) => ({ ...prev, isActive: event.target.checked }))} />
             </label>
 
-            <div className="api-settings-summary-list mt-4 rounded-xl border p-3" style={elevatedPanelStyle}>
+            <div className="api-settings-summary-list mt-4 rounded-[10px] p-3" style={elevatedPanelStyle}>
               <div className="api-settings-summary-item">
                 <span className="api-settings-summary-item__label">总额度</span>
                 <span className="api-settings-summary-item__value">{currentProviderBudgetPreview.total}</span>
@@ -3362,14 +3355,14 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               </div>
             </div>
 
-            <div className="mt-3 rounded-xl border px-3 py-3 text-xs leading-6 text-[var(--text-tertiary)]" style={elevatedPanelStyle}>
+            <div className="mt-3 rounded-[10px] px-3 py-3 text-xs leading-6 text-[var(--text-tertiary)]" style={elevatedPanelStyle}>
               {currentProviderStatus.helper}
               {currentProviderBudgetPreview.unit ? ` 当前额度单位为 ${currentProviderBudgetPreview.unit}。` : ''}
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border p-4" style={overlayPanelStyle}>
+        <div className="rounded-[10px] p-4" style={overlayPanelStyle}>
             <button className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setShowAdvancedMode((prev) => !prev)}>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-[var(--text-primary)]">{advancedPanelTitle}</div>
@@ -3389,14 +3382,14 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
               <div className="mt-4 space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {currentProviderCanScanPricing ? (
-                    <button className="inline-flex h-9 items-center gap-1 rounded-xl border px-3 text-sm" style={secondaryButtonStyle} onClick={() => void handleDetectAdvanced()} disabled={advancedLoading}>
+                    <button className="inline-flex h-9 items-center gap-1 rounded-[10px] px-3 text-sm" style={secondaryButtonStyle} onClick={() => void handleDetectAdvanced()} disabled={advancedLoading}>
                       <RefreshCw size={14} className={advancedLoading ? 'animate-spin' : ''} />{scanActionLabel}
                     </button>
                   ) : null}
                   {currentProviderCanValidateModels ? (
                     <button
                       type="button"
-                      className="inline-flex h-9 items-center gap-1 rounded-xl border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-9 items-center gap-1 rounded-[10px] px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                       style={secondaryButtonStyle}
                       onClick={() => currentEditingProvider && void handleValidateProvider(currentEditingProvider)}
                       disabled={!canOperateOnCurrentProvider || detectingProviderId === currentEditingProvider?.id}
@@ -3409,7 +3402,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                   ) : null}
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center gap-1 rounded-xl border px-3 text-sm"
+                    className="inline-flex h-9 items-center gap-1 rounded-[10px] px-3 text-sm"
                     style={secondaryButtonStyle}
                     onClick={() => handleAddManualPricingRow({
                       model: isEndpointModelMode ? (currentWuyinEndpointModelId || '') : '',
@@ -3426,7 +3419,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                   {isCurrentProviderWuyin && currentWuyinEndpointModelId ? (
                     <button
                       type="button"
-                      className="inline-flex h-9 items-center gap-1 rounded-xl border px-3 text-sm"
+                      className="inline-flex h-9 items-center gap-1 rounded-[10px] px-3 text-sm"
                       style={secondaryButtonStyle}
                       onClick={handleUseEndpointModelAsManual}
                     >
@@ -3437,21 +3430,21 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                 </div>
 
                 {(advancedResult || manualPricingRows.length > 0) ? (
-                  <div className="space-y-4 rounded-2xl border p-4" style={elevatedPanelStyle}>
-                    <div className="rounded-xl border px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={overlayPanelStyle}>
+                  <div className="space-y-4 rounded-[10px] p-4" style={elevatedPanelStyle}>
+                    <div className="rounded-[10px] px-3 py-3 text-xs leading-5 text-[var(--text-tertiary)]" style={overlayPanelStyle}>
                       {pricingLeadText}
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-xl border p-3" style={overlayPanelStyle}>
+                      <div className="rounded-[10px] p-3" style={overlayPanelStyle}>
                         <div className="text-[11px] text-[var(--text-tertiary)]">{pricingSourceLabel}</div>
                         <div className="mt-1 min-w-0 break-words text-sm font-medium text-[var(--text-primary)]">{pricingSourceValue}</div>
                       </div>
-                      <div className="rounded-xl border p-3" style={overlayPanelStyle}>
+                      <div className="rounded-[10px] p-3" style={overlayPanelStyle}>
                         <div className="text-[11px] text-[var(--text-tertiary)]">模型数量</div>
                         <div className="mt-1 text-sm font-medium text-[var(--text-primary)]">{effectivePricingModels.length}</div>
                       </div>
-                      <div className="rounded-xl border p-3" style={overlayPanelStyle}>
+                      <div className="rounded-[10px] p-3" style={overlayPanelStyle}>
                         <div className="text-[11px] text-[var(--text-tertiary)]">{isCurrentProviderWuyin ? '供应商模式' : '默认分组倍率'}</div>
                         <div className="mt-1 min-w-0 break-words text-sm font-medium text-[var(--text-primary)]">
                           {isCurrentProviderWuyin ? '无分组 / 异步单接口' : formatRatioDisplay(defaultScannedGroupRatio)}
@@ -3460,7 +3453,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     </div>
 
                     {currentProviderSupportsGroups && advancedResult?.availableGroups && advancedResult.availableGroups.length > 0 ? (
-                      <div className="rounded-xl border p-3" style={overlayPanelStyle}>
+                      <div className="rounded-[10px] p-3" style={overlayPanelStyle}>
                         <div className="text-xs font-medium text-[var(--text-primary)]">扫描到的可用分组</div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {advancedResult.availableGroups.map((group) => (
@@ -3475,7 +3468,6 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                     color: 'rgb(var(--settings-accent-rgb))',
                                   }
                                 : {
-                                    borderColor: 'var(--settings-border-subtle)',
                                     color: 'var(--text-secondary)',
                                   }}
                               onClick={() => setProviderForm((prev) => ({ ...prev, group }))}
@@ -3487,21 +3479,21 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                       </div>
                     ) : null}
 
-                    <div className="rounded-xl border p-3" style={overlayPanelStyle}>
+                    <div className="rounded-[10px] p-3" style={overlayPanelStyle}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="text-xs font-medium text-[var(--text-primary)]">{manualPricingTitle}</div>
                           <div className="mt-1 text-[11px] text-[var(--text-tertiary)]">{manualPricingDescription}</div>
                         </div>
                         {isCurrentProviderWuyin && currentWuyinEndpointModelId ? (
-                          <span className="settings-inline-chip rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                          <span className="settings-inline-chip rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ }}>
                             当前接口模型 {currentWuyinEndpointModelId}
                           </span>
                         ) : null}
                       </div>
 
                       {manualPricingRows.length === 0 ? (
-                        <div className="mt-3 rounded-xl border border-dashed p-4 text-xs leading-5 text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                        <div className="mt-3 rounded-[10px] border border-dashed p-4 text-xs leading-5 text-[var(--text-tertiary)]" style={{ }}>
                           {manualPricingEmptyText}
                         </div>
                       ) : (
@@ -3509,13 +3501,13 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                           {manualPricingRows.map((row) => (
                             <div
                               key={row.id}
-                              className={`grid gap-3 rounded-xl border p-3 ${manualPricingGridClass}`}
+                              className={`grid gap-3 rounded-[10px] p-3 ${manualPricingGridClass}`}
                               style={elevatedPanelStyle}
                             >
                               {currentProviderUsesEndpointPricingRows ? (
                                 <div className="space-y-1">
                                   <input
-                                    className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                                    className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                                     style={formFieldStyle}
                                     value={row.endpointUrl || ''}
                                     onChange={(event) => handleUpdateManualPricingRow(row.id, { endpointUrl: event.target.value })}
@@ -3527,7 +3519,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                 </div>
                               ) : (
                                 <input
-                                  className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                                  className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                                   style={formFieldStyle}
                                   value={row.model}
                                   onChange={(event) => handleUpdateManualPricingRow(row.id, {
@@ -3539,21 +3531,21 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                 />
                               )}
                               <input
-                                className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                                className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                                 style={formFieldStyle}
                                 value={row.price}
                                 onChange={(event) => handleUpdateManualPricingRow(row.id, { price: event.target.value })}
                                 placeholder="单价，例如 0.1"
                               />
                               <input
-                                className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                                className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                                 style={formFieldStyle}
                                 value={row.unit}
                                 onChange={(event) => handleUpdateManualPricingRow(row.id, { unit: event.target.value })}
                                 placeholder="单位：张 / 秒 / 次"
                               />
                               <select
-                                className="h-10 w-full rounded-xl border px-3 text-sm outline-none"
+                                className="h-10 w-full rounded-[10px] px-3 text-sm outline-none"
                                 style={formFieldStyle}
                                 value={row.currency}
                                 onChange={(event) => handleUpdateManualPricingRow(row.id, { currency: event.target.value as 'CNY' | 'USD' })}
@@ -3588,14 +3580,14 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                             value={pricingSearch}
                             onChange={(event) => setPricingSearch(event.target.value)}
                             placeholder="搜索模型 / 分组 / 供应商"
-                            className="h-9 w-full rounded-xl border pl-10 pr-3 text-xs text-[var(--text-primary)] outline-none transition"
+                            className="h-9 w-full rounded-[10px] pl-10 pr-3 text-xs text-[var(--text-primary)] outline-none transition"
                             style={formFieldStyle}
                           />
                         </div>
                       </div>
 
                       {filteredAdvancedPricingRows.length === 0 ? (
-                        <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>当前没有可展示的价格明细。</div>
+                        <div className="rounded-[10px] border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ }}>当前没有可展示的价格明细。</div>
                       ) : (
                         <div className="space-y-3">
                           {filteredAdvancedPricingRows.map((row) => {
@@ -3603,18 +3595,18 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                             const detailBadges = renderPricingDetailBadges(row);
 
                             return (
-                              <div key={row.model} className="rounded-xl border p-4" style={overlayPanelStyle}>
+                              <div key={row.model} className="rounded-[10px] p-4" style={overlayPanelStyle}>
                                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                   <div className="min-w-0">
                                     <div className="text-sm font-semibold text-[var(--text-primary)]">{row.model}</div>
                                     <div className="mt-2 flex flex-wrap gap-2">
-                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ }}>
                                         品牌 {row.providerLabel || row.provider || '未标注'}
                                       </span>
-                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ }}>
                                         分组 {row.tokenGroup || providerForm.group || 'default'}
                                       </span>
-                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                                      <span className="rounded-full border px-2.5 py-1 text-[11px] text-[var(--text-secondary)]" style={{ }}>
                                         计费 {billingLabel}
                                       </span>
                                     </div>
@@ -3641,7 +3633,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="rounded-full border px-3 py-1.5 text-[11px] text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                                    <div className="rounded-full border px-3 py-1.5 text-[11px] text-[var(--text-tertiary)]" style={{ }}>
                                       当前模型未返回可直接展示的价格字段
                                     </div>
                                   )}
@@ -3654,7 +3646,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed p-4 text-sm leading-6 text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                  <div className="rounded-[10px] border border-dashed p-4 text-sm leading-6 text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                     {isModelDetectMode
                       ? '识别模型后，这里会展示已识别模型和你手动维护的价格，方便继续确认保存内容。'
                       : isEndpointModelMode
@@ -3686,7 +3678,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
   };
 
   const renderProviderEditorCard = () => (
-    <div ref={providerEditorRef} className="api-settings-editor-card overflow-hidden rounded-[24px] border scroll-mt-6" style={elevatedPanelStyle}>
+    <div ref={providerEditorRef} className="api-settings-editor-card overflow-hidden rounded-[10px] scroll-mt-6" style={elevatedPanelStyle}>
       {showProviderCreateForm ? (
         <>
           <div className="border-b px-5 py-4" style={headerPanelStyle}>
@@ -3736,7 +3728,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
           <div className="p-5">
             <div className="space-y-4">
-              <div className="rounded-2xl border p-5" style={overlayPanelStyle}>
+              <div className="rounded-[10px] p-5" style={overlayPanelStyle}>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">未选择供应商</div>
                 <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                   左侧列表只负责定位对象；选中后，这里再显示连接、预算、校准和危险操作。
@@ -3761,12 +3753,12 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
   return (
     <div className="api-settings-view space-y-4 pb-8">
-      <section className="rounded-[24px] border p-5 md:p-6" style={sectionPanelStyle}>
+      <section className="rounded-[24px] p-5 md:p-6" style={sectionPanelStyle}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">API SETTINGS</div>
-            <h3 className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">API 管理</h3>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+            
+            <h3 className="text-[17px] font-semibold text-[var(--text-primary)]">API 管理</h3>
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-[var(--text-tertiary)]">
               用更简单的左右工作区整理第三方供应商和官方接口，左侧浏览，右侧编辑。
             </p>
           </div>
@@ -3795,19 +3787,19 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full border px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
             第三方 {summary.providerCount}
           </span>
-          <span className="rounded-full border px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
             官方 {summary.officialCount}
           </span>
-          <span className="rounded-full border px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--text-tertiary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
             待处理 {providerWorkspaceSummary.pendingSyncCount + providerWorkspaceSummary.errorCount}
           </span>
         </div>
       </section>
 
-      <div className="api-settings-secondary-nav rounded-[24px] border p-3 md:p-4" style={sectionPanelStyle}>
+      <div className="api-settings-secondary-nav rounded-[10px] p-3" style={sectionPanelStyle}>
         <div className="api-settings-secondary-nav__inner">
           <button
             type="button"
@@ -3833,7 +3825,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
       </div>
 
       {activeWorkspace === 'third-party' ? (
-      <section className="rounded-[24px] border p-4 md:p-5" style={sectionPanelStyle}>
+      <section className="rounded-[24px] p-4 md:p-5" style={sectionPanelStyle}>
         <div className="mb-4">
           <div>
             <div className="text-lg font-semibold text-[var(--text-primary)]">第三方供应商</div>
@@ -3846,7 +3838,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
         <div className={`api-settings-layout ${showProviderCreateForm ? 'is-editing' : 'is-browsing'}`}>
           {!isNarrowViewport || !showProviderCreateForm ? (
           <aside className="api-settings-list-panel min-w-0">
-            <div className="overflow-hidden rounded-[24px] border" style={elevatedPanelStyle}>
+            <div className="overflow-hidden rounded-[10px]" style={elevatedPanelStyle}>
               <div className="border-b px-4 py-4 md:px-5 md:py-5" style={headerPanelStyle}>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -3859,7 +3851,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                           : '先浏览对象，再进入详情区处理连接、预算和价格同步。'}
                       </div>
                     </div>
-                    <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                    <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                       {providerSearch.trim() ? `${filteredProviders.length}/${providers.length}` : providers.length}
                     </span>
                   </div>
@@ -3872,7 +3864,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                       value={providerSearch}
                       onChange={(event) => setProviderSearch(event.target.value)}
                       placeholder="搜索供应商名称或地址..."
-                      className="h-11 w-full rounded-xl border pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none"
+                      className="h-11 w-full rounded-[10px] pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none"
                       style={formFieldStyle}
                     />
                   </div>
@@ -3881,7 +3873,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
               <div ref={providerListRef} className="api-settings-provider-list space-y-3 p-3 md:p-4">
                 {filteredProviders.length === 0 ? (
-                  <div className="apple-empty-state rounded-2xl border border-dashed p-6 text-left text-sm text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                  <div className="apple-empty-state rounded-[10px] border border-dashed p-6 text-left text-sm text-[var(--text-tertiary)]" style={{ }}>
                     {providers.length === 0 ? '暂无第三方供应商配置，使用右上角“新增供应商”开始添加。' : '没有匹配到供应商，请换个关键词试试。'}
                   </div>
                 ) : (
@@ -3935,7 +3927,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                         data-provider-id={provider.id}
                         role="button"
                         tabIndex={0}
-                        className={`api-settings-provider-item api-settings-provider-item--provider w-full cursor-pointer overflow-hidden rounded-2xl border p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 ${isHighlighted ? 'animate-pulse-highlight' : ''}`}
+                        className={`api-settings-provider-item api-settings-provider-item--provider w-full cursor-pointer overflow-hidden rounded-[10px] p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 ${isHighlighted ? 'animate-pulse-highlight' : ''}`}
                         style={isSelected
                           ? {
                               borderColor: `${providerColor}88`,
@@ -3949,7 +3941,6 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                                 boxShadow: '0 0 0 1px var(--state-success-border)',
                               }
                             : {
-                                borderColor: 'var(--settings-border-subtle)',
                                 backgroundColor: 'var(--settings-section-bg)',
                               }}
                         onClick={() => loadProviderToForm(provider)}
@@ -3979,7 +3970,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                             <StatusBadge label={providerStatus.label} tone={providerStatus.tone} compact />
                           </div>
 
-                          <div className="api-settings-provider-runtime-card rounded-2xl border px-3 py-3" style={elevatedPanelStyle}>
+                          <div className="api-settings-provider-runtime-card rounded-[10px] px-3 py-3" style={elevatedPanelStyle}>
                             <div className="api-settings-provider-runtime text-sm font-medium text-[var(--text-primary)]">
                               {runtimeSummary.text}
                             </div>
@@ -4078,7 +4069,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
       ) : null}
 
       {activeWorkspace === 'official' ? (
-      <section className="rounded-[24px] border p-4 md:p-5" style={sectionPanelStyle}>
+      <section className="rounded-[24px] p-4 md:p-5" style={sectionPanelStyle}>
         <div className="mb-4">
           <div>
             <div className="text-lg font-semibold text-[var(--text-primary)]">官方接口</div>
@@ -4091,7 +4082,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
         <div className={`api-settings-layout ${showOfficialCreateForm ? 'is-editing' : 'is-browsing'}`}>
           {!isNarrowViewport || !showOfficialCreateForm ? (
           <aside className="api-settings-list-panel min-w-0">
-            <div className="overflow-hidden rounded-[24px] border" style={elevatedPanelStyle}>
+            <div className="overflow-hidden rounded-[10px]" style={elevatedPanelStyle}>
               <div className="border-b px-4 py-4 md:px-5 md:py-5" style={headerPanelStyle}>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -4102,7 +4093,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                         选择一个官方接口进入详情页统一编辑名称、Key 和额度配置。
                       </div>
                     </div>
-                    <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]" style={{ borderColor: 'var(--settings-border-subtle)', backgroundColor: 'var(--settings-surface-elevated)' }}>
+                    <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]" style={{ backgroundColor: 'var(--settings-surface-elevated)' }}>
                       已配置 {summary.officialCount}
                     </span>
                   </div>
@@ -4111,7 +4102,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
               <div className="space-y-3 p-3 md:p-4">
                 {officialEntries.length === 0 ? (
-                  <div className="apple-empty-state rounded-2xl border border-dashed p-6 text-sm text-[var(--text-tertiary)]" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                  <div className="apple-empty-state rounded-[10px] border border-dashed p-6 text-sm text-[var(--text-tertiary)]" style={{ }}>
                     暂无官方接口配置，使用右上角“新增官方接口”开始添加。
                   </div>
                 ) : (
@@ -4142,7 +4133,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                           key={slot.id}
                           role="button"
                           tabIndex={0}
-                          className="api-settings-provider-item api-settings-provider-item--official w-full cursor-pointer overflow-hidden rounded-2xl border p-4 text-left transition-[border-color,background-color,box-shadow] duration-200"
+                          className="api-settings-provider-item api-settings-provider-item--official w-full cursor-pointer overflow-hidden rounded-[10px] p-4 text-left transition-[border-color,background-color,box-shadow] duration-200"
                           style={isSelected
                             ? {
                                 borderColor: 'rgb(var(--settings-accent-rgb) / 0.28)',
@@ -4150,7 +4141,6 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                               boxShadow: '0 0 0 1px rgb(var(--settings-accent-rgb) / 0.10)',
                             }
                           : {
-                              borderColor: 'var(--settings-border-subtle)',
                               backgroundColor: 'var(--settings-section-bg)',
                             }}
                         onClick={() => loadOfficialToForm(slot)}
@@ -4182,7 +4172,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
 
                           {/* 第二排：预算信息（已用/限额 + 进度条） */}
                           {costMode !== 'unlimited' ? (
-                            <div className="api-settings-provider-runtime-card rounded-2xl border px-3 py-3" style={elevatedPanelStyle}>
+                            <div className="api-settings-provider-runtime-card rounded-[10px] px-3 py-3" style={elevatedPanelStyle}>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="font-medium text-[var(--text-primary)]">
                                   已用 {budget.used} / 限额 {budget.total}
@@ -4202,7 +4192,7 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                               </div>
                             </div>
                           ) : (
-                            <div className="api-settings-provider-runtime-card rounded-2xl border px-3 py-3" style={elevatedPanelStyle}>
+                            <div className="api-settings-provider-runtime-card rounded-[10px] px-3 py-3" style={elevatedPanelStyle}>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="font-medium text-[var(--text-primary)]">
                                   无限额度

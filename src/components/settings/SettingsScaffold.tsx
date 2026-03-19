@@ -110,17 +110,14 @@ const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties
 };
 
 export const SETTINGS_PANEL_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-section-bg)',
 } as const;
 
 export const SETTINGS_ELEVATED_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-surface-elevated)',
 } as const;
 
 export const SETTINGS_OVERLAY_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
   backgroundColor: 'var(--settings-surface-overlay)',
 } as const;
 
@@ -140,7 +137,7 @@ export const SETTINGS_DANGER_STYLE = {
 } as const;
 
 export const SETTINGS_INPUT_CLASSNAME =
-  'w-full rounded-xl border border-[var(--settings-input-border)] bg-[var(--settings-input-bg)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--settings-focus-border)] focus:ring-2 focus:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60';
+  'w-full rounded-[8px] border border-[var(--settings-input-border)] bg-[var(--settings-input-bg)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--settings-focus-border)] focus:ring-2 focus:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60';
 
 export const SETTINGS_LABEL_CLASSNAME =
   'text-[11px] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
@@ -155,7 +152,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full border px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] whitespace-nowrap ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] whitespace-nowrap ${className}`.trim()}
     style={toneStyles[tone].badgeStyle}
   >
     {children}
@@ -186,7 +183,7 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className="settings-hero-card rounded-[10px] border p-4" style={SETTINGS_PANEL_STYLE}>
+    <section className="settings-hero-card rounded-[10px] p-4" style={SETTINGS_PANEL_STYLE}>
       <div className="settings-hero-card__content space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -235,7 +232,7 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <div className="settings-metric-card h-full rounded-[10px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+    <div className="settings-metric-card h-full rounded-[10px] p-3" style={SETTINGS_ELEVATED_STYLE}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
@@ -282,7 +279,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       </h3>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
     </div>
-    <div className="settings-section-card rounded-[10px] border p-4" style={SETTINGS_PANEL_STYLE}>
+    <div className="settings-section-card rounded-[10px] p-4" style={SETTINGS_PANEL_STYLE}>
       {children}
     </div>
     {description ? (

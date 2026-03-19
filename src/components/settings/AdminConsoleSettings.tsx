@@ -374,7 +374,7 @@ const AdminConsoleSettings: React.FC = () => {
               </label>
             </div>
 
-            <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+            <div className="mt-4 rounded-2xl border p-4" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className={SETTINGS_LABEL_CLASSNAME}>充值额度</span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -489,7 +489,7 @@ const AdminConsoleSettings: React.FC = () => {
                   </label>
                 </div>
 
-                <label className="mt-4 flex items-center justify-between rounded-xl border px-3 py-3 text-sm" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                <label className="mt-4 flex items-center justify-between rounded-xl border px-3 py-3 text-sm" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
                   <span>前台显示并允许使用该币种充值</span>
                   <input
                     type="checkbox"

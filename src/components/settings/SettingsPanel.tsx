@@ -1132,7 +1132,7 @@ const StorageSettingsView: React.FC = () => {
               </SettingsActionButton>
             </div>
 
-            <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+            <div className="mt-5 border-t pt-5" style={{ }}>
               <div className="space-y-2">
                 <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   清理错误卡片
@@ -1288,7 +1288,7 @@ const SystemLogsView: React.FC = () => {
         {importantLogs.length === 0 ? (
           <div
             className="rounded-2xl border border-dashed px-5 py-10 text-center"
-            style={{ borderColor: 'var(--settings-border-subtle)', color: 'var(--text-tertiary)' }}
+            style={{ color: 'var(--text-tertiary)' }}
           >
             今日暂无重要日志，当前系统状态稳定。
           </div>
@@ -1541,7 +1541,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
               <main className="settings-shell-page settings-shell-page--mobile mobile-sheet-scroll h-full px-3 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
                 <div className="settings-shell-content space-y-4">
-                  <div className="rounded-[20px] border p-4" style={SETTINGS_PANEL_STYLE}>
+                  <div className="rounded-[10px] border p-4" style={SETTINGS_PANEL_STYLE}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>

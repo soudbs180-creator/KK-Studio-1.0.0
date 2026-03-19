@@ -22,16 +22,84 @@ type AdminTab = 'credit-models' | 'exchange-rates' | 'admin-console';
 const SESSION_UNLOCK_KEY = 'admin_panel_unlocked_at';
 const SESSION_UNLOCK_TTL_MS = 30 * 60 * 1000;
 
-function isSessionUnlocked(): boolean {
-  if (typeof window === 'undefined') return false;
+type AdminUnlockSession = {
+  unlockedAt: number;
+  userId: string | null;
+};
+
+function clearUnlockSession() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+}
+
+function readUnlockSession(): AdminUnlockSession | null {
+  if (typeof window === 'undefined') return null;
 
   const raw = sessionStorage.getItem(SESSION_UNLOCK_KEY);
-  if (!raw) return false;
+  if (!raw) return null;
 
   const ts = Number(raw);
-  if (!Number.isFinite(ts)) return false;
+  if (Number.isFinite(ts)) {
+    return {
+      unlockedAt: ts,
+      userId: null,
+    };
+  }
 
-  return Date.now() - ts < SESSION_UNLOCK_TTL_MS;
+  try {
+    const parsed = JSON.parse(raw) as Partial<AdminUnlockSession>;
+    if (!parsed || typeof parsed !== 'object') {
+      clearUnlockSession();
+      return null;
+    }
+
+    const unlockedAt = Number(parsed.unlockedAt);
+    if (!Number.isFinite(unlockedAt)) {
+      clearUnlockSession();
+      return null;
+    }
+
+    return {
+      unlockedAt,
+      userId: typeof parsed.userId === 'string' ? parsed.userId : null,
+    };
+  } catch {
+    clearUnlockSession();
+    return null;
+  }
+}
+
+function getUnlockSessionRemainingMs(userId?: string): number {
+  const session = readUnlockSession();
+  if (!session) return 0;
+
+  if (session.userId && userId && session.userId !== userId) {
+    clearUnlockSession();
+    return 0;
+  }
+
+  const remaining = SESSION_UNLOCK_TTL_MS - (Date.now() - session.unlockedAt);
+  if (remaining <= 0) {
+    clearUnlockSession();
+    return 0;
+  }
+
+  return remaining;
+}
+
+function isSessionUnlocked(userId?: string): boolean {
+  return getUnlockSessionRemainingMs(userId) > 0;
+}
+
+function persistUnlockSession(userId?: string) {
+  if (typeof window === 'undefined') return;
+
+  const payload: AdminUnlockSession = {
+    unlockedAt: Date.now(),
+    userId: userId ?? null,
+  };
+
+  sessionStorage.setItem(SESSION_UNLOCK_KEY, JSON.stringify(payload));
 }
 
 const infoCardStyle: React.CSSProperties = {
@@ -115,12 +183,38 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   }, [initialTab]);
 
   useEffect(() => {
+    if (authLoading || checkingAdmin) return;
+
     if (!user || !isAdmin) {
       setUnlocked(false);
       setMustChangeDefaultPassword(false);
-      sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+      clearUnlockSession();
+      return;
     }
-  }, [isAdmin, user]);
+
+    setUnlocked(isSessionUnlocked(user.id));
+  }, [authLoading, checkingAdmin, isAdmin, user]);
+
+  useEffect(() => {
+    if (!unlocked || !user || !isAdmin) return;
+
+    const remaining = getUnlockSessionRemainingMs(user.id);
+    if (remaining <= 0) {
+      setUnlocked(false);
+      setMustChangeDefaultPassword(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clearUnlockSession();
+      setUnlocked(false);
+      setMustChangeDefaultPassword(false);
+    }, remaining);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [unlocked, isAdmin, user]);
 
   const verifyAdminPassword = async () => {
     if (!password.trim()) {
@@ -156,7 +250,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
         return;
       }
 
-      sessionStorage.setItem(SESSION_UNLOCK_KEY, String(Date.now()));
+      persistUnlockSession(user?.id);
       setUnlocked(true);
       setPassword('');
       notify.success('验证通过', '管理员后台已解锁。');
@@ -177,7 +271,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   };
 
   const lockNow = () => {
-    sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+    clearUnlockSession();
     setUnlocked(false);
     setMustChangeDefaultPassword(false);
   };

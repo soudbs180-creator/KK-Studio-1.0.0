@@ -26,6 +26,31 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 
 ---
 
+## 🤖 Gemini 官方开发对齐（新增）
+
+本项目已经深度接入 Gemini 生态，修改以下内容时，必须优先按官方 Gemini 开发语义判断，再决定落点：
+- Google 官方 Gemini 通道
+- Gemini 原生协议
+- OpenAI 兼容代理中的 Gemini 模型
+- Imagen / Veo / 多模态请求
+
+### 必须遵守
+- 涉及 Gemini 协议改动时，先看 `docs/development/gemini-agent-guide.md`
+- Google 官方通道优先对齐官方 Gemini 端点、鉴权与模型列表接口
+- OpenAI 兼容通道不要发送 Google 专有字段
+- 协议判断优先复用 `providerStrategy` 与 `connectionTest` 的既有运行时解析，不要在业务层重新猜协议
+- `geminiService` 负责编排与错误体验，不负责定义协议事实
+
+### 代码职责映射
+- `src/services/api/providerStrategy.ts`：供应商识别、协议家族、鉴权规则
+- `src/services/api/connectionTest.ts`：低成本连通性验证与安全探测
+- `src/services/llm/GeminiNativeAdapter.ts`：Gemini 原生 chat 入口
+- `src/services/llm/GoogleAdapter.ts`：Google 官方 Gemini / Imagen / Veo 主入口
+- `src/services/llm/geminiService.ts`：生成编排、fallback、错误归一化
+- `src/hooks/useImageGeneration.ts`：UI 层任务状态与结果拼装
+
+---
+
 ## 🛰️ 多渠道 API 调用规范（新增）
 
 目标：输入地址+密钥后自动获取模型、探测能力，并在 UI 里只展示可用参数，避免互相串扰。

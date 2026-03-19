@@ -12,6 +12,7 @@
 - 统一版本号维护方式
 - 统一文档与代码同步策略
 - 统一提交前验证动作
+- 统一 Gemini 多协议开发时的判断方式，避免把 Google 官方协议与兼容协议混写
 
 ## 修改时必须同步的版本源
 当项目版本发生变化时，优先同步以下文件：
@@ -38,3 +39,7 @@ npm run build
 
 ## 说明
 `SKILL.md` 是详细规则总纲；本 README 负责说明当前基线版本和“修改时必须同步什么”。
+
+## Gemini 开发补充
+- 涉及 Gemini 官方通道、Gemini 原生协议、OpenAI 兼容代理、Imagen、Veo 时，优先参考 `docs/development/gemini-agent-guide.md`
+- 该文档会把官方 Gemini coding agent guidance 映射到本项目当前的 `providerStrategy`、`connectionTest`、`GoogleAdapter`、`GeminiNativeAdapter` 与 `geminiService` 分层
