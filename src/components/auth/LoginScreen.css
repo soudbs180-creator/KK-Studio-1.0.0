@@ -385,6 +385,93 @@ body.auth-screen-active #root {
   color: #d7ffe8;
 }
 
+.auth-turnstile-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-turnstile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #d8e3f7;
+}
+
+.auth-turnstile-head,
+.auth-turnstile-help {
+  display: none;
+}
+
+.auth-turnstile-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-turnstile-badge.is-pending {
+  background: rgba(255, 191, 67, 0.16);
+  color: #ffd38a;
+}
+
+.auth-turnstile-badge.is-ready {
+  background: rgba(80, 214, 160, 0.18);
+  color: #b7ffd7;
+}
+
+.auth-turnstile-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-turnstile-widget {
+  min-height: 70px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-turnstile-inline-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 109, 109, 0.15);
+  border: 1px solid rgba(255, 109, 109, 0.38);
+  color: #ffd9d9;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.auth-turnstile-help {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9fb4d8;
+}
+
+.auth-turnstile-debug {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10, 19, 34, 0.84);
+  border: 1px solid rgba(143, 216, 255, 0.2);
+  color: #cfe5ff;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .auth-footer {
   margin-top: 16px;
   padding-top: 14px;

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { KeyRound, Shield } from 'lucide-react';
+import { useAdminRole } from '../../hooks/useAdminRole';
 
 const ApiSettingsView = lazy(() => import('../settings/ApiSettingsView'));
 const AdminSystem = lazy(() => import('../settings/AdminSystem'));
@@ -31,7 +32,19 @@ const managerNavItems: Array<{
 ];
 
 export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onNavigateToPricing: _onNavigateToPricing }) => {
+  const { authLoading, checkingAdmin, isAdmin } = useAdminRole();
   const [activeTab, setActiveTab] = useState<ManagerTab>('api');
+  const canAccessAdmin = !authLoading && !checkingAdmin && isAdmin;
+  const visibleNavItems = useMemo(
+    () => (canAccessAdmin ? managerNavItems : managerNavItems.filter((item) => item.id !== 'admin')),
+    [canAccessAdmin]
+  );
+
+  React.useEffect(() => {
+    if (!canAccessAdmin && activeTab === 'admin') {
+      setActiveTab('api');
+    }
+  }, [activeTab, canAccessAdmin]);
 
   const activeMeta = useMemo(
     () =>
@@ -56,7 +69,7 @@ export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onNavigateToPricin
           <aside className="md:w-[240px] md:flex-shrink-0">
             <div className="apple-glass-card rounded-[28px] p-3 md:sticky md:top-6">
               <div className="space-y-1">
-                {managerNavItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const Icon = item.icon;
                   const active = activeTab === item.id;
 

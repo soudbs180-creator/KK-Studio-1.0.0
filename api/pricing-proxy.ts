@@ -1,6 +1,8 @@
 ﻿/**
  * Pricing scan proxy
- * 优先抓取 /api/pricing，也会尝试解析 /pricing、/pricing.html、/models 页面中的嵌入 JSON 和表格数据。
+ * 优先尝试 /pricing、/pricing.html。
+ * 仅当 pricing 页面未提取到有效价格数据时，才回退解析 /models 页面。
+ * 若前端价格页仍无法提取，再兜底尝试 /api/pricing。
  */
 
 export const config = { runtime: 'edge' };
@@ -8,6 +10,12 @@ export const config = { runtime: 'edge' };
 type PricingRow = Record<string, any>;
 type ParsedPayload = { data: PricingRow[]; groupRatio: Record<string, number> };
 type DiscoveryTarget = { key: string; url: string; accept: string };
+type FetchAndParseResult = DiscoveryTarget & {
+  ok: boolean;
+  status: number;
+  text: string;
+  parsed: ParsedPayload | null;
+};
 
 const PRIVATE_IPV4_PATTERNS = [
   /^0\./,
@@ -59,6 +67,34 @@ const isForbiddenHostname = (hostname: string) => {
   return false;
 };
 
+const SUPPLIER_PATH_SUFFIXES = [
+  /\/api\/pricing$/i,
+  /\/api\/price$/i,
+  /\/v1\/pricing$/i,
+  /\/pricing\.html$/i,
+  /\/pricing$/i,
+  /\/price$/i,
+  /\/models$/i,
+  /\/v1$/i,
+];
+
+const stripSupplierPathSuffixes = (pathname: string) => {
+  let clean = String(pathname || '').replace(/\/+$/, '');
+  let stripped = true;
+
+  while (stripped) {
+    stripped = false;
+    for (const suffix of SUPPLIER_PATH_SUFFIXES) {
+      if (!suffix.test(clean)) continue;
+      clean = clean.replace(suffix, '').replace(/\/+$/, '');
+      stripped = true;
+      break;
+    }
+  }
+
+  return clean || '/';
+};
+
 const normalizeSupplierBaseUrl = (rawBaseUrl: string) => {
   const parsed = new URL(String(rawBaseUrl || '').trim());
 
@@ -76,7 +112,7 @@ const normalizeSupplierBaseUrl = (rawBaseUrl: string) => {
 
   parsed.hash = '';
   parsed.search = '';
-  parsed.pathname = parsed.pathname.replace(/\/v1\/?$/i, '').replace(/\/+$/, '') || '/';
+  parsed.pathname = stripSupplierPathSuffixes(parsed.pathname);
 
   return parsed.toString().replace(/\/$/, '');
 };
@@ -575,6 +611,29 @@ const fetchAndParse = async (url: string, accept: string) => {
   };
 };
 
+const buildSuccessResponse = (
+  results: FetchAndParseResult[],
+  discoveredUrls: string[],
+  corsHeaders: Record<string, string>
+) => {
+  const mergedData = mergeRows(...results.map((item) => item.parsed?.data || []));
+  const mergedGroupRatio = mergeGroupRatios(...results.map((item) => item.parsed?.groupRatio));
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: mergedData,
+      group_ratio: mergedGroupRatio,
+      sources: Object.fromEntries(results.map((item) => [item.key, item.ok])),
+      discovered: discoveredUrls,
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    }
+  );
+};
+
 export default async function handler(request: Request) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -604,13 +663,11 @@ export default async function handler(request: Request) {
     }
 
     const cleanUrl = normalizeSupplierBaseUrl(baseUrl);
+    const attemptedUrls = new Set<string>();
+    const results: FetchAndParseResult[] = [];
+    const discoveredUrls: string[] = [];
 
-    const baseTargets: DiscoveryTarget[] = [
-      {
-        key: 'apiPricing',
-        url: `${cleanUrl}/api/pricing`,
-        accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
-      },
+    const pricingTargets: DiscoveryTarget[] = [
       {
         key: 'pricingPage',
         url: `${cleanUrl}/pricing`,
@@ -621,62 +678,81 @@ export default async function handler(request: Request) {
         url: `${cleanUrl}/pricing.html`,
         accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
       },
-      {
-        key: 'modelsPage',
-        url: `${cleanUrl}/models`,
-        accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      },
     ];
+    const modelsTarget: DiscoveryTarget = {
+      key: 'modelsPage',
+      url: `${cleanUrl}/models`,
+      accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+    };
+    const apiPricingTarget: DiscoveryTarget = {
+      key: 'apiPricing',
+      url: `${cleanUrl}/api/pricing`,
+      accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
+    };
 
-    const baseResults = await Promise.all(
-      baseTargets.map((target) => fetchAndParse(target.url, target.accept).then((result) => ({ ...target, ...result })))
-    );
+    const runTarget = async (target: DiscoveryTarget, allowDiscovery: boolean): Promise<Response | null> => {
+      if (attemptedUrls.has(target.url)) return null;
+      attemptedUrls.add(target.url);
 
-    const discoveredTargets = Array.from(
-      new Map(
-        baseResults
-          .filter((item) => item.ok && looksLikeHtml(item.text))
-          .flatMap((item) => discoverDynamicTargets(item.text, cleanUrl))
-          .map((target) => [target.url, target])
-      ).values()
-    ).filter((target) => !baseTargets.some((item) => item.url === target.url));
+      const result: FetchAndParseResult = {
+        ...target,
+        ...(await fetchAndParse(target.url, target.accept)),
+      };
+      results.push(result);
 
-    const discoveredResults = await Promise.all(
-      discoveredTargets.map((target) =>
-        fetchAndParse(target.url, target.accept).then((result) => ({ ...target, ...result }))
-      )
-    );
+      if (result.parsed?.data?.length) {
+        return buildSuccessResponse(results, discoveredUrls, corsHeaders);
+      }
 
-    const results = [...baseResults, ...discoveredResults];
+      if (!allowDiscovery || !result.ok || !looksLikeHtml(result.text)) {
+        return null;
+      }
 
-    const mergedData = mergeRows(...results.map((item) => item.parsed?.data || []));
-    const mergedGroupRatio = mergeGroupRatios(...results.map((item) => item.parsed?.groupRatio));
+      const discoveredTargets = discoverDynamicTargets(result.text, cleanUrl).filter((item) => !attemptedUrls.has(item.url));
+      for (const discoveredTarget of discoveredTargets) {
+        attemptedUrls.add(discoveredTarget.url);
+        discoveredUrls.push(discoveredTarget.url);
 
-    if (mergedData.length === 0) {
-      const firstError = results.find((item) => !item.ok);
-      const upstreamError = firstError
-        ? `${firstError.key} 返回 ${firstError.status}`
-        : '未从供应商价格页提取到基础价和倍率数据';
+        const discoveredResult: FetchAndParseResult = {
+          ...discoveredTarget,
+          ...(await fetchAndParse(discoveredTarget.url, discoveredTarget.accept)),
+        };
+        results.push(discoveredResult);
 
-      return new Response(JSON.stringify({ error: upstreamError }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        if (discoveredResult.parsed?.data?.length) {
+          return buildSuccessResponse(results, discoveredUrls, corsHeaders);
+        }
+      }
+
+      return null;
+    };
+
+    for (const target of pricingTargets) {
+      const pricingResponse = await runTarget(target, true);
+      if (pricingResponse) {
+        return pricingResponse;
+      }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: mergedData,
-        group_ratio: mergedGroupRatio,
-        sources: Object.fromEntries(results.map((item) => [item.key, item.ok])),
-        discovered: discoveredTargets.map((item) => item.url),
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
+    const modelsResponse = await runTarget(modelsTarget, true);
+    if (modelsResponse) {
+      return modelsResponse;
+    }
+
+    const apiPricingResponse = await runTarget(apiPricingTarget, false);
+    if (apiPricingResponse) {
+      return apiPricingResponse;
+    }
+
+    const firstError = results.find((item) => !item.ok);
+    const upstreamError = firstError
+      ? `${firstError.key} 返回 ${firstError.status}`
+      : '未从供应商价格页提取到基础价和倍率数据';
+
+    return new Response(JSON.stringify({ error: upstreamError }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error?.message || '价格代理请求失败' }), {
       status: 200,

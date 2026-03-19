@@ -33,7 +33,7 @@ import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
 import { Provider } from '../../types';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
-import { adminModelService } from '../model/adminModelService'; // 棣冩畬 [閺傛澘顤僝 缁狅紕鎮婇敾姗€鍘嗙純顔芥箛閿?
+import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot';
 import { fetchRawPricingCatalog, fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
 
@@ -48,7 +48,7 @@ export function parseModelString(input: string): { id: string; name?: string; de
         let name = parts[1]?.trim() || undefined;
         const provider = parts[2]?.trim() || undefined;
 
-        // 閸忕厧顔愰摗鍡楀蕉皤敂蹇旀殶閹? 閸欘垵鍏樼悮顐︽晩鐠囶垰鐡ㄩ幋?"name|id|provider"
+        // 如果第二个参数是ID，第一个是名称(显示用)"name|id|provider"
         const idLikeRegex = /^[a-z0-9-.:/]+$/;
         const firstLooksLikeName = /\s/.test(id) || !idLikeRegex.test(id);
         const secondLooksLikeId = !!name && idLikeRegex.test(name);
@@ -75,8 +75,8 @@ export function parseModelString(input: string): { id: string; name?: string; de
     let name = match[2]?.trim();
     const description = match[3]?.trim();
 
-    // 閺呴缚鍏樺Λ鈧ù? 婵″倹鐏?ID 皤摵瀣崳皎睊銉ュ剼閽栧矕袨(閸栧懎鎯堢粚鐑樼壐閹存牕銇囬崘?, 閽ュ本瀚崣宄板敶闀?name 皤摵瀣崳皎睊銉ュ剼 ID (kebab-case/lowercase)
-    // 皤攧娆庢唉閹广垹鐣犳禒?
+    // 智能交换: 如果第二个参数看起来像ID (无空格, kebab-case/小写)
+    // 就交换
     const idLikeRegex = /^[a-z0-9-.:]+$/;
     const hasSpace = /\s/.test(id);
 
@@ -173,8 +173,8 @@ export interface KeySlot {
     id: string;
     key: string;
     name: string;
-    provider: Provider; // 皎眳?Updated to strict type
-    type: 'official' | 'proxy' | 'third-party'; // 皎眳?New field for categorization
+    provider: Provider; // 注意: Updated to strict type
+    type: 'official' | 'proxy' | 'third-party'; // 注意: New field for categorization
     format: ApiProtocolFormat;
 
     // Provider Specific Config
@@ -203,10 +203,10 @@ export interface KeySlot {
     customBody?: Record<string, any>; // Provider-specific custom request body template
 
     // Advanced Configuration (NEW)
-    weight?: number;         // 皎睊鍐惃 (1-100), 閻劋绨拹鐔绘祰閸у洷銆€,姒涙か顓?0
-    timeout?: number;        // 鐡掑懏妞傞暈鍫曟？ (ms), 姒涙か顓?0000
-    maxRetries?: number;     // 閾锯偓婢堆囧惃鐠囨洘顐奸弫?姒涙か顓?
-    retryDelay?: number;     // 闃咅『冪槸瀵ゆ儼绻?(ms), 姒涙か顓?000
+    weight?: number;         // 权重 (1-100), 请求时优先选择,默认为0
+    timeout?: number;        // 请求超时 (ms), 默认为10000
+    maxRetries?: number;     // 最大重试次数, 默认为3
+    retryDelay?: number;     // 重试延迟(ms), 默认为1000
 
     // Status & Usage
     status: 'valid' | 'invalid' | 'rate_limited' | 'unknown';
@@ -218,10 +218,10 @@ export interface KeySlot {
     createdAt: number;
 
     // Performance Metrics (NEW)
-    avgResponseTime?: number;    // 楠炲啿娼庨崫宥呯安闀炲爼妫?(ms)
-    lastResponseTime?: number;   // 閾锯偓閽栧簼绔村▎鈥虫惙鎼存梹妞傞梻?(ms)
-    successRate?: number;        // 閹存劕濮涢悳?(0-100)
-    totalRequests?: number;      // 闀愭槒顕Ч鍌涙殶
+    avgResponseTime?: number;    // 平均响应时间计算窗口(ms)
+    lastResponseTime?: number;   // 上次响应时间(ms)
+    successRate?: number;        // 成功率(0-100)
+    totalRequests?: number;      // 总请求次数
 
     // Call History (NEW)
     recentCalls?: Array<{
@@ -236,8 +236,8 @@ export interface KeySlot {
     usedTokens?: number;
     totalCost: number;
     budgetLimit: number; // -1 for unlimited
-    tokenLimit?: number; // 皎眳?New: -1 for unlimited
-    creditCost?: number; // 棣冩畬 [API Isolation] User-defined custom cost per generation
+    tokenLimit?: number; // 注意: New: -1 for unlimited
+    creditCost?: number; // 完成 [API Isolation] User-defined custom cost per generation
 
     // Sync
     updatedAt?: number; // Timestamp of last modification for sync conflict resolution
@@ -260,8 +260,8 @@ interface KeyManagerState {
 }
 
 /**
- * 缁楊兛绗侀弬?API 閾惧秴濮熼崯鍡樺复閸?
- * 閺€顖涘瘮閺呴缚姘ㄩ妴浣风濞撳懌鈧胶浼€鐏炲崬绱╅晭搴ｇ搼 OpenAI 閸忕厧顔?API
+ * 专门用于API密钥轮询服务
+ * 类似Gemini Balance但完全运行在前端，现在也支持OpenAI格式的API
  */
 export interface ThirdPartyProvider {
     id: string;

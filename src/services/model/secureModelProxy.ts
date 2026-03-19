@@ -88,7 +88,25 @@ export interface SecureProxyTaskStatusResponse {
   deducted?: boolean;
 }
 
-async function ensureCloudSession(feature: string): Promise<void> {
+type SecureProxyInvokeResult = {
+  data: any;
+  error: any;
+  response?: Response;
+};
+
+type CloudSessionResolution = {
+  accessToken: string;
+};
+
+function buildCloudSessionError(feature: string): Error {
+  if (tempUserService.getCachedTempUser()) {
+    return new Error('Guest mode does not have a real Supabase session, so cloud sync and system credit models are unavailable.');
+  }
+
+  return new Error(`Please sign in before using ${feature}.`);
+}
+
+async function resolveCloudSession(feature: string): Promise<CloudSessionResolution> {
   const {
     data: { session },
     error,
@@ -98,73 +116,127 @@ async function ensureCloudSession(feature: string): Promise<void> {
     throw new Error(error.message || `Unable to verify login state for ${feature}.`);
   }
 
-  if (session?.access_token) {
-    return;
+  let activeSession = session;
+  const expiresAtMs = typeof activeSession?.expires_at === 'number'
+    ? activeSession.expires_at * 1000
+    : 0;
+  const shouldRefresh = !activeSession?.access_token
+    || (expiresAtMs > 0 && expiresAtMs <= Date.now() + 60_000);
+
+  if (shouldRefresh) {
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshData.session?.access_token) {
+      activeSession = refreshData.session;
+    }
   }
 
-  if (tempUserService.getCachedTempUser()) {
-    throw new Error('Temporary guest mode has no real Supabase session, so cloud sync and system credit models are unavailable.');
+  if (!activeSession?.access_token) {
+    throw buildCloudSessionError(feature);
   }
 
-  throw new Error('Please sign in before using this feature.');
+  return {
+    accessToken: activeSession.access_token,
+  };
+}
+
+async function buildInvocationError(
+  feature: string,
+  error: any,
+  response?: Response
+): Promise<Error> {
+  const status = response?.status;
+  let responseBody = '';
+
+  if (response) {
+    try {
+      responseBody = await response.clone().text();
+    } catch {
+      responseBody = '';
+    }
+  }
+
+  let message = error?.message || 'System proxy invocation failed';
+  if (status === 401) {
+    message = `System credit ${feature} failed because your login session expired. Please sign in again and retry.`;
+  } else if (status === 403) {
+    message = `System credit ${feature} is not available for the current account.`;
+  } else if (responseBody) {
+    try {
+      const parsed = JSON.parse(responseBody);
+      message = parsed?.error || parsed?.message || message;
+    } catch {
+      message = responseBody || message;
+    }
+  }
+
+  const normalized = new Error(message);
+  if (status !== undefined) {
+    (normalized as Error & { status?: number }).status = status;
+  }
+  if (responseBody) {
+    (normalized as Error & { responseBody?: string }).responseBody = responseBody;
+  }
+
+  return normalized;
+}
+
+async function invokeSecureSystemProxy(
+  feature: string,
+  body: Record<string, unknown>
+): Promise<any> {
+  const invokeWithToken = async (accessToken: string): Promise<SecureProxyInvokeResult> => (
+    supabase.functions.invoke('secure-model-proxy', {
+      body,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+  );
+
+  const session = await resolveCloudSession(feature);
+  let result = await invokeWithToken(session.accessToken);
+
+  if (result.response?.status === 401) {
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshData.session?.access_token) {
+      result = await invokeWithToken(refreshData.session.access_token);
+    }
+  }
+
+  if (result.error) {
+    throw await buildInvocationError(feature, result.error, result.response);
+  }
+
+  if (!result.data?.success) {
+    throw new Error(result.data?.error || 'System proxy returned error');
+  }
+
+  return result.data;
 }
 
 export async function cancelSecureSystemProxyTask(taskId: string): Promise<boolean> {
-  await ensureCloudSession('task cancel');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'cancel_task',
-      taskId,
-    },
+  await invokeSecureSystemProxy('task cancel', {
+    mode: 'cancel_task',
+    taskId,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy cancel invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return true;
 }
 
 export async function deleteSecureSystemProxyTask(taskId: string): Promise<boolean> {
-  await ensureCloudSession('task delete');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'delete_task',
-      taskId,
-    },
+  await invokeSecureSystemProxy('task delete', {
+    mode: 'delete_task',
+    taskId,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy delete invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return true;
 }
 
 export async function downloadSecureSystemProxyTaskContent(taskId: string): Promise<string> {
-  await ensureCloudSession('task download');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'download_task',
-      taskId,
-    },
+  const data = await invokeSecureSystemProxy('task download', {
+    mode: 'download_task',
+    taskId,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy download invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return String(data.url || '');
 }
@@ -183,30 +255,19 @@ function normalizeMessageContent(content: unknown): string {
 export async function callSecureSystemProxyChat(
   payload: SecureProxyChatRequest
 ): Promise<SecureProxyChatResponse> {
-  await ensureCloudSession('chat generation');
   const normalizedMessages = payload.messages.map((message) => ({
     role: message.role,
     content: normalizeMessageContent(message.content),
   }));
 
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'chat',
-      modelId: payload.modelId,
-      messages: normalizedMessages,
-      temperature: payload.temperature,
-      maxTokens: payload.maxTokens,
-      stream: payload.stream ?? false,
-    },
+  const data = await invokeSecureSystemProxy('chat generation', {
+    mode: 'chat',
+    modelId: payload.modelId,
+    messages: normalizedMessages,
+    temperature: payload.temperature,
+    maxTokens: payload.maxTokens,
+    stream: payload.stream ?? false,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return {
     content: data.content || '',
@@ -219,26 +280,15 @@ export async function callSecureSystemProxyChat(
 export async function callSecureSystemProxyImage(
   payload: SecureProxyImageRequest
 ): Promise<SecureProxyImageResponse> {
-  await ensureCloudSession('image generation');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'image',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      imageSize: payload.imageSize,
-      imageCount: payload.imageCount ?? 1,
-      referenceImages: payload.referenceImages ?? [],
-    },
+  const data = await invokeSecureSystemProxy('image generation', {
+    mode: 'image',
+    modelId: payload.modelId,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    imageSize: payload.imageSize,
+    imageCount: payload.imageCount ?? 1,
+    referenceImages: payload.referenceImages ?? [],
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy image invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return {
     urls: Array.isArray(data.urls) ? data.urls : [],
@@ -251,28 +301,17 @@ export async function callSecureSystemProxyImage(
 export async function callSecureSystemProxyVideo(
   payload: SecureProxyVideoRequest
 ): Promise<SecureProxyVideoResponse> {
-  await ensureCloudSession('video generation');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'video',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      resolution: payload.resolution,
-      duration: payload.duration,
-      videoDuration: payload.videoDuration,
-      imageUrl: payload.imageUrl,
-      imageTailUrl: payload.imageTailUrl,
-    },
+  const data = await invokeSecureSystemProxy('video generation', {
+    mode: 'video',
+    modelId: payload.modelId,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    resolution: payload.resolution,
+    duration: payload.duration,
+    videoDuration: payload.videoDuration,
+    imageUrl: payload.imageUrl,
+    imageTailUrl: payload.imageTailUrl,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy video invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return {
     taskId: data.taskId || '',
@@ -286,22 +325,11 @@ export async function callSecureSystemProxyVideo(
 export async function callSecureSystemProxyAudio(
   payload: SecureProxyAudioRequest
 ): Promise<SecureProxyAudioResponse> {
-  await ensureCloudSession('audio generation');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'audio',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-    },
+  const data = await invokeSecureSystemProxy('audio generation', {
+    mode: 'audio',
+    modelId: payload.modelId,
+    prompt: payload.prompt,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy audio invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return {
     url: data.url || '',
@@ -312,21 +340,10 @@ export async function callSecureSystemProxyAudio(
 }
 
 export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<SecureProxyTaskStatusResponse> {
-  await ensureCloudSession('task status');
-  const { data, error } = await supabase.functions.invoke('secure-model-proxy', {
-    body: {
-      mode: 'task_status',
-      taskId,
-    },
+  const data = await invokeSecureSystemProxy('task status', {
+    mode: 'task_status',
+    taskId,
   });
-
-  if (error) {
-    throw new Error(error.message || 'System proxy task status invocation failed');
-  }
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'System proxy returned error');
-  }
 
   return {
     status: data.status || 'pending',

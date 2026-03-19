@@ -10,18 +10,15 @@ import {
     Maximize2,
     Moon,
     Search,
-    ScrollText,
     Square,
     Sun,
     Trash2,
-    Wand2,
 } from 'lucide-react';
 import { useCanvas } from '../../context/CanvasContext';
 import { useTheme } from '../../context/ThemeContext';
 import { notify } from '../../services/system/notificationService';
-
-type WorkflowTemplateId = 'prompt-image-save' | 'image-follow-up-image' | 'ppt-prompt-export';
-type WorkflowUtilityCardKind = 'preview' | 'save' | 'agent';
+import type { WorkflowUtilityNodeKind } from '../../workflow/schema';
+import type { WorkflowTemplateDefinition, WorkflowTemplateId } from '../../workflow/templates/workflowTemplates';
 
 interface ProjectManagerProps {
     onSearch: () => void;
@@ -40,13 +37,9 @@ interface ProjectManagerProps {
     mobilePromptOptimizationSupported?: boolean;
     onToggleMobilePromptOptimization?: () => void;
     onOpenMobilePromptLibrary?: () => void;
-    workflowTemplates?: Array<{
-        id: WorkflowTemplateId;
-        title: string;
-        description: string;
-    }>;
-    onApplyWorkflowTemplate?: (id: WorkflowTemplateId) => void;
-    onAddWorkflowUtilityCard?: (kind: WorkflowUtilityCardKind) => void;
+    workflowTemplates?: WorkflowTemplateDefinition[];
+    onApplyWorkflowTemplate?: (templateId: WorkflowTemplateId) => void;
+    onAddWorkflowUtilityCard?: (kind: WorkflowUtilityNodeKind) => void;
 }
 
 const ProjectManager: React.FC<ProjectManagerProps> = ({
@@ -61,9 +54,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     mobilePromptOptimizationSupported = true,
     onToggleMobilePromptOptimization,
     onOpenMobilePromptLibrary,
-    workflowTemplates = [],
-    onApplyWorkflowTemplate,
-    onAddWorkflowUtilityCard,
 }) => {
     const {
         state,
@@ -526,80 +516,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <Trash2 size={16} />
                         {cleaningInvalid ? '正在清理错误卡片...' : '清理错误卡片'}
                     </button>
-
-                    {(workflowTemplates.length > 0 || onAddWorkflowUtilityCard) && (
-                        <>
-                            <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
-
-                            {workflowTemplates.length > 0 && (
-                                <div className="space-y-1">
-                                    <div className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-tertiary)' }}>
-                                        宸ヤ綔娴佹ā鏉?
-                                    </div>
-                                    {workflowTemplates.map((template) => (
-                                        <button
-                                            key={template.id}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                onApplyWorkflowTemplate?.(template.id);
-                                                setShowDropdown(false);
-                                            }}
-                                            className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                                        >
-                                            <ScrollText size={16} className="mt-0.5 shrink-0" />
-                                            <span className="min-w-0">
-                                                <span className="block truncate font-medium">{template.title}</span>
-                                                <span className="mt-0.5 block text-xs leading-5 text-[var(--text-tertiary)]">
-                                                    {template.description}
-                                                </span>
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {onAddWorkflowUtilityCard && (
-                                <div className="space-y-1">
-                                    <div className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-tertiary)' }}>
-                                        闄勫姞鍔熻兘鍗?
-                                    </div>
-                                    <button
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onAddWorkflowUtilityCard('preview');
-                                            setShowDropdown(false);
-                                        }}
-                                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                                    >
-                                        <Focus size={16} />
-                                        棰勮鍗?
-                                    </button>
-                                    <button
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onAddWorkflowUtilityCard('save');
-                                            setShowDropdown(false);
-                                        }}
-                                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                                    >
-                                        <ScrollText size={16} />
-                                        淇濆瓨鍗?
-                                    </button>
-                                    <button
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onAddWorkflowUtilityCard('agent');
-                                            setShowDropdown(false);
-                                        }}
-                                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)]"
-                                    >
-                                        <Wand2 size={16} />
-                                        鎻愮ず澧炲己鍗?
-                                    </button>
-                                </div>
-                            )}
-                        </>
-                    )}
 
                     <button
                         onClick={(event) => {

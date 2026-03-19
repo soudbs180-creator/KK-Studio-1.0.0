@@ -437,7 +437,8 @@ const buildOptimizerCacheKey = (
 };
 
 const pickOptimizerModel = (preferredModelId?: string): string | null => {
-    const models = keyManager.getGlobalModelList().filter((model) => model.type === 'chat');
+    // Avoid silently consuming admin/system credits for behind-the-scenes prompt optimization.
+    const models = keyManager.getGlobalModelList().filter((model) => model.type === 'chat' && !model.isSystemInternal);
     if (models.length === 0) return null;
 
     if (preferredModelId) {

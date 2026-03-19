@@ -50,18 +50,58 @@ function looksLikeJson(text) {
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
+const supplierPathSuffixes = [
+  /\/api\/pricing$/i,
+  /\/api\/price$/i,
+  /\/v1\/pricing$/i,
+  /\/pricing\.html$/i,
+  /\/pricing$/i,
+  /\/price$/i,
+  /\/models$/i,
+  /\/v1$/i,
+];
+
+function stripSupplierPathSuffixes(pathname) {
+  let clean = String(pathname || '').replace(/\/+$/, '');
+  let stripped = true;
+
+  while (stripped) {
+    stripped = false;
+    for (const suffix of supplierPathSuffixes) {
+      if (!suffix.test(clean)) continue;
+      clean = clean.replace(suffix, '').replace(/\/+$/, '');
+      stripped = true;
+      break;
+    }
+  }
+
+  return clean || '/';
+}
+
+function normalizePricingBaseUrl(baseUrl) {
+  try {
+    const parsed = new URL(String(baseUrl || '').trim());
+    parsed.hash = '';
+    parsed.search = '';
+    parsed.pathname = stripSupplierPathSuffixes(parsed.pathname);
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return String(baseUrl || '').replace(/\/+$/, '');
+  }
+}
+
 async function fetchPricingPayload(baseUrl) {
-  const cleanUrl = String(baseUrl || '').replace(/\/v1\/?$/, '').replace(/\/$/, '');
+  const cleanUrl = normalizePricingBaseUrl(baseUrl);
 
   if (!cleanUrl) {
     return { error: 'Missing baseUrl.' };
   }
 
   const candidates = [
-    `${cleanUrl}/api/pricing`,
     `${cleanUrl}/pricing`,
     `${cleanUrl}/pricing.html`,
     `${cleanUrl}/models`,
+    `${cleanUrl}/api/pricing`,
   ];
 
   let lastError = 'No pricing endpoint returned JSON.';

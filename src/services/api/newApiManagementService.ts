@@ -66,6 +66,133 @@ function extractModelIds(channel: Channel): string[] {
         .filter(Boolean);
 }
 
+function normalizePricingBaseUrl(baseUrl?: string): string {
+    return String(baseUrl || DEFAULT_BASE_URL).trim().replace(/\/+$/, '');
+}
+
+function buildPricingCandidateUrls(baseUrl?: string): string[] {
+    const cleanBaseUrl = normalizePricingBaseUrl(baseUrl);
+    const rootBaseUrl = cleanBaseUrl.replace(/\/v1$/i, '');
+    return Array.from(new Set([
+        `${cleanBaseUrl}/api/pricing`,
+        `${cleanBaseUrl}/pricing`,
+        `${cleanBaseUrl}/api/price`,
+        `${cleanBaseUrl}/price`,
+        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/api/pricing` : '',
+        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/pricing` : '',
+        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/api/price` : '',
+        cleanBaseUrl !== rootBaseUrl ? `${rootBaseUrl}/price` : '',
+    ].filter(Boolean)));
+}
+
+function parsePricingNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+}
+
+function extractPricingPayloadRows(payload: any): any[] {
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.prices)) return payload.prices;
+    if (Array.isArray(payload?.models)) return payload.models;
+    if (Array.isArray(payload?.data?.items)) return payload.data.items;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+}
+
+function extractPricingGroupRatioMap(payload: any): Record<string, number> {
+    const raw = payload?.group_ratio ?? payload?.groupRatio ?? payload?.data?.group_ratio ?? payload?.data?.groupRatio;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return raw as Record<string, number>;
+    }
+    return {};
+}
+
+function normalizePricingRow(item: any, groupRatioMap: Record<string, number>): PricingConfig | null {
+    const modelId = String(item?.modelId ?? item?.model ?? item?.id ?? '').trim();
+    if (!modelId) return null;
+
+    const groupKey = String(item?.group ?? item?.groupId ?? item?.group_id ?? item?.token_group ?? '').trim();
+    const inferredType = String(
+        item?.type ??
+        item?.billingType ??
+        item?.billing_type ??
+        item?.quotaType ??
+        item?.quota_type ??
+        ''
+    ).trim().toLowerCase();
+    const type: PricingConfig['type'] = (
+        inferredType.includes('times')
+        || inferredType.includes('request')
+        || inferredType.includes('per_request')
+    )
+        ? 'times'
+        : 'tokens';
+
+    const perRequestPrice = parsePricingNumber(
+        item?.perRequestPrice ?? item?.per_request_price ?? item?.price_per_image ?? item?.price ?? item?.modelPrice ?? item?.model_price
+    );
+    const inputPrice = parsePricingNumber(
+        item?.inputPrice ?? item?.input_price ?? item?.price ?? item?.modelPrice ?? item?.model_price ?? perRequestPrice
+    ) ?? 0;
+    const outputPrice = parsePricingNumber(
+        item?.outputPrice ?? item?.output_price ?? item?.completionPrice ?? item?.completion_price
+    ) ?? (type === 'times' ? 0 : inputPrice);
+    const groupRatio = parsePricingNumber(
+        item?.groupRatio ?? item?.group_ratio ?? item?.groupMultiplier ?? item?.group_multiplier
+    ) ?? (groupKey ? parsePricingNumber(groupRatioMap[groupKey]) : undefined) ?? parsePricingNumber(groupRatioMap.default) ?? 1;
+
+    return {
+        modelId,
+        modelName: String(item?.modelName ?? item?.model_name ?? modelId).trim() || modelId,
+        inputPrice: type === 'times' ? (perRequestPrice ?? inputPrice) : inputPrice,
+        outputPrice,
+        groupRatio,
+        currency: String(item?.currency ?? 'USD').trim() || 'USD',
+        type,
+    };
+}
+
+async function fetchPricingWithAccessToken(accessToken: string, baseUrl?: string): Promise<PricingConfig[]> {
+    const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+    };
+
+    for (const endpointUrl of buildPricingCandidateUrls(baseUrl)) {
+        try {
+            const response = await fetch(endpointUrl, {
+                method: 'GET',
+                headers,
+            });
+
+            if (!response.ok) continue;
+
+            const text = await response.text();
+            const trimmed = text.trimStart();
+            if (!trimmed || trimmed.startsWith('<!') || trimmed.startsWith('<html')) continue;
+
+            const payload = JSON.parse(text);
+            const groupRatioMap = extractPricingGroupRatioMap(payload);
+            const pricingRows = extractPricingPayloadRows(payload)
+                .map((item) => normalizePricingRow(item, groupRatioMap))
+                .filter((item): item is PricingConfig => Boolean(item));
+
+            if (pricingRows.length > 0) {
+                return pricingRows;
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    return [];
+}
+
 class NewApiManagementFacade {
     async verifyAccessToken(accessToken: string, baseUrl?: string): Promise<{
         success: boolean;
@@ -141,14 +268,17 @@ class NewApiManagementFacade {
     }
 
     async getPricing(accessToken: string, baseUrl?: string): Promise<PricingConfig[]> {
-        return createService(baseUrl || DEFAULT_BASE_URL, accessToken).getAllPricing();
+        const pricing = await createService(baseUrl || DEFAULT_BASE_URL, accessToken)
+            .getAllPricing()
+            .catch(() => [] as PricingConfig[]);
+        return pricing.length > 0 ? pricing : fetchPricingWithAccessToken(accessToken, baseUrl);
     }
 
     async fetchAdminModels(accessToken: string, baseUrl?: string): Promise<NewAPIModel[]> {
         const service = createService(baseUrl || DEFAULT_BASE_URL, accessToken);
         const [channels, pricing] = await Promise.all([
             service.getAllChannels(),
-            service.getAllPricing().catch(() => [] as PricingConfig[]),
+            this.getPricing(accessToken, baseUrl),
         ]);
 
         const pricingMap = new Map<string, PricingConfig>();

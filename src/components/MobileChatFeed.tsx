@@ -163,7 +163,7 @@ const getMediaExtension = (image: GeneratedImage, source: string | null, blobTyp
     .replace('quicktime', 'mov');
 };
 
-const getDisplayCost = (image: GeneratedImage): number => {
+const getDisplayCost = (image: GeneratedImage) => {
   return resolveImageCost({
     model: image.model || '',
     imageSize: image.imageSize || ImageSize.SIZE_1K,
@@ -172,7 +172,8 @@ const getDisplayCost = (image: GeneratedImage): number => {
     referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
     keySlotId: image.keySlotId,
     storedCost: image.cost,
-  }).cost;
+    storedCostSource: image.costSource,
+  });
 };
 
 const getImageAmountLabel = (image: GeneratedImage): string => {
@@ -180,7 +181,12 @@ const getImageAmountLabel = (image: GeneratedImage): string => {
     return `${COPY.pointsPrefix} ${getModelCredits(image.model || '', image.imageSize)}`;
   }
 
-  return `${COPY.amountPrefix} $${getDisplayCost(image).toFixed(4)}`;
+  const resolvedCost = getDisplayCost(image);
+  if (resolvedCost.source === 'none' || !(resolvedCost.cost > 0)) {
+    return `${COPY.amountPrefix} 未获取`;
+  }
+
+  return `${COPY.amountPrefix} $${resolvedCost.cost.toFixed(4)}`;
 };
 
 const getImageParameterLabel = (image: GeneratedImage): string => {

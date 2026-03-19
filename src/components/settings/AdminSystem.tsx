@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Clock3, Loader2, Lock, Settings, ShieldAlert, ShieldCheck, UserCog } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
+import { useAdminRole } from '../../hooks/useAdminRole';
 import { notify } from '../../services/system/notificationService';
 import CreditModelSettings from './CreditModelSettings';
 import AdminConsoleSettings from './AdminConsoleSettings';
+import { ExchangeRateSettingsView } from './views/ExchangeRateSettingsView';
 import {
   SETTINGS_ELEVATED_STYLE,
   SETTINGS_INPUT_CLASSNAME,
@@ -16,7 +17,7 @@ import {
   SettingsViewShell,
 } from './SettingsScaffold';
 
-type AdminTab = 'credit-models' | 'admin-console';
+type AdminTab = 'credit-models' | 'exchange-rates' | 'admin-console';
 
 const SESSION_UNLOCK_KEY = 'admin_panel_unlocked_at';
 const SESSION_UNLOCK_TTL_MS = 30 * 60 * 1000;
@@ -92,15 +93,12 @@ const AdminAccessCard: React.FC<{
   </section>
 );
 
-export const AdminSystem: React.FC = () => {
-  const { user, loading: authLoading } = useAuth();
-
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 'credit-models' }) => {
+  const { user, authLoading, checkingAdmin, isAdmin } = useAdminRole();
   const [unlocked, setUnlocked] = useState(isSessionUnlocked());
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [activeTab, setActiveTab] = useState<AdminTab>('credit-models');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [mustChangeDefaultPassword, setMustChangeDefaultPassword] = useState(false);
 
   const userLabel = user?.email || user?.phone || user?.id || '未登录';
@@ -113,47 +111,16 @@ export const AdminSystem: React.FC = () => {
   }, [authLoading, checkingAdmin, isAdmin, user]);
 
   useEffect(() => {
-    let alive = true;
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
-    const checkAdmin = async () => {
-      if (!user) {
-        if (alive) {
-          setIsAdmin(false);
-          setCheckingAdmin(false);
-          setUnlocked(false);
-          setMustChangeDefaultPassword(false);
-        }
-        return;
-      }
-
-      setCheckingAdmin(true);
-      try {
-        const adminRpc = await supabase.rpc('is_admin');
-        if (!adminRpc.error && Boolean(adminRpc.data) === true) {
-          if (alive) {
-            setIsAdmin(true);
-            setCheckingAdmin(false);
-          }
-          return;
-        }
-
-        const profileResult = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-
-        if (!alive) return;
-        setIsAdmin(profileResult.data?.role === 'admin');
-      } catch {
-        if (alive) setIsAdmin(false);
-      } finally {
-        if (alive) setCheckingAdmin(false);
-      }
-    };
-
-    void checkAdmin();
-
-    return () => {
-      alive = false;
-    };
-  }, [user]);
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      setUnlocked(false);
+      setMustChangeDefaultPassword(false);
+      sessionStorage.removeItem(SESSION_UNLOCK_KEY);
+    }
+  }, [isAdmin, user]);
 
   const verifyAdminPassword = async () => {
     if (!password.trim()) {
@@ -401,6 +368,13 @@ export const AdminSystem: React.FC = () => {
               积分模型
             </button>
             <button
+              onClick={() => setActiveTab('exchange-rates')}
+              className={`apple-pill-button ${activeTab === 'exchange-rates' ? 'active' : ''}`}
+            >
+              <ShieldCheck size={14} />
+              汇率设置
+            </button>
+            <button
               onClick={() => setActiveTab('admin-console')}
               className={`apple-pill-button ${activeTab === 'admin-console' ? 'active' : ''}`}
             >
@@ -410,7 +384,13 @@ export const AdminSystem: React.FC = () => {
           </div>
         }
       >
-        {activeTab === 'credit-models' ? <CreditModelSettings /> : <AdminConsoleSettings />}
+        {activeTab === 'credit-models' ? (
+          <CreditModelSettings />
+        ) : activeTab === 'exchange-rates' ? (
+          <ExchangeRateSettingsView />
+        ) : (
+          <AdminConsoleSettings />
+        )}
       </SettingsSection>
     </SettingsViewShell>
   );

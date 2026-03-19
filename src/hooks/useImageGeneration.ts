@@ -14,8 +14,10 @@ import {
   buildAutoPptSlides, 
   buildPptPageAlias 
 } from '../utils/pptUtils';
+import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
 import { clearSyncImageBridgeRequest, getSyncImageBridgeRequest, isSyncImageBridgeSupported } from '../services/llm/syncImageBridge';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
+import { hasNetworkErrorMarkers, hasTimeoutMarkers } from '../services/api/errorClassification';
 
 const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -29,6 +31,26 @@ type PendingSyncRequest = {
   prompt: string;
   startedAt: number;
   keySlotId?: string;
+};
+
+const toFiniteTimestamp = (value?: number | null): number | undefined => (
+  typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : undefined
+);
+
+const resolveSyncBridgeDurationMs = (
+  result: { startedAt?: number; completedAt?: number },
+  fallbackStartedAt?: number
+): number => {
+  const startedAt = toFiniteTimestamp(result.startedAt) ?? toFiniteTimestamp(fallbackStartedAt);
+  const completedAt = toFiniteTimestamp(result.completedAt);
+
+  if (startedAt !== undefined && completedAt !== undefined && completedAt >= startedAt) {
+    return clampGenerationDurationMs(completedAt - startedAt);
+  }
+
+  return 0;
 };
 
 const hasRecoverableReferenceImage = (img?: Partial<ReferenceImage> | null): boolean => {
@@ -68,7 +90,11 @@ const resolveUsageMetrics = (params: {
   keySlotId?: string;
   explicitCost?: number;
   explicitTokens?: number;
-}) => {
+}): {
+  cost?: number;
+  tokens?: number;
+  costSource: NonNullable<GeneratedImage['costSource']>;
+} => {
   const explicitCost = toFiniteNumber(params.explicitCost);
   const explicitTokens = toFiniteNumber(params.explicitTokens);
   const resolvedImageSize = params.imageSize || ImageSize.SIZE_1K;
@@ -91,15 +117,21 @@ const resolveUsageMetrics = (params: {
       Math.max(0, params.referenceImageCount || 0),
       params.keySlotId
     );
+    const shouldSuppressEstimatedTokens = Boolean(params.keySlotId)
+      && !resolvedCost.usedPricingSnapshot
+      && resolvedCost.source === 'none'
+      && explicitTokens === undefined;
 
     return {
-      cost: resolvedCost.cost,
-      tokens: explicitTokens ?? estimate.tokens,
+      cost: resolvedCost.source === 'none' ? undefined : resolvedCost.cost,
+      tokens: explicitTokens ?? (shouldSuppressEstimatedTokens ? undefined : estimate.tokens),
+      costSource: resolvedCost.source as NonNullable<GeneratedImage['costSource']>,
     };
   } catch {
     return {
       cost: explicitCost,
       tokens: explicitTokens,
+      costSource: explicitCost !== undefined ? 'explicit' : 'none',
     };
   }
 };
@@ -109,7 +141,7 @@ export const useImageGeneration = (options: {
   getCardDimensions: (ratio: AspectRatio, hasToolbar?: boolean) => { width: number; totalHeight: number };
   rememberPreferredKeyForMode: (mode: GenerationMode | undefined, keySlotId: string | undefined) => void;
 }) => {
-  const { isMobile, getCardDimensions, rememberPreferredKeyForMode } = options;
+  const { isMobile, rememberPreferredKeyForMode } = options;
   const { 
     activeCanvas, 
     updatePromptNode, 
@@ -145,6 +177,40 @@ export const useImageGeneration = (options: {
     if (error?.responseBody) details.responseBody = typeof error.responseBody === 'string' ? error.responseBody : JSON.stringify(error.responseBody, null, 2);
     if (error?.message && !details.responseBody) details.responseBody = String(error.message);
     return details;
+  }, []);
+
+  const isRecoverableSyncBridgeFailure = useCallback((params: {
+    requestId?: string;
+    error?: string;
+    errorDetails?: {
+      code?: string;
+      responseBody?: string;
+    };
+    pendingSyncRequestIds?: Set<string>;
+  }) => {
+    const requestId = String(params.requestId || '').trim();
+    if (!requestId) return false;
+    if (params.pendingSyncRequestIds && !params.pendingSyncRequestIds.has(requestId)) return false;
+
+    const code = String(params.errorDetails?.code || '').trim().toUpperCase();
+    if (RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES.has(code)) return true;
+
+    const combinedText = [
+      params.error,
+      params.errorDetails?.responseBody,
+      params.errorDetails?.code,
+    ]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' ');
+
+    if (!combinedText) return false;
+    if (RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS.some((hint) => combinedText.includes(hint))) return true;
+    if (hasNetworkErrorMarkers(combinedText) || hasTimeoutMarkers(combinedText)) return true;
+
+    const normalized = combinedText.toLowerCase();
+    return normalized.includes('sync image bridge')
+      || normalized.includes('service worker')
+      || normalized.includes('failed to fetch');
   }, []);
 
   const resolveProviderDisplay = useCallback((keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
@@ -284,6 +350,7 @@ export const useImageGeneration = (options: {
     if (RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES.has(errorCode)) return true;
 
     const errorText = `${node.error || ''} ${node.errorDetails?.responseBody || ''}`;
+    if (hasNetworkErrorMarkers(errorText) || hasTimeoutMarkers(errorText)) return true;
     return RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS.some((hint) => errorText.includes(hint));
   }, [getResolvedChildImageCount]);
 
@@ -312,39 +379,14 @@ export const useImageGeneration = (options: {
     totalCount: number
   ) => {
     const safeTotalCount = Math.max(1, totalCount);
-    const gapToImages = 80;
-    const { width: cardWidth, totalHeight: cardHeight } = getCardDimensions(aspectRatio, true);
-    const compactSpacing = cardWidth < 260;
-    const gap = compactSpacing ? 12 : 20;
-    const columns = 2;
-    const row = Math.floor(index / columns);
-    const col = index % columns;
-    const cardsInCurrentRow = Math.min(columns, safeTotalCount - row * columns);
-
-    if (mode === GenerationMode.PPT) {
-      const pptGap = compactSpacing ? 18 : 28;
-      return { x: basePosition.x, y: basePosition.y + gapToImages + cardHeight + index * (cardHeight + pptGap) };
-    }
-    
-    if (isMobile) {
-      const mobileCardWidth = 170;
-      const mobileCardHeight = 260;
-      const mobileGap = 8;
-      const rowWidth = cardsInCurrentRow * mobileCardWidth + (cardsInCurrentRow - 1) * mobileGap;
-      const startX = -rowWidth / 2;
-      return {
-        x: basePosition.x + startX + col * (mobileCardWidth + mobileGap) + mobileCardWidth / 2,
-        y: basePosition.y + gapToImages + mobileCardHeight + row * (mobileCardHeight + mobileGap),
-      };
-    }
-
-    const rowWidth = cardsInCurrentRow * cardWidth + (cardsInCurrentRow - 1) * gap;
-    const startX = -rowWidth / 2;
-    return {
-      x: basePosition.x + startX + col * (cardWidth + gap) + cardWidth / 2,
-      y: basePosition.y + gapToImages + cardHeight + row * (cardHeight + gap),
-    };
-  }, [isMobile, getCardDimensions]);
+    const positions = buildGeneratedImageBatchPositions({
+      basePosition,
+      items: Array.from({ length: safeTotalCount }, () => ({ aspectRatio })),
+      mode,
+      isMobile,
+    });
+    return positions[index] || positions[positions.length - 1] || basePosition;
+  }, [isMobile]);
 
   const syncBridgeRecoveryTimersRef = useRef<Map<string, number>>(new Map());
   const syncBridgeRecoveryInFlightRef = useRef<Set<string>>(new Set());
@@ -440,6 +482,7 @@ export const useImageGeneration = (options: {
         referenceImageCount: latestNode.referenceImages?.length || 0,
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
       });
+      const recoveredGenerationTime = resolveSyncBridgeDurationMs(bridgeResult, pendingRequest.startedAt);
       const recoveredResults = bridgeResult.urls.map((url, index) => {
         const imageId = `${nodeId}_sync_recovered_${Date.now()}_${pendingRequest.index}_${index}`;
         const layoutIndex = pendingRequest.index + index;
@@ -465,9 +508,10 @@ export const useImageGeneration = (options: {
           provider: latestNode.provider,
           providerLabel: latestNode.providerLabel,
           keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
-          generationTime: 0,
+          generationTime: recoveredGenerationTime,
           tokens: splitMetricAcrossItems(recoveredUsage.tokens, bridgeResult.urls.length),
           cost: splitMetricAcrossItems(recoveredUsage.cost, bridgeResult.urls.length),
+          costSource: recoveredUsage.costSource,
           alias: latestNode.mode === GenerationMode.PPT ? buildPptPageAlias(latestNode.pptSlides?.[layoutIndex], layoutIndex) : undefined,
         };
       });
@@ -685,6 +729,7 @@ export const useImageGeneration = (options: {
               : {
                   cost: toFiniteNumber((result as any).usage?.cost),
                   tokens: toFiniteNumber((result as any).usage?.totalTokens),
+                  costSource: toFiniteNumber((result as any).usage?.cost) !== undefined ? 'explicit' : 'none',
                 };
 
             // Success recovery logic (similar to executeGeneration completion)
@@ -713,6 +758,7 @@ export const useImageGeneration = (options: {
                 generationTime: clampGenerationDurationMs((result as any).generationTime),
                 tokens: splitMetricAcrossItems(recoveredUsage.tokens, imageUrls.length),
                 cost: splitMetricAcrossItems(recoveredUsage.cost, imageUrls.length),
+                costSource: recoveredUsage.costSource,
                 alias: latestNode.mode === GenerationMode.PPT ? buildPptPageAlias(latestNode.pptSlides?.[layoutIndex], layoutIndex) : undefined,
               };
             });
@@ -776,10 +822,57 @@ export const useImageGeneration = (options: {
     }
   }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      const canvas = activeCanvasRef.current;
+      if (!canvas?.promptNodes?.length) return;
+
+      canvas.promptNodes.forEach((node) => {
+        const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
+        const pendingSyncRequests = getPendingSyncRequests(latestNode);
+
+        pendingSyncRequests.forEach((pendingRequest) => {
+          clearSyncBridgeRecoveryTimer(pendingRequest.requestId);
+          syncBridgeRecoveryInFlightRef.current.delete(pendingRequest.requestId);
+          void recoverSyncBridgeRequest(latestNode.id, pendingRequest);
+        });
+
+        getPendingTaskIds(latestNode).forEach((taskId) => {
+          void pollTaskStatus(latestNode, taskId);
+        });
+
+        if (canAttemptRetroSyncBridgeRecovery(latestNode)) {
+          retroSyncBridgeRecoveryAttemptedRef.current.delete(latestNode.id);
+          void recoverFailedSyncBridgeGeneration(latestNode);
+        }
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [
+    canAttemptRetroSyncBridgeRecovery,
+    clearSyncBridgeRecoveryTimer,
+    getPendingSyncRequests,
+    getPendingTaskIds,
+    pollTaskStatus,
+    recoverFailedSyncBridgeGeneration,
+    recoverSyncBridgeRequest
+  ]);
+
   // --- Execution Logic ---
 
   const executeGeneration = useCallback(async (node: PromptNode) => {
     const { id: promptNodeId, prompt: promptToUse, parallelCount: count = 1, mode, referenceImages: initialFiles = [] } = node;
+    const isVideo = mode === GenerationMode.VIDEO;
+    const isAudio = mode === GenerationMode.AUDIO;
+    const isPpt = mode === GenerationMode.PPT;
+    const requestedCount = Math.max(1, Number(count) || 1);
+    const actualCount = isPpt ? Math.min(20, requestedCount) : requestedCount;
     setIsGenerating(true);
     
     try {
@@ -847,10 +940,25 @@ export const useImageGeneration = (options: {
         });
       }
 
-      const isVideo = mode === GenerationMode.VIDEO;
-      const isAudio = mode === GenerationMode.AUDIO;
-      const isPpt = mode === GenerationMode.PPT;
       const effectiveSlideLines = isPpt ? normalizePptSlidesForCount(executionNode.pptSlides, executionNode.prompt, count) : [];
+      const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
+
+      urgentUpdatePromptNode({
+        ...latestNode,
+        ...executionNode,
+        isGenerating: true,
+        jobId: undefined,
+        childImageIds: [],
+        lastGenerationSuccessCount: 0,
+        lastGenerationFailCount: 0,
+        lastGenerationTotalCount: actualCount,
+        error: undefined,
+        errorDetails: undefined,
+        generationMetadata: buildGenerationMetadata(latestNode, {
+          pendingTaskIds: [],
+          pendingSyncRequests: [],
+        }),
+      });
       
       const buildPptPagePrompt = (basePrompt: string, index: number, total: number) => {
         const pageNo = index + 1;
@@ -859,9 +967,6 @@ export const useImageGeneration = (options: {
         return `PPT 第 ${pageNo} 页：${picked}。16:9 演示文稿风格，中文排版清晰，信息层次分明。`;
       };
 
-      const requestedCount = Math.max(1, Number(count) || 1);
-      const actualCount = isPpt ? Math.min(20, requestedCount) : requestedCount;
-      
       const buildTask = (index: number) => async () => {
         const startTime = Date.now();
         const currentRequestId = `${promptNodeId}-${index}`;
@@ -877,8 +982,11 @@ export const useImageGeneration = (options: {
           let resolvedModelName = executionNode.modelLabel;
           let resolvedModelId = executionNode.model;
           let resolvedCost: number | undefined = undefined;
+          let resolvedCostSource: NonNullable<GeneratedImage['costSource']> | undefined = undefined;
           let resolvedTokens: number | undefined = undefined;
           let resolvedImageSize: ImageSize | undefined = executionNode.imageSize;
+          let resolvedAspectRatio: AspectRatio = executionNode.aspectRatio;
+          let resolvedExactDimensions: { width: number; height: number } | undefined = undefined;
           
           if (isAudio) {
             const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
@@ -889,6 +997,7 @@ export const useImageGeneration = (options: {
             resolvedModelName = audioResult.modelName || resolvedModelName;
             resolvedModelId = audioResult.model || resolvedModelId;
             resolvedCost = toFiniteNumber(audioResult.usage?.cost);
+            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(audioResult.usage?.totalTokens);
           } else if (isVideo) {
             const videoResult = await llmService.generateVideo({ 
@@ -908,6 +1017,7 @@ export const useImageGeneration = (options: {
             resolvedModelName = videoResult.modelName || resolvedModelName;
             resolvedModelId = videoResult.model || resolvedModelId;
             resolvedCost = toFiniteNumber(videoResult.usage?.cost);
+            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(videoResult.usage?.totalTokens);
           } else {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
@@ -937,6 +1047,8 @@ export const useImageGeneration = (options: {
             resolvedModelName = result.modelName || resolvedModelName;
             resolvedModelId = result.effectiveModel || resolvedModelId;
             resolvedImageSize = result.effectiveSize || result.imageSize || resolvedImageSize;
+            resolvedAspectRatio = result.aspectRatio || resolvedAspectRatio;
+            resolvedExactDimensions = result.dimensions;
 
             const resolvedUsage = resolveUsageMetrics({
               model: resolvedModelId,
@@ -949,6 +1061,7 @@ export const useImageGeneration = (options: {
               explicitTokens: result.tokens,
             });
             resolvedCost = resolvedUsage.cost;
+            resolvedCostSource = resolvedUsage.costSource;
             resolvedTokens = resolvedUsage.tokens;
           }
 
@@ -957,7 +1070,7 @@ export const useImageGeneration = (options: {
             generationTime: clampGenerationDurationMs(Date.now() - startTime), base64: generatedBase64, mode, 
             taskId: taskIdForRecovery, taskPrompt, keySlotId: resolvedResultKeySlotId, requestId: currentRequestId,
             provider: resolvedProvider, providerName: resolvedProviderName, modelName: resolvedModelName, model: resolvedModelId,
-            imageSize: resolvedImageSize, tokens: resolvedTokens, cost: resolvedCost,
+            imageSize: resolvedImageSize, aspectRatio: resolvedAspectRatio, dimensions: resolvedExactDimensions, tokens: resolvedTokens, cost: resolvedCost, costSource: resolvedCostSource,
           };
         } catch (error: any) {
           return { error: error.message || 'Unknown error', errorDetails: extractErrorDetails(error, executionNode.model), taskId: taskIdForRecovery, requestId: currentRequestId };
@@ -969,8 +1082,37 @@ export const useImageGeneration = (options: {
       
       const validImageData = imageData.filter(d => !('error' in d)) as any[];
       const failedImageData = imageData.filter(d => 'error' in d) as any[];
+      const latestNodeAfterBatch = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
+      const pendingSyncRequestIds = new Set(
+        getPendingSyncRequests(latestNodeAfterBatch).map((item) => item.requestId)
+      );
+      const recoverableSyncFailureRequestIds = new Set(
+        failedImageData
+          .filter((item) => isRecoverableSyncBridgeFailure({
+            requestId: item.requestId,
+            error: item.error,
+            errorDetails: item.errorDetails,
+            pendingSyncRequestIds,
+          }))
+          .map((item) => item.requestId)
+          .filter((requestId): requestId is string => typeof requestId === 'string' && requestId.trim().length > 0)
+      );
+      const recoverableSyncFailureCount = failedImageData.filter((item) => (
+        typeof item.requestId === 'string' && recoverableSyncFailureRequestIds.has(item.requestId)
+      )).length;
+      const nonRecoverableFailureCount = Math.max(0, failedImageData.length - recoverableSyncFailureCount);
       
       if (validImageData.length > 0) {
+        const generatedPositions = buildGeneratedImageBatchPositions({
+          basePosition: executionNode.position,
+          items: validImageData.map((item) => ({
+            aspectRatio: item.aspectRatio || executionNode.aspectRatio,
+            exactDimensions: item.dimensions,
+          })),
+          mode: executionNode.mode,
+          isMobile,
+        });
+
         const results = validImageData.map(item => {
           const idx = item.index;
           const uniqueId = `${Date.now()}_${idx}_${Math.random()}`;
@@ -978,7 +1120,7 @@ export const useImageGeneration = (options: {
           
           return {
             id: uniqueId, storageId: uniqueId, url: item.url, originalUrl: item.originalUrl,
-            prompt: item.taskPrompt || promptToUse, aspectRatio: executionNode.aspectRatio, imageSize: item.imageSize || executionNode.imageSize,
+            prompt: item.taskPrompt || promptToUse, aspectRatio: item.aspectRatio || executionNode.aspectRatio, imageSize: item.imageSize || executionNode.imageSize,
             timestamp: Date.now(), model: item.model || executionNode.model, canvasId: activeCanvasRef.current?.id || 'default',
             modelLabel: item.modelName || executionNode.modelLabel,
             modelColorStart: executionNode.modelColorStart,
@@ -987,10 +1129,13 @@ export const useImageGeneration = (options: {
             modelTextColor: executionNode.modelTextColor,
             provider: item.provider || executionNode.provider,
             providerLabel: item.providerName || executionNode.providerLabel,
-            parentPromptId: promptNodeId, position: getGeneratedImagePosition(executionNode.position, executionNode.aspectRatio, executionNode.mode, idx, actualCount),
+            parentPromptId: promptNodeId,
+            position: generatedPositions[idx] || getGeneratedImagePosition(executionNode.position, executionNode.aspectRatio, executionNode.mode, idx, actualCount),
+            dimensions: item.dimensions ? `${item.dimensions.width}x${item.dimensions.height}` : undefined,
+            exactDimensions: item.dimensions,
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
-            tokens: item.tokens, cost: item.cost,
+            tokens: item.tokens, cost: item.cost, costSource: item.costSource,
           };
         });
 
@@ -998,7 +1143,8 @@ export const useImageGeneration = (options: {
         const pendingIds = getPendingTaskIds(latestNode).filter(tid => !validImageData.some(v => v.taskId === tid));
         const completedSyncRequestIds = imageData
           .map(item => item.requestId)
-          .filter((requestId): requestId is string => typeof requestId === 'string' && requestId.trim().length > 0);
+          .filter((requestId): requestId is string => typeof requestId === 'string' && requestId.trim().length > 0)
+          .filter((requestId) => !recoverableSyncFailureRequestIds.has(requestId));
         const nextNodeBase = clearPendingSyncRequests(latestNode, completedSyncRequestIds);
         const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
         const firstSuccess = validImageData[0];
@@ -1009,7 +1155,7 @@ export const useImageGeneration = (options: {
         const updatedNode = {
           ...nextNodeBase, isGenerating: pendingIds.length > 0 || remainingSyncRequests.length > 0, jobId: pendingIds[0],
           childImageIds: results.map(r => r.id), lastGenerationSuccessCount: validImageData.length,
-          lastGenerationFailCount: failedImageData.length, lastGenerationTotalCount: actualCount,
+          lastGenerationFailCount: nonRecoverableFailureCount, lastGenerationTotalCount: actualCount,
           error: undefined,
           errorDetails: undefined,
           generationMetadata: buildGenerationMetadata(nextNodeBase, { pendingTaskIds: pendingIds, pendingSyncRequests: remainingSyncRequests }),
@@ -1032,30 +1178,72 @@ export const useImageGeneration = (options: {
             if (fresh?.isGenerating) pendingIds.forEach(tid => pollTaskStatus(fresh, tid));
           }, 5000);
         }
+
+        if (remainingSyncRequests.length > 0) {
+          remainingSyncRequests.forEach((pendingRequest) => {
+            clearSyncBridgeRecoveryTimer(pendingRequest.requestId);
+            void recoverSyncBridgeRequest(updatedNode.id, pendingRequest);
+          });
+        }
       } else {
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
         const completedSyncRequestIds = imageData
           .map(item => item.requestId)
-          .filter((requestId): requestId is string => typeof requestId === 'string' && requestId.trim().length > 0);
+          .filter((requestId): requestId is string => typeof requestId === 'string' && requestId.trim().length > 0)
+          .filter((requestId) => !recoverableSyncFailureRequestIds.has(requestId));
         const nextNodeBase = clearPendingSyncRequests(latestNode, completedSyncRequestIds);
-        updatePromptNode({
+        const remainingPendingTaskIds = getPendingTaskIds(nextNodeBase);
+        const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
+        const isStillRecovering = remainingPendingTaskIds.length > 0 || remainingSyncRequests.length > 0;
+
+        await updatePromptNode({
           ...nextNodeBase,
-          isGenerating: getPendingTaskIds(nextNodeBase).length > 0 || getPendingSyncRequests(nextNodeBase).length > 0,
-          jobId: getPendingTaskIds(nextNodeBase)[0],
-          error: failedImageData[0]?.error || 'Generation failed',
-          errorDetails: failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model)
+          isGenerating: isStillRecovering,
+          jobId: remainingPendingTaskIds[0],
+          childImageIds: [],
+          lastGenerationSuccessCount: 0,
+          lastGenerationFailCount: isStillRecovering ? nonRecoverableFailureCount : (nonRecoverableFailureCount || actualCount),
+          lastGenerationTotalCount: actualCount,
+          error: isStillRecovering ? undefined : (failedImageData[0]?.error || 'Generation failed'),
+          errorDetails: isStillRecovering
+            ? undefined
+            : (failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model))
         });
         completedSyncRequestIds.forEach((requestId) => {
           void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
           clearSyncBridgeRecoveryTimer(requestId);
         });
+
+        if (isStillRecovering) {
+          remainingPendingTaskIds.forEach((taskId) => {
+            setTimeout(() => {
+              const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
+              if (fresh?.isGenerating) void pollTaskStatus(fresh, taskId);
+            }, 5000);
+          });
+
+          remainingSyncRequests.forEach((pendingRequest) => {
+            clearSyncBridgeRecoveryTimer(pendingRequest.requestId);
+            void recoverSyncBridgeRequest(nextNodeBase.id, pendingRequest);
+          });
+          return;
+        }
+
         throw new Error(failedImageData[0]?.error || 'Generation failed');
       }
 
     } catch (err: any) {
       console.error('[useImageGeneration] Execution error:', err);
       const latest = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
-      updatePromptNode({ ...latest, isGenerating: false, error: err.message, errorDetails: extractErrorDetails(err, node.model) });
+      await updatePromptNode({
+        ...latest,
+        isGenerating: false,
+        lastGenerationSuccessCount: latest.lastGenerationSuccessCount ?? 0,
+        lastGenerationFailCount: Math.max(latest.lastGenerationFailCount ?? 0, actualCount),
+        lastGenerationTotalCount: latest.lastGenerationTotalCount ?? actualCount,
+        error: err.message,
+        errorDetails: extractErrorDetails(err, node.model)
+      });
       if (node.cost && node.cost > 0) refundCredits(node.cost, `退款 ${node.id}`);
     } finally {
       setIsGenerating(false);
@@ -1081,7 +1269,9 @@ export const useImageGeneration = (options: {
     refundCredits,
     resolveProviderDisplay,
     shouldPreferRouteProviderDisplay,
-    clearSyncBridgeRecoveryTimer
+    clearSyncBridgeRecoveryTimer,
+    recoverSyncBridgeRequest,
+    isRecoverableSyncBridgeFailure
   ]);
 
   const hookCancelGeneration = useCallback((nodeId?: string) => {

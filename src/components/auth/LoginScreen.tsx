@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -16,6 +16,7 @@ import { Chrome } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import AnoAI from '@/components/ui/animated-shader-background';
+import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import './LoginScreen.css';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
@@ -43,9 +44,23 @@ function isNetworkError(error: unknown): boolean {
   return message.includes('failed to fetch') || message.includes('network') || message.includes('timeout');
 }
 
+function isCaptchaError(error: unknown): boolean {
+  const message = String((error as { message?: string }).message || '').toLowerCase();
+  return (
+    message.includes('captcha') ||
+    message.includes('turnstile') ||
+    message.includes('captcha_token') ||
+    message.includes('security purposes') ||
+    message.includes('robot')
+  );
+}
+
 function mapAuthError(error: unknown, view: AuthView): string {
   const message = String((error as { message?: string }).message || '');
 
+  if (isCaptchaError(error)) {
+    return '当前请求需要先完成人机验证，请等待 Turnstile 组件验证完成后再试。';
+  }
   if (view === 'register' && (message.includes('User already registered') || message.includes('already registered'))) {
     return '该邮箱已注册，请直接登录。';
   }
@@ -98,6 +113,15 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
+  const turnstileAvailable = canUseTurnstile();
+  const {
+    token: turnstileToken,
+    error: turnstileError,
+    handleVerify,
+    handleError,
+    handleExpire,
+    reset: resetTurnstile,
+  } = useTurnstile();
 
   const [view, setView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
@@ -109,6 +133,7 @@ const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showTempUserWarning, setShowTempUserWarning] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [captchaRequiredByBackend, setCaptchaRequiredByBackend] = useState(false);
   const [fieldTouched, setFieldTouched] = useState<FieldTouched>({
     email: false,
     password: false,
@@ -138,6 +163,16 @@ const LoginScreen: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!turnstileAvailable) {
+      return;
+    }
+
+    void ensureTurnstileScript().catch(() => {
+      // Widget 内部会显示更具体的错误信息
+    });
+  }, [turnstileAvailable]);
+
   const localErrors = useMemo(
     () => validateFields(view, email, password, confirmPassword),
     [view, email, password, confirmPassword]
@@ -157,6 +192,15 @@ const LoginScreen: React.FC = () => {
     []
   );
 
+  const turnstileAction = view === 'forgot-password' ? 'reset-password' : view;
+  const turnstileHint = turnstileError
+    ? turnstileError
+    : captchaRequiredByBackend && !turnstileToken
+      ? '当前请求需要先完成人机验证，验证通过后再提交。'
+      : turnstileToken
+        ? '安全验证已完成，提交时会自动携带 captchaToken。'
+        : '页面打开后会自动加载 Turnstile，用于防机器人校验。';
+
   useEffect(() => {
     setError(null);
     setMessage(null);
@@ -164,13 +208,18 @@ const LoginScreen: React.FC = () => {
     setConfirmPassword('');
     setShowPassword(false);
     setSubmitted(false);
+    setCaptchaRequiredByBackend(false);
     setFieldTouched({
       email: false,
       password: false,
       confirmPassword: false,
     });
     setFieldErrors({});
-  }, [view]);
+
+    if (turnstileAvailable) {
+      resetTurnstile();
+    }
+  }, [resetTurnstile, turnstileAvailable, view]);
 
   const showFieldError = (field: FieldName) => Boolean(fieldErrors[field] && (submitted || fieldTouched[field]));
 
@@ -182,6 +231,29 @@ const LoginScreen: React.FC = () => {
     setFieldTouched((current) => ({ ...current, [field]: true }));
     setFieldErrors(localErrors);
   };
+
+  const handleTurnstileVerify = useCallback(
+    (token: string) => {
+      setCaptchaRequiredByBackend(false);
+      handleVerify(token);
+    },
+    [handleVerify]
+  );
+
+  const handleTurnstileError = useCallback(
+    (nextError: string) => {
+      handleError(nextError);
+      if (captchaRequiredByBackend) {
+        setError(nextError);
+      }
+    },
+    [captchaRequiredByBackend, handleError]
+  );
+
+  const handleTurnstileExpire = useCallback(() => {
+    handleExpire();
+    setCaptchaRequiredByBackend(true);
+  }, [handleExpire]);
 
   const confirmTempUserLogin = async () => {
     setShowTempUserWarning(false);
@@ -198,7 +270,7 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  const attemptAuth = async () => {
+  const attemptAuth = async (captchaToken?: string) => {
     const emailValue = email.trim();
 
     if (view === 'register') {
@@ -210,6 +282,7 @@ const LoginScreen: React.FC = () => {
           data: {
             display_name: displayName,
           },
+          ...(captchaToken ? { captchaToken } : {}),
         },
       });
       if (signUpError) throw signUpError;
@@ -227,6 +300,7 @@ const LoginScreen: React.FC = () => {
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: emailValue,
         password,
+        ...(captchaToken ? { options: { captchaToken } } : {}),
       });
       if (signInError) throw signInError;
       return;
@@ -234,6 +308,7 @@ const LoginScreen: React.FC = () => {
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailValue, {
       redirectTo: window.location.origin,
+      ...(captchaToken ? { captchaToken } : {}),
     });
     if (resetError) throw resetError;
     setMessage('重置密码邮件已发送，请检查邮箱。');
@@ -256,6 +331,12 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
+    if (turnstileAvailable && !turnstileToken) {
+      setCaptchaRequiredByBackend(true);
+      setError(turnstileError || '安全验证尚未完成，请等待 Turnstile 加载完成后再试。');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -264,11 +345,16 @@ const LoginScreen: React.FC = () => {
 
     for (let index = 0; index < MAX_RETRY; index += 1) {
       try {
-        await attemptAuth();
+        await attemptAuth(turnstileToken || undefined);
         setLoading(false);
         return;
       } catch (authError) {
         lastError = authError;
+
+        if (isCaptchaError(authError)) {
+          setCaptchaRequiredByBackend(true);
+        }
+
         if (isNetworkError(authError) && index < MAX_RETRY - 1) {
           setError(`网络连接不稳定，正在重试（${index + 1}/${MAX_RETRY}）...`);
           await sleep(900);
@@ -282,8 +368,41 @@ const LoginScreen: React.FC = () => {
       setError(`网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录。`);
     } else {
       setError(mapAuthError(lastError, view));
+      if (turnstileAvailable) {
+        resetTurnstile();
+      }
     }
     setLoading(false);
+  };
+
+  const handleGoogleLogin = async () => {
+    if (loading) return;
+
+    if (turnstileAvailable && !turnstileToken) {
+      setCaptchaRequiredByBackend(true);
+      setError(turnstileError || '请先等待人机验证完成后再使用 Google 登录。');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError) {
+      setError(mapAuthError(oauthError, 'login'));
+      if (!isNetworkError(oauthError) && turnstileAvailable) {
+        resetTurnstile();
+      }
+      setLoading(false);
+    }
   };
 
   return (
@@ -471,6 +590,26 @@ const LoginScreen: React.FC = () => {
               </label>
             )}
 
+            {turnstileAvailable && (
+              <div className="auth-turnstile-block">
+                <div className="auth-turnstile-head">
+                  <span>安全验证</span>
+                  <span className={`auth-turnstile-badge ${turnstileToken ? 'is-ready' : 'is-pending'}`}>
+                    {turnstileToken ? '已就绪' : '加载中'}
+                  </span>
+                </div>
+                <TurnstileWidget
+                  onVerify={handleTurnstileVerify}
+                  onError={handleTurnstileError}
+                  onExpire={handleTurnstileExpire}
+                  appearance="always"
+                  action={turnstileAction}
+                  className="auth-turnstile-shell"
+                />
+                <div className="auth-turnstile-help">{turnstileHint}</div>
+              </div>
+            )}
+
             <button type="submit" className="auth-btn auth-btn-main" disabled={loading}>
               {loading ? (
                 <>
@@ -492,27 +631,7 @@ const LoginScreen: React.FC = () => {
                 <div className="auth-divider">
                   <span>或使用以下方式登录</span>
                 </div>
-                <button
-                  type="button"
-                  className="auth-btn auth-btn-google"
-                  onClick={async () => {
-                    setLoading(true);
-                    setError(null);
-                    try {
-                      const { error } = await supabase.auth.signInWithOAuth({
-                        provider: 'google',
-                        options: {
-                          redirectTo: `${window.location.origin}/auth/callback`,
-                        },
-                      });
-                      if (error) throw error;
-                    } catch (err) {
-                      setError(mapAuthError(err, 'login'));
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                >
+                <button type="button" className="auth-btn auth-btn-google" onClick={handleGoogleLogin} disabled={loading}>
                   <Chrome size={18} />
                   使用 Google 登录
                 </button>

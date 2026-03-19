@@ -78,6 +78,34 @@ function isForbiddenHostname(hostname: string): boolean {
     return false;
 }
 
+const SUPPLIER_PATH_SUFFIXES = [
+    /\/api\/pricing$/i,
+    /\/api\/price$/i,
+    /\/v1\/pricing$/i,
+    /\/pricing\.html$/i,
+    /\/pricing$/i,
+    /\/price$/i,
+    /\/models$/i,
+    /\/v1$/i,
+];
+
+function stripSupplierPathSuffixes(pathname: string): string {
+    let clean = String(pathname || "").replace(/\/+$/, "");
+    let stripped = true;
+
+    while (stripped) {
+        stripped = false;
+        for (const suffix of SUPPLIER_PATH_SUFFIXES) {
+            if (!suffix.test(clean)) continue;
+            clean = clean.replace(suffix, "").replace(/\/+$/, "");
+            stripped = true;
+            break;
+        }
+    }
+
+    return clean || "/";
+}
+
 async function assertResolvedHostIsPublic(hostname: string): Promise<void> {
     const normalized = normalizeHostForChecks(hostname);
     if (!normalized || isIP(normalized)) {
@@ -115,9 +143,7 @@ async function buildPricingUrl(rawBaseUrl: string): Promise<string> {
     parsed.hash = "";
     parsed.search = "";
 
-    const normalizedPath = parsed.pathname
-        .replace(/\/v1\/?$/i, "")
-        .replace(/\/+$/, "");
+    const normalizedPath = stripSupplierPathSuffixes(parsed.pathname);
 
     parsed.pathname = `${normalizedPath}/api/pricing`.replace(/\/{2,}/g, "/");
     return parsed.toString();

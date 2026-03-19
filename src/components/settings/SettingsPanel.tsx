@@ -1414,8 +1414,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const lazyFallback = (
     <div className="flex min-h-[280px] items-center justify-center">
-      <div className="settings-shell-loading-card">
-        <div className="settings-shell-kicker">Loading</div>
+      <div className="settings-shell-loading-card rounded-[10px]">
+        <div className="settings-shell-kicker text-[11px]">Loading</div>
         <div className="mt-2 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
           正在加载设置内容
         </div>
@@ -1473,8 +1473,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <Icon size={16} />
                 </span>
                 <span className="settings-sidebar-item__body">
-                  <span className="settings-sidebar-item__label">{item.label}</span>
-                  <span className="settings-sidebar-item__desc">{item.description}</span>
+                  <span className="settings-sidebar-item__label text-[14px] font-medium">{item.label}</span>
+                  <span className="settings-sidebar-item__desc text-[11px]">{item.description}</span>
                 </span>
                 <ChevronRight size={15} className="settings-sidebar-item__arrow" />
               </button>
@@ -1492,7 +1492,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     >
       {isMobile ? (
         <div
-          className="settings-panel apple-glass-card settings-shell-mobile mobile-sheet-viewport mobile-sheet-viewport--fill flex w-full flex-col overflow-hidden rounded-t-[30px] rounded-b-none ios-mobile-sheet shadow-2xl"
+          className="settings-panel apple-glass-card settings-shell-mobile mobile-sheet-viewport mobile-sheet-viewport--fill flex w-full flex-col overflow-hidden rounded-t-[12px] rounded-b-none ios-mobile-sheet"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="settings-shell-mobile__handle">
@@ -1510,8 +1510,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </button>
               ) : null}
               <div className="settings-shell-mobile__title-wrap">
-                <div className="settings-shell-kicker">{mobileShowNav ? 'Settings' : activeSectionLabel}</div>
-                <div className="mt-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                <div className="settings-shell-kicker text-[11px]">{mobileShowNav ? 'Settings' : activeSectionLabel}</div>
+                <div className="mt-1 text-[17px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {mobileShowNav ? '高级设置' : activeNavItem.label}
                 </div>
                 <div className="mt-1 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
@@ -1572,10 +1572,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           <aside className="w-[286px] flex-shrink-0">
-            <div className="settings-panel apple-glass-card settings-shell-nav flex h-full flex-col rounded-[32px] p-4 shadow-2xl">
+            <div className="settings-panel apple-glass-card settings-shell-nav flex h-full flex-col rounded-[12px] p-3">
               <div className="settings-shell-nav__hero">
-                <div className="settings-shell-kicker">Settings</div>
-                <div className="mt-1.5 text-[22px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                <div className="settings-shell-kicker text-[11px]">Settings</div>
+                <div className="text-[17px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                   高级设置
                 </div>
                 <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
@@ -1598,15 +1598,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </aside>
 
-          <section className="settings-panel apple-glass-card settings-shell-main flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[32px] shadow-2xl">
+          <section className="settings-panel apple-glass-card settings-shell-main flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[12px]">
             <div className="settings-shell-main__topbar">
               <div className="settings-shell-main__module">
                 <div className="min-w-0">
-                  <div className="settings-shell-kicker">{activeSectionLabel}</div>
-                  <div className="mt-2 text-[28px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                  <div className="settings-shell-kicker text-[11px]">{activeSectionLabel}</div>
+                  <div className="mt-1 text-[20px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                     {activeNavItem.label}
                   </div>
-                  <div className="settings-shell-toolbar__description mt-2">
+                  <div className="settings-shell-toolbar__description mt-1 text-[13px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
                     {activeNavItem.description}
                   </div>
                 </div>
@@ -1623,7 +1623,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
-            <main className="settings-shell-page settings-shell-page--desktop min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-5 md:px-6 md:pb-7">
+            <main className="settings-shell-page settings-shell-page--desktop min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4">
               <div className="settings-shell-content">{renderBody()}</div>
             </main>
           </section>

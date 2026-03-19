@@ -19,10 +19,10 @@ import { clampGenerationDurationMs } from '../utils/timeUtils';
 const MAX_CANVASES = 10;
 
 
-// 鍓崱鎺掑垪妯″紡: 妯悜 | 瀹牸 | 绔栧悜
+// 副卡排列模式: 横向 | 宫格 | 纵向
 export type SubCardLayout = 'row' | 'grid' | 'column';
 
-// 鏁寸悊妯″紡: 瀹牸(6鍒? | 妯悜 | 绾靛悜
+// 整理模式: 宫格(6列) | 横向 | 纵向
 export type ArrangeMode = 'grid' | 'row' | 'column';
 
 
@@ -40,9 +40,9 @@ interface CanvasState {
     fileSystemHandle: FileSystemDirectoryHandle | null;
     folderName: string | null;
     selectedNodeIds: string[];
-    // 鍓崱鎺掑垪妯″紡 (杞崲: row -> grid -> column -> row)
+    // 副卡排列模式 (轮换: row -> grid -> column -> row)
     subCardLayoutMode: SubCardLayout;
-    // 馃殌 瑙嗗彛涓績浣嶇疆锛堝姩鎬佷紭鍏堢骇鍔犺浇锛?
+    // 🎯 视口中心位置（动态优先级加载）
     viewportCenter: { x: number; y: number };
 }
 
@@ -59,7 +59,7 @@ interface CanvasContextType {
     updatePromptNodePosition: (id: string, pos: { x: number; y: number }, options?: { moveChildren?: boolean; ignoreSelection?: boolean }) => void;
     updateImageNodePosition: (id: string, pos: { x: number; y: number }, options?: { ignoreSelection?: boolean }) => void;
     updateImageNodeDimensions: (id: string, dimensions: string) => void;
-    updateImageNode: (id: string, updates: Partial<GeneratedImage>) => void; // 馃殌 [New] Generic Update
+    updateImageNode: (id: string, updates: Partial<GeneratedImage>) => void; // 🎯 [New] Generic Update
     deleteImageNode: (id: string) => void;
     deletePromptNode: (id: string) => void;
     linkNodes: (promptId: string, imageId: string) => void;
@@ -71,7 +71,7 @@ interface CanvasContextType {
     pushToHistory: () => void;
     canUndo: boolean;
     canRedo: boolean;
-    arrangeAllNodes: (mode?: ArrangeMode) => void; // Auto-layout cards: grid(6鍒? | row | column
+    arrangeAllNodes: (mode?: ArrangeMode) => void; // Auto-layout cards: grid(6列) | row | column
     getNextCardPosition: () => { x: number; y: number }; // Get next available position for new card
     // File System
     connectLocalFolder: () => Promise<void>;
@@ -85,6 +85,7 @@ interface CanvasContextType {
     clearSelection: () => void;
     bringNodesToFront: (nodeIds: string[]) => void;
     moveSelectedNodes: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
+    moveSelectedNodesImmediate: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
     findSmartPosition: (x: number, y: number, width: number, height: number, buffer?: number) => { x: number; y: number };
     findNextGroupPosition: () => { x: number; y: number }; // Grid-based Card Group placement
     addGroup: (group: CanvasGroup) => void;
@@ -92,9 +93,9 @@ interface CanvasContextType {
     updateGroup: (group: CanvasGroup) => void;
     setNodeTags: (ids: string[], tags: string[]) => void;
     isReady: boolean;
-    // 馃殌 璁剧疆瑙嗗彛涓績锛堝姩鎬佷紭鍏堢骇鍔犺浇锛?
+    // 🎯 设置视口中心（动态优先级加载）
     setViewportCenter: (center: { x: number; y: number }) => void;
-    // 馃殌 杩佺Щ閫変腑鑺傜偣鍒板叾浠栭」鐩?
+    // 🎯 迁移选中节点到其他项目
     migrateNodes: (nodeIds: string[], targetCanvasId: string) => void;
     mergeCanvasInto: (sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
         movedPrompts: number;
@@ -106,9 +107,9 @@ interface CanvasContextType {
         removedImages: number;
         removedGroups: number;
     };
-    // 馃殌 [Persistence] Urgent state saving for generation tasks
+    // 🎯 [Persistence] Urgent state saving for generation tasks
     urgentUpdatePromptNode: (node: PromptNode) => void;
-    // 馃殌 [Batch Update] Atomic update for multiple nodes (e.g. stacking)
+    // 🎯 [Batch Update] Atomic update for multiple nodes (e.g. stacking)
     updateNodes: (updates: {
         promptNodes?: { id: string, updates: Partial<PromptNode> }[],
         imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
@@ -133,7 +134,7 @@ const createCanvasWorkflow = (): Canvas['workflow'] | undefined =>
 
 const DEFAULT_CANVAS: Canvas = {
     id: 'default',
-    name: '椤圭洰1',
+    name: '项目1',
     promptNodes: [],
     imageNodes: [],
     groups: [] as CanvasGroup[],
@@ -148,8 +149,8 @@ const DEFAULT_STATE: CanvasState = {
     fileSystemHandle: null,
     folderName: null,
     selectedNodeIds: [],
-    subCardLayoutMode: 'row', // 榛樿妯悜鎺掑垪
-    viewportCenter: { x: 0, y: 0 } // 榛樿鐢诲竷涓績
+    subCardLayoutMode: 'row', // 默认横向排列
+    viewportCenter: { x: 0, y: 0 } // 默认画布中心
 };
 
 const stripReferenceImageData = (
@@ -4376,6 +4377,26 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const pendingMoveSourceRef = useRef<string | string[] | undefined>(undefined);
     const moveRafRef = useRef<number | null>(null);
 
+    const flushPendingMoveSelectedNodes = useCallback((delta?: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
+        if (moveRafRef.current !== null) {
+            cancelAnimationFrame(moveRafRef.current);
+            moveRafRef.current = null;
+        }
+
+        const batchedDelta = {
+            x: pendingMoveDeltaRef.current.x + (delta?.x ?? 0),
+            y: pendingMoveDeltaRef.current.y + (delta?.y ?? 0),
+        };
+        const batchedSource = sourceNodeIdOrIds ?? pendingMoveSourceRef.current;
+
+        pendingMoveDeltaRef.current = { x: 0, y: 0 };
+        pendingMoveSourceRef.current = undefined;
+
+        if (batchedDelta.x !== 0 || batchedDelta.y !== 0) {
+            applyMoveSelectedNodes(batchedDelta, batchedSource);
+        }
+    }, [applyMoveSelectedNodes]);
+
     const moveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
         pendingMoveDeltaRef.current = {
             x: pendingMoveDeltaRef.current.x + delta.x,
@@ -4392,17 +4413,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         moveRafRef.current = window.requestAnimationFrame(() => {
             moveRafRef.current = null;
-            const batchedDelta = pendingMoveDeltaRef.current;
-            const batchedSource = pendingMoveSourceRef.current;
-
-            pendingMoveDeltaRef.current = { x: 0, y: 0 };
-            pendingMoveSourceRef.current = undefined;
-
-            if (batchedDelta.x !== 0 || batchedDelta.y !== 0) {
-                applyMoveSelectedNodes(batchedDelta, batchedSource);
-            }
+            flushPendingMoveSelectedNodes();
         });
-    }, [applyMoveSelectedNodes]);
+    }, [flushPendingMoveSelectedNodes]);
+
+    const moveSelectedNodesImmediate = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
+        flushPendingMoveSelectedNodes(delta, sourceNodeIdOrIds);
+    }, [flushPendingMoveSelectedNodes]);
 
     useEffect(() => {
         return () => {
@@ -5010,6 +5027,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearSelection,
         bringNodesToFront,
         moveSelectedNodes,
+        moveSelectedNodesImmediate,
         findSmartPosition,
         findNextGroupPosition,
         addGroup,
@@ -5030,7 +5048,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
-        isLoading, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode
+        isLoading, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode
     ]);
 
     return (

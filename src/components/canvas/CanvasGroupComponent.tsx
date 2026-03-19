@@ -56,7 +56,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             const newBounds = computedBounds || group.bounds;
             localBoundsRef.current = newBounds;
             if (containerRef.current) {
-                containerRef.current.style.transform = `translate3d(${newBounds.x}px, ${newBounds.y}px, 0)`;
+                containerRef.current.style.transform = `translate(${newBounds.x}px, ${newBounds.y}px)`;
                 containerRef.current.style.width = `${newBounds.width}px`;
                 containerRef.current.style.height = `${newBounds.height}px`;
             }
@@ -114,6 +114,24 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     // Use computed bounds if available, otherwise fall back to stored group bounds
     const bounds = computedBounds || group.bounds;
 
+    const flushPendingDrag = useCallback(() => {
+        if (!onGroupDrag) return;
+
+        const { x, y } = pendingDelta.current;
+        if (x === 0 && y === 0) return;
+
+        if (containerRef.current) {
+            const cb = localBoundsRef.current;
+            const newX = cb.x + x;
+            const newY = cb.y + y;
+            localBoundsRef.current = { ...cb, x: newX, y: newY };
+            containerRef.current.style.transform = `translate(${newX}px, ${newY}px)`;
+        }
+
+        onGroupDrag({ x, y }, group.nodeIds);
+        pendingDelta.current = { x: 0, y: 0 };
+    }, [group.nodeIds, onGroupDrag]);
+
     const handleMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent canvas pan
         onDragStart(group.id, e); // Select the group nodes
@@ -139,22 +157,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             // Schedule RAF if not already pending
             if (!rafRef.current) {
                 rafRef.current = requestAnimationFrame(() => {
-                    // 1. Update Group Box DOM
-                    if (containerRef.current) {
-                        const cb = localBoundsRef.current;
-                        const newX = cb.x + pendingDelta.current.x;
-                        const newY = cb.y + pendingDelta.current.y;
-                        localBoundsRef.current = { ...cb, x: newX, y: newY };
-                        containerRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
-                    }
-
-                    // 2. Move Cards (flush accumulated delta)
-                    if (onGroupDrag) {
-                        onGroupDrag(pendingDelta.current, group.nodeIds);
-                    }
-
-                    // Reset
-                    pendingDelta.current = { x: 0, y: 0 };
+                    flushPendingDrag();
                     rafRef.current = null;
                 });
             }
@@ -163,11 +166,12 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         const handleMouseUp = () => {
             setIsDragging(false);
             lastPos.current = null;
-            pendingDelta.current = { x: 0, y: 0 };
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
             }
+            flushPendingDrag();
+            pendingDelta.current = { x: 0, y: 0 };
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
@@ -190,13 +194,13 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     top: 0,
                     width: bounds.width,
                     height: bounds.height,
-                    transform: `translate3d(${bounds.x}px, ${bounds.y}px, 0)`,
+                    transform: `translate(${bounds.x}px, ${bounds.y}px)`,
                     zIndex: stackZIndex,
                     pointerEvents: 'auto',
-                    willChange: isDragging ? 'transform' : 'auto', // GPU Optimization
+                    willChange: isDragging ? 'transform' : 'auto',
                     // Disable transition during drag to prevent rubber-banding
                     transition: isDragging ? 'none' : 'box-shadow 0.3s ease, transform 0.1s linear, width 0.1s linear, height 0.1s linear',
-                    backfaceVisibility: 'hidden'
+                    contain: 'layout style'
                 }}
                 onMouseDown={handleMouseDown} // Allow dragging from anywhere in the group box
                 onContextMenu={handleContextMenu}

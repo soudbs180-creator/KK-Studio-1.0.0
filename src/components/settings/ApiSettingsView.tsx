@@ -4120,11 +4120,22 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                     const costMode = resolveCostModeFromLimits(slot.budgetLimit, slot.tokenLimit);
                     const isSelected = officialForm.id === slot.id && showOfficialCreateForm;
                     const isPaused = Boolean(slot.disabled);
-                    const officialMetaItems = [
-                      '内置模型与价格',
-                      `额度 ${costModeText[costMode]}`,
-                      costMode !== 'unlimited' ? `剩余 ${budget.remaining}` : '无限额度',
-                    ];
+                    const slotColor = '#3B82F6';
+                    
+                    // 计算预算使用百分比
+                    let budgetPercent = 0;
+                    let isDepleted = false;
+                    if (costMode === 'amount') {
+                      const total = slot.budgetLimit || 0;
+                      const used = slot.totalCost || 0;
+                      budgetPercent = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+                      isDepleted = total > 0 && used >= total;
+                    } else if (costMode === 'tokens') {
+                      const total = slot.tokenLimit || 0;
+                      const used = slot.usedTokens || 0;
+                      budgetPercent = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+                      isDepleted = total > 0 && used >= total;
+                    }
 
                     return (
                         <article
@@ -4152,55 +4163,105 @@ const ApiSettingsView: React.FC<ApiSettingsViewProps> = ({ initialSupplier = nul
                         aria-label={`编辑官方接口 ${slot.name}`}
                       >
                         <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-3">
+                          {/* 第一排：彩色圆点 + 名称 + 状态徽章 */}
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{slot.name}</div>
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slotColor }} />
+                                <span className="api-settings-provider-name text-sm font-semibold text-[var(--text-primary)]">{slot.name}</span>
                                 {isSelected ? (
-                                  <span
-                                    className="shrink-0 rounded-full px-2 py-1 text-[10px] font-medium"
-                                    style={{
-                                      backgroundColor: 'rgb(var(--settings-accent-rgb) / 0.12)',
-                                      color: 'rgb(var(--settings-accent-rgb))',
-                                    }}
-                                  >
+                                  <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-medium" style={{ backgroundColor: 'rgb(var(--settings-accent-rgb) / 0.12)', color: 'rgb(var(--settings-accent-rgb))' }}>
                                     当前详情
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="mt-1 text-xs text-[var(--text-tertiary)]">
-                                官方接口已保存 Key，可直接使用内置模型地址与价格。
+                            </div>
+
+                            <StatusBadge label={isPaused ? '已暂停' : '已启用'} tone={isPaused ? 'slate' : 'green'} compact />
+                          </div>
+
+                          {/* 第二排：预算信息（已用/限额 + 进度条） */}
+                          {costMode !== 'unlimited' ? (
+                            <div className="api-settings-provider-runtime-card rounded-2xl border px-3 py-3" style={elevatedPanelStyle}>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium text-[var(--text-primary)]">
+                                  已用 {budget.used} / 限额 {budget.total}
+                                </span>
+                                <span className={isDepleted ? 'text-[var(--state-danger-text)]' : 'text-[var(--text-secondary)]'}>
+                                  剩余 {budget.remaining}
+                                </span>
+                              </div>
+                              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--settings-border-subtle)]">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${budgetPercent}%`,
+                                    backgroundColor: isDepleted ? 'var(--state-danger-text)' : 'rgb(var(--settings-accent-rgb))',
+                                  }}
+                                />
                               </div>
                             </div>
-                            <StatusBadge
-                              label={isPaused ? '已暂停' : '已启用'}
-                              tone={isPaused ? 'slate' : 'green'}
-                              compact
-                            />
-                          </div>
-
-                          <div className="api-settings-provider-meta">
-                            {officialMetaItems.map((item) => (
-                              <span key={`${slot.id}-${item}`}>{item}</span>
-                            ))}
-                          </div>
-
-                          <div className="rounded-xl border px-3 py-3 text-[11px]" style={elevatedPanelStyle}>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span style={{ color: 'var(--text-tertiary)' }}>
-                                {budget.unit ? `当前按 ${budget.unit} 管控额度。` : '当前保持无限额度，可直接投入使用。'}
-                              </span>
-                              <span
-                                className="font-medium"
-                                style={{
-                                  color: isBudgetDepleted(budget.remaining)
-                                    ? 'var(--state-danger-text)'
-                                    : 'var(--text-secondary)',
-                                }}
-                              >
-                                {costMode === 'unlimited' ? '预算未受限' : `剩余 ${budget.remaining}`}
-                              </span>
+                          ) : (
+                            <div className="api-settings-provider-runtime-card rounded-2xl border px-3 py-3" style={elevatedPanelStyle}>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium text-[var(--text-primary)]">
+                                  无限额度
+                                </span>
+                                <span className="text-[var(--text-secondary)]">
+                                  已用 {budget.used}
+                                </span>
+                              </div>
+                              <div className="mt-2 text-[11px] text-[var(--text-tertiary)]">
+                                当前保持无限额度，可直接投入使用
+                              </div>
                             </div>
+                          )}
+
+                          {/* 第三排：快捷操作按钮（编辑、刷新、暂停/恢复） */}
+                          <div className="api-settings-provider-action-row">
+                            <button
+                              type="button"
+                              className="apple-button-secondary h-8 px-3 text-xs transition-all active:scale-95"
+                              style={secondaryButtonStyle}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                loadOfficialToForm(slot);
+                              }}
+                            >
+                              <ActionButtonIcon compact>
+                                <Edit3 size={12} />
+                              </ActionButtonIcon>
+                              编辑
+                            </button>
+                            <button
+                              type="button"
+                              className="apple-button-secondary h-8 px-3 text-xs transition-all active:scale-95"
+                              style={secondaryButtonStyle}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                refresh();
+                              }}
+                            >
+                              <ActionButtonIcon compact>
+                                <RefreshCw size={12} />
+                              </ActionButtonIcon>
+                              刷新
+                            </button>
+                            <button
+                              type="button"
+                              className="apple-button-secondary h-8 px-3 text-xs transition-all active:scale-95"
+                              style={secondaryButtonStyle}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void keyManager.updateKey(slot.id, { disabled: !slot.disabled });
+                                refresh();
+                              }}
+                            >
+                              <ActionButtonIcon compact>
+                                {isPaused ? <Play size={12} /> : <Pause size={12} />}
+                              </ActionButtonIcon>
+                              {isPaused ? '恢复' : '暂停'}
+                            </button>
                           </div>
                         </div>
                       </article>

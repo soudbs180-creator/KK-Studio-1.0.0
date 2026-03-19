@@ -71,6 +71,7 @@ export interface ResolveImageCostOptions {
     keySlotId?: string;
     explicitCost?: unknown;
     storedCost?: unknown;
+    storedCostSource?: unknown;
 }
 
 export interface ResolvedImageCost {
@@ -284,6 +285,13 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
     const explicitCost = toFiniteNumber(options.explicitCost);
     const storedCost = toFiniteNumber(options.storedCost);
     const usedPricingSnapshot = hasPricingSnapshotForKeySlot(options.keySlotId);
+    const normalizedStoredCostSource = typeof options.storedCostSource === 'string'
+        ? options.storedCostSource.trim().toLowerCase()
+        : '';
+    const trustedStoredCostSource = normalizedStoredCostSource === 'explicit' || normalizedStoredCostSource === 'snapshot'
+        ? normalizedStoredCostSource
+        : undefined;
+    const isKeyedModelWithoutPricingSnapshot = Boolean(options.keySlotId) && !usedPricingSnapshot;
 
     const estimateCost = (): number | undefined => {
         try {
@@ -306,6 +314,22 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
         if (snapshotCost !== undefined && snapshotCost > 0) {
             return { cost: snapshotCost, source: 'snapshot', usedPricingSnapshot };
         }
+    }
+
+    if (isKeyedModelWithoutPricingSnapshot) {
+        if (explicitCost !== undefined) {
+            return { cost: explicitCost, source: 'explicit', usedPricingSnapshot };
+        }
+
+        if (trustedStoredCostSource && storedCost !== undefined) {
+            return {
+                cost: storedCost,
+                source: trustedStoredCostSource,
+                usedPricingSnapshot,
+            };
+        }
+
+        return { cost: 0, source: 'none', usedPricingSnapshot };
     }
 
     if (explicitCost !== undefined && (explicitCost > 0 || !options.keySlotId)) {

@@ -379,7 +379,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
                     if (response.status >= 500 || response.status === 404) {
                         continue;
                     }
-                    fatalError = new Error(`瑙嗛杞閿欒 ${response.status}: ${errText.slice(0, 200)}`);
+                    fatalError = new Error(`视频杞错误 ${response.status}: ${errText.slice(0, 200)}`);
                     break;
                 }
 

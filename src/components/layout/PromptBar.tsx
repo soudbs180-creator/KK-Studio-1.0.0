@@ -559,7 +559,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     });
     const [isInputAreaHovered, setIsInputAreaHovered] = useState(false); // Phase 3: hover state
     const [uploadingCount, setUploadingCount] = useState(0); // [NEW] Uploading indicator count
+    const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
+    const canAccessSystemCreditModels = !!user && !isTempUser;
 
     // 🚀 [NEW] 模型手动锁定标识 - 解决更换 API 或模式后自动跳第一个的需求
     const [isModelManuallyLocked, setIsModelManuallyLocked] = useState<boolean>(() => {
@@ -823,7 +825,11 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
     // Get available models based on global list and current mode
     const availableModels = useMemo(() => {
-        const step1 = globalModels.filter(m => m.type !== 'chat');
+        const step1 = globalModels.filter(m => {
+            if (m.type === 'chat') return false;
+            if (m.isSystemInternal && !canAccessSystemCreditModels) return false;
+            return true;
+        });
 
         const step2 = step1.map(m => {
             // Infer type for custom models
@@ -913,7 +919,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         });
 
         return Array.from(displayGroupedModels.values());
-    }, [globalModels, config.mode, config.imageSize]);
+    }, [globalModels, config.mode, config.imageSize, canAccessSystemCreditModels]);
 
     const sortedAvailableModels = useMemo(() => {
         return filterAndSortModels(availableModels, '', modelCustomizations);
@@ -3316,8 +3322,17 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 colorStart={currentModel?.colorStart}
                                 colorEnd={currentModel?.colorEnd}
                                 onClick={() => {
+                                    if (isNanoBanana2 && authLoading) {
+                                        notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
+                                        return;
+                                    }
+                                    if (isNanoBanana2 && !canAccessSystemCreditModels) {
+                                        notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
+                                        return;
+                                    }
                                     if (isNanoBanana2 && totalCreditCost > 0 && balance < totalCreditCost) {
                                         notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额: ${balance}，请充值。`);
+                                        setShowRechargeModal(true);
                                         return;
                                     }
                                     onGenerate();

@@ -490,8 +490,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
         keySlotId: image.keySlotId,
         storedCost: image.cost,
-    }), [image.cost, image.keySlotId, image.imageSize, image.model, image.prompt, image.sourceReferenceStorageIds]);
+        storedCostSource: image.costSource,
+    }), [image.cost, image.costSource, image.keySlotId, image.imageSize, image.model, image.prompt, image.sourceReferenceStorageIds]);
     const displayCost = resolvedDisplayCost.cost;
+    const displayTokens = typeof image.tokens === 'number' && Number.isFinite(image.tokens) ? image.tokens : 0;
+    const showTokenInfo = displayTokens > 0;
+    const hasResolvedDisplayCost = resolvedDisplayCost.source !== 'none' && displayCost > 0;
 
     // 🚀 [UI Optimization] 判断是否为内置积分加速模型
     const isCreditModel = useMemo(() => {
@@ -587,10 +591,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const storedCost = typeof image.cost === 'number' && Number.isFinite(image.cost)
             ? image.cost
             : undefined;
-        if (storedCost !== undefined && Math.abs(storedCost - displayCost) < 0.000001) return;
+        if (
+            storedCost !== undefined
+            && Math.abs(storedCost - displayCost) < 0.000001
+            && image.costSource === resolvedDisplayCost.source
+        ) {
+            return;
+        }
 
-        onUpdate(image.id, { cost: displayCost });
-    }, [displayCost, image.cost, image.id, isCreditModel, onUpdate]);
+        onUpdate(image.id, { cost: displayCost, costSource: resolvedDisplayCost.source });
+    }, [displayCost, image.cost, image.costSource, image.id, isCreditModel, onUpdate, resolvedDisplayCost.source]);
 
     const modelText = image.modelLabel || image.model || image.id;
     const providerText = resolveDisplayedProviderLabel(image);
@@ -609,7 +619,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const footerTimeLabel = clampedGenerationTime > 0
         ? `耗时 ${formatGenerationDurationSeconds(clampedGenerationTime)}s`
         : '耗时 --';
-    const footerTokenLabel = `令牌 ${image.tokens || 0}`;
+    const footerTokenLabel = showTokenInfo ? `令牌 ${displayTokens}` : '';
     const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
     const footerCreditsLabel = `✨${getModelCredits(image.model || '', image.imageSize)}`;
     const footerSummaryTitle = isCreditModel
@@ -1760,7 +1770,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                         {/* 第二层：耗时/费用 */}
                                         <div
                                             ref={footerInfoRowRef}
-                                            title={footerSummaryTitle}
+                                            title={isCreditModel
+                                                ? footerSummaryTitle
+                                                : [
+                                                    footerTimeLabel,
+                                                    showTokenInfo ? `令牌 ${displayTokens}` : null,
+                                                    hasResolvedDisplayCost ? `\u8d39\u7528 $${displayCost.toFixed(4)}` : '\u8d39\u7528 \u672a\u83b7\u53d6',
+                                                ].filter(Boolean).join(' | ')}
                                             className={joinClasses('flex items-center justify-center leading-none text-[var(--text-secondary)] relative group/info overflow-hidden whitespace-nowrap', footerInfoGapClass, isTightFooter ? 'h-[18px]' : 'h-5', footerInfoTextClass)}
                                             style={primaryTextRenderStyle}
                                         >
@@ -1772,14 +1788,20 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             {isCreditModel ? (
                                                 <>
                                                     <span className={footerSeparatorClass}>|</span>
-                                                    <span title="积分消耗" className="text-blue-400 font-medium shrink-0">{footerCreditsLabel}</span>
+                                                    <span title="\u79ef\u5206\u6d88\u8017" className="text-blue-400 font-medium shrink-0">{footerCreditsLabel}</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <span className={footerSeparatorClass}>|</span>
-                                                    <span title={`Token消耗 ${image.tokens || 0}`} className="text-emerald-400 shrink-0">{footerTokenLabel}</span>
-                                                    <span className={footerSeparatorClass}>|</span>
-                                                    <span title={footerCostLabel} className="text-amber-400 shrink-0">{footerCostLabel}</span>
+                                                    {showTokenInfo ? (
+                                                        <>
+                                                            <span title={`Token消耗 ${displayTokens}`} className="text-emerald-400 shrink-0">{footerTokenLabel}</span>
+                                                            <span className={footerSeparatorClass}>|</span>
+                                                        </>
+                                                    ) : null}
+                                                    <span title={hasResolvedDisplayCost ? `\u8d39\u7528 $${displayCost.toFixed(4)}` : '\u8d39\u7528 \u672a\u83b7\u53d6'} className="text-amber-400 shrink-0">
+                                                        {hasResolvedDisplayCost ? `\u8d39\u7528 $${displayCost.toFixed(4)}` : '\u8d39\u7528 \u672a\u83b7\u53d6'}
+                                                    </span>
                                                 </>
                                             )}
                                         </div>

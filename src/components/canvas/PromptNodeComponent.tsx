@@ -609,7 +609,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         ? effectiveChildImageCount
         : (node.lastGenerationSuccessCount || 0);
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
-    const showError = Boolean(node.error) && renderedSuccessCount === 0;
+    const showError = Boolean(node.error);
     const isThumbnailShell = detailLevel === 'thumbnail-shell';
     const shellPreviewText = (
         node.optimizedPromptEn
@@ -986,34 +986,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         </div>
                     )}
 
-                    {/* Prompt Text Area - 文本可选，但选择范围被约束在本卡片内 */}
+                    {/* Prompt Text Area - 画布主卡禁用文本选择，避免拖拽时误选中文案 */}
                     <div
-                        className="relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] select-text cursor-text group/content"
+                        className={`relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] group/content ${isChatMode ? 'select-text cursor-text' : 'select-none'}`}
                         style={primaryTextRenderStyle}
                         onWheel={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => {
-                            e.stopPropagation();
-                            const el = e.currentTarget;
-                            el.setAttribute('data-text-selecting', 'true');
-                            const style = document.createElement('style');
-                            style.id = 'kk-text-select-lock';
-                            style.textContent = `
-                                .select-text:not([data-text-selecting]) {
-                                    -webkit-user-select: none !important;
-                                    user-select: none !important;
-                                }
-                            `;
-                            document.head.appendChild(style);
-                            const cleanup = () => {
-                                el.removeAttribute('data-text-selecting');
-                                const s = document.getElementById('kk-text-select-lock');
-                                if (s) s.remove();
-                                document.removeEventListener('mouseup', cleanup);
-                            };
-                            document.addEventListener('mouseup', cleanup);
-                        }}
                         onClick={(e) => {
                             e.stopPropagation();
+                            if (hasMoved.current) return;
                             const sel = document.getSelection();
                             if (sel && sel.toString().length > 0) return;
                             if (onClickPrompt) onClickPrompt(node, activeTab === 'opt');

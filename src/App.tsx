@@ -21,7 +21,7 @@ import { getModelCapabilities } from './services/model/modelCapabilities';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
-import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 馃殌 Smart Positioning
+import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
 
@@ -164,7 +164,8 @@ import {
 } from './canvas/performanceProfile';
 
 const UserProfileModal = lazy(() => import('./components/modals/UserProfileModal'));
-const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'));
+// const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel')); // 旧版本
+const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel.v2')); // ✅ 新版本 v2.0 - 路由支持、骨架屏、移动端优化
 const SearchPalette = lazy(() => import('./components/layout/SearchPalette'));
 const TagInputModal = lazy(() => import('./components/modals/TagInputModal'));
 const TutorialOverlay = lazy(() => import('./components/common/TutorialOverlay'));
@@ -188,6 +189,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     user,
     loading: authLoading,
+    isTempUser,
     signOut
   } = useAuth();
   const [showTutorial, setShowTutorial] = useState(false);
@@ -202,10 +204,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     addPromptNode,
     updatePromptNode,
     addImageNodes,
-    updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // 馃殌
+    updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // 🎯
     deletePromptNode,
     deleteImageNode,
-    urgentUpdatePromptNode, // 馃殌 [New] 绱ф€ョ姸鎬佸悓姝?
+    urgentUpdatePromptNode, // 🎯 [New] 绱ф€ョ姸鎬佸悓姝?
     linkNodes,
     unlinkNodes,
     undo,
@@ -224,16 +226,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     setNodeTags,
     arrangeAllNodes,
     moveSelectedNodes,
+    moveSelectedNodesImmediate,
     addWorkflowNode,
     updateWorkflowNode,
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
-    setViewportCenter, // 馃殌 瑙嗗彛涓績鍔ㄦ€佷紭鍏堢骇
-    state, // 馃殌 杩佺Щ闇€瑕佽闂甤anvases鍒楄〃
-    migrateNodes, // 馃殌 杩佺Щ鑺傜偣鍒板叾浠栭」鐩?
-    createCanvas, // 馃殌 鍒涘缓鏂伴」鐩?
-    switchCanvas  // 馃殌 鍒囨崲椤圭洰
+    setViewportCenter, // 🎯 视口中心鍔ㄦ€佷紭鍏堢骇
+    state, // 🎯 杩佺Щ闇€瑕佽闂甤anvases列表
+    migrateNodes, // 🎯 杩佺Щ鑺傜偣鍒板叾浠栭」鐩?
+    createCanvas, // 🎯 创建鏂伴」鐩?
+    switchCanvas  // 🎯 切换项目
   } = useCanvas();
 
   const { balance, loading: balanceLoading, showRechargeModal, setShowRechargeModal, consumeCredits, refundCredits } = useBilling();
@@ -336,12 +339,12 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-  // [鏂板姛鑳絔 鍏ㄥ眬鐏鐘舵€?(閽堝鍥剧墖娴忚)
+  // [鏂板姛鑳絔 鍏ㄥ眬鐏状态(閽堝图片娴忚)
   const [previewImages, setPreviewImages] = useState<GeneratedImage[] | null>(null);
   const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
   const [pptStackPreview, setPptStackPreview] = useState<{ images: GeneratedImage[]; initialIndex: number } | null>(null);
   const [pptDeckEditor, setPptDeckEditor] = useState<{ nodeId: string; initialIndex: number } | null>(null);
-  const [showMigrateModal, setShowMigrateModal] = useState(false); // 馃殌 杩佺Щ寮圭獥鐘舵€?
+  const [showMigrateModal, setShowMigrateModal] = useState(false); // 🎯 杩佺Щ寮圭獥状态
 
   const handleOpenPreview = useCallback((imageId: string) => {
     const canvas = activeCanvasRef.current;
@@ -354,7 +357,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
-    // 1. 缂栫粍閫昏緫 (浼樺厛澶勭悊鐢诲竷缂栫粍)
+    // 1. 缂栫粍閫昏緫 (浼樺厛处理鐢诲竷缂栫粍)
     const group = canvas.groups.find(g => g.nodeIds.includes(imageId));
     let list: GeneratedImage[] = [];
 
@@ -362,7 +365,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       list = canvas.imageNodes.filter(n => group.nodeIds.includes(n.id))
         .sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x));
     } else {
-      // 2. 鎻愮ず璇嶅鏃?Lineage)閫昏緫鏍?(鍖呭惈鐖跺浘銆佸彉浣撱€佹墿鍥俱€侀噸缁樼殑鏁存潯琛嶇敓閾?
+      // 2. 提示璇嶅鏃?Lineage)閫昏緫鏍?(鍖呭惈鐖跺浘銆佸彉浣撱€佹墿鍥俱€侀噸缁樼殑鏁存潯琛嶇敓閾?
       const graphImages = new Set<string>();
       const queue = [imageId];
 
@@ -372,7 +375,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           graphImages.add(currId);
           const img = canvas.imageNodes.find(n => n.id === currId);
           if (img) {
-            // 鍚戜笂鎵撅細鍚岀骇鐨勫厔寮熷浘鐗囷紝浠ュ強瀛曡偛杩欎釜Prompt鐨勭埗鍥剧墖
+            // 鍚戜笂鎵撅細鍚岀骇鐨勫厔寮熷浘鐗囷紝浠ュ強瀛曡偛杩欎釜Prompt鐨勭埗图片
             const prompt = canvas.promptNodes.find(p => p.id === img.parentPromptId);
             if (prompt) {
               prompt.childImageIds?.forEach(id => {
@@ -382,7 +385,7 @@ const AppContent: React.FC<AppContentProps> = () => {
                 queue.push(prompt.sourceImageId);
               }
             }
-            // 鍚戜笅鎵撅細浠ュ綋鍓嶅浘鐗囦綔涓虹埗鍥捐鐢熷嚭鐨勫瓙鍗＄粍鍥剧墖
+            // 鍚戜笅鎵撅細浠ュ綋鍓嶅浘鐗囦綔涓虹埗鍥捐鐢熷嚭鐨勫瓙鍗＄粍图片
             const childPrompts = canvas.promptNodes.filter(p => p.sourceImageId === currId);
             childPrompts.forEach(cp => {
               cp.childImageIds?.forEach(id => {
@@ -397,7 +400,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         list = canvas.imageNodes.filter(n => graphImages.has(n.id))
           .sort((a, b) => a.timestamp - b.timestamp || (a.position.x - b.position.x));
       } else {
-        // 3. 鍏滃簳閫昏緫 (鍗曞紶鍥剧墖)
+        // 3. 鍏滃簳閫昏緫 (鍗曞紶图片)
         const target = canvas.imageNodes.find(n => n.id === imageId);
         if (target) list = [target];
       }
@@ -482,9 +485,9 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Mobile Nav Bar Visibility (Swipe to Show, Auto Hide)
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(false);
   const mobileNavTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [isPromptFocused, setIsPromptFocused] = useState(false); // 璺熻釜杈撳叆妗嗙劍鐐圭姸鎬?
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false); // 璺熻釜渚ц竟鏍廻over鐘舵€?
-  const lastMouseMoveRef = useRef<number>(Date.now()); // 璁板綍鏈€鍚庝竴娆￠紶鏍囩Щ鍔ㄦ椂闂?
+  const [isPromptFocused, setIsPromptFocused] = useState(false); // 跟踪输入妗嗙劍鐐圭姸鎬?
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false); // 跟踪渚ц竟鏍廻over状态
+  const lastMouseMoveRef = useRef<number>(Date.now()); // 记录鏈€后一娆￠紶鏍囩Щ鍔ㄦ椂闂?
 
   const handleShowMobileNav = useCallback(() => {
     const timeSinceLastMouseMove = Date.now() - lastMouseMoveRef.current;
@@ -492,11 +495,11 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     console.log('[handleShowMobileNav] isPromptFocused:', isPromptFocused, 'isSidebarHovered:', isSidebarHovered, 'isMouseActive:', isMouseActive);
     setIsMobileNavVisible(true);
-    // 娓呴櫎鏃у畾鏃跺櫒
+    // 清除鏃у畾鏃跺櫒
     if (mobileNavTimerRef.current) {
       clearTimeout(mobileNavTimerRef.current);
     }
-    // 濡傛灉杈撳叆妗嗘湁鐒︾偣銆侀紶鏍囧湪渚ц竟鏍忎笂銆佹垨榧犳爣姝ｅ湪娲诲姩,涓嶈缃嚜鍔ㄩ殣钘忓畾鏃跺櫒
+    // 濡傛灉输入妗嗘湁鐒︾偣銆侀紶鏍囧湪渚ц竟鏍忎笂銆佹垨榧犳爣姝ｅ湪娲诲姩,涓嶈缃嚜鍔ㄩ殣钘忓畾鏃跺櫒
     if (!isPromptFocused && !isSidebarHovered && !isMouseActive) {
       console.log('[handleShowMobileNav] 设置 5 秒自动隐藏定时器');
       mobileNavTimerRef.current = setTimeout(() => {
@@ -515,11 +518,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, []);
 
-  // 鍏ㄥ眬榧犳爣绉诲姩鐩戝惉 - 閲嶇疆瀹氭椂鍣?
+  // 鍏ㄥ眬榧犳爣移动鐩戝惉 - 重置瀹氭椂鍣?
   useEffect(() => {
     const handleGlobalMouseMove = () => {
       lastMouseMoveRef.current = Date.now();
-      // 榧犳爣绉诲姩鏃?濡傛灉渚ц竟鏍忓彲瑙佷笖娌℃湁娲诲姩瀹氭椂鍣?閲嶆柊鏄剧ず骞堕噸缃畾鏃跺櫒
+      // 榧犳爣移动鏃?濡傛灉渚ц竟鏍忓彲瑙佷笖娌℃湁娲诲姩瀹氭椂鍣?重新显示骞堕噸缃畾鏃跺櫒
       if (isMobileNavVisible) {
         handleShowMobileNav();
       }
@@ -539,7 +542,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Tag Constraints State
   const [tagLimits, setTagLimits] = useState({ maxTags: 10, maxChars: 6 });
 
-  // 馃殌 New State for enhanced TagInputModal
+  // 🎯 New State for enhanced TagInputModal
   const [allTags, setAllTags] = useState<string[]>([]);
   const [inheritedTags, setInheritedTags] = useState<string[]>([]);
   const [isSubCard, setIsSubCard] = useState(false);
@@ -552,7 +555,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     const promptNode = activeCanvas?.promptNodes.find(n => n.id === firstId);
     const imageNode = activeCanvas?.imageNodes.find(n => n.id === firstId);
 
-    // 馃殌 Collect all existing tags from canvas for suggestions
+    // 🎯 Collect all existing tags from canvas for suggestions
     const allPromptTags = activeCanvas?.promptNodes.flatMap(n => n.tags || []) || [];
     const allImageTags = activeCanvas?.imageNodes.flatMap(n => n.tags || []) || [];
     const uniqueAllTags = [...new Set([...allPromptTags, ...allImageTags])];
@@ -560,7 +563,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     // Determine if editing Sub Card and find inherited tags
     if (imageNode) {
-      // 馃殌 Sub Card - find parent's tags
+      // 🎯 Sub Card - find parent's tags
       const parentPrompt = activeCanvas?.promptNodes.find(n => n.id === imageNode.parentPromptId);
       setInheritedTags(parentPrompt?.tags || []);
       setIsSubCard(true);
@@ -582,7 +585,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     const firstId = taggingNodeIds[0];
     const promptNode = activeCanvas?.promptNodes.find(n => n.id === firstId);
 
-    // 馃殌 Deduplication Logic: If Main Card adds a tag, remove from its Sub Cards
+    // 🎯 Deduplication Logic: If Main Card adds a tag, remove from its Sub Cards
     if (promptNode) {
       // Editing a Main Card
       const childImageIds = promptNode.childImageIds || [];
@@ -604,7 +607,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     setNodeTags(taggingNodeIds, tags);
     setIsTagModalOpen(false);
 
-    // 馃殌 File System Shortcut Integration
+    // 🎯 File System Shortcut Integration
     try {
       const { fileSystemService } = await import('./services/storage/fileSystemService');
       const handle = fileSystemService.getGlobalHandle();
@@ -688,10 +691,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         setShowStorageModal(true);
       } else {
         // Mode exists -> Check Keys for API Panel
-        // 馃殌 [淇] 浠呭棣栨鐢ㄦ埛鏄剧ず API 璁剧疆闈㈡澘锛岃繑鍥炵敤鎴蜂笉鑷姩寮瑰嚭
+        // 🎯 [修复] 浠呭棣栨用户显示 API 设置闈㈡澘锛岃繑鍥炵敤鎴蜂笉鑷姩寮瑰嚭
         const hasKeys = keyManager.hasValidKeys();
         if (!hasKeys && !hasLoggedInBefore && !isDevMode) {
-          // 鍙湁棣栨鐢ㄦ埛鎵嶈嚜鍔ㄥ脊鍑?API 璁剧疆闈㈡澘
+          // 鍙湁棣栨用户鎵嶈嚜鍔ㄥ脊鍑?API 设置闈㈡澘
           openSettingsSurface('api-management');
         }
         setIsStorageChecked(true);
@@ -731,7 +734,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const parsed = JSON.parse(saved);
         // Merge with defaults to ensure all fields exist
         return {
-          prompt: parsed.prompt || '', // 馃殌 鎭㈠鎸佷箙鍖栫殑 Prompt
+          prompt: parsed.prompt || '', // 🎯 恢复鎸佷箙鍖栫殑 Prompt
           enablePromptOptimization: parsed.enablePromptOptimization || false,
           promptOptimizationMode: parsed.promptOptimizationMode === 'custom' ? 'custom' : 'auto',
           promptOptimizationTemplateId: parsed.promptOptimizationTemplateId || getDefaultPromptOptimizerTemplateId(parsed.mode || GenerationMode.IMAGE),
@@ -739,10 +742,10 @@ const AppContent: React.FC<AppContentProps> = () => {
           aspectRatio: AspectRatio.AUTO, // [Default: Auto]
           imageSize: ImageSize.SIZE_1K,
           parallelCount: parsed.parallelCount || 1,
-          // 馃殌 [Fix] 鎭㈠鍙傝€冨浘鍏冩暟鎹紙涓嶅惈 base64锛夛紝璁?hydrate effect 浠?IndexedDB 杩樺師鍥剧墖鏁版嵁
+          // 🎯 [Fix] 恢复鍙傝€冨浘鍏冩暟鎹紙涓嶅惈 base64锛夛紝璁?hydrate effect 浠?IndexedDB 还原图片数据
           referenceImages: (parsed.referenceImages || []).map((img: any) => ({
             ...img,
-            data: undefined // data 闇€瑕佷粠 IndexedDB hydrate锛屼笉浠?localStorage 鎭㈠
+            data: undefined // data 闇€瑕佷粠 IndexedDB hydrate锛屼笉浠?localStorage 恢复
           })),
           model: parsed.model || KnownModel.IMAGEN_3,
           enableGrounding: parsed.enableGrounding || false,
@@ -895,7 +898,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       mode: config.mode,
       pptSlides: config.pptSlides || [],
       pptStyleLocked: config.pptStyleLocked !== false,
-      // 馃殌 [New] 琛ラ綈缂哄け鐨勮棰戙€侀煶棰戝強鎻愮ず璇嶅瓧娈?
+      // 🎯 [New] 琛ラ綈缂哄け鐨勮棰戙€侀煶棰戝強提示璇嶅瓧娈?
       prompt: config.prompt || '',
       videoResolution: config.videoResolution,
       videoDuration: config.videoDuration,
@@ -921,7 +924,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     config.aspectRatio, config.imageSize, config.parallelCount,
     config.model, config.enableGrounding, config.enableImageSearch, config.thinkingMode, config.mode, config.pptSlides, config.pptStyleLocked,
     config.referenceImages, // Add referenceImages to dep array
-    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 馃殌 鍏ㄩ噺渚濊禆鐩戝惉
+    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 🎯 鍏ㄩ噺渚濊禆鐩戝惉
   ]);
 
   // Pending generation state
@@ -1011,30 +1014,30 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const [isCanvasTransforming, setIsCanvasTransforming] = useState(false);
 
-  // 馃殌 鍚屾瑙嗗彛涓績鍒癈anvasContext锛堢敤浜庡姩鎬佷紭鍏堢骇鍔犺浇锛?
+  // 🎯 同步视口中心鍒癈anvasContext锛堢敤浜庡姩鎬佷紭鍏堢骇加载锛?
   useEffect(() => {
-    // 璁＄畻褰撳墠瑙嗗彛涓績鍦ㄧ敾甯冨潗鏍囦腑鐨勪綅缃?
+    // 计算当前视口中心鍦ㄧ敾甯冨潗鏍囦腑鐨勪綅缃?
     const centerX = (window.innerWidth / 2 - canvasTransform.x) / canvasTransform.scale;
     const centerY = (window.innerHeight / 2 - canvasTransform.y) / canvasTransform.scale;
     setViewportCenter({ x: centerX, y: centerY });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasTransform]); // 馃殌 绉婚櫎setViewportCenter渚濊禆闃叉鏃犻檺寰幆
+  }, [canvasTransform]); // 🎯 移除setViewportCenter渚濊禆闃叉鏃犻檺循环
 
   // Derived Pending Position: Always Center (or linked to source)
   const pendingPosition = React.useMemo(() => {
     if (activeSourceImage && activeCanvas) {
       const sourceImage = activeCanvas.imageNodes.find(img => img.id === activeSourceImage);
       if (sourceImage) {
-        // 馃殌 杩介棶妯″紡锛氭柊涓诲崱鏀惧湪鍘熺埗鍗＄粍涓嬫柟
+        // 🎯 杩介棶模式锛氭柊涓诲崱鏀惧湪鍘熺埗鍗＄粍下方
         const parentPromptId = sourceImage.parentPromptId;
         const parentPrompt = activeCanvas.promptNodes.find(p => p.id === parentPromptId);
 
         if (parentPrompt) {
-          // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝璁＄畻鏈€澶浣嶇疆
+          // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝计算鏈€澶位置
           const siblingImages = activeCanvas.imageNodes.filter(img => img.parentPromptId === parentPromptId);
-          let maxY = parentPrompt.position.y; // 鐖朵富鍗＄殑Y浣嶇疆锛堝簳閮ㄩ敋鐐癸級
+          let maxY = parentPrompt.position.y; // 鐖朵富鍗＄殑Y位置锛堝簳閮ㄩ敋鐐癸級
 
-          // 璁＄畻鎵€鏈夊瓙鍗＄殑鏈€澶浣嶇疆锛堝簳閮級
+          // 计算鎵€鏈夊瓙鍗＄殑鏈€澶位置锛堝簳閮級
           siblingImages.forEach(img => {
             const { totalHeight } = getCardDimensions(img.aspectRatio, true);
             const imgBottom = img.position.y + totalHeight;
@@ -1044,7 +1047,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const GAP = 60; // 鏂颁富鍗′笌瀛愬崱缁勭殑闂磋窛
           return {
             x: parentPrompt.position.x,  // 涓庣埗涓诲崱X瀵归綈
-            y: maxY + GAP  // 鏀惧湪鏈€涓嬫柟瀛愬崱鐨勪笅闈?
+            y: maxY + GAP  // 鏀惧湪鏈€下方瀛愬崱鐨勪笅闈?
           };
         }
 
@@ -1070,7 +1073,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
     }
     // Smart Center Placement - Manual Mode (Always Center)
-    // 馃殌 [Fix] 浣跨敤 InfiniteCanvas 鐨勫疄闄呭彲瑙佸尯鍩?+ 瀹炴椂 transform 璁＄畻绮剧‘涓績
+    // 🎯 [Fix] 使用 InfiniteCanvas 鐨勫疄闄呭彲瑙佸尯鍩?+ 瀹炴椂 transform 计算绮剧‘中心
     const currentTf = canvasRef.current?.getCurrentTransform() || canvasTransform;
     const vpRect = canvasRef.current?.getCanvasRect() || null;
     return getViewportPreferredPosition(currentTf, vpRect, 180);
@@ -1083,10 +1086,10 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-  // 馃殌 娓呴櫎杩介棶婧愬浘鐗囷紝鍚屾椂鍒犻櫎杩介棶Draft鑺傜偣
+  // 🎯 清除杩介棶婧愬浘鐗囷紝鍚屾椂删除杩介棶Draft鑺傜偣
   const handleClearSource = useCallback(() => {
     setActiveSourceImage(null);
-    // 濡傛灉鏈夎拷闂瓺raft涓旀病鏈夊唴瀹癸紝鍒犻櫎瀹?
+    // 濡傛灉鏈夎拷闂瓺raft涓旀病鏈夊唴瀹癸紝删除瀹?
     if (draftNodeId) {
       const draftNode = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
       if (draftNode && draftNode.sourceImageId && !draftNode.prompt.trim()) {
@@ -1227,7 +1230,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
         nextSelectionIds = ids;
         if (ids.length > 0) {
-          // 馃殌 Shift=鍔犻€? Ctrl=鍑忛€? 鏃犱慨楗伴敭=鏇挎崲
+          // 🎯 Shift=鍔犻€? Ctrl=鍑忛€? 鏃犱慨楗伴敭=替换
           const mode = e.ctrlKey ? 'remove' : (e.shiftKey ? 'add' : 'replace');
           selectNodes(ids, mode);
         } else {
@@ -1241,7 +1244,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           clearSelection();
         }
       }
-      // 馃殌 Show selection menu centered on selection bounds (not at mouse)
+      // 🎯 Show selection menu centered on selection bounds (not at mouse)
       if (e.button === 2) {
         const allSelectedIds = nextSelectionIds.length > 0 ? nextSelectionIds : selectedNodeIds;
         if (allSelectedIds.length > 0) {
@@ -1356,7 +1359,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? 'me'
         : 'create';
 
-  // 浣跨敤鏂板皝瑁呯殑 CanvasCenter API锛堝紩鍏ヨ嚜 src/utils/canvasCenter.ts锛?
+  // 使用鏂板皝瑁呯殑 CanvasCenter API锛堝紩鍏ヨ嚜 src/utils/canvasCenter.ts锛?
 
   useEffect(() => {
     const handleResize = () => {
@@ -1454,7 +1457,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const shouldAutoCenter = !node.userMoved && !node.sourceImageId;
 
           if (hasChanged || shouldAutoCenter) {
-            // 馃殌 [Smart Re-centering]
+            // 🎯 [Smart Re-centering]
             // If the user hasn't moved the draft, and it's a normal draft (not follow-up),
             // auto-sync its position to current viewport center
             const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
@@ -1511,7 +1514,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     // We want: targetX * scale + transformX = screenCenterX
     // So: transformX = screenCenterX - targetX * scale
 
-    // User requested "Zoom and Pan" (骞崇Щ骞剁缉鏀?
+    // User requested "Zoom and Pan" (平移骞剁缉鏀?
     const targetScale = 1; // Reset to 1:1 view for clarity
 
     const newX = screenCenterX - targetX * targetScale;
@@ -1541,7 +1544,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     }, 100);
   }, [selectNodes, arrangeAllNodes]);
 
-  // 馃殌 Helper: Compute selection bounds center in screen coordinates
+  // 🎯 Helper: Compute selection bounds center in screen coordinates
   const getSelectionScreenCenter = useCallback((nodeIds: string[]) => {
     if (!activeCanvas || nodeIds.length === 0) return null;
 
@@ -1599,7 +1602,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     return { x: screenX, y: screenY };
   }, [activeCanvas, canvasTransform, getCardDimensions]);
 
-  // 馃殌 瀹氫綅鍗＄粍锛氫紭鍏堝畾浣嶉€変腑鍗＄粍锛屾棤閫変腑鏃跺畾浣嶆渶鏂?
+  // 🎯 瀹氫綅鍗＄粍锛氫紭鍏堝畾浣嶉€変腑鍗＄粍锛屾棤閫変腑鏃跺畾浣嶆渶鏂?
   const handleResetView = useCallback(() => {
     if (!activeCanvas) return;
 
@@ -1614,7 +1617,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         )
       );
 
-      // 璁＄畻閫変腑鑺傜偣鐨勪腑蹇冧綅缃?
+      // 计算閫変腑鑺傜偣鐨勪腑蹇冧綅缃?
       const allPositions = [
         ...selectedPrompts.map(p => p.position),
         ...selectedImages.map(img => img.position),
@@ -1664,30 +1667,30 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [activeCanvas, handleNavigateToNode, selectedNodeIds]);
 
-  // 澶勭悊鎷栧叆鍥剧墖鍒涘缓瀛ょ嫭鍓崱
+  // 处理鎷栧叆图片创建瀛ょ嫭鍓崱
   const handleImageDrop = useCallback(async (file: File, canvasPosition: { x: number; y: number }) => {
     if (!activeCanvas) return;
 
     try {
-      // 璇诲彇鍥剧墖
+      // 读取图片
       const reader = new FileReader();
       reader.onload = async (e: ProgressEvent<FileReader>) => {
         const dataUrl = e.target?.result as string;
         if (!dataUrl) return;
 
-        // 鑾峰彇鍥剧墖灏哄
+        // 鑾峰彇图片尺寸
         const img = new Image();
         img.onload = async () => {
           const calc = await import('./utils/imageUtils');
           const storageId = await calc.calculateImageHash(dataUrl.split(',')[1]);
 
-          // 淇濆瓨鍒板瓨鍌?
+          // 保存鍒板瓨鍌?
           const storage = await import('./services/storage/imageStorage');
           await storage.saveImage(storageId, dataUrl).catch(err =>
             console.error("Failed to save dropped image", err)
           );
 
-          // 璁＄畻瀹介珮姣?
+          // 计算瀹介珮姣?
           const calcAspect = (w: number, h: number): AspectRatio => {
             const ratio = w / h;
             if (Math.abs(ratio - 1) < 0.1) return AspectRatio.SQUARE;
@@ -1695,7 +1698,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             return AspectRatio.LANDSCAPE_4_3;
           };
 
-          // 鍒涘缓瀛ょ嫭鍓崱
+          // 创建瀛ょ嫭鍓崱
           const newImage: GeneratedImage = {
             id: Date.now().toString(),
             storageId,
@@ -1708,14 +1711,14 @@ const AppContent: React.FC<AppContentProps> = () => {
             parentPromptId: '', // 瀛ょ嫭鍗＄墖鏃犵埗鑺傜偣
             position: canvasPosition,
             dimensions: `${img.width}脳${img.height}`,
-            orphaned: true, // 鏍囪涓哄鐙崱鐗?
+            orphaned: true, // 标记涓哄鐙崱鐗?
             fileName: file.name,
             fileSize: file.size
           };
 
           addImageNodes([newImage]);
 
-          // 閫氱煡鐢ㄦ埛
+          // 通知用户
           import('./services/system/notificationService').then(({ notify }) => {
             notify.success('图片已添加', `${file.name} (${img.width}×${img.height})`);
           });
@@ -2547,8 +2550,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     lastGenerateAtRef.current = now;
     lastGenerateSignatureRef.current = { value: submitSignature, at: now };
 
-    // 馃殌 [鐪熷疄璁¤垂鎷︽埅涓庢墸闄
-    // 棣栧厛鍒ゆ柇鏄惁涓虹郴缁熸寜绉垎璁¤垂鐨勬ā鍨嬶紙鑷繁娣诲姞鐨勭涓夋柟娓犻亾妯″瀷鎴栨槑纭甫鏈?@ 鍚庣紑鐨勮皟鐢ㄤ笉璧扮Н鍒嗘祦绋嬶級
+    // 🎯 [鐪熷疄璁¤垂鎷︽埅涓庢墸闄
+    // 棣栧厛判断鏄惁涓虹郴缁熸寜绉垎璁¤垂鐨勬ā鍨嬶紙鑷繁添加鐨勭涓夋柟娓犻亾妯″瀷鎴栨槑纭甫鏈?@ 鍚庣紑鐨勮皟鐢ㄤ笉璧扮Н鍒嗘祦绋嬶級
     const provider = config.model.includes('@') ? config.model.split('@')[1] : undefined;
     const customLocal = (() => {
       try {
@@ -2564,7 +2567,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       hasCustomUserKey
     );
 
-    console.log('[handleGenerate] 璁¤垂妫€鏌?', {
+    console.log('[handleGenerate] 璁¤垂检查', {
       model: config.model,
       provider,
       hasCustomUserKey,
@@ -2575,6 +2578,20 @@ const AppContent: React.FC<AppContentProps> = () => {
     let requiredCredits = 0;
     const useServerSideCreditSettlement = isCreditModel && config.model.toLowerCase().includes('@system');
     if (isCreditModel) {
+      if (authLoading) {
+        import('./services/system/notificationService').then(({ notify }) => {
+          notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
+        });
+        return;
+      }
+
+      if (!user || isTempUser) {
+        import('./services/system/notificationService').then(({ notify }) => {
+          notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
+        });
+        return;
+      }
+
       const perImageCost = getModelCredits(config.model, config.imageSize);
       if (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) {
         requiredCredits = (config.parallelCount || 1) * perImageCost;
@@ -2608,7 +2625,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     try {
 
       // 4. Calculate Position
-      // 鏅€氭ā寮忓簲浣跨敤褰撳墠瑙嗗彛涓績锛涜拷闂ā寮忎繚鐣欏師鏈夎崏绋垮畾浣嶉€昏緫
+      // 鏅€氭ā寮忓簲使用当前视口中心锛涜拷闂ā寮忎繚鐣欏師鏈夎崏绋垮畾浣嶉€昏緫
       const isFollowUp = !!activeSourceImage;
       const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
       const viewportRect = canvasRef.current?.getCanvasRect() || null;
@@ -2636,7 +2653,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           isReusingDraft = true;
           currentPos = draft.position;
 
-          // 馃殌 [Smart Re-centering Fix]
+          // 🎯 [Smart Re-centering Fix]
           // If the draft is an auto-center draft (not moved by user), FORCE it to stay at the REAL center
           // during the final generation calculation, even if the canvas was panned just now.
           const shouldAutoCenter = !draft.userMoved && !draft.sourceImageId && !draft.isGenerating;
@@ -2645,9 +2662,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             console.log('[handleGenerate] Auto-centering draft to latest viewCenter for precise placement');
             currentPos = { ...viewCenter };
           } else {
-            // 馃殌 [Auto-Center Fallback] If draft is off-screen, snap it to current view center
+            // 🎯 [Auto-Center Fallback] If draft is off-screen, snap it to current view center
             // This fixes the issue where users pan away from a draft and then generate, causing the result to be "lost"
-            // 馃殌 浣跨敤瀹炴椂 transform锛堝寘鎷嫋鍔ㄤ腑鐨勪綅缃級
+            // 🎯 使用瀹炴椂 transform锛堝寘鎷嫋鍔ㄤ腑鐨勪綅缃級
             const currentTransformForVisibility = canvasRef.current?.getCurrentTransform() || canvasTransform;
             const vLeft = -currentTransformForVisibility.x / currentTransformForVisibility.scale;
             const vTop = -currentTransformForVisibility.y / currentTransformForVisibility.scale;
@@ -2674,7 +2691,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             }
           }
 
-          // 馃殌 [Collision Check] Ensure draft doesn't overlap others
+          // 🎯 [Collision Check] Ensure draft doesn't overlap others
           const freshCanvas = activeCanvasRef.current; // Use Ref for fresh state
           const now = Date.now();
 
@@ -2692,7 +2709,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             ...(reservedRegionsRef.current || []).map(r => ({ x: r.bounds.x, y: r.bounds.y, width: r.bounds.width, height: r.bounds.height }))
           ];
 
-          // 馃殌 [Fix] If reusing a draft (user placed), Respect its position! 
+          // 🎯 [Fix] If reusing a draft (user placed), Respect its position! 
           // Only use safe-find for completely new/automatic generations.
           let safePos = currentPos;
           if (!isReusingDraft) {
@@ -2702,7 +2719,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             safePos = { x: Math.round(currentPos.x), y: Math.round(currentPos.y) };
           }
 
-          // 馃殌 Always reserve the FINAL position (whether shifted or not)
+          // 🎯 Always reserve the FINAL position (whether shifted or not)
           reservedRegionsRef.current.push({
             timestamp: now,
             bounds: { x: safePos.x, y: safePos.y, width: 380, height: 200 }
@@ -2759,7 +2776,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       });
 
-      // 馃殌 Final hard-guard: in normal mode, always lock to CURRENT viewport center at click-time
+      // 🎯 Final hard-guard: in normal mode, always lock to CURRENT viewport center at click-time
       // This prevents any stale draft/canvas closure from pulling position back to initial canvas.
       if (!isFollowUp) {
         const latestTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
@@ -2769,12 +2786,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         console.log('[handleGenerate] Final position hard-guard (normal mode):', currentPos);
       }
 
-      const isNewAnim = true; // 馃殌 Always set for standard generation
+      const isNewAnim = true; // 🎯 Always set for standard generation
 
       const rawPrompt = config.prompt.trim();
       let optimizedPromptEn: string | undefined;
       let optimizedPromptZh: string | undefined;
-      let promptOptimizerResult: any | undefined; // 馃殌 [New] 鎻愮ず璇嶇紪璇戝櫒缁撴灉
+      let promptOptimizerResult: any | undefined; // 🎯 [New] 提示璇嶇紪璇戝櫒结果
 
       if ((config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) && config.enablePromptOptimization && rawPrompt) {
         try {
@@ -2813,7 +2830,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           });
           optimizedPromptEn = optimized.optimizedEn;
           optimizedPromptZh = optimized.optimizedZh;
-          promptOptimizerResult = optimized.fullResult; // 馃殌 鎹曡幏瀹屾暣缂栬瘧鍣ㄧ粨鏋?
+          promptOptimizerResult = optimized.fullResult; // 🎯 捕获瀹屾暣缂栬瘧鍣ㄧ粨鏋?
         } catch (e: any) {
           console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', e);
           import('./services/system/notificationService').then(({ notify }) => {
@@ -2843,7 +2860,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         originalPrompt: rawPrompt,
         optimizedPromptEn,
         optimizedPromptZh,
-        promptOptimizerResult, // 馃殌 [New] 瀛樺偍缂栬瘧鍣ㄧ粨鏋?
+        promptOptimizerResult, // 🎯 [New] 存储缂栬瘧鍣ㄧ粨鏋?
         promptOptimizationEnabled: !!(config.enablePromptOptimization && (optimizedPromptEn || promptOptimizerResult)),
         position: currentPos,
         aspectRatio: config.aspectRatio,
@@ -2870,7 +2887,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         error: undefined,
         errorDetails: undefined,
         refundStatus: undefined,
-        isNew: isNewAnim, // 馃殌 鍚敤鍔ㄧ敾鏍囪
+        isNew: isNewAnim, // 🎯 启用鍔ㄧ敾标记
         parallelCount: pptCount,
         sourceImageId: activeSourceImage || undefined,
         mode: config.mode,
@@ -2887,7 +2904,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         },
       };
 
-      // 馃殌 [Fix Duplicate Placeholders]
+      // 🎯 [Fix Duplicate Placeholders]
       // Always check if the ID we are about to add/update actually exists on canvas
       // If not, revert to add. If yes, update.
       const canvasForWrite = activeCanvasRef.current;
@@ -2977,7 +2994,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       }
 
-      // 馃殌 [Cleanup] Remove any OTHER drafts if they exist (duplicate prevention)
+      // 🎯 [Cleanup] Remove any OTHER drafts if they exist (duplicate prevention)
       // This is a safety measure - uncommented to fix orphan card issue
       const leftovers = canvasForWrite?.promptNodes.filter(n => n.isDraft && n.id !== generatingNode.id);
       if (leftovers && leftovers.length > 0) {
@@ -2997,10 +3014,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('发送失败', e?.message || '请重试');
       });
     } finally {
-      // 馃殌 [Fix] 涓嶅湪姝ゅ setIsGenerating(false)锛屽洜涓?executeGeneration 鍐呴儴宸茬鐞嗘鐘舵€?
-      // 鍙戦€佽妭娴佺敱 lastGenerateAtRef 鎺у埗锛屼笉鍐嶄緷璧栨暣杞敓鎴愮粨鏉熸墠瑙ｉ攣
+      // 🎯 [Fix] 涓嶅湪姝ゅ setIsGenerating(false)锛屽洜涓?executeGeneration 内部宸茬鐞嗘状态
+      // 鍙戦€佽妭娴佺敱 lastGenerateAtRef 控制锛屼笉鍐嶄緷璧栨暣杞敓鎴愮粨鏉熸墠瑙ｉ攣
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCredits, balance, setShowRechargeModal]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCredits, balance, setShowRechargeModal, user, isTempUser, authLoading]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -3052,12 +3069,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     arrangeAllNodes();
   }, [arrangeAllNodes]);
 
-  // --- 杩炴帴绠＄悊 ---
+  // --- 连接管理 ---
   const handleCutConnection = useCallback((promptId: string, imageId: string) => {
     unlinkNodes(promptId, imageId);
   }, [unlinkNodes]);
 
-  // 馃殌 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
+  // 🎯 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
   const handleDisconnectPrompt = useCallback((id: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (node && node.sourceImageId) {
@@ -3074,7 +3091,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [activeCanvas, updatePromptNode, draftNodeId, setActiveSourceImage]);
 
-  // 馃殌 [Strict Logic] Pin Draft -> Create Lonely Main Card
+  // 🎯 [Strict Logic] Pin Draft -> Create Lonely Main Card
   const handlePinDraft = useCallback((id: string, mode: 'button' | 'drag') => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (!node) return;
@@ -3091,7 +3108,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     // Clear Draft ID so next typing creates new draft
     setDraftNodeId(null);
-    // 馃殌 [New Requirement] Clear input box and active source
+    // 🎯 [New Requirement] Clear input box and active source
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
     setActiveSourceImage(null);
 
@@ -3100,7 +3117,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [activeCanvas, updatePromptNode, setDraftNodeId, setConfig]);
 
-  // 馃殌 [New Feature] Pin Image -> Convert to Lonely Main Card (Idea Freeze)
+  // 🎯 [New Feature] Pin Image -> Convert to Lonely Main Card (Idea Freeze)
   const handlePinImage = useCallback(async (imageId: string) => {
     const imageNode = activeCanvas?.imageNodes.find(n => n.id === imageId);
     if (!imageNode) return;
@@ -3118,7 +3135,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       imageSize: imageNode.imageSize || ImageSize.SIZE_1K,
       aspectRatio: imageNode.aspectRatio,
       childImageIds: [], // Initialize empty array for new prompt node
-      // 馃殌 Use the image itself as a reference to preserve the "Idea"
+      // 🎯 Use the image itself as a reference to preserve the "Idea"
       referenceImages: [{
         id: `ref-${newPromptId}`,
         storageId: imageNode.storageId || imageNode.id,
@@ -3166,7 +3183,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isGenerating: true,
       error: undefined,
       errorDetails: undefined,
-      isDraft: false, // 馃殌 [Fix] Ensure visibility
+      isDraft: false, // 🎯 [Fix] Ensure visibility
       timestamp: Date.now() // Reset timer
     });
 
@@ -3186,7 +3203,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             updatePromptNode({
               ...executionNode,
               isGenerating: false,
-              isDraft: false, // 馃殌 [Fix] Prevent disappearance on timeout
+              isDraft: false, // 🎯 [Fix] Prevent disappearance on timeout
               error: '生成超时',
               errorDetails: {
                 code: 'TIMEOUT',
@@ -3315,7 +3332,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           // Calculate Hash/StorageID
           const storageId = await calculateImageHash(url);
 
-          // 馃殌 [Fair Billing] Detect ACTUAL dimensions from the blob/image
+          // 🎯 [Fair Billing] Detect ACTUAL dimensions from the blob/image
           // This ensures we bill for what was received (e.g. 1K), not what was requested (e.g. 4K)
           // if the API downgraded it.
           let actualWidth = 1024;
@@ -3370,7 +3387,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           return {
             canvasId: activeCanvas?.id || 'default',
             parentPromptId: executionNode.id,
-            dimensions: displayDimensions, // 馃殌 Use Real Dimensions
+            dimensions: displayDimensions, // 🎯 Use Real Dimensions
             generationTime,
             index,
             url,
@@ -3379,7 +3396,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             width: actualWidth,
             height: actualHeight,
             aspectRatio: executionNode.aspectRatio,
-            imageSize: computedImageSize, // 馃殌 Use Computed Cost Tier
+            imageSize: computedImageSize, // 🎯 Use Computed Cost Tier
             model: actualModel,
             modelLabel: actualModelLabel,
             provider: actualProvider,
@@ -3457,7 +3474,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const startX = -mobileCardWidth / 2;
           const offsetX = startX + mobileCardWidth / 2;
 
-          // 馃殌 [Fix] Image Y should be exactly below Prompt Y, without adding promptCardHeight
+          // 🎯 [Fix] Image Y should be exactly below Prompt Y, without adding promptCardHeight
           // Because Prompt Y is already its bottom edge.
           const offsetY = gapToImages + exactImageHeight + row * (exactImageHeight + mobileGap);
           x = executionNode.position.x + offsetX;
@@ -3477,7 +3494,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const offsetX = startX + col * (cardWidth + gap) + cardWidth / 2;
 
           // Y: Prompt Bottom + Gap + Image Height
-          // 馃殌 [Fix] node.position.y is already bottom anchor. Do NOT add promptCardHeight!
+          // 🎯 [Fix] node.position.y is already bottom anchor. Do NOT add promptCardHeight!
           const rowHeight = exactImageHeight;
           const rowOffsetY = row * (rowHeight + gap);
 
@@ -3497,7 +3514,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       addImageNodes(newImageNodes, {
         [node.id]: {
           isGenerating: false,
-          isDraft: false, // 馃殌 [Fix] Ensure persistence
+          isDraft: false, // 🎯 [Fix] Ensure persistence
           childImageIds: newImageNodes.map(n => n.id),
           error: undefined,
           errorDetails: undefined,
@@ -3509,7 +3526,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
 
       // Record cost
-      // 馃殌 [Fair Billing] Use the computed/effective size from the first result (assuming all in batch are same)
+      // 🎯 [Fair Billing] Use the computed/effective size from the first result (assuming all in batch are same)
       const effectiveSize = newImageNodes[0]?.imageSize || executionNode.imageSize; // fallback
 
       import('./services/billing/costService').then(({ recordCost }) => {
@@ -3537,12 +3554,12 @@ const AppContent: React.FC<AppContentProps> = () => {
       updatePromptNode({
         ...executionNode,
         isGenerating: false,
-        isDraft: false, // 馃殌 [Fix] Prevent disappearance on error
+        isDraft: false, // 🎯 [Fix] Prevent disappearance on error
         error: error.message || 'Retry failed',
         errorDetails: extractErrorDetails(error, executionNode.model)
       });
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('閲嶈瘯澶辫触', error.message);
+        notify.error('閲嶈瘯失败', error.message);
       });
     }
   }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration]);
@@ -3656,7 +3673,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   </style>
 </head>
 <body>
-  <h1>${(node.prompt || 'PPT 瀵煎嚭').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
+  <h1>${(node.prompt || 'PPT 导出').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
   <div class="grid">
     ${pagesMeta.map(p => `
       <div class="card">
@@ -3910,7 +3927,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${escapeXml(node.prompt || 'KK Studio PPT 瀵煎嚭')}</dc:title>
+  <dc:title>${escapeXml(node.prompt || 'KK Studio PPT 导出')}</dc:title>
   <dc:creator>KK Studio</dc:creator>
   <cp:lastModifiedBy>KK Studio</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
@@ -4552,6 +4569,22 @@ ${slideLayerXml.join('\n')}
     });
   }, [getPptEditableExportBundle, resolvePptExportImageAsset]);
 
+  const promptNodeById = React.useMemo(() => {
+    const map = new Map<string, PromptNode>();
+    activeCanvas?.promptNodes.forEach((node) => {
+      map.set(node.id, node);
+    });
+    return map;
+  }, [activeCanvas?.promptNodes]);
+
+  const imageNodeById = React.useMemo(() => {
+    const map = new Map<string, GeneratedImage>();
+    activeCanvas?.imageNodes.forEach((node) => {
+      map.set(node.id, node);
+    });
+    return map;
+  }, [activeCanvas?.imageNodes]);
+
   // Auto-Recover Interrupted Tasks
   useEffect(() => {
     if (activeCanvas) {
@@ -4605,7 +4638,7 @@ ${slideLayerXml.join('\n')}
       imageSize: clickedNode.imageSize,
       model: clickedNode.model,
       referenceImages: referenceImages,
-      mode: clickedNode.mode || GenerationMode.IMAGE // 馃殌 Sync Mode (Image/Video)
+      mode: clickedNode.mode || GenerationMode.IMAGE // 🎯 Sync Mode (Image/Video)
     }));
 
     // [Draft Logic] Resume Draft if clicked on a draft node
@@ -4618,7 +4651,7 @@ ${slideLayerXml.join('\n')}
   }, [setConfig]);
 
   const handleImageClick = useCallback((imageId: string) => {
-    // 馃殌 Shift=鍒囨崲(鍚戝悗鍏煎), 鏃犱慨楗伴敭=鏇挎崲
+    // 🎯 Shift=切换(鍚戝悗鍏煎), 鏃犱慨楗伴敭=替换
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
 
     // Set this image as source for continuing conversation
@@ -4626,36 +4659,36 @@ ${slideLayerXml.join('\n')}
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
-    // 馃殌 绔嬪嵆鍒涘缓杩介棶妯″紡鐨凞raft鑺傜偣
-    // 鍒犻櫎鐜版湁鐨刣raft锛堝鏋滄湁锛?
+    // 🎯 绔嬪嵆创建杩介棶模式鐨凞raft鑺傜偣
+    // 删除鐜版湁鐨刣raft锛堝鏋滄湁锛?
     if (draftNodeId) {
       deletePromptNode(draftNodeId);
     }
 
-    // 璁＄畻杩介棶Draft鐨勪綅缃紙鍦ㄧ埗鍗＄粍涓嬫柟锛?
+    // 计算杩介棶Draft鐨勪綅缃紙鍦ㄧ埗鍗＄粍下方锛?
     const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
     if (sourceImage) {
       const parentPromptId = sourceImage.parentPromptId;
       const parentPrompt = activeCanvas?.promptNodes.find(p => p.id === parentPromptId);
 
-      // 馃殌 璁＄畻婧愬浘鐗囩殑搴曢儴Y锛堝浘鐗囦娇鐢ㄥ簳閮ㄩ敋鐐癸紝position.y灏辨槸搴曢儴锛?
+      // 🎯 计算婧愬浘鐗囩殑底部Y锛堝浘鐗囦娇鐢ㄥ簳閮ㄩ敋鐐癸紝position.y灏辨槸底部锛?
       const sourceBottom = sourceImage.position.y;
 
-      let draftPos = { x: sourceImage.position.x, y: sourceBottom + 100 }; // fallback锛氭簮鍥剧墖涓嬫柟100px
+      let draftPos = { x: sourceImage.position.x, y: sourceBottom + 100 }; // fallback锛氭簮图片下方100px
 
       if (parentPrompt) {
-        // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝璁＄畻鏈€澶浣嶇疆锛堝簳閮級
+        // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝计算鏈€澶位置锛堝簳閮級
         const siblingImages = activeCanvas?.imageNodes.filter(img => img.parentPromptId === parentPromptId) || [];
-        let maxY = parentPrompt.position.y; // 涓诲崱搴曢儴閿氱偣
+        let maxY = parentPrompt.position.y; // 涓诲崱底部閿氱偣
 
         siblingImages.forEach(img => {
-          // 馃殌 FIX: 鍥剧墖浣跨敤搴曢儴閿氱偣锛宲osition.y灏辨槸搴曢儴锛屾棤闇€鍐嶅姞楂樺害
+          // 🎯 FIX: 图片使用底部閿氱偣锛宲osition.y灏辨槸底部锛屾棤闇€鍐嶅姞楂樺害
           maxY = Math.max(maxY, img.position.y);
         });
 
         draftPos = {
           x: parentPrompt.position.x,
-          y: maxY + 80  // 鍦ㄦ渶搴曢儴鐨勫崱鐗囦笅鏂?0px
+          y: maxY + 80  // 鍦ㄦ渶底部鐨勫崱鐗囦笅鏂?0px
         };
       }
 
@@ -4685,7 +4718,7 @@ ${slideLayerXml.join('\n')}
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasNodes = false;
-    // 馃殌 Uniform 40px padding on all sides
+    // 🎯 Uniform 40px padding on all sides
     const PADDING = 40;
     const TOP_EXTRA = 40; // Extra for header
     const BOTTOM_EXTRA = 40;
@@ -4707,13 +4740,13 @@ ${slideLayerXml.join('\n')}
 
     group.nodeIds.forEach(id => {
       // 1. Check Prompts
-      const prompt = activeCanvas.promptNodes.find(p => p.id === id);
+      const prompt = promptNodeById.get(id);
       if (prompt) {
         addRect(prompt.position.x, prompt.position.y, 380, prompt.height || 200);
         return;
       }
       // 2. Check Images
-      const img = activeCanvas.imageNodes.find(n => n.id === id);
+      const img = imageNodeById.get(id);
       if (img) {
         const { width, totalHeight } = getCardDimensions(img.aspectRatio, true);
         addRect(img.position.x, img.position.y, width, totalHeight);
@@ -4728,7 +4761,7 @@ ${slideLayerXml.join('\n')}
       width: (maxX - minX) + PADDING * 2,
       height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA
     };
-  }, [activeCanvas]);
+  }, [activeCanvas, imageNodeById, promptNodeById]);
 
   const promptGroupLayerById = React.useMemo(() => {
     const groupLayerMap = new Map<string, number>();
@@ -4769,6 +4802,27 @@ ${slideLayerXml.join('\n')}
     return groupIds;
   }, [activeCanvas, selectedNodeIds]);
 
+  const resolveCurrentPromptChildImages = useCallback((
+    promptNode: PromptNode | undefined | null,
+    imageNodes: GeneratedImage[],
+  ) => {
+    if (!promptNode) return [] as GeneratedImage[];
+
+    const orderedIds = (promptNode.childImageIds || []).filter((id): id is string => Boolean(id));
+    if (orderedIds.length > 0) {
+      const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
+      return orderedIds
+        .map((imageId) => imageNodeById.get(imageId))
+        .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode));
+    }
+
+    if (promptNode.error) {
+      return [] as GeneratedImage[];
+    }
+
+    return imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+  }, []);
+
   const promptGroupStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
     if (!activeCanvas) return stackMap;
@@ -4780,7 +4834,7 @@ ${slideLayerXml.join('\n')}
 
     activeCanvas.promptNodes.forEach((promptNode) => {
       const baseLayer = promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0;
-      const childImages = activeCanvas.imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
       const isGeneratingGroup = Boolean(promptNode.isGenerating) || childImages.some((imageNode) => imageNode.isGenerating);
       const isNewGroup = Boolean(promptNode.isNew) || childImages.some((imageNode) => now - (imageNode.timestamp || 0) < 10000);
       const isSelectedGroup = selectedPromptGroupIds.has(promptNode.id);
@@ -4803,7 +4857,7 @@ ${slideLayerXml.join('\n')}
     });
 
     return stackMap;
-  }, [activeCanvas, activeSourceImage, promptGroupLayerById, selectedPromptGroupIds]);
+  }, [activeCanvas, activeSourceImage, promptGroupLayerById, resolveCurrentPromptChildImages, selectedPromptGroupIds]);
 
   const standaloneImageStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
@@ -4906,10 +4960,10 @@ ${slideLayerXml.join('\n')}
       })
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
-    // 2. Filter Prompt Nodes (鎺掗櫎绾緟鍛借崏绋匡紝浣嗕繚鐣欐鍦ㄧ敓鎴愮殑鑺傜偣)
+    // 2. Filter Prompt Nodes (排除绾緟鍛借崏绋匡紝浣嗕繚鐣欐鍦ㄧ敓鎴愮殑鑺傜偣)
     const visiblePromptNodes = activeCanvas.promptNodes
       .filter(n => {
-        // 馃殌 [Fix] 鍙湁褰撳崱鐗囦粎浠呮槸闈欐€佽崏绋匡紙闈炵敓鎴愪腑锛夋椂鎵嶉殣钘忥紝鍥犱负瀹冪敱涓績鎺у埗鏍忚礋璐ｆ覆鏌撱€?
+        // 🎯 [Fix] 鍙湁褰撳崱鐗囦粎浠呮槸闈欐€佽崏绋匡紙闈炵敓鎴愪腑锛夋椂鎵嶉殣钘忥紝因为瀹冪敱中心控制鏍忚礋璐ｆ覆鏌撱€?
         // 涓€鏃﹁繘鍏ョ敓鎴愮姸鎬?(n.isGenerating)锛屽畠闇€瑕佸嚭鐜板湪鐢诲竷涓娿€?
         if (n.isDraft && !n.isGenerating) {
           return false;
@@ -4944,7 +4998,7 @@ ${slideLayerXml.join('\n')}
         return a.timestamp - b.timestamp;
       });
 
-    // 馃殌 Cache timestamp
+    // 🎯 Cache timestamp
     const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
       .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
       .filter((node) => {
@@ -4969,15 +5023,15 @@ ${slideLayerXml.join('\n')}
     const childMap = new Map<string, GeneratedImage[]>();
     if (!activeCanvas) return childMap;
 
-    activeCanvas.imageNodes.forEach(image => {
-      if (!image.parentPromptId) return;
-      const bucket = childMap.get(image.parentPromptId) || [];
-      bucket.push(image);
-      childMap.set(image.parentPromptId, bucket);
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
+      if (childImages.length > 0) {
+        childMap.set(promptNode.id, childImages);
+      }
     });
 
     return childMap;
-  }, [activeCanvas]);
+  }, [activeCanvas, resolveCurrentPromptChildImages]);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -5003,30 +5057,15 @@ ${slideLayerXml.join('\n')}
     const childMap = new Map<string, GeneratedImage[]>();
     if (!activeCanvas) return childMap;
 
-    visibleImageNodes.forEach((imageNode) => {
-      if (!imageNode.parentPromptId || !visiblePromptNodeIds.has(imageNode.parentPromptId)) {
-        return;
+    visiblePromptNodes.forEach((promptNode) => {
+      const images = resolveCurrentPromptChildImages(promptNode, visibleImageNodes);
+      if (images.length > 0) {
+        childMap.set(promptNode.id, images);
       }
-
-      const bucket = childMap.get(imageNode.parentPromptId) || [];
-      bucket.push(imageNode);
-      childMap.set(imageNode.parentPromptId, bucket);
-    });
-
-    childMap.forEach((images, promptId) => {
-      const promptNode = activeCanvas.promptNodes.find((node) => node.id === promptId);
-      const childOrder = new Map((promptNode?.childImageIds || []).map((id, index) => [id, index]));
-      images.sort((left, right) => {
-        const leftOrder = childOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER;
-        const rightOrder = childOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER;
-        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-        if ((left.zIndex ?? 0) !== (right.zIndex ?? 0)) return (left.zIndex ?? 0) - (right.zIndex ?? 0);
-        return left.timestamp - right.timestamp;
-      });
     });
 
     return childMap;
-  }, [activeCanvas, visibleImageNodes, visiblePromptNodeIds]);
+  }, [activeCanvas, resolveCurrentPromptChildImages, visibleImageNodes, visiblePromptNodes]);
 
   const standaloneVisibleImageNodes = React.useMemo(
     () => visibleImageNodes.filter((imageNode) => !imageNode.parentPromptId || !visiblePromptNodeIds.has(imageNode.parentPromptId)),
@@ -5335,18 +5374,8 @@ ${slideLayerXml.join('\n')}
 
   const getPromptChildrenForWorkflow = useCallback((promptNode: PromptNode | undefined | null) => {
     if (!promptNode || !activeCanvas) return [] as GeneratedImage[];
-
-    const orderedIds = (promptNode.childImageIds || []).filter((id): id is string => Boolean(id));
-    const orderedImages = orderedIds
-      .map((imageId) => activeCanvas.imageNodes.find((imageNode) => imageNode.id === imageId))
-      .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode));
-
-    if (orderedImages.length > 0) {
-      return orderedImages;
-    }
-
-    return activeCanvas.imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
-  }, [activeCanvas]);
+    return resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
+  }, [activeCanvas, resolveCurrentPromptChildImages]);
 
   const resolveWorkflowSourceIdsFromSelection = useCallback(() => {
     const explicitIds = selectedNodeIds.filter((nodeId) => (
@@ -6197,7 +6226,7 @@ ${slideLayerXml.join('\n')}
 
           selectNodes(nodeIds, 'toggle');
         }}
-        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodes(delta, sourceNodeIds)}
+        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
       />
@@ -6206,7 +6235,7 @@ ${slideLayerXml.join('\n')}
     canvasTransform.scale,
     getComputedGroupBounds,
     highlightedId,
-    moveSelectedNodes,
+    moveSelectedNodesImmediate,
     removeGroup,
     selectNodes,
     selectedNodeIds,
@@ -6571,7 +6600,7 @@ ${slideLayerXml.join('\n')}
                       个人中心
                     </button>
 
-                    {/* [NEW] 璐︽埛绠＄悊鍏ュ彛 */}
+                    {/* [NEW] 账户管理鍏ュ彛 */}
                     <button
                       onClick={() => {
                         setProfileInitialView('billing');
@@ -6636,7 +6665,7 @@ ${slideLayerXml.join('\n')}
       )}
       {/* Selection Menu Overlay */}
       {selectionMenuPosition && selectedNodeIds.length > 0 && (() => {
-        // 馃殌 璁＄畻璇︾粏缁熻锛氱粍鏁?鍥剧墖鏁?瑙嗛鏁?
+        // 🎯 计算璇︾粏统计锛氱粍鏁?图片鏁?视频鏁?
         const selectedPrompts = activeCanvas?.promptNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
         const selectedImages = activeCanvas?.imageNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
 
@@ -6646,7 +6675,7 @@ ${slideLayerXml.join('\n')}
           img.url?.includes('.mp4') ||
           img.url?.startsWith('data:video')
         ).length;
-        const imageCount = selectedImages.length - videoCount; // 鍥剧墖 = 鍓崱鎬绘暟 - 瑙嗛鏁?
+        const imageCount = selectedImages.length - videoCount; // 图片 = 鍓崱鎬绘暟 - 视频鏁?
 
         return (
           <SelectionMenu
@@ -6680,7 +6709,7 @@ ${slideLayerXml.join('\n')}
               const childImageIds = prompts.flatMap(p => p.childImageIds || []);
               const images = activeCanvas.imageNodes.filter(n => selectedNodeIds.includes(n.id) || childImageIds.includes(n.id));
 
-              // 馃殌 Merge Logic: Find existing groups that contain any of the selected nodes
+              // 🎯 Merge Logic: Find existing groups that contain any of the selected nodes
               const selectedNodeSet = new Set([...prompts.map(n => n.id), ...images.map(n => n.id)]);
               const existingGroupsInSelection = activeCanvas.groups.filter(g =>
                 g.nodeIds.some(nid => selectedNodeSet.has(nid))
@@ -6691,7 +6720,7 @@ ${slideLayerXml.join('\n')}
               existingGroupsInSelection.forEach(g => g.nodeIds.forEach(nid => allMergedNodeIds.add(nid)));
               selectedNodeSet.forEach(nid => allMergedNodeIds.add(nid));
 
-              // 馃殌 Label Merge Logic
+              // 🎯 Label Merge Logic
               let mergedLabel: string | undefined;
               const existingLabels = existingGroupsInSelection
                 .map(g => g.label?.trim())
@@ -6709,7 +6738,7 @@ ${slideLayerXml.join('\n')}
                 mergedLabel = uniqueLabels.join(' + ');
               }
 
-              // 馃殌 Remove old groups that are being merged
+              // 🎯 Remove old groups that are being merged
               existingGroupsInSelection.forEach(g => removeGroup(g.id));
 
               // Calculate combined bounds (using all merged nodes)
@@ -6741,7 +6770,7 @@ ${slideLayerXml.join('\n')}
                 return;
               }
 
-              const padding = 40; // 馃殌 Uniform 40px all sides
+              const padding = 40; // 🎯 Uniform 40px all sides
               const topExtra = 40;
               const bottomExtra = 40;
               const group: CanvasGroup = {
@@ -6833,7 +6862,7 @@ ${slideLayerXml.join('\n')}
         ]}
         onCanvasClick={() => {
           // [Draft Logic] Detach from draft when clicking background
-          // if (draftNodeId) setDraftNodeId(null); // 馃殌 [FIX] Prevent detaching draft on background click to avoid "Lonely Main Card" orphans
+          // if (draftNodeId) setDraftNodeId(null); // 🎯 [FIX] Prevent detaching draft on background click to avoid "Lonely Main Card" orphans
 
           // Clear input when clicking empty canvas, but NOT during generation
           // and NOT when in "continue from image" mode
@@ -6856,7 +6885,7 @@ ${slideLayerXml.join('\n')}
             // Also clear selection
             clearSelection();
             setSelectionMenuPosition(null);
-            // 馃殌 [Fix] Explicitly remove draft node so preview disappears
+            // 🎯 [Fix] Explicitly remove draft node so preview disappears
             if (draftNodeId) {
               deletePromptNode(draftNodeId);
               setDraftNodeId(null);
@@ -6869,18 +6898,18 @@ ${slideLayerXml.join('\n')}
           const latestImage = activeCanvas?.imageNodes[activeCanvas.imageNodes.length - 1];
           const latestPrompt = activeCanvas?.promptNodes[activeCanvas.promptNodes.length - 1];
 
-          // 浼樺厛瀹氫綅鍒版渶鏂扮殑鍥剧墖,濡傛灉娌℃湁鍒欏畾浣嶅埌鏈€鏂扮殑鎻愮ず璇?
+          // 浼樺厛瀹氫綅鍒版渶鏂扮殑图片,濡傛灉娌℃湁鍒欏畾浣嶅埌鏈€鏂扮殑提示璇?
           const targetNode = latestImage || latestPrompt;
 
           if (targetNode && canvasRef.current) {
-            // 浣跨敤InfiniteCanvas鐨剆etView鏂规硶瀹氫綅鍒扮洰鏍囧崱鐗?
+            // 使用InfiniteCanvas鐨剆etView鏂规硶瀹氫綅鍒扮洰鏍囧崱鐗?
             const container = document.getElementById('canvas-container');
             if (container) {
               const rect = container.getBoundingClientRect();
               const centerX = rect.width / 2;
               const centerY = rect.height / 2;
 
-              // 璁＄畻闇€瑕佺殑transform浣跨洰鏍囧崱鐗囧眳涓?
+              // 计算闇€瑕佺殑transform浣跨洰鏍囧崱鐗囧眳涓?
               const newX = centerX - targetNode.position.x * canvasTransform.scale;
               const newY = centerY - targetNode.position.y * canvasTransform.scale;
 
@@ -6940,7 +6969,7 @@ ${slideLayerXml.join('\n')}
               let imageHeight = theoreticalHeight;
 
               if (childNode.dimensions && typeof childNode.dimensions === 'string') {
-                // 馃殌 [Fix Bug] Extract purely the dimension part: "1:1 路 4096x4096" -> "4096x4096"
+                // 🎯 [Fix Bug] Extract purely the dimension part: "1:1 路 4096x4096" -> "4096x4096"
                 // Then split by 'x' to avoid parsing the "1:1" as "1"
                 const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
                 if (match && match[1] && match[2]) {
@@ -6953,7 +6982,7 @@ ${slideLayerXml.join('\n')}
                   }
                 }
               }
-              /* 馃殌 涓诲崱鍜屽壇鍗′箣闂寸殑杩炵嚎淇濇寔鐧界伆鑹?*/
+              /* 🎯 涓诲崱鍜屽壇鍗′箣闂寸殑杩炵嚎淇濇寔鐧界伆鑹?*/
 
               if (isNaN(imageHeight) || imageHeight <= 0) {
                 imageHeight = theoreticalHeight;
@@ -7025,7 +7054,7 @@ ${slideLayerXml.join('\n')}
             const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
             const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
 
-            /* 馃殌 鏂伴鑹查€昏緫锛氶噸缁樹负缁胯壊锛岃拷闂负閲戣壊 */
+            /* 🎯 鏂伴鑹查€昏緫锛氶噸缁樹负缁胯壊锛岃拷闂负閲戣壊 */
             const baseColor = pn.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
             const hoverClass = pn.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
@@ -7118,7 +7147,7 @@ ${slideLayerXml.join('\n')}
             const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
             const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
 
-            /* 馃殌 鏂伴鑹查€昏緫瀵逛簬寰呯敓鎴愯繛鎺ワ細鍒╃敤閰嶇疆涓殑妯″紡鍒ゆ柇 */
+            /* 🎯 鏂伴鑹查€昏緫瀵逛簬寰呯敓鎴愯繛鎺ワ細利用配置涓殑模式判断 */
             const baseColor = config.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
             const hoverClass = config.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
@@ -7246,7 +7275,7 @@ ${slideLayerXml.join('\n')}
 
               selectNodes(nodeIds, 'toggle');
             }}
-            onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodes(delta, sourceNodeIds)}
+            onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
             onUpdateGroup={updateGroup}
             computedBounds={getComputedGroupBounds(group)}
           />
@@ -7419,7 +7448,7 @@ ${slideLayerXml.join('\n')}
             onPositionChange={updateImageNodePosition}
             highlighted={highlightedId === node.id}
             onDimensionsUpdate={updateImageNodeDisplayMeta}
-            onUpdate={updateImageNode} // 馃殌
+            onUpdate={updateImageNode} // 🎯
             onDelete={deleteImageNode}
             onConnectEnd={handleConnectEnd}
             onClick={handleImageClick}
@@ -7428,7 +7457,7 @@ ${slideLayerXml.join('\n')}
             isSelected={selectedNodeIds.includes(node.id)}
             onSelect={() => {
               selectNodes([node.id], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-              // 馃殌 Right Click triggers Selection Menu centered on node bounds
+              // 🎯 Right Click triggers Selection Menu centered on node bounds
               if ((window.event as any)?.button === 2) {
                 const pos = getSelectionScreenCenter([node.id]);
                 if (pos) setSelectionMenuPosition(pos);
@@ -7440,9 +7469,9 @@ ${slideLayerXml.join('\n')}
             onPreviewPptStack={handleOpenPptStackPreview}
             onDownloadPptComposite={handleDownloadPptComposite}
             isCanvasTransforming={isCanvasTransforming}
-            // 馃殌 [Optimization] Identify if the node was created in the last 10 seconds
+            // 🎯 [Optimization] Identify if the node was created in the last 10 seconds
             isNew={(nowTimestamp || Date.now()) - (node.timestamp || 0) < 10000}
-            canvasTransform={canvasTransform} // 馃殌 Pass Transform for Animation Calculation
+            canvasTransform={canvasTransform} // 🎯 Pass Transform for Animation Calculation
             onDragDelta={(delta, sourceNodeId) => {
               if (!sourceNodeId) return;
 
@@ -7466,8 +7495,8 @@ ${slideLayerXml.join('\n')}
               } else {
                 moveSelectedNodes(delta, sourceNodeId);
               }
-              // 馃殌 [Fix] Force re-render for real-time connection line updates
-            }} // 馃殌 Enable Safe Relative Drag
+              // 🎯 [Fix] Force re-render for real-time connection line updates
+            }} // 🎯 Enable Safe Relative Drag
           />
         ))}
 
@@ -7504,13 +7533,13 @@ ${slideLayerXml.join('\n')}
           }}
           onInteract={handleShowMobileNav}
           onFocus={() => {
-            console.log('[PromptBar] onFocus - 璁剧疆isPromptFocused=true');
+            console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
             setIsPromptFocused(true);
           }}
           onBlur={() => {
-            console.log('[PromptBar] onBlur - 璁剧疆isPromptFocused=false');
+            console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
             setIsPromptFocused(false);
-            // 澶卞幓鐒︾偣鍚?绔嬪嵆閲嶆柊璁剧疆5绉掑畾鏃跺櫒
+            // 澶卞幓鐒︾偣鍚?绔嬪嵆重新设置5绉掑畾鏃跺櫒
             setTimeout(() => handleShowMobileNav(), 0);
           }}
         />
@@ -7645,16 +7674,16 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* [NEW] Draft Node Overlay (Fixed Center) - 馃殌 [宸茬鐢╙ 鐢ㄦ埛涓嶆兂瑕佽拷闂椂鐨勯瑙堝崱鐗?*/}
+      {/* [NEW] Draft Node Overlay (Fixed Center) - 🎯 [宸茬鐢╙ 用户涓嶆兂瑕佽拷闂椂鐨勯瑙堝崱鐗?*/}
       {/* {draftNodeId && (() => {
         const draftNode = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
-        // 馃殌 [Fix] 鍙湁褰撹妭鐐逛粛鐒舵槸鑽夌鏃舵墠鏄剧ず鍙犲姞灞傦紝鐢熸垚涓殑鑺傜偣搴旇鍙湪鐢诲竷涓婃樉绀?
+        // 🎯 [Fix] 鍙湁褰撹妭鐐逛粛鐒舵槸鑽夌鏃舵墠显示鍙犲姞灞傦紝鐢熸垚涓殑鑺傜偣搴旇鍙湪鐢诲竷涓婃樉绀?
         if (!draftNode || !draftNode.isDraft) return null;
 
         // Mock position 0,0 for component, handle centering via container
         const displayNode = { ...draftNode, position: { x: 0, y: 0 } };
 
-        // 馃殌 [Sidebar Responsive Layout]
+        // 🎯 [Sidebar Responsive Layout]
         // Calculate center for the overlay (Accurate widths from components)
         const overlayOffsets = getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth);
         const overlayLeft = overlayOffsets.left;
@@ -7691,7 +7720,7 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* 鍏ㄥ眬鐏涓庢悳绱㈤潰鏉?(鎼滅储闈㈡澘缃簬搴曢儴锛岀伅绠辩疆浜庢渶涓婂眰) */}
+      {/* 鍏ㄥ眬鐏涓庢悳绱㈤潰鏉?(搜索闈㈡澘缃簬底部锛岀伅绠辩疆浜庢渶涓婂眰) */}
       {previewImages && (
         <Suspense fallback={null}>
           <GlobalLightbox
@@ -7703,7 +7732,7 @@ ${slideLayerXml.join('\n')}
             onDownloadPptComposite={handleDownloadPptComposite}
             onInpaint={(image, maskBase64, prompt) => {
               const userPrompt = (prompt || '局部重绘').trim();
-              // 馃殌 [绠€鍖栧榻怾 杩欓噷鐨?prompt 灏嗕細杩涘叆浼樺寲鍣紝鍥犳涓嶉渶瑕佸甫鏈夊お閲嶇殑纭紪鐮佷腑鏂囨寚浠ゃ€?
+              // 🎯 [绠€鍖栧榻怾 杩欓噷鐨?prompt 灏嗕細杩涘叆优化鍣紝因此涓嶉渶瑕佸甫鏈夊お閲嶇殑纭紪鐮佷腑鏂囨寚浠ゃ€?
               // 鍙渶瑕佹爣鏄庢牳蹇冩剰鍥撅細濡傛灉鏄?mask锛屽己璋冧慨鏀规秱鎶瑰尯鍩燂紱濡傛灉鏄叏灞€鍙傝€冿紝寮鸿皟閲嶇粯銆?
               const finalPrompt = maskBase64
                 ? `${userPrompt} (change masked area only)`
@@ -7833,7 +7862,7 @@ ${slideLayerXml.join('\n')}
           {/* 钃濊壊鍗婇€忔槑閬僵灞?*/}
           <div className="absolute inset-0 rounded-full bg-blue-500/15 z-[1]"></div>
 
-          {/* 鏄熷厜鍥炬爣 - 鎮仠鏃剁紦鎱㈡棆杞?0搴?*/}
+          {/* 鏄熷厜图标 - 鎮仠鏃剁紦鎱㈡棆杞?0搴?*/}
           <svg
             className="ai-chat-icon relative z-10"
             width="24"
@@ -7859,7 +7888,7 @@ ${slideLayerXml.join('\n')}
         </button>
       </div>}
 
-      {/* 馃殌 杩佺Щ寮圭獥 */}
+      {/* 🎯 杩佺Щ寮圭獥 */}
       {showMigrateModal && (
         <Suspense fallback={null}>
           <MigrateModal
@@ -7869,19 +7898,19 @@ ${slideLayerXml.join('\n')}
             currentCanvasId={state.activeCanvasId}
             selectedCount={selectedNodeIds.length}
             onMigrate={(targetCanvasId) => {
-          // 馃殌 澶勭悊"鏂板缓椤圭洰骞惰縼绉?
+          // 🎯 处理"新建项目骞惰縼绉?
           if (targetCanvasId === '__new__') {
-            // 鍒涘缓鏂伴」鐩紙杩斿洖鏂扮敾甯僆D锛?
+            // 创建鏂伴」鐩紙返回鏂扮敾甯僆D锛?
             const newCanvasId = createCanvas();
             if (newCanvasId) {
-              // 馃殌 鐩存帴浣跨敤杩斿洖鐨勬柊鐢诲竷ID杩涜杩佺Щ锛屾棤闇€绛夊緟state鏇存柊
-              // 淇濆瓨褰撳墠椤圭洰ID鐢ㄤ簬杩佺Щ
+              // 🎯 鐩存帴使用返回鐨勬柊鐢诲竷ID杩涜杩佺Щ锛屾棤闇€等待state更新
+              // 保存当前项目ID鐢ㄤ簬杩佺Щ
               const originalCanvasId = state.activeCanvasId;
 
-              // 鍒囨崲鍥炲師椤圭洰鎵ц杩佺Щ
+              // 切换鍥炲師项目执行杩佺Щ
               switchCanvas(originalCanvasId);
 
-              // 绋嶇瓑涓€涓嬬‘淇濆垏鎹㈠畬鎴愬悗鎵ц杩佺Щ
+              // 绋嶇瓑涓€涓嬬‘淇濆垏鎹㈠畬鎴愬悗执行杩佺Щ
               setTimeout(() => {
                 migrateNodes(selectedNodeIds, newCanvasId);
                 switchCanvas(newCanvasId);
@@ -7902,7 +7931,7 @@ ${slideLayerXml.join('\n')}
         </Suspense>
       )}
 
-      {/* 馃殌 鍏ㄥ眬鍏呭€兼ā鎬佹 */}
+      {/* 🎯 鍏ㄥ眬鍏呭€兼ā鎬佹 */}
       {showRechargeModal && (
         <Suspense fallback={null}>
           <RechargeModal />
@@ -7926,7 +7955,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // 馃殌 Pre-load admin models for credit-based model display
+  // 🎯 Pre-load admin models for credit-based model display
   useEffect(() => {
     adminModelService.loadAdminModels();
   }, []);

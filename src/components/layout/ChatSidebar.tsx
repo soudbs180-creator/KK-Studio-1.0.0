@@ -7,10 +7,13 @@ import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
+import { getModelCredits } from '../../services/model/modelPricing';
 import { sortModels, toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import ReactDOM from 'react-dom';
 import { AspectRatio, ImageSize } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useBilling } from '../../context/BillingContext';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -46,10 +49,12 @@ interface ChatModel {
     name: string;
     provider: string;
     isCustom: boolean;
+    isSystemInternal?: boolean;
     type?: 'chat' | 'image' | 'video' | 'image+chat' | 'audio';  // ✨ 支持多模态
     icon?: string;
     displayName?: string;
     description?: string;
+    creditCost?: number;
 }
 
 interface ChatSessionItem {
@@ -250,6 +255,32 @@ const pickPlannerModelId = (models: ChatModel[], selected: ChatModel): string | 
     return fallback?.id || null;
 };
 
+const buildAvailableChatModels = (canAccessSystemCreditModels: boolean): ChatModel[] => {
+    const rawModels = keyManager.getGlobalModelList().filter(model => {
+        const idLower = model.id.toLowerCase();
+
+        if (model.isSystemInternal && !canAccessSystemCreditModels) return false;
+
+        // 🚀 Allow Image Models (for /image command usage)
+        if (model.type === 'image') return true;
+        if (model.type === 'video') return false;
+
+        if (idLower.includes('flux') || idLower.includes('midjourney') || idLower.includes('dall-e') || idLower.includes('stable-diffusion') || idLower.includes('sdxl')) return false;
+        if (idLower.includes('nano') && idLower.includes('banana') && model.type !== 'image+chat') return false;
+
+        return model.type === 'chat' || model.type === 'image+chat';
+    });
+
+    const uniqueMap = new Map<string, ChatModel>();
+    rawModels.forEach(model => {
+        if (!uniqueMap.has(model.id)) {
+            uniqueMap.set(model.id, model);
+        }
+    });
+
+    return Array.from(uniqueMap.values());
+};
+
 const extractJson = (raw: string): any => {
     const txt = (raw || '').trim();
     try {
@@ -310,33 +341,13 @@ Return STRICT JSON only:
 };
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
+    const { user, isTempUser, loading: authLoading } = useAuth();
+    const { balance, setShowRechargeModal } = useBilling();
+    const canAccessSystemCreditModels = !!user && !isTempUser;
+
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
-    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => {
-        const models = keyManager.getGlobalModelList().filter(model => {
-            const idLower = model.id.toLowerCase();
-
-            // 🚀 Allow Image Models (for /image command usage)
-            // We consciously allow them so user can select "Imagen 4.0" and use /image
-            if (model.type === 'image') return true;
-            if (model.type === 'video') return false; // Keep video hidden for now unless requested
-
-            // 排除Nano Banana/Flux/Midjourney等纯图像生成模型 (即使被误判为chat)
-            // ✨ Update: We WANT Nano Banana (it is image+chat capable usually, or at least image)
-            // If it's pure image, we already allowed it above.
-
-            if (idLower.includes('flux') || idLower.includes('midjourney') || idLower.includes('dall-e') || idLower.includes('stable-diffusion') || idLower.includes('sdxl')) return false;
-            if (idLower.includes('nano') && idLower.includes('banana') && model.type !== 'image+chat') return false;
-            if (idLower.includes('flux') || idLower.includes('midjourney') || idLower.includes('dall-e') || idLower.includes('stable-diffusion') || idLower.includes('sdxl')) return false;
-
-            // 必须是 Chat 或 Image+Chat
-            return model.type === 'chat' || model.type === 'image+chat';
-        });
-        // 🚀 去重：使用 Map 按 ID 去重
-        const uniqueMap = new Map<string, ChatModel>();
-        models.forEach(m => { if (!uniqueMap.has(m.id)) uniqueMap.set(m.id, m); });
-        return Array.from(uniqueMap.values());
-    });
+    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canAccessSystemCreditModels));
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
@@ -428,22 +439,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     // Subscribe to keyManager updates
     useEffect(() => {
         const updateModels = () => {
-            // ✨ 支持多模态模型 (image+chat) + 🚀 去重
-            const rawModels = keyManager.getGlobalModelList().filter(model => {
-                const idLower = model.id.toLowerCase();
-
-                // 🚀 Allow Image Models
-                if (model.type === 'image') return true;
-                if (model.type === 'video') return false;
-
-                if (idLower.includes('flux') || idLower.includes('midjourney') || idLower.includes('dall-e') || idLower.includes('stable-diffusion') || idLower.includes('sdxl')) return false;
-
-                return model.type === 'chat' || model.type === 'image+chat';
-            });
-            // 🚀 去重：使用 Map 按 ID 去重
-            const uniqueMap = new Map<string, ChatModel>();
-            rawModels.forEach(m => { if (!uniqueMap.has(m.id)) uniqueMap.set(m.id, m); });
-            const models = Array.from(uniqueMap.values());
+            const models = buildAvailableChatModels(canAccessSystemCreditModels);
             setAvailableModels(models);
 
             if (models.length > 0) {
@@ -458,9 +454,41 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             }
         };
 
+        updateModels();
         const unsubscribe = keyManager.subscribe(updateModels);
         return unsubscribe;
-    }, [selectedModel.id]);
+    }, [canAccessSystemCreditModels, selectedModel.id]);
+
+    const getRequiredCredits = useCallback((model?: ChatModel | null) => {
+        if (!model) return 0;
+        const fallbackCredits = getModelCredits(model.id);
+        return Math.max(0, Number(model.creditCost ?? fallbackCredits ?? 0));
+    }, []);
+
+    const ensureModelAccess = useCallback((model: ChatModel | undefined | null, feature: string) => {
+        if (!model?.isSystemInternal) {
+            return true;
+        }
+
+        if (authLoading) {
+            notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
+            return false;
+        }
+
+        if (!canAccessSystemCreditModels) {
+            notify.error('请先登录', `管理员配置的积分模型需要登录账号后使用积分才能${feature}。`);
+            return false;
+        }
+
+        const requiredCredits = getRequiredCredits(model);
+        if (requiredCredits > 0 && balance < requiredCredits) {
+            notify.error('积分不足', `使用当前管理员模型${feature}需要 ${requiredCredits} 积分，当前余额: ${balance}，请充值。`);
+            setShowRechargeModal(true);
+            return false;
+        }
+
+        return true;
+    }, [authLoading, balance, canAccessSystemCreditModels, getRequiredCredits, setShowRechargeModal]);
 
     // 2. Chat State
     const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
@@ -915,7 +943,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
         try {
             // 1. 查找可用的绘图模型
-            const allModels = keyManager.getGlobalModelList();
+            const allModels = availableModels;
 
             // 🚀 Use Selected Model if it supports image generation
             let imageModel = allModels.find(m => m.id === selectedModel.id && (m.type === 'image' || m.type === 'image+chat'));
@@ -930,6 +958,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
             if (!imageModel) {
                 throw new Error("未找到可用的绘图模型，请在设置中添加支持绘图的模型 (如 Imagen 3/4, Gemini Flash Image等)");
+            }
+
+            if (!ensureModelAccess(imageModel, '生成图片')) {
+                return;
             }
 
             const referenceImages = refs
@@ -1015,6 +1047,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isThinking) return;
+        if (!ensureModelAccess(selectedModel, '进行对话')) return;
 
         const userText = input.trim();
 
@@ -1218,6 +1251,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const handleRegenerateAssistant = useCallback(async (assistantId: string) => {
         if (isThinking) return;
+        if (!ensureModelAccess(selectedModel, '进行对话')) return;
 
         const assistantIndex = messages.findIndex(m => m.id === assistantId);
         if (assistantIndex < 0) return;
@@ -1277,7 +1311,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             abortControllerRef.current = null;
             setIsThinking(false);
         }
-    }, [agentMode, currentAgent, isThinking, messages, registerActivity, selectedModel.id]);
+    }, [agentMode, currentAgent, ensureModelAccess, isThinking, messages, registerActivity, selectedModel]);
 
     const handleNewSession = useCallback(() => {
         const id = `session_${Date.now()}`;

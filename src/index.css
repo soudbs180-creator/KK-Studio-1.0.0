@@ -269,8 +269,9 @@
 .settings-panel .settings-dashboard-priority:hover,
 .settings-panel .settings-dashboard-log:hover,
 .settings-panel .settings-dashboard-row:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--settings-card-shadow);
+  background: var(--settings-surface-overlay);
+  transform: none;
+  box-shadow: none;
 }
 
 .settings-panel .api-settings-editor-card {
@@ -303,7 +304,8 @@
 .settings-panel .apple-icon-button:hover,
 .settings-panel .api-settings-provider-action-row > button:hover,
 .settings-panel .api-settings-editor-toolbar > button:hover {
-  transform: translateY(-1px);
+  opacity: 0.7;
+  transform: none;
 }
 
 .settings-panel .apple-button-primary:active,
@@ -312,7 +314,8 @@
 .settings-panel .apple-icon-button:active,
 .settings-panel .api-settings-provider-action-row > button:active,
 .settings-panel .api-settings-editor-toolbar > button:active {
-  transform: translateY(0) scale(0.98);
+  opacity: 0.5;
+  transform: none;
 }
 
 .settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]),
@@ -328,8 +331,9 @@
 .settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]):focus,
 .settings-panel .api-settings-view textarea:focus,
 .settings-panel .api-settings-view select:focus {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 4px var(--settings-focus-ring);
+  transform: none;
+  border-color: var(--settings-focus-border);
+  box-shadow: 0 0 0 3px var(--settings-focus-ring);
 }
 
 .settings-panel .api-settings-view input[type="checkbox"] {
@@ -3774,10 +3778,9 @@ body.dark-mode .settings-panel-header {
 }
 
 body.dark-mode .settings-shell-backdrop {
-  background:
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 24%),
-    radial-gradient(circle at top right, rgba(129, 140, 248, 0.14), transparent 28%),
-    rgba(7, 10, 19, 0.68);
+  background: var(--settings-backdrop);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 body.dark-mode .settings-shell-mobile,
@@ -4170,10 +4173,8 @@ iframe,
 .settings-shell-mobile,
 .settings-shell-nav,
 .settings-shell-main {
-  position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.94) 100%);
+  border: none;
+  background: var(--settings-shell-bg);
 }
 
 .settings-shell-mobile {
@@ -4429,8 +4430,8 @@ iframe,
 }
 
 .settings-sidebar-item.active .settings-sidebar-item__icon {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--settings-accent-rgb) / 0.2);
+  color: rgb(var(--settings-accent-rgb));
 }
 
 .settings-sidebar-item__desc {
@@ -4439,62 +4440,81 @@ iframe,
 }
 
 /* ============================================
-   Simplified Advanced Settings Refresh
+   iOS-Style Advanced Settings
    ============================================ */
 .settings-panel {
-  --settings-accent-rgb: 68 110 255;
-  --settings-accent-soft-rgb: 112 197 255;
-  --settings-layer-base: #f3f5fa;
-  --settings-layer-surface: rgba(255, 255, 255, 0.94);
-  --settings-layer-emphasis: #ffffff;
-  --settings-layer-strong: #eef2f8;
-  --settings-layer-input: rgba(246, 248, 252, 0.96);
-  --settings-layer-hover: #edf2fb;
-  --settings-page-bg: #eef2f7;
-  --settings-shell-bg: rgba(255, 255, 255, 0.92);
-  --settings-shell-header-bg: rgba(248, 250, 252, 0.96);
-  --settings-section-bg: rgba(255, 255, 255, 0.94);
-  --settings-surface-elevated: #ffffff;
-  --settings-surface-overlay: #f4f6fb;
-  --settings-surface-muted: #ecf1f8;
-  --settings-input-bg: var(--settings-layer-input);
-  --settings-input-border: rgba(15, 23, 42, 0.08);
-  --settings-border-subtle: rgba(15, 23, 42, 0.08);
-  --settings-border-strong: rgba(15, 23, 42, 0.14);
-  --settings-focus-border: rgba(68, 110, 255, 0.42);
-  --settings-focus-ring: rgba(68, 110, 255, 0.16);
-  --settings-text-main: #182033;
-  --settings-text-sub: rgba(24, 32, 51, 0.8);
-  --settings-text-muted: rgba(24, 32, 51, 0.62);
-  --settings-icon-main: #6a7387;
+  /* iOS 系统蓝 */
+  --settings-accent-rgb: 0 122 255;
+  --settings-accent-soft-rgb: 50 173 255;
+
+  /* 背景层级 — iOS 亮色 */
+  --settings-layer-base: #F2F2F7;
+  --settings-layer-surface: #FFFFFF;
+  --settings-layer-emphasis: #FFFFFF;
+  --settings-layer-strong: #E5E5EA;
+  --settings-layer-input: #FFFFFF;
+  --settings-layer-hover: #E5E5EA;
+  --settings-page-bg: #F2F2F7;
+  --settings-shell-bg: #F2F2F7;
+  --settings-shell-header-bg: #F2F2F7;
+  --settings-section-bg: #FFFFFF;
+  --settings-surface-elevated: #FFFFFF;
+  --settings-surface-overlay: #F2F2F7;
+  --settings-surface-muted: #F2F2F7;
+
+  /* 输入框 */
+  --settings-input-bg: #FFFFFF;
+  --settings-input-border: rgba(60, 60, 67, 0.12);
+
+  /* 边框 — iOS 分隔线 */
+  --settings-border-subtle: rgba(60, 60, 67, 0.12);
+  --settings-border-strong: rgba(60, 60, 67, 0.18);
+
+  /* 焦点 */
+  --settings-focus-border: rgba(0, 122, 255, 0.5);
+  --settings-focus-ring: rgba(0, 122, 255, 0.2);
+
+  /* 文字 — iOS 系统色 */
+  --settings-text-main: #000000;
+  --settings-text-sub: #3C3C43;
+  --settings-text-muted: rgba(60, 60, 67, 0.6);
+
+  /* 图标 */
+  --settings-icon-main: rgba(60, 60, 67, 0.6);
   --settings-icon-accent: rgb(var(--settings-accent-rgb));
-  --settings-button-primary-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%);
-  --settings-button-primary-bg-hover: linear-gradient(135deg, rgb(57 94 227) 0%, rgb(87 176 240) 100%);
-  --settings-button-primary-text: #ffffff;
-  --settings-button-primary-shadow:
-    0 14px 30px rgb(var(--settings-accent-rgb) / 0.22),
-    inset 0 1px 0 rgb(255 255 255 / 0.2);
-  --settings-button-secondary-bg: rgba(255, 255, 255, 0.88);
-  --settings-button-secondary-bg-hover: #ffffff;
-  --settings-button-secondary-text: #1f2937;
-  --settings-button-secondary-border: rgba(15, 23, 42, 0.08);
-  --settings-button-icon-bg: var(--settings-surface-muted);
-  --settings-button-icon-bg-hover: #e6edf8;
-  --settings-button-icon-text: #516077;
-  --settings-button-danger-bg: rgba(239, 68, 68, 0.08);
-  --settings-button-danger-border: rgba(239, 68, 68, 0.18);
-  --settings-button-danger-text: #b42318;
-  --settings-surface-start: var(--settings-layer-surface);
-  --settings-surface-end: rgba(255, 255, 255, 0.86);
-  --settings-soft-start: #ffffff;
-  --settings-soft-end: #f6f8fc;
-  --settings-muted-surface: rgba(236, 241, 248, 0.72);
-  --settings-muted-surface-strong: #f1f4fa;
-  --settings-panel-shadow: 0 20px 52px rgba(17, 24, 39, 0.12);
-  --settings-card-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
-  --settings-shell-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
-  --settings-inset-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  --settings-backdrop: rgba(11, 19, 32, 0.28);
+
+  /* 按钮 — iOS 扁平风格 */
+  --settings-button-primary-bg: rgb(var(--settings-accent-rgb));
+  --settings-button-primary-bg-hover: rgb(0, 100, 220);
+  --settings-button-primary-text: #FFFFFF;
+  --settings-button-primary-shadow: none;
+  --settings-button-secondary-bg: #F2F2F7;
+  --settings-button-secondary-bg-hover: #E5E5EA;
+  --settings-button-secondary-text: rgb(0, 122, 255);
+  --settings-button-secondary-border: transparent;
+  --settings-button-icon-bg: #F2F2F7;
+  --settings-button-icon-bg-hover: #E5E5EA;
+  --settings-button-icon-text: rgba(60, 60, 67, 0.6);
+  --settings-button-danger-bg: transparent;
+  --settings-button-danger-border: transparent;
+  --settings-button-danger-text: #FF3B30;
+
+  /* 表面 */
+  --settings-surface-start: #FFFFFF;
+  --settings-surface-end: #FFFFFF;
+  --settings-soft-start: #FFFFFF;
+  --settings-soft-end: #F2F2F7;
+  --settings-muted-surface: #F2F2F7;
+  --settings-muted-surface-strong: #E5E5EA;
+
+  /* 阴影 — iOS 极简 */
+  --settings-panel-shadow: none;
+  --settings-card-shadow: none;
+  --settings-shell-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --settings-inset-shadow: none;
+  --settings-backdrop: rgba(0, 0, 0, 0.3);
+
+  /* 覆盖全局变量 */
   --bg-base: var(--settings-layer-base);
   --bg-surface: var(--settings-layer-surface);
   --bg-elevated: var(--settings-layer-emphasis);
@@ -4502,93 +4522,115 @@ iframe,
   --bg-overlay: var(--settings-layer-emphasis);
   --bg-input: var(--settings-layer-input);
   --bg-hover: var(--settings-layer-hover);
-  --toolbar-bg: rgba(255, 255, 255, 0.82);
-  --toolbar-hover: rgba(68, 110, 255, 0.08);
-  --toolbar-active: rgba(68, 110, 255, 0.12);
-  --toolbar-divider: rgba(15, 23, 42, 0.08);
+  --toolbar-bg: rgba(242, 242, 247, 0.94);
+  --toolbar-hover: rgba(0, 122, 255, 0.08);
+  --toolbar-active: rgba(0, 122, 255, 0.12);
+  --toolbar-divider: rgba(60, 60, 67, 0.12);
   --border-subtle: var(--settings-border-subtle);
-  --border-default: rgba(15, 23, 42, 0.1);
-  --border-strong: rgba(15, 23, 42, 0.14);
+  --border-default: rgba(60, 60, 67, 0.12);
+  --border-strong: rgba(60, 60, 67, 0.18);
   --border-light: var(--border-default);
   --border-medium: var(--border-strong);
   --text-primary: var(--settings-text-main);
   --text-secondary: var(--settings-text-sub);
   --text-tertiary: var(--settings-text-muted);
-  --text-muted: rgba(24, 32, 51, 0.34);
-  --state-success-bg: rgba(16, 185, 129, 0.12);
-  --state-success-border: rgba(16, 185, 129, 0.22);
-  --state-success-text: #0f7a56;
-  --state-success-muted: rgba(15, 122, 86, 0.82);
-  --state-warning-bg: rgba(245, 158, 11, 0.14);
-  --state-warning-border: rgba(245, 158, 11, 0.24);
-  --state-warning-text: #9a6004;
-  --state-warning-muted: rgba(154, 96, 4, 0.82);
-  --state-danger-bg: rgba(239, 68, 68, 0.1);
-  --state-danger-border: rgba(239, 68, 68, 0.2);
-  --state-danger-text: #be3f3f;
-  --state-danger-muted: rgba(190, 63, 63, 0.78);
-  --state-info-bg: rgba(59, 130, 246, 0.1);
-  --state-info-border: rgba(59, 130, 246, 0.2);
-  --state-info-text: #295cd8;
-  --state-info-muted: rgba(41, 92, 216, 0.82);
+  --text-muted: rgba(60, 60, 67, 0.3);
+
+  /* 状态色 — iOS 语义色 */
+  --state-success-bg: rgba(52, 199, 89, 0.12);
+  --state-success-border: rgba(52, 199, 89, 0.24);
+  --state-success-text: #248A3D;
+  --state-success-muted: rgba(36, 138, 61, 0.82);
+  --state-warning-bg: rgba(255, 149, 0, 0.12);
+  --state-warning-border: rgba(255, 149, 0, 0.24);
+  --state-warning-text: #C93400;
+  --state-warning-muted: rgba(201, 52, 0, 0.82);
+  --state-danger-bg: rgba(255, 59, 48, 0.1);
+  --state-danger-border: rgba(255, 59, 48, 0.2);
+  --state-danger-text: #FF3B30;
+  --state-danger-muted: rgba(255, 59, 48, 0.82);
+  --state-info-bg: rgba(0, 122, 255, 0.1);
+  --state-info-border: rgba(0, 122, 255, 0.2);
+  --state-info-text: #007AFF;
+  --state-info-muted: rgba(0, 122, 255, 0.82);
+
   color: var(--text-primary);
   color-scheme: light;
 }
 
 body.dark-mode .settings-panel {
-  --settings-accent-rgb: 130 167 255;
-  --settings-accent-soft-rgb: 86 212 255;
-  --settings-layer-base: #0f131a;
-  --settings-layer-surface: rgba(19, 24, 33, 0.94);
-  --settings-layer-emphasis: #161d28;
-  --settings-layer-strong: #202938;
-  --settings-layer-input: rgba(16, 24, 35, 0.96);
-  --settings-layer-hover: #263243;
-  --settings-page-bg: #0d1117;
-  --settings-shell-bg: rgba(19, 24, 33, 0.94);
-  --settings-shell-header-bg: rgba(20, 27, 38, 0.98);
-  --settings-section-bg: #141c27;
-  --settings-surface-elevated: #18212d;
-  --settings-surface-overlay: #1f2a38;
-  --settings-surface-muted: #243040;
-  --settings-input-bg: var(--settings-layer-input);
-  --settings-input-border: rgba(255, 255, 255, 0.08);
-  --settings-border-subtle: rgba(255, 255, 255, 0.1);
-  --settings-border-strong: rgba(255, 255, 255, 0.18);
-  --settings-focus-border: rgba(130, 167, 255, 0.48);
-  --settings-focus-ring: rgba(130, 167, 255, 0.18);
-  --settings-text-main: rgba(246, 249, 255, 0.96);
-  --settings-text-sub: rgba(236, 242, 252, 0.88);
-  --settings-text-muted: rgba(205, 215, 231, 0.76);
-  --settings-icon-main: #b6c3d8;
+  /* iOS 暗色蓝 */
+  --settings-accent-rgb: 10 132 255;
+  --settings-accent-soft-rgb: 100 210 255;
+
+  /* 背景层级 — iOS 暗色 */
+  --settings-layer-base: #000000;
+  --settings-layer-surface: #1C1C1E;
+  --settings-layer-emphasis: #1C1C1E;
+  --settings-layer-strong: #2C2C2E;
+  --settings-layer-input: #2C2C2E;
+  --settings-layer-hover: #3A3A3C;
+  --settings-page-bg: #000000;
+  --settings-shell-bg: #000000;
+  --settings-shell-header-bg: #000000;
+  --settings-section-bg: #1C1C1E;
+  --settings-surface-elevated: #2C2C2E;
+  --settings-surface-overlay: #1C1C1E;
+  --settings-surface-muted: #1C1C1E;
+
+  /* 输入框 */
+  --settings-input-bg: #2C2C2E;
+  --settings-input-border: rgba(255, 255, 255, 0.1);
+
+  /* 边框 */
+  --settings-border-subtle: rgba(255, 255, 255, 0.08);
+  --settings-border-strong: rgba(255, 255, 255, 0.15);
+
+  /* 焦点 */
+  --settings-focus-border: rgba(10, 132, 255, 0.6);
+  --settings-focus-ring: rgba(10, 132, 255, 0.25);
+
+  /* 文字 */
+  --settings-text-main: #FFFFFF;
+  --settings-text-sub: rgba(235, 235, 245, 0.6);
+  --settings-text-muted: rgba(235, 235, 245, 0.3);
+
+  /* 图标 */
+  --settings-icon-main: rgba(235, 235, 245, 0.6);
   --settings-icon-accent: rgb(var(--settings-accent-rgb));
-  --settings-button-primary-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%);
-  --settings-button-primary-bg-hover: linear-gradient(135deg, rgb(111 147 236) 0%, rgb(62 191 242) 100%);
-  --settings-button-primary-text: #ffffff;
-  --settings-button-primary-shadow:
-    0 16px 34px rgb(9 14 22 / 0.38),
-    inset 0 1px 0 rgb(255 255 255 / 0.16);
-  --settings-button-secondary-bg: rgba(255, 255, 255, 0.06);
-  --settings-button-secondary-bg-hover: rgba(255, 255, 255, 0.1);
-  --settings-button-secondary-text: rgba(241, 245, 255, 0.92);
-  --settings-button-secondary-border: rgba(255, 255, 255, 0.08);
-  --settings-button-icon-bg: rgba(255, 255, 255, 0.06);
-  --settings-button-icon-bg-hover: rgba(255, 255, 255, 0.1);
-  --settings-button-icon-text: #d4deef;
-  --settings-button-danger-bg: rgba(239, 68, 68, 0.12);
-  --settings-button-danger-border: rgba(239, 68, 68, 0.22);
-  --settings-button-danger-text: #fecaca;
-  --settings-surface-start: var(--settings-layer-surface);
-  --settings-surface-end: rgba(25, 31, 43, 0.98);
-  --settings-soft-start: #171f2b;
-  --settings-soft-end: #1d2634;
-  --settings-muted-surface: rgba(255, 255, 255, 0.08);
-  --settings-muted-surface-strong: rgba(255, 255, 255, 0.1);
-  --settings-panel-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
-  --settings-card-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
-  --settings-shell-shadow: 0 28px 76px rgba(0, 0, 0, 0.38);
-  --settings-inset-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --settings-backdrop: rgba(5, 10, 18, 0.62);
+
+  /* 按钮 */
+  --settings-button-primary-bg: rgb(var(--settings-accent-rgb));
+  --settings-button-primary-bg-hover: rgb(30, 150, 255);
+  --settings-button-primary-text: #FFFFFF;
+  --settings-button-primary-shadow: none;
+  --settings-button-secondary-bg: #2C2C2E;
+  --settings-button-secondary-bg-hover: #3A3A3C;
+  --settings-button-secondary-text: rgb(10, 132, 255);
+  --settings-button-secondary-border: transparent;
+  --settings-button-icon-bg: #2C2C2E;
+  --settings-button-icon-bg-hover: #3A3A3C;
+  --settings-button-icon-text: rgba(235, 235, 245, 0.6);
+  --settings-button-danger-bg: transparent;
+  --settings-button-danger-border: transparent;
+  --settings-button-danger-text: #FF453A;
+
+  /* 表面 */
+  --settings-surface-start: #1C1C1E;
+  --settings-surface-end: #1C1C1E;
+  --settings-soft-start: #1C1C1E;
+  --settings-soft-end: #000000;
+  --settings-muted-surface: #1C1C1E;
+  --settings-muted-surface-strong: #2C2C2E;
+
+  /* 阴影 */
+  --settings-panel-shadow: none;
+  --settings-card-shadow: none;
+  --settings-shell-shadow: none;
+  --settings-inset-shadow: none;
+  --settings-backdrop: rgba(0, 0, 0, 0.5);
+
+  /* 覆盖全局变量 */
   --bg-base: var(--settings-layer-base);
   --bg-surface: var(--settings-layer-surface);
   --bg-elevated: var(--settings-layer-emphasis);
@@ -4596,35 +4638,38 @@ body.dark-mode .settings-panel {
   --bg-overlay: var(--settings-layer-emphasis);
   --bg-input: var(--settings-layer-input);
   --bg-hover: var(--settings-layer-hover);
-  --toolbar-bg: rgba(17, 24, 35, 0.88);
-  --toolbar-hover: rgba(130, 167, 255, 0.1);
-  --toolbar-active: rgba(130, 167, 255, 0.14);
+  --toolbar-bg: rgba(0, 0, 0, 0.9);
+  --toolbar-hover: rgba(10, 132, 255, 0.1);
+  --toolbar-active: rgba(10, 132, 255, 0.15);
   --toolbar-divider: rgba(255, 255, 255, 0.08);
   --border-subtle: var(--settings-border-subtle);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
   --border-light: var(--border-default);
   --border-medium: var(--border-strong);
   --text-primary: var(--settings-text-main);
   --text-secondary: var(--settings-text-sub);
   --text-tertiary: var(--settings-text-muted);
-  --text-muted: rgba(255, 255, 255, 0.44);
-  --state-success-bg: rgba(16, 185, 129, 0.14);
-  --state-success-border: rgba(52, 211, 153, 0.28);
-  --state-success-text: #9ce6c4;
-  --state-success-muted: rgba(156, 230, 196, 0.84);
-  --state-warning-bg: rgba(245, 158, 11, 0.16);
-  --state-warning-border: rgba(245, 158, 11, 0.26);
-  --state-warning-text: #f9d489;
-  --state-warning-muted: rgba(249, 212, 137, 0.86);
-  --state-danger-bg: rgba(239, 68, 68, 0.14);
-  --state-danger-border: rgba(239, 68, 68, 0.22);
-  --state-danger-text: #ffc6c6;
-  --state-danger-muted: rgba(255, 198, 198, 0.84);
-  --state-info-bg: rgba(130, 167, 255, 0.16);
-  --state-info-border: rgba(130, 167, 255, 0.26);
-  --state-info-text: #c8dbff;
-  --state-info-muted: rgba(200, 219, 255, 0.86);
+  --text-muted: rgba(235, 235, 245, 0.18);
+
+  /* 状态色 — iOS 暗色 */
+  --state-success-bg: rgba(48, 209, 88, 0.15);
+  --state-success-border: rgba(48, 209, 88, 0.3);
+  --state-success-text: #30D158;
+  --state-success-muted: rgba(48, 209, 88, 0.8);
+  --state-warning-bg: rgba(255, 159, 10, 0.15);
+  --state-warning-border: rgba(255, 159, 10, 0.3);
+  --state-warning-text: #FF9F0A;
+  --state-warning-muted: rgba(255, 159, 10, 0.8);
+  --state-danger-bg: rgba(255, 69, 58, 0.15);
+  --state-danger-border: rgba(255, 69, 58, 0.3);
+  --state-danger-text: #FF453A;
+  --state-danger-muted: rgba(255, 69, 58, 0.8);
+  --state-info-bg: rgba(10, 132, 255, 0.15);
+  --state-info-border: rgba(10, 132, 255, 0.3);
+  --state-info-text: #0A84FF;
+  --state-info-muted: rgba(10, 132, 255, 0.8);
+
   color-scheme: dark;
 }
 
@@ -4641,14 +4686,14 @@ body.dark-mode .settings-panel {
 .settings-panel .apple-glass-card {
   border: 1px solid var(--settings-border-subtle);
   background: var(--settings-shell-bg);
-  box-shadow: var(--settings-shell-shadow), var(--settings-inset-shadow);
-  backdrop-filter: blur(22px) saturate(1.1);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .settings-panel .apple-soft-card {
   border-color: var(--settings-border-subtle);
   background: var(--settings-section-bg);
-  box-shadow: var(--settings-card-shadow);
+  box-shadow: none;
 }
 
 .settings-view-shell {
@@ -4694,7 +4739,7 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-metric-card {
   border-color: var(--settings-border-subtle);
   background: var(--settings-surface-elevated);
-  box-shadow: var(--settings-card-shadow);
+  box-shadow: none;
 }
 
 .settings-panel .settings-danger-zone {
@@ -4726,7 +4771,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-shell-desktop {
-  gap: 18px;
+  gap: 0;
 }
 
 .settings-shell-mobile,
@@ -4760,8 +4805,11 @@ body.dark-mode .settings-panel {
 .settings-shell-nav__summary,
 .settings-shell-nav__footer,
 .settings-shell-mobile__topbar {
-  border-radius: 24px;
-  padding: 18px;
+  border-radius: 12px;
+  padding: 14px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .settings-shell-nav__hero {
@@ -4771,11 +4819,11 @@ body.dark-mode .settings-panel {
 .settings-shell-nav__search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  min-height: 48px;
-  border-radius: 18px;
-  border: 1px solid var(--border-light);
+  gap: 8px;
+  padding: 0 12px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: none;
   background: var(--settings-muted-surface-strong);
   color: var(--text-tertiary);
 }
@@ -4830,9 +4878,9 @@ body.dark-mode .settings-panel {
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border-light);
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--settings-border-subtle);
   background: transparent;
 }
 
@@ -4902,36 +4950,33 @@ body.dark-mode .settings-panel {
 
 .settings-sidebar-item {
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border-light);
-  background: var(--settings-muted-surface);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
 }
 
 .settings-sidebar-item:hover {
-  border-color: rgb(var(--settings-accent-rgb) / 0.2);
-  background: rgb(var(--settings-accent-rgb) / 0.08);
+  background: var(--settings-muted-surface);
   color: var(--text-primary);
-  box-shadow: 0 10px 22px rgb(var(--settings-accent-rgb) / 0.08);
+  transform: none;
+  box-shadow: none;
 }
 
 .settings-sidebar-item.active {
-  border-color: rgb(var(--settings-accent-rgb) / 0.24);
-  background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.14) 0%, rgb(var(--settings-accent-rgb) / 0.08) 100%);
-  box-shadow:
-    0 12px 24px rgb(var(--settings-accent-rgb) / 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  color: var(--text-primary);
+  background: rgba(var(--settings-accent-rgb) / 0.12);
+  color: rgb(var(--settings-accent-rgb));
+  box-shadow: none;
 }
 
 .settings-sidebar-item__icon {
-  height: 40px;
-  width: 40px;
-  border-radius: 14px;
-  border: 1px solid var(--border-light);
-  background: var(--settings-muted-surface-strong);
-  color: var(--text-secondary);
+  height: 32px;
+  width: 32px;
+  border-radius: 7px;
+  border: none;
+  background: rgba(var(--settings-accent-rgb) / 0.1);
+  color: rgb(var(--settings-accent-rgb));
 }
 
 .settings-sidebar-item.active .settings-sidebar-item__icon {
@@ -9010,4 +9055,639 @@ body.dark-mode .settings-panel .apple-glass-card {
     justify-content: center;
     padding: 8px 10px;
   }
+}
+
+/* Advanced settings refactor */
+.settings-panel {
+  --settings-accent-rgb: 0 122 255;
+  --settings-accent-soft-rgb: 64 156 255;
+  --settings-shell-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.08), transparent 26%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.94) 0%, rgb(245 245 247 / 0.94) 100%);
+  --settings-section-bg: rgb(255 255 255 / 0.82);
+  --settings-surface-elevated: rgb(255 255 255 / 0.92);
+  --settings-surface-overlay: rgb(245 245 247 / 0.9);
+  --settings-shell-header-bg: rgb(255 255 255 / 0.74);
+  --settings-border-subtle: rgb(29 29 31 / 0.08);
+  --settings-card-shadow: 0 18px 48px rgb(15 23 42 / 0.08);
+  --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.64);
+  --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.18);
+  --settings-input-bg: rgb(255 255 255 / 0.94);
+  --settings-input-border: rgb(29 29 31 / 0.12);
+  --settings-button-primary-bg: linear-gradient(135deg, #007aff 0%, #2d8cff 100%);
+  --settings-button-primary-text: #ffffff;
+  --settings-button-primary-shadow: 0 14px 28px rgb(var(--settings-accent-rgb) / 0.2);
+  --settings-button-secondary-bg: rgb(245 245 247 / 0.96);
+  --settings-button-secondary-border: rgb(29 29 31 / 0.08);
+  --settings-button-secondary-text: var(--text-primary);
+  --settings-button-danger-bg: rgb(255 59 48 / 0.08);
+  --settings-button-danger-border: rgb(255 59 48 / 0.18);
+  --settings-button-danger-text: #ff3b30;
+}
+
+body.dark-mode .settings-panel {
+  --settings-accent-rgb: 10 132 255;
+  --settings-accent-soft-rgb: 90 200 250;
+  --settings-shell-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.14), transparent 28%),
+    linear-gradient(180deg, rgb(28 28 30 / 0.96) 0%, rgb(0 0 0 / 0.94) 100%);
+  --settings-section-bg: rgb(28 28 30 / 0.84);
+  --settings-surface-elevated: rgb(36 36 38 / 0.94);
+  --settings-surface-overlay: rgb(44 44 46 / 0.9);
+  --settings-shell-header-bg: rgb(28 28 30 / 0.84);
+  --settings-border-subtle: rgb(255 255 255 / 0.08);
+  --settings-card-shadow: 0 24px 60px rgb(0 0 0 / 0.36);
+  --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.72);
+  --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.22);
+  --settings-input-bg: rgb(36 36 38 / 0.94);
+  --settings-input-border: rgb(255 255 255 / 0.12);
+  --settings-button-primary-bg: linear-gradient(135deg, #0a84ff 0%, #4da3ff 100%);
+  --settings-button-primary-text: #ffffff;
+  --settings-button-primary-shadow: 0 18px 34px rgb(var(--settings-accent-rgb) / 0.28);
+  --settings-button-secondary-bg: rgb(36 36 38 / 0.96);
+  --settings-button-secondary-border: rgb(255 255 255 / 0.08);
+  --settings-button-secondary-text: var(--text-primary);
+  --settings-button-danger-bg: rgb(255 69 58 / 0.1);
+  --settings-button-danger-border: rgb(255 69 58 / 0.18);
+  --settings-button-danger-text: #ff453a;
+}
+
+.settings-shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(15 23 42 / 0.2);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.settings-shell-desktop {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  width: min(1480px, 100%);
+  height: min(92vh, 980px);
+}
+
+.settings-shell-nav,
+.settings-shell-main,
+.settings-shell-mobile {
+  border: 1px solid var(--settings-border-subtle);
+  background: var(--settings-shell-bg);
+  box-shadow: var(--settings-card-shadow);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+
+.settings-shell-nav {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+  border-radius: 32px;
+}
+
+.settings-shell-nav__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.12), transparent 38%),
+    var(--settings-surface-elevated);
+}
+
+.settings-shell-kicker {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.settings-shell-nav__title,
+.settings-shell-main__title,
+.settings-shell-mobile__title,
+.settings-hero-card__title {
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.settings-shell-nav__description,
+.settings-shell-mobile__description,
+.settings-shell-toolbar__description,
+.settings-hero-card__description,
+.settings-section-card__description {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.settings-shell-nav__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--settings-input-border);
+  border-radius: 18px;
+  background: var(--settings-input-bg);
+  color: var(--text-tertiary);
+}
+
+.settings-shell-nav__search input {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  background: transparent;
+  outline: none;
+}
+
+.settings-shell-nav__search input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.settings-shell-nav__list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  margin-top: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-shell-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-shell-nav__group-label {
+  padding: 0 6px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.settings-shell-nav__group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  text-align: left;
+  background: transparent;
+  color: var(--text-secondary);
+  transition:
+    transform 180ms var(--ease-default),
+    box-shadow 220ms var(--ease-default),
+    border-color 220ms var(--ease-default),
+    background-color 220ms var(--ease-default),
+    color 220ms var(--ease-default);
+}
+
+.settings-sidebar-item:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--settings-accent-rgb) / 0.12);
+  background: rgb(var(--settings-accent-rgb) / 0.05);
+}
+
+.settings-sidebar-item.active {
+  color: var(--text-primary);
+  border-color: rgb(var(--settings-accent-rgb) / 0.2);
+  background:
+    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.14) 0%, rgb(var(--settings-accent-soft-rgb) / 0.06) 100%),
+    var(--settings-surface-elevated);
+  box-shadow: 0 16px 28px rgb(var(--settings-accent-rgb) / 0.12);
+}
+
+.settings-sidebar-item__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background: var(--settings-surface-overlay);
+  color: inherit;
+}
+
+.settings-sidebar-item.active .settings-sidebar-item__icon {
+  background: rgb(var(--settings-accent-rgb) / 0.12);
+  color: rgb(var(--settings-accent-rgb));
+}
+
+.settings-sidebar-item__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-sidebar-item__label {
+  color: currentColor;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.settings-sidebar-item__desc {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.settings-sidebar-item__arrow {
+  color: var(--text-tertiary);
+}
+
+.settings-shell-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 32px;
+}
+
+.settings-shell-main__topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--settings-border-subtle);
+  background: var(--settings-shell-header-bg);
+}
+
+.settings-shell-main__module {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-shell-page {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.settings-shell-page--desktop {
+  padding: 20px 24px 28px;
+}
+
+.settings-shell-mobile {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 960px);
+  height: min(100dvh, 100%);
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+.settings-shell-mobile__topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px 18px;
+  border-bottom: 1px solid var(--settings-border-subtle);
+  background: var(--settings-shell-header-bg);
+}
+
+.settings-shell-mobile__title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-shell-page--mobile {
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+.settings-shell-nav__list--compact {
+  margin-top: 0;
+  padding-right: 0;
+}
+
+.settings-shell-empty {
+  padding: 18px;
+  border: 1px dashed var(--settings-border-subtle);
+  border-radius: 20px;
+  background: var(--settings-surface-overlay);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settings-hero-card,
+.settings-section-card,
+.settings-metric-card,
+.settings-dashboard-card,
+.settings-dashboard-priority,
+.settings-dashboard-log,
+.settings-dashboard-quiet,
+.settings-exchange-card {
+  border-color: var(--settings-border-subtle) !important;
+  box-shadow: none;
+}
+
+.settings-hero-card {
+  border-radius: 28px;
+}
+
+.settings-section-card {
+  border-radius: 24px;
+}
+
+.settings-section-card__title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.settings-metric-card {
+  min-height: 176px;
+  border-radius: 22px;
+  background: var(--settings-surface-elevated);
+}
+
+.settings-metric-card__label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.settings-metric-card__value {
+  font-size: clamp(26px, 2vw, 32px);
+  font-weight: 300;
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.settings-metric-card__helper {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settings-panel .settings-dashboard-card {
+  padding: 18px;
+  border-radius: 22px;
+  background: var(--settings-surface-elevated);
+}
+
+.settings-panel .settings-dashboard-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-panel .settings-dashboard-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 16px;
+}
+
+.settings-panel .settings-dashboard-card__title {
+  margin-top: 16px;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.settings-panel .settings-dashboard-card__description {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.settings-panel .settings-dashboard-card__meter {
+  margin-top: 16px;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(148 163 184 / 0.18);
+  overflow: hidden;
+}
+
+.settings-panel .settings-dashboard-card__meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.settings-panel .settings-dashboard-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-panel .settings-dashboard-grid--health {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.settings-panel .settings-dashboard-priority,
+.settings-panel .settings-dashboard-log,
+.settings-panel .settings-dashboard-quiet {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--settings-surface-elevated);
+}
+
+.settings-exchange-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.settings-exchange-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 24px;
+  background: var(--settings-surface-elevated);
+}
+
+.settings-exchange-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-exchange-card__title {
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.settings-exchange-card__subtitle {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settings-exchange-card__fields {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-exchange-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 18px;
+}
+
+.settings-exchange-toggle__title {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.settings-exchange-toggle__hint {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-exchange-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 18px;
+}
+
+.settings-exchange-preview__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-exchange-preview__label {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-exchange-preview__value {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.settings-exchange-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 1023px) {
+  .settings-shell-backdrop {
+    padding: 0;
+  }
+
+  .settings-shell-mobile {
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .settings-shell-page--mobile {
+    padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  }
+}
+
+
+/* ============================================
+   iOS 补充样式 — 分组列表与行
+   ============================================ */
+
+/* iOS 风格分隔线 */
+.settings-panel .settings-ios-separator {
+  height: 0.5px;
+  background: var(--settings-border-subtle);
+  margin-left: 16px;
+}
+
+/* iOS 风格列表行 */
+.settings-panel .settings-ios-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 11px 16px;
+  gap: 12px;
+}
+
+/* iOS 风格 Section Footer（卡片外下方小灰字） */
+.settings-panel .settings-ios-footer {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--settings-text-muted);
+  padding: 6px 16px 0;
+}
+
+/* 统一所有设置面板内的圆角 */
+.settings-panel .rounded-2xl,
+.settings-panel .rounded-\[18px\],
+.settings-panel .rounded-\[20px\],
+.settings-panel .rounded-\[22px\],
+.settings-panel .rounded-\[24px\],
+.settings-panel .rounded-\[30px\],
+.settings-panel .rounded-\[32px\] {
+  border-radius: 10px !important;
+}
+
+/* 所有设置面板内 box-shadow 降为0 */
+.settings-panel .shadow-2xl {
+  box-shadow: none !important;
+}
+
+/* iOS checkbox 保持原有的 toggle 样式但使用 iOS 绿色 */
+.settings-panel .api-settings-view input[type="checkbox"]:checked {
+  background: #34C759;
+  border-color: #34C759;
+  box-shadow: none;
+}
+
+/* 分组卡片的统一圆角 */
+.settings-panel .settings-section-card,
+.settings-panel .settings-hero-card {
+  border-radius: 10px;
 }
