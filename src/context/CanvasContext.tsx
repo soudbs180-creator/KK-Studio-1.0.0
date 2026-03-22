@@ -229,27 +229,57 @@ const hasRecoverablePendingTask = (node?: Partial<PromptNode> | null): boolean =
 };
 
 const resolvePromptChildImageIds = (
-    node?: Pick<PromptNode, 'id' | 'childImageIds'> | null,
+    node?: Pick<PromptNode, 'id' | 'childImageIds' | 'sourceImageId'> | null,
     imageNodes: GeneratedImage[] = []
 ): string[] => {
     if (!node?.id) return [];
 
-    const orderedIds: string[] = [];
-    const seenIds = new Set<string>();
-    const pushId = (id?: string) => {
-        if (!id || seenIds.has(id)) return;
-        seenIds.add(id);
-        orderedIds.push(id);
-    };
+    const promptId = node.id;
+    const sourceImageId = node.sourceImageId;
+    const orderedIds = (node.childImageIds || []).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+    const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
+    const strongOwnedImages = imageNodes.filter((imageNode) => (
+        imageNode.parentPromptId === promptId && imageNode.id !== sourceImageId
+    ));
 
-    (node.childImageIds || []).forEach(pushId);
-    imageNodes.forEach((imageNode) => {
-        if (imageNode.parentPromptId === node.id) {
-            pushId(imageNode.id);
+    if (strongOwnedImages.length > 0) {
+        const resolvedIds: string[] = [];
+        const seenIds = new Set<string>();
+
+        orderedIds.forEach((imageId) => {
+            const imageNode = imageNodeById.get(imageId);
+            if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId !== promptId || seenIds.has(imageNode.id)) {
+                return;
+            }
+            seenIds.add(imageNode.id);
+            resolvedIds.push(imageNode.id);
+        });
+
+        strongOwnedImages.forEach((imageNode) => {
+            if (seenIds.has(imageNode.id)) return;
+            seenIds.add(imageNode.id);
+            resolvedIds.push(imageNode.id);
+        });
+
+        return resolvedIds;
+    }
+
+    if (sourceImageId) {
+        return [];
+    }
+
+    const legacyIds: string[] = [];
+    const seenIds = new Set<string>();
+    orderedIds.forEach((imageId) => {
+        const imageNode = imageNodeById.get(imageId);
+        if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId || seenIds.has(imageNode.id)) {
+            return;
         }
+        seenIds.add(imageNode.id);
+        legacyIds.push(imageNode.id);
     });
 
-    return orderedIds;
+    return legacyIds;
 };
 
 const getWorkflowSourceNodeIds = (node: WorkflowNode): string[] => {
@@ -1844,7 +1874,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return {
                 ...c,
                 promptNodes: c.promptNodes.map(n => n.id === id ? { ...n, position: pos } : n),
-                imageNodes: c.imageNodes
+                imageNodes: c.imageNodes.map((img) => (
+                    img.parentPromptId === id
+                        ? { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } }
+                        : img
+                ))
             };
         });
     }, [updateCanvas, state.selectedNodeIds]);
@@ -4352,6 +4386,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             // Simple set-based selection
             const selectedSet = new Set(selectedIds);
+            const movedPromptIds = new Set(
+                currentCanvas.promptNodes
+                    .filter((node) => selectedSet.has(node.id))
+                    .map((node) => node.id)
+            );
 
             // Move only selected nodes
             const newPromptNodes = currentCanvas.promptNodes.map(n => {
@@ -4362,7 +4401,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
 
             const newImageNodes = currentCanvas.imageNodes.map(n => {
-                if (selectedSet.has(n.id)) {
+                if (selectedSet.has(n.id) || (n.parentPromptId && movedPromptIds.has(n.parentPromptId))) {
                     return { ...n, position: { x: n.position.x + delta.x, y: n.position.y + delta.y } };
                 }
                 return n;

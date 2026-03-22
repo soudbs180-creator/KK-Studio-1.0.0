@@ -605,10 +605,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         };
     }, [isDragging, zoomScale, onDragDelta, onPositionChange, node.id]);
 
-    const effectiveChildImageCount = Math.max(actualChildImageCount, node.childImageIds?.length || 0);
+    const effectiveChildImageCount = Math.max(0, actualChildImageCount);
     const renderedSuccessCount = effectiveChildImageCount > 0
         ? effectiveChildImageCount
-        : (node.lastGenerationSuccessCount || 0);
+        : Math.max(0, Number(node.lastGenerationSuccessCount || 0));
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
     const showError = Boolean(node.error);
     const isThumbnailShell = detailLevel === 'thumbnail-shell';

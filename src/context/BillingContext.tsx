@@ -1,5 +1,6 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { creditService } from '../services/billing/creditService';
 import { useAuth } from './AuthContext';
 
 export interface CreditTransactionLog {
@@ -18,12 +19,27 @@ export interface CreditTransactionLog {
   completed_at?: string | null;
 }
 
+export interface CreditConsumeResult {
+  success: boolean;
+  transactionId?: string;
+  newBalance?: number;
+  message: string;
+}
+
+export interface CreditRefundResult {
+  success: boolean;
+  newBalance?: number;
+  message: string;
+}
+
 interface BillingContextType {
   balance: number;
   loading: boolean;
   recharge: (amount: number, currency: 'CNY' | 'USD') => Promise<void>;
   consumeCredits: (modelId: string, count: number, details?: any) => Promise<boolean>;
+  consumeCreditsDetailed: (modelId: string, count: number, details?: any) => Promise<CreditConsumeResult>;
   refundCredits: (amount: number, reason: string) => Promise<boolean>;
+  refundCreditsByTransaction: (transactionId: string, reason: string) => Promise<CreditRefundResult>;
   refreshBilling: () => Promise<void>;
   adjustBalanceOptimistically: (delta: number) => void;
   billingLogs: CreditTransactionLog[];
@@ -38,7 +54,9 @@ const BillingContext = createContext<BillingContextType>({
   loading: true,
   recharge: async () => {},
   consumeCredits: async () => false,
+  consumeCreditsDetailed: async () => ({ success: false, message: 'Billing context not ready' }),
   refundCredits: async () => false,
+  refundCreditsByTransaction: async () => ({ success: false, message: 'Billing context not ready' }),
   refreshBilling: async () => {},
   adjustBalanceOptimistically: () => {},
   billingLogs: [],
@@ -212,12 +230,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [user, isTempUser, refreshBilling]);
 
-  const consumeCredits = useCallback(
-    async (modelId: string, count: number, details: any = {}) => {
-      if (!user) return false;
+  const consumeCreditsDetailed = useCallback(
+    async (modelId: string, count: number, details: any = {}): Promise<CreditConsumeResult> => {
+      if (!user) {
+        return { success: false, message: 'User not authenticated' };
+      }
 
       const needAmount = Math.max(0, Number(count || 0));
-      if (needAmount <= 0) return true;
+      if (needAmount <= 0) {
+        return { success: true, message: 'No credits required' };
+      }
 
       try {
         const { data: latestBalanceRow } = await supabase
@@ -228,44 +250,86 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         const latestBalance = Number(latestBalanceRow?.balance ?? balance);
         if (latestBalance < needAmount) {
-          return false;
+          return {
+            success: false,
+            newBalance: latestBalance,
+            message: '积分不足',
+          };
         }
 
-        const { data: success, error } = await supabase.rpc('consume_user_credits', {
-          p_user_id: user.id,
-          p_consume_amount: needAmount,
-          p_feature: details?.feature || `模型调用：${modelId}`,
-        });
+        const result = await creditService.consumeCredits(
+          user.id,
+          needAmount,
+          {
+            model_id: String(details?.modelId || modelId || ''),
+            model_name: String(details?.modelName || modelId || ''),
+            provider_id: String(details?.providerId || details?.keySlotId || details?.provider || 'managed'),
+          },
+          details?.feature || `模型调用：${modelId}`
+        );
 
-        if (error) throw error;
-        if (!success) return false;
+        if (!result.success) {
+          return {
+            success: false,
+            newBalance: result.newBalance,
+            message: result.message || '扣减积分失败',
+          };
+        }
 
         await refreshBilling();
-        return true;
+        return {
+          success: true,
+          transactionId: result.transactionId,
+          newBalance: result.newBalance,
+          message: result.message || '扣减积分成功',
+        };
       } catch (error) {
         console.error('[BillingContext] 扣减积分失败:', error);
-        return false;
+        return { success: false, message: '扣减积分失败' };
       }
     },
     [user, balance, refreshBilling]
   );
 
+  const consumeCredits = useCallback(
+    async (modelId: string, count: number, details: any = {}) => {
+      const result = await consumeCreditsDetailed(modelId, count, details);
+      return result.success;
+    },
+    [consumeCreditsDetailed]
+  );
+
   const refundCredits = useCallback(
     async (amount: number, reason: string) => {
-      if (!user || amount <= 0) return false;
+      void amount;
+      console.warn('[BillingContext] Legacy amount-based refund is disabled:', reason);
+      return false;
+    },
+    []
+  );
+
+  const refundCreditsByTransaction = useCallback(
+    async (transactionId: string, reason: string): Promise<CreditRefundResult> => {
+      const safeTransactionId = String(transactionId || '').trim();
+      if (!user || safeTransactionId.length === 0) {
+        return { success: false, message: 'Missing refund transaction' };
+      }
 
       try {
-        const { data: success, error } = await supabase.rpc('refund_user_credits', {
-          p_user_id: user.id,
-          p_refund_amount: amount,
-        });
+        const result = await creditService.refundCredits(safeTransactionId, reason);
 
-        if (error) throw error;
-        await refreshBilling();
-        return Boolean(success);
+        if (result.success) {
+          await refreshBilling();
+        }
+
+        return {
+          success: result.success,
+          newBalance: result.newBalance,
+          message: result.message || (result.success ? '退款成功' : '退款失败'),
+        };
       } catch (error) {
-        console.error('[BillingContext] 退还积分失败:', reason, error);
-        return false;
+        console.error('[BillingContext] 按交易退款失败:', reason, error);
+        return { success: false, message: '退款失败' };
       }
     },
     [user, refreshBilling]
@@ -288,7 +352,9 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loading,
         recharge,
         consumeCredits,
+        consumeCreditsDetailed,
         refundCredits,
+        refundCreditsByTransaction,
         refreshBilling,
         adjustBalanceOptimistically,
         billingLogs,

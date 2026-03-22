@@ -37,11 +37,9 @@ const alipaySdk = new AlipaySdk({
 // ============================================
 // Core recharge helper
 // ============================================
-async function addCreditsToSupabase(userId, transactionId, amount, currency) {
-    const creditsAdded = Math.floor(amount * 5);
-
+async function addCreditsToSupabase(userId, transactionId, amount, currency, payType, billNo) {
     console.log(
-        `[payment-webhook] Crediting user ${userId} with ${creditsAdded} credits from ${currency} ${amount}`
+        `[payment-webhook] Syncing recharge for user ${userId}: ${currency} ${amount}, payType=${payType}, transactionId=${transactionId}, billNo=${billNo || 'n/a'}`
     );
 
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -66,11 +64,13 @@ async function addCreditsToSupabase(userId, transactionId, amount, currency) {
                 p_transaction_id: transactionId,
                 p_amount: amount,
                 p_currency: currency,
-                p_credits_added: creditsAdded
+                p_credits_added: null,
+                p_pay_type: payType,
+                p_bill_no: billNo || transactionId
             })
         });
 
-        const result = await response.json();
+        const result = await response.json().catch(() => ({}));
 
         if (!response.ok) {
             console.error('[payment-webhook] Supabase recharge RPC failed:', result);
@@ -117,7 +117,9 @@ router.post('/alipay', async (req, res) => {
                 userId,
                 alipayTradeNo,
                 Number(totalAmount),
-                'CNY'
+                'CNY',
+                'alipay',
+                outTradeNo
             );
 
             if (rechargeSuccess) {
@@ -189,7 +191,14 @@ router.post('/wechat', async (req, res) => {
             const transactionId = decryptData.transaction_id;
 
             if (userId) {
-                const rechargeSuccess = await addCreditsToSupabase(userId, transactionId, amount, 'CNY');
+                const rechargeSuccess = await addCreditsToSupabase(
+                    userId,
+                    transactionId,
+                    amount,
+                    'CNY',
+                    'wechat',
+                    outTradeNo
+                );
                 if (rechargeSuccess) {
                     return res.status(200).json({ code: 'SUCCESS', message: '成功' });
                 }

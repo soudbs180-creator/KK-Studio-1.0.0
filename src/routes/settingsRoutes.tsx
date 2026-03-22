@@ -40,15 +40,15 @@ export interface SettingsNavItem {
 
 export const settingsNavSections: Array<{ id: NavSectionId; label: string }> = [
   { id: 'workspace', label: '工作台' },
-  { id: 'system', label: '系统' },
-  { id: 'admin', label: '管理员' },
+  { id: 'system', label: '系统维护' },
+  { id: 'admin', label: '后台管理' },
 ];
 
 export const settingsNavItems: SettingsNavItem[] = [
   {
     id: 'dashboard',
-    label: '仪表盘',
-    description: '纯展示当前链路、消费、充值和待处理状态。',
+    label: '总览',
+    description: '查看链路状态、消费概况和待处理事项。',
     icon: LayoutDashboard,
     section: 'workspace',
     path: '',
@@ -56,7 +56,7 @@ export const settingsNavItems: SettingsNavItem[] = [
   {
     id: 'api-management',
     label: 'API 管理',
-    description: '统一管理官方接口与第三方供应商。',
+    description: '统一管理官方接口、供应商和预算策略。',
     icon: KeyRound,
     section: 'workspace',
     path: 'api-management',
@@ -71,8 +71,8 @@ export const settingsNavItems: SettingsNavItem[] = [
   },
   {
     id: 'storage-settings',
-    label: '储存设置',
-    description: '管理本地与浏览器存储、清理缓存和项目整理。',
+    label: '存储设置',
+    description: '管理本地存储、缓存清理和项目整理。',
     icon: HardDrive,
     section: 'system',
     path: 'storage-settings',
@@ -88,7 +88,7 @@ export const settingsNavItems: SettingsNavItem[] = [
   {
     id: 'admin-console',
     label: '管理员后台',
-    description: '集中处理积分模型、汇率设置和后台权限。',
+    description: '处理积分模型、汇率规则和后台权限。',
     icon: Shield,
     section: 'admin',
     path: 'admin-console',
@@ -103,6 +103,22 @@ export const settingsRoutes: RouteObject[] = [
   },
   {
     path: 'api-management',
+    element: <ApiSettingsView />,
+  },
+  {
+    path: 'api-management/official/new',
+    element: <ApiSettingsView />,
+  },
+  {
+    path: 'api-management/official/:officialId',
+    element: <ApiSettingsView />,
+  },
+  {
+    path: 'api-management/provider/new',
+    element: <ApiSettingsView />,
+  },
+  {
+    path: 'api-management/provider/:providerId',
     element: <ApiSettingsView />,
   },
   {
@@ -142,6 +158,8 @@ export const settingsRoutes: RouteObject[] = [
 export const getNavItemByPath = (path: string): SettingsNavItem | undefined =>
   path === 'credit-models' || path === 'exchange-rates' || path === 'admin-system'
     ? settingsNavItems.find((item) => item.id === 'admin-console')
+    : path.startsWith('api-management')
+      ? settingsNavItems.find((item) => item.id === 'api-management')
     : settingsNavItems.find((item) => item.path === path);
 
 export const getNavItemById = (id: SettingsViewId): SettingsNavItem | undefined =>

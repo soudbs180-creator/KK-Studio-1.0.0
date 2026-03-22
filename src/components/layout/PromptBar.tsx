@@ -671,8 +671,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [commitPromptToConfig, config.prompt]);
 
     const updateConfigFields = useCallback((patch: Partial<GenerationConfig>) => {
-        transitionConfigUpdate(prev => ({ ...prev, ...patch }));
-    }, [transitionConfigUpdate]);
+        // These generation controls must commit immediately so a quick "change option -> send"
+        // sequence always uses the latest settings (especially parallelCount for multi-image generation).
+        setConfig(prev => ({ ...prev, ...patch }));
+    }, [setConfig]);
 
     // [NEW] Click outside to close options panel
     useEffect(() => {

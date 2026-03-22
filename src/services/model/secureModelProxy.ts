@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
 
 export interface SecureProxyChatMessage {
@@ -98,12 +98,8 @@ type CloudSessionResolution = {
   accessToken: string;
 };
 
-async function clearExpiredCloudSession(): Promise<void> {
-  try {
-    await supabase.auth.signOut();
-  } catch {
-    // Best-effort cleanup only.
-  }
+function getSecureProxyEndpoint(): string {
+  return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
 }
 
 function buildCloudSessionError(feature: string): Error {
@@ -133,13 +129,15 @@ async function resolveCloudSession(feature: string): Promise<CloudSessionResolut
 
   if (shouldRefresh) {
     const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.warn('[secureModelProxy] refreshSession failed:', refreshError);
+    }
     if (!refreshError && refreshData.session?.access_token) {
       activeSession = refreshData.session;
     }
   }
 
   if (!activeSession?.access_token) {
-    await clearExpiredCloudSession();
     throw buildCloudSessionError(feature);
   }
 
@@ -166,7 +164,6 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
-    await clearExpiredCloudSession();
     message = `System credit ${feature} failed because your login session expired. Please sign in again and retry.`;
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;
@@ -190,17 +187,69 @@ async function buildInvocationError(
   return normalized;
 }
 
+async function invokeSecureSystemProxyHttp(
+  accessToken: string,
+  body: Record<string, unknown>
+): Promise<SecureProxyInvokeResult> {
+  const response = await fetch(getSecureProxyEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  let data: any = null;
+  let parseError: Error | null = null;
+
+  try {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      data = text ? { error: text } : null;
+    }
+  } catch (error) {
+    parseError = error instanceof Error ? error : new Error(String(error));
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof data?.error === 'string'
+        ? data.error
+        : parseError?.message || `secure-model-proxy request failed with status ${response.status}`;
+
+    return {
+      data,
+      error: new Error(message),
+      response,
+    };
+  }
+
+  if (parseError) {
+    return {
+      data: null,
+      error: parseError,
+      response,
+    };
+  }
+
+  return {
+    data,
+    error: null,
+    response,
+  };
+}
+
 async function invokeSecureSystemProxy(
   feature: string,
   body: Record<string, unknown>
 ): Promise<any> {
   const invokeWithToken = async (accessToken: string): Promise<SecureProxyInvokeResult> => (
-    supabase.functions.invoke('secure-model-proxy', {
-      body,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
+    invokeSecureSystemProxyHttp(accessToken, body)
   );
 
   const session = await resolveCloudSession(feature);
@@ -208,6 +257,9 @@ async function invokeSecureSystemProxy(
 
   if (result.response?.status === 401) {
     const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.warn('[secureModelProxy] retry refreshSession failed:', refreshError);
+    }
     if (!refreshError && refreshData.session?.access_token) {
       result = await invokeWithToken(refreshData.session.access_token);
     }

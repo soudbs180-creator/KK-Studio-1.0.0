@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, HardDrive, RefreshCw, Trash2 } from 'lucide-react';
+import { Activity, FolderOpen, HardDrive, Layers3, RefreshCw, Trash2 } from 'lucide-react';
 import { useCanvas } from '../../../context/CanvasContext';
 import {
   getLocalFolderHandle,
@@ -16,16 +16,43 @@ import {
 } from '../../../services/storage/imageStorage';
 import { notify } from '../../../services/system/notificationService';
 import {
-  DangerButton,
-  EmptyState,
-  MetricCard,
-  PrimaryButton,
-  ProgressBar,
-  SecondaryButton,
-  SettingCard,
-  SettingSelect,
-  StatusBadge,
-} from '../ui/index';
+  SETTINGS_ELEVATED_STYLE,
+  SETTINGS_OVERLAY_STYLE,
+  SettingsActionButton,
+  SettingsBadge,
+  SettingsHero,
+  SettingsMetricCard,
+  SettingsSection,
+  SettingsViewShell,
+} from '../SettingsScaffold';
+import { EmptyState, ProgressBar, SettingSelect, StatusBadge } from '../ui/index';
+
+const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
+
+const getModeLabel = (mode: StorageMode | null) => {
+  if (mode === 'local') return '本地文件夹';
+  if (mode === 'browser') return '浏览器存储';
+  if (mode === 'opfs') return '设备私有存储';
+  return '尚未设置';
+};
+
+const InfoCard: React.FC<{
+  title: string;
+  description: string;
+  badge?: React.ReactNode;
+  children?: React.ReactNode;
+}> = ({ title, description, badge, children }) => (
+  <div className="rounded-[24px] border p-5" style={SETTINGS_ELEVATED_STYLE}>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="text-[16px] font-semibold text-[var(--text-primary)]">{title}</div>
+        <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{description}</div>
+      </div>
+      {badge}
+    </div>
+    {children ? <div className="mt-4">{children}</div> : null}
+  </div>
+);
 
 export const StorageSettingsView: React.FC = () => {
   const {
@@ -46,18 +73,16 @@ export const StorageSettingsView: React.FC = () => {
   const [cleanupType, setCleanupType] = useState<'compress' | number | null>(null);
   const [projectAction, setProjectAction] = useState<'merge' | 'cleanup' | null>(null);
   const [mergeSourceId, setMergeSourceId] = useState('');
-  const [lastActionMessage, setLastActionMessage] = useState('最近一次状态读取尚未执行。');
+  const [lastActionMessage, setLastActionMessage] = useState('最近还没有执行存储动作。');
 
   const supportsLocal = isFileSystemAccessSupported();
-  const isBusy = refreshing || switchingMode !== null || cleanupType !== null;
   const cleanupOptions = [
-    { label: '1 天前', days: 1 },
-    { label: '7 天前', days: 7 },
-    { label: '30 天前', days: 30 },
+    { label: '1 天前缓存', days: 1 },
+    { label: '7 天前缓存', days: 7 },
+    { label: '30 天前缓存', days: 30 },
   ] as const;
   const mergeCandidates = state.canvases.filter((canvas) => canvas.id !== activeCanvas?.id);
-
-  const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
+  const usageProgress = Math.min(100, (usageMB / 1024) * 100);
 
   useEffect(() => {
     setMergeSourceId((current) => {
@@ -70,14 +95,13 @@ export const StorageSettingsView: React.FC = () => {
 
   const refresh = async () => {
     setRefreshing(true);
-    setLastActionMessage('正在重新读取存储状态...');
+    setLastActionMessage('正在读取当前存储状态...');
     try {
       const [storedMode, usageBytes, ids] = await Promise.all([
         getStorageMode(),
         getStorageUsage(),
         getAllImageIds(),
       ]);
-
       setMode(storedMode);
       setUsageMB(usageBytes / (1024 * 1024));
       setImageCount(ids.length);
@@ -102,29 +126,29 @@ export const StorageSettingsView: React.FC = () => {
     }
 
     setSwitchingMode('local');
-    setLastActionMessage('正在切换到本地文档夹存储...');
+    setLastActionMessage('正在切换到本地文件夹存储...');
     try {
       await connectLocalFolder();
       const handle = await getLocalFolderHandle();
       if (!handle) {
-        notify.warning('未完成授权', '请先选择并授权本地文档夹。');
-        setLastActionMessage('本地目录授权未完成。');
+        notify.warning('未完成授权', '请先选择并授权本地文件夹。');
+        setLastActionMessage('本地目录授权尚未完成。');
         return;
       }
 
       const ok = await setStorageMode('local');
       if (!ok) {
-        notify.error('切换失败', '本地文档夹模式保存失败，请重试。');
-        setLastActionMessage('切换到本地文档夹失败。');
+        notify.error('切换失败', '本地文件夹模式保存失败，请重试。');
+        setLastActionMessage('切换到本地文件夹失败。');
         return;
       }
 
-      notify.success('切换成功', '已切换为本地文档夹存储。');
+      notify.success('切换成功', '现在已经改为本地文件夹存储。');
       await refresh();
     } catch (error) {
-      notify.error('切换失败', '本地文档夹连接失败，请重试。');
       console.error('[StorageSettingsView] 切换本地模式失败:', error);
-      setLastActionMessage('切换到本地文档夹失败。');
+      notify.error('切换失败', '本地文件夹连接失败，请稍后再试。');
+      setLastActionMessage('切换到本地文件夹失败。');
     } finally {
       setSwitchingMode(null);
     }
@@ -142,11 +166,11 @@ export const StorageSettingsView: React.FC = () => {
         return;
       }
 
-      notify.success('切换成功', '已切换为浏览器存储。');
+      notify.success('切换成功', '现在已经改为浏览器存储。');
       await refresh();
     } catch (error) {
-      notify.error('切换失败', '浏览器存储切换失败，请重试。');
       console.error('[StorageSettingsView] 切换浏览器模式失败:', error);
+      notify.error('切换失败', '浏览器存储切换失败，请稍后再试。');
       setLastActionMessage('切换到浏览器存储失败。');
     } finally {
       setSwitchingMode(null);
@@ -155,16 +179,16 @@ export const StorageSettingsView: React.FC = () => {
 
   const handleCleanup = async () => {
     setCleanupType('compress');
-    setLastActionMessage('正在压缩并清理原图缓存...');
+    setLastActionMessage('正在清理原图缓存...');
     try {
       const result = await cleanupOriginals();
-      const summary = `共处理 ${result.count} 条缓存，预计释放 ${formatSavedSpace(result.savedBytes)}。`;
+      const summary = `已处理 ${result.count} 条缓存，预计释放 ${formatSavedSpace(result.savedBytes)}。`;
       notify.success('清理完成', summary);
       setLastActionMessage(summary);
       await refresh();
     } catch (error) {
-      notify.error('清理失败', '请稍后重试。');
       console.error('[StorageSettingsView] 清理失败:', error);
+      notify.error('清理失败', '请稍后重试。');
       setLastActionMessage('原图缓存清理失败。');
     } finally {
       setCleanupType(null);
@@ -184,8 +208,8 @@ export const StorageSettingsView: React.FC = () => {
       setLastActionMessage(summary);
       await refresh();
     } catch (error) {
-      notify.error('按时间清理失败', '请稍后重试。');
       console.error('[StorageSettingsView] 按时间清理失败:', error);
+      notify.error('清理失败', '请稍后重试。');
       setLastActionMessage(`清理 ${days} 天前缓存失败。`);
     } finally {
       setCleanupType(null);
@@ -194,26 +218,26 @@ export const StorageSettingsView: React.FC = () => {
 
   const handleMergeProject = async () => {
     if (!activeCanvas || !mergeSourceId) {
-      notify.warning('请选择项目', '先选一个要合并进当前画布的项目。');
+      notify.warning('请选择项目', '先选择一个要合并到当前项目的来源项目。');
       return;
     }
 
     const sourceCanvas = mergeCandidates.find((canvas) => canvas.id === mergeSourceId);
     if (!sourceCanvas) {
-      notify.warning('项目不存在', '目标项目列表已变化，请重新选择。');
+      notify.warning('项目不存在', '来源项目列表已变化，请重新选择。');
       return;
     }
 
     setProjectAction('merge');
-    setLastActionMessage(`正在把"${sourceCanvas.name}"合并到"${activeCanvas.name}"...`);
+    setLastActionMessage(`正在把“${sourceCanvas.name}”合并到“${activeCanvas.name}”...`);
     try {
       const result = mergeCanvasInto(sourceCanvas.id, activeCanvas.id, { deleteSource: true });
-      const summary = `已合并 ${result.movedPrompts} 张主卡和 ${result.movedImages} 张子卡到"${activeCanvas.name}"。`;
-      notify.success('项目合并完成', summary);
+      const summary = `已合并 ${result.movedPrompts} 张主卡和 ${result.movedImages} 张子卡到“${activeCanvas.name}”。`;
+      notify.success('合并完成', summary);
       setLastActionMessage(summary);
     } catch (error) {
-      console.error('[StorageSettingsView] 项目合并失败:', error);
-      notify.error('项目合并失败', '请稍后重试。');
+      console.error('[StorageSettingsView] 合并项目失败:', error);
+      notify.error('合并失败', '请稍后再试。');
       setLastActionMessage('项目合并失败。');
     } finally {
       setProjectAction(null);
@@ -222,163 +246,162 @@ export const StorageSettingsView: React.FC = () => {
 
   const handleCleanupProjectCards = async () => {
     if (!activeCanvas) {
-      notify.warning('没有活动项目', '请先打开一个项目再执行清理。');
+      notify.warning('没有活动项目', '请先打开一个项目。');
       return;
     }
 
     setProjectAction('cleanup');
-    setLastActionMessage(`正在清理"${activeCanvas.name}"中的错误卡片...`);
+    setLastActionMessage(`正在整理“${activeCanvas.name}”中的异常卡片...`);
     try {
       const result = cleanupInvalidCards(activeCanvas.id);
       const summary =
         result.removedPrompts === 0 && result.removedImages === 0 && result.removedGroups === 0
-          ? `"${activeCanvas.name}"里没有发现需要清理的错误卡片。`
+          ? `“${activeCanvas.name}”里没有需要清理的异常卡片。`
           : `已清理 ${result.removedPrompts} 张主卡、${result.removedImages} 张子卡，并移除 ${result.removedGroups} 个空分组。`;
-      notify.success('项目整理完成', summary);
+      notify.success('整理完成', summary);
       setLastActionMessage(summary);
     } catch (error) {
-      console.error('[StorageSettingsView] 错误卡片清理失败:', error);
-      notify.error('错误卡片清理失败', '请稍后重试。');
-      setLastActionMessage('错误卡片清理失败。');
+      console.error('[StorageSettingsView] 整理项目失败:', error);
+      notify.error('整理失败', '请稍后再试。');
+      setLastActionMessage('项目整理失败。');
     } finally {
       setProjectAction(null);
     }
   };
 
-  const modeLabel = mode === 'local' ? '本地文档夹' : mode === 'browser' ? '浏览器存储' : '未设置';
-  const modeStatus = mode === 'local' ? 'online' : mode === 'browser' ? 'warning' : 'paused';
-  const usageProgress = Math.min(100, (usageMB / 1024) * 100);
-
   return (
-    <div className="space-y-4 p-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard value={modeLabel} label="当前存储" helper={supportsLocal ? '支持本地目录授权' : '仅浏览器存储'} tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'neutral'} />
-        <MetricCard value={`${imageCount} 张`} label="已存图片" helper="当前可识别的图片记录" tone="indigo" />
-        <MetricCard value={`${usageMB.toFixed(2)} MB`} label="占用空间" helper={usageMB > 512 ? '建议清理缓存' : '容量处于可控范围'} tone={usageMB > 512 ? 'amber' : 'neutral'} />
-        <MetricCard value={activeCanvas?.name || '未打开'} label="当前项目" helper={`${state.canvases.length} 个项目`} tone="neutral" />
-      </div>
+    <SettingsViewShell>
+      <SettingsHero
+        eyebrow="高级设置"
+        title="存储设置"
+        description="把存储策略、缓存清理和项目整理拆成独立动作。切换模式、清理缓存和合并项目现在都会用明确的中文按钮表达。"
+        icon={HardDrive}
+        tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}
+        badge={<SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>{getModeLabel(mode)}</SettingsBadge>}
+        actions={<SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refresh()}>刷新状态</SettingsActionButton>}
+        metrics={
+          <>
+            <SettingsMetricCard label="当前存储" value={getModeLabel(mode)} helper={supportsLocal ? '支持本地文件夹授权' : '仅支持浏览器存储'} icon={HardDrive} tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'neutral'} />
+            <SettingsMetricCard label="已存图片" value={`${imageCount}`} helper="当前可识别的图片记录总数" icon={Activity} tone="indigo" />
+            <SettingsMetricCard label="占用空间" value={`${usageMB.toFixed(2)} MB`} helper={usageMB > 512 ? '建议清理缓存或迁移项目' : '容量仍处于可控范围'} icon={Layers3} tone={usageMB > 512 ? 'amber' : 'neutral'} />
+            <SettingsMetricCard label="当前项目" value={activeCanvas?.name || '未打开'} helper={`${state.canvases.length} 个项目可管理`} icon={FolderOpen} tone="neutral" />
+          </>
+        }
+      />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
-        <SettingCard title="存储策略">
-          <div className="space-y-3">
-            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[15px] font-medium text-[var(--text-primary)]">本地文档夹存储</div>
-                  <div className="mt-1 text-[13px] leading-6 text-[var(--text-secondary)]">适合长期归档、项目交付和跨浏览器访问。</div>
-                </div>
-                <StatusBadge status={mode === 'local' ? (isConnectedToLocal ? 'online' : 'warning') : 'paused'} />
-              </div>
-              <div className="mt-3 flex gap-2">
-                <PrimaryButton onClick={() => void switchToLocal()} loading={switchingMode === 'local'} className="flex-1">
-                  切换到本地文档夹
-                </PrimaryButton>
-              </div>
-            </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <SettingsSection title="存储策略" eyebrow="模式切换" description="模式切换只负责决定数据落盘位置，不会自动执行清理或迁移。">
+          <div className="space-y-4">
+            <InfoCard
+              title="本地文件夹存储"
+              description="适合长期归档、项目交付和跨浏览器访问。切换后会把后续读写交给你授权的本地目录。"
+              badge={<StatusBadge status={mode === 'local' ? (isConnectedToLocal ? 'online' : 'warning') : 'paused'} label={mode === 'local' ? (isConnectedToLocal ? '已启用' : '待授权') : '未启用'} />}
+            >
+              <SettingsActionButton icon={FolderOpen} tone="primary" loading={switchingMode === 'local'} onClick={() => void switchToLocal()}>
+                设为本地文件夹存储
+              </SettingsActionButton>
+            </InfoCard>
 
-            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[15px] font-medium text-[var(--text-primary)]">浏览器存储</div>
-                  <div className="mt-1 text-[13px] leading-6 text-[var(--text-secondary)]">无需授权，适合试跑和轻量场景。</div>
-                </div>
-                <StatusBadge status={mode === 'browser' ? 'online' : 'paused'} />
-              </div>
-              <div className="mt-3 flex gap-2">
-                <SecondaryButton onClick={() => void switchToBrowser()} className="flex-1">
-                  {switchingMode === 'browser' ? '正在切换...' : '切换到浏览器存储'}
-                </SecondaryButton>
-              </div>
-            </div>
+            <InfoCard
+              title="浏览器存储"
+              description="无需授权，适合快速试跑和轻量使用。切换后数据继续保留在浏览器环境内。"
+              badge={<StatusBadge status={mode === 'browser' ? 'online' : 'paused'} label={mode === 'browser' ? '已启用' : '未启用'} />}
+            >
+              <SettingsActionButton loading={switchingMode === 'browser'} onClick={() => void switchToBrowser()}>
+                设为浏览器存储
+              </SettingsActionButton>
+            </InfoCard>
           </div>
-        </SettingCard>
+        </SettingsSection>
 
-        <SettingCard title="存储概况">
-          <div className="space-y-3">
-            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[15px] font-medium text-[var(--text-primary)]">当前状态</div>
-                  <div className="mt-1 text-[13px] text-[var(--text-secondary)]">{lastActionMessage}</div>
-                </div>
-                <StatusBadge status={modeStatus} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[15px] font-medium text-[var(--text-primary)]">空间占用</div>
-                <div className="text-[14px] font-semibold text-[var(--text-primary)]">{usageMB.toFixed(2)} MB</div>
+        <SettingsSection title="存储概况" eyebrow="状态总览" description="这里汇总最近一次动作结果、空间占用和本地授权支持状态。">
+          <div className="space-y-4">
+            <InfoCard title="最近动作" description={lastActionMessage} badge={<SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'neutral'}>{getModeLabel(mode)}</SettingsBadge>} />
+
+            <div className="rounded-[24px] border p-5" style={SETTINGS_ELEVATED_STYLE}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-[16px] font-semibold text-[var(--text-primary)]">空间占用</div>
+                <div className="text-[16px] font-semibold text-[var(--text-primary)]">{usageMB.toFixed(2)} MB</div>
               </div>
               <ProgressBar progress={usageProgress} tone={usageMB > 512 ? 'amber' : 'indigo'} showLabel={false} />
-              <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">以 1 GB 为高占用参考阈值</div>
+              <div className="mt-3 text-[12px] text-[var(--text-tertiary)]">以 1 GB 作为高占用参考阈值。</div>
             </div>
-            <div className="flex gap-2">
-              <SecondaryButton onClick={() => void refresh()} className="flex-1">
-                <RefreshCw size={14} className="mr-1 inline-block" />
-                {refreshing ? '正在刷新...' : '刷新状态'}
-              </SecondaryButton>
-            </div>
-          </div>
-        </SettingCard>
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
-        <SettingCard title="缓存清理">
-          <div className="space-y-3">
-            <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-              <div className="text-[15px] font-medium text-[var(--text-primary)]">压缩原图缓存</div>
-              <div className="mt-1 text-[13px] text-[var(--text-secondary)]">保留结果图，尽量释放原图占用空间。</div>
-              <div className="mt-3">
-                <PrimaryButton onClick={() => void handleCleanup()} loading={cleanupType === 'compress'}>
-                  <Trash2 size={14} className="mr-1 inline-block" />清理原图缓存
-                </PrimaryButton>
+            <div className="rounded-[24px] border p-5" style={SETTINGS_OVERLAY_STYLE}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[15px] font-semibold text-[var(--text-primary)]">本地授权能力</div>
+                  <div className="mt-2 text-[13px] text-[var(--text-secondary)]">
+                    {supportsLocal ? '当前浏览器支持本地文件夹授权。' : '当前浏览器只支持浏览器存储。'}
+                  </div>
+                </div>
+                <StatusBadge status={supportsLocal ? 'online' : 'warning'} label={supportsLocal ? '支持' : '不支持'} />
               </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
+          </div>
+        </SettingsSection>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <SettingsSection title="缓存清理" eyebrow="空间回收" description="缓存清理只影响图片缓存，不会改动供应商设置或其他业务数据。">
+          <div className="space-y-4">
+            <InfoCard title="清理原图缓存" description="保留结果图，优先释放原图和中间缓存占用空间。" badge={<SettingsBadge tone="amber">建议定期执行</SettingsBadge>}>
+              <SettingsActionButton icon={Trash2} tone="primary" loading={cleanupType === 'compress'} onClick={() => void handleCleanup()}>
+                清理原图缓存
+              </SettingsActionButton>
+            </InfoCard>
+
+            <div className="grid gap-3 sm:grid-cols-3">
               {cleanupOptions.map((option) => (
-                <SecondaryButton key={option.days} onClick={() => void handleCleanupByAge(option.days)}>
-                  {cleanupType === option.days ? '清理中...' : `清理 ${option.label}`}
-                </SecondaryButton>
+                <div key={option.days} className="rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
+                  <div className="text-[13px] font-medium text-[var(--text-primary)]">{option.label}</div>
+                  <div className="mt-2">
+                    <SettingsActionButton
+                      loading={cleanupType === option.days}
+                      onClick={() => void handleCleanupByAge(option.days)}
+                    >
+                      {option.label}
+                    </SettingsActionButton>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
-        </SettingCard>
+        </SettingsSection>
 
-        <SettingCard title="项目整理">
+        <SettingsSection title="项目整理" eyebrow="项目维护" description="整理和合并只作用在当前项目空间，不会影响你的存储模式选择。">
           {activeCanvas ? (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-                <div className="text-[15px] font-medium text-[var(--text-primary)]">整理当前项目</div>
-                <div className="mt-1 text-[13px] text-[var(--text-secondary)]">清理错误卡片、空分组和无效内容。</div>
-                <div className="mt-3">
-                  <SecondaryButton onClick={() => void handleCleanupProjectCards()}>
-                    {projectAction === 'cleanup' ? '整理中...' : '整理当前项目'}
-                  </SecondaryButton>
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--border-light)] p-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}>
-                <div className="text-[15px] font-medium text-[var(--text-primary)]">合并项目到当前画布</div>
-                <div className="mt-1 text-[13px] text-[var(--text-secondary)]">把其他项目的卡片迁移到当前打开的项目中。</div>
-                <div className="mt-3 space-y-3">
-                  <SettingSelect
-                    label="来源项目"
-                    value={mergeSourceId}
-                    options={mergeCandidates.map((canvas) => ({ value: canvas.id, label: canvas.name }))}
-                    onChange={setMergeSourceId}
-                    helper={mergeCandidates.length === 0 ? '没有可合并的其他项目' : undefined}
-                  />
-                  <PrimaryButton onClick={() => void handleMergeProject()} loading={projectAction === 'merge'}>
-                    合并到当前项目
-                  </PrimaryButton>
-                </div>
-              </div>
+            <div className="space-y-4">
+              <InfoCard title="整理当前项目" description="清理异常卡片、空分组和失效内容，让项目结构更干净。" badge={<SettingsBadge tone="neutral">{activeCanvas.name}</SettingsBadge>}>
+                <SettingsActionButton loading={projectAction === 'cleanup'} onClick={() => void handleCleanupProjectCards()}>
+                  整理当前项目
+                </SettingsActionButton>
+              </InfoCard>
+
+              <InfoCard title="合并到当前项目" description="把另一个项目里的卡片迁移到当前打开的项目中，并自动删除来源项目。">
+                {mergeCandidates.length > 0 ? (
+                  <div className="space-y-4">
+                    <SettingSelect
+                      label="来源项目"
+                      value={mergeSourceId}
+                      options={mergeCandidates.map((canvas) => ({ value: canvas.id, label: canvas.name }))}
+                      onChange={setMergeSourceId}
+                    />
+                    <SettingsActionButton tone="primary" loading={projectAction === 'merge'} onClick={() => void handleMergeProject()}>
+                      合并到当前项目
+                    </SettingsActionButton>
+                  </div>
+                ) : (
+                  <div className="text-[13px] text-[var(--text-secondary)]">当前没有可合并的其他项目。</div>
+                )}
+              </InfoCard>
             </div>
           ) : (
             <EmptyState title="当前没有活动项目" description="先打开一个项目，再执行整理或合并操作。" />
           )}
-        </SettingCard>
+        </SettingsSection>
       </div>
-    </div>
+    </SettingsViewShell>
   );
 };
 

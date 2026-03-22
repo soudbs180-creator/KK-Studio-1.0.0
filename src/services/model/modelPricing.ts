@@ -463,7 +463,7 @@ export const isCreditBasedModel = (
   // 1. [严格判定] 只有 @system 后缀才是积分模型
   // 管理员配置的模型统一使用 @system 后缀
   const suffix = lowerId.includes('@') ? lowerId.split('@')[1] : '';
-  if (suffix.startsWith('system') || suffix === 'systemproxy' || suffix === '12ai') {
+  if (suffix.startsWith('system') || suffix === 'systemproxy') {
     return true;
   }
 

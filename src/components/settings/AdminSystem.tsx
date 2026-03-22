@@ -7,12 +7,7 @@ import CreditModelSettings from './CreditModelSettings';
 import AdminConsoleSettings from './AdminConsoleSettings';
 import { ExchangeRateSettingsView } from './views/ExchangeRateSettingsView';
 import {
-  MetricCard,
-  PrimaryButton,
-  SecondaryButton,
   SegmentedControlMulti,
-  SettingCard,
-  SettingInput,
   StatusBadge,
 } from './ui/index';
 import {
@@ -22,6 +17,8 @@ import {
   SETTINGS_WARNING_STYLE,
   SettingsActionButton,
   SettingsBadge,
+  SettingsHero,
+  SettingsMetricCard,
   SettingsSection,
   SettingsViewShell,
 } from './SettingsScaffold';
@@ -145,8 +142,8 @@ const AdminAccessCard: React.FC<{
             <Icon size={18} />
           </div>
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
-              Admin Access
+            <div className="text-[11px] font-semibold tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
+              权限校验
             </div>
             <div className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
               {title}
@@ -183,6 +180,14 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   const [mustChangeDefaultPassword, setMustChangeDefaultPassword] = useState(false);
 
   const userLabel = user?.email || user?.phone || user?.id || '未登录';
+  const activeModuleLabel =
+    activeTab === 'credit-models' ? '积分模型' : activeTab === 'exchange-rates' ? '汇率设置' : '后台管理';
+  const activeModuleDescription =
+    activeTab === 'credit-models'
+      ? '维护计费模型、积分消耗和高级出图策略。'
+      : activeTab === 'exchange-rates'
+        ? '配置充值汇率、金额范围和前台可见状态。'
+        : '处理管理员密码、手动充值和权限授权。';
 
   const lockedReason = useMemo(() => {
     if (authLoading || checkingAdmin) return '正在校验管理员权限。';
@@ -421,64 +426,117 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
 
   return (
     <SettingsViewShell>
-      <div className="space-y-4 p-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard value="已验证" label="后台状态" helper={mustChangeDefaultPassword ? '建议先修改默认密码' : '当前会话已解锁'} tone={mustChangeDefaultPassword ? 'amber' : 'emerald'} />
-          <MetricCard value="30 分钟" label="会话时长" helper="到期后需要重新验证" tone="neutral" />
-          <MetricCard value={user?.email || '管理员'} label="当前账号" helper="仅管理员可见" tone="indigo" />
-          <MetricCard value={activeTab === 'credit-models' ? '积分模型' : activeTab === 'exchange-rates' ? '汇率设置' : '后台管理'} label="当前模块" helper="可在下方切换" tone="neutral" />
-        </div>
-
-        <SettingCard
-          title="管理员后台"
-          action={
-            <SecondaryButton onClick={lockNow}>
-              <Lock size={14} className="mr-1 inline-block" />立即锁定
-            </SecondaryButton>
-          }
-        >
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status="online" label="已验证" />
-              {mustChangeDefaultPassword ? <StatusBadge status="warning" label="请修改默认密码" /> : null}
-              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
-                <UserCog size={12} />
-                {userLabel}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
-                <Clock3 size={12} />
-                会话 30 分钟
-              </span>
-            </div>
-
-            <div className="text-[13px] leading-6" style={{ color: 'var(--text-secondary)' }}>
-              这里只保留后台真正需要的模块入口，避免和普通用户设置内容冲突。
-            </div>
-
-            <SegmentedControlMulti
-              options={['积分模型', '汇率设置', '后台管理']}
-              value={activeTab === 'credit-models' ? '积分模型' : activeTab === 'exchange-rates' ? '汇率设置' : '后台管理'}
-              onChange={(value) =>
-                setActiveTab(value === '积分模型' ? 'credit-models' : value === '汇率设置' ? 'exchange-rates' : 'admin-console')
-              }
+      <SettingsHero
+        eyebrow="高级设置"
+        title="管理员后台"
+        description="这里集中维护积分模型、充值汇率和高权限操作。普通用户不会看到这些入口，所有写入仍通过 Supabase RPC 执行。"
+        icon={ShieldCheck}
+        tone={mustChangeDefaultPassword ? 'amber' : 'indigo'}
+        badge={
+          <SettingsBadge tone={mustChangeDefaultPassword ? 'amber' : 'emerald'}>
+            {mustChangeDefaultPassword ? '默认密码待更换' : '后台会话已解锁'}
+          </SettingsBadge>
+        }
+        actions={
+          <SettingsActionButton icon={Lock} onClick={lockNow}>
+            立即锁定
+          </SettingsActionButton>
+        }
+        metrics={
+          <>
+            <SettingsMetricCard
+              label="后台状态"
+              value="已验证"
+              helper={mustChangeDefaultPassword ? '建议优先修改默认密码' : '当前会话已解锁'}
+              icon={ShieldCheck}
+              tone={mustChangeDefaultPassword ? 'amber' : 'emerald'}
             />
+            <SettingsMetricCard
+              label="会话时长"
+              value="30 分钟"
+              helper="到期后需要重新输入管理员密码"
+              icon={Clock3}
+              tone="neutral"
+            />
+            <SettingsMetricCard
+              label="当前账号"
+              value={user?.email || '管理员'}
+              helper="仅管理员可见"
+              icon={UserCog}
+              tone="indigo"
+            />
+            <SettingsMetricCard
+              label="当前模块"
+              value={activeModuleLabel}
+              helper="支持在下方快速切换"
+              icon={Settings}
+              tone="neutral"
+            />
+          </>
+        }
+      />
+
+      <SettingsSection
+        title="模块切换"
+        eyebrow="后台导航"
+        description="切换模块不会退出当前管理员会话，只会切换当前显示内容。"
+        action={<SettingsBadge tone="neutral">{activeModuleLabel}</SettingsBadge>}
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status="online" label="已验证" />
+            {mustChangeDefaultPassword ? <StatusBadge status="warning" label="请先修改默认密码" /> : null}
+            <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
+              <UserCog size={12} />
+              {userLabel}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs" style={infoCardStyle}>
+              <Clock3 size={12} />
+              会话 30 分钟
+            </span>
           </div>
-        </SettingCard>
 
-        {mustChangeDefaultPassword ? (
-          <SettingCard title="安全提醒">
-            <div className="rounded-xl border p-3" style={SETTINGS_WARNING_STYLE}>
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                默认密码仍然有效
-              </div>
-              <div className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-                建议先到"后台管理"里修改默认密码 `123456`，再继续执行其他后台操作。
-              </div>
+          <div className="rounded-[24px] border p-4 text-[13px] leading-6" style={SETTINGS_ELEVATED_STYLE}>
+            当前停留在“{activeModuleLabel}”模块。{activeModuleDescription}
+          </div>
+
+          <SegmentedControlMulti
+            options={['积分模型', '汇率设置', '后台管理']}
+            value={activeModuleLabel}
+            onChange={(value) =>
+              setActiveTab(value === '积分模型' ? 'credit-models' : value === '汇率设置' ? 'exchange-rates' : 'admin-console')
+            }
+          />
+        </div>
+      </SettingsSection>
+
+      {mustChangeDefaultPassword ? (
+        <SettingsSection
+          title="安全提醒"
+          eyebrow="高优先级"
+          description="建议先完成密码更新，再继续执行充值或权限类操作。"
+        >
+          <div className="rounded-[24px] border p-4" style={SETTINGS_WARNING_STYLE}>
+            <div className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              默认密码仍然有效
             </div>
-          </SettingCard>
-        ) : null}
+            <div className="mt-2 text-[13px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+              建议先到“后台管理”模块里修改默认密码 `123456`，再继续执行其他后台操作。
+            </div>
+          </div>
+        </SettingsSection>
+      ) : null}
 
-        <SettingCard title="后台模块">
+      <SettingsSection
+        title={activeModuleLabel}
+        eyebrow="后台模块"
+        description={activeModuleDescription}
+        action={
+          <SettingsBadge tone={activeTab === 'admin-console' ? 'amber' : 'indigo'}>
+            {activeModuleLabel}
+          </SettingsBadge>
+        }
+      >
         {activeTab === 'credit-models' ? (
           <CreditModelSettings />
         ) : activeTab === 'exchange-rates' ? (
@@ -486,8 +544,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
         ) : (
           <AdminConsoleSettings />
         )}
-        </SettingCard>
-      </div>
+      </SettingsSection>
     </SettingsViewShell>
   );
 };

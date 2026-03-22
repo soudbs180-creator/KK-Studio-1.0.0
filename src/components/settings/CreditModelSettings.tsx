@@ -272,6 +272,8 @@ const AdvancedToggle: React.FC<AdvancedToggleProps> = ({
   </button>
 );
 
+const ADD_MODEL_BUTTON_CLASSNAME = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap';
+
 const CreditModelSettings: React.FC = () => {
   const [rows, setRows] = useState<CreditModelRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -927,8 +929,9 @@ const CreditModelSettings: React.FC = () => {
                 <div className="text-sm font-semibold text-[var(--text-primary)]">模型配置</div>
                 <div className="mt-1 text-[12px] text-[var(--text-tertiary)]">每个模型都能单独配置积分、颜色、上限和高级策略。</div>
               </div>
-              <SecondaryButton onClick={addModel}>
-                <Plus size={12} className="mr-1 inline-block" />添加模型
+              <SecondaryButton onClick={addModel} className={ADD_MODEL_BUTTON_CLASSNAME}>
+                <Plus size={14} className="h-3.5 w-3.5 shrink-0" />
+                <span className="leading-none">添加模型</span>
               </SecondaryButton>
             </div>
             {!supportsMaxCallsLimit && (
@@ -1278,16 +1281,32 @@ const CreditModelSettings: React.FC = () => {
                                 return (
                                   <div
                                     key={quality}
-                                    className="rounded-xl border border-[var(--border-light)] p-3"
-                                    style={{ backgroundColor: isEnabled ? 'color-mix(in srgb, var(--bg-hover) 55%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)' }}
+                                    className="flex h-full flex-col rounded-[22px] border border-[var(--border-light)] px-4 py-4"
+                                    style={{
+                                      backgroundColor: isEnabled
+                                        ? 'color-mix(in srgb, var(--bg-hover) 55%, transparent)'
+                                        : 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)',
+                                    }}
                                   >
                                     <div className="flex items-start justify-between gap-3">
-                                      <div>
+                                      <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <div className="text-sm font-medium text-[var(--text-primary)]">{quality}</div>
-                                          <span className="rounded-full border border-[var(--border-light)] px-2 py-0.5 text-[10px] text-[var(--text-tertiary)]">{qualityMeta.resolution}</span>
+                                          <div className="text-[15px] font-semibold text-[var(--text-primary)]">{quality}</div>
+                                          <span className="rounded-full border border-[var(--border-light)] px-2 py-0.5 text-[10px] text-[var(--text-tertiary)]">
+                                            {qualityMeta.resolution}
+                                          </span>
                                         </div>
-                                        <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{qualityMeta.hint}</div>
+                                        <div className="mt-2">
+                                          <span
+                                            className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                                              isEnabled
+                                                ? 'bg-indigo-500/14 text-indigo-200'
+                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+                                            }`}
+                                          >
+                                            {isEnabled ? '当前启用' : '当前停用'}
+                                          </span>
+                                        </div>
                                       </div>
                                       <AdvancedToggle
                                         checked={isEnabled}
@@ -1297,11 +1316,25 @@ const CreditModelSettings: React.FC = () => {
                                       />
                                     </div>
 
-                                    <label className="mt-3 block">
-                                      <span className="text-[11px] text-[var(--text-tertiary)]">
-                                        {isEnabled ? '单次积分' : '当前已停用'}
-                                      </span>
-                                      <div className="mt-1 flex items-center gap-2 rounded-xl border border-[var(--border-light)] px-3 py-2">
+                                    <div className="mt-3 flex-1 text-[13px] leading-6 text-[var(--text-secondary)]">
+                                      {qualityMeta.hint}
+                                    </div>
+
+                                    <label className="mt-auto block pt-4">
+                                      <div className="mb-2 flex items-center justify-between gap-2">
+                                        <span className="text-[11px] text-[var(--text-tertiary)]">
+                                          {isEnabled ? '单次积分' : '当前已停用'}
+                                        </span>
+                                        <span className="text-[10px] text-[var(--text-tertiary)]">
+                                          {isEnabled ? '按次结算' : '暂停计费'}
+                                        </span>
+                                      </div>
+                                      <div
+                                        className={`flex h-12 items-center justify-between gap-3 rounded-2xl border px-3 ${
+                                          isEnabled ? '' : 'opacity-70'
+                                        }`}
+                                        style={{ backgroundColor: 'color-mix(in srgb, var(--bg-primary) 38%, transparent)' }}
+                                      >
                                         <input
                                           type="number"
                                           min={1}
@@ -1312,9 +1345,11 @@ const CreditModelSettings: React.FC = () => {
                                               creditCost: Math.max(1, Number(e.target.value || model.creditCost || 1)),
                                             })
                                           }
-                                          className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none"
+                                          className="w-16 min-w-0 bg-transparent text-left text-[18px] font-semibold tabular-nums text-[var(--text-primary)] outline-none"
                                         />
-                                        <span className="text-[11px] text-[var(--text-tertiary)]">积分</span>
+                                        <span className="shrink-0 text-[12px] font-medium text-[var(--text-secondary)]">
+                                          积分
+                                        </span>
                                       </div>
                                     </label>
                                   </div>
@@ -1366,9 +1401,10 @@ const CreditModelSettings: React.FC = () => {
             })}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <SecondaryButton onClick={addModel}>
-              <Plus size={12} className="mr-1 inline-block" />添加模型
+          <div className="flex flex-wrap items-center gap-2">
+            <SecondaryButton onClick={addModel} className={ADD_MODEL_BUTTON_CLASSNAME}>
+              <Plus size={14} className="h-3.5 w-3.5 shrink-0" />
+              <span className="leading-none">添加模型</span>
             </SecondaryButton>
             <PrimaryButton onClick={() => void saveProvider()} loading={saving}>
               {saving ? '保存中...' : '保存供应商'}

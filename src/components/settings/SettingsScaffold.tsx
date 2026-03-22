@@ -93,7 +93,7 @@ const toneStyles: Record<Tone, { iconStyle: CSSProperties; badgeStyle: CSSProper
 const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties> = {
   secondary: {
     borderColor: 'var(--settings-button-secondary-border)',
-    backgroundColor: 'var(--settings-button-secondary-bg)',
+    background: 'var(--settings-button-secondary-bg)',
     color: 'var(--settings-button-secondary-text)',
   },
   primary: {
@@ -104,24 +104,24 @@ const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties
   },
   danger: {
     borderColor: 'var(--settings-button-danger-border)',
-    backgroundColor: 'var(--settings-button-danger-bg)',
+    background: 'var(--settings-button-danger-bg)',
     color: 'var(--settings-button-danger-text)',
   },
 };
 
 export const SETTINGS_PANEL_STYLE = {
-  borderColor: 'var(--border-light)',
-  backgroundColor: 'var(--bg-secondary)',
+  borderColor: 'var(--settings-border-subtle)',
+  background: 'var(--settings-section-bg)',
 } as const;
 
 export const SETTINGS_ELEVATED_STYLE = {
-  borderColor: 'var(--border-light)',
-  backgroundColor: 'var(--bg-tertiary)',
+  borderColor: 'var(--settings-border-subtle)',
+  background: 'var(--settings-surface-elevated)',
 } as const;
 
 export const SETTINGS_OVERLAY_STYLE = {
-  borderColor: 'var(--border-light)',
-  backgroundColor: 'var(--bg-secondary)',
+  borderColor: 'var(--settings-border-subtle)',
+  background: 'var(--settings-surface-overlay)',
 } as const;
 
 export const SETTINGS_SUCCESS_STYLE = {
@@ -146,7 +146,7 @@ export const SETTINGS_LABEL_CLASSNAME =
   'text-[11px] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="settings-view-shell space-y-5">{children}</div>
+  <div className="settings-view-shell space-y-5 pb-2">{children}</div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({
@@ -158,7 +158,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
     className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] whitespace-nowrap ${className}`.trim()}
     style={toneStyles[tone].badgeStyle}
   >
-    {children}
+    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
   </span>
 );
 
@@ -171,6 +171,7 @@ type SettingsHeroProps = {
   metrics?: ReactNode;
   icon?: IconLike;
   tone?: Tone;
+  className?: string;
 };
 
 export const SettingsHero: React.FC<SettingsHeroProps> = ({
@@ -182,36 +183,51 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   metrics,
   icon: Icon,
   tone = 'indigo',
+  className = '',
 }) => {
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className="settings-hero-card rounded-2xl border p-4" style={SETTINGS_PANEL_STYLE}>
-      <div className="settings-hero-card__content space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+    <section
+      className={`settings-hero-card space-y-4 ${className}`.trim()}
+      style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: 0, textAlign: 'left' }}
+    >
+      <div className="settings-hero-card__content space-y-4" style={{ textAlign: 'left' }}>
+        {eyebrow ? (
+          <div
+            className="text-[11px] font-semibold tracking-[0.22em]"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            {eyebrow}
+          </div>
+        ) : null}
+        <div className="settings-hero-card__header flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="settings-hero-card__lead flex min-w-0 flex-1 items-start gap-3">
             {Icon ? (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={toneStyle.iconStyle}>
-                <Icon size={16} />
+              <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={toneStyle.iconStyle}>
+                <Icon size={17} />
               </div>
             ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="min-w-0 text-[17px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="settings-hero-card__title-wrap min-w-0 flex-1" style={{ textAlign: 'left' }}>
+              <div className="flex flex-wrap items-center gap-2" style={{ justifyContent: 'flex-start' }}>
+                <h2
+                  className="min-w-0 break-words text-[32px] font-semibold tracking-[-0.05em]"
+                  style={{ color: 'var(--text-primary)', textAlign: 'left', overflowWrap: 'anywhere' }}
+                >
                   {title}
                 </h2>
                 {badge}
               </div>
+              {description ? (
+                <p className="mt-2 max-w-3xl break-words text-[14px] leading-6" style={{ color: 'var(--text-secondary)', textAlign: 'left', overflowWrap: 'anywhere' }}>
+                  {description}
+                </p>
+              ) : null}
             </div>
           </div>
-          {actions ? <div className="flex flex-shrink-0 flex-wrap gap-2">{actions}</div> : null}
+          {actions ? <div className="settings-hero-card__actions flex flex-shrink-0 flex-wrap gap-2">{actions}</div> : null}
         </div>
-        {description ? (
-          <p className="text-[13px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
-            {description}
-          </p>
-        ) : null}
-        {metrics ? <div className="settings-hero-card__metrics grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{metrics}</div> : null}
+        {metrics ? <div className="settings-hero-card__metrics grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics}</div> : null}
       </div>
     </section>
   );
@@ -238,10 +254,13 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
     <div className="settings-metric-card h-full rounded-xl border p-3" style={SETTINGS_ELEVATED_STYLE}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
+          <div className="break-words text-[11px] font-medium" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
             {label}
           </div>
-          <div className="mt-1 min-w-0 text-[15px] font-semibold leading-tight [font-variant-numeric:tabular-nums]" style={{ color: 'var(--text-primary)' }}>
+          <div
+            className="mt-1 min-w-0 break-words text-[15px] font-semibold leading-tight [font-variant-numeric:tabular-nums]"
+            style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}
+          >
             {value}
           </div>
         </div>
@@ -252,7 +271,7 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
         ) : null}
       </div>
       {helper ? (
-        <div className="mt-1.5 text-[11px] leading-4" style={{ color: 'var(--text-tertiary)' }}>
+        <div className="mt-1.5 break-words text-[11px] leading-4" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
           {helper}
         </div>
       ) : null}
@@ -276,17 +295,17 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   children,
 }) => (
   <section className="space-y-2">
-    <div className="flex items-center justify-between gap-3 px-4">
-      <h3 className="text-[13px] font-normal uppercase" style={{ color: 'var(--text-tertiary)' }}>
+    <div className="flex items-start justify-between gap-3 px-2">
+      <h3 className="text-left text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
         {eyebrow || title}
       </h3>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
     </div>
-    <div className="settings-section-card rounded-2xl border p-4" style={SETTINGS_PANEL_STYLE}>
+    <div className="settings-section-card rounded-[26px] border p-5" style={SETTINGS_PANEL_STYLE}>
       {children}
     </div>
     {description ? (
-      <p className="settings-ios-footer px-4 text-[13px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
+      <p className="settings-ios-footer break-words px-2 text-[13px] leading-6" style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
         {description}
       </p>
     ) : null}
@@ -313,8 +332,12 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
 }) => (
   <button
     type={type}
-    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 rounded-[8px] border text-left font-medium leading-tight transition-opacity duration-150 hover:opacity-70 active:opacity-50 disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap ${size === 'sm' ? 'min-h-9 px-3 py-1.5 text-xs' : 'min-h-10 px-4 py-2 text-[13px]'} ${className}`.trim()}
-    style={{ ...buttonToneStyles[tone], ...style }}
+    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[8px] border text-left font-medium leading-tight transition-opacity duration-150 hover:opacity-70 active:opacity-50 disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap ${size === 'sm' ? 'min-h-9 px-3 py-1.5 text-xs' : 'min-h-10 px-4 py-2 text-[13px]'} ${className}`.trim()}
+    style={{
+      borderRadius: size === 'sm' ? 14 : 16,
+      ...buttonToneStyles[tone],
+      ...style,
+    }}
     {...buttonProps}
   >
     {Icon ? (
@@ -325,7 +348,7 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
         <Icon size={size === 'sm' ? 14 : 16} className={loading ? 'animate-spin' : undefined} />
       </span>
     ) : null}
-    {children}
+    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
   </button>
 );
 
@@ -347,12 +370,12 @@ export const SettingsDangerZone: React.FC<SettingsDangerZoneProps> = ({
       backgroundColor: 'var(--state-danger-bg)',
     }}
   >
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-medium" style={{ color: 'var(--state-danger-text)' }}>
+        <div className="break-words text-[15px] font-medium" style={{ color: 'var(--state-danger-text)', overflowWrap: 'anywhere' }}>
           {title}
         </div>
-        <div className="mt-0.5 text-[13px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
+        <div className="mt-0.5 break-words text-[13px] leading-5" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
           {description}
         </div>
       </div>

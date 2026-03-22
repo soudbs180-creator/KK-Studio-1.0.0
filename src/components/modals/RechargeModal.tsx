@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -20,9 +21,17 @@ const initialRateMap: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
 
 const formatCurrencySymbol = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '¥' : '$');
 const formatRateValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+const PAYMENT_GATEWAY_BASE_URL = (import.meta.env.VITE_PAYMENT_GATEWAY_URL || '/api/pay').trim() || '/api/pay';
+const PAYMENT_STATUS_LABELS = {
+  idle: '待发起',
+  pending: '等待支付',
+  success: '支付成功',
+  failed: '支付失败',
+  closed: '订单关闭',
+} as const;
 
 const RechargeModal: React.FC = () => {
-  const { showRechargeModal, setShowRechargeModal } = useBilling();
+  const { showRechargeModal, setShowRechargeModal, refreshBilling } = useBilling();
   const { user } = useAuth();
 
   const [currency, setCurrency] = useState<SupportedRechargeCurrency>('CNY');
@@ -31,6 +40,12 @@ const RechargeModal: React.FC = () => {
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
   const [loadingRates, setLoadingRates] = useState(false);
   const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(initialRateMap);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [paymentLink, setPaymentLink] = useState<string | null>(null);
+  const [paymentOrderNo, setPaymentOrderNo] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<keyof typeof PAYMENT_STATUS_LABELS>('idle');
+  const [paymentMessage, setPaymentMessage] = useState('');
+  const [pendingCredits, setPendingCredits] = useState<number | null>(null);
 
   const currentRate = exchangeRates[currency] || initialRateMap[currency];
   const minAmount = currentRate.minAmount ?? (currency === 'CNY' ? 5 : 1);
@@ -91,6 +106,86 @@ const RechargeModal: React.FC = () => {
   );
 
   const hasAvailableCurrency = availableCurrencies.length > 0;
+  const buildPaymentUrl = useCallback((pathSuffix: '' | '/qrcode' | '/status', params?: Record<string, string>) => {
+    const normalizedBase = PAYMENT_GATEWAY_BASE_URL
+      .replace(/\/(qrcode|status)\/?$/i, '')
+      .replace(/\/+$/, '');
+    const url = new URL(`${normalizedBase}${pathSuffix}`, window.location.origin);
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+
+    return url.toString();
+  }, []);
+
+  useEffect(() => {
+    if (showRechargeModal) return;
+
+    setIsSubmittingPayment(false);
+    setPaymentLink(null);
+    setPaymentOrderNo(null);
+    setPaymentStatus('idle');
+    setPaymentMessage('');
+    setPendingCredits(null);
+  }, [showRechargeModal]);
+
+  useEffect(() => {
+    if (!showRechargeModal || !paymentOrderNo || paymentStatus === 'success' || paymentStatus === 'closed') {
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(buildPaymentUrl('/status', { outTradeNo: paymentOrderNo }));
+        const payload = await response.json().catch(() => ({}));
+
+        if (cancelled) return;
+
+        if (!response.ok) {
+          throw new Error(payload?.error || '支付状态查询失败');
+        }
+
+        const tradeStatus = String(payload?.tradeStatus || 'WAITING');
+        if (tradeStatus === 'TRADE_SUCCESS') {
+          setPaymentStatus('success');
+          setPaymentMessage('支付成功，积分已同步到云端余额。');
+          await refreshBilling();
+          notify.success('充值成功', pendingCredits ? `已到账 ${pendingCredits} 积分` : '积分已同步到账。');
+          return;
+        }
+
+        if (tradeStatus === 'TRADE_CLOSED') {
+          setPaymentStatus('closed');
+          setPaymentMessage('订单已关闭，请重新发起充值。');
+          return;
+        }
+
+        setPaymentStatus('pending');
+        setPaymentMessage('已创建订单，等待支付完成后自动同步余额。');
+      } catch (error: any) {
+        if (cancelled) return;
+        setPaymentStatus('failed');
+        setPaymentMessage(error?.message || '支付状态查询失败，请稍后重试。');
+      }
+
+      if (!cancelled) {
+        timer = window.setTimeout(pollStatus, 4000);
+      }
+    };
+
+    void pollStatus();
+
+    return () => {
+      cancelled = true;
+      if (typeof timer === 'number') {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [showRechargeModal, paymentOrderNo, paymentStatus, buildPaymentUrl, refreshBilling, pendingCredits]);
 
   const theme = useMemo(() => {
     if (currency === 'USD') {
@@ -164,7 +259,45 @@ const RechargeModal: React.FC = () => {
     const paymentChannel = isCny ? selectedChannel : 'paypal';
 
     if (paymentChannel === 'alipay') {
-      notify.alipay('支付宝通道维护中', '当前暂未开放在线支付，请联系管理员处理。');
+      setIsSubmittingPayment(true);
+      setPaymentStatus('pending');
+      setPaymentMessage('正在创建支付订单...');
+      setPendingCredits(credits);
+
+      try {
+        const response = await fetch(
+          buildPaymentUrl('/qrcode', {
+            method: 'alipay',
+            userId: user.id,
+            amount: String(amount),
+          })
+        );
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload?.error || '支付订单创建失败');
+        }
+
+        const nextPaymentLink = String(payload?.qrCode || '').trim();
+        const nextOrderNo = String(payload?.outTradeNo || '').trim();
+
+        if (!nextPaymentLink || !nextOrderNo) {
+          throw new Error('支付服务未返回有效订单信息');
+        }
+
+        setPaymentLink(nextPaymentLink);
+        setPaymentOrderNo(nextOrderNo);
+        setPaymentStatus('pending');
+        setPaymentMessage('订单已创建，请完成支付，余额会自动与 Supabase 同步。');
+        notify.alipay('订单已创建', '请扫码或打开支付链接完成支付，到账后会自动刷新余额。');
+      } catch (error: any) {
+        const message = error?.message || '支付订单创建失败，请稍后重试。';
+        setPaymentStatus('failed');
+        setPaymentMessage(message);
+        notify.error('创建充值订单失败', message);
+      } finally {
+        setIsSubmittingPayment(false);
+      }
     } else if (paymentChannel === 'wechat') {
       notify.wechat('微信支付维护中', '当前暂未开放在线支付，请联系管理员处理。');
     } else {
@@ -369,6 +502,45 @@ const RechargeModal: React.FC = () => {
             </div>
           </div>
 
+          {paymentLink && (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/5 dark:bg-zinc-900/50">
+              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${theme.light} ${theme.text}`}>
+                {paymentStatus === 'success' ? <CheckCircle2 size={14} /> : <Loader2 size={14} className={paymentStatus === 'pending' ? 'animate-spin' : ''} />}
+                {PAYMENT_STATUS_LABELS[paymentStatus]}
+              </div>
+
+              <div className={`mt-4 grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-[180px_minmax(0,1fr)]'}`}>
+                <div className="flex justify-center">
+                  <div className="rounded-2xl bg-white p-3 shadow-sm">
+                    <QRCodeCanvas value={paymentLink} size={isMobile ? 160 : 180} includeMargin />
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-sm text-gray-600 dark:text-zinc-300">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">Order</div>
+                    <div className="mt-1 break-all font-medium text-gray-900 dark:text-white">{paymentOrderNo}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">Status</div>
+                    <div className="mt-1">{paymentMessage || '请使用支付宝完成支付，成功后会自动刷新云端余额。'}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                    {pendingCredits ? `本次预计到账 ${pendingCredits} 积分。` : '到账积分将按当前汇率同步。'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open(paymentLink, '_blank', 'noopener,noreferrer')}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium ${theme.border} ${theme.text} ${theme.light}`}
+                  >
+                    <ExternalLink size={14} />
+                    打开支付页
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600 dark:border-white/5 dark:bg-zinc-900/50 dark:text-zinc-400">
             <div className="flex items-start gap-3">
               <div className={`rounded-xl p-2 ${theme.light} ${theme.text}`}>
@@ -386,13 +558,13 @@ const RechargeModal: React.FC = () => {
           <button
             onClick={handleRecharge}
             className={`flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-lg font-semibold text-white shadow-xl transition-all ${
-              loadingRates || !hasAvailableCurrency
+              loadingRates || !hasAvailableCurrency || isSubmittingPayment
                 ? 'cursor-not-allowed bg-gray-300 dark:bg-zinc-800'
                 : `bg-gradient-to-r ${theme.gradient} ${theme.shadow} hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]`
             }`}
-            disabled={loadingRates || !hasAvailableCurrency}
+            disabled={loadingRates || !hasAvailableCurrency || isSubmittingPayment}
           >
-            {loadingRates ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
+            {loadingRates || isSubmittingPayment ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
             {loadingRates ? '同步汇率中...' : hasAvailableCurrency ? '发起充值' : '当前不可充值'}
           </button>
         </div>

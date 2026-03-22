@@ -9,14 +9,13 @@ import {
 } from '../../../services/billing/creditExchangeRateService';
 import { notify } from '../../../services/system/notificationService';
 import {
-  MetricCard,
-  PrimaryButton,
-  SecondaryButton,
-  SettingCard,
-  SettingInput,
-  SettingToggle,
-  StatusBadge,
-} from '../ui/index';
+  SETTINGS_ELEVATED_STYLE,
+  SETTINGS_OVERLAY_STYLE,
+  SettingsActionButton,
+  SettingsBadge,
+  SettingsMetricCard,
+} from '../SettingsScaffold';
+import { SettingInput, SettingToggle, StatusBadge } from '../ui/index';
 
 const currencies: SupportedRechargeCurrency[] = ['CNY', 'USD'];
 
@@ -27,6 +26,8 @@ const createEmptyRateState = (): Record<SupportedRechargeCurrency, CreditExchang
 
 const formatAmountPreview = (amount: number, currency: SupportedRechargeCurrency) =>
   currency === 'CNY' ? `¥${amount}` : `$${amount}`;
+
+const getCurrencyLabel = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '人民币充值' : '美元充值');
 
 const formatAmountRange = (rate: CreditExchangeRate, currency: SupportedRechargeCurrency) => {
   const parts: string[] = [];
@@ -135,95 +136,135 @@ export const ExchangeRateSettingsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard value={`${activeCurrencies} / ${currencies.length}`} label="启用币种" helper="前台充值页会读取这里的状态" tone={activeCurrencies === currencies.length ? 'emerald' : 'amber'} />
-        <MetricCard value={`¥1 = ${exchangeRates.CNY.creditsPerUnit}`} label="人民币汇率" helper={formatAmountRange(exchangeRates.CNY, 'CNY')} tone={exchangeRates.CNY.isActive ? 'indigo' : 'neutral'} />
-        <MetricCard value={`$1 = ${exchangeRates.USD.creditsPerUnit}`} label="美元汇率" helper={formatAmountRange(exchangeRates.USD, 'USD')} tone={exchangeRates.USD.isActive ? 'indigo' : 'neutral'} />
-        <MetricCard value={summaryLabel} label="当前摘要" helper="修改后充值页同步生效" tone="neutral" />
+        <SettingsMetricCard
+          label="启用币种"
+          value={`${activeCurrencies} / ${currencies.length}`}
+          helper="前台充值页会读取这里的开关"
+          icon={Coins}
+          tone={activeCurrencies === currencies.length ? 'emerald' : 'amber'}
+        />
+        <SettingsMetricCard
+          label="人民币汇率"
+          value={`¥1 = ${exchangeRates.CNY.creditsPerUnit}`}
+          helper={formatAmountRange(exchangeRates.CNY, 'CNY')}
+          icon={Coins}
+          tone={exchangeRates.CNY.isActive ? 'indigo' : 'neutral'}
+        />
+        <SettingsMetricCard
+          label="美元汇率"
+          value={`$1 = ${exchangeRates.USD.creditsPerUnit}`}
+          helper={formatAmountRange(exchangeRates.USD, 'USD')}
+          icon={Coins}
+          tone={exchangeRates.USD.isActive ? 'indigo' : 'neutral'}
+        />
+        <SettingsMetricCard
+          label="当前摘要"
+          value={summaryLabel}
+          helper="修改后前台充值页同步生效"
+          icon={RefreshCw}
+          tone="neutral"
+        />
       </div>
 
-      <SettingCard
-        title="汇率规则"
-        action={
-          <SecondaryButton onClick={() => void loadRates()}>
-            <RefreshCw size={14} className="mr-1 inline-block" />
-            {loadingRates ? '正在刷新...' : '刷新汇率'}
-          </SecondaryButton>
-        }
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border p-4"
+        style={SETTINGS_OVERLAY_STYLE}
       >
-        <div className="grid gap-4 xl:grid-cols-2">
-          {currencies.map((currency) => {
-            const rate = exchangeRates[currency];
-            const isSaving = savingCurrency === currency;
-            const previewAmount = currency === 'CNY' ? 100 : 10;
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[15px] font-semibold text-[var(--text-primary)]">充值汇率规则</div>
+            <SettingsBadge tone="neutral">前台同步生效</SettingsBadge>
+          </div>
+          <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+            每个币种都支持独立设置兑换比例、金额范围和可见状态。保存后，充值页会立刻读取新规则。
+          </div>
+        </div>
+        <SettingsActionButton icon={RefreshCw} loading={loadingRates} onClick={() => void loadRates()}>
+          {loadingRates ? '刷新中...' : '刷新汇率'}
+        </SettingsActionButton>
+      </div>
 
-            return (
-              <div
-                key={currency}
-                className="rounded-xl border border-[var(--border-light)] p-4"
-                style={{ backgroundColor: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[15px] font-medium text-[var(--text-primary)]">
-                      {currency === 'CNY' ? '人民币充值' : '美元充值'}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {currencies.map((currency) => {
+          const rate = exchangeRates[currency];
+          const isSaving = savingCurrency === currency;
+          const previewAmount = currency === 'CNY' ? 100 : 10;
+
+          return (
+            <div key={currency} className="rounded-[24px] border p-5" style={SETTINGS_ELEVATED_STYLE}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+                      {getCurrencyLabel(currency)}
                     </div>
-                    <div className="mt-1 text-[13px] text-[var(--text-secondary)]">
-                      {currency === 'CNY' ? '¥1' : '$1'} = {rate.creditsPerUnit} 积分
-                    </div>
+                    <SettingsBadge tone="neutral">{currency}</SettingsBadge>
+                    <SettingsBadge tone={rate.isActive ? 'emerald' : 'neutral'}>
+                      {rate.isActive ? '前台显示中' : '前台已隐藏'}
+                    </SettingsBadge>
                   </div>
-                  <StatusBadge status={rate.isActive ? 'online' : 'paused'} label={rate.isActive ? '已启用' : '已停用'} />
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <SettingInput
-                    label="每 1 单位货币可得积分"
-                    type="number"
-                    value={String(rate.creditsPerUnit)}
-                    onChange={(value) => handleRateFieldChange(currency, 'creditsPerUnit', value)}
-                  />
-                  <SettingInput
-                    label="最小充值金额"
-                    type="number"
-                    value={rate.minAmount === null ? '' : String(rate.minAmount)}
-                    onChange={(value) => handleRateFieldChange(currency, 'minAmount', value)}
-                  />
-                  <SettingInput
-                    label="最大充值金额"
-                    type="number"
-                    value={rate.maxAmount === null ? '' : String(rate.maxAmount)}
-                    onChange={(value) => handleRateFieldChange(currency, 'maxAmount', value)}
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <SettingToggle
-                    label="允许前台显示并使用该币种"
-                    helper="关闭后，充值页会隐藏该币种入口。"
-                    checked={rate.isActive}
-                    onChange={(checked) => handleRateFieldChange(currency, 'isActive', checked)}
-                  />
-                </div>
-
-                <div className="mt-4 rounded-xl border border-[var(--border-light)] p-3 text-[13px] text-[var(--text-secondary)]">
-                  <div>金额范围：{formatAmountRange(rate, currency)}</div>
-                  <div className="mt-1">
-                    充值预览：{formatAmountPreview(previewAmount, currency)} = {previewAmount * rate.creditsPerUnit} 积分
+                  <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+                    {currency === 'CNY'
+                      ? '控制人民币充值档位的积分换算与展示状态。'
+                      : '控制美元充值档位的积分换算与展示状态。'}
                   </div>
                 </div>
+                <StatusBadge status={rate.isActive ? 'online' : 'paused'} label={rate.isActive ? '已启用' : '已停用'} />
+              </div>
 
-                <div className="mt-4">
-                  <PrimaryButton onClick={() => void handleSaveExchangeRate(currency)} loading={isSaving}>
-                    <Coins size={14} className="mr-1 inline-block" />
-                    {isSaving ? '保存中...' : `保存 ${currency} 汇率`}
-                  </PrimaryButton>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <SettingInput
+                  label="每 1 单位货币可得积分"
+                  type="number"
+                  value={String(rate.creditsPerUnit)}
+                  onChange={(value) => handleRateFieldChange(currency, 'creditsPerUnit', value)}
+                />
+                <SettingInput
+                  label="最小充值金额"
+                  type="number"
+                  value={rate.minAmount === null ? '' : String(rate.minAmount)}
+                  onChange={(value) => handleRateFieldChange(currency, 'minAmount', value)}
+                />
+                <SettingInput
+                  label="最大充值金额"
+                  type="number"
+                  value={rate.maxAmount === null ? '' : String(rate.maxAmount)}
+                  onChange={(value) => handleRateFieldChange(currency, 'maxAmount', value)}
+                />
+              </div>
+
+              <div className="mt-4">
+                <SettingToggle
+                  label="允许前台显示并使用该币种"
+                  helper="关闭后，充值页会隐藏该币种入口。"
+                  checked={rate.isActive}
+                  onChange={(checked) => handleRateFieldChange(currency, 'isActive', checked)}
+                />
+              </div>
+
+              <div className="mt-4 rounded-[20px] border p-4 text-[13px] leading-6" style={SETTINGS_OVERLAY_STYLE}>
+                <div>金额范围：{formatAmountRange(rate, currency)}</div>
+                <div className="mt-2">
+                  充值预览：{formatAmountPreview(previewAmount, currency)} = {previewAmount * rate.creditsPerUnit} 积分
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </SettingCard>
+
+              <div className="mt-4 flex justify-end">
+                <SettingsActionButton
+                  icon={Coins}
+                  tone="primary"
+                  loading={isSaving}
+                  onClick={() => void handleSaveExchangeRate(currency)}
+                >
+                  {isSaving ? '保存中...' : `保存${currency === 'CNY' ? '人民币' : '美元'}规则`}
+                </SettingsActionButton>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

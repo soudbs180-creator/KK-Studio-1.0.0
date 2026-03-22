@@ -240,7 +240,16 @@ const AppContent: React.FC<AppContentProps> = () => {
     switchCanvas  // 🎯 切换项目
   } = useCanvas();
 
-  const { balance, loading: balanceLoading, showRechargeModal, setShowRechargeModal, consumeCredits, refundCredits, adjustBalanceOptimistically } = useBilling();
+  const {
+    balance,
+    loading: balanceLoading,
+    showRechargeModal,
+    setShowRechargeModal,
+    consumeCreditsDetailed,
+    refundCreditsByTransaction,
+    refreshBilling,
+    adjustBalanceOptimistically
+  } = useBilling();
 
   // Canvas Ref for Zoom/Pan Controls
   const canvasRef = useRef<InfiniteCanvasHandle>(null);
@@ -348,6 +357,104 @@ const AppContent: React.FC<AppContentProps> = () => {
         : (node.providerLabel || routeDisplay.providerLabel),
     };
   }, [resolveProviderDisplay, shouldPreferRouteProviderDisplay]);
+
+  const ensureCreditAttemptCharged = useCallback(async (params: {
+    modelId: string;
+    modelLabel?: string;
+    providerId?: string;
+    provider?: string;
+    requiredCredits: number;
+    useServerSideCreditSettlement: boolean;
+  }) => {
+    if (params.requiredCredits <= 0) {
+      return { success: true as const, transactionId: undefined as string | undefined };
+    }
+
+    if (authLoading) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.info('账户状态确认中', '正在校验登录状态，请稍后再试。');
+      });
+      return { success: false as const };
+    }
+
+    if (!user || isTempUser) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.error('请先登录', '积分模型需要登录正式账号后使用。');
+      });
+      return { success: false as const };
+    }
+
+    if (balance < params.requiredCredits) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.error('生成失败', '您的账户余额不足，请先充值积分。');
+      });
+      setShowRechargeModal(true);
+      return { success: false as const };
+    }
+
+    if (params.useServerSideCreditSettlement) {
+      return { success: true as const, transactionId: undefined as string | undefined };
+    }
+
+    const chargeResult = await consumeCreditsDetailed(params.modelId, params.requiredCredits, {
+      feature: `模型调用：${params.modelLabel || params.modelId}`,
+      modelName: params.modelLabel || params.modelId,
+      providerId: params.providerId || params.provider || 'managed',
+      provider: params.provider,
+      keySlotId: params.providerId,
+    });
+
+    if (!chargeResult.success) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.error('生成失败', chargeResult.message || '积分扣费失败，请稍后重试。');
+      });
+      if ((chargeResult.newBalance ?? balance) < params.requiredCredits) {
+        setShowRechargeModal(true);
+      }
+      return { success: false as const };
+    }
+
+    return {
+      success: true as const,
+      transactionId: chargeResult.transactionId,
+    };
+  }, [authLoading, user, isTempUser, balance, setShowRechargeModal, consumeCreditsDetailed]);
+
+  const resolveFailedCreditAttempt = useCallback(async (node: Pick<PromptNode, 'id' | 'billingMode' | 'creditSettlement' | 'isPaymentProcessed' | 'paymentTransactionId' | 'refundStatus' | 'cost'>) => {
+    const refundableTransactionId = String(node.paymentTransactionId || '').trim();
+    const shouldRefundCurrentAttempt =
+      node.billingMode === 'credits'
+      && node.creditSettlement === 'client'
+      && node.isPaymentProcessed === true
+      && refundableTransactionId.length > 0;
+
+    let refundStatus = node.refundStatus;
+    let isPaymentProcessed = node.isPaymentProcessed;
+    let paymentTransactionId = node.paymentTransactionId;
+
+    if (shouldRefundCurrentAttempt) {
+      const refundResult = await refundCreditsByTransaction(refundableTransactionId, `退款 ${node.id}`);
+      refundStatus = refundResult.success ? 'success' : 'failed';
+      if (refundResult.success) {
+        isPaymentProcessed = false;
+        paymentTransactionId = undefined;
+      }
+    }
+
+    if (
+      node.billingMode === 'credits'
+      && node.creditSettlement === 'server'
+      && (node.cost || 0) > 0
+    ) {
+      await refreshBilling();
+    }
+
+    return {
+      refundStatus,
+      isPaymentProcessed,
+      paymentTransactionId,
+    };
+  }, [refundCreditsByTransaction, refreshBilling]);
 
   // Track reserved regions for rapid-fire generation to prevent overlaps (before React update reflects)
   const reservedRegionsRef = useRef<{ bounds: { x: number; y: number; width: number; height: number }; timestamp: number; }[]>([]);
@@ -1971,20 +2078,29 @@ const AppContent: React.FC<AppContentProps> = () => {
     return best.ratio;
   }, []);
 
-  const updateImageNodeDisplayMeta = useCallback((id: string, dimensions: string) => {
+  const parseImageDimensions = useCallback((dimensions?: string | null) => {
+    if (!dimensions) return undefined;
+
     const match = dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-    if (!match) {
-      updateImageNodeDimensions(id, dimensions);
-      return;
-    }
+    if (!match) return undefined;
 
     const width = Number(match[1]);
     const height = Number(match[2]);
     if (!width || !height) {
+      return undefined;
+    }
+
+    return { width, height };
+  }, []);
+
+  const updateImageNodeDisplayMeta = useCallback((id: string, dimensions: string) => {
+    const parsedDimensions = parseImageDimensions(dimensions);
+    if (!parsedDimensions) {
       updateImageNodeDimensions(id, dimensions);
       return;
     }
 
+    const { width, height } = parsedDimensions;
     const maxDim = Math.max(width, height);
     const effectiveSize = maxDim > 3000 ? ImageSize.SIZE_4K : maxDim > 1500 ? ImageSize.SIZE_2K : ImageSize.SIZE_1K;
     const inferredRatio = inferAspectRatioFromDimensions(width, height);
@@ -1995,7 +2111,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       aspectRatio: inferredRatio,
       exactDimensions: { width, height }
     });
-  }, [inferAspectRatioFromDimensions, updateImageNode, updateImageNodeDimensions]);
+  }, [inferAspectRatioFromDimensions, parseImageDimensions, updateImageNode, updateImageNodeDimensions]);
 
   const extractErrorDetails = useCallback((error: any, fallbackModel?: string) => {
     const details = {
@@ -2620,6 +2736,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     let requiredCredits = 0;
     let perImageCreditCost = 0;
+    let paymentTransactionId: string | undefined = undefined;
     const useServerSideCreditSettlement = isCreditModel && config.model.toLowerCase().includes('@system');
     if (isCreditModel) {
       if (authLoading) {
@@ -2654,15 +2771,21 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 闈炵郴缁熶唬鐞嗙Н鍒嗘ā鍨嬩粛娌跨敤鏃х殑鍓嶇棰勬墸璐规祦绋?
       if (requiredCredits > 0 && !useServerSideCreditSettlement) {
         console.log('[handleGenerate] 准备扣费:', { model: config.model, requiredCredits });
-        const isPaymentSuccess = await consumeCredits(config.model, requiredCredits);
-        console.log('[handleGenerate] 扣费结果:', { isPaymentSuccess });
-        if (!isPaymentSuccess) {
+        const chargeResult = await consumeCreditsDetailed(config.model, requiredCredits, {
+          feature: `模型调用：${config.model}`,
+          modelName: config.model,
+          providerId: provider || 'managed',
+          provider,
+        });
+        console.log('[handleGenerate] 扣费结果:', { chargeResult });
+        if (!chargeResult.success) {
           import('./services/system/notificationService').then(({ notify }) => {
             notify.error('生成失败', '您的账户余额不足，请先充值积分。');
           });
           setShowRechargeModal(true); // 鑷姩寮瑰嚭鍏呭€煎叆鍙?
           return;
         }
+        paymentTransactionId = chargeResult.transactionId;
       }
     }
     // setIsGenerating(true); // Removed, handled by hook
@@ -2941,6 +3064,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         errorDetails: undefined,
         refundStatus: undefined,
         creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
+        paymentTransactionId,
         isNew: isNewAnim, // 🎯 启用鍔ㄧ敾标记
         parallelCount: pptCount,
         sourceImageId: activeSourceImage || undefined,
@@ -2954,7 +3078,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         cost: requiredCredits,
         billingMode: isCreditModel ? 'credits' : 'currency',
         creditCost: isCreditModel ? perImageCreditCost : undefined,
-        isPaymentProcessed: requiredCredits > 0,
+        isPaymentProcessed: requiredCredits > 0 && !useServerSideCreditSettlement,
         generationMetadata: {
           pendingTaskIds: [],
         },
@@ -3076,7 +3200,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 🎯 [Fix] 涓嶅湪姝ゅ setIsGenerating(false)锛屽洜涓?executeGeneration 内部宸茬鐞嗘状态
       // 鍙戦€佽妭娴佺敱 lastGenerateAtRef 控制锛屼笉鍐嶄緷璧栨暣杞敓鎴愮粨鏉熸墠瑙ｉ攣
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCredits, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -3220,7 +3344,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
     const resolvedRoute = resolveNodeRouteState(node);
-    const executionNode: PromptNode = {
+    let executionNode: PromptNode = {
       ...node,
       ...resolvedRoute,
     };
@@ -3236,19 +3360,72 @@ const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
+    const currentNodeId = node.id;
+    const requestedCount = node.parallelCount || config.parallelCount || 1;
+    const count = node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
+    const retryProvider = executionNode.model.includes('@')
+      ? executionNode.model.split('@')[1]
+      : executionNode.provider;
+    const hasRetryCustomUserKey = keyManager.hasCustomKeyForModel(executionNode.model);
+    const retryIsCreditModel = isCreditBasedModel(
+      executionNode.model,
+      retryProvider,
+      undefined,
+      hasRetryCustomUserKey
+    );
+    const retryUseServerSideCreditSettlement = retryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
+    const retryPerImageCreditCost = retryIsCreditModel
+      ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
+      : 0;
+    const retryRequiredCredits = retryIsCreditModel
+      ? ((executionNode.mode === GenerationMode.IMAGE || executionNode.mode === GenerationMode.PPT)
+        ? count * retryPerImageCreditCost
+        : (retryPerImageCreditCost || 1))
+      : 0;
+    const retryChargeAttempt = await ensureCreditAttemptCharged({
+      modelId: executionNode.model,
+      modelLabel: executionNode.modelLabel || executionNode.model,
+      providerId: retryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
+      provider: executionNode.provider,
+      requiredCredits: retryRequiredCredits,
+      useServerSideCreditSettlement: retryUseServerSideCreditSettlement,
+    });
+
+    if (!retryChargeAttempt.success) {
+      return;
+    }
+
+    executionNode = {
+      ...executionNode,
+      refundStatus: undefined,
+      billingMode: retryIsCreditModel ? 'credits' : 'currency',
+      creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
+      creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
+      cost: retryRequiredCredits,
+      isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
+      paymentTransactionId: retryChargeAttempt.transactionId,
+    };
+
     // 1. Reset state to generating
     updatePromptNode({
       ...executionNode,
       isGenerating: true,
       error: undefined,
       errorDetails: undefined,
+      refundStatus: undefined,
+      billingMode: retryIsCreditModel ? 'credits' : 'currency',
+      creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
+      creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
+      cost: retryRequiredCredits,
+      isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
+      paymentTransactionId: retryChargeAttempt.transactionId,
       isDraft: false, // 🎯 [Fix] Ensure visibility
       timestamp: Date.now() // Reset timer
     });
+    if (retryUseServerSideCreditSettlement && retryRequiredCredits > 0) {
+      adjustBalanceOptimistically(-retryRequiredCredits);
+    }
 
-    const currentNodeId = node.id;
-    const requestedCount = node.parallelCount || config.parallelCount || 1;
-    const count = node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
     const startTime = Date.now();
 
     try {
@@ -3620,6 +3797,9 @@ const AppContent: React.FC<AppContentProps> = () => {
           childImageIds: alignedImageNodes.map(n => n.id),
           error: undefined,
           errorDetails: undefined,
+          refundStatus: undefined,
+          isPaymentProcessed: false,
+          paymentTransactionId: undefined,
           keySlotId: alignedImageNodes[0]?.keySlotId || executionNode.keySlotId,
           provider: alignedImageNodes[0]?.provider || executionNode.provider,
           providerLabel: alignedImageNodes[0]?.providerLabel || executionNode.providerLabel,
@@ -3653,18 +3833,20 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
 
     } catch (error: any) {
+      const failedBillingState = await resolveFailedCreditAttempt(executionNode);
       updatePromptNode({
         ...executionNode,
         isGenerating: false,
         isDraft: false, // 🎯 [Fix] Prevent disappearance on error
         error: error.message || 'Retry failed',
-        errorDetails: extractErrorDetails(error, executionNode.model)
+        errorDetails: extractErrorDetails(error, executionNode.model),
+        ...failedBillingState
       });
       import('./services/system/notificationService').then(({ notify }) => {
         notify.error('重试失败', error.message);
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, resolveCreditCostForModel, adjustBalanceOptimistically, resolveFailedCreditAttempt]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
@@ -3807,7 +3989,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (!activeCanvas) return;
     if (node.mode !== GenerationMode.PPT) return;
     const resolvedRoute = resolveNodeRouteState(node);
-    const executionNode: PromptNode = {
+    let executionNode: PromptNode = {
       ...node,
       ...resolvedRoute,
     };
@@ -3832,6 +4014,51 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
       return;
     }
+
+    const pageRetryProvider = executionNode.model.includes('@')
+      ? executionNode.model.split('@')[1]
+      : executionNode.provider;
+    const hasPageRetryCustomUserKey = keyManager.hasCustomKeyForModel(executionNode.model);
+    const pageRetryIsCreditModel = isCreditBasedModel(
+      executionNode.model,
+      pageRetryProvider,
+      undefined,
+      hasPageRetryCustomUserKey
+    );
+    const pageRetryUseServerSideCreditSettlement = pageRetryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
+    const pageRetryPerImageCreditCost = pageRetryIsCreditModel
+      ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
+      : 0;
+    const pageRetryRequiredCredits = pageRetryIsCreditModel
+      ? (pageRetryPerImageCreditCost || 1)
+      : 0;
+    const pageRetryChargeAttempt = await ensureCreditAttemptCharged({
+      modelId: executionNode.model,
+      modelLabel: executionNode.modelLabel || executionNode.model,
+      providerId: pageRetryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
+      provider: executionNode.provider,
+      requiredCredits: pageRetryRequiredCredits,
+      useServerSideCreditSettlement: pageRetryUseServerSideCreditSettlement,
+    });
+
+    if (!pageRetryChargeAttempt.success) {
+      return;
+    }
+
+    executionNode = {
+      ...executionNode,
+      refundStatus: undefined,
+      billingMode: pageRetryIsCreditModel ? 'credits' : 'currency',
+      creditCost: pageRetryIsCreditModel ? pageRetryPerImageCreditCost : undefined,
+      creditSettlement: pageRetryUseServerSideCreditSettlement ? 'server' : 'client',
+      cost: pageRetryRequiredCredits,
+      isPaymentProcessed: Boolean(pageRetryChargeAttempt.transactionId),
+      paymentTransactionId: pageRetryChargeAttempt.transactionId,
+      error: undefined,
+      errorDetails: undefined,
+    };
+
+    updatePromptNode(executionNode);
 
     const slides = normalizePptSlidesForCount(
       executionNode.pptSlides,
@@ -3863,6 +4090,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       isGenerating: true,
       error: undefined
     });
+
+    if (pageRetryUseServerSideCreditSettlement && pageRetryRequiredCredits > 0) {
+      adjustBalanceOptimistically(-pageRetryRequiredCredits);
+    }
 
     const startTime = Date.now();
     try {
@@ -3922,11 +4153,24 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
 
       rememberPreferredKeyForMode(executionNode.mode, result.keySlotId || executionNode.keySlotId);
+      updatePromptNode({
+        ...executionNode,
+        refundStatus: undefined,
+        isPaymentProcessed: false,
+        paymentTransactionId: undefined,
+        error: undefined,
+        errorDetails: undefined
+      });
 
       import('./services/system/notificationService').then(({ notify }) => {
         notify.success('单页重绘完成', `已更新图${pageIndex + 1}`);
       });
     } catch (error: any) {
+      const failedBillingState = await resolveFailedCreditAttempt(executionNode);
+      updatePromptNode({
+        ...executionNode,
+        ...failedBillingState
+      });
       updateImageNode(target.id, {
         isGenerating: false,
         error: error?.message || '单页重绘失败'
@@ -3935,7 +4179,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('单页重绘失败', error?.message || '请稍后重试');
       });
     }
-  }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay]);
+  }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay, ensureCreditAttemptCharged, resolveCreditCostForModel, adjustBalanceOptimistically, updatePromptNode, resolveFailedCreditAttempt]);
 
   const handleExportPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
     if (!activeCanvas) return;
@@ -4912,19 +5156,56 @@ ${slideLayerXml.join('\n')}
   ) => {
     if (!promptNode) return [] as GeneratedImage[];
 
+    const promptId = promptNode.id;
+    const sourceImageId = promptNode.sourceImageId;
     const orderedIds = (promptNode.childImageIds || []).filter((id): id is string => Boolean(id));
-    if (orderedIds.length > 0) {
-      const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
-      return orderedIds
-        .map((imageId) => imageNodeById.get(imageId))
-        .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode));
+    const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
+    const strongOwnedImages = imageNodes.filter((imageNode) => (
+      imageNode.parentPromptId === promptId && imageNode.id !== sourceImageId
+    ));
+
+    if (strongOwnedImages.length > 0) {
+      const orderedOwnedImages: GeneratedImage[] = [];
+      const seenIds = new Set<string>();
+
+      orderedIds.forEach((imageId) => {
+        const imageNode = imageNodeById.get(imageId);
+        if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId !== promptId || seenIds.has(imageNode.id)) {
+          return;
+        }
+        seenIds.add(imageNode.id);
+        orderedOwnedImages.push(imageNode);
+      });
+
+      strongOwnedImages.forEach((imageNode) => {
+        if (seenIds.has(imageNode.id)) return;
+        seenIds.add(imageNode.id);
+        orderedOwnedImages.push(imageNode);
+      });
+
+      return orderedOwnedImages;
     }
 
     if (promptNode.error) {
       return [] as GeneratedImage[];
     }
 
-    return imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+    if (sourceImageId) {
+      return [] as GeneratedImage[];
+    }
+
+    const legacyOwnedImages: GeneratedImage[] = [];
+    const seenIds = new Set<string>();
+    orderedIds.forEach((imageId) => {
+      const imageNode = imageNodeById.get(imageId);
+      if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId || seenIds.has(imageNode.id)) {
+        return;
+      }
+      seenIds.add(imageNode.id);
+      legacyOwnedImages.push(imageNode);
+    });
+
+    return legacyOwnedImages;
   }, []);
 
   const promptGroupStackZIndexById = React.useMemo(() => {
@@ -5140,6 +5421,73 @@ ${slideLayerXml.join('\n')}
 
     return childMap;
   }, [activeCanvas, resolveCurrentPromptChildImages]);
+
+  const actualChildImageIdsByPromptId = React.useMemo(() => {
+    const childIdMap = new Map<string, string[]>();
+
+    actualChildImagesByPromptId.forEach((images, promptId) => {
+      childIdMap.set(promptId, images.map((imageNode) => imageNode.id));
+    });
+
+    return childIdMap;
+  }, [actualChildImagesByPromptId]);
+
+  const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    autoRepairedPromptLayoutKeysRef.current.clear();
+  }, [activeCanvas?.id]);
+
+  useEffect(() => {
+    if (!activeCanvas) return;
+
+    const repairKeys = autoRepairedPromptLayoutKeysRef.current;
+    const activeCanvasId = activeCanvas.id;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+      if (childImages.length === 0) return;
+
+      const repairKey = [
+        activeCanvasId,
+        promptNode.id,
+        promptNode.position.x,
+        promptNode.position.y,
+        childImages.map((imageNode) => imageNode.id).join(','),
+      ].join(':');
+
+      if (repairKeys.has(repairKey)) return;
+
+      const expectedPositions = buildGeneratedImageBatchPositions({
+        basePosition: promptNode.position,
+        items: childImages.map((imageNode) => ({
+          aspectRatio: imageNode.aspectRatio,
+          exactDimensions: imageNode.exactDimensions || parseImageDimensions(imageNode.dimensions),
+        })),
+        mode: promptNode.mode,
+        isMobile,
+      });
+
+      const hasSevereLayoutDrift = childImages.some((imageNode, index) => {
+        const expectedPosition = expectedPositions[index];
+        if (!expectedPosition) return false;
+
+        const dx = Math.abs(imageNode.position.x - expectedPosition.x);
+        const dy = Math.abs(imageNode.position.y - expectedPosition.y);
+
+        return dx > 220 || dy > 260;
+      });
+
+      if (!hasSevereLayoutDrift) return;
+
+      repairKeys.add(repairKey);
+      expectedPositions.forEach((expectedPosition, index) => {
+        const imageNode = childImages[index];
+        if (!imageNode || !expectedPosition) return;
+        updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
+      });
+    });
+  }, [activeCanvas, actualChildImagesByPromptId, isMobile, parseImageDimensions, updateImageNodePosition]);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -5425,27 +5773,15 @@ ${slideLayerXml.join('\n')}
     const childMap = new Map<string, GeneratedImage[]>();
     if (!activeCanvas) return childMap;
 
-    connectorVisibleImageNodes.forEach((imageNode) => {
-      if (!imageNode.parentPromptId) return;
-      const bucket = childMap.get(imageNode.parentPromptId) || [];
-      bucket.push(imageNode);
-      childMap.set(imageNode.parentPromptId, bucket);
-    });
-
-    childMap.forEach((images, promptId) => {
-      const promptNode = activeCanvas.promptNodes.find((node) => node.id === promptId);
-      const childOrder = new Map((promptNode?.childImageIds || []).map((id, index) => [id, index]));
-      images.sort((left, right) => {
-        const leftOrder = childOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER;
-        const rightOrder = childOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER;
-        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-        if ((left.zIndex ?? 0) !== (right.zIndex ?? 0)) return (left.zIndex ?? 0) - (right.zIndex ?? 0);
-        return left.timestamp - right.timestamp;
-      });
+    connectorPromptNodes.forEach((promptNode) => {
+      const images = resolveCurrentPromptChildImages(promptNode, connectorVisibleImageNodes);
+      if (images.length > 0) {
+        childMap.set(promptNode.id, images);
+      }
     });
 
     return childMap;
-  }, [activeCanvas, connectorVisibleImageNodes]);
+  }, [activeCanvas, connectorPromptNodes, connectorVisibleImageNodes, resolveCurrentPromptChildImages]);
 
   const expandedSelectedNodeIds = React.useMemo(
     () => Array.from(new Set(
@@ -5455,11 +5791,11 @@ ${slideLayerXml.join('\n')}
 
         return [
           selectedId,
-          ...(selectedPrompt.childImageIds || []).filter((id): id is string => !!id),
+          ...(actualChildImageIdsByPromptId.get(selectedPrompt.id) || []),
         ];
       })
     )),
-    [activeCanvas, selectedNodeIds]
+    [activeCanvas, actualChildImageIdsByPromptId, selectedNodeIds]
   );
 
   const handleCanvasNodeSelect = useCallback((nodeId: string) => {
@@ -6100,7 +6436,7 @@ ${slideLayerXml.join('\n')}
             if (!sourceNodeId) return;
 
             const mainCard = activeCanvas?.promptNodes.find(p => p.id === sourceNodeId);
-            const childImageIds = mainCard?.childImageIds || [];
+            const childImageIds = mainCard ? (actualChildImageIdsByPromptId.get(mainCard.id) || []) : [];
 
             if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
               moveSelectedNodes(delta, expandedSelectedNodeIds);
@@ -6131,6 +6467,7 @@ ${slideLayerXml.join('\n')}
     );
   }, [
     activeCanvas,
+    actualChildImageIdsByPromptId,
     actualChildImagesByPromptId,
     bringNodesToFront,
     canvasTransform,
@@ -6814,7 +7151,7 @@ ${slideLayerXml.join('\n')}
               const prompts = activeCanvas.promptNodes.filter(n => selectedNodeIds.includes(n.id));
 
               // [FIX] Include child images of selected prompts for adaptive bounding
-              const childImageIds = prompts.flatMap(p => p.childImageIds || []);
+              const childImageIds = prompts.flatMap((promptNode) => actualChildImageIdsByPromptId.get(promptNode.id) || []);
               const images = activeCanvas.imageNodes.filter(n => selectedNodeIds.includes(n.id) || childImageIds.includes(n.id));
 
               // 🎯 Merge Logic: Find existing groups that contain any of the selected nodes
@@ -7054,12 +7391,7 @@ ${slideLayerXml.join('\n')}
 
           {/* 1. Prompt -> Image Connections (Generation Flow) */}
           {connectorPromptNodes.map(pn => {
-            const actualChildNodes = connectorChildImagesByPromptId.get(pn.id) || [];
-            const childNodes = actualChildNodes.length > 0
-              ? actualChildNodes
-              : (pn.childImageIds || [])
-                .map(childId => connectorVisibleImageNodesById.get(childId))
-                .filter((img): img is GeneratedImage => Boolean(img));
+            const childNodes = connectorChildImagesByPromptId.get(pn.id) || [];
 
             return childNodes.map((childNode) => {
               if (!childNode || !connectorVisibleImageNodeIds.has(childNode.id)) return null;

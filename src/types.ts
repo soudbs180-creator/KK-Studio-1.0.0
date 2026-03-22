@@ -301,6 +301,7 @@ export interface PromptNode {
   // 🎯 [添加] 绉垎閫€鍥炵姸鎬侊紝鐢ㄤ簬显示"鐢熸垚失败锛岀Н鍒嗗凡閫€鍥?
   refundStatus?: 'pending' | 'success' | 'failed';
   creditSettlement?: 'client' | 'server';
+  paymentTransactionId?: string;
 
   mode?: GenerationMode; // New
   width?: number; // Dynamic width for layout calculation

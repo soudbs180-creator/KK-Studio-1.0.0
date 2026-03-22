@@ -19,6 +19,7 @@ export const isUsingBuiltinSupabaseConfig = hasSupabaseConfig && missingEnvKeys.
 export const supabaseConfigIssue = hasSupabaseConfig
   ? null
   : 'Missing Supabase public config. Auth and sync are disabled.';
+export { supabaseUrl, supabaseAnonKey };
 
 if (isUsingBuiltinSupabaseConfig) {
   console.warn(
