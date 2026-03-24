@@ -1,5 +1,6 @@
 import React from 'react';
 import { Menu, Sparkles } from 'lucide-react';
+import { resolveAvatarUrl } from '../../utils/presetAvatars';
 
 interface MobileHeaderProps {
     onMenuClick: () => void;
@@ -30,6 +31,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
     const balanceDisplay = balanceLoading ? '...' : (typeof balance === 'number' ? balance : '--');
+    const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[980] px-3 pt-[env(safe-area-inset-top)] md:hidden">
@@ -43,8 +45,8 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         title={userName}
                     >
                         <span className="ios-mobile-user-avatar ios-mobile-user-avatar--large">
-                            {userAvatarUrl ? (
-                                <img src={userAvatarUrl} alt={userName} className="h-full w-full object-cover" />
+                            {resolvedAvatarUrl ? (
+                                <img src={resolvedAvatarUrl} alt={userName} className="h-full w-full object-cover" />
                             ) : (
                                 <span>{avatarFallback}</span>
                             )}

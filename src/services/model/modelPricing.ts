@@ -1,5 +1,9 @@
 import { ImageSize } from '../../types';
-import { keyManager } from '../auth/keyManager';
+import {
+  keyManager,
+  normalizeModelId as normalizeProviderModelId,
+  parseModelVariantMeta,
+} from '../auth/keyManager';
 import { adminModelService } from './adminModelService';
 import { registerModelPricingOverrideHandler } from './modelPricingOverrideBridge';
 
@@ -8,7 +12,9 @@ export type ModelPricing = {
   outputPerMillionTokens?: number;
   pricePerImage?: number;
   tokensPerImage?: {
+    low?: number;
     standard?: number;
+    medium?: number;
     hd?: number;
   };
   refImageTokens?: number;
@@ -167,8 +173,9 @@ const BUILTIN_PRICING: Record<string, ModelPricing> = {
   // 输出: $0.067/张 = 2233 tokens 按照 $30/1M tokens 计算 (或者如果 3.1 flash 输出依然是 $3 则不同)
   // 官网说是 0.067美刀一张
   'gemini-3.1-flash-image-preview': {
-    inputPerMillionTokens: 0.25, // Updated from 0.50 based on latest pricing
-    pricePerImage: 0.066667, // Adjusted to exactly 1 point per image ($1 = 15 points)
+    inputPerMillionTokens: 0.50,
+    outputPerMillionTokens: 60,
+    tokensPerImage: { low: 747, standard: 1120, medium: 1680, hd: 2520 },
     refImageTokens: DEFAULT_REF_IMAGE_TOKENS,
     currency: 'USD'
   },
@@ -185,7 +192,8 @@ const BUILTIN_PRICING: Record<string, ModelPricing> = {
   // 官网说是 $0.134/张
   'gemini-3-pro-image-preview': {
     inputPerMillionTokens: 2.00,
-    pricePerImage: 0.134, // Using exact explicit price matching screenshot instead of tokens math
+    outputPerMillionTokens: 120,
+    tokensPerImage: { standard: 1120, medium: 1120, hd: 2000 },
     refImageTokens: DEFAULT_REF_IMAGE_TOKENS,
     currency: 'USD'
   },
@@ -285,6 +293,45 @@ const FALLBACK_IMAGE_TOKENS: Record<string, number> = {
 };
 
 const normalizeModelId = (modelId: string): string => modelId.trim().toLowerCase();
+
+const stripModelRoutingDecorators = (modelId: string): string => {
+  return String(modelId || '')
+    .trim()
+    .split('|')[0]
+    .split('@')[0]
+    .replace(/^models\//i, '')
+    .trim();
+};
+
+const appendPricingLookupCandidate = (candidates: string[], modelId?: string): void => {
+  const normalized = normalizeModelId(String(modelId || ''));
+  if (!normalized || candidates.includes(normalized)) return;
+  candidates.push(normalized);
+};
+
+const getPricingLookupCandidates = (modelId: string): string[] => {
+  const candidates: string[] = [];
+  const raw = String(modelId || '').trim();
+  if (!raw) return candidates;
+
+  appendPricingLookupCandidate(candidates, raw);
+
+  const stripped = stripModelRoutingDecorators(raw);
+  appendPricingLookupCandidate(candidates, stripped);
+
+  const canonical = normalizeProviderModelId(stripped);
+  appendPricingLookupCandidate(candidates, canonical);
+
+  const variantMeta = parseModelVariantMeta(stripped);
+  if (variantMeta.canonicalId && variantMeta.canonicalId !== stripped) {
+    appendPricingLookupCandidate(candidates, variantMeta.canonicalId);
+    appendPricingLookupCandidate(candidates, normalizeProviderModelId(variantMeta.canonicalId));
+  }
+
+  appendPricingLookupCandidate(candidates, stripped.replace(/\s+/g, '-'));
+
+  return candidates;
+};
 
 const toNumber = (value: any): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
@@ -387,10 +434,14 @@ export const mergeModelPricingOverrides = (input: unknown): void => {
 };
 
 export const getModelPricing = (modelId: string): ModelPricing | null => {
-  const normalized = normalizeModelId(modelId);
-  // ✨ Refactored: Removed legacy aliases (Nano Banana)
   const overrides = loadOverrides();
-  return overrides[normalized] || BUILTIN_PRICING[normalized] || null;
+
+  for (const candidate of getPricingLookupCandidates(modelId)) {
+    const pricing = overrides[candidate] || BUILTIN_PRICING[candidate];
+    if (pricing) return pricing;
+  }
+
+  return null;
 };
 
 export const getRefImageTokenEstimate = (modelId: string): number => {
@@ -403,22 +454,8 @@ export const getRefImageTokenEstimate = (modelId: string): number => {
  * 优先从管理员配置的模型中获取
  */
 export const getModelCredits = (modelId: string, imageSize?: ImageSize | string): number => {
-  // 🚀 [Fix] 去掉 @后缀（如 @system, @SystemProxy）再查询，避免匹配失败
-  const baseModelId = modelId.split('@')[0];
-
-  // 1. 优先从管理员配置获取（getModel 内部也会做后缀剥离，双重保障）
   const normalizedImageSize = typeof imageSize === 'string' ? imageSize : String(imageSize || '');
-  const adminCreditCost = adminModelService.getModelCreditCost(modelId, normalizedImageSize);
-  if (adminCreditCost > 0) {
-    return adminCreditCost;
-  }
-
-  // 2. 兼容旧的 Nano Banana 模型
-  const id = modelId.split('@')[0].toLowerCase();
-  if ((id.includes('pro') && id.includes('banana')) || (id.includes('pro') && id.includes('gemini') && (id.includes('image') || id.includes('preview')))) return 2;
-  if (id.includes('banana') || (id.includes('gemini') && (id.includes('image') || id.includes('preview')))) return 1;
-
-  return 0;
+  return adminModelService.getModelCreditCost(modelId, normalizedImageSize);
 };
 
 export const getImageTokenEstimate = (modelId: string, size: ImageSize): number => {
@@ -426,15 +463,20 @@ export const getImageTokenEstimate = (modelId: string, size: ImageSize): number 
   const tokens = pricing?.tokensPerImage;
   const isHd = size === ImageSize.SIZE_4K;
   const is2K = size === ImageSize.SIZE_2K;
+  const is05K = size === ImageSize.SIZE_05K;
 
-  // 对于支持 HD/2K 的模型，使用对应的 token 数
+  // 对于支持多档分辨率的模型，使用对应的 token 数
   if (tokens) {
+    if (is05K && tokens.low) return tokens.low;
     if (isHd && tokens.hd) return tokens.hd;
+    if (is2K && tokens.medium) return tokens.medium;
     if (is2K && tokens.hd) return tokens.hd;
-    return tokens.standard || tokens.hd || 0;
+    return tokens.standard || tokens.medium || tokens.hd || tokens.low || 0;
   }
 
-  const fallback = FALLBACK_IMAGE_TOKENS[normalizeModelId(modelId)];
+  const fallback = getPricingLookupCandidates(modelId)
+    .map((candidate) => FALLBACK_IMAGE_TOKENS[candidate])
+    .find((value) => typeof value === 'number');
 
   // 🚀 [修复] 如果是按张定价的模型（如 Imagen），估算一个合理的 token 数用于显示
   // Imagen 4: 1K=1120 tokens, 2K=1560 tokens, 4K=2000 tokens (近似值)
@@ -454,38 +496,34 @@ export const isCreditBasedModel = (
   _customAlias?: string,
   hasCustomUserKey?: boolean
 ): boolean => {
-  const lowerId = modelId.toLowerCase();
+  const normalizedModelId = String(modelId || '').trim();
+  const lowerId = normalizedModelId.toLowerCase();
 
-  // 🚀 [Fix] 优先判断：如果用户已配置自定义 Key，明确走用户体系（非积分）
   if (hasCustomUserKey) {
     return false;
   }
 
-  // 1. [严格判定] 只有 @system 后缀才是积分模型
-  // 管理员配置的模型统一使用 @system 后缀
   const suffix = lowerId.includes('@') ? lowerId.split('@')[1] : '';
   if (suffix.startsWith('system') || suffix === 'systemproxy') {
-    return true;
+    return adminModelService.isAdminModel(normalizedModelId);
   }
 
-  // 2. 其他后缀（用户自定义渠道）一律不是积分模型
   if (lowerId.includes('@')) {
     return false;
   }
 
-  // 3. 回退：仅当模型条目本身是系统内部模型时才按积分
-  // 🚀 [防御性加固] 如果调用方未传 hasCustomUserKey，自动检测用户是否配有该模型的 Key
   if (hasCustomUserKey === undefined) {
     try {
-      const autoDetected = keyManager.hasCustomKeyForModel(modelId);
-      if (autoDetected) {
-        return false; // 用户已自行配置，不走积分
+      if (keyManager.hasCustomKeyForModel(normalizedModelId)) {
+        return false;
       }
-    } catch { /* keyManager 未就绪时忽略 */ }
+    } catch {
+      // Ignore key state lookup errors and fall back to the exact model list match.
+    }
   }
 
   const globalModels = keyManager.getGlobalModelList();
-  const matchedModel = globalModels.find((m: any) => m.id === modelId);
+  const matchedModel = globalModels.find((m: any) => m.id === normalizedModelId);
 
   return !!matchedModel?.isSystemInternal;
 };

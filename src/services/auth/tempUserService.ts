@@ -1,5 +1,6 @@
 import { User } from '@supabase/supabase-js';
 import { legacyWebApiClient } from '../api/kkApiClient';
+import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
 const TEMP_USER_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -40,7 +41,7 @@ function buildTempUser(input: {
       provider: 'temp',
     },
     user_metadata: {
-      avatar_url: null,
+      avatar_url: getDefaultPresetAvatarId(input.userId),
       full_name: input.nickname,
       isTempUser: true,
     },

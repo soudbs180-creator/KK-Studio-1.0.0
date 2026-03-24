@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { CreditTransactionDto } from '../../packages/contracts/src/dto/billing.ts';
 import { supabase } from '../lib/supabase';
@@ -186,6 +186,8 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [usageLogs, setUsageLogs] = useState<CreditTransactionLog[]>([]);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const apiAccessToken = session?.access_token;
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const realtimeRefreshTimerRef = useRef<number | null>(null);
 
   const applyTransactionRows = useCallback((rows: CreditTransactionLog[]) => {
     const { rechargeRows, usageRows } = splitCreditLogs(rows);
@@ -339,8 +341,40 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user, isTempUser, apiAccessToken, fetchLogsFromSupabase, applyTransactionRows]);
 
   const refreshBilling = useCallback(async () => {
-    await Promise.all([fetchBalance(), fetchLogs()]);
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    const refreshPromise = Promise.all([fetchBalance(), fetchLogs()])
+      .then(() => undefined)
+      .finally(() => {
+        if (refreshPromiseRef.current === refreshPromise) {
+          refreshPromiseRef.current = null;
+        }
+      });
+
+    refreshPromiseRef.current = refreshPromise;
+    return refreshPromise;
   }, [fetchBalance, fetchLogs]);
+
+  const scheduleRealtimeRefresh = useCallback((delayMs = 120) => {
+    if (!user || isTempUser || typeof window === 'undefined') {
+      return;
+    }
+
+    if (realtimeRefreshTimerRef.current !== null) {
+      window.clearTimeout(realtimeRefreshTimerRef.current);
+    }
+
+    realtimeRefreshTimerRef.current = window.setTimeout(() => {
+      realtimeRefreshTimerRef.current = null;
+      void refreshBilling();
+    }, delayMs);
+  }, [user, isTempUser, refreshBilling]);
+
+  useEffect(() => {
+    refreshPromiseRef.current = null;
+  }, [user?.id, isTempUser]);
 
   const adjustBalanceOptimistically = useCallback((delta: number) => {
     if (!Number.isFinite(delta) || delta === 0) {
@@ -376,6 +410,52 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       cancelled = true;
     };
   }, [user, isTempUser, refreshBilling]);
+
+  useEffect(() => {
+    const userId = String(user?.id || '').trim();
+    if (!userId || isTempUser) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`billing-sync:${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_credits',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        scheduleRealtimeRefresh(0);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'credit_transactions',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        scheduleRealtimeRefresh(80);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          scheduleRealtimeRefresh(0);
+        }
+      });
+
+    return () => {
+      if (realtimeRefreshTimerRef.current !== null && typeof window !== 'undefined') {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, isTempUser, scheduleRealtimeRefresh]);
+
+  useEffect(() => () => {
+    if (realtimeRefreshTimerRef.current !== null && typeof window !== 'undefined') {
+      window.clearTimeout(realtimeRefreshTimerRef.current);
+      realtimeRefreshTimerRef.current = null;
+    }
+  }, []);
 
   const consumeCreditsDetailed = useCallback(
     async (modelId: string, count: number, details: any = {}): Promise<CreditConsumeResult> => {

@@ -12,17 +12,9 @@ export const SettingCard: React.FC<{
   action?: React.ReactNode;
 }> = ({ title, children, className = '', action }) => {
   return (
-    <section 
-      className={`mb-3 rounded-[26px] border p-5 backdrop-blur-xl ${className}`}
-      style={{
-        borderColor: 'rgba(148, 163, 184, 0.12)',
-        background:
-          'linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(9, 16, 28, 0.96) 100%)',
-        boxShadow: '0 18px 40px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-      }}
-    >
+    <section className={`settings-reference-card settings-reference-card--elevated mb-3 p-5 ${className}`.trim()}>
       <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0 flex-1 break-words text-[15px] font-semibold tracking-[0.01em] text-[var(--text-primary)]">
+        <div className="settings-reference-card__title mt-0 min-w-0 flex-1 break-words">
           {title}
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -176,7 +168,7 @@ export const SettingInput: React.FC<{
 }> = ({ label, value, onChange, placeholder, type = 'text', helper }) => {
   return (
     <label className="block">
-      <div className="mb-1.5 break-words text-[13px] font-medium text-[var(--text-primary)]">
+      <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
         {label}
       </div>
       <input
@@ -184,15 +176,16 @@ export const SettingInput: React.FC<{
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-2xl border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
+        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
         style={{
-          borderColor: 'rgba(148, 163, 184, 0.12)',
-          backgroundColor: 'rgba(8, 15, 27, 0.82)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+          borderColor: 'var(--settings-border-subtle)',
+          background:
+            'linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, transparent 100%), var(--settings-surface-overlay)',
+          boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.03)',
         }}
       />
       {helper && (
-        <div className="mt-1 break-words text-xs text-[var(--text-secondary)]">
+        <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
           {helper}
         </div>
       )}
@@ -214,7 +207,7 @@ export const SettingToggle: React.FC<{
           {label}
         </div>
         {helper && (
-          <div className="mt-0.5 break-words text-xs text-[var(--text-secondary)]">
+          <div className="mt-1 break-words text-xs leading-5 text-[var(--text-secondary)]">
             {helper}
           </div>
         )}
@@ -224,10 +217,10 @@ export const SettingToggle: React.FC<{
         onClick={() => onChange(!checked)}
         className="relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200"
         style={{
-          backgroundColor: checked 
-            ? '#5da0ff'
-            : 'rgba(30, 41, 59, 0.92)',
-          borderColor: checked ? 'rgba(96, 165, 250, 0.42)' : 'rgba(148, 163, 184, 0.12)',
+          background: checked
+            ? 'linear-gradient(90deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%)'
+            : 'var(--settings-surface-overlay)',
+          borderColor: checked ? 'rgb(var(--settings-accent-rgb) / 0.35)' : 'var(--settings-border-subtle)',
         }}
       >
         <span
@@ -251,17 +244,18 @@ export const SettingSelect: React.FC<{
 }> = ({ label, value, options, onChange, helper }) => {
   return (
     <label className="block">
-      <div className="mb-1.5 break-words text-[13px] font-medium text-[var(--text-primary)]">
+      <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
         {label}
       </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-2xl border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
+        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
         style={{
-          backgroundColor: 'rgba(8, 15, 27, 0.92)',
-          borderColor: 'rgba(148, 163, 184, 0.12)',
-          boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+          borderColor: 'var(--settings-border-subtle)',
+          background:
+            'linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, transparent 100%), var(--settings-surface-overlay)',
+          boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.03)',
         }}
       >
         {options.map((option) => (
@@ -271,7 +265,7 @@ export const SettingSelect: React.FC<{
         ))}
       </select>
       {helper && (
-        <div className="mt-1 break-words text-xs text-[var(--text-secondary)]">
+        <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
           {helper}
         </div>
       )}
@@ -291,13 +285,14 @@ export const PrimaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={loading}
-      className={`inline-flex max-w-full items-center justify-center overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:opacity-50 ${className}`}
       style={{
-        background: 'linear-gradient(135deg, #67a8ff 0%, #4f8dff 55%, #3b82f6 100%)',
-        boxShadow: '0 16px 28px rgba(59, 130, 246, 0.22)',
+        borderColor: 'transparent',
+        background: 'var(--settings-button-primary-bg)',
+        boxShadow: 'var(--settings-button-primary-shadow)',
       }}
     >
-      <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+      <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">
         {loading ? '加载中...' : children}
       </span>
     </button>
@@ -314,13 +309,13 @@ export const SecondaryButton: React.FC<{
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex max-w-full items-center justify-center overflow-hidden rounded-2xl border px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 ${className}`}
       style={{
-        borderColor: 'rgba(148, 163, 184, 0.12)',
-        backgroundColor: 'rgba(12, 20, 34, 0.82)',
+        borderColor: 'var(--settings-button-secondary-border)',
+        background: 'var(--settings-button-secondary-bg)',
       }}
     >
-      <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
+      <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
     </button>
   );
 };
@@ -335,13 +330,13 @@ export const DangerButton: React.FC<{
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex max-w-full items-center justify-center overflow-hidden rounded-2xl border px-4 py-3 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 ${className}`}
       style={{
-        borderColor: 'rgba(248, 113, 113, 0.18)',
-        backgroundColor: 'rgba(127, 29, 29, 0.18)',
+        borderColor: 'var(--settings-button-danger-border)',
+        background: 'var(--settings-button-danger-bg)',
       }}
     >
-      <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
+      <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
     </button>
   );
 };
@@ -364,26 +359,13 @@ export const MetricCard: React.FC<{
   const color = toneColors[tone];
 
   return (
-    <div 
-      className="rounded-[24px] border p-5 backdrop-blur-xl"
-      style={{
-        borderColor: 'rgba(148, 163, 184, 0.12)',
-        background:
-          'linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(9, 16, 28, 0.96) 100%)',
-        boxShadow: '0 16px 32px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-      }}
-    >
-      <div 
-        className="text-[30px] font-semibold tracking-[-0.03em]"
-        style={{ color: color.text }}
-      >
+    <div className="settings-reference-mini-metric">
+      <div className="settings-reference-mini-metric__label">{label}</div>
+      <div className="settings-reference-mini-metric__value" style={{ color: color.text }}>
         {value}
       </div>
-      <div className="mt-1 break-words text-[15px] font-medium text-[var(--text-primary)]">
-        {label}
-      </div>
       {helper && (
-        <div className="mt-0.5 break-words text-[13px] text-[var(--text-secondary)]">
+        <div className="settings-reference-mini-metric__helper">
           {helper}
         </div>
       )}
@@ -415,10 +397,10 @@ export const IconButton: React.FC<{
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-9 w-9 items-center justify-center rounded-xl border text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] active:scale-95"
+      className="flex h-10 w-10 items-center justify-center rounded-2xl border text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] active:scale-95"
       style={{
-        backgroundColor: 'rgba(12, 20, 34, 0.82)',
-        borderColor: 'rgba(148, 163, 184, 0.12)',
+        background: 'var(--settings-surface-overlay)',
+        borderColor: 'var(--settings-border-subtle)',
         ...variantStyles[variant],
       }}
     >
@@ -434,18 +416,25 @@ export const ProgressBar: React.FC<{
   showLabel?: boolean;
 }> = ({ progress, tone = 'indigo', showLabel = true }) => {
   const toneColors = {
-    indigo: 'bg-blue-500',
-    emerald: 'bg-emerald-500',
-    amber: 'bg-amber-500',
-    rose: 'bg-rose-500',
+    indigo: 'linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%)',
+    emerald: 'linear-gradient(90deg, #34d399 0%, #10b981 100%)',
+    amber: 'linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)',
+    rose: 'linear-gradient(90deg, #fb7185 0%, #ef4444 100%)',
   };
 
   return (
     <div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+      <div
+        className="h-2 w-full overflow-hidden rounded-full"
+        style={{ background: 'rgb(255 255 255 / 0.08)' }}
+      >
         <div 
-          className={`h-full rounded-full ${toneColors[tone]} transition-all duration-500`}
-          style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${Math.max(0, Math.min(100, progress))}%`,
+            background: toneColors[tone],
+            boxShadow: '0 0 20px rgb(96 165 250 / 0.18)',
+          }}
         />
       </div>
       {showLabel && (
@@ -473,12 +462,19 @@ export const StatusBadge: React.FC<{
   const config = statusConfig[status];
 
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div
+      className="inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.12em]"
+      style={{
+        borderColor: `${config.color}33`,
+        backgroundColor: `${config.color}14`,
+        color: config.color,
+      }}
+    >
       <span 
         className="h-2 w-2 shrink-0 rounded-full"
         style={{ backgroundColor: config.color }}
       />
-      <span className="min-w-0 truncate text-xs text-[var(--text-secondary)]">
+      <span className="min-w-0 truncate">
         {label || config.label}
       </span>
     </div>
@@ -493,10 +489,9 @@ export const EmptyState: React.FC<{
 }> = ({ title, description, action }) => {
   return (
     <div 
-      className="rounded-[24px] border border-dashed p-8 text-center"
+      className="settings-reference-card settings-reference-card--soft p-8 text-center"
       style={{
-        borderColor: 'rgba(148, 163, 184, 0.18)',
-        backgroundColor: 'rgba(10, 18, 30, 0.72)',
+        borderStyle: 'dashed',
       }}
     >
       <div className="break-words text-sm font-medium text-[var(--text-primary)]">

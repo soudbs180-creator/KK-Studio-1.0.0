@@ -1,5 +1,15 @@
 ﻿import { useState, useCallback, useRef, useEffect } from 'react';
-import { PromptNode, GeneratedImage, GenerationMode, AspectRatio, ImageSize, ReferenceImage } from '../types';
+import {
+  PromptNode,
+  GeneratedImage,
+  GenerationMode,
+  AspectRatio,
+  ImageSize,
+  ReferenceImage,
+  PromptPendingSyncRequest,
+  PromptCompletedTask,
+  TaskProviderType,
+} from '../types';
 import { llmService } from '../services/llm/LLMService';
 import { generateImage, cancelGeneration } from '../services/llm/geminiService';
 import { useCanvas } from '../context/CanvasContext';
@@ -19,6 +29,15 @@ import { clearSyncImageBridgeRequest, getSyncImageBridgeRequest, isSyncImageBrid
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { hasNetworkErrorMarkers, hasTimeoutMarkers } from '../services/api/errorClassification';
 import { useTaskRecovery, persistTask, markTaskCompleted, markTaskFailed } from './useTaskRecovery';
+import { resolveProviderRuntime } from '../services/api/providerStrategy';
+import {
+  buildImageResultIdentity,
+  buildTaskResultIdentity,
+  getPromptCompletedTasks,
+  mergeCompletedTaskResults,
+  normalizePersistentResultUrl,
+} from '../utils/imageResultPersistence';
+import { resolveProviderIdentity } from '../utils/providerDisplay';
 
 const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -26,12 +45,23 @@ const SYNC_BRIDGE_RECOVERY_MAX_AGE_MS = 15 * 60 * 1000;
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES = new Set(['SYNC_REQUEST_INTERRUPTED', 'SYNC_BRIDGE_TIMEOUT']);
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS = ['::INTERRUPTED::', '页面刷新或离开时中断了同步生成请求', '同步生成恢复超时'];
 
-type PendingSyncRequest = {
-  requestId: string;
-  index: number;
-  prompt: string;
-  startedAt: number;
-  keySlotId?: string;
+type PendingSyncRequest = PromptPendingSyncRequest;
+
+type CompletedTaskSourceItem = Partial<GeneratedImage> & {
+  taskId?: string;
+  requestId?: string;
+  providerName?: string;
+  modelName?: string;
+  taskPrompt?: string;
+  base64?: string;
+  index?: number;
+};
+
+type PreparedCompletedTaskItem<T> = {
+  item: T;
+  sourceTaskId: string;
+  sourceResultIndex: number;
+  apiResultUrl?: string;
 };
 
 const toFiniteTimestamp = (value?: number | null): number | undefined => (
@@ -89,15 +119,26 @@ const resolveUsageMetrics = (params: {
   imageCount?: number;
   referenceImageCount?: number;
   keySlotId?: string;
+  provider?: string;
+  providerLabel?: string;
   explicitCost?: number;
   explicitTokens?: number;
+  explicitPromptTokens?: number;
+  explicitCompletionTokens?: number;
 }): {
   cost?: number;
   tokens?: number;
+  promptTokens?: number;
+  completionTokens?: number;
   costSource: NonNullable<GeneratedImage['costSource']>;
 } => {
   const explicitCost = toFiniteNumber(params.explicitCost);
-  const explicitTokens = toFiniteNumber(params.explicitTokens);
+  const explicitPromptTokens = toFiniteNumber(params.explicitPromptTokens);
+  const explicitCompletionTokens = toFiniteNumber(params.explicitCompletionTokens);
+  const explicitTokens = toFiniteNumber(params.explicitTokens)
+    ?? ((explicitPromptTokens !== undefined || explicitCompletionTokens !== undefined)
+      ? (explicitPromptTokens || 0) + (explicitCompletionTokens || 0)
+      : undefined);
   const resolvedImageSize = params.imageSize || ImageSize.SIZE_1K;
 
   try {
@@ -108,6 +149,11 @@ const resolveUsageMetrics = (params: {
       prompt: params.prompt,
       referenceImageCount: Math.max(0, params.referenceImageCount || 0),
       keySlotId: params.keySlotId,
+      provider: params.provider,
+      providerLabel: params.providerLabel,
+      promptTokens: explicitPromptTokens,
+      completionTokens: explicitCompletionTokens,
+      totalTokens: explicitTokens,
       explicitCost,
     });
     const estimate = calculateCost(
@@ -126,12 +172,16 @@ const resolveUsageMetrics = (params: {
     return {
       cost: resolvedCost.source === 'none' ? undefined : resolvedCost.cost,
       tokens: explicitTokens ?? (shouldSuppressEstimatedTokens ? undefined : estimate.tokens),
+      promptTokens: explicitPromptTokens,
+      completionTokens: explicitCompletionTokens,
       costSource: resolvedCost.source as NonNullable<GeneratedImage['costSource']>,
     };
   } catch {
     return {
       cost: explicitCost,
       tokens: explicitTokens,
+      promptTokens: explicitPromptTokens,
+      completionTokens: explicitCompletionTokens,
       costSource: explicitCost !== undefined ? 'explicit' : 'none',
     };
   }
@@ -160,6 +210,12 @@ export const useImageGeneration = (options: {
   useEffect(() => {
     activeCanvasRef.current = activeCanvas;
   }, [activeCanvas]);
+
+  const shouldRefreshServerBillingState = useCallback((target?: Partial<PromptNode> | null) => (
+    target?.billingMode === 'credits'
+      && target?.creditSettlement === 'server'
+      && Number(target?.cost || 0) > 0
+  ), []);
 
   // --- Helpers ---
 
@@ -215,14 +271,11 @@ export const useImageGeneration = (options: {
   }, []);
 
   const resolveProviderDisplay = useCallback((keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
-    if (fallbackProviderLabel) return { provider: fallbackProvider, providerLabel: fallbackProviderLabel };
-    if (keySlotId) {
-      const provider = keyManager.getProviderForKeySlot(keySlotId);
-      if (provider) return { provider: provider.name || fallbackProvider, providerLabel: provider.name || fallbackProviderLabel || 'Custom' };
-      const keySlot = keyManager.getKey(keySlotId);
-      if (keySlot) return { provider: String(keySlot.provider || ''), providerLabel: keySlot.name || String(keySlot.provider || 'Official') };
-    }
-    return { provider: fallbackProvider, providerLabel: fallbackProviderLabel || fallbackProvider };
+    return resolveProviderIdentity({
+      keySlotId,
+      provider: fallbackProvider,
+      providerLabel: fallbackProviderLabel,
+    });
   }, []);
 
   const shouldPreferRouteProviderDisplay = useCallback((
@@ -246,6 +299,65 @@ export const useImageGeneration = (options: {
     return genericLabels.has(currentLabel.toLowerCase());
   }, []);
 
+  const detectTaskProviderType = useCallback((model?: string, runtimeStrategyId?: string): TaskProviderType => {
+    const normalizedModel = String(model || '').trim().toLowerCase();
+    if (
+      normalizedModel.includes('midjourney')
+      || normalizedModel.startsWith('mj-')
+      || normalizedModel.startsWith('mj_')
+      || normalizedModel.includes('/mj')
+    ) {
+      return 'midjourney';
+    }
+
+    if (runtimeStrategyId === 'gpt-best' && normalizedModel.includes('journey')) {
+      return 'midjourney';
+    }
+
+    return 'generic';
+  }, []);
+
+  const resolveTaskRuntimeSnapshot = useCallback((params: {
+    keySlotId?: string;
+    provider?: string;
+    providerLabel?: string;
+    model?: string;
+  }) => {
+    const keySlot = params.keySlotId ? keyManager.getKey(params.keySlotId) : null;
+    const runtime = resolveProviderRuntime({
+      provider: keySlot?.provider || params.provider,
+      baseUrl: keySlot?.baseUrl,
+      format: keySlot?.format,
+      authMethod: keySlot?.authMethod,
+      headerName: keySlot?.headerName,
+      compatibilityMode: keySlot?.compatibilityMode,
+      modelId: params.model,
+    });
+
+    return {
+      keySlotId: params.keySlotId || keySlot?.id,
+      provider: params.provider || keySlot?.provider,
+      providerLabel: params.providerLabel || keySlot?.name,
+      runtimeStrategyId: runtime.strategyId,
+      taskProviderType: detectTaskProviderType(params.model, runtime.strategyId),
+    };
+  }, [detectTaskProviderType]);
+
+  const resolveCompletedTaskId = useCallback((params: {
+    promptId: string;
+    taskId?: string;
+    requestId?: string;
+    fallbackSeed?: string | number;
+  }) => {
+    const taskId = String(params.taskId || '').trim();
+    if (taskId) return taskId;
+
+    const requestId = String(params.requestId || '').trim();
+    if (requestId) return `sync:${params.promptId}:${requestId}`;
+
+    return `sync:${params.promptId}:${String(params.fallbackSeed || Date.now())}`;
+  }, []);
+
   // --- Task State Helpers ---
 
   const getPendingTaskIds = useCallback((node?: PromptNode | null): string[] => {
@@ -261,6 +373,111 @@ export const useImageGeneration = (options: {
     ...(node?.generationMetadata || {}),
     ...partial,
   }), []);
+
+  const attachCompletedTasksToPrompt = useCallback((
+    node: PromptNode,
+    completedTasks: PromptCompletedTask[]
+  ): PromptNode => {
+    if (!completedTasks.length) return node;
+
+    return {
+      ...node,
+      generationMetadata: buildGenerationMetadata(node, {
+        completedTasks: mergeCompletedTaskResults(
+          getPromptCompletedTasks(node),
+          completedTasks
+        ),
+      }),
+    };
+  }, [buildGenerationMetadata]);
+
+  const prepareCompletedTaskResults = useCallback(<T extends CompletedTaskSourceItem>(
+    promptId: string,
+    items: T[],
+    fallback: {
+      keySlotId?: string;
+      provider?: string;
+      providerLabel?: string;
+      model?: string;
+      modelLabel?: string;
+      batchKey?: string;
+    }
+  ): {
+    completedTasks: PromptCompletedTask[];
+    preparedItems: Array<PreparedCompletedTaskItem<T>>;
+  } => {
+    const groups = new Map<string, { record: PromptCompletedTask; urlToIndex: Map<string, number> }>();
+    const preparedItems = items.map((item, index) => {
+      const sourceTaskId = resolveCompletedTaskId({
+        promptId,
+        taskId: item.taskId,
+        requestId: item.requestId,
+        fallbackSeed: `${fallback.batchKey || 'sync'}:${index}`,
+      });
+      const runtimeSnapshot = resolveTaskRuntimeSnapshot({
+        keySlotId: item.keySlotId || fallback.keySlotId,
+        provider: item.provider || fallback.provider,
+        providerLabel: item.providerName || item.providerLabel || fallback.providerLabel,
+        model: item.model || fallback.model,
+      });
+
+      let group = groups.get(sourceTaskId);
+      if (!group) {
+        group = {
+          record: {
+            taskId: sourceTaskId,
+            resultUrls: [],
+            completedAt: Date.now(),
+            provider: runtimeSnapshot.provider,
+            providerLabel: runtimeSnapshot.providerLabel,
+            keySlotId: runtimeSnapshot.keySlotId,
+            runtimeStrategyId: runtimeSnapshot.runtimeStrategyId,
+            taskProviderType: runtimeSnapshot.taskProviderType,
+            model: item.model || fallback.model,
+            modelLabel: item.modelName || item.modelLabel || fallback.modelLabel,
+          },
+          urlToIndex: new Map<string, number>(),
+        };
+        groups.set(sourceTaskId, group);
+      }
+
+      const apiResultUrl = normalizePersistentResultUrl(item.originalUrl || item.url);
+      let sourceResultIndex = index;
+
+      if (apiResultUrl) {
+        const existingIndex = group.urlToIndex.get(apiResultUrl);
+        if (existingIndex !== undefined) {
+          sourceResultIndex = existingIndex;
+        } else {
+          sourceResultIndex = group.record.resultUrls.length;
+          group.record.resultUrls.push(apiResultUrl);
+          group.urlToIndex.set(apiResultUrl, sourceResultIndex);
+        }
+      }
+
+      const resolvedCost = toFiniteNumber(item.cost);
+      if (resolvedCost !== undefined) {
+        group.record.cost = (group.record.cost || 0) + resolvedCost;
+      }
+
+      const resolvedTokens = toFiniteNumber(item.tokens);
+      if (resolvedTokens !== undefined) {
+        group.record.tokens = (group.record.tokens || 0) + resolvedTokens;
+      }
+
+      return {
+        item,
+        sourceTaskId,
+        sourceResultIndex,
+        apiResultUrl,
+      };
+    });
+
+    return {
+      completedTasks: Array.from(groups.values()).map((group) => group.record),
+      preparedItems,
+    };
+  }, [resolveCompletedTaskId, resolveTaskRuntimeSnapshot]);
 
   const getPendingSyncRequests = useCallback((node?: PromptNode | null): PendingSyncRequest[] => {
     const rawPendingSyncRequests = (node?.generationMetadata as { pendingSyncRequests?: unknown } | undefined)?.pendingSyncRequests;
@@ -394,36 +611,56 @@ export const useImageGeneration = (options: {
   const retroSyncBridgeRecoveryAttemptedRef = useRef<Set<string>>(new Set());
   const activeSyncBridgeRequestIdsRef = useRef<Set<string>>(new Set());
 
-  const buildGeneratedSourceKey = useCallback((value?: string | null) => {
-    const trimmed = typeof value === 'string' ? value.trim() : '';
-    if (!trimmed || trimmed.startsWith('blob:')) return null;
-    return trimmed;
-  }, []);
-
   const getPromptChildImageSourceKeys = useCallback((promptId: string) => {
     const keys = new Set<string>();
     (activeCanvasRef.current?.imageNodes || []).forEach((imageNode) => {
       if (imageNode.parentPromptId !== promptId) return;
-      const key = buildGeneratedSourceKey(imageNode.originalUrl || imageNode.url);
-      if (key) keys.add(key);
+
+      const identity = buildImageResultIdentity(imageNode);
+      if (identity) {
+        keys.add(identity);
+      }
+
+      const legacyUrlIdentity = buildTaskResultIdentity({
+        url: normalizePersistentResultUrl(imageNode.originalUrl || imageNode.url),
+      });
+      if (legacyUrlIdentity) {
+        keys.add(legacyUrlIdentity);
+      }
     });
     return keys;
-  }, [buildGeneratedSourceKey]);
+  }, []);
 
   const filterUniqueGeneratedSources = useCallback(<T,>(
     promptId: string,
     items: T[],
-    resolveSource: (item: T) => string | undefined | null
+    resolveSource: (item: T, index: number) => {
+      taskId?: string | null;
+      requestId?: string | null;
+      resultIndex?: number | null;
+      url?: string | null;
+    }
   ) => {
     const seenKeys = getPromptChildImageSourceKeys(promptId);
-    return items.filter((item) => {
-      const key = buildGeneratedSourceKey(resolveSource(item));
+    return items.filter((item, index) => {
+      const source = resolveSource(item, index);
+      const sourceTaskId = resolveCompletedTaskId({
+        promptId,
+        taskId: typeof source.taskId === 'string' ? source.taskId : undefined,
+        requestId: typeof source.requestId === 'string' ? source.requestId : undefined,
+        fallbackSeed: index,
+      });
+      const key = buildTaskResultIdentity({
+        taskId: sourceTaskId,
+        resultIndex: source.resultIndex,
+        url: source.url,
+      });
       if (!key) return true;
       if (seenKeys.has(key)) return false;
       seenKeys.add(key);
       return true;
     });
-  }, [buildGeneratedSourceKey, getPromptChildImageSourceKeys]);
+  }, [getPromptChildImageSourceKeys, resolveCompletedTaskId]);
 
   const clearSyncBridgeRecoveryTimer = useCallback((requestId: string) => {
     const timer = syncBridgeRecoveryTimersRef.current.get(requestId);
@@ -521,7 +758,11 @@ export const useImageGeneration = (options: {
 
       const currentChildIds = Array.from(new Set((latestNode.childImageIds || []).filter(Boolean)));
       const expectedCount = getExpectedGenerationCount(latestNode);
-      const uniqueRecoveredUrls = filterUniqueGeneratedSources(nodeId, bridgeResult.urls, (url) => url);
+      const uniqueRecoveredUrls = filterUniqueGeneratedSources(nodeId, bridgeResult.urls, (url, index) => ({
+        requestId: pendingRequest.requestId,
+        resultIndex: index,
+        url,
+      }));
       const recoveredUsage = resolveUsageMetrics({
         model: latestNode.model,
         imageSize: latestNode.imageSize,
@@ -531,14 +772,34 @@ export const useImageGeneration = (options: {
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
       });
       const recoveredGenerationTime = resolveSyncBridgeDurationMs(bridgeResult, pendingRequest.startedAt);
-      const recoveredResults = uniqueRecoveredUrls.map((url, index) => {
+      const { completedTasks, preparedItems } = prepareCompletedTaskResults(nodeId, uniqueRecoveredUrls.map((url, index) => ({
+        requestId: pendingRequest.requestId,
+        url,
+        originalUrl: url,
+        keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
+        provider: latestNode.provider,
+        providerName: latestNode.providerLabel,
+        model: latestNode.model,
+        modelName: latestNode.modelLabel,
+        cost: splitMetricAcrossItems(recoveredUsage.cost, bridgeResult.urls.length),
+        tokens: splitMetricAcrossItems(recoveredUsage.tokens, bridgeResult.urls.length),
+      })), {
+        keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
+        provider: latestNode.provider,
+        providerLabel: latestNode.providerLabel,
+        model: latestNode.model,
+        modelLabel: latestNode.modelLabel,
+        batchKey: pendingRequest.requestId,
+      });
+      const recoveredResults = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, index) => {
         const imageId = `${nodeId}_sync_recovered_${Date.now()}_${pendingRequest.index}_${index}`;
         const layoutIndex = pendingRequest.index + index;
         return {
           id: imageId,
           storageId: imageId,
-          url,
-          originalUrl: url,
+          url: item.url,
+          originalUrl: item.originalUrl,
+          apiResultUrl,
           prompt: pendingRequest.prompt || latestNode.prompt,
           model: latestNode.model,
           modelLabel: latestNode.modelLabel,
@@ -551,6 +812,8 @@ export const useImageGeneration = (options: {
           timestamp: Date.now(),
           canvasId: activeCanvasRef.current?.id || 'default',
           parentPromptId: nodeId,
+          sourceTaskId,
+          sourceResultIndex,
           sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
           position: getGeneratedImagePosition(latestNode.position, latestNode.aspectRatio, latestNode.mode, layoutIndex, expectedCount),
           provider: latestNode.provider,
@@ -572,16 +835,22 @@ export const useImageGeneration = (options: {
       const nextFailCount = remainingTaskIds.length > 0 || remainingSyncRequests.length > 0
         ? Math.max(0, expectedCount - nextSuccessCount - remainingTaskIds.length - remainingSyncRequests.length)
         : Math.max(0, expectedCount - nextSuccessCount);
-
-      const nextPromptState = {
+      const persistedPromptState = attachCompletedTasksToPrompt({
         ...nextNode,
         isGenerating: remainingTaskIds.length > 0 || remainingSyncRequests.length > 0,
         jobId: remainingTaskIds[0],
-        childImageIds: mergedChildIds,
         error: undefined,
         errorDetails: undefined,
         lastGenerationSuccessCount: nextSuccessCount,
-        lastGenerationFailCount: nextFailCount
+        lastGenerationFailCount: nextFailCount,
+        lastGenerationTotalCount: expectedCount,
+      }, completedTasks);
+
+      urgentUpdatePromptNode(persistedPromptState);
+
+      const nextPromptState = {
+        ...persistedPromptState,
+        childImageIds: mergedChildIds,
       };
 
       if (recoveredResults.length > 0) {
@@ -600,6 +869,8 @@ export const useImageGeneration = (options: {
     }
   }, [
     addImageNodes,
+    attachCompletedTasksToPrompt,
+    prepareCompletedTaskResults,
     filterUniqueGeneratedSources,
     buildPptPageAlias,
     clearPendingSyncRequests,
@@ -759,7 +1030,12 @@ export const useImageGeneration = (options: {
     if (!targetTaskId) return;
 
     try {
-      const result = await llmService.checkTaskStatus(targetTaskId, node.mode || GenerationMode.IMAGE, node.keySlotId ? { id: node.keySlotId } as any : undefined);
+      const result = await llmService.checkTaskStatus(
+        targetTaskId,
+        node.mode || GenerationMode.IMAGE,
+        node.keySlotId ? { id: node.keySlotId } as any : undefined,
+        node.model
+      );
 
       if (result && 'status' in result && (result.status === 'success' || result.status === 'failed')) {
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === node.id) || node;
@@ -775,7 +1051,11 @@ export const useImageGeneration = (options: {
           const imageUrls: string[] = rawImageUrls.filter((url: unknown): url is string => (
             typeof url === 'string' && url.trim().length > 0
           ));
-          const uniqueImageUrls = filterUniqueGeneratedSources(node.id, imageUrls, (url) => url);
+          const uniqueImageUrls = filterUniqueGeneratedSources(node.id, imageUrls, (url, index) => ({
+            taskId: targetTaskId,
+            resultIndex: index,
+            url,
+          }));
           if (imageUrls.length > 0) {
             const resolvedResultImageSize = ((result as any).imageSize || latestNode.imageSize) as ImageSize | undefined;
             const recoveredUsage = latestNode.mode === GenerationMode.IMAGE
@@ -788,21 +1068,48 @@ export const useImageGeneration = (options: {
                   keySlotId: (result as any).keySlotId || latestNode.keySlotId,
                   explicitCost: (result as any).usage?.cost,
                   explicitTokens: (result as any).usage?.totalTokens,
+                  explicitPromptTokens: (result as any).usage?.promptTokens,
+                  explicitCompletionTokens: (result as any).usage?.completionTokens,
                 })
               : {
                   cost: toFiniteNumber((result as any).usage?.cost),
                   tokens: toFiniteNumber((result as any).usage?.totalTokens),
+                  promptTokens: toFiniteNumber((result as any).usage?.promptTokens),
+                  completionTokens: toFiniteNumber((result as any).usage?.completionTokens),
                   costSource: toFiniteNumber((result as any).usage?.cost) !== undefined ? 'explicit' : 'none',
                 };
+            const { completedTasks, preparedItems } = prepareCompletedTaskResults(node.id, uniqueImageUrls.map((url) => ({
+              taskId: targetTaskId,
+              url,
+              originalUrl: url,
+              keySlotId: (result as any).keySlotId || latestNode.keySlotId,
+              provider: (result as any).provider || latestNode.provider,
+              providerName: (result as any).providerName || latestNode.providerLabel,
+              model: (result as any).model || latestNode.model,
+              modelName: (result as any).modelName || latestNode.modelLabel,
+              cost: splitMetricAcrossItems(recoveredUsage.cost, uniqueImageUrls.length || imageUrls.length),
+              tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
+            })), {
+              keySlotId: (result as any).keySlotId || latestNode.keySlotId,
+              provider: (result as any).provider || latestNode.provider,
+              providerLabel: (result as any).providerName || latestNode.providerLabel,
+              model: (result as any).model || latestNode.model,
+              modelLabel: (result as any).modelName || latestNode.modelLabel,
+              batchKey: targetTaskId,
+            });
 
             // Success recovery logic (similar to executeGeneration completion)
-            const recoveredImageNodes = uniqueImageUrls.map((url: string, index: number) => {
+            const recoveredImageNodes = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, index: number) => {
               const imageId = `${node.id}_recovered_${Date.now()}_${index}`;
               const layoutIndex = currentChildIds.length + index;
               const resolvedAspectRatio = (result as any).aspectRatio || latestNode.aspectRatio;
               const resolvedImageSize = (result as any).imageSize || latestNode.imageSize;
               return {
-                id: imageId, storageId: imageId, url, originalUrl: url,
+                id: imageId,
+                storageId: imageId,
+                url: item.url,
+                originalUrl: item.originalUrl,
+                apiResultUrl,
                 prompt: latestNode.prompt, model: (result as any).model || latestNode.model,
                 modelLabel: (result as any).modelName || latestNode.modelLabel,
                 modelColorStart: latestNode.modelColorStart,
@@ -812,6 +1119,8 @@ export const useImageGeneration = (options: {
                 aspectRatio: resolvedAspectRatio, imageSize: resolvedImageSize,
                 timestamp: Date.now(), canvasId: activeCanvasRef.current?.id || 'default',
                 parentPromptId: node.id,
+                sourceTaskId,
+                sourceResultIndex,
                 sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
@@ -820,6 +1129,8 @@ export const useImageGeneration = (options: {
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
                 generationTime: clampGenerationDurationMs((result as any).generationTime),
                 tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
+                promptTokens: splitMetricAcrossItems(recoveredUsage.promptTokens, uniqueImageUrls.length || imageUrls.length),
+                completionTokens: splitMetricAcrossItems(recoveredUsage.completionTokens, uniqueImageUrls.length || imageUrls.length),
                 cost: splitMetricAcrossItems(recoveredUsage.cost, uniqueImageUrls.length || imageUrls.length),
                 costSource: recoveredUsage.costSource,
                 alias: latestNode.mode === GenerationMode.PPT ? buildPptPageAlias(latestNode.pptSlides?.[layoutIndex], layoutIndex) : undefined,
@@ -829,17 +1140,23 @@ export const useImageGeneration = (options: {
             const mergedChildIds = Array.from(new Set([...currentChildIds, ...recoveredImageNodes.map((img: any) => img.id)]));
             const nextSuccessCount = mergedChildIds.length;
             const nextFailCount = nextPendingTaskIds.length > 0 ? Math.max(0, expectedCount - nextSuccessCount - nextPendingTaskIds.length) : Math.max(0, expectedCount - nextSuccessCount);
-
-            const nextPromptState = {
+            const persistedPromptState = attachCompletedTasksToPrompt({
               ...latestNode,
               isGenerating: nextPendingTaskIds.length > 0,
               jobId: nextJobId,
-              childImageIds: mergedChildIds,
               error: undefined,
               errorDetails: undefined,
               lastGenerationSuccessCount: nextSuccessCount,
               lastGenerationFailCount: nextFailCount,
-              generationMetadata: nextGenerationMetadata
+              lastGenerationTotalCount: expectedCount,
+              generationMetadata: nextGenerationMetadata,
+            }, completedTasks);
+
+            urgentUpdatePromptNode(persistedPromptState);
+
+            const nextPromptState = {
+              ...persistedPromptState,
+              childImageIds: mergedChildIds,
             };
 
             if (recoveredImageNodes.length > 0) {
@@ -852,10 +1169,14 @@ export const useImageGeneration = (options: {
 
             void markTaskCompleted(
               targetTaskId,
-              imageUrls,
+              completedTasks.find((task) => task.taskId === targetTaskId)?.resultUrls || imageUrls,
               recoveredUsage.cost,
               recoveredUsage.tokens
             );
+
+            if (shouldRefreshServerBillingState(latestNode)) {
+              await refreshBilling();
+            }
             
             if (nextPendingTaskIds.length > 0) {
               setTimeout(() => {
@@ -869,6 +1190,10 @@ export const useImageGeneration = (options: {
           urgentUpdatePromptNode({ ...latestNode, isGenerating: nextPendingTaskIds.length > 0, jobId: nextJobId, generationMetadata: nextGenerationMetadata, error: nextPendingTaskIds.length === 0 ? 'Task failed on backend' : undefined });
           // 轮询失败，更新数据库状态
           void markTaskFailed(targetTaskId, 'Task failed on backend');
+
+          if (shouldRefreshServerBillingState(latestNode)) {
+            await refreshBilling();
+          }
         }
       } else {
         // Still pending
@@ -891,6 +1216,9 @@ export const useImageGeneration = (options: {
           error: message,
           errorDetails: extractErrorDetails(err, latestNode.model)
         });
+        if (shouldRefreshServerBillingState(latestNode)) {
+          await refreshBilling();
+        }
         return;
       }
       setTimeout(() => {
@@ -898,7 +1226,7 @@ export const useImageGeneration = (options: {
         if (freshNode?.isGenerating) pollTaskStatus(freshNode, targetTaskId);
       }, 15000);
     }
-  }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources]);
+  }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults]);
 
   useTaskRecovery(pollTaskStatus);
 
@@ -992,7 +1320,8 @@ export const useImageGeneration = (options: {
       const routeProviderDisplay = effectiveKeySlotId
         ? resolveProviderDisplay(effectiveKeySlotId)
         : resolveProviderDisplay(undefined, node.providerLabel, node.provider);
-      const preferRouteProviderDisplay = shouldPreferRouteProviderDisplay(node, routeProviderDisplay);
+      const preferRouteProviderDisplay = (!!effectiveKeySlotId && !!routeProviderDisplay.providerLabel)
+        || shouldPreferRouteProviderDisplay(node, routeProviderDisplay);
       const executionNode: PromptNode = {
         ...node,
         keySlotId: effectiveKeySlotId,
@@ -1062,6 +1391,8 @@ export const useImageGeneration = (options: {
           let resolvedCost: number | undefined = undefined;
           let resolvedCostSource: NonNullable<GeneratedImage['costSource']> | undefined = undefined;
           let resolvedTokens: number | undefined = undefined;
+          let resolvedPromptTokens: number | undefined = undefined;
+          let resolvedCompletionTokens: number | undefined = undefined;
           let resolvedImageSize: ImageSize | undefined = executionNode.imageSize;
           let resolvedAspectRatio: AspectRatio = executionNode.aspectRatio;
           let resolvedExactDimensions: { width: number; height: number } | undefined = undefined;
@@ -1077,6 +1408,8 @@ export const useImageGeneration = (options: {
             resolvedCost = toFiniteNumber(audioResult.usage?.cost);
             resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(audioResult.usage?.totalTokens);
+            resolvedPromptTokens = toFiniteNumber((audioResult as any).usage?.promptTokens);
+            resolvedCompletionTokens = toFiniteNumber((audioResult as any).usage?.completionTokens);
           } else if (isVideo) {
             const videoResult = await llmService.generateVideo({ 
               modelId: executionNode.model, prompt: taskPrompt, aspectRatio: executionNode.aspectRatio === '9:16' ? '9:16' : '16:9', 
@@ -1100,6 +1433,8 @@ export const useImageGeneration = (options: {
             resolvedCost = toFiniteNumber(videoResult.usage?.cost);
             resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(videoResult.usage?.totalTokens);
+            resolvedPromptTokens = toFiniteNumber((videoResult as any).usage?.promptTokens);
+            resolvedCompletionTokens = toFiniteNumber((videoResult as any).usage?.completionTokens);
           } else {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
               maskUrl: executionNode.maskUrl, editMode: executionNode.mode === GenerationMode.INPAINT ? 'inpaint' : (executionNode.mode === GenerationMode.EDIT ? 'edit' : undefined),
@@ -1141,12 +1476,18 @@ export const useImageGeneration = (options: {
               imageCount: 1,
               referenceImageCount: files.length,
               keySlotId: resolvedResultKeySlotId,
+              provider: resolvedProvider,
+              providerLabel: resolvedProviderName,
               explicitCost: result.cost,
               explicitTokens: result.tokens,
+              explicitPromptTokens: result.promptTokens,
+              explicitCompletionTokens: result.completionTokens,
             });
             resolvedCost = resolvedUsage.cost;
             resolvedCostSource = resolvedUsage.costSource;
             resolvedTokens = resolvedUsage.tokens;
+            resolvedPromptTokens = resolvedUsage.promptTokens;
+            resolvedCompletionTokens = resolvedUsage.completionTokens;
           }
 
           return { 
@@ -1154,7 +1495,7 @@ export const useImageGeneration = (options: {
             generationTime: clampGenerationDurationMs(Date.now() - startTime), base64: generatedBase64, mode, 
             taskId: taskIdForRecovery, taskPrompt, keySlotId: resolvedResultKeySlotId, requestId: currentRequestId,
             provider: resolvedProvider, providerName: resolvedProviderName, modelName: resolvedModelName, model: resolvedModelId,
-            imageSize: resolvedImageSize, aspectRatio: resolvedAspectRatio, dimensions: resolvedExactDimensions, tokens: resolvedTokens, cost: resolvedCost, costSource: resolvedCostSource,
+            imageSize: resolvedImageSize, aspectRatio: resolvedAspectRatio, dimensions: resolvedExactDimensions, tokens: resolvedTokens, promptTokens: resolvedPromptTokens, completionTokens: resolvedCompletionTokens, cost: resolvedCost, costSource: resolvedCostSource,
           };
         } catch (error: any) {
           return { error: error.message || 'Unknown error', errorDetails: extractErrorDetails(error, executionNode.model), taskId: taskIdForRecovery, requestId: currentRequestId };
@@ -1199,11 +1540,37 @@ export const useImageGeneration = (options: {
         const acceptedImageData = filterUniqueGeneratedSources(
           promptNodeId,
           validImageData,
-          (item) => item.originalUrl || item.url
+          (item, index) => ({
+            taskId: item.taskId,
+            requestId: item.requestId,
+            resultIndex: typeof item.index === 'number' ? item.index : index,
+            url: item.originalUrl || item.url,
+          })
         );
+        const { completedTasks, preparedItems } = prepareCompletedTaskResults(promptNodeId, acceptedImageData.map((item) => ({
+          ...item,
+          taskId: item.taskId,
+          requestId: item.requestId,
+          url: item.url,
+          originalUrl: item.originalUrl,
+          keySlotId: item.keySlotId || executionNode.keySlotId,
+          provider: item.provider || executionNode.provider,
+          providerName: item.providerName || executionNode.providerLabel,
+          model: item.model || executionNode.model,
+          modelName: item.modelName || executionNode.modelLabel,
+          cost: item.cost,
+          tokens: item.tokens,
+        })), {
+          keySlotId: executionNode.keySlotId,
+          provider: executionNode.provider,
+          providerLabel: executionNode.providerLabel,
+          model: executionNode.model,
+          modelLabel: executionNode.modelLabel,
+          batchKey: `${promptNodeId}:${Date.now()}`,
+        });
         const generatedPositions = buildGeneratedImageBatchPositions({
           basePosition: executionNode.position,
-          items: acceptedImageData.map((item) => ({
+          items: preparedItems.map(({ item }) => ({
             aspectRatio: item.aspectRatio || executionNode.aspectRatio,
             exactDimensions: item.dimensions,
           })),
@@ -1211,7 +1578,7 @@ export const useImageGeneration = (options: {
           isMobile,
         });
 
-        const results = acceptedImageData.map((item, layoutIndex) => {
+        const results = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
           const idx = item.index;
           const uniqueId = `${Date.now()}_${idx}_${Math.random()}`;
           const layoutPosition = generatedPositions[layoutIndex] || getGeneratedImagePosition(
@@ -1224,7 +1591,11 @@ export const useImageGeneration = (options: {
           if (item.base64?.startsWith('data:')) saveOriginalImage(uniqueId, item.base64, mode === GenerationMode.VIDEO).catch(() => {});
           
           return {
-            id: uniqueId, storageId: uniqueId, url: item.url, originalUrl: item.originalUrl,
+            id: uniqueId,
+            storageId: uniqueId,
+            url: item.url,
+            originalUrl: item.originalUrl,
+            apiResultUrl,
             prompt: item.taskPrompt || promptToUse, aspectRatio: item.aspectRatio || executionNode.aspectRatio, imageSize: item.imageSize || executionNode.imageSize,
             timestamp: Date.now(), model: item.model || executionNode.model, canvasId: activeCanvasRef.current?.id || 'default',
             modelLabel: item.modelName || executionNode.modelLabel,
@@ -1235,12 +1606,14 @@ export const useImageGeneration = (options: {
             provider: item.provider || executionNode.provider,
             providerLabel: item.providerName || executionNode.providerLabel,
             parentPromptId: promptNodeId,
+            sourceTaskId,
+            sourceResultIndex,
             position: layoutPosition,
             dimensions: item.dimensions ? `${item.dimensions.width}x${item.dimensions.height}` : undefined,
             exactDimensions: item.dimensions,
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
-            tokens: item.tokens, cost: item.cost, costSource: item.costSource,
+            tokens: item.tokens, promptTokens: item.promptTokens, completionTokens: item.completionTokens, cost: item.cost, costSource: item.costSource,
           };
         });
 
@@ -1256,11 +1629,13 @@ export const useImageGeneration = (options: {
         const resolvedSuccessDisplay = firstSuccess?.keySlotId
           ? resolveProviderDisplay(firstSuccess.keySlotId, firstSuccess.providerName, firstSuccess.provider)
           : resolveProviderDisplay(undefined, executionNode.providerLabel, executionNode.provider);
-        
-        const updatedNode = {
-          ...nextNodeBase, isGenerating: pendingIds.length > 0 || remainingSyncRequests.length > 0, jobId: pendingIds[0],
-          childImageIds: results.map(r => r.id), lastGenerationSuccessCount: results.length,
-          lastGenerationFailCount: nonRecoverableFailureCount, lastGenerationTotalCount: actualCount,
+        const persistedPromptState = attachCompletedTasksToPrompt({
+          ...nextNodeBase,
+          isGenerating: pendingIds.length > 0 || remainingSyncRequests.length > 0,
+          jobId: pendingIds[0],
+          lastGenerationSuccessCount: results.length,
+          lastGenerationFailCount: nonRecoverableFailureCount,
+          lastGenerationTotalCount: actualCount,
           error: undefined,
           errorDetails: undefined,
           refundStatus: undefined,
@@ -1270,7 +1645,14 @@ export const useImageGeneration = (options: {
           keySlotId: firstSuccess?.keySlotId || executionNode.keySlotId,
           provider: resolvedSuccessDisplay.provider || executionNode.provider,
           providerLabel: resolvedSuccessDisplay.providerLabel || executionNode.providerLabel,
-          modelLabel: firstSuccess?.modelName || executionNode.modelLabel
+          modelLabel: firstSuccess?.modelName || executionNode.modelLabel,
+        }, completedTasks);
+
+        urgentUpdatePromptNode(persistedPromptState);
+        
+        const updatedNode = {
+          ...persistedPromptState,
+          childImageIds: results.map(r => r.id),
         };
         
         if (results.length > 0) {
@@ -1278,17 +1660,24 @@ export const useImageGeneration = (options: {
         } else {
           await updatePromptNode(updatedNode);
         }
-        validImageData.forEach((item) => {
-          if (typeof item.taskId !== 'string' || item.taskId.trim().length === 0) return;
-          if (typeof item.url !== 'string' || item.url.trim().length === 0) return;
-
-          void markTaskCompleted(item.taskId, [item.url], item.cost, item.tokens);
+        const persistedTaskIds = new Set(
+          acceptedImageData
+            .map((item) => (typeof item.taskId === 'string' ? item.taskId.trim() : ''))
+            .filter((taskId): taskId is string => taskId.length > 0)
+        );
+        completedTasks.forEach((task) => {
+          if (!persistedTaskIds.has(task.taskId)) return;
+          void markTaskCompleted(task.taskId, task.resultUrls, task.cost, task.tokens);
         });
         completedSyncRequestIds.forEach((requestId) => {
           void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
           clearSyncBridgeRecoveryTimer(requestId);
         });
         rememberPreferredKeyForMode(mode, updatedNode.keySlotId);
+
+        if (shouldRefreshServerBillingState(updatedNode)) {
+          await refreshBilling();
+        }
         
         if (pendingIds.length > 0) {
           setTimeout(() => {
@@ -1383,11 +1772,7 @@ export const useImageGeneration = (options: {
         isPaymentProcessed,
         paymentTransactionId,
       });
-      if (
-        latest.billingMode === 'credits'
-        && latest.creditSettlement === 'server'
-        && (latest.cost || 0) > 0
-      ) {
+      if (shouldRefreshServerBillingState(latest)) {
         await refreshBilling();
       }
       return;
@@ -1408,6 +1793,7 @@ export const useImageGeneration = (options: {
     buildPendingTaskMetadata,
     buildGenerationMetadata,
     pollTaskStatus,
+    shouldRefreshServerBillingState,
     extractErrorDetails,
     normalizePptSlidesForCount,
     buildAutoPptSlides,
@@ -1420,6 +1806,8 @@ export const useImageGeneration = (options: {
     recoverSyncBridgeRequest,
     isRecoverableSyncBridgeFailure,
     filterUniqueGeneratedSources,
+    attachCompletedTasksToPrompt,
+    prepareCompletedTaskResults,
     markSyncBridgeRequestActive,
     releaseSyncBridgeRequestActive
   ]);

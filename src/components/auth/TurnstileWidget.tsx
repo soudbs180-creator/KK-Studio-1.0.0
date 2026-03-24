@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { localizeUserFacingText } from '../../utils/localeText';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
@@ -132,7 +133,7 @@ async function waitForTurnstile(timeoutMs = TURNSTILE_TIMEOUT_MS): Promise<void>
     await new Promise((resolve) => window.setTimeout(resolve, 50));
   }
 
-  throw new Error('Timed out while waiting for Turnstile');
+    throw new Error(localizeUserFacingText('Timed out while waiting for Turnstile') || 'Timed out while waiting for Turnstile');
 }
 
 export async function ensureTurnstileScript(): Promise<void> {
@@ -166,7 +167,7 @@ export async function ensureTurnstileScript(): Promise<void> {
     };
     script.onerror = () => {
       turnstileScriptPromise = null;
-      reject(new Error('Failed to load Turnstile script'));
+          reject(new Error(localizeUserFacingText('Failed to load Turnstile script') || 'Failed to load Turnstile script'));
     };
 
     document.head.appendChild(script);

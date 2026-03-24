@@ -67,6 +67,7 @@ const buildViewportTransform = (nextTransform: Transform, _preferGpu: boolean = 
 
 const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onAutoArrange, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, onImageDrop, id }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
     const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
@@ -86,10 +87,123 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const [isImageDragOver, setIsImageDragOver] = useState(false); // 图片拖拽悬停状态
     const dragCounter = useRef(0); // 防止拖拽事件抖动
 
+    const gridGlowAnimationFrameRef = useRef<number | null>(null);
+    const gridGlowIdleTimeoutRef = useRef<number | null>(null);
+    const gridGlowPointerInsideRef = useRef(false);
+    const gridGlowCurrentRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
+    const gridGlowTargetRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
+
+    const applyGridGlow = useCallback((x: number, y: number, opacity: number, scale: number) => {
+        const grid = gridRef.current;
+        if (!grid) return;
+
+        grid.style.setProperty('--grid-glow-x', `${x.toFixed(1)}px`);
+        grid.style.setProperty('--grid-glow-y', `${y.toFixed(1)}px`);
+        grid.style.setProperty('--grid-glow-opacity', opacity.toFixed(3));
+        grid.style.setProperty('--grid-glow-scale', scale.toFixed(3));
+    }, []);
+
+    const animateGridGlow = useCallback(() => {
+        gridGlowAnimationFrameRef.current = null;
+
+        const current = gridGlowCurrentRef.current;
+        const target = gridGlowTargetRef.current;
+
+        current.x = target.x;
+        current.y = target.y;
+        current.opacity += (target.opacity - current.opacity) * 0.16;
+        current.scale += (target.scale - current.scale) * 0.16;
+
+        applyGridGlow(current.x, current.y, current.opacity, current.scale);
+
+        const needsNextFrame =
+            Math.abs(current.opacity - target.opacity) > 0.02
+            || Math.abs(current.scale - target.scale) > 0.02;
+
+        if (needsNextFrame) {
+            gridGlowAnimationFrameRef.current = window.requestAnimationFrame(animateGridGlow);
+            return;
+        }
+
+        current.x = target.x;
+        current.y = target.y;
+        current.opacity = target.opacity;
+        current.scale = target.scale;
+        applyGridGlow(current.x, current.y, current.opacity, current.scale);
+    }, [applyGridGlow]);
+
+    const queueGridGlowAnimation = useCallback(() => {
+        if (gridGlowAnimationFrameRef.current !== null) return;
+        gridGlowAnimationFrameRef.current = window.requestAnimationFrame(animateGridGlow);
+    }, [animateGridGlow]);
+
+    const setGridGlowTarget = useCallback((clientX: number, clientY: number, opacity: number, scale: number) => {
+        if (!showGrid) return;
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const nextX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const nextY = Math.max(0, Math.min(rect.height, clientY - rect.top));
+        const current = gridGlowCurrentRef.current;
+        const previousTarget = gridGlowTargetRef.current;
+
+        current.x = nextX;
+        current.y = nextY;
+
+        if (current.opacity < 0.02 && previousTarget.opacity < 0.02) {
+            current.scale = 0.42;
+            applyGridGlow(nextX, nextY, opacity, current.scale);
+        } else {
+            applyGridGlow(nextX, nextY, current.opacity, current.scale);
+        }
+
+        gridGlowTargetRef.current = { x: nextX, y: nextY, opacity, scale };
+        queueGridGlowAnimation();
+    }, [applyGridGlow, queueGridGlowAnimation, showGrid]);
+
+    const scheduleGridGlowIdleFade = useCallback(() => {
+        if (!showGrid) return;
+
+        if (gridGlowIdleTimeoutRef.current !== null) {
+            window.clearTimeout(gridGlowIdleTimeoutRef.current);
+        }
+
+        gridGlowIdleTimeoutRef.current = window.setTimeout(() => {
+            gridGlowIdleTimeoutRef.current = null;
+            gridGlowTargetRef.current = { ...gridGlowTargetRef.current, opacity: 0, scale: 0.24 };
+            queueGridGlowAnimation();
+        }, 1150);
+    }, [queueGridGlowAnimation, showGrid]);
+
+    const fadeGridGlow = useCallback(() => {
+        if (!showGrid) return;
+
+        if (gridGlowIdleTimeoutRef.current !== null) {
+            window.clearTimeout(gridGlowIdleTimeoutRef.current);
+            gridGlowIdleTimeoutRef.current = null;
+        }
+
+        gridGlowTargetRef.current = { ...gridGlowTargetRef.current, opacity: 0, scale: 0.2 };
+        queueGridGlowAnimation();
+    }, [queueGridGlowAnimation, showGrid]);
+
     // Center the canvas on mount OR restore from localStorage
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const initialGlow = {
+            x: rect.width / 2,
+            y: rect.height / 2,
+            opacity: 0,
+            scale: 0.32,
+        };
+        gridGlowCurrentRef.current = initialGlow;
+        gridGlowTargetRef.current = initialGlow;
+        applyGridGlow(initialGlow.x, initialGlow.y, initialGlow.opacity, initialGlow.scale);
 
         // Try to load saved view
         try {
@@ -111,7 +225,6 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
 
         // Fallback to center
-        const rect = container.getBoundingClientRect();
         const initialTransform = {
             x: rect.width / 2,
             y: rect.height / 2,
@@ -258,23 +371,44 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
     }, [onImageDrop, transform]);
 
+    const startCanvasPan = useCallback((clientX: number, clientY: number) => {
+        const currentTransform = syncTransformRef.current;
+
+        setIsDragging(true);
+        isDraggingRef.current = true;
+        dragStart.current = { x: clientX, y: clientY };
+        lastTransform.current = { x: currentTransform.x, y: currentTransform.y };
+        setGridGlowTarget(clientX, clientY, 0.52, 0.72);
+    }, [setGridGlowTarget]);
+
+    const handleMouseDownCapture = useCallback((e: React.MouseEvent) => {
+        if (e.button !== 1) return;
+
+        // Middle mouse should always pan the canvas, even above cards or controls.
+        e.preventDefault();
+        e.stopPropagation();
+        startCanvasPan(e.clientX, e.clientY);
+    }, [startCanvasPan]);
+
     // Handle mouse down for panning
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         const isEmptyCanvas = e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-grid');
 
+        if (e.button === 1) {
+            return;
+        }
+
         // Call parent handler first
         onMouseDown?.(e);
 
-        // Pan on Middle Button (1) OR Left Button (0) on empty background
+        // Pan on Left Button (0) on empty background
         // IGNORE Right Button (2) to allow external handling (Selection)
-        if (e.button === 1 || (isEmptyCanvas && e.button === 0)) {
+        if (isEmptyCanvas && e.button === 0) {
             e.preventDefault();
-            setIsDragging(true);
+            startCanvasPan(e.clientX, e.clientY);
             isDraggingRef.current = true; // 🚀 设置拖动标记
-            dragStart.current = { x: e.clientX, y: e.clientY };
-            lastTransform.current = { x: transform.x, y: transform.y };
         }
-    }, [transform, onMouseDown]);
+    }, [onMouseDown, startCanvasPan]);
 
     // Handle mouse move for panning
     // 🚀 优化：拖动时只更新临时transform，不触发重绘
@@ -299,6 +433,53 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
         }
     }, [transform.scale]);
+
+    const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        onMouseMove?.(e);
+        setGridGlowTarget(
+            e.clientX,
+            e.clientY,
+            isDraggingRef.current ? 0.52 : 0.82,
+            isDraggingRef.current ? 0.72 : 0.96
+        );
+        scheduleGridGlowIdleFade();
+    }, [onMouseMove, scheduleGridGlowIdleFade, setGridGlowTarget]);
+
+    const handleCanvasMouseLeave = useCallback(() => {
+        gridGlowPointerInsideRef.current = false;
+        fadeGridGlow();
+    }, [fadeGridGlow]);
+
+    const handleWindowMouseMoveForGlow = useCallback((e: MouseEvent) => {
+        if (!showGrid) return;
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const isInside =
+            e.clientX >= rect.left
+            && e.clientX <= rect.right
+            && e.clientY >= rect.top
+            && e.clientY <= rect.bottom;
+
+        if (!isInside) {
+            if (gridGlowPointerInsideRef.current) {
+                gridGlowPointerInsideRef.current = false;
+                fadeGridGlow();
+            }
+            return;
+        }
+
+        gridGlowPointerInsideRef.current = true;
+        setGridGlowTarget(
+            e.clientX,
+            e.clientY,
+            isDraggingRef.current ? 0.52 : 0.82,
+            isDraggingRef.current ? 0.72 : 0.96
+        );
+        scheduleGridGlowIdleFade();
+    }, [fadeGridGlow, scheduleGridGlowIdleFade, setGridGlowTarget, showGrid]);
 
     const handleMouseUp = useCallback((e: MouseEvent) => {
         if (isDraggingRef.current) {
@@ -547,6 +728,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
         // 🚀 使用 passive 监听器提升滚动/移动性能
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
+        window.addEventListener('mousemove', handleWindowMouseMoveForGlow, { passive: true });
         window.addEventListener('mouseup', handleMouseUp, { passive: true });
         window.addEventListener('keydown', handleKeyDown, { passive: true });
 
@@ -557,6 +739,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             container.removeEventListener('touchend', handleTouchEnd);
 
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mousemove', handleWindowMouseMoveForGlow);
             window.removeEventListener('mouseup', handleMouseUp);
             window.removeEventListener('keydown', handleKeyDown);
             if (zoomIndicatorTimeoutRef.current) {
@@ -564,7 +747,18 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 zoomIndicatorTimeoutRef.current = null;
             }
         };
-    }, [handleWheel, handleMouseMove, handleMouseUp, handleKeyDown]);
+    }, [handleWheel, handleKeyDown, handleMouseMove, handleMouseUp, handleTouchEnd, handleTouchMove, handleTouchStart, handleWindowMouseMoveForGlow]);
+
+    useEffect(() => {
+        return () => {
+            if (gridGlowAnimationFrameRef.current !== null) {
+                window.cancelAnimationFrame(gridGlowAnimationFrameRef.current);
+            }
+            if (gridGlowIdleTimeoutRef.current !== null) {
+                window.clearTimeout(gridGlowIdleTimeoutRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div className="relative w-full h-full">
@@ -573,9 +767,11 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 ref={containerRef}
                 className={`canvas-container outline-none focus:outline-none gpu-accelerated ${isDragging ? 'is-dragging' : ''} ${isZooming ? 'is-zooming' : ''} ${isImageDragOver ? 'ring-4 ring-indigo-500' : ''}`}
                 tabIndex={-1}
+                onMouseDownCapture={handleMouseDownCapture}
                 onMouseDown={handleMouseDown}
-                onMouseMove={onMouseMove}
+                onMouseMove={handleCanvasMouseMove}
                 onMouseUp={onMouseUp}
+                onMouseLeave={handleCanvasMouseLeave}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -598,7 +794,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             >
                 {/* 拖拽悬停效果 - 只显示边框高亮，不显示提示文本 */}
                 {/* Grid Background */}
-                {showGrid && <div className="canvas-grid" />}
+                {showGrid && <div ref={gridRef} className="canvas-grid" />}
 
                 {/* Viewport with transform - GPU accelerated */}
                 <div

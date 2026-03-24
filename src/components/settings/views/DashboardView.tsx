@@ -12,9 +12,10 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react';
-import keyManager from '../../../services/auth/keyManager';
 import { useBilling } from '../../../context/BillingContext';
+import keyManager from '../../../services/auth/keyManager';
 import { getTodayCosts } from '../../../services/billing/costService';
+import { getAllImageIds, getStorageUsage } from '../../../services/storage/imageStorage';
 import { getStorageMode, type StorageMode } from '../../../services/storage/storagePreference';
 import {
   getTodayLogs,
@@ -22,26 +23,18 @@ import {
   subscribeToLogs,
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
-import {
-  SETTINGS_ELEVATED_STYLE,
-  SETTINGS_OVERLAY_STYLE,
-  SettingsActionButton,
-  SettingsBadge,
-  SettingsHero,
-  SettingsMetricCard,
-  SettingsSection,
-  SettingsViewShell,
-} from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
 import { EmptyState, ProgressBar, StatusBadge } from '../ui/index';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
 }
 
-type Tone = 'indigo' | 'emerald' | 'amber' | 'rose' | 'neutral';
-
 const formatNumber = (value: number, maximumFractionDigits = 0) =>
   new Intl.NumberFormat('zh-CN', { maximumFractionDigits }).format(value);
+
+const formatCompactNumber = (value: number) =>
+  new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
 const formatUsd = (value: number) =>
   new Intl.NumberFormat('zh-CN', {
@@ -53,9 +46,9 @@ const formatUsd = (value: number) =>
   }).format(value);
 
 const formatDateTime = (value?: string | number | null) => {
-  if (!value) return '暂无记录';
+  if (!value) return 'No recent activity';
   const target = typeof value === 'number' ? new Date(value) : new Date(value);
-  if (Number.isNaN(target.getTime())) return '暂无记录';
+  if (Number.isNaN(target.getTime())) return 'No recent activity';
   return target.toLocaleString('zh-CN', {
     hour12: false,
     month: '2-digit',
@@ -78,103 +71,103 @@ const isSameLocalDay = (value?: string | null) => {
 };
 
 const getStorageModeLabel = (mode: StorageMode | null) => {
-  if (mode === 'local') return '本地文件夹';
-  if (mode === 'opfs') return '设备私有存储';
-  if (mode === 'browser') return '浏览器存储';
-  return '尚未设置';
+  if (mode === 'local') return 'Local Folder';
+  if (mode === 'opfs') return 'Private Device';
+  if (mode === 'browser') return 'Browser Cache';
+  return 'Unassigned';
 };
 
-const toneToBadge = (tone: Tone): 'indigo' | 'emerald' | 'amber' | 'rose' | 'neutral' => {
-  if (tone === 'emerald') return 'emerald';
-  if (tone === 'amber') return 'amber';
-  if (tone === 'rose') return 'rose';
-  if (tone === 'indigo') return 'indigo';
-  return 'neutral';
+const buildChartPaths = (points: number[]) => {
+  if (points.length === 0) {
+    return { linePath: '', areaPath: '' };
+  }
+
+  const step = points.length > 1 ? 100 / (points.length - 1) : 100;
+  const linePath = points
+    .map((point, index) => {
+      const x = Number((index * step).toFixed(2));
+      const y = Number((100 - point).toFixed(2));
+      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+    })
+    .join(' ');
+
+  return {
+    linePath,
+    areaPath: `${linePath} L 100 100 L 0 100 Z`,
+  };
 };
 
-const DashboardHealthRow: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  value: string;
-  progress?: number;
-  tone: Tone;
-  actionLabel: string;
-  onClick?: () => void;
-}> = ({ icon, title, description, value, progress, tone, actionLabel, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="w-full rounded-[24px] border p-4 text-left transition-all duration-200 hover:opacity-90"
-    style={SETTINGS_ELEVATED_STYLE}
-  >
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-          style={SETTINGS_OVERLAY_STYLE}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-0 break-words text-[16px] font-semibold text-[var(--text-primary)]">{title}</div>
-            <SettingsBadge tone={toneToBadge(tone)}>{actionLabel}</SettingsBadge>
-          </div>
-          <div className="mt-1 break-words text-[13px] leading-6 text-[var(--text-secondary)]">{description}</div>
-        </div>
-      </div>
-      <div className="max-w-[40%] shrink-0 text-right">
-        <div className="break-words text-[22px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
-          {value}
-        </div>
+const getLogTone = (level: LogLevel) => {
+  if (level === LogLevel.CRITICAL || level === LogLevel.ERROR) return 'error' as const;
+  if (level === LogLevel.WARNING) return 'warning' as const;
+  return 'online' as const;
+};
+
+const DashboardRingRow: React.FC<{
+  label: string;
+  percent: number;
+  helper: string;
+  color: string;
+}> = ({ label, percent, helper, color }) => (
+  <div className="settings-reference-ring-row">
+    <div className="settings-reference-ring" style={{ ['--value' as string]: String(percent), ['--ring-color' as string]: color }}>
+      <div>
+        <strong>{percent}%</strong>
+        <span>Health</span>
       </div>
     </div>
-    {typeof progress === 'number' ? (
-      <div className="mt-4">
-        <ProgressBar
-          progress={progress}
-          tone={tone === 'rose' ? 'rose' : tone === 'amber' ? 'amber' : 'emerald'}
-          showLabel={false}
-        />
-      </div>
-    ) : null}
-  </button>
+    <div className="min-w-0 flex-1">
+      <div className="settings-reference-list-item__title">{label}</div>
+      <div className="settings-reference-list-item__meta">{helper}</div>
+    </div>
+  </div>
 );
 
-const DashboardActivityCard: React.FC<{
+const DashboardActivityRow: React.FC<{
   icon: React.ReactNode;
   title: string;
   summary: string;
   meta: string;
   value?: string;
+  status?: React.ReactNode;
   onClick?: () => void;
-}> = ({ icon, title, summary, meta, value, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="w-full rounded-[24px] border p-4 text-left transition-all duration-200 hover:opacity-90"
-    style={SETTINGS_ELEVATED_STYLE}
-  >
-    <div className="flex items-start gap-3">
+}> = ({ icon, title, summary, meta, value, status, onClick }) => (
+  <button type="button" className="settings-reference-list-item w-full text-left" onClick={onClick}>
+    <div className="flex min-w-0 flex-1 items-start gap-3">
       <div
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-        style={SETTINGS_OVERLAY_STYLE}
+        style={{
+          border: '1px solid var(--settings-border-subtle)',
+          background:
+            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-surface-overlay)',
+          color: 'var(--text-primary)',
+        }}
       >
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div className="min-w-0 flex-1 truncate text-[16px] font-semibold text-[var(--text-primary)]">{title}</div>
-          {value ? (
-            <div className="shrink-0 text-[14px] font-semibold text-[var(--text-primary)]">{value}</div>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="settings-reference-list-item__title">{title}</div>
+          {status}
         </div>
-        <div className="mt-1 truncate text-[13px] text-[var(--text-secondary)]">{summary}</div>
-        <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{meta}</div>
+        <div className="settings-reference-list-item__meta">{summary}</div>
+        <div className="mt-2 text-[11px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{meta}</div>
       </div>
     </div>
+    {value ? <div className="settings-reference-list-item__value">{value}</div> : null}
   </button>
+);
+
+const DashboardStorageRow: React.FC<{ label: string; value: string; helper: string }> = ({
+  label,
+  value,
+  helper,
+}) => (
+  <div className="settings-reference-mini-metric">
+    <div className="settings-reference-mini-metric__label">{label}</div>
+    <div className="settings-reference-mini-metric__value">{value}</div>
+    <div className="settings-reference-mini-metric__helper">{helper}</div>
+  </div>
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
@@ -186,6 +179,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [providerCount, setProviderCount] = useState(0);
   const [activeProviderCount, setActiveProviderCount] = useState(0);
   const [storageMode, setStorageMode] = useState<StorageMode | null>(null);
+  const [storageUsageMb, setStorageUsageMb] = useState(0);
+  const [storedImages, setStoredImages] = useState(0);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -196,7 +191,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       const allSlots = keyManager.getSlots();
       const providers = keyManager.getProviders();
       const cost = getTodayCosts();
-      const nextStorageMode = await getStorageMode();
+      const [nextStorageMode, usageBytes, imageIds] = await Promise.all([
+        getStorageMode(),
+        getStorageUsage().catch(() => 0),
+        getAllImageIds().catch(() => []),
+      ]);
 
       const official = allSlots.filter((slot) => {
         if (!slot.key || slot.disabled) return false;
@@ -212,6 +211,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       setProviderCount(providers.length);
       setActiveProviderCount(providers.filter((item) => item.isActive).length);
       setStorageMode(nextStorageMode);
+      setStorageUsageMb(usageBytes / (1024 * 1024));
+      setStoredImages(imageIds.length);
     } finally {
       setRefreshing(false);
     }
@@ -228,9 +229,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     const unsubscribe = subscribeToLogs((next) => setLogs(next));
     return unsubscribe;
   }, []);
-
-  const keyHealthPercent =
-    stats.total > 0 ? Math.max(0, Math.min(100, Math.round((stats.valid / stats.total) * 100))) : 0;
 
   const todayUsageLogs = useMemo(
     () => usageLogs.filter((log) => isSameLocalDay(log.created_at)),
@@ -269,7 +267,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     const maxCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
     return buckets.map((bucket) => ({
       ...bucket,
-      height: bucket.count === 0 ? 16 : Math.max(20, Math.round((bucket.count / maxCount) * 110)),
+      percentage: bucket.count === 0 ? 8 : Math.max(12, Math.round((bucket.count / maxCount) * 84)),
     }));
   }, [todayUsageLogs]);
 
@@ -277,379 +275,370 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const todayRechargeCount = todayRechargeLogs.length;
   const latestUsage = todayUsageLogs[0] || usageLogs[0] || null;
   const latestRecharge = todayRechargeLogs[0] || billingLogs[0] || null;
-  const latestLog = importantLogs.slice(-1)[0] || null;
+  const latestLog = importantLogs[0] || logs[0] || null;
   const importantLogCount = importantLogs.length;
-  const storageModeLabel = getStorageModeLabel(storageMode);
   const hasCriticalLogs = importantLogs.some(
     (item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL
   );
   const hasAvailableRoute = stats.valid > 0 || activeProviderCount > 0;
-  const providerHealthPercent =
-    providerCount > 0 ? Math.round((activeProviderCount / providerCount) * 100) : hasAvailableRoute ? 100 : 0;
-  const storageReadyPercent = storageMode ? 100 : 42;
-
-  const heroTone: Tone = hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber';
-  const heroMetrics = (
-    <>
-      <SettingsMetricCard
-        label="可用链路"
-        value={hasAvailableRoute ? `${officialCount + activeProviderCount}` : '0'}
-        helper={
-          hasAvailableRoute
-            ? `官方 ${officialCount} 条，在线供应商 ${activeProviderCount} 个`
-            : '当前还没有可用接口链路'
-        }
-        icon={KeyRound}
-        tone={hasAvailableRoute ? 'indigo' : 'rose'}
-      />
-      <SettingsMetricCard
-        label="今日消耗"
-        value={formatUsd(todayCostUsd)}
-        helper={`${formatNumber(todayTokens)} 令牌，${todayUsageCount} 次调用`}
-        icon={Wallet}
-        tone={todayCostUsd > 0 ? 'amber' : 'neutral'}
-      />
-      <SettingsMetricCard
-        label="今日充值"
-        value={todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : '暂无'}
-        helper={
-          latestRecharge ? `最近一笔：${formatDateTime(latestRecharge.created_at)}` : '今天没有新的充值记录'
-        }
-        icon={Coins}
-        tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}
-      />
-      <SettingsMetricCard
-        label="风险事件"
-        value={importantLogCount > 0 ? `${importantLogCount} 条` : '稳定'}
-        helper={
-          hasCriticalLogs ? '存在错误或严重告警' : importantLogCount > 0 ? '存在待处理警告' : '当前没有高优先级问题'
-        }
-        icon={AlertTriangle}
-        tone={hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'emerald'}
-      />
-    </>
+  const storageModeLabel = getStorageModeLabel(storageMode);
+  const channelCount = officialCount + activeProviderCount;
+  const channelCoverage = officialCount + providerCount > 0
+    ? Math.round((channelCount / Math.max(officialCount + providerCount, 1)) * 100)
+    : 0;
+  const logHealth = logs.length > 0 ? Math.max(0, 100 - Math.round((importantLogCount / logs.length) * 100)) : 100;
+  const storageHealth = storageMode ? 100 : 38;
+  const storageProgress = Math.min(100, (storageUsageMb / 1024) * 100);
+  const { linePath, areaPath } = useMemo(
+    () => buildChartPaths(usageBuckets.map((bucket) => bucket.percentage)),
+    [usageBuckets]
   );
 
-  const healthRows = [
-    {
-      icon: <KeyRound size={18} className="text-[var(--text-primary)]" />,
-      title: '密钥池健康度',
-      description:
-        stats.total > 0
-          ? `有效 ${stats.valid} / 总计 ${stats.total}，限流 ${stats.rateLimited}，异常 ${stats.invalid}`
-          : '还没有可统计的官方接口或密钥池数据。',
-      value: stats.total > 0 ? `${keyHealthPercent}%` : '未配置',
-      progress: stats.total > 0 ? keyHealthPercent : undefined,
-      tone:
-        stats.total === 0 || stats.valid === 0
-          ? 'rose'
-          : stats.invalid > 0 || stats.rateLimited > 0
-            ? 'amber'
-            : 'emerald',
-      actionLabel: '查看接口',
-      onClick: () => onNavigate('api-management'),
-    },
-    {
-      icon: <LayoutDashboard size={18} className="text-[var(--text-primary)]" />,
-      title: '供应商连通率',
-      description:
-        providerCount > 0
-          ? `在线 ${activeProviderCount} / 总计 ${providerCount} 个第三方供应商`
-          : officialCount > 0
-            ? '当前主要由官方接口承担请求调度。'
-            : '还没有接入第三方供应商。',
-      value: providerCount > 0 ? `${activeProviderCount}/${providerCount}` : '未接入',
-      progress: providerCount > 0 ? providerHealthPercent : undefined,
-      tone:
-        providerCount === 0
-          ? hasAvailableRoute
-            ? 'neutral'
-            : 'rose'
-          : activeProviderCount === 0
-            ? 'rose'
-            : activeProviderCount < providerCount
-              ? 'amber'
-              : 'emerald',
-      actionLabel: '管理供应商',
-      onClick: () => onNavigate('api-management'),
-    },
-    {
-      icon: <HardDrive size={18} className="text-[var(--text-primary)]" />,
-      title: '存储状态',
-      description:
-        storageMode
-          ? '图片和项目数据已经有明确的落盘策略，可继续清理或迁移。'
-          : '尚未设置固定存储位置，建议尽快完成。',
-      value: storageModeLabel,
-      progress: storageReadyPercent,
-      tone: storageMode ? 'emerald' : 'amber',
-      actionLabel: '打开存储设置',
-      onClick: () => onNavigate('storage-settings'),
-    },
-  ] as const;
+  const recentActivity = useMemo(
+    () => [
+      {
+        key: 'usage',
+        icon: <Activity size={18} />,
+        title: 'Recent Requests',
+        summary:
+          latestUsage?.model_name ||
+          latestUsage?.model_id ||
+          latestUsage?.description ||
+          'No model request has been recorded today.',
+        meta: latestUsage ? formatDateTime(latestUsage.created_at) : 'Waiting for a new request event',
+        value: todayUsageCount > 0 ? `${formatNumber(todayUsageCount)} calls` : undefined,
+        status: <SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>API</SettingsBadge>,
+        onClick: () => onNavigate('consumption-records'),
+      },
+      {
+        key: 'billing',
+        icon: <Coins size={18} />,
+        title: 'Recharge & Balance',
+        summary: latestRecharge
+          ? `Latest recharge settled at ${formatDateTime(latestRecharge.created_at)}`
+          : `Current balance ${formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}`,
+        meta: todayRechargeCount > 0 ? `${todayRechargeCount} recharges today` : 'No recharge activity today',
+        value: formatNumber(balance, Number.isInteger(balance) ? 0 : 2),
+        status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>Credits</SettingsBadge>,
+        onClick: () => onNavigate('consumption-records'),
+      },
+      {
+        key: 'logs',
+        icon: <ScrollText size={18} />,
+        title: 'System Alerts',
+        summary: latestLog?.message || 'No warning or error logs are blocking the system right now.',
+        meta: latestLog ? `${formatDateTime(latestLog.timestamp)} · ${latestLog.source}` : 'Live log stream is stable',
+        value: importantLogCount > 0 ? `${importantLogCount} items` : 'Stable',
+        status: (
+          <StatusBadge
+            status={latestLog ? getLogTone(latestLog.level) : 'online'}
+            label={hasCriticalLogs ? 'Critical' : importantLogCount > 0 ? 'Watch' : 'Healthy'}
+          />
+        ),
+        onClick: () => onNavigate('system-logs'),
+      },
+      {
+        key: 'channels',
+        icon: <KeyRound size={18} />,
+        title: 'Route Availability',
+        summary: hasAvailableRoute
+          ? `${channelCount} active channels are ready for dispatch.`
+          : 'No ready route was detected. API setup should be prioritised.',
+        meta: providerCount > 0 ? `${activeProviderCount}/${providerCount} external providers online` : 'Official routes only',
+        value: hasAvailableRoute ? `${channelCount}` : '0',
+        status: <SettingsBadge tone={hasAvailableRoute ? 'emerald' : 'rose'}>Routes</SettingsBadge>,
+        onClick: () => onNavigate('api-management'),
+      },
+    ],
+    [
+      activeProviderCount,
+      balance,
+      channelCount,
+      hasAvailableRoute,
+      hasCriticalLogs,
+      importantLogCount,
+      latestLog,
+      latestRecharge,
+      latestUsage,
+      onNavigate,
+      providerCount,
+      todayRechargeCount,
+      todayUsageCount,
+    ]
+  );
 
-  const activityRows = [
-    {
-      icon: <Activity size={18} className="text-[var(--text-primary)]" />,
-      title: '最近生成',
-      summary:
-        latestUsage?.model_name ||
-        latestUsage?.model_id ||
-        latestUsage?.description ||
-        '今天还没有新的生成记录。',
-      meta: latestUsage ? formatDateTime(latestUsage.created_at) : '等待新的调用事件',
-      value: todayUsageCount > 0 ? `${todayUsageCount} 次` : undefined,
-      onClick: () => onNavigate('consumption-records'),
-    },
-    {
-      icon: <Wallet size={18} className="text-[var(--text-primary)]" />,
-      title: '充值与余额',
-      summary: latestRecharge
-        ? `最近充值时间：${formatDateTime(latestRecharge.created_at)}`
-        : `当前余额：${formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}`,
-      meta: todayRechargeCount > 0 ? `今日新增 ${todayRechargeCount} 笔充值` : '今天没有新的充值记录',
-      value: todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : undefined,
-      onClick: () => onNavigate('consumption-records'),
-    },
-    {
-      icon: <ScrollText size={18} className="text-[var(--text-primary)]" />,
-      title: '系统日志',
-      summary: latestLog?.message || '今天没有高优先级的告警或错误。',
-      meta: latestLog ? `${formatDateTime(latestLog.timestamp)} · ${latestLog.source}` : '系统运行稳定',
-      value: importantLogCount > 0 ? `${importantLogCount} 条` : undefined,
-      onClick: () => onNavigate('system-logs'),
-    },
-  ];
-
-  const priorityItems: Array<{
-    title: string;
-    description: string;
-    actionLabel: string;
-    actionView: string;
-    tone: Tone;
-  }> = [];
-
-  if (!hasAvailableRoute) {
-    priorityItems.push({
-      title: '缺少可用链路',
-      description: '当前没有任何可用接口，建议先补齐官方接口或第三方供应商。',
-      actionLabel: '前往 API 管理',
-      actionView: 'api-management',
-      tone: 'rose',
-    });
-  }
-
-  if (hasCriticalLogs) {
-    priorityItems.push({
-      title: '存在高优先级日志',
-      description: latestLog?.message || '系统检测到需要优先处理的错误日志。',
-      actionLabel: '查看系统日志',
-      actionView: 'system-logs',
-      tone: 'amber',
-    });
-  }
-
-  if (!storageMode) {
-    priorityItems.push({
-      title: '存储尚未配置完成',
-      description: '建议尽快确定图片存储位置，后续清理和迁移会更顺手。',
-      actionLabel: '打开存储设置',
-      actionView: 'storage-settings',
-      tone: 'amber',
-    });
-  }
+  const statusTone = hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber';
 
   return (
     <SettingsViewShell>
-      <SettingsHero
-        eyebrow="高级设置"
-        title="总览"
-        description="从链路、消费、日志和存储四个维度快速判断系统状态，优先处理会影响生产的异常。"
-        icon={LayoutDashboard}
-        tone={toneToBadge(heroTone)}
-        badge={
-          <SettingsBadge tone={toneToBadge(heroTone)}>
-            {hasCriticalLogs ? '存在风险' : hasAvailableRoute ? '系统运行中' : '待补齐链路'}
-          </SettingsBadge>
-        }
-        actions={
-          <>
+      <div className="settings-reference-stack">
+        <div className="settings-reference-page-header">
+          <div className="settings-reference-page-header__lead">
+            <div className="settings-reference-page-header__eyebrow">Advanced Settings</div>
+            <h2>Dashboard</h2>
+            <p>
+              A live control view for channels, spend, alerts, and storage. The layout now follows the
+              same dark admin language as the reference screens so the entire settings area reads as one
+              unified console.
+            </p>
+          </div>
+          <div className="settings-reference-actions">
+            <SettingsBadge tone={statusTone}>
+              {hasCriticalLogs ? 'Needs Attention' : hasAvailableRoute ? 'System Active' : 'Setup Required'}
+            </SettingsBadge>
             <SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refreshDashboard()}>
-              刷新总览
+              Refresh
             </SettingsActionButton>
             <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate('api-management')}>
-              管理 API
+              Open API Management
             </SettingsActionButton>
-          </>
-        }
-        metrics={heroMetrics}
-      />
+          </div>
+        </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
-        <SettingsSection
-          title="调用概况"
-          eyebrow="今日调用"
-          description="根据今天的请求分布生成简报，便于快速判断调用高峰和预算压力。"
-        >
-          <div className="space-y-4">
-            <div className="rounded-[24px] border p-5" style={SETTINGS_ELEVATED_STYLE}>
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <div className="text-[12px] font-medium tracking-[0.16em] text-[var(--text-tertiary)]">
-                    API 请求趋势
-                  </div>
-                  <div className="mt-2 text-[40px] font-semibold tracking-[-0.05em] text-[var(--text-primary)]">
-                    {formatNumber(todayUsageCount)}
-                  </div>
-                  <div className="mt-2 text-[13px] text-[var(--text-secondary)]">
-                    今日累计 {formatNumber(todayTokens)} 令牌，支出 {formatUsd(todayCostUsd)}
-                  </div>
-                </div>
-                <SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>
-                  {todayUsageCount > 0 ? '按 4 小时分段' : '等待新调用'}
-                </SettingsBadge>
+        <div className="settings-reference-grid-2">
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">Requests Today</div>
+                <div className="settings-reference-card__title">Traffic Overview</div>
               </div>
+              <SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>
+                {todayUsageCount > 0 ? 'Live volume' : 'Waiting for traffic'}
+              </SettingsBadge>
+            </div>
+            <div className="settings-reference-kpi__value">{formatNumber(todayUsageCount)}</div>
+            <div className="settings-reference-kpi__helper">
+              {formatNumber(todayTokens)} tokens consumed today across official and third-party routes.
+            </div>
+            <div className="mt-5 settings-reference-metric-grid">
+              <DashboardStorageRow
+                label="Active Channels"
+                value={String(channelCount)}
+                helper={hasAvailableRoute ? 'Routes currently available for dispatch' : 'No active route detected'}
+              />
+              <DashboardStorageRow
+                label="Valid Keys"
+                value={String(stats.valid)}
+                helper={`${stats.total} total key slots are registered in the key manager`}
+              />
+            </div>
+          </section>
 
-              <div className="mt-8 flex items-end gap-2">
-                {usageBuckets.map((bucket) => (
-                  <div key={bucket.label} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                    <div
-                      className="w-full rounded-t-[12px] bg-[linear-gradient(180deg,rgba(96,165,250,0.92)_0%,rgba(37,99,235,0.55)_100%)]"
-                      style={{ height: `${bucket.height}px` }}
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">Spend Today</div>
+                <div className="settings-reference-card__title">Cost Snapshot</div>
+              </div>
+              <SettingsBadge tone={todayCostUsd > 0 ? 'amber' : 'neutral'}>
+                {todayCostUsd > 0 ? 'Tracking' : 'No spend yet'}
+              </SettingsBadge>
+            </div>
+            <div className="settings-reference-kpi__value">{formatUsd(todayCostUsd)}</div>
+            <div className="settings-reference-kpi__helper">
+              {todayRechargeCount > 0
+                ? `${todayRechargeCount} recharge records were added today.`
+                : 'No recharge movement has been written to the ledger today.'}
+            </div>
+            <div className="mt-5 settings-reference-metric-grid">
+              <DashboardStorageRow
+                label="Balance"
+                value={formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}
+                helper="Remaining credits currently available to the workspace"
+              />
+              <DashboardStorageRow
+                label="Latest Recharge"
+                value={latestRecharge ? formatDateTime(latestRecharge.created_at) : 'No record'}
+                helper="Most recent balance top-up event"
+              />
+            </div>
+          </section>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">Request Trend</div>
+                <div className="settings-reference-card__title">API Traffic by 4-Hour Window</div>
+                <div className="settings-reference-card__meta">
+                  A reference-style area chart for today&apos;s request rhythm, using real activity buckets from
+                  the local billing logs.
+                </div>
+              </div>
+              <SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>
+                {todayUsageCount > 0 ? 'Updated live' : 'No samples'}
+              </SettingsBadge>
+            </div>
+
+            <div className="settings-reference-chart">
+              <div className="settings-reference-chart__frame">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+                  <defs>
+                    <linearGradient id="dashboardArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgb(123 179 255 / 0.42)" />
+                      <stop offset="100%" stopColor="rgb(123 179 255 / 0)" />
+                    </linearGradient>
+                  </defs>
+                  {areaPath ? <path d={areaPath} fill="url(#dashboardArea)" /> : null}
+                  {linePath ? (
+                    <path
+                      d={linePath}
+                      fill="none"
+                      stroke="rgb(123 179 255)"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                    <div className="text-[11px] text-[var(--text-tertiary)]">{bucket.label}</div>
-                  </div>
+                  ) : null}
+                </svg>
+              </div>
+              <div className="settings-reference-chart__labels">
+                {usageBuckets.map((bucket) => (
+                  <span key={bucket.label}>{bucket.label}</span>
                 ))}
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-                <div className="text-[12px] text-[var(--text-tertiary)]">当前余额</div>
-                <div className="mt-2 text-[24px] font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
-                  {formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}
-                </div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">可在消费记录里查看明细和充值流水。</div>
-              </div>
-              <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-                <div className="text-[12px] text-[var(--text-tertiary)]">今日充值</div>
-                <div className="mt-2 text-[24px] font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
-                  {todayRechargeCount > 0 ? `${todayRechargeCount} 笔` : '暂无'}
-                </div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">
-                  {latestRecharge ? `最近一笔：${formatDateTime(latestRecharge.created_at)}` : '今天没有新的充值动作。'}
-                </div>
-              </div>
-              <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-                <div className="text-[12px] text-[var(--text-tertiary)]">日志风险</div>
-                <div className="mt-2 text-[24px] font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
-                  {importantLogCount > 0 ? `${importantLogCount} 条` : '稳定'}
-                </div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">
-                  {hasCriticalLogs ? '存在错误或严重告警，建议优先排查。' : '当前没有需要立刻处理的高优先级日志。'}
-                </div>
-              </div>
+            <div className="mt-5 settings-reference-metric-grid">
+              <DashboardStorageRow
+                label="Peak Window"
+                value={usageBuckets.slice().sort((left, right) => right.count - left.count)[0]?.label || '00:00'}
+                helper="Most active 4-hour segment recorded today"
+              />
+              <DashboardStorageRow
+                label="Average Window"
+                value={formatCompactNumber(todayUsageCount / Math.max(usageBuckets.length, 1))}
+                helper="Mean request count per 4-hour bucket"
+              />
             </div>
-          </div>
-        </SettingsSection>
+          </section>
 
-        <SettingsSection
-          title="系统健康度"
-          eyebrow="运行状态"
-          description="这里聚合了接口、供应商和存储三个最容易影响可用性的关键面板。"
-        >
-          <div className="space-y-3">
-            {healthRows.map((row) => (
-              <DashboardHealthRow key={row.title} {...row} />
-            ))}
-          </div>
-        </SettingsSection>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <SettingsSection
-          title="最近活动"
-          eyebrow="事件流"
-          description="优先展示最近一条生成、充值和日志事件，方便快速回到对应模块继续处理。"
-        >
-          <div className="space-y-3">
-            {activityRows.map((row) => (
-              <DashboardActivityCard key={row.title} {...row} />
-            ))}
-          </div>
-        </SettingsSection>
-
-        <SettingsSection
-          title="待处理事项"
-          eyebrow="运维提醒"
-          description="只列出会影响链路、数据安全或运维效率的重点项。"
-        >
-          {priorityItems.length > 0 ? (
-            <div className="space-y-3">
-              {priorityItems.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[24px] border p-4"
-                  style={
-                    item.tone === 'rose'
-                      ? {
-                          borderColor: 'var(--state-danger-border)',
-                          backgroundColor: 'var(--state-danger-bg)',
-                        }
-                      : {
-                          borderColor: 'var(--state-warning-border)',
-                          backgroundColor: 'var(--state-warning-bg)',
-                        }
-                  }
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="break-words text-[16px] font-semibold text-[var(--text-primary)]">{item.title}</div>
-                      <div className="mt-2 break-words text-[13px] leading-6 text-[var(--text-secondary)]">
-                        {item.description}
-                      </div>
-                    </div>
-                    <StatusBadge status={item.tone === 'rose' ? 'error' : 'warning'} />
-                  </div>
-                  <div className="mt-4">
-                    <SettingsActionButton
-                      icon={ArrowRight}
-                      tone={item.tone === 'rose' ? 'danger' : 'secondary'}
-                      onClick={() => onNavigate(item.actionView)}
-                    >
-                      {item.actionLabel}
-                    </SettingsActionButton>
-                  </div>
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">System Health</div>
+                <div className="settings-reference-card__title">Operational Rings</div>
+                <div className="settings-reference-card__meta">
+                  A compact health stack for routing, logging, and storage readiness.
                 </div>
+              </div>
+              <LayoutDashboard size={18} className="text-[var(--text-primary)]" />
+            </div>
+
+            <div className="mt-5 settings-reference-rings">
+              <DashboardRingRow
+                label="Channel Coverage"
+                percent={channelCoverage}
+                helper={
+                  hasAvailableRoute
+                    ? `${channelCount} routes are currently available across official and third-party pools.`
+                    : 'No dispatch-ready route is available right now.'
+                }
+                color="rgb(123 179 255)"
+              />
+              <DashboardRingRow
+                label="Log Health"
+                percent={logHealth}
+                helper={
+                  importantLogCount > 0
+                    ? `${importantLogCount} warning or error entries are in today’s stream.`
+                    : 'No warning or error entries are present in today’s live stream.'
+                }
+                color={hasCriticalLogs ? 'rgb(255 122 122)' : 'rgb(52 211 153)'}
+              />
+              <DashboardRingRow
+                label="Storage Readiness"
+                percent={storageHealth}
+                helper={
+                  storageMode
+                    ? `${storageModeLabel} is configured as the active storage target.`
+                    : 'A storage target has not been pinned yet.'
+                }
+                color={storageMode ? 'rgb(52 211 153)' : 'rgb(245 158 11)'}
+              />
+            </div>
+          </section>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">Recent Activity</div>
+                <div className="settings-reference-card__title">Live Consumption & Alerts</div>
+                <div className="settings-reference-card__meta">
+                  A compact feed of the latest request, billing, routing, and log activity so you can jump
+                  straight into the right settings page.
+                </div>
+              </div>
+              <Activity size={18} className="text-[var(--text-primary)]" />
+            </div>
+
+            <div className="mt-5 settings-reference-list">
+              {recentActivity.map(({ key, ...item }) => (
+                <DashboardActivityRow key={key} {...item} />
               ))}
             </div>
-          ) : (
-            <EmptyState
-              title="当前没有待优先处理的事项"
-              description="链路、日志和存储状态都比较稳定，可以直接处理日常配置。"
-            />
-          )}
-        </SettingsSection>
-      </div>
+          </section>
 
-      {!latestLog && !latestUsage && !latestRecharge ? (
-        <div className="rounded-[26px] border p-6" style={SETTINGS_ELEVATED_STYLE}>
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={SETTINGS_OVERLAY_STYLE}
-            >
-              <ShieldCheck size={18} className="text-[var(--text-primary)]" />
+          <section className="settings-reference-card">
+            <div className="settings-reference-card__header">
+              <div>
+                <div className="settings-reference-card__eyebrow">Storage Distribution</div>
+                <div className="settings-reference-card__title">Cache & Mode Snapshot</div>
+                <div className="settings-reference-card__meta">
+                  Storage mode, cache footprint, and image volume are surfaced here so this panel visually
+                  mirrors the reference dashboard’s right-side resource card.
+                </div>
+              </div>
+              <HardDrive size={18} className="text-[var(--text-primary)]" />
             </div>
-            <div>
-              <div className="break-words text-[16px] font-semibold text-[var(--text-primary)]">当前系统很安静</div>
-              <div className="mt-1 break-words text-[13px] text-[var(--text-secondary)]">
-                今天还没有新的关键事件写入，你可以从左侧继续进入具体设置页。
+
+            <div className="settings-reference-kpi__value">{storageUsageMb.toFixed(2)} MB</div>
+            <div className="settings-reference-kpi__helper">
+              {storedImages} stored images tracked in the current workspace cache.
+            </div>
+
+            <div className="mt-4">
+              <ProgressBar
+                progress={storageProgress}
+                tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'indigo'}
+                showLabel={false}
+              />
+              <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">
+                Visualised against a 1 GB reference threshold for quick capacity checks.
               </div>
             </div>
-          </div>
+
+            <div className="settings-reference-segments">
+              <span className={`settings-reference-segment ${storageMode === 'browser' ? 'is-active' : ''}`.trim()} />
+              <span className={`settings-reference-segment ${storageMode === 'opfs' ? 'is-active' : ''}`.trim()} />
+              <span className={`settings-reference-segment ${storageMode === 'local' ? 'is-active' : ''}`.trim()} />
+            </div>
+
+            <div className="mt-5 settings-reference-metric-grid">
+              <DashboardStorageRow label="Primary Mode" value={storageModeLabel} helper="The current destination used for local asset persistence" />
+              <DashboardStorageRow label="Stored Images" value={formatNumber(storedImages)} helper="Detected image records in the local cache layer" />
+              <DashboardStorageRow label="Providers Online" value={formatNumber(activeProviderCount)} helper="Third-party providers currently allowed to participate" />
+              <DashboardStorageRow
+                label="Latest Alert"
+                value={latestLog ? formatDateTime(latestLog.timestamp) : 'No alert'}
+                helper={latestLog ? latestLog.source : 'System logs are currently stable'}
+              />
+            </div>
+
+            {!hasAvailableRoute && !storageMode ? (
+              <div className="mt-5">
+                <EmptyState
+                  title="Setup is still incomplete"
+                  description="Connect at least one API route and assign a storage mode to bring this dashboard fully online."
+                />
+              </div>
+            ) : null}
+          </section>
         </div>
-      ) : null}
+      </div>
     </SettingsViewShell>
   );
 };

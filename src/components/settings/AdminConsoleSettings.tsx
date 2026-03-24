@@ -1,9 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyRound, Shield, ShieldAlert, Wallet } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
+import { useLocale } from '../../context/LocaleContext';
 import { clearStoredAdminSession } from '../../services/api/adminSession';
 import { legacyWebApiClient } from '../../services/api/kkApiClient';
+import {
+  adminRechargeCreditsViaSupabase,
+  changeAdminPasswordViaSupabase,
+} from '../../services/admin/supabaseAdminFallbackService';
 import { notify } from '../../services/system/notificationService';
 import {
   MetricCard,
@@ -12,7 +17,8 @@ import {
   SettingInput,
 } from './ui/index';
 
-const DEFAULT_RECHARGE_REMARK = '管理员手动充值';
+const DEFAULT_RECHARGE_REMARK_ZH = '管理员手动充值';
+const DEFAULT_RECHARGE_REMARK_EN = 'Manual admin recharge';
 
 function buildRequestId(prefix: string, suffix?: string): string {
   const uuid = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
@@ -26,8 +32,21 @@ function buildAdminRequestOptions(requestId?: string) {
   };
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = String((error as { message?: unknown }).message || '').trim();
+    if (message) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
 const AdminConsoleSettings: React.FC = () => {
   const { user } = useAuth();
+  const { pick } = useLocale();
+  const defaultRechargeRemark = pick(DEFAULT_RECHARGE_REMARK_ZH, DEFAULT_RECHARGE_REMARK_EN);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -36,18 +55,32 @@ const AdminConsoleSettings: React.FC = () => {
 
   const [identity, setIdentity] = useState('');
   const [rechargeAmount, setRechargeAmount] = useState(100);
-  const [rechargeRemark, setRechargeRemark] = useState(DEFAULT_RECHARGE_REMARK);
+  const [rechargeRemark, setRechargeRemark] = useState(DEFAULT_RECHARGE_REMARK_ZH);
   const [recharging, setRecharging] = useState(false);
 
   const [newAdminIdentity, setNewAdminIdentity] = useState('');
   const [settingAdmin, setSettingAdmin] = useState(false);
 
-  const amountLabel = useMemo(() => `${rechargeAmount} 积分`, [rechargeAmount]);
+  useEffect(() => {
+    setRechargeRemark((current) =>
+      current === DEFAULT_RECHARGE_REMARK_ZH || current === DEFAULT_RECHARGE_REMARK_EN
+        ? defaultRechargeRemark
+        : current
+    );
+  }, [defaultRechargeRemark]);
+
+  const amountLabel = useMemo(
+    () => `${rechargeAmount} ${pick('积分', 'credits')}`,
+    [pick, rechargeAmount]
+  );
 
   const requireAdminUserId = (): string | null => {
     const userId = user?.id;
     if (!userId) {
-      notify.error('管理员身份缺失', '请先登录管理员账号后再继续操作。');
+      notify.error(
+        pick('管理员身份缺失', 'Missing admin identity'),
+        pick('请先登录管理员账号后再继续操作。', 'Please sign in with an admin account before continuing.')
+      );
       return null;
     }
 
@@ -61,41 +94,63 @@ const AdminConsoleSettings: React.FC = () => {
     }
 
     if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-      notify.error('信息不完整', '请填写旧密码、新密码和确认密码。');
+      notify.error(
+        pick('信息不完整', 'Incomplete information'),
+        pick('请填写旧密码、新密码和确认密码。', 'Enter the current password, new password, and confirmation password.')
+      );
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      notify.error('两次输入不一致', '请确认两次输入的新密码完全一致。');
+      notify.error(
+        pick('两次输入不一致', 'Passwords do not match'),
+        pick('请确认两次输入的新密码完全一致。', 'Make sure the new password matches in both fields.')
+      );
       return;
     }
 
     if (newPassword.length < 8) {
-      notify.error('密码过短', '新密码至少需要 8 位。');
+      notify.error(
+        pick('密码过短', 'Password too short'),
+        pick('新密码至少需要 8 位。', 'The new password must be at least 8 characters long.')
+      );
       return;
     }
 
     setChangingPassword(true);
     try {
-      const response = await legacyWebApiClient.changeAdminPassword(
-        {
-          oldPassword,
-          newPassword,
-        },
-        buildAdminRequestOptions(buildRequestId('admin-password-change', userId)),
-      );
+      try {
+        const response = await legacyWebApiClient.changeAdminPassword(
+          {
+            oldPassword,
+            newPassword,
+          },
+          buildAdminRequestOptions(buildRequestId('admin-password-change', userId))
+        );
 
-      if (!response.success) {
-        throw new Error(response.error.message || '管理员密码修改失败。');
+        if (!response.success) {
+          throw new Error(response.error?.message || pick('管理员密码修改失败。', 'Failed to change the admin password.'));
+        }
+      } catch {
+        await changeAdminPasswordViaSupabase(user, oldPassword, newPassword);
       }
 
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
       clearStoredAdminSession();
-      notify.success('修改成功', '管理员密码已更新，请重新验证后台会话。');
-    } catch (error: any) {
-      notify.error('修改失败', error?.message || '请检查旧密码后重试。');
+      notify.success(
+        pick('修改成功', 'Password updated'),
+        pick(
+          '管理员密码已更新，请重新输入新密码解锁后台。',
+          'The admin password has been updated. Use the new password to unlock the console again.'
+        )
+      );
+    } catch (error) {
+      notify.error(
+        pick('修改失败', 'Update failed'),
+        getErrorMessage(error, pick('请检查旧密码后重试。', 'Check the current password and try again.'))
+      );
     } finally {
       setChangingPassword(false);
     }
@@ -108,29 +163,59 @@ const AdminConsoleSettings: React.FC = () => {
     }
 
     if (!identity.trim()) {
-      notify.error('缺少目标用户', '请输入用户 ID 或邮箱。');
+      notify.error(
+        pick('缺少目标用户', 'Missing target user'),
+        pick('请输入用户 ID 或邮箱。', 'Enter a user ID or email address.')
+      );
+      return;
+    }
+
+    if (!Number.isFinite(rechargeAmount) || rechargeAmount <= 0) {
+      notify.error(
+        pick('充值金额无效', 'Invalid recharge amount'),
+        pick('充值积分必须大于 0。', 'Recharge credits must be greater than 0.')
+      );
       return;
     }
 
     setRecharging(true);
     try {
-      const response = await legacyWebApiClient.adminRechargeCredits(
-        {
-          identity: identity.trim(),
-          creditAmount: rechargeAmount,
-          description: rechargeRemark.trim() || DEFAULT_RECHARGE_REMARK,
-        },
-        buildAdminRequestOptions(buildRequestId('admin-recharge', identity)),
-      );
+      let balanceAfter = 0;
 
-      if (!response.success) {
-        throw new Error(response.error.message || '充值失败。');
+      try {
+        const response = await legacyWebApiClient.adminRechargeCredits(
+          {
+            identity: identity.trim(),
+            creditAmount: rechargeAmount,
+            description: rechargeRemark.trim() || defaultRechargeRemark,
+          },
+          buildAdminRequestOptions(buildRequestId('admin-recharge', identity))
+        );
+
+        if (!response.success) {
+          throw new Error(response.error?.message || pick('充值失败。', 'Recharge failed.'));
+        }
+
+        balanceAfter = Number(response.data.balanceAfter || 0);
+      } catch {
+        const result = await adminRechargeCreditsViaSupabase(
+          identity.trim(),
+          rechargeAmount,
+          rechargeRemark.trim() || defaultRechargeRemark
+        );
+        balanceAfter = result.balanceAfter;
       }
 
-      notify.success('充值成功', `最新余额：${response.data.balanceAfter} 积分`);
+      notify.success(
+        pick('充值成功', 'Recharge completed'),
+        pick(`最新余额：${balanceAfter} 积分`, `Latest balance: ${balanceAfter} credits`)
+      );
       setIdentity('');
-    } catch (error: any) {
-      notify.error('充值失败', error?.message || '请检查用户信息后重试。');
+    } catch (error) {
+      notify.error(
+        pick('充值失败', 'Recharge failed'),
+        getErrorMessage(error, pick('请检查用户信息后重试。', 'Check the target user information and try again.'))
+      );
     } finally {
       setRecharging(false);
     }
@@ -143,7 +228,10 @@ const AdminConsoleSettings: React.FC = () => {
     }
 
     if (!newAdminIdentity.trim()) {
-      notify.error('缺少目标用户', '请输入用户 ID 或邮箱。');
+      notify.error(
+        pick('缺少目标用户', 'Missing target user'),
+        pick('请输入用户 ID 或邮箱。', 'Enter a user ID or email address.')
+      );
       return;
     }
 
@@ -154,17 +242,29 @@ const AdminConsoleSettings: React.FC = () => {
           identity: newAdminIdentity.trim(),
           role: 'admin',
         },
-        buildAdminRequestOptions(buildRequestId('admin-role', newAdminIdentity)),
+        buildAdminRequestOptions(buildRequestId('admin-role', newAdminIdentity))
       );
 
       if (!response.success) {
-        throw new Error(response.error.message || '授予管理员权限失败。');
+        throw new Error(response.error?.message || pick('授予管理员权限失败。', 'Failed to grant admin access.'));
       }
 
-      notify.success('设置成功', `已将 ${newAdminIdentity.trim()} 设为管理员。`);
+      notify.success(
+        pick('设置成功', 'Role updated'),
+        pick(
+          `已将 ${newAdminIdentity.trim()} 设置为管理员。`,
+          `${newAdminIdentity.trim()} has been granted admin access.`
+        )
+      );
       setNewAdminIdentity('');
-    } catch (error: any) {
-      notify.error('设置失败', error?.message || '请检查用户信息后重试。');
+    } catch (error) {
+      notify.error(
+        pick('设置失败', 'Update failed'),
+        pick(
+          `${getErrorMessage(error, '授予管理员权限失败。')} 当前“授予管理员”仍依赖本地 API 的 Supabase service role 配置。`,
+          `${getErrorMessage(error, 'Failed to grant admin access.')} The grant-admin action still depends on the local API service-role configuration.`
+        )
+      );
     } finally {
       setSettingAdmin(false);
     }
@@ -174,91 +274,110 @@ const AdminConsoleSettings: React.FC = () => {
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          value="至少 8 位"
-          label="密码策略"
-          helper="建议尽快替换默认管理员密码"
+          value={pick('至少 8 位', '8+ characters')}
+          label={pick('密码策略', 'Password policy')}
+          helper={pick('建议尽快替换默认管理员密码', 'Replace the default admin password as soon as possible.')}
           tone="amber"
         />
         <MetricCard
           value={amountLabel}
-          label="本次充值"
-          helper="提交前可再次核对金额"
+          label={pick('本次充值', 'Recharge amount')}
+          helper={pick('提交前可再次核对金额', 'Review the amount one more time before submitting.')}
           tone="emerald"
         />
         <MetricCard
-          value="管理员作用域"
-          label="权限范围"
-          helper="影响后台配置与用户资产"
+          value={pick('高权限操作', 'Privileged actions')}
+          label={pick('影响范围', 'Impact scope')}
+          helper={pick('会直接影响后台配置与用户积分', 'Changes here directly affect admin settings and user credits.')}
           tone="rose"
         />
         <MetricCard
-          value="3 项"
-          label="当前操作"
-          helper="密码、充值、授权"
+          value={pick('3 项', '3 actions')}
+          label={pick('当前模块', 'Current module')}
+          helper={pick('改密、充值、授予管理员', 'Password change, recharge, and grant-admin tools.')}
           tone="neutral"
         />
       </div>
 
+      <div
+        className="rounded-[24px] border p-4 text-sm leading-6"
+        style={{
+          borderColor: 'var(--border-light)',
+          backgroundColor: 'var(--bg-overlay)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        {pick(
+          '管理员改密和手动充值现在支持 Supabase 直连兜底；如果本地 API 没有正确加载 service role，也可以继续使用这两项能力。授予管理员权限目前仍通过本地 API 执行。',
+          'Changing the admin password and manual recharges now support a direct Supabase fallback. If the local API does not load the service role correctly, these two actions still work. Granting admin access still runs through the local API.'
+        )}
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
-        <SettingCard title="修改管理员密码">
+        <SettingCard title={pick('修改管理员密码', 'Change admin password')}>
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
               <SettingInput
-                label="旧密码"
+                label={pick('旧密码', 'Current password')}
                 type="password"
                 value={oldPassword}
                 onChange={setOldPassword}
-                placeholder="输入当前密码"
+                placeholder={pick('输入当前密码', 'Enter the current password')}
               />
               <SettingInput
-                label="新密码"
+                label={pick('新密码', 'New password')}
                 type="password"
                 value={newPassword}
                 onChange={setNewPassword}
-                placeholder="至少 8 位"
+                placeholder={pick('至少 8 位', 'At least 8 characters')}
               />
               <SettingInput
-                label="确认新密码"
+                label={pick('确认新密码', 'Confirm new password')}
                 type="password"
                 value={confirmPassword}
                 onChange={setConfirmPassword}
-                placeholder="再次输入新密码"
+                placeholder={pick('再次输入新密码', 'Enter the new password again')}
               />
             </div>
 
             <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
-              建议同时使用字母、数字和符号组合。修改成功后，再次进入后台时需要使用新密码验证。
+              {pick(
+                '建议同时使用字母、数字和符号组合。修改成功后，重新进入后台时需要使用新密码再次验证。',
+                'Use a mix of letters, numbers, and symbols when possible. After the password changes, you will need to unlock the console again with the new password.'
+              )}
             </div>
 
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleChangePassword()} loading={changingPassword}>
-                <KeyRound size={14} className="mr-1 inline-block" />
-                保存新密码
+                <KeyRound size={14} />
+                {pick('保存新密码', 'Save new password')}
               </PrimaryButton>
             </div>
           </div>
         </SettingCard>
 
-        <SettingCard title="给用户充值积分">
+        <SettingCard title={pick('给用户充值积分', 'Recharge user credits')}>
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <SettingInput
-                label="用户 ID 或邮箱"
+                label={pick('用户 ID 或邮箱', 'User ID or email')}
                 value={identity}
                 onChange={setIdentity}
-                placeholder="例如 user@example.com"
+                placeholder={pick('例如 user@example.com', 'For example: user@example.com')}
               />
               <SettingInput
-                label="备注"
+                label={pick('备注', 'Note')}
                 value={rechargeRemark}
                 onChange={setRechargeRemark}
-                placeholder="可选备注"
+                placeholder={pick('可选备注', 'Optional note')}
               />
             </div>
 
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),180px]">
               <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4">
-                <div className="text-[13px] font-medium text-[var(--text-primary)]">充值额度</div>
+                <div className="text-[13px] font-medium text-[var(--text-primary)]">
+                  {pick('充值额度', 'Recharge amount')}
+                </div>
                 <input
                   type="range"
                   min={1}
@@ -269,7 +388,7 @@ const AdminConsoleSettings: React.FC = () => {
                 />
               </div>
               <SettingInput
-                label="积分值"
+                label={pick('积分值', 'Credits')}
                 type="number"
                 value={String(rechargeAmount)}
                 onChange={(value) => setRechargeAmount(Math.max(1, Number(value) || 1))}
@@ -277,35 +396,35 @@ const AdminConsoleSettings: React.FC = () => {
             </div>
 
             <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
-              <div>目标用户：{identity.trim() || '尚未填写'}</div>
-              <div>充值额度：{amountLabel}</div>
-              <div>备注信息：{rechargeRemark.trim() || DEFAULT_RECHARGE_REMARK}</div>
+              <div>{pick('目标用户：', 'Target user: ')}{identity.trim() || pick('尚未填写', 'Not set')}</div>
+              <div>{pick('充值额度：', 'Recharge amount: ')}{amountLabel}</div>
+              <div>{pick('备注信息：', 'Note: ')}{rechargeRemark.trim() || defaultRechargeRemark}</div>
             </div>
 
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleRecharge()} loading={recharging}>
-                <Wallet size={14} className="mr-1 inline-block" />
-                确认充值
+                <Wallet size={14} />
+                {pick('确认充值', 'Confirm recharge')}
               </PrimaryButton>
             </div>
           </div>
         </SettingCard>
       </div>
 
-      <SettingCard title="授予管理员权限">
+      <SettingCard title={pick('授予管理员权限', 'Grant admin access')}>
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),320px]">
           <div className="space-y-4">
             <SettingInput
-              label="用户 ID 或邮箱"
+              label={pick('用户 ID 或邮箱', 'User ID or email')}
               value={newAdminIdentity}
               onChange={setNewAdminIdentity}
-              placeholder="输入后将授予管理员权限"
+              placeholder={pick('输入后将授予管理员权限', 'Enter a user ID or email to grant admin access')}
             />
 
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleSetAdmin()} loading={settingAdmin}>
-                <Shield size={14} className="mr-1 inline-block" />
-                确认设为管理员
+                <Shield size={14} />
+                {pick('确认设置为管理员', 'Grant admin access')}
               </PrimaryButton>
             </div>
           </div>
@@ -319,10 +438,24 @@ const AdminConsoleSettings: React.FC = () => {
           >
             <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
               <ShieldAlert size={16} />
-              操作提醒
+              {pick('操作提醒', 'Reminder')}
             </div>
             <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-              管理员拥有全局配置能力，请先核对目标账号身份。更推荐通过邮箱定位，方便人工复核。
+              {pick(
+                '管理员拥有全局配置能力，请先核对目标账号身份。更推荐通过邮箱定位，方便人工复核。',
+                'Admins can change global configuration, so verify the target account carefully. Using email is recommended because it is easier to audit manually.'
+              )}
+            </div>
+            <div className="mt-3 text-[13px] leading-6 text-[var(--text-secondary)]">
+              {pick(
+                '如果这一步失败，请先确认本地 API 已通过',
+                'If this action fails, first confirm that the local API loaded'
+              )}
+              <code className="mx-1 rounded bg-black/10 px-1 py-0.5">apps/api/.env.local</code>
+              {pick(
+                '加载了正确的 Supabase service role。',
+                'with the correct Supabase service-role credentials.'
+              )}
             </div>
           </div>
         </div>

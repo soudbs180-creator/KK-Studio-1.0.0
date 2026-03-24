@@ -6,8 +6,8 @@ import {
   AUTHENTICATED_USER_EMAIL_HEADER,
   AUTHENTICATED_USER_ID_HEADER,
   AUTHENTICATED_USER_ROLE_HEADER,
-  env,
 } from "../../../../packages/shared/src/index.ts";
+import { resolveServerSupabaseConfig } from "./server-supabase-config.ts";
 
 export interface AuthenticatedRequestContext {
   userId: string;
@@ -115,8 +115,5 @@ export function createRequestAuthenticator(
 }
 
 export function resolveSupabaseAuthKey(): string | undefined {
-  return env.get("SUPABASE_SERVICE_ROLE_KEY")
-    || env.get("SUPABASE_SECRET_KEY")
-    || env.get("SUPABASE_ANON_KEY")
-    || env.get("VITE_SUPABASE_ANON_KEY");
+  return resolveServerSupabaseConfig().authKey;
 }

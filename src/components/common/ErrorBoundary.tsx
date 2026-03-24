@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import { localizeUserFacingText, pickByDocumentLanguage } from '../../utils/localeText';
 
 interface Props {
     children: ReactNode;
@@ -28,18 +29,20 @@ class ErrorBoundary extends Component<Props, State> {
             return (
                 <div className="min-h-screen bg-[#09090b] flex items-center justify-center p-4">
                     <div className="bg-[#18181b] border border-red-500/20 rounded-2xl p-8 max-w-md">
-                        <h2 className="text-xl font-bold text-red-500 mb-4">Application Error</h2>
+                        <h2 className="text-xl font-bold text-red-500 mb-4">
+                            {pickByDocumentLanguage('应用错误', 'Application Error')}
+                        </h2>
                         <p className="dark:text-zinc-300 mb-4">
-                            Something went wrong. Please refresh the page.
+                            {pickByDocumentLanguage('页面发生异常，请刷新后重试。', 'Something went wrong. Please refresh the page.')}
                         </p>
                         <pre className="text-xs dark:text-zinc-500 bg-black/30 p-3 rounded overflow-auto max-h-40">
-                            {this.state.error?.message}
+                            {localizeUserFacingText(this.state.error?.message) || this.state.error?.message}
                         </pre>
                         <button
                             onClick={() => window.location.reload()}
                             className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg transition-colors"
                         >
-                            Reload Page
+                            {pickByDocumentLanguage('刷新页面', 'Reload Page')}
                         </button>
                     </div>
                 </div>

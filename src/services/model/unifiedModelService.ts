@@ -31,6 +31,12 @@ export interface UnifiedModel {
 
 type GlobalModelEntry = ReturnType<typeof keyManager.getGlobalModelList>[number];
 
+const hasSystemRouteSuffix = (id: string): boolean => {
+  const normalized = String(id || '').trim().toLowerCase();
+  const suffix = normalized.includes('@') ? normalized.split('@')[1] : '';
+  return suffix.startsWith('system') || suffix === 'systemproxy';
+};
+
 class UnifiedModelService {
   private models: UnifiedModel[] = [];
   private listeners: Array<() => void> = [];
@@ -80,38 +86,21 @@ class UnifiedModelService {
   }
 
   isCreditBasedModel(id: string): boolean {
-    if (adminModelService.isAdminModel(id)) {
-      return true;
+    const model = this.getModel(id);
+    if (model) {
+      return model.isSystemInternal === true || model.isAdminModel === true;
     }
 
-    const model = this.getModel(id);
-    return model?.isSystemInternal === true || model?.isAdminModel === true;
+    return hasSystemRouteSuffix(id) && adminModelService.isAdminModel(id);
   }
 
   getCreditCost(id: string): number {
-    const adminModel = adminModelService.getModel(id);
-    if (adminModel) {
-      return adminModel.creditCost;
+    const model = this.getModel(id);
+    if (model?.isSystemInternal === true || hasSystemRouteSuffix(id)) {
+      return Number(adminModelService.getModelCreditCost(id) || model?.creditCost || 0);
     }
 
-    const lowerId = id.toLowerCase();
-    if (
-      (lowerId.includes('pro') && lowerId.includes('banana')) ||
-      (lowerId.includes('pro') &&
-        lowerId.includes('gemini') &&
-        (lowerId.includes('image') || lowerId.includes('preview')))
-    ) {
-      return 2;
-    }
-    if (
-      lowerId.includes('banana') ||
-      (lowerId.includes('gemini') &&
-        (lowerId.includes('image') || lowerId.includes('preview')))
-    ) {
-      return 1;
-    }
-
-    return 0;
+    return Number(model?.creditCost || 0);
   }
 
   getModelColors(id: string): { start: string; end: string } | null {

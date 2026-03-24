@@ -159,9 +159,9 @@ export function SecureApiKeyManager({ className = '' }: SecureApiKeyManagerProps
         <button
           type="button"
           onClick={() => setIsAdding(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg transition-colors"
+          className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap px-3 py-1.5 text-xs font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3.5 h-3.5 shrink-0" />
           添加密钥
         </button>
       </div>
@@ -173,8 +173,8 @@ export function SecureApiKeyManager({ className = '' }: SecureApiKeyManagerProps
           className="p-4 rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] space-y-3"
         >
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Key className="w-4 h-4 text-indigo-400" />
+            <h4 className="text-sm font-medium flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+              <Key className="w-4 h-4 shrink-0 text-indigo-400" />
               添加新密钥
             </h4>
             <button
@@ -250,7 +250,7 @@ export function SecureApiKeyManager({ className = '' }: SecureApiKeyManagerProps
             <button
               type="submit"
               disabled={isSubmitting || !newKeyName.trim() || !newKeyValue.trim()}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 rounded-lg transition-colors"
+              className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap px-4 py-1.5 text-xs font-medium text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 rounded-lg transition-colors"
             >
               {isSubmitting ? (
                 <>
@@ -259,7 +259,7 @@ export function SecureApiKeyManager({ className = '' }: SecureApiKeyManagerProps
                 </>
               ) : (
                 <>
-                  <Lock className="w-3.5 h-3.5" />
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
                   安全保存
                 </>
               )}
@@ -330,13 +330,13 @@ export function SecureApiKeyManager({ className = '' }: SecureApiKeyManagerProps
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                      <Lock className="w-3 h-3" />
-                      <span>{key.key_status}</span>
+                    <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-[var(--text-tertiary)]">
+                      <Lock className="w-3 h-3 shrink-0" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{key.key_status}</span>
                       {key.base_url && (
                         <>
                           <span>•</span>
-                          <span className="font-mono">{key.base_url}</span>
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono">{key.base_url}</span>
                         </>
                       )}
                     </div>

@@ -3,6 +3,7 @@ import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Wallet, X, Zap } from
 import { QRCodeCanvas } from 'qrcode.react';
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLocale } from '../../context/LocaleContext';
 import {
   DEFAULT_CREDIT_EXCHANGE_RATES,
   getCreditExchangeRateMap,
@@ -45,6 +46,7 @@ function buildReturnUrl(): string {
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal, refreshBilling } = useBilling();
   const { user } = useAuth();
+  const { pick } = useLocale();
 
   const [currency, setCurrency] = useState<SupportedRechargeCurrency>('CNY');
   const [amount, setAmount] = useState<number>(20);
@@ -345,7 +347,7 @@ const RechargeModal: React.FC = () => {
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">积分充值</h3>
                 <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
-                  Managed Exchange Rate
+                  {pick('后台汇率联动', 'Managed Exchange Rate')}
                 </p>
               </div>
             </div>
@@ -410,9 +412,9 @@ const RechargeModal: React.FC = () => {
 
             <div className="mt-5 space-y-3">
               <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
-                <span>{isCny ? '充值金额' : 'Amount'}</span>
+                <span>{pick('充值金额', 'Amount')}</span>
                 <span>
-                  {isCny ? `最小 ¥${minAmount}` : `MIN $${minAmount}`} / {isCny ? `最大 ¥${maxAmount}` : `MAX $${maxAmount}`}
+                  {pick(`最小 ¥${minAmount}`, `MIN $${minAmount}`)} / {pick(`最大 ¥${maxAmount}`, `MAX $${maxAmount}`)}
                 </span>
               </div>
 
@@ -457,7 +459,7 @@ const RechargeModal: React.FC = () => {
 
           <div className="space-y-3">
             <div className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">
-              {isCny ? '支付方式' : 'Payment Method'}
+              {pick('支付方式', 'Payment Method')}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -504,8 +506,8 @@ const RechargeModal: React.FC = () => {
                 >
                   <img src={cardIcon} className="h-8 w-8 object-contain" alt="card" />
                   <div>
-                    <div className="text-sm font-semibold">Card / PayPal</div>
-                    <div className="mt-1 text-xs text-current/70">适合国际支付</div>
+                    <div className="text-sm font-semibold">{pick('银行卡 / PayPal', 'Card / PayPal')}</div>
+                    <div className="mt-1 text-xs text-current/70">{pick('适合国际支付', 'Best for international payments')}</div>
                   </div>
                 </button>
               )}
@@ -514,10 +516,10 @@ const RechargeModal: React.FC = () => {
 
           {paymentLink && (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/5 dark:bg-zinc-900/50">
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${theme.light} ${theme.text}`}>
+              <div className={`inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${theme.light} ${theme.text}`}>
                 {paymentStatus === 'success'
-                  ? <CheckCircle2 size={14} />
-                  : <Loader2 size={14} className={paymentStatus === 'pending' ? 'animate-spin' : ''} />}
+                  ? <CheckCircle2 size={14} className="shrink-0" />
+                  : <Loader2 size={14} className={`${paymentStatus === 'pending' ? 'animate-spin' : ''} shrink-0`} />}
                 {PAYMENT_STATUS_LABELS[paymentStatus]}
               </div>
 
@@ -530,11 +532,11 @@ const RechargeModal: React.FC = () => {
 
                 <div className="space-y-3 text-sm text-gray-600 dark:text-zinc-300">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">Order</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">{pick('订单号', 'Order')}</div>
                     <div className="mt-1 break-all font-medium text-gray-900 dark:text-white">{paymentOrderNo}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">Status</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">{pick('支付状态', 'Status')}</div>
                     <div className="mt-1">{paymentMessage || '请使用支付工具完成支付，成功后会自动刷新余额。'}</div>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-zinc-400">
@@ -569,14 +571,14 @@ const RechargeModal: React.FC = () => {
 
           <button
             onClick={handleRecharge}
-            className={`flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-lg font-semibold text-white shadow-xl transition-all ${
+            className={`flex h-14 w-full min-w-0 items-center justify-center gap-3 overflow-hidden whitespace-nowrap rounded-2xl text-lg font-semibold text-white shadow-xl transition-all ${
               loadingRates || !hasAvailableCurrency || isSubmittingPayment
                 ? 'cursor-not-allowed bg-gray-300 dark:bg-zinc-800'
                 : `bg-gradient-to-r ${theme.gradient} ${theme.shadow} hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]`
             }`}
             disabled={loadingRates || !hasAvailableCurrency || isSubmittingPayment}
           >
-            {loadingRates || isSubmittingPayment ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
+            {loadingRates || isSubmittingPayment ? <Loader2 size={18} className="shrink-0 animate-spin" /> : <Wallet size={18} className="shrink-0" />}
             {loadingRates ? '同步汇率中...' : hasAvailableCurrency ? '发起充值' : '当前不可充值'}
           </button>
         </div>

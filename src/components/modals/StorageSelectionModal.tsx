@@ -170,7 +170,7 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
               </div>
 
               {isConnectedToLocal ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">
+                <span className="inline-flex max-w-full items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">
                   <CheckCircle2 size={12} /> 已连接
                 </span>
               ) : null}
@@ -216,9 +216,9 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           <button
             onClick={handleConfirm}
             disabled={selectingLocal || saving}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 disabled:opacity-60"
+            className="inline-flex h-11 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl bg-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 disabled:opacity-60"
           >
-            {(selectingLocal || saving) && <Loader2 size={15} className="animate-spin" />}
+            {(selectingLocal || saving) && <Loader2 size={15} className="shrink-0 animate-spin" />}
             {selectedMode === 'local' && !isConnectedToLocal ? '选择文件夹并保存' : '保存设置'}
           </button>
         </div>

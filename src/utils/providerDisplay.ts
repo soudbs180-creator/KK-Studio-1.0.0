@@ -1,33 +1,153 @@
-import { keyManager, getModelMetadata } from '../services/auth/keyManager';
+import { keyManager } from '../services/auth/keyManager';
 
 type ProviderDisplayTarget = {
   keySlotId?: string;
   model?: string;
   provider?: string;
   providerLabel?: string;
+  type?: string;
+  baseUrl?: string;
 };
 
-export function resolveDisplayedProviderLabel(target: ProviderDisplayTarget): string {
+const LANGUAGE_STORAGE_KEY = 'kk_language';
+
+const OFFICIAL_PROVIDER_ALIASES: Record<string, string[]> = {
+  Google: [
+    'google',
+    'google api',
+    'google gemini',
+    'google official',
+    'google official api',
+    'google gemini official',
+    'google gemini official endpoint',
+    'google official endpoint',
+    '谷歌',
+    '谷歌接口',
+    '谷歌官方接口',
+  ],
+  OpenAI: [
+    'openai',
+    'openai api',
+    'openai official',
+    'openai official api',
+    'openai official endpoint',
+    'openai 官方接口',
+  ],
+};
+
+function normalizeValue(value?: string | null): string {
+  return String(value || '').trim();
+}
+
+function getCurrentLanguage(): 'zh-CN' | 'en-US' {
+  if (typeof window === 'undefined') {
+    return 'zh-CN';
+  }
+
+  const stored = normalizeValue(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
+  const documentLanguage = normalizeValue(
+    document.documentElement.dataset.language || document.documentElement.lang
+  );
+  const resolved = stored || documentLanguage;
+
+  return resolved.toLowerCase().startsWith('en') ? 'en-US' : 'zh-CN';
+}
+
+function isOfficialSlot(target: ProviderDisplayTarget): boolean {
+  const keySlot = target.keySlotId ? keyManager.getKey(target.keySlotId) : undefined;
+  if (keySlot) {
+    return keySlot.type === 'official';
+  }
+
+  return normalizeValue(target.type).toLowerCase() === 'official';
+}
+
+function shouldUseCanonicalOfficialLabel(target: ProviderDisplayTarget, provider: string): boolean {
+  if (!provider || !isOfficialSlot(target)) {
+    return false;
+  }
+
+  return provider === 'Google' || provider === 'OpenAI';
+}
+
+function isOfficialAlias(provider: string, providerLabel?: string): boolean {
+  const normalizedProvider = normalizeValue(provider);
+  const normalizedLabel = normalizeValue(providerLabel).toLowerCase();
+  if (!normalizedProvider || !normalizedLabel) {
+    return false;
+  }
+
+  const aliases = OFFICIAL_PROVIDER_ALIASES[normalizedProvider];
+  return Array.isArray(aliases) && aliases.includes(normalizedLabel);
+}
+
+export function getCanonicalProviderDisplayName(provider?: string): string {
+  const normalizedProvider = normalizeValue(provider);
+
+  if (normalizedProvider === 'Google') {
+    return getCurrentLanguage() === 'en-US' ? 'Google' : '谷歌';
+  }
+
+  if (normalizedProvider === 'OpenAI') {
+    return 'OpenAI';
+  }
+
+  return normalizedProvider;
+}
+
+export function resolveProviderIdentity(target: ProviderDisplayTarget): {
+  provider?: string;
+  providerLabel?: string;
+} {
   const currentLabel = String(target.providerLabel || '').trim();
   const currentProvider = String(target.provider || '').trim();
   const linkedProvider = target.keySlotId ? keyManager.getProviderForKeySlot(target.keySlotId) : undefined;
   const keySlot = target.keySlotId ? keyManager.getKey(target.keySlotId) : undefined;
   const routeLabel = String(linkedProvider?.name || keySlot?.name || '').trim();
+  const resolvedProvider = normalizeValue(linkedProvider?.name || keySlot?.provider || currentProvider);
 
-  if (!routeLabel) {
-    return currentLabel || currentProvider;
+  if (shouldUseCanonicalOfficialLabel(target, resolvedProvider || currentProvider)) {
+    const canonical = getCanonicalProviderDisplayName(resolvedProvider || currentProvider);
+    return {
+      provider: resolvedProvider || currentProvider,
+      providerLabel: canonical,
+    };
   }
 
-  if (!currentLabel || currentLabel === routeLabel) {
-    return routeLabel;
+  if (
+    (currentProvider === 'Google' || currentProvider === 'OpenAI')
+    && isOfficialAlias(currentProvider, currentLabel)
+  ) {
+    return {
+      provider: currentProvider,
+      providerLabel: getCanonicalProviderDisplayName(currentProvider),
+    };
   }
 
-  const modelMeta = getModelMetadata(target.model || '') as { provider?: string; providerLabel?: string } | undefined;
-  const genericLabels = new Set(
-    [currentProvider, modelMeta?.providerLabel, modelMeta?.provider]
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .map((value) => value.trim().toLowerCase())
-  );
+  // When a node is still bound to a concrete route, the route label is the
+  // authoritative display source. This prevents stale labels from a previous
+  // provider (for example an old proxy name) from leaking into the current UI.
+  if (routeLabel) {
+    return {
+      provider: resolvedProvider || currentProvider,
+      providerLabel: routeLabel,
+    };
+  }
 
-  return genericLabels.has(currentLabel.toLowerCase()) ? routeLabel : currentLabel;
+  if (currentLabel) {
+    return {
+      provider: currentProvider || currentLabel,
+      providerLabel: currentLabel,
+    };
+  }
+
+  return {
+    provider: currentProvider,
+    providerLabel: currentProvider,
+  };
+}
+
+export function resolveDisplayedProviderLabel(target: ProviderDisplayTarget): string {
+  const resolved = resolveProviderIdentity(target);
+  return normalizeValue(resolved.providerLabel || resolved.provider);
 }

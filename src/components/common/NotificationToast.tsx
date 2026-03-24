@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check } from 'lucide-react';
 import { notificationService, Notification, NotificationType } from '../../services/system/notificationService';
 import { writeTextToClipboard } from '../../utils/clipboard';
+import { useLocale } from '../../context/LocaleContext';
 
 const NotificationToast: React.FC = () => {
+    const { pick } = useLocale();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
-    const leaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         // Initial load
@@ -20,7 +20,7 @@ const NotificationToast: React.FC = () => {
     }, []);
 
     const handleCopyDetails = async (notification: Notification) => {
-        const text = `[${notification.type.toUpperCase()}] ${notification.title}\n${notification.message}${notification.details ? '\n\nDetails: ' + notification.details : ''}`;
+        const text = `[${notification.type.toUpperCase()}] ${notification.title}\n${notification.message}${notification.details ? `\n\n${pick('详情', 'Details')}: ` + notification.details : ''}`;
         try {
             await writeTextToClipboard(text);
             setCopiedId(notification.id);
@@ -184,7 +184,7 @@ const NotificationToast: React.FC = () => {
                                                         borderRadius: 'var(--radius-sm)',
                                                         transitionDuration: 'var(--duration-fast)'
                                                     }}
-                                                    title="复制详细信息"
+                                                    title={pick('复制详细信息', 'Copy details')}
                                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
                                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                                 >

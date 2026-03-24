@@ -5,6 +5,7 @@
  */
 
 import { addLog, LogLevel } from './systemLogService';
+import { localizeUserFacingText, pickByDocumentLanguage } from '../../utils/localeText';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info' | 'alipay' | 'wechat' | 'paypal';
 
@@ -37,13 +38,16 @@ class NotificationService {
     ): string {
         const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const duration = options?.duration ?? 10000; // Default 10s for all types
+        const localizedTitle = localizeUserFacingText(title) || title;
+        const localizedMessage = localizeUserFacingText(message) || message;
+        const localizedDetails = localizeUserFacingText(options?.details);
 
         const notification: Notification = {
             id,
             type,
-            title,
-            message,
-            details: options?.details,
+            title: localizedTitle,
+            message: localizedMessage,
+            details: localizedDetails,
             duration,
             timestamp: Date.now()
         };
@@ -64,15 +68,19 @@ class NotificationService {
         addLog(
             level,
             'NotificationSystem',
-            `${title}: ${message}`,
-            options?.details || (type === 'error' ? 'No technical details provided' : 'User Notification'),
+            `${localizedTitle}: ${localizedMessage}`,
+            localizedDetails || (
+                type === 'error'
+                    ? pickByDocumentLanguage('未提供技术细节', 'No technical details provided')
+                    : pickByDocumentLanguage('用户通知', 'User Notification')
+            ),
         );
 
         // Console Log
         const logPrefix = `[Notification/${type.toUpperCase()}]`;
-        const logMessage = `${logPrefix} ${title}: ${message}`;
-        if (options?.details) {
-            console.log(logMessage, '\n  Details:', options.details);
+        const logMessage = `${logPrefix} ${localizedTitle}: ${localizedMessage}`;
+        if (localizedDetails) {
+            console.log(logMessage, '\n  Details:', localizedDetails);
         } else {
             console.log(logMessage);
         }

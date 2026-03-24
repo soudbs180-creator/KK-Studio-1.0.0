@@ -1,35 +1,35 @@
-# KK Studio Project Handoff (v1.3.7)
+# KK Studio Project Handoff (v1.3.9)
 
 ## 1. 项目概览
 - **项目名称**：KK Studio
-- **当前稳定版本**：`v1.3.7`
-- **当前状态**：可构建、可类型检查、文档版本口径已统一
-- **定位**：面向图像/多模态创作的可视化 AI 工作台，核心交互为无限画布 + Prompt/Card 编排
+- **当前稳定文档版本**：`v1.3.9`
+- **当前状态**：版本口径已同步，当前工作区重点集中在设置中心、后台链路与鉴权稳态
+- **定位**：面向图像、多模态与提示词生产的可视化 AI 工作台，核心交互为无限画布 + 设置工作台 + 管理后台
 
 ## 2. 当前版本重点
-- **版本统一**：主应用、前端展示、README、开发文档、`.agent` 规则与支付子服务版本已同步到 `1.3.7`
-- **画布版本展示收口**：版本标识改为统一常量管理，避免 `v1.3.5 / v1.3.7` 混用
-- **设置模块稳定化**：设置面板恢复到可维护状态，并对重型子面板增加懒加载
-- **编码与可维护性**：新增/扩展乱码巡检，修复关键日志乱码，降低后续改动污染风险
-- **打包组织优化**：对设置模块、体验面板、图标相关依赖做更细的分块处理
+- **版本统一**：主应用、README、开发文档、`.agent` 规则与支付子服务版本已同步到 `1.3.9`
+- **设置中心升级**：设置页采用更清晰的工作台式导航结构，总览、存储、日志与后台管理的边界更明确
+- **本地化底座**：通过 `LocaleProvider` 与 localized views 为设置页引入中英双语表达能力
+- **后台与鉴权收口**：服务端 Supabase 配置解析更集中，认证数据访问与管理员链路更易维护
+- **用户与运营细节**：默认头像、用户资料、供应商管理、成本估算与日志体验继续收口
 
 ## 3. 当前架构
 - **Frontend**：React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS 4
-- **State**：React Context + localStorage / IndexedDB / File System Access API
-- **Storage**：浏览器存储为默认方案，本地文件夹存储用于双层保护与恢复
-- **Backend / Data**：Supabase（Auth / Database / Edge Functions）+ Vercel / Netlify 部署
+- **State**：React Context + 本地状态 + IndexedDB / File System Access API
+- **Storage**：浏览器缓存、本地文件夹与工作区维护动作共存
+- **Backend / Data**：Supabase（Auth / Database / Edge Functions）+ `apps/api/` Node API
 - **Payment Sidecar**：`payment-server/` 独立维护支付与 MCP 相关能力
 
 ## 4. 当前版本的事实基线
-- 版本源建议以 `package.json` 和 `src/config/appInfo.ts` 为准
-- 文档基线建议以 `README.md`、`docs/development/progress.md`、本文件为准
-- 修改规则基线建议以 `.agent/README.md` 与 `.agent/rules/skills/SKILL.md` 为准
+- 版本源以 `package.json`、`src/config/appInfo.ts`、`payment-server/package.json` 为准
+- 文档基线以 `README.md`、`docs/development/progress.md`、本文件为准
+- AI 规则基线以 `.agent/README.md` 与 `.agent/rules/skills/SKILL.md` 为准
 
 ## 5. 建议优先检查项
-- **部署侧**：继续验证 Vercel 白屏问题是否已彻底消除
-- **体积侧**：`@lobehub/icons` 相关 chunk 仍偏大，可继续做按需裁剪
-- **数据库侧**：继续收敛 Supabase 表结构与权限策略，避免重复表/重复字段
-- **移动端侧**：继续检查模型选择、参数面板、长文本输入在小屏上的边界表现
+- **设置页**：检查 Dashboard、Storage、System Logs、Admin Console 的路由与空状态是否一致
+- **鉴权侧**：继续验证管理员登录、会话恢复、权限判断与回退逻辑
+- **部署侧**：核对 Vercel / Netlify / 本地环境下 Supabase 服务端配置是否一致
+- **资源侧**：继续关注重型设置页与图标资源带来的构建体积
 
 ## 6. 推荐验证命令
 ```bash
@@ -39,6 +39,6 @@ npm run build
 ```
 
 ## 7. 交接备注
-- 文档中旧版 `V1.1.0 / V1.2.x / V1.3.1 / V1.3.5` 的“当前版本”定位已改为 `v1.3.7`
-- 历史更新日志仍保留在 README 中用于追溯，但不再作为当前基线说明
-- 路径示例优先使用 `<project-root>`，避免目录名再次与版本号耦合
+- 历史文档中的旧版本号仅用于追溯，不代表当前发布基线
+- 路径示例继续优先使用 `<project-root>`，避免目录名与版本号耦合
+- 当前工作区仍有较多进行中的业务改动；如果准备发布，建议把设置、后台和登录链路做完整回归

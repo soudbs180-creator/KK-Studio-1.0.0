@@ -12,11 +12,15 @@ import {
 import {
   applyAuthenticatedHeaders,
   createRequestAuthenticator,
-  resolveSupabaseAuthKey,
   stripAuthenticatedHeaders,
   type AuthenticatedRequestContext,
   type RequestAuthenticator,
 } from "./lib/request-authenticator.ts";
+import {
+  resolveServerSupabaseConfig,
+  summarizeServerSupabaseConfig,
+  type ServerSupabaseConfig,
+} from "./lib/server-supabase-config.ts";
 import {
   AdminConsoleService,
   type AdminConsoleRepository,
@@ -180,119 +184,93 @@ export interface ApiServerOptions {
   verifyTurnstileToken?: TurnstileVerifier;
 }
 
-function createAdminConsoleRepository(): AdminConsoleRepository {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig): AdminConsoleRepository {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase admin console repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseAdminConsoleRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
     });
   }
 
   apiLogger.warn("Falling back to in-memory admin console repository", {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    hasServiceRoleKey: Boolean(serviceRoleKey),
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryAdminConsoleRepository();
 }
 
-function createCreditAccountRepository(): CreditAccountRepository {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfig): CreditAccountRepository {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase credit account repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseCreditAccountRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
     });
   }
 
   apiLogger.warn("Falling back to in-memory credit account repository", {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    hasServiceRoleKey: Boolean(serviceRoleKey),
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryCreditAccountRepository();
 }
 
-function createCreditProviderRepository() {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase credit provider repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseCreditProviderRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
     });
   }
 
   apiLogger.warn("Falling back to in-memory credit provider repository", {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    hasServiceRoleKey: Boolean(serviceRoleKey),
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryCreditProviderRepository();
 }
 
-function createAuthDataRepository() {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase auth data repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseAuthDataRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
+      storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
     });
   }
 
   apiLogger.warn("Falling back to in-memory auth data repository", {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    hasServiceRoleKey: Boolean(serviceRoleKey),
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryAuthDataRepository();
 }
 
-function createWorkspaceLayoutRepository() {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase workspace layout repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseWorkspaceLayoutRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
     });
   }
 
   apiLogger.warn("Falling back to in-memory workspace layout repository", {
-    hasSupabaseUrl: Boolean(supabaseUrl),
-    hasServiceRoleKey: Boolean(serviceRoleKey),
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryWorkspaceLayoutRepository();
 }
 
-function createWechatAuthService(): WechatAuthService | undefined {
-  const supabaseUrl = env.get("SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
+function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): WechatAuthService | undefined {
   const providerAppId = env.get("WECHAT_OPEN_APP_ID");
   const providerSecret = env.get("WECHAT_OPEN_APP_SECRET");
   const callbackUrl = env.get("WECHAT_OPEN_REDIRECT_URI");
@@ -302,10 +280,9 @@ function createWechatAuthService(): WechatAuthService | undefined {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!serverSupabaseConfig.supabaseUrl || !serverSupabaseConfig.serviceRoleKey) {
     apiLogger.warn("WeChat auth service is disabled because Supabase admin config is unavailable.", {
-      hasSupabaseUrl: Boolean(supabaseUrl),
-      hasServiceRoleKey: Boolean(serviceRoleKey),
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return undefined;
   }
@@ -322,8 +299,8 @@ function createWechatAuthService(): WechatAuthService | undefined {
 
   return new WechatAuthService({
     repository: new SupabaseWechatAuthRepository({
-      supabaseUrl,
-      serviceRoleKey,
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
     }),
     providerAppId,
     providerSecret,
@@ -337,16 +314,17 @@ export function createApiServer(
   port = Number(process.env.PORT || 3001),
   options: ApiServerOptions = {},
 ) {
+  const serverSupabaseConfig = resolveServerSupabaseConfig();
   const authService = new AuthService({
     verifyTurnstileToken: options.verifyTurnstileToken || defaultTurnstileVerifier,
   });
-  const authDataService = new AuthDataService(createAuthDataRepository());
+  const authDataService = new AuthDataService(createAuthDataRepository(serverSupabaseConfig));
   const adminConsoleService = new AdminConsoleService(
-    options.adminConsoleRepository || createAdminConsoleRepository(),
+    options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig),
   );
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
   const creditAccountService = new CreditAccountService(
-    options.creditAccountRepository || createCreditAccountRepository(),
+    options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig),
   );
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: (accessToken) => {
@@ -366,19 +344,19 @@ export function createApiServer(
         role: profile.role,
       };
     },
-    supabaseUrl: env.get("SUPABASE_URL"),
-    supabaseAuthKey: resolveSupabaseAuthKey(),
+    supabaseUrl: serverSupabaseConfig.supabaseUrl,
+    supabaseAuthKey: serverSupabaseConfig.authKey,
   });
   const generationService = new GenerationService(new InMemoryGenerationTaskRepository());
   const modelCatalogService = new ModelCatalogService(new InMemoryModelCatalogRepository());
-  const creditProviderService = new CreditProviderService(createCreditProviderRepository());
+  const creditProviderService = new CreditProviderService(createCreditProviderRepository(serverSupabaseConfig));
   const workflowRepository = new InMemoryWorkflowRepository();
   const workflowService = new WorkflowService(workflowRepository);
   const workspaceCanvasService = new WorkspaceCanvasService(
     workflowRepository,
-    createWorkspaceLayoutRepository(),
+    createWorkspaceLayoutRepository(serverSupabaseConfig),
   );
-  const wechatAuthService = createWechatAuthService();
+  const wechatAuthService = createWechatAuthService(serverSupabaseConfig);
 
   const server = createServer((req, res) => {
     void (async () => {

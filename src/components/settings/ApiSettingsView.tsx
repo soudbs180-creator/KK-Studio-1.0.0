@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -16,9 +16,10 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
+import { useLocale } from '../../context/LocaleContext';
 import keyManager, {
   autoDetectAndConfigureModels,
   type KeySlot,
@@ -54,6 +55,11 @@ type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = 'official' | 'third-party';
 type EditorMode = TabType | null;
+type EditorSource = 'route' | 'local' | null;
+
+const TOKEN_UNIT_LABEL = '词元';
+const TOKEN_LIMIT_LABEL = '词元上限';
+const LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
 
 type OfficialForm = {
   id?: string;
@@ -77,7 +83,7 @@ type ProviderForm = {
   value: string;
 };
 
-const BUDGET_OPTIONS = ['不限额', '金额预算', '令牌上限'] as const;
+const BUDGET_OPTIONS = ['不限额', '金额预算', TOKEN_LIMIT_LABEL] as const;
 
 const officialDefaults: OfficialForm = {
   name: '',
@@ -135,7 +141,7 @@ const formatUsd = (value: number) =>
 const compactNumber = (value: number) =>
   new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
-const formatTokens = (value: number) => `${compactNumber(value)} 令牌`;
+const formatTokens = (value: number) => `${compactNumber(value)} ${TOKEN_UNIT_LABEL}`;
 
 const formatDateTime = (value?: number | string | null) => {
   if (!value) return '暂无记录';
@@ -183,19 +189,19 @@ const getMode = (budget?: number, tokenLimit?: number, fallback: CostMode = 'unl
 
 const getModeLabel = (mode: CostMode) => {
   if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return '令牌上限';
+  if (mode === 'tokens') return TOKEN_LIMIT_LABEL;
   return '不限额';
 };
 
 const getModeOption = (mode: CostMode) => {
   if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return '令牌上限';
+  if (mode === 'tokens') return TOKEN_LIMIT_LABEL;
   return '不限额';
 };
 
 const parseModeOption = (value: string): CostMode => {
   if (value === '金额预算') return 'amount';
-  if (value === '令牌上限') return 'tokens';
+  if (value === TOKEN_LIMIT_LABEL || value === LEGACY_TOKEN_LIMIT_LABEL) return 'tokens';
   return 'unlimited';
 };
 
@@ -207,7 +213,7 @@ const getProtocolLabel = (format: ApiProtocolFormat) => {
 };
 
 const getOfficialProviderLabel = (provider: OfficialProvider) =>
-  provider === 'Google' ? 'Google Gemini 官方接口' : 'OpenAI 官方接口';
+  provider === 'Google' ? '谷歌官方接口' : 'OpenAI 官方接口';
 
 const getOfficialStatus = (slot: KeySlot) => {
   if (slot.disabled) return { badge: 'neutral' as const, status: 'paused' as const, label: '已暂停' };
@@ -267,7 +273,7 @@ const getProviderActivityLine = (provider: ThirdPartyProvider) => {
   if (!summary?.lastLatencyMs) return '暂无最近调用数据';
   const items = [`延迟 ${formatLatency(summary.lastLatencyMs)}`];
   if (typeof summary.lastTokens === 'number' && summary.lastTokens > 0) {
-    items.push(`令牌 ${formatTokens(summary.lastTokens)}`);
+    items.push(formatTokens(summary.lastTokens));
   }
   if (typeof summary.lastAmount === 'number' && summary.lastAmount >= 0) {
     items.push(formatUsd(summary.lastAmount));
@@ -277,7 +283,7 @@ const getProviderActivityLine = (provider: ThirdPartyProvider) => {
 
 const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   id: slot.id,
-  name: slot.name,
+  name: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   provider: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   key: slot.key,
   mode: getMode(slot.budgetLimit, slot.tokenLimit),
@@ -327,14 +333,108 @@ const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({
   </div>
 );
 
-const EndpointSurface: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
-  <div className={`rounded-[26px] border p-5 ${className || ''}`} style={SETTINGS_ELEVATED_STYLE}>
-    {children}
-  </div>
-);
+type EndpointStatusVariant = 'online' | 'offline' | 'warning' | 'error' | 'paused';
+
+type ConsoleEndpointCardMetric = {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  helper?: React.ReactNode;
+};
+
+type ConsoleEndpointCardProps = {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  meta?: React.ReactNode;
+  avatar: React.ReactNode;
+  badges?: React.ReactNode;
+  status: { status: EndpointStatusVariant; label: string };
+  metrics: ConsoleEndpointCardMetric[];
+  progress?: { summary: string; percentage: number };
+  error?: string | null;
+  actions: React.ReactNode;
+  footer?: React.ReactNode;
+  className?: string;
+};
+
+const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
+  title,
+  subtitle,
+  meta,
+  avatar,
+  badges,
+  status,
+  metrics,
+  progress,
+  error,
+  actions,
+  footer,
+  className = '',
+}) => {
+  const cardClass = ['settings-provider-card', className].filter(Boolean).join(' ');
+  const progressPercentage = progress?.percentage ?? 0;
+  const progressTone = progressPercentage >= 90 ? 'rose' : progressPercentage >= 70 ? 'amber' : 'indigo';
+
+  return (
+    <article className={cardClass}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="settings-provider-card__avatar">{avatar}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
+              {badges}
+            </div>
+            {subtitle ? <div className="mt-1 text-[13px] text-[var(--text-secondary)]">{subtitle}</div> : null}
+            {meta ? <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{meta}</div> : null}
+          </div>
+        </div>
+        <StatusBadge status={status.status} label={status.label} />
+      </div>
+
+      <div className="settings-provider-card__metrics">
+        {metrics.map((metric, index) => (
+          <div key={`${metric.label}-${index}`} className="settings-provider-card__metric">
+            <div className="settings-provider-card__metric-label">{metric.label}</div>
+            <div className="settings-provider-card__metric-value">{metric.value}</div>
+            {metric.helper ? <div className="settings-provider-card__metric-helper">{metric.helper}</div> : null}
+          </div>
+        ))}
+      </div>
+
+      {footer ? <div className="mt-2">{footer}</div> : null}
+
+      {progress ? (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
+            <span>{progress.summary}</span>
+            <span>{Math.round(progressPercentage)}%</span>
+          </div>
+          <ProgressBar progress={progressPercentage} tone={progressTone} showLabel={false} />
+        </div>
+      ) : null}
+
+      {error ? (
+        <div
+          className="mt-4 rounded-[18px] border px-4 py-3 text-[13px] leading-6"
+          style={{ borderColor: 'var(--state-danger-border)', backgroundColor: 'var(--state-danger-bg)', color: 'var(--state-danger-text)' }}
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <div className="settings-provider-card__actions">{actions}</div>
+    </article>
+  );
+};
 
 const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { pick } = useLocale();
+  const getOfficialDisplayName = useCallback(
+    (provider: OfficialProvider) => (provider === 'Google' ? pick('谷歌', 'Google') : 'OpenAI'),
+    [pick]
+  );
   const { supplierId: legacySupplierId, officialId, providerId } = useParams<{
     supplierId?: string;
     officialId?: string;
@@ -348,6 +448,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const [providerForm, setProviderForm] = useState<ProviderForm>(providerDefaults);
   const [editingOfficialId, setEditingOfficialId] = useState<string | null>(null);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const [editorSource, setEditorSource] = useState<EditorSource>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const officialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
@@ -386,12 +487,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     officialSlots.filter((slot) => slot.disabled || slot.status === 'invalid' || slot.status === 'rate_limited').length +
     thirdPartyProviders.filter((provider) => !provider.isActive || provider.status === 'error').length;
   const connectedChannels = officialSlots.filter((slot) => !slot.disabled).length + activeProviders;
+  const showInlineOfficialCreate = editorMode === null && activeTab === 'official';
+  const showInlineProviderCreate = editorMode === null && activeTab === 'third-party';
+  const showOfficialEditor = editorMode === 'official' || showInlineOfficialCreate;
+  const showProviderEditor = editorMode === 'third-party' || showInlineProviderCreate;
 
   const latencyCards = useMemo(() => {
     const officialItems = officialSlots
       .map((slot) => ({
         id: slot.id,
-        label: slot.name || getOfficialProviderLabel(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google'),
+        label: getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google'),
         helper: slot.provider === 'OpenAI' ? '官方直连' : 'Gemini 官方直连',
         latency: slot.lastResponseTime ?? slot.avgResponseTime ?? null,
       }))
@@ -409,7 +514,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     return [...officialItems, ...providerItems]
       .sort((a, b) => Number(a.latency) - Number(b.latency))
       .slice(0, 4);
-  }, [officialSlots, thirdPartyProviders]);
+  }, [getOfficialDisplayName, officialSlots, thirdPartyProviders]);
 
   const refresh = () => {
     setSlots(keyManager.getSlots());
@@ -425,15 +530,18 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (isOfficialEditorRoute) {
       setActiveTab('official');
       setEditorMode('official');
+      setEditorSource('route');
 
       if (isCreatingOfficial) {
         setEditingOfficialId(null);
+        setEditingProviderId(null);
         setOfficialForm(officialDefaults);
         return;
       }
 
       if (selectedOfficialSlot) {
         setEditingOfficialId(selectedOfficialSlot.id);
+        setEditingProviderId(null);
         setOfficialForm(toOfficialForm(selectedOfficialSlot));
       }
       return;
@@ -442,35 +550,46 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (isProviderEditorRoute) {
       setActiveTab('third-party');
       setEditorMode('third-party');
+      setEditorSource('route');
 
       if (isCreatingProvider) {
         setEditingProviderId(null);
+        setEditingOfficialId(null);
         setProviderForm(initialSupplier ? toProviderFormFromSupplier(initialSupplier) : providerDefaults);
         return;
       }
 
       if (selectedProvider) {
         setEditingProviderId(selectedProvider.id);
+        setEditingOfficialId(null);
         setProviderForm(toProviderForm(selectedProvider));
         return;
       }
 
       if (initialSupplier) {
         setEditingProviderId(null);
+        setEditingOfficialId(null);
         setProviderForm(toProviderFormFromSupplier(initialSupplier));
       }
       return;
     }
 
-    setEditorMode(null);
-    setEditingOfficialId(null);
-    setEditingProviderId(null);
+    if (editorSource === 'route' && location.pathname === API_MANAGEMENT_HOME_PATH) {
+      setEditorMode(null);
+      setEditingOfficialId(null);
+      setEditingProviderId(null);
+      setOfficialForm(officialDefaults);
+      setProviderForm(providerDefaults);
+      setEditorSource(null);
+    }
   }, [
+    editorSource,
     initialSupplier,
     isCreatingOfficial,
     isCreatingProvider,
     isOfficialEditorRoute,
     isProviderEditorRoute,
+    location.pathname,
     selectedOfficialSlot?.id,
     selectedProvider?.id,
   ]);
@@ -486,35 +605,69 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const beginCreateOfficial = () => {
+    setActiveTab('official');
+    setEditorMode('official');
+    setEditingOfficialId(null);
+    setEditingProviderId(null);
+    setOfficialForm(officialDefaults);
+    setEditorSource('local');
     navigate(buildOfficialEditorPath());
   };
 
   const beginCreateProvider = () => {
+    setActiveTab('third-party');
+    setEditorMode('third-party');
+    setEditingOfficialId(null);
+    setEditingProviderId(null);
+    setProviderForm(initialSupplier ? toProviderFormFromSupplier(initialSupplier) : providerDefaults);
+    setEditorSource('local');
     navigate(buildProviderEditorPath());
   };
 
   const startEditOfficial = (slot: KeySlot) => {
+    setActiveTab('official');
+    setEditorMode('official');
+    setEditingOfficialId(slot.id);
+    setEditingProviderId(null);
+    setOfficialForm(toOfficialForm(slot));
+    setEditorSource('local');
     navigate(buildOfficialEditorPath(slot.id));
   };
 
   const startEditProvider = (provider: ThirdPartyProvider) => {
+    setActiveTab('third-party');
+    setEditorMode('third-party');
+    setEditingOfficialId(null);
+    setEditingProviderId(provider.id);
+    setProviderForm(toProviderForm(provider));
+    setEditorSource('local');
     navigate(buildProviderEditorPath(provider.id));
   };
 
   const cancelEdit = () => {
-    navigate(API_MANAGEMENT_HOME_PATH);
+    setEditorMode(null);
+    setEditingOfficialId(null);
+    setEditingProviderId(null);
     setOfficialForm(officialDefaults);
     setProviderForm(providerDefaults);
+    setEditorSource(null);
+    navigate(API_MANAGEMENT_HOME_PATH);
   };
 
   const saveOfficial = async () => {
     const value = officialForm.mode === 'unlimited' ? null : positive(officialForm.value);
     if (!officialForm.key.trim()) {
-      notify.error('保存失败', '请填写有效的 API Key。');
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        pick('请填写有效的 API Key。', 'Enter a valid API key.')
+      );
       return;
     }
     if (officialForm.mode !== 'unlimited' && !value) {
-      notify.error('保存失败', '预算或令牌上限必须大于 0。');
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.')
+      );
       return;
     }
 
@@ -526,7 +679,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
       if (officialForm.id) {
         await keyManager.updateKey(officialForm.id, {
-          name: officialForm.name.trim() || `${officialForm.provider} 官方接口`,
+          name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
@@ -534,10 +687,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           key: officialForm.key.trim(),
           ...payload,
         });
-        notify.success('保存成功', '官方接口配置已更新。');
+        notify.success(
+          pick('保存成功', 'Saved'),
+          pick('官方接口配置已更新。', 'Official endpoint settings have been updated.')
+        );
       } else {
         const result = await keyManager.addKey(officialForm.key.trim(), {
-          name: officialForm.name.trim() || `${officialForm.provider} 官方接口`,
+          name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
@@ -545,10 +701,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           ...payload,
         });
         if (!result.success) {
-          notify.error('新增失败', result.error || '无法创建官方接口。');
+          notify.error(
+            pick('新增失败', 'Creation failed'),
+            result.error || pick('无法创建官方接口。', 'Unable to create the official endpoint.')
+          );
           return;
         }
-        notify.success('新增成功', '官方接口已加入当前链路。');
+        notify.success(
+          pick('新增成功', 'Created'),
+          pick('官方接口已加入当前链路。', 'The official endpoint has been added to the current routing chain.')
+        );
       }
       cancelEdit();
     });
@@ -557,11 +719,17 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const saveProvider = async () => {
     const value = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
     if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.apiKey.trim()) {
-      notify.error('保存失败', '请完整填写供应商名称、基础地址和 API Key。');
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        pick('请完整填写供应商名称、基础地址和 API Key。', 'Enter the provider name, base URL, and API key.')
+      );
       return;
     }
     if (providerForm.mode !== 'unlimited' && !value) {
-      notify.error('保存失败', '预算或令牌上限必须大于 0。');
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.')
+      );
       return;
     }
 
@@ -584,7 +752,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           isActive: providerForm.isActive,
           ...payload,
         });
-        notify.success('保存成功', '供应商配置已更新。');
+        await keyManager.syncToCloudNow();
+        notify.success(
+          pick('保存成功', 'Saved'),
+          pick('供应商配置已更新。', 'Provider settings have been updated.')
+        );
       } else {
         keyManager.addProvider({
           name: providerForm.name.trim(),
@@ -597,7 +769,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           isActive: providerForm.isActive,
           ...payload,
         });
-        notify.success('新增成功', '供应商已加入当前调度池。');
+        await keyManager.syncToCloudNow();
+        notify.success(
+          pick('新增成功', 'Created'),
+          pick('供应商已加入当前调度池。', 'The provider has been added to the routing pool.')
+        );
       }
       cancelEdit();
     });
@@ -606,7 +782,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const deleteOfficial = async (id: string) => {
     await run(`official-delete:${id}`, async () => {
       keyManager.removeKey(id);
-      notify.success('删除成功', '官方接口已移除。');
+      await keyManager.syncToCloudNow();
+      notify.success(
+        pick('删除成功', 'Deleted'),
+        pick('官方接口已移除。', 'The official endpoint has been removed.')
+      );
       if (editingOfficialId === id) cancelEdit();
     });
   };
@@ -614,7 +794,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const deleteProvider = async (id: string) => {
     await run(`provider-delete:${id}`, async () => {
       keyManager.removeProvider(id);
-      notify.success('删除成功', '供应商配置已移除。');
+      await keyManager.syncToCloudNow();
+      notify.success(
+        pick('删除成功', 'Deleted'),
+        pick('供应商配置已移除。', 'The provider configuration has been removed.')
+      );
       if (editingProviderId === id) cancelEdit();
     });
   };
@@ -623,7 +807,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
       await keyManager.updateKey(slot.id, { disabled: nextDisabled });
-      notify.success(nextDisabled ? '已暂停' : '已启用', `${slot.name} 的调度状态已更新。`);
+      notify.success(
+        nextDisabled ? pick('已暂停', 'Paused') : pick('已启用', 'Enabled'),
+        pick(`${slot.name} 的调度状态已更新。`, `${slot.name} scheduling status has been updated.`)
+      );
     });
   };
 
@@ -631,7 +818,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
       keyManager.updateProvider(provider.id, { isActive: nextActive });
-      notify.success(nextActive ? '已启用' : '已暂停', `${provider.name} 的调度状态已更新。`);
+      notify.success(
+        nextActive ? pick('已启用', 'Enabled') : pick('已暂停', 'Paused'),
+        pick(`${provider.name} 的调度状态已更新。`, `${provider.name} scheduling status has been updated.`)
+      );
     });
   };
 
@@ -653,8 +843,17 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         lastError: check.success ? null : check.message || '连接失败',
         supportedModels: models?.success ? models.models : slot.supportedModels,
       });
-      if (check.success) notify.success('刷新成功', `${slot.name} 已完成连通检测。`);
-      else notify.warning('检测失败', check.message || '请检查密钥和网络连通性。');
+      if (check.success) {
+        notify.success(
+          pick('刷新成功', 'Refreshed'),
+          pick(`${slot.name} 已完成连通检测。`, `${slot.name} connectivity check is complete.`)
+        );
+      } else {
+        notify.warning(
+          pick('检测失败', 'Check failed'),
+          check.message || pick('请检查密钥和网络连通性。', 'Check the key and network connectivity.')
+        );
+      }
     });
   };
 
@@ -668,16 +867,34 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         lastError: check.success ? undefined : check.message || '连接失败',
         models: models?.success ? models.models : provider.models,
       });
-      if (check.success) notify.success('刷新成功', `${provider.name} 已完成连通检测。`);
-      else notify.warning('检测失败', check.message || '请检查基础地址和密钥。');
+      if (check.success) {
+        notify.success(
+          pick('刷新成功', 'Refreshed'),
+          pick(`${provider.name} 已完成连通检测。`, `${provider.name} connectivity check is complete.`)
+        );
+      } else {
+        notify.warning(
+          pick('检测失败', 'Check failed'),
+          check.message || pick('请检查基础地址和密钥。', 'Check the base URL and key.')
+        );
+      }
     });
   };
 
   const syncPricing = async (provider: ThirdPartyProvider) => {
     await run(`provider-price:${provider.id}`, async () => {
       const result = await keyManager.syncProviderPricingDetailed(provider.id);
-      if (result.ok) notify.success('同步成功', result.message || '价格信息已更新。');
-      else notify.warning('同步失败', result.message || '当前没有可用的价格数据返回。');
+      if (result.ok) {
+        notify.success(
+          pick('同步成功', 'Synced'),
+          result.message || pick('价格信息已更新。', 'Pricing information has been updated.')
+        );
+      } else {
+        notify.warning(
+          pick('同步失败', 'Sync failed'),
+          result.message || pick('当前没有可用的价格数据返回。', 'No pricing data is available right now.')
+        );
+      }
     });
   };
 
@@ -685,19 +902,33 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     return (
       <SettingsViewShell>
         <SettingsHero
-          eyebrow="接口编辑"
-          title="找不到接口"
-          description="当前要编辑的官方接口已经不存在了，先回到列表重新选择。"
+          eyebrow={pick('接口编辑', 'Endpoint editor')}
+          title={pick('找不到接口', 'Endpoint not found')}
+          description={pick(
+            '当前要编辑的官方接口已经不存在了，先回到列表重新选择。',
+            'The official endpoint you are editing no longer exists. Return to the list and pick another one.'
+          )}
           icon={Shield}
           tone="amber"
-          actions={<SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回接口列表</SettingsActionButton>}
+          actions={
+            <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+              {pick('返回接口列表', 'Back to endpoints')}
+            </SettingsActionButton>
+          }
         />
 
-        <SettingsSection title="接口不存在" eyebrow="无法继续编辑">
+        <SettingsSection title={pick('接口不存在', 'Endpoint missing')} eyebrow={pick('无法继续编辑', 'Cannot continue')}>
           <EmptyState
-            title="这条官方接口可能已经被删除"
-            description="返回 API 管理列表后重新选择要编辑的接口。"
-            action={<SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回接口列表</SettingsActionButton>}
+            title={pick('这条官方接口可能已经被删除', 'This official endpoint may have been removed')}
+            description={pick(
+              '返回 API 管理列表后重新选择要编辑的接口。',
+              'Return to API Management and choose another endpoint to edit.'
+            )}
+            action={
+              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+                {pick('返回接口列表', 'Back to endpoints')}
+              </SettingsActionButton>
+            }
           />
         </SettingsSection>
       </SettingsViewShell>
@@ -708,19 +939,33 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     return (
       <SettingsViewShell>
         <SettingsHero
-          eyebrow="供应商编辑"
-          title="找不到供应商"
-          description="当前要编辑的供应商已经不存在了，先回到列表重新选择。"
+          eyebrow={pick('供应商编辑', 'Provider editor')}
+          title={pick('找不到供应商', 'Provider not found')}
+          description={pick(
+            '当前要编辑的供应商已经不存在了，先回到列表重新选择。',
+            'The provider you are editing no longer exists. Return to the list and pick another one.'
+          )}
           icon={Globe}
           tone="amber"
-          actions={<SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回供应商列表</SettingsActionButton>}
+          actions={
+            <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+              {pick('返回供应商列表', 'Back to providers')}
+            </SettingsActionButton>
+          }
         />
 
-        <SettingsSection title="供应商不存在" eyebrow="无法继续编辑">
+        <SettingsSection title={pick('供应商不存在', 'Provider missing')} eyebrow={pick('无法继续编辑', 'Cannot continue')}>
           <EmptyState
-            title="目标供应商不存在或已被移除"
-            description="返回 API 管理列表后重新选择要编辑的供应商。"
-            action={<SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回供应商列表</SettingsActionButton>}
+            title={pick('目标供应商不存在或已被移除', 'The target provider is missing or has been removed')}
+            description={pick(
+              '返回 API 管理列表后重新选择要编辑的供应商。',
+              'Return to API Management and choose another provider to edit.'
+            )}
+            action={
+              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+                {pick('返回供应商列表', 'Back to providers')}
+              </SettingsActionButton>
+            }
           />
         </SettingsSection>
       </SettingsViewShell>
@@ -731,22 +976,32 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     <SettingsViewShell>
       {editorMode === 'official' ? (
         <SettingsHero
-          eyebrow="接口编辑"
-          title={editingOfficialId ? officialForm.name.trim() || `${officialForm.provider} 官方接口` : '新增官方接口'}
-          description={editingOfficialId ? '当前页面只修改这一条官方接口，保存后返回列表。' : '在独立页面创建官方接口，避免和列表卡片混在一起。'}
+          eyebrow={pick('接口编辑', 'Endpoint editor')}
+          title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增官方接口', 'New official endpoint')}
+          description={
+            editingOfficialId
+              ? pick('当前页面只修改这一条官方接口，保存后返回列表。', 'This page edits one official endpoint at a time and returns to the list after saving.')
+              : pick('在独立页面创建官方接口，避免和列表卡片混在一起。', 'Create official endpoints in a focused editor instead of mixing them with the list.')
+          }
           icon={Shield}
           tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'indigo'}
-          badge={<SettingsBadge tone={editingOfficialId ? 'indigo' : 'emerald'}>{editingOfficialId ? '编辑模式' : '新增模式'}</SettingsBadge>}
+          badge={
+            <SettingsBadge tone={editingOfficialId ? 'indigo' : 'emerald'}>
+              {editingOfficialId ? pick('编辑模式', 'Edit mode') : pick('新增模式', 'Create mode')}
+            </SettingsBadge>
+          }
           actions={
             <>
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回接口列表</SettingsActionButton>
+              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+                {pick('返回接口列表', 'Back to endpoints')}
+              </SettingsActionButton>
               {selectedOfficialSlot ? (
                 <SettingsActionButton
                   icon={RefreshCw}
                   loading={busy === `official-check:${selectedOfficialSlot.id}`}
                   onClick={() => void refreshOfficial(selectedOfficialSlot)}
                 >
-                  刷新连通性
+                  {pick('刷新连通性', 'Refresh connectivity')}
                 </SettingsActionButton>
               ) : null}
             </>
@@ -754,30 +1009,30 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           metrics={
             <>
               <SettingsMetricCard
-                label="当前接口"
-                value={officialForm.name.trim() || `${officialForm.provider} 官方接口`}
-                helper={editingOfficialId ? '你现在编辑的是这一条接口' : '保存后会加入官方接口列表'}
+                label={pick('当前接口', 'Current endpoint')}
+                value={getOfficialDisplayName(officialForm.provider)}
+                helper={editingOfficialId ? pick('你现在编辑的是这一条接口', 'You are editing this endpoint now') : pick('保存后会加入官方接口列表', 'After saving it will join the endpoint list')}
                 icon={Key}
                 tone="indigo"
               />
               <SettingsMetricCard
-                label="服务商"
-                value={officialForm.provider === 'Google' ? 'Google Gemini' : 'OpenAI'}
+                label={pick('服务商', 'Provider')}
+                value={getOfficialDisplayName(officialForm.provider)}
                 helper={getOfficialProviderLabel(officialForm.provider)}
                 icon={Shield}
                 tone="indigo"
               />
               <SettingsMetricCard
-                label="预算策略"
+                label={pick('预算策略', 'Budget rule')}
                 value={getModeLabel(officialForm.mode)}
                 helper={getLimitValueLabel(officialForm.mode, positive(officialForm.value) ?? undefined)}
                 icon={Layers3}
                 tone={officialForm.mode === 'unlimited' ? 'neutral' : 'amber'}
               />
               <SettingsMetricCard
-                label="最近检测"
-                value={selectedOfficialSlot ? formatLatency(selectedOfficialSlot.lastResponseTime ?? selectedOfficialSlot.avgResponseTime ?? null) : '待保存'}
-                helper={selectedOfficialSlot ? formatDateTime(selectedOfficialSlot.lastUsed || selectedOfficialSlot.updatedAt || selectedOfficialSlot.createdAt) : '新增后可进行连通检测'}
+                label={pick('最近检测', 'Latest check')}
+                value={selectedOfficialSlot ? formatLatency(selectedOfficialSlot.lastResponseTime ?? selectedOfficialSlot.avgResponseTime ?? null) : pick('待保存', 'Not saved yet')}
+                helper={selectedOfficialSlot ? formatDateTime(selectedOfficialSlot.lastUsed || selectedOfficialSlot.updatedAt || selectedOfficialSlot.createdAt) : pick('新增后可进行连通检测', 'Connectivity checks are available after creation')}
                 icon={Clock3}
                 tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'neutral'}
               />
@@ -788,15 +1043,25 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       {editorMode === 'third-party' ? (
         <SettingsHero
-          eyebrow="供应商编辑"
-          title={editingProviderId ? providerForm.name.trim() || '未命名供应商' : '新增供应商'}
-          description={editingProviderId ? '当前页面只修改这一家供应商，保存后返回列表。' : '在独立页面创建供应商，编辑时不会再和卡片列表混在一起。'}
+          eyebrow={pick('供应商编辑', 'Provider editor')}
+          title={editingProviderId ? providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider') : pick('新增供应商', 'New provider')}
+          description={
+            editingProviderId
+              ? pick('当前页面只修改这一家供应商，保存后返回列表。', 'This page edits one provider at a time and returns to the list after saving.')
+              : pick('在独立页面创建供应商，编辑时不会再和卡片列表混在一起。', 'Create providers in a focused editor instead of mixing them with the list.')
+          }
           icon={Globe}
           tone={selectedProvider ? getProviderStatus(selectedProvider).badge : providerForm.isActive ? 'emerald' : 'neutral'}
-          badge={<SettingsBadge tone={editingProviderId ? 'indigo' : 'emerald'}>{editingProviderId ? '编辑模式' : '新增模式'}</SettingsBadge>}
+          badge={
+            <SettingsBadge tone={editingProviderId ? 'indigo' : 'emerald'}>
+              {editingProviderId ? pick('编辑模式', 'Edit mode') : pick('新增模式', 'Create mode')}
+            </SettingsBadge>
+          }
           actions={
             <>
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>返回供应商列表</SettingsActionButton>
+              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+                {pick('返回供应商列表', 'Back to providers')}
+              </SettingsActionButton>
               {selectedProvider ? (
                 <>
                   <SettingsActionButton
@@ -804,14 +1069,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     loading={busy === `provider-check:${selectedProvider.id}`}
                     onClick={() => void refreshProvider(selectedProvider)}
                   >
-                    刷新连通性
+                    {pick('刷新连通性', 'Refresh connectivity')}
                   </SettingsActionButton>
                   <SettingsActionButton
                     icon={Wand2}
                     loading={busy === `provider-price:${selectedProvider.id}`}
                     onClick={() => void syncPricing(selectedProvider)}
                   >
-                    自动获取价格
+                    {pick('自动获取价格', 'Sync pricing')}
                   </SettingsActionButton>
                 </>
               ) : null}
@@ -820,30 +1085,30 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           metrics={
             <>
               <SettingsMetricCard
-                label="当前供应商"
-                value={providerForm.name.trim() || '未命名供应商'}
-                helper={editingProviderId ? '你现在编辑的是这一家供应商' : '保存后会加入供应商列表'}
+                label={pick('当前供应商', 'Current provider')}
+                value={providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider')}
+                helper={editingProviderId ? pick('你现在编辑的是这一家供应商', 'You are editing this provider now') : pick('保存后会加入供应商列表', 'After saving it will join the provider list')}
                 icon={Globe}
                 tone="indigo"
               />
               <SettingsMetricCard
-                label="基础地址"
+                label={pick('基础地址', 'Base URL')}
                 value={extractDomain(providerForm.baseUrl)}
-                helper="连通检测、模型拉取和价格同步都会使用这里"
+                helper={pick('连通检测、模型拉取和价格同步都会使用这里', 'Connectivity checks, model sync, and pricing sync all use this URL')}
                 icon={Key}
                 tone="neutral"
               />
               <SettingsMetricCard
-                label="通信协议"
+                label={pick('通信协议', 'Protocol')}
                 value={getProtocolLabel(providerForm.format)}
-                helper="决定请求结构、模型识别和价格同步方式"
+                helper={pick('决定请求结构、模型识别和价格同步方式', 'Determines request shape, model detection, and pricing sync behavior')}
                 icon={Layers3}
                 tone="indigo"
               />
               <SettingsMetricCard
-                label="调度状态"
-                value={providerForm.isActive ? '参与调度' : '暂停调度'}
-                helper={selectedProvider ? formatDateTime(selectedProvider.lastChecked || selectedProvider.updatedAt) : '保存后可继续做检测和价格同步'}
+                label={pick('调度状态', 'Scheduling')}
+                value={providerForm.isActive ? pick('参与调度', 'Included in routing') : pick('暂停调度', 'Routing paused')}
+                helper={selectedProvider ? formatDateTime(selectedProvider.lastChecked || selectedProvider.updatedAt) : pick('保存后可继续做检测和价格同步', 'Checks and pricing sync are available after saving')}
                 icon={Clock3}
                 tone={providerForm.isActive ? 'emerald' : 'neutral'}
               />
@@ -855,51 +1120,66 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       {editorMode === null ? (
         <>
           <SettingsHero
-        eyebrow="高级设置"
-        title="API 管理"
-        description="统一管理官方接口、第三方供应商、通信协议和预算策略。这里所有按钮都只表达一个真实动作，不再混用保存、刷新和同步语义。"
+        eyebrow={pick('高级设置', 'Advanced settings')}
+        title={pick('API 管理', 'API management')}
+        description={pick(
+          '统一管理官方接口、第三方供应商、通信协议和预算策略。这里所有按钮都只表达一个真实动作，不再混用保存、刷新和同步语义。',
+          'Manage official endpoints, third-party providers, protocols, and budgets in one place. Each action now maps to one clear behavior.'
+        )}
         icon={Key}
         tone={attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}
         badge={
           <SettingsBadge tone={attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}>
-            {connectedChannels > 0 ? `已接入 ${connectedChannels} 条链路` : '尚未接入链路'}
+            {connectedChannels > 0
+              ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
+              : pick('尚未接入链路', 'No routes connected yet')}
           </SettingsBadge>
         }
         actions={
           <>
-            <SettingsActionButton icon={RefreshCw} onClick={refresh}>刷新数据</SettingsActionButton>
+            <SettingsActionButton icon={RefreshCw} onClick={refresh}>{pick('刷新数据', 'Refresh data')}</SettingsActionButton>
             <SettingsActionButton icon={Plus} tone="primary" onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
-              {activeTab === 'official' ? '新增官方接口' : '新增供应商'}
+              {activeTab === 'official' ? pick('新增官方接口', 'New official endpoint') : pick('新增供应商', 'New provider')}
             </SettingsActionButton>
           </>
         }
         metrics={
           <>
             <SettingsMetricCard
-              label="官方接口"
+              label={pick('官方接口', 'Official endpoints')}
               value={`${officialSlots.length}`}
-              helper={`${officialSlots.filter((slot) => !slot.disabled).length} 条当前可参与调度`}
+              helper={pick(
+                `${officialSlots.filter((slot) => !slot.disabled).length} 条当前可参与调度`,
+                `${officialSlots.filter((slot) => !slot.disabled).length} currently available for routing`
+              )}
               icon={Shield}
               tone={officialSlots.length > 0 ? 'indigo' : 'neutral'}
             />
             <SettingsMetricCard
-              label="在线供应商"
+              label={pick('在线供应商', 'Active providers')}
               value={`${activeProviders}/${thirdPartyProviders.length}`}
-              helper={thirdPartyProviders.length > 0 ? `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} 个存在异常` : '尚未配置第三方供应商'}
+              helper={thirdPartyProviders.length > 0
+                ? pick(
+                    `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} 个存在异常`,
+                    `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} with issues`
+                  )
+                : pick('尚未配置第三方供应商', 'No third-party providers configured yet')}
               icon={Globe}
               tone={activeProviders > 0 ? 'emerald' : 'neutral'}
             />
             <SettingsMetricCard
-              label="预算策略"
+              label={pick('预算策略', 'Budget rules')}
               value={`${budgetCount}`}
-              helper="已设置预算或令牌上限的链路数量"
+              helper={pick('已设置预算或词元上限的链路数量', 'Routes with a budget or token limit')}
               icon={Layers3}
               tone={budgetCount > 0 ? 'amber' : 'neutral'}
             />
             <SettingsMetricCard
-              label="待处理项"
+              label={pick('待处理项', 'Needs attention')}
               value={`${attentionCount}`}
-              helper={attentionCount > 0 ? '建议优先排查异常与暂停链路' : '当前没有待优先处理的问题'}
+              helper={attentionCount > 0
+                ? pick('建议优先排查异常与暂停链路', 'Review failed or paused routes first')
+                : pick('当前没有待优先处理的问题', 'No urgent routing issues right now')}
               icon={Activity}
               tone={attentionCount > 0 ? 'rose' : 'emerald'}
             />
@@ -908,16 +1188,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       />
 
       <SettingsSection
-        title="运行视图"
-        eyebrow="链路面板"
-        description="先决定你当前要看的是官方接口还是第三方供应商，再进入对应的卡片和编辑器。"
-        action={<SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>{activeTab === 'official' ? '官方接口视图' : '第三方供应商视图'}</SettingsBadge>}
+        title={pick('运行视图', 'Runtime view')}
+        eyebrow={pick('链路面板', 'Routing panel')}
+        description={pick(
+          '先决定你当前要看的是官方接口还是第三方供应商，再进入对应的卡片和编辑器。',
+          'Choose whether you want to inspect official endpoints or third-party providers, then move into the matching cards and editor.'
+        )}
+        action={
+          <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
+            {activeTab === 'official' ? pick('官方接口视图', 'Official endpoint view') : pick('第三方供应商视图', 'Third-party provider view')}
+          </SettingsBadge>
+        }
       >
         <div className="space-y-4">
           <SegmentedControl
             options={[
-              { value: 'official', label: '官方接口' },
-              { value: 'third-party', label: '第三方供应商' },
+              { value: 'official', label: pick('官方接口', 'Official endpoints') },
+              { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
             ]}
             value={activeTab}
             onChange={(value) => setActiveTab(value as TabType)}
@@ -931,9 +1218,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             </div>
           ) : (
             <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-              <div className="text-[15px] font-semibold text-[var(--text-primary)]">全局延迟概览</div>
+              <div className="text-[15px] font-semibold text-[var(--text-primary)]">
+                {pick('全局延迟概览', 'Global latency summary')}
+              </div>
               <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-                暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。
+                {pick(
+                  '暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。',
+                  'No recent latency checks are available yet. Use Refresh on any card to re-check connectivity, models, and latency.'
+                )}
               </div>
             </div>
           )}
@@ -942,78 +1234,82 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       {activeTab === 'official' ? (
         <SettingsSection
-          title="官方接口"
-          eyebrow="官方渠道"
-          description="适合直连 OpenAI 和 Gemini 官方接口，用于承担稳定、核心的生产流量。"
-          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>新增官方接口</SettingsActionButton>}
+          title={pick('官方接口', 'Official endpoints')}
+          eyebrow={pick('官方渠道', 'Official channels')}
+          description={pick(
+            '适合直连 OpenAI 和 Gemini 官方接口，用于承担稳定、核心的生产流量。',
+            'Best for direct OpenAI and Gemini traffic that needs a stable primary route.'
+          )}
+          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
         >
           {officialSlots.length === 0 ? (
             <EmptyState
-              title="当前还没有官方接口"
-              description="先添加 OpenAI 或 Gemini 官方接口，再让它们进入调度。"
-              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>新增官方接口</SettingsActionButton>}
+              title={pick('当前还没有官方接口', 'No official endpoints yet')}
+              description={pick(
+                '先添加 OpenAI 或 Gemini 官方接口，再让它们进入调度。',
+                'Add an OpenAI or Gemini endpoint first, then bring it into routing.'
+              )}
+              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
             />
           ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="settings-provider-grid">
               {officialSlots.map((slot) => {
                 const mode = getMode(slot.budgetLimit, slot.tokenLimit);
                 const status = getOfficialStatus(slot);
                 const progress = getProgress(mode, mode === 'amount' ? slot.totalCost : slot.usedTokens || 0, slot.budgetLimit, slot.tokenLimit);
+                const usageSummary = getOfficialUsageSummary(slot);
+                const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
+
+                const metrics: ConsoleEndpointCardMetric[] = [
+                  {
+                    label: pick('预算策略', 'Budget rule'),
+                    value: getModeLabel(mode),
+                    helper: getLimitValueLabel(mode, mode === 'amount' ? slot.budgetLimit : slot.tokenLimit),
+                  },
+                  {
+                    label: pick('累计消耗', 'Total usage'),
+                    value: mode === 'tokens' ? formatTokens(slot.usedTokens || 0) : formatUsd(slot.totalCost),
+                    helper: usageSummary,
+                  },
+                  {
+                    label: pick('支持模型', 'Supported models'),
+                    value: `${slot.supportedModels.length}`,
+                    helper: slot.supportedModels.length > 0 ? pick('已自动识别模型列表', 'Auto detected models list') : pick('点击刷新后自动拉取', 'Refresh to fetch models'),
+                  },
+                  {
+                    label: pick('最近延迟', 'Latest latency'),
+                    value: formatLatency(slot.lastResponseTime ?? slot.avgResponseTime ?? null),
+                    helper: formatDateTime(slot.lastUsed || slot.updatedAt || slot.createdAt),
+                  },
+                ];
+
+                const avatar = (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border" style={SETTINGS_OVERLAY_STYLE}>
+                    <Shield size={18} className="text-[var(--text-primary)]" />
+                  </div>
+                );
 
                 return (
-                  <EndpointSurface key={slot.id}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[var(--text-primary)]" style={SETTINGS_OVERLAY_STYLE}>
-                          <Shield size={18} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="truncate text-[18px] font-semibold text-[var(--text-primary)]">
-                              {slot.name || getOfficialProviderLabel(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
-                            </div>
-                            <SettingsBadge tone={status.badge}>{status.label}</SettingsBadge>
-                          </div>
-                          <div className="mt-1 text-[13px] text-[var(--text-secondary)]">
-                            {slot.provider === 'OpenAI' ? 'OpenAI 官方接口' : 'Google Gemini 官方接口'}
-                          </div>
-                          <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">Key 预览：{maskSecret(slot.key)}</div>
-                        </div>
-                      </div>
-                      <StatusBadge status={status.status} label={status.label} />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <InfoCell label="预算策略" value={getModeLabel(mode)} helper={getLimitValueLabel(mode, mode === 'amount' ? slot.budgetLimit : slot.tokenLimit)} />
-                      <InfoCell label="累计消耗" value={mode === 'tokens' ? formatTokens(slot.usedTokens || 0) : formatUsd(slot.totalCost)} helper={getOfficialUsageSummary(slot)} />
-                      <InfoCell label="支持模型" value={`${slot.supportedModels.length}`} helper={slot.supportedModels.length > 0 ? '已自动识别模型列表' : '点击刷新后自动拉取'} />
-                      <InfoCell label="最近延迟" value={formatLatency(slot.lastResponseTime ?? slot.avgResponseTime ?? null)} helper={formatDateTime(slot.lastUsed || slot.updatedAt || slot.createdAt)} />
-                    </div>
-
-                    {mode !== 'unlimited' ? (
-                      <div className="mt-4">
-                        <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
-                          <span>{getOfficialUsageSummary(slot)}</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                        <ProgressBar progress={progress} tone={progress >= 90 ? 'rose' : progress >= 70 ? 'amber' : 'indigo'} showLabel={false} />
-                      </div>
-                    ) : null}
-
-                    {slot.lastError ? (
-                      <div className="mt-4 rounded-[18px] border px-4 py-3 text-[13px] leading-6" style={{ borderColor: 'var(--state-danger-border)', backgroundColor: 'var(--state-danger-bg)', color: 'var(--state-danger-text)' }}>
-                        {slot.lastError}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditOfficial(slot)}>编辑</SettingsActionButton>
-                      <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>刷新</SettingsActionButton>
-                      <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" onClick={() => void toggleOfficial(slot)}>
-                        {slot.disabled ? '启用' : '暂停'}
-                      </SettingsActionButton>
-                    </div>
-                  </EndpointSurface>
+                  <ConsoleEndpointCard
+                    key={slot.id}
+                    title={getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
+                    subtitle={slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint')}
+                    meta={pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)}
+                    avatar={avatar}
+                    status={status}
+                    metrics={metrics}
+                    progress={progressData}
+                    error={slot.lastError}
+                    actions={
+                      <>
+                        <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
+                        <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" onClick={() => void toggleOfficial(slot)}>
+                          {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
+                        </SettingsActionButton>
+                      </>
+                    }
+                  />
                 );
               })}
             </div>
@@ -1021,78 +1317,97 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         </SettingsSection>
       ) : (
         <SettingsSection
-          title="第三方供应商"
-          eyebrow="第三方渠道"
-          description="这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。"
-          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>新增供应商</SettingsActionButton>}
+          title={pick('第三方供应商', 'Third-party providers')}
+          eyebrow={pick('第三方渠道', 'Third-party channels')}
+          description={pick(
+            '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
+            'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
+          )}
+          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
-              title="当前还没有第三方供应商"
-              description="先添加一个供应商，再配置协议、预算和自动价格同步。"
-              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>新增供应商</SettingsActionButton>}
+              title={pick('当前还没有第三方供应商', 'No third-party providers yet')}
+              description={pick(
+                '先添加一个供应商，再配置协议、预算和自动价格同步。',
+                'Add a provider first, then configure its protocol, budget, and pricing sync.'
+              )}
+              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
             />
           ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="settings-provider-grid">
               {thirdPartyProviders.map((provider) => {
                 const mode = getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited');
                 const status = getProviderStatus(provider);
                 const progress = getProgress(mode, mode === 'amount' ? provider.usage.totalCost : provider.usage.totalTokens, provider.budgetLimit, provider.tokenLimit);
+                const usageSummary = getProviderUsageSummary(provider);
+                const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
+
+                const metrics: ConsoleEndpointCardMetric[] = [
+                  {
+                    label: pick('预算策略', 'Budget rule'),
+                    value: getModeLabel(mode),
+                    helper: getLimitValueLabel(mode, mode === 'amount' ? provider.budgetLimit : provider.tokenLimit),
+                  },
+                  {
+                    label: pick('总使用', 'Total usage'),
+                    value: mode === 'tokens' ? formatTokens(provider.usage.totalTokens) : formatUsd(provider.usage.totalCost),
+                    helper: usageSummary,
+                  },
+                  {
+                    label: pick('支持模型', 'Supported models'),
+                    value: `${provider.models.length}`,
+                    helper:
+                      provider.models.length > 0
+                        ? pick('自动识别的模型典藏', 'Auto detected models list')
+                        : pick('刷新以提取模型', 'Refresh to fetch models'),
+                  },
+                  {
+                    label: pick('最近检测', 'Latest latency'),
+                    value: formatLatency(provider.activitySummary?.lastLatencyMs ?? null),
+                    helper: formatDateTime(provider.lastChecked || provider.updatedAt),
+                  },
+                ];
+
+                const avatar = (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border text-[14px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
+                    {provider.name.charAt(0).toUpperCase()}
+                  </div>
+                );
+
+                const activityLine = getProviderActivityLine(provider);
 
                 return (
-                  <EndpointSurface key={provider.id} className="flex h-full flex-col">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[14px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
-                          {provider.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="truncate text-[18px] font-semibold text-[var(--text-primary)]">{provider.name}</div>
-                            <SettingsBadge tone={status.badge}>{status.label}</SettingsBadge>
-                            {provider.group ? <SettingsBadge tone="neutral">{provider.group}</SettingsBadge> : null}
-                          </div>
-                          <div className="mt-1 truncate text-[13px] text-[var(--text-secondary)]">{extractDomain(provider.baseUrl)}</div>
-                          <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{getProviderActivityLine(provider)}</div>
-                        </div>
-                      </div>
-                      <StatusBadge status={status.status} label={status.label} />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <InfoCell label="通信协议" value={getProtocolLabel(provider.format)} helper="决定模型拉取和请求结构" />
-                      <InfoCell label="预算策略" value={getModeLabel(mode)} helper={getLimitValueLabel(mode, mode === 'amount' ? provider.budgetLimit : provider.tokenLimit)} />
-                      <InfoCell label="已识别模型" value={`${provider.models.length}`} helper={provider.models.length > 0 ? '刷新后可同步模型列表' : '等待连通检测'} />
-                      <InfoCell label="最近检测" value={formatLatency(provider.activitySummary?.lastLatencyMs ?? null)} helper={formatDateTime(provider.lastChecked || provider.updatedAt)} />
-                    </div>
-
-                    <div className="mt-4 text-[13px] text-[var(--text-secondary)]">{getProviderUsageSummary(provider)}</div>
-
-                    {mode !== 'unlimited' ? (
-                      <div className="mt-3">
-                        <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
-                          <span>使用进度</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                        <ProgressBar progress={progress} tone={progress >= 90 ? 'rose' : progress >= 70 ? 'amber' : 'indigo'} showLabel={false} />
-                      </div>
-                    ) : null}
-
-                    {provider.lastError ? (
-                      <div className="mt-4 rounded-[18px] border px-4 py-3 text-[13px] leading-6" style={{ borderColor: 'var(--state-danger-border)', backgroundColor: 'var(--state-danger-bg)', color: 'var(--state-danger-text)' }}>
-                        {provider.lastError}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                      <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditProvider(provider)}>编辑</SettingsActionButton>
-                      <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>刷新</SettingsActionButton>
-                      <SettingsActionButton icon={Wand2} size="sm" loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>自动获取价格</SettingsActionButton>
-                      <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" onClick={() => void toggleProvider(provider)}>
-                        {provider.isActive ? '暂停' : '启用'}
-                      </SettingsActionButton>
-                    </div>
-                  </EndpointSurface>
+                  <ConsoleEndpointCard
+                    key={provider.id}
+                    title={provider.name}
+                    subtitle={getProtocolLabel(provider.format)}
+                    meta={<div className="text-[13px] text-[var(--text-secondary)]">{extractDomain(provider.baseUrl)}</div>}
+                    avatar={avatar}
+                    badges={provider.group ? <SettingsBadge tone="neutral">{provider.group}</SettingsBadge> : null}
+                    status={status}
+                    metrics={metrics}
+                    progress={progressData}
+                    error={provider.lastError || null}
+                    footer={activityLine ? <div className="text-[13px] text-[var(--text-secondary)]">{activityLine}</div> : null}
+                    actions={
+                      <>
+                        <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditProvider(provider)}>
+                          {pick('编辑', 'Edit')}
+                        </SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
+                          {pick('刷新', 'Refresh')}
+                        </SettingsActionButton>
+                        <SettingsActionButton icon={Wand2} size="sm" loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
+                          {pick('自动获取价格', 'Sync pricing')}
+                        </SettingsActionButton>
+                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" onClick={() => void toggleProvider(provider)}>
+                          {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
+                        </SettingsActionButton>
+                      </>
+                    }
+                    className="settings-reference-card--soft"
+                  />
                 );
               })}
             </div>
@@ -1102,35 +1417,66 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         </>
       ) : null}
 
-      {editorMode === 'official' ? (
+      {showOfficialEditor ? (
         <SettingsSection
-          title="官方接口编辑器"
-          eyebrow={editingOfficialId ? '编辑官方接口' : '新增官方接口'}
-          description="保存只负责提交当前表单；刷新和启用状态请在上面的接口卡片里单独操作。"
+          title={pick('官方接口编辑器', 'Official endpoint editor')}
+          eyebrow={
+            editingOfficialId
+              ? pick('编辑官方接口', 'Edit official endpoint')
+              : showInlineOfficialCreate
+                ? pick('快速新增官方接口', 'Quick create official endpoint')
+                : pick('新增官方接口', 'Create official endpoint')
+          }
+          description={pick(
+            showInlineOfficialCreate
+              ? '如果上方“新增官方接口”按钮没有反应，也可以直接在这里填写并保存。'
+              : '保存只负责提交当前表单；刷新和启用状态请在上面的接口卡片里单独操作。',
+            showInlineOfficialCreate
+              ? 'If the New official endpoint button above does not respond, you can fill out this form here and save directly.'
+              : 'Save only submits this form. Refresh and enable states are still managed from the endpoint cards above.'
+          )}
         >
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
-              <InfoCell label="当前对象" value={officialForm.name.trim() || `${officialForm.provider} 官方接口`} helper={editingOfficialId ? '正在编辑已有接口' : '准备新增一条官方链路'} />
-              <InfoCell label="服务商" value={officialForm.provider === 'Google' ? 'Google Gemini' : 'OpenAI'} helper={getOfficialProviderLabel(officialForm.provider)} />
-              <InfoCell label="预算策略" value={getModeLabel(officialForm.mode)} helper={officialForm.mode === 'unlimited' ? '当前不限制累计消耗' : officialForm.mode === 'amount' ? '按累计金额控制预算' : '按累计令牌量控制预算'} />
+              <InfoCell
+                label={pick('当前对象', 'Current object')}
+                value={getOfficialDisplayName(officialForm.provider)}
+                helper={editingOfficialId ? pick('正在编辑已有接口', 'Editing an existing endpoint') : pick('准备新增一条官方链路', 'Preparing a new official route')}
+              />
+              <InfoCell
+                label={pick('服务商', 'Provider')}
+                value={getOfficialDisplayName(officialForm.provider)}
+                helper={getOfficialProviderLabel(officialForm.provider)}
+              />
+              <InfoCell
+                label={pick('预算策略', 'Budget rule')}
+                value={getModeLabel(officialForm.mode)}
+                helper={
+                  officialForm.mode === 'unlimited'
+                    ? pick('当前不限制累计消耗', 'There is no cumulative usage limit right now')
+                    : officialForm.mode === 'amount'
+                      ? pick('按累计金额控制预算', 'Budget is controlled by cumulative amount')
+                      : pick('按累计词元量控制预算', 'Budget is controlled by cumulative tokens')
+                }
+              />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <SettingInput
-                label="接口名称"
-                value={officialForm.name}
-                onChange={(value) => setOfficialForm((current) => ({ ...current, name: value }))}
-                placeholder="例如：OpenAI 主账号"
-                helper="建议使用对你有识别度的名称，便于后续调度。"
+                label={pick('接口名称', 'Endpoint name')}
+                value={getOfficialDisplayName(officialForm.provider)}
+                onChange={() => setOfficialForm((current) => ({ ...current, name: current.provider }))}
+                placeholder={pick('会根据提供商自动固定', 'Automatically fixed by provider')}
+                helper={pick('官方接口名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Official endpoint names are fixed by provider; Google follows the current language.')}
               />
               <SettingSelect
-                label="服务商"
+                label={pick('服务商', 'Provider')}
                 value={officialForm.provider}
                 options={[
-                  { value: 'Google', label: 'Google Gemini' },
+                  { value: 'Google', label: pick('谷歌', 'Google') },
                   { value: 'OpenAI', label: 'OpenAI' },
                 ]}
-                onChange={(value) => setOfficialForm((current) => ({ ...current, provider: value as OfficialProvider }))}
+                onChange={(value) => setOfficialForm((current) => ({ ...current, provider: value as OfficialProvider, name: value as OfficialProvider }))}
               />
             </div>
 
@@ -1138,23 +1484,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               label="API Key"
               value={officialForm.key}
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
-              placeholder="输入官方接口的 API Key"
+              placeholder={pick('输入官方接口的 API Key', 'Enter the official endpoint API key')}
               type="password"
-              helper="这里只保存当前接口使用的密钥，不会和刷新动作混用。"
+              helper={pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
             />
 
             <div>
-              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">预算策略</div>
+              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
               <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} />
               {officialForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput
-                    label={officialForm.mode === 'amount' ? '预算上限' : '令牌上限'}
+                    label={officialForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
                     value={officialForm.value}
                     onChange={(value) => setOfficialForm((current) => ({ ...current, value }))}
                     type="number"
-                    placeholder={officialForm.mode === 'amount' ? '例如：100' : '例如：1000000'}
-                    helper={officialForm.mode === 'amount' ? '金额预算按累计成本统计。' : '令牌上限按累计令牌量统计。'}
+                    placeholder={officialForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
+                    helper={officialForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
                   />
                 </div>
               ) : null}
@@ -1163,13 +1509,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             <div className="flex flex-wrap gap-2 pt-2">
               <PrimaryButton onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
-                {editingOfficialId ? '保存变更' : '新增官方接口'}
+                {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增官方接口', 'Create endpoint')}
               </PrimaryButton>
-              <SecondaryButton onClick={cancelEdit}>取消</SecondaryButton>
+              <SecondaryButton onClick={cancelEdit}>
+                {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
+              </SecondaryButton>
               {editingOfficialId ? (
                 <DangerButton onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto">
                   <Trash2 size={16} className="mr-1" />
-                  删除接口
+                  {pick('删除接口', 'Delete endpoint')}
                 </DangerButton>
               ) : null}
             </div>
@@ -1177,42 +1525,67 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         </SettingsSection>
       ) : null}
 
-      {editorMode === 'third-party' ? (
+      {showProviderEditor ? (
         <SettingsSection
-          title="供应商编辑器"
-          eyebrow={editingProviderId ? '编辑供应商' : '新增供应商'}
-          description="“自动获取价格”只负责同步价格数据，不负责保存当前表单；保存按钮才会提交供应商配置。"
+          title={pick('供应商编辑器', 'Provider editor')}
+          eyebrow={
+            editingProviderId
+              ? pick('编辑供应商', 'Edit provider')
+              : showInlineProviderCreate
+                ? pick('快速新增供应商', 'Quick create provider')
+                : pick('新增供应商', 'Create provider')
+          }
+          description={pick(
+            showInlineProviderCreate
+              ? '如果上方“新增供应商”按钮没有反应，也可以直接在这里填写并保存。'
+              : '“自动获取价格”只负责同步价格数据，不负责保存当前表单；保存按钮才会提交供应商配置。',
+            showInlineProviderCreate
+              ? 'If the New provider button above does not respond, you can fill out this form here and save directly.'
+              : 'Sync pricing only pulls pricing data. It does not save this form; only Save submits the provider configuration.'
+          )}
         >
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
-              <InfoCell label="当前对象" value={providerForm.name.trim() || '未命名供应商'} helper={editingProviderId ? '正在编辑已有供应商' : '准备新增一个供应商'} />
-              <InfoCell label="通信协议" value={getProtocolLabel(providerForm.format)} helper="决定请求结构、模型识别和价格拉取方式" />
-              <InfoCell label="调度状态" value={providerForm.isActive ? '参与调度' : '暂停调度'} helper={providerForm.mode === 'unlimited' ? '当前不限制预算' : getModeLabel(providerForm.mode)} />
+              <InfoCell
+                label={pick('当前对象', 'Current object')}
+                value={providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider')}
+                helper={editingProviderId ? pick('正在编辑已有供应商', 'Editing an existing provider') : pick('准备新增一个供应商', 'Preparing a new provider')}
+              />
+              <InfoCell
+                label={pick('通信协议', 'Protocol')}
+                value={getProtocolLabel(providerForm.format)}
+                helper={pick('决定请求结构、模型识别和价格拉取方式', 'Determines request shape, model detection, and pricing sync behavior')}
+              />
+              <InfoCell
+                label={pick('调度状态', 'Scheduling')}
+                value={providerForm.isActive ? pick('参与调度', 'Included in routing') : pick('暂停调度', 'Routing paused')}
+                helper={providerForm.mode === 'unlimited' ? pick('当前不限制预算', 'There is no budget limit right now') : getModeLabel(providerForm.mode)}
+              />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <SettingInput
-                label="供应商名称"
+                label={pick('供应商名称', 'Provider name')}
                 value={providerForm.name}
                 onChange={(value) => setProviderForm((current) => ({ ...current, name: value }))}
-                placeholder="例如：SiliconFlow"
-                helper="建议写成你在团队里常用的供应商名称。"
+                placeholder={pick('例如：SiliconFlow', 'For example: SiliconFlow')}
+                helper={pick('建议写成你在团队里常用的供应商名称。', 'Use the provider name your team already recognizes.')}
               />
               <SettingInput
-                label="主题颜色"
+                label={pick('主题颜色', 'Theme color')}
                 value={providerForm.color}
                 onChange={(value) => setProviderForm((current) => ({ ...current, color: value }))}
                 placeholder="#60A5FA"
-                helper="用于列表卡片的识别色，不影响真实请求。"
+                helper={pick('用于列表卡片的识别色，不影响真实请求。', 'Used as the list accent color and does not affect real requests.')}
               />
             </div>
 
             <SettingInput
-              label="基础地址"
+              label={pick('基础地址', 'Base URL')}
               value={providerForm.baseUrl}
               onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
               placeholder="https://api.example.com/v1"
-              helper="通信检测、模型拉取和价格同步都会基于这里的地址。"
+              helper={pick('通信检测、模型拉取和价格同步都会基于这里的地址。', 'Connectivity checks, model sync, and pricing sync all use this URL.')}
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -1220,35 +1593,35 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 label="API Key"
                 value={providerForm.apiKey}
                 onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
-                placeholder="输入供应商 API Key"
+                placeholder={pick('输入供应商 API Key', 'Enter the provider API key')}
                 type="password"
               />
               <SettingSelect
-                label="通信协议"
+                label={pick('通信协议', 'Protocol')}
                 value={providerForm.format}
                 options={[
-                  { value: 'auto', label: '自动识别' },
-                  { value: 'openai', label: 'OpenAI 协议' },
-                  { value: 'gemini', label: 'Gemini 协议' },
-                  { value: 'claude', label: 'Claude 协议' },
+                  { value: 'auto', label: pick('自动识别', 'Auto detect') },
+                  { value: 'openai', label: pick('OpenAI 协议', 'OpenAI protocol') },
+                  { value: 'gemini', label: pick('Gemini 协议', 'Gemini protocol') },
+                  { value: 'claude', label: pick('Claude 协议', 'Claude protocol') },
                 ]}
                 onChange={(value) => setProviderForm((current) => ({ ...current, format: value as ApiProtocolFormat }))}
-                helper="默认推荐自动识别，必要时再手动固定协议。"
+                helper={pick('默认推荐自动识别，必要时再手动固定协议。', 'Auto detect is recommended unless you need to lock the protocol manually.')}
               />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <SettingInput
-                label="分组"
+                label={pick('分组', 'Group')}
                 value={providerForm.group}
                 onChange={(value) => setProviderForm((current) => ({ ...current, group: value }))}
-                placeholder="例如：国内通道"
-                helper="用于组织和筛选供应商，不影响请求协议。"
+                placeholder={pick('例如：国内通道', 'For example: CN route')}
+                helper={pick('用于组织和筛选供应商，不影响请求协议。', 'Used for organization and filtering, without affecting request behavior.')}
               />
               <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
                 <SettingToggle
-                  label="参与调度"
-                  helper="关闭后，供应商会保留配置，但不会再参与自动调度。"
+                  label={pick('参与调度', 'Include in routing')}
+                  helper={pick('关闭后，供应商会保留配置，但不会再参与自动调度。', 'When disabled, the provider stays configured but is removed from automatic routing.')}
                   checked={providerForm.isActive}
                   onChange={(checked) => setProviderForm((current) => ({ ...current, isActive: checked }))}
                 />
@@ -1258,9 +1631,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-[15px] font-semibold text-[var(--text-primary)]">自动获取价格</div>
+                  <div className="text-[15px] font-semibold text-[var(--text-primary)]">{pick('自动获取价格', 'Sync pricing')}</div>
                   <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-                    这个动作只会尝试从供应商价格端点同步价格数据，不会保存表单。如果当前供应商还没落库，请先点击“保存变更”或“新增供应商”。
+                    {pick(
+                      '这个动作只会尝试从供应商价格端点同步价格数据，不会保存表单。如果当前供应商还没落库，请先点击“保存变更”或“新增供应商”。',
+                      'This action only pulls pricing data from the provider endpoint and does not save the form. Save the provider first before syncing pricing.'
+                    )}
                   </div>
                 </div>
                 {editingProviderId ? (
@@ -1272,26 +1648,26 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                       if (matched) void syncPricing(matched);
                     }}
                   >
-                    自动获取价格
+                    {pick('自动获取价格', 'Sync pricing')}
                   </SettingsActionButton>
                 ) : (
-                  <SettingsBadge tone="neutral">需先保存后可同步</SettingsBadge>
+                  <SettingsBadge tone="neutral">{pick('需先保存后可同步', 'Save before syncing')}</SettingsBadge>
                 )}
               </div>
             </div>
 
             <div>
-              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">预算策略</div>
+              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
               <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} />
               {providerForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput
-                    label={providerForm.mode === 'amount' ? '预算上限' : '令牌上限'}
+                    label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
                     value={providerForm.value}
                     onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
                     type="number"
-                    placeholder={providerForm.mode === 'amount' ? '例如：100' : '例如：1000000'}
-                    helper={providerForm.mode === 'amount' ? '金额预算按累计成本统计。' : '令牌上限按累计令牌量统计。'}
+                    placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
+                    helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
                   />
                 </div>
               ) : null}
@@ -1300,13 +1676,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             <div className="flex flex-wrap gap-2 pt-2">
               <PrimaryButton onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
-                {editingProviderId ? '保存变更' : '新增供应商'}
+                {editingProviderId ? pick('保存变更', 'Save changes') : pick('新增供应商', 'Create provider')}
               </PrimaryButton>
-              <SecondaryButton onClick={cancelEdit}>取消</SecondaryButton>
+              <SecondaryButton onClick={cancelEdit}>
+                {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
+              </SecondaryButton>
               {editingProviderId ? (
                 <DangerButton onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
                   <Trash2 size={16} className="mr-1" />
-                  删除供应商
+                  {pick('删除供应商', 'Delete provider')}
                 </DangerButton>
               ) : null}
             </div>

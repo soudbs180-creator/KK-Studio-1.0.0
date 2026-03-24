@@ -85,6 +85,32 @@ function normalizeGeminiImageSize(raw: string | undefined): '512px' | '1K' | '2K
     return '1K';
 }
 
+function extractUsageMetadata(data: any) {
+    const usage = data?.usageMetadata || data?.usage_metadata;
+    if (!usage || typeof usage !== 'object') {
+        return undefined;
+    }
+
+    const promptTokens = Number(usage.promptTokenCount ?? usage.prompt_token_count);
+    const rawCompletionTokens = Number(usage.candidatesTokenCount ?? usage.candidates_token_count);
+    const totalTokens = Number(usage.totalTokenCount ?? usage.total_token_count);
+    const completionTokens = Number.isFinite(rawCompletionTokens)
+        ? rawCompletionTokens
+        : (Number.isFinite(totalTokens) && Number.isFinite(promptTokens))
+            ? Math.max(0, totalTokens - promptTokens)
+            : Number.NaN;
+
+    if (![promptTokens, completionTokens, totalTokens].some((value) => Number.isFinite(value) && value > 0)) {
+        return undefined;
+    }
+
+    return {
+        promptTokens: Number.isFinite(promptTokens) ? promptTokens : undefined,
+        completionTokens: Number.isFinite(completionTokens) ? completionTokens : undefined,
+        totalTokens: Number.isFinite(totalTokens) ? totalTokens : undefined,
+    };
+}
+
 export function buildInlineImagePart(base64Data: string, mimeType: string, useSnakeCase: boolean = false): any {
     if (useSnakeCase) {
         return {
@@ -488,6 +514,7 @@ export class GoogleAdapter implements LLMAdapter {
         // 🚀 Robust Multimodal Response Parsing
         // Google API can return multiple candidates. Usually we want the first.
         const candidate = data.candidates?.[0];
+        const usage = extractUsageMetadata(data);
         if (!candidate) {
             throw new Error(`Google API returned no candidates. Finish Reason: ${data.candidates?.[0]?.finishReason || 'Unknown'}`);
         }
@@ -530,6 +557,7 @@ export class GoogleAdapter implements LLMAdapter {
 
             return {
                 urls: [`data:${bestMime};base64,${bestData}`],
+                usage,
                 provider: 'Google',
                 model: options.modelId,
                 imageSize: effectiveImageConfig.imageSize || '1K',
@@ -567,6 +595,7 @@ export class GoogleAdapter implements LLMAdapter {
         if (fileUri) {
             return {
                 urls: [fileUri],
+                usage,
                 provider: 'Google',
                 model: options.modelId,
                 imageSize: effectiveImageConfig.imageSize || '1K',
@@ -587,6 +616,7 @@ export class GoogleAdapter implements LLMAdapter {
             const b64 = String(proxyData.b64_json).replace(/\s+/g, '');
             return {
                 urls: [`data:image/png;base64,${b64}`],
+                usage,
                 provider: 'Google',
                 model: options.modelId,
                 imageSize: effectiveImageConfig.imageSize || '1K',
@@ -603,6 +633,7 @@ export class GoogleAdapter implements LLMAdapter {
         if (typeof proxyData?.url === 'string' && /^https?:\/\//i.test(proxyData.url)) {
             return {
                 urls: [proxyData.url],
+                usage,
                 provider: 'Google',
                 model: options.modelId,
                 imageSize: effectiveImageConfig.imageSize || '1K',

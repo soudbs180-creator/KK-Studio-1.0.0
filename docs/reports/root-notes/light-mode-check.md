@@ -17,7 +17,7 @@
         - generic [ref=e79]:
           - slider [ref=e80] [cursor=pointer]: "100"
           - generic [ref=e81]: 100%
-- generic [ref=e83]: v1.3.7
+- generic [ref=e83]: v1.3.9
     - generic [ref=e86]:
       - generic [ref=e87]:
         - generic [ref=e89]:

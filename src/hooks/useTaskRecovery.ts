@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { PromptNode } from '../types';
+import type { PromptNode, TaskProviderType } from '../types';
 import { GenerationMode } from '../types';
 import {
   getPendingTasks,
@@ -8,6 +8,10 @@ import {
   modeToTaskType
 } from '../services/persistence/taskPersistence';
 import { useCanvas } from '../context/CanvasContext';
+import { llmService } from '../services/llm/LLMService';
+import { keyManager } from '../services/auth/keyManager';
+import { resolveProviderRuntime } from '../services/api/providerStrategy';
+import { normalizePersistentResultUrl } from '../utils/imageResultPersistence';
 
 interface TaskRecoveryState {
   isLoading: boolean;
@@ -18,6 +22,24 @@ interface TaskRecoveryState {
 type RecoveryReason = 'initial' | 'visibility' | 'online' | 'manual';
 
 const RECOVERY_THROTTLE_MS = 30_000;
+
+const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): TaskProviderType => {
+  const normalizedModel = String(model || '').trim().toLowerCase();
+  if (
+    normalizedModel.includes('midjourney')
+    || normalizedModel.startsWith('mj-')
+    || normalizedModel.startsWith('mj_')
+    || normalizedModel.includes('/mj')
+  ) {
+    return 'midjourney';
+  }
+
+  if (runtimeStrategyId === 'gpt-best' && normalizedModel.includes('journey')) {
+    return 'midjourney';
+  }
+
+  return 'generic';
+};
 
 /**
  * 任务恢复 Hook
@@ -51,6 +73,7 @@ export function useTaskRecovery(
         task => task.status === 'pending' || task.status === 'processing'
       );
       const now = Date.now();
+      const recoverableEntries: Array<{ task: typeof recoverableTasks[number]; node: PromptNode }> = [];
       let recovered = 0;
 
       for (const task of recoverableTasks) {
@@ -73,6 +96,37 @@ export function useTaskRecovery(
         }
 
         lastRecoveredAtRef.current.set(task.taskId, now);
+        recoverableEntries.push({ task, node });
+      }
+
+      const midjourneyGroups = new Map<string, Array<{ task: typeof recoverableTasks[number]; node: PromptNode }>>();
+      recoverableEntries.forEach((entry) => {
+        if (entry.task.taskType !== 'image' || entry.task.taskProviderType !== 'midjourney') {
+          return;
+        }
+
+        const groupKey = entry.task.keySlotId || entry.task.providerLabel || entry.task.provider || 'midjourney';
+        const group = midjourneyGroups.get(groupKey) || [];
+        group.push(entry);
+        midjourneyGroups.set(groupKey, group);
+      });
+
+      for (const group of midjourneyGroups.values()) {
+        if (group.length < 2) continue;
+
+        try {
+          await llmService.checkTaskStatuses(
+            group.map((entry) => entry.task.taskId),
+            GenerationMode.IMAGE,
+            { id: group[0].task.keySlotId },
+            group[0].node.model
+          );
+        } catch (error) {
+          console.warn('[TaskRecovery] Midjourney batch preflight failed:', error);
+        }
+      }
+
+      for (const { task, node } of recoverableEntries) {
         recovered++;
 
         void pollTaskFn(node, task.taskId).catch((error) => {
@@ -135,11 +189,28 @@ export async function persistTask(
   canvasId?: string
 ): Promise<void> {
   try {
+    const keySlot = node.keySlotId ? keyManager.getKey(node.keySlotId) : null;
+    const runtime = resolveProviderRuntime({
+      provider: keySlot?.provider || node.provider,
+      baseUrl: keySlot?.baseUrl,
+      format: keySlot?.format,
+      authMethod: keySlot?.authMethod,
+      headerName: keySlot?.headerName,
+      compatibilityMode: keySlot?.compatibilityMode,
+      modelId: node.model,
+    });
+    const taskProviderType = detectTaskProviderType(node.model, runtime.strategyId);
+
     await saveTask({
       taskId,
       taskType: modeToTaskType(node.mode || GenerationMode.IMAGE),
+      taskProviderType,
       prompt: node.prompt,
       model: node.model,
+      provider: node.provider || keySlot?.provider,
+      providerLabel: node.providerLabel || keySlot?.name,
+      keySlotId: node.keySlotId || keySlot?.id,
+      runtimeStrategyId: runtime.strategyId,
       aspectRatio: node.aspectRatio,
       imageSize: node.imageSize,
       canvasId: canvasId || 'default',
@@ -162,8 +233,12 @@ export async function markTaskCompleted(
   tokens?: number
 ): Promise<void> {
   try {
+    const persistedUrls = resultUrls
+      .map((url) => normalizePersistentResultUrl(url))
+      .filter((url): url is string => !!url);
+
     await updateTaskStatus(taskId, 'completed', {
-      resultUrls,
+      resultUrls: persistedUrls,
       cost,
       tokens,
     });

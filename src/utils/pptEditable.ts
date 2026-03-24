@@ -44,7 +44,7 @@ const createBackgroundLayer = (image: GeneratedImage, pageIndex: number): PptEdi
   height: PPT_EDITABLE_CANVAS.height,
   opacity: 1,
   imageNodeId: image.id,
-  sourceUrl: image.originalUrl || image.url,
+  sourceUrl: image.originalUrl || image.apiResultUrl || image.url,
 });
 
 const createTextLayer = (
@@ -166,7 +166,7 @@ const mergePageLayers = (
         ...(isImageLayer(existingLayer) ? existingLayer : {}),
         type: 'image',
         imageNodeId: image.id,
-        sourceUrl: image.originalUrl || image.url,
+        sourceUrl: image.originalUrl || image.apiResultUrl || image.url,
       };
       return imageLayer;
     }

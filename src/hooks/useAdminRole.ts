@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_SESSION_CHANGE_EVENT } from '../services/api/adminSession';
 import { legacyWebApiClient } from '../services/api/kkApiClient';
+import { resolveSupabaseAdminAccess } from '../services/admin/supabaseAdminFallbackService';
 
 type UseAdminRoleResult = {
   authLoading: boolean;
@@ -64,20 +65,36 @@ export const useAdminRole = (): UseAdminRoleResult => {
       setCheckingAdmin(true);
 
         try {
-          const response = await legacyWebApiClient.getAdminAccess(
-            buildAdminRequestOptions(),
-          );
+          const [response, fallbackAccess] = await Promise.all([
+            legacyWebApiClient.getAdminAccess(
+              buildAdminRequestOptions(),
+            ).catch(() => undefined),
+            resolveSupabaseAdminAccess(user).catch(() => ({
+              isAdmin: false,
+              adminSessionActive: false,
+              adminSessionExpiresAt: undefined,
+              requiresPasswordChange: false,
+            })),
+          ]);
 
         if (!alive) {
           return;
         }
 
-        setIsAdmin(response.success ? response.data.isAdmin === true : false);
-        setAdminSessionActive(response.success ? response.data.adminSessionActive === true : false);
-        setAdminSessionExpiresAt(response.success ? response.data.adminSessionExpiresAt : undefined);
-        setRequiresAdminPasswordChange(
-          response.success ? response.data.requiresPasswordChange === true : false,
+        const apiIsAdmin = response?.success ? response.data.isAdmin === true : false;
+        const apiAdminSessionActive = response?.success ? response.data.adminSessionActive === true : false;
+        const apiAdminSessionExpiresAt = response?.success ? response.data.adminSessionExpiresAt : undefined;
+        const apiRequiresPasswordChange =
+          response?.success ? response.data.requiresPasswordChange === true : false;
+
+        setIsAdmin(apiIsAdmin || fallbackAccess.isAdmin);
+        setAdminSessionActive(apiAdminSessionActive || fallbackAccess.adminSessionActive);
+        setAdminSessionExpiresAt(
+          apiAdminSessionActive
+            ? apiAdminSessionExpiresAt
+            : fallbackAccess.adminSessionExpiresAt,
         );
+        setRequiresAdminPasswordChange(apiRequiresPasswordChange || fallbackAccess.requiresPasswordChange);
       } catch {
         if (alive) {
           setIsAdmin(false);

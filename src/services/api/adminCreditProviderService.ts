@@ -3,7 +3,13 @@ import type {
   AdminCreditProviderDto,
   SaveAdminCreditProviderModelRequestDto,
 } from '../../../packages/contracts/src/index';
+import {
+  deleteAdminCreditProviderViaSupabase,
+  listAdminCreditProvidersViaSupabase,
+  saveAdminCreditProviderViaSupabase,
+} from '../admin/supabaseAdminFallbackService';
 import { legacyWebApiClient } from './kkApiClient';
+import { adminModelService } from '../model/adminModelService';
 
 export interface AdminCreditProviderRpcModel {
   model_id?: string | null;
@@ -113,36 +119,105 @@ function mapSaveModelInput(
   };
 }
 
-function unwrapOrThrow<T>(
-  response: ApiResponse<T>,
-  fallback: string,
-) {
+function unwrapOrThrow<T>(response: ApiResponse<T>, fallback: string): T {
   if (response.success) {
-    return response;
+    return response.data;
   }
 
   throw new Error(response.error?.message || fallback);
 }
 
-export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpcGroup[]> {
-  const response = await legacyWebApiClient.listAdminCreditProviders();
-  const payload = unwrapOrThrow(response, 'Failed to load admin credit providers.');
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = String((error as { message?: unknown }).message || '').trim();
+    if (message) {
+      return message;
+    }
+  }
 
-  return payload.data.items.map((provider) => mapAdminCreditProviderGroup(provider));
+  return fallback;
+}
+
+async function withSupabaseFallback<T>(
+  legacyRequest: () => Promise<T>,
+  supabaseRequest: () => Promise<T>,
+  fallbackMessage: string,
+): Promise<T> {
+  try {
+    return await legacyRequest();
+  } catch (legacyError) {
+    try {
+      return await supabaseRequest();
+    } catch (supabaseError) {
+      throw new Error(
+        getErrorMessage(
+          supabaseError,
+          getErrorMessage(legacyError, fallbackMessage),
+        ),
+      );
+    }
+  }
+}
+
+export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpcGroup[]> {
+  return withSupabaseFallback(
+    async () => {
+      const payload = unwrapOrThrow(
+        await legacyWebApiClient.listAdminCreditProviders(),
+        'Failed to load admin credit providers.',
+      );
+
+      return payload.items.map((provider) => mapAdminCreditProviderGroup(provider));
+    },
+    async () => {
+      const rows = await listAdminCreditProvidersViaSupabase();
+      return rows.map((row) => ({
+        provider_id: row.provider_id || null,
+        provider_name: row.provider_name || row.provider_id || null,
+        base_url: row.base_url || null,
+        api_key_count: row.api_key_count ?? 0,
+        models: Array.isArray(row.models) ? row.models : [],
+      }));
+    },
+    'Failed to load admin credit providers.',
+  );
 }
 
 export async function saveAdminCreditProvider(input: SaveAdminCreditProviderInput): Promise<void> {
-  const response = await legacyWebApiClient.saveAdminCreditProvider(input.providerId, {
-    providerName: input.providerName,
-    baseUrl: input.baseUrl,
-    apiKeys: input.apiKeys,
-    models: input.models.map((model) => mapSaveModelInput(model)),
-  });
+  await withSupabaseFallback(
+    async () => {
+      unwrapOrThrow(
+        await legacyWebApiClient.saveAdminCreditProvider(input.providerId, {
+          providerName: input.providerName,
+          baseUrl: input.baseUrl,
+          apiKeys: input.apiKeys,
+          models: input.models.map((model) => mapSaveModelInput(model)),
+        }),
+        'Failed to save admin credit provider.',
+      );
+    },
+    async () => {
+      await saveAdminCreditProviderViaSupabase(input);
+    },
+    'Failed to save admin credit provider.',
+  );
 
-  unwrapOrThrow(response, 'Failed to save admin credit provider.');
+  await adminModelService.broadcastCatalogUpdate('save');
 }
 
 export async function deleteAdminCreditProvider(providerId: string): Promise<void> {
-  const response = await legacyWebApiClient.deleteAdminCreditProvider(providerId);
-  unwrapOrThrow(response, 'Failed to delete admin credit provider.');
+  await withSupabaseFallback(
+    async () => {
+      unwrapOrThrow(
+        await legacyWebApiClient.deleteAdminCreditProvider(providerId),
+        'Failed to delete admin credit provider.',
+      );
+    },
+    async () => {
+      await deleteAdminCreditProviderViaSupabase(providerId);
+    },
+    'Failed to delete admin credit provider.',
+  );
+
+  await adminModelService.broadcastCatalogUpdate('delete');
 }

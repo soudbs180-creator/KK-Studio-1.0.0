@@ -98,6 +98,9 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     const { width: w, totalHeight: h } = getCardDimensions(aspectRatio, true);
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+        if ('button' in e && e.button === 1) {
+            return;
+        }
         e.stopPropagation();
         setIsDragging(true);
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;

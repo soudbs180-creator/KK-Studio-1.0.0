@@ -6,9 +6,11 @@ import { createPortal } from 'react-dom';
 export interface CanvasGroupProps {
     group: CanvasGroup;
     zoom: number;
+    stackZIndexOverride?: number;
     onUngroup: (id: string) => void;
     onDragStart: (id: string, e: React.MouseEvent) => void;
     onGroupDrag?: (delta: { x: number; y: number }, sourceNodeIds?: string[]) => void;
+    onDragStateChange?: (dragging: boolean) => void;
     onUpdateGroup?: (group: CanvasGroup) => void;
     highlighted?: boolean;
     computedBounds?: { x: number; y: number; width: number; height: number };
@@ -17,9 +19,11 @@ export interface CanvasGroupProps {
 export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     group,
     zoom,
+    stackZIndexOverride,
     onUngroup,
     onDragStart,
     onGroupDrag,
+    onDragStateChange,
     onUpdateGroup,
     highlighted,
     computedBounds
@@ -29,7 +33,8 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const rafRef = useRef<number | null>(null);
     const pendingDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
-    const stackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
+    const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
+    const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
 
     // Direct DOM Refs
     const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +90,12 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         return () => window.removeEventListener('click', handleClick);
     }, []);
 
+    useEffect(() => {
+        return () => {
+            onDragStateChange?.(false);
+        };
+    }, [onDragStateChange]);
+
     useLayoutEffect(() => {
         if (!contextMenu) {
             setMenuPosition(null);
@@ -133,6 +144,9 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     }, [group.nodeIds, onGroupDrag]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (e.button === 1) {
+            return;
+        }
         e.stopPropagation(); // Prevent canvas pan
         onDragStart(group.id, e); // Select the group nodes
 
@@ -140,6 +154,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
 
         lastPos.current = { x: e.clientX, y: e.clientY };
         setIsDragging(true);
+        onDragStateChange?.(true);
 
         const handleMouseMove = (ev: MouseEvent) => {
             if (!lastPos.current) return;
@@ -154,17 +169,12 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                 y: pendingDelta.current.y + dy
             };
 
-            // Schedule RAF if not already pending
-            if (!rafRef.current) {
-                rafRef.current = requestAnimationFrame(() => {
-                    flushPendingDrag();
-                    rafRef.current = null;
-                });
-            }
+            flushPendingDrag();
         };
 
         const handleMouseUp = () => {
             setIsDragging(false);
+            onDragStateChange?.(false);
             lastPos.current = null;
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current);

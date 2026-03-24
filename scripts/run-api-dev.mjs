@@ -42,18 +42,19 @@ function parseEnvFile(filePath) {
 
 function loadLocalEnv() {
   const protectedKeys = new Set(Object.keys(process.env));
-  const baseEnv = parseEnvFile(path.join(repoRoot, ".env"));
-  const localEnv = parseEnvFile(path.join(repoRoot, ".env.local"));
+  const envFiles = [
+    path.join(repoRoot, ".env"),
+    path.join(repoRoot, ".env.local"),
+    path.join(repoRoot, "apps", "api", ".env"),
+    path.join(repoRoot, "apps", "api", ".env.local"),
+  ];
 
-  for (const [key, value] of Object.entries(baseEnv)) {
-    if (!protectedKeys.has(key)) {
-      process.env[key] = value;
-    }
-  }
-
-  for (const [key, value] of Object.entries(localEnv)) {
-    if (!protectedKeys.has(key)) {
-      process.env[key] = value;
+  for (const filePath of envFiles) {
+    const values = parseEnvFile(filePath);
+    for (const [key, value] of Object.entries(values)) {
+      if (!protectedKeys.has(key)) {
+        process.env[key] = value;
+      }
     }
   }
 }

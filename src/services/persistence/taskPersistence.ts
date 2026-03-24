@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { GenerationMode } from '../../types';
+import { GenerationMode, TaskProviderType } from '../../types';
 import { tempUserService } from '../auth/tempUserService';
 
 export type TaskType = 'image' | 'video' | 'audio';
@@ -8,9 +8,14 @@ export interface PersistedTask {
   id: string;
   taskId: string;
   taskType: TaskType;
+  taskProviderType?: TaskProviderType;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   prompt?: string;
   model?: string;
+  provider?: string;
+  providerLabel?: string;
+  keySlotId?: string;
+  runtimeStrategyId?: string;
   aspectRatio?: string;
   imageSize?: string;
   resultUrls?: string[];
@@ -51,6 +56,7 @@ function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
     id: String(raw.id || buildTaskRecordId(String(raw.taskId || nowIso))),
     taskId: String(raw.taskId || ''),
     taskType: raw.taskType === 'video' || raw.taskType === 'audio' ? raw.taskType : 'image',
+    taskProviderType: raw.taskProviderType === 'midjourney' ? 'midjourney' : 'generic',
     status:
       raw.status === 'processing'
         || raw.status === 'completed'
@@ -59,6 +65,10 @@ function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
         : 'pending',
     prompt: raw.prompt,
     model: raw.model,
+    provider: raw.provider,
+    providerLabel: raw.providerLabel,
+    keySlotId: raw.keySlotId,
+    runtimeStrategyId: raw.runtimeStrategyId,
     aspectRatio: raw.aspectRatio,
     imageSize: raw.imageSize,
     resultUrls: Array.isArray(raw.resultUrls) ? raw.resultUrls.map((item) => String(item)) : [],
@@ -118,8 +128,13 @@ async function withUserTasks<T>(
 export async function saveTask(params: {
   taskId: string;
   taskType: TaskType;
+  taskProviderType?: TaskProviderType;
   prompt?: string;
   model?: string;
+  provider?: string;
+  providerLabel?: string;
+  keySlotId?: string;
+  runtimeStrategyId?: string;
   aspectRatio?: string;
   imageSize?: string;
   canvasId?: string;
@@ -135,11 +150,16 @@ export async function saveTask(params: {
       id: previous?.id || buildTaskRecordId(params.taskId),
       taskId: params.taskId,
       taskType: params.taskType,
+      taskProviderType: params.taskProviderType || previous?.taskProviderType || 'generic',
       status: previous?.status === 'completed' || previous?.status === 'failed'
         ? previous.status
         : 'pending',
       prompt: params.prompt,
       model: params.model,
+      provider: params.provider,
+      providerLabel: params.providerLabel,
+      keySlotId: params.keySlotId,
+      runtimeStrategyId: params.runtimeStrategyId,
       aspectRatio: params.aspectRatio,
       imageSize: params.imageSize,
       canvasId: params.canvasId,

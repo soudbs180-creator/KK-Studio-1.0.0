@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import logo from '../../assets/logo.png';
 import { User } from '@supabase/supabase-js';
 import { useTheme } from '../../context/ThemeContext';
+import { resolveAvatarUrl } from '../../utils/presetAvatars';
 // Lucide icons replaced with SVGs
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     const [activeTab, setActiveTab] = useState<'home' | 'history'>('home');
     const { theme, toggleTheme, setTheme } = useTheme();
+    const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
 
     return (
         <>
@@ -201,8 +203,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <div className="p-2 rounded-xl mb-2 transition-colors" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                         <div className="flex items-center gap-3 mb-3 p-1">
                             <div className="sidebar-avatar relative shrink-0 overflow-hidden cursor-pointer hover:scale-105 transition-transform" onClick={onOpenProfile} role="button">
-                                {user?.user_metadata?.avatar_url ? (
-                                    <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
                                         {user?.email?.[0].toUpperCase() || 'K'}

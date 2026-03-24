@@ -129,7 +129,7 @@ const formatDuration = (duration?: number): string => {
 };
 
 const resolveMediaSource = (image: GeneratedImage): string | null => {
-  const source = image.originalUrl || image.url;
+  const source = image.originalUrl || image.apiResultUrl || image.url;
   if (!source) {
     return null;
   }
@@ -171,6 +171,11 @@ const getDisplayCost = (image: GeneratedImage) => {
     prompt: image.prompt,
     referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
     keySlotId: image.keySlotId,
+    provider: image.provider,
+    providerLabel: image.providerLabel,
+    promptTokens: image.promptTokens,
+    completionTokens: image.completionTokens,
+    totalTokens: image.tokens,
     storedCost: image.cost,
     storedCostSource: image.costSource,
   });

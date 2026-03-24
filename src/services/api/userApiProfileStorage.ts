@@ -1,6 +1,11 @@
 import type { ApiResponse } from '../../../packages/contracts/src/index';
 import type { ApiProtocolFormat } from './apiConfig';
 import { legacyWebApiClient } from './kkApiClient';
+import { extractUserApiEntriesFromPayload } from './userApiPayload';
+import {
+  loadUserApisPayloadViaSupabase,
+  mergeUserApisPayloadViaSupabase,
+} from './supabaseUserApiCloudStorage';
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
@@ -152,9 +157,33 @@ function unwrapOrThrow<T>(response: ApiResponse<T>, fallback: string): T {
 }
 
 export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
-  const response = await legacyWebApiClient.getUserApiEntries();
-  const data = unwrapOrThrow(response, 'Failed to load user API entries.');
-  return normalizeEntries(data.entries);
+  let supabaseEntries: StoredUserApiEntry[] = [];
+  let supabaseError: unknown = null;
+
+  try {
+    const supabasePayload = await loadUserApisPayloadViaSupabase();
+    supabaseEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
+  } catch (error) {
+    supabaseError = error;
+  }
+
+  try {
+    const response = await legacyWebApiClient.getUserApiEntries();
+    const data = unwrapOrThrow(response, 'Failed to load user API entries.');
+    const apiEntries = normalizeEntries(data.entries);
+    return supabaseEntries.length > 0 ? supabaseEntries : apiEntries;
+  } catch (apiError) {
+    if (supabaseEntries.length > 0) {
+      return supabaseEntries;
+    }
+
+    const fallbackError = supabaseError || apiError;
+    throw new Error(
+      typeof fallbackError === 'object' && fallbackError && 'message' in fallbackError
+        ? String((fallbackError as { message?: unknown }).message || 'Failed to load user API entries.')
+        : 'Failed to load user API entries.'
+    );
+  }
 }
 
 export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise<void> {
@@ -164,10 +193,28 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
       updatedAt: Date.now(),
     }),
   );
-  const response = await legacyWebApiClient.replaceUserApiEntries({
-    entries: normalizedEntries,
-  });
-  unwrapOrThrow(response, 'Failed to save user API entries.');
+
+  try {
+    await mergeUserApisPayloadViaSupabase({
+      entries: normalizedEntries,
+    });
+    return;
+  } catch (supabaseError) {
+    const response = await legacyWebApiClient.replaceUserApiEntries({
+      entries: normalizedEntries,
+    });
+
+    if (response.success) {
+      return;
+    }
+
+    throw new Error(
+      response.error?.message
+      || (typeof supabaseError === 'object' && supabaseError && 'message' in supabaseError
+        ? String((supabaseError as { message?: unknown }).message || 'Failed to save user API entries.')
+        : 'Failed to save user API entries.')
+    );
+  }
 }
 
 export async function mutateUserApiEntries(

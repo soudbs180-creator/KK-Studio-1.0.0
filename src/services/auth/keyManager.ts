@@ -27,6 +27,11 @@ import {
     extractUserApiProvidersFromPayload,
     isUserApisEnvelope,
 } from '../api/userApiPayload';
+import {
+    getUserApisPayloadDensity,
+    loadUserApisPayloadViaSupabase,
+    mergeUserApisPayloadViaSupabase,
+} from '../api/supabaseUserApiCloudStorage';
 import { legacyWebApiClient } from '../api/kkApiClient';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
@@ -445,6 +450,7 @@ const STORAGE_KEY = 'kk_studio_key_manager';
 const PROVIDERS_STORAGE_KEY = 'kk_studio_third_party_providers';
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
+type ProviderStorageScope = 'anonymous' | 'user' | 'cloud' | 'none';
 // Legacy Gemini model IDs kept for backward-compatible migrations
 const LEGACY_GOOGLE_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
 
@@ -922,6 +928,7 @@ export class KeyManager {
     private isSyncing = false;
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
+    private providerStorageScope: ProviderStorageScope = 'none';
 
     // Cached global model list snapshot
     private globalModelListCache: {
@@ -960,6 +967,11 @@ export class KeyManager {
     private getStorageKey(): string {
         if (!this.userId) return STORAGE_KEY; // Default global key for anon
         return `${STORAGE_KEY}_${this.userId}`;
+    }
+
+    private getProviderStorageKey(targetUserId: string | null = this.userId): string {
+        if (!targetUserId) return PROVIDERS_STORAGE_KEY;
+        return `${PROVIDERS_STORAGE_KEY}_${targetUserId}`;
     }
 
     /**
@@ -1202,6 +1214,7 @@ export class KeyManager {
 
         this.userId = userId;
         this.hasHydratedCloudState = false;
+        this.loadProviders(true);
 
         if (userId) {
             console.log('[KeyManager] User login:', userId);
@@ -1225,7 +1238,7 @@ export class KeyManager {
                         return;
                     }
 
-                    if (this.providers.length > 0) {
+                    if (this.providerStorageScope === 'user' && this.providers.length > 0) {
                         void this.saveToCloud(this.state).catch((syncError) => {
                             console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
                         });
@@ -1273,11 +1286,13 @@ export class KeyManager {
         const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
         const shouldPreserveLocalProviders =
             options?.preserveLocalProvidersOnEmpty === true
+            && this.providerStorageScope === 'user'
             && cloudProviders.length === 0
             && this.providers.length > 0;
 
         if (isUserApisEnvelope(rawPayload) && 'providers' in rawPayload && !shouldPreserveLocalProviders) {
             this.providers = cloudProviders;
+            this.providerStorageScope = 'cloud';
             this.persistProvidersLocal();
         }
 
@@ -1385,23 +1400,58 @@ export class KeyManager {
 
         try {
             this.isSyncing = true;
-            console.log('[KeyManager] Loading cloud state via API...');
+            console.log('[KeyManager] Loading cloud state via API/Supabase...');
 
-            const response = await legacyWebApiClient.getKeyManagerCloudState();
-            if (!response.success) {
-                if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
-                    console.warn('[KeyManager] Cloud fetch failed:', response.error);
+            let apiPayload: unknown = null;
+            let apiError: unknown = null;
+
+            try {
+                const response = await legacyWebApiClient.getKeyManagerCloudState();
+                if (response.success) {
+                    apiPayload = response.data;
+                } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
+                    apiError = new Error(response.error.message || 'Cloud fetch failed.');
+                    console.warn('[KeyManager] Cloud fetch via API failed:', response.error);
                 }
-                return;
+            } catch (error) {
+                apiError = error;
+                console.warn('[KeyManager] Cloud fetch via API threw:', error);
+            }
+
+            let supabasePayload: unknown = null;
+            let supabaseError: unknown = null;
+            try {
+                supabasePayload = await loadUserApisPayloadViaSupabase(activeUserId);
+            } catch (error) {
+                supabaseError = error;
+                console.warn('[KeyManager] Cloud fetch via Supabase failed:', error);
             }
 
             if (this.userId !== activeUserId) {
                 return;
             }
 
-            const shouldPreserveLocalProviders = !this.hasHydratedCloudState && this.providers.length > 0;
+            const apiDensity = getUserApisPayloadDensity(apiPayload);
+            const supabaseDensity = getUserApisPayloadDensity(supabasePayload);
+            const preferredPayload =
+                supabaseDensity > 0
+                    ? supabasePayload
+                    : apiDensity > 0
+                        ? apiPayload
+                        : supabasePayload ?? apiPayload;
+
+            const hasLocalState = this.state.slots.length > 0 || this.providers.length > 0;
+            if ((preferredPayload == null || getUserApisPayloadDensity(preferredPayload) === 0) && hasLocalState && (apiError || supabaseError)) {
+                console.warn('[KeyManager] Cloud payload empty during degraded sync, preserving local state.');
+                return;
+            }
+
+            const shouldPreserveLocalProviders =
+                !this.hasHydratedCloudState
+                && this.providerStorageScope === 'user'
+                && this.providers.length > 0;
             this.hasHydratedCloudState = true;
-            this.applyCloudPayload(response.data, {
+            this.applyCloudPayload(preferredPayload, {
                 preserveLocalProvidersOnEmpty: shouldPreserveLocalProviders,
             });
         } catch (e) {
@@ -1442,7 +1492,13 @@ export class KeyManager {
     /**
      * Save state to Supabase
      */
-    private async saveToCloud(state: KeyManagerState) {
+    private async saveToCloud(
+        state: KeyManagerState,
+        options?: {
+            ignoreBackoff?: boolean;
+            throwOnError?: boolean;
+        }
+    ) {
         if (!this.userId || this.userId.startsWith('dev-user-')) {
             console.log('[KeyManager] Skip cloud upload (missing userId or dev user)');
             return;
@@ -1453,7 +1509,7 @@ export class KeyManager {
             return;
         }
 
-        if (Date.now() < this.cloudSyncBackoffUntil) {
+        if (!options?.ignoreBackoff && Date.now() < this.cloudSyncBackoffUntil) {
             return;
         }
 
@@ -1467,6 +1523,23 @@ export class KeyManager {
                 this.hasHydratedCloudState || this.providers.length > 0
                     ? this.providers
                     : undefined;
+
+            try {
+                const savedPayload = await mergeUserApisPayloadViaSupabase({
+                    slots: state.slots as unknown as Record<string, unknown>[],
+                    providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                }, this.userId || undefined);
+
+                this.hasHydratedCloudState = true;
+                this.applyCloudPayload(savedPayload);
+                console.log('[KeyManager] Supabase cloud sync succeeded!');
+                this.cloudSyncBackoffUntil = 0;
+
+                requestCostSync().catch(console.error);
+                return;
+            } catch (supabaseError) {
+                console.warn('[KeyManager] Supabase cloud sync failed, falling back to API route:', supabaseError);
+            }
 
             const response = await legacyWebApiClient.replaceKeyManagerCloudState({
                 version: 2,
@@ -1483,6 +1556,9 @@ export class KeyManager {
                 if (isNetworkError) {
                     console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
                     this.cloudSyncBackoffUntil = Date.now() + 30_000;
+                    if (options?.throwOnError) {
+                        throw new Error(errorMessage);
+                    }
                     return;
                 }
 
@@ -1495,6 +1571,9 @@ export class KeyManager {
                 if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
                     console.error('[KeyManager] Session is missing or expired, postponing cloud sync.');
                     this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
+                    if (options?.throwOnError) {
+                        throw new Error(errorMessage);
+                    }
                     return;
                 }
 
@@ -1512,7 +1591,39 @@ export class KeyManager {
             if (!isNetworkError) {
                 console.error('[KeyManager] saveToCloud failed:', e);
             }
+            if (options?.throwOnError) {
+                throw e;
+            }
         }
+    }
+
+    async syncToCloudNow(): Promise<void> {
+        await this.saveToCloud(this.state, {
+            ignoreBackoff: true,
+            throwOnError: true,
+        });
+    }
+
+    async refreshFromCloudNow(): Promise<void> {
+        if (!this.userId || this.userId.startsWith('dev-user-')) {
+            return;
+        }
+
+        await this.loadFromCloud();
+    }
+
+    private ensureCloudHydration(): void {
+        if (!this.userId || this.userId.startsWith('dev-user-')) {
+            return;
+        }
+
+        if (this.hasHydratedCloudState || this.isSyncing) {
+            return;
+        }
+
+        void this.loadFromCloud().catch((error) => {
+            console.warn('[KeyManager] Lazy cloud hydration failed:', error);
+        });
     }
 
     /**
@@ -1783,20 +1894,6 @@ export class KeyManager {
                                 });
                             }
 
-                            // 棣冩畬 Add System Internal Models (Built-in Credits)
-                            Object.entries(MODEL_REGISTRY).forEach(([id, m]) => {
-                                // [Fix] Filter system internal models to only include specific "Banana" ones
-                                const isTargetBanana = id === 'gemini-3.1-flash-image-preview' || id === 'gemini-3-pro-image-preview';
-
-                                if (m.isSystemInternal && isTargetBanana) {
-                                    // Add to the list of models, ensuring it's not duplicated
-                                    const modelIdWithSuffix = `${id}@system`;
-                                    if (!models.includes(modelIdWithSuffix)) {
-                                        models.push(modelIdWithSuffix);
-                                    }
-                                }
-                            });
-
                             // Try to fetch /pricing in the background and refresh the cached pricing snapshot
                             try {
                                 const sanitizedPricingBase = cleanUrl.replace(PROVIDER_MARKETING_SUFFIX_RE, '') || cleanUrl;
@@ -1945,7 +2042,6 @@ export class KeyManager {
         // Format: modelId@Suffix or just modelId
         const [baseIdPart, suffix] = modelId.split('@');
         const normalizedSuffix = decodeRouteSuffix(suffix);
-        const isSystemRouteSuffix = normalizedSuffix.startsWith('system') || normalizedSuffix === 'systemproxy';
 
         // Normalize the requested model ID and apply migration mapping
         let normalizedModelId = baseIdPart.replace(/^models\//, '');
@@ -2082,16 +2178,8 @@ export class KeyManager {
                 const slotIdLower = String(s.id || '').trim().toLowerCase();
                 return slotIdLower === normalizedPreferredKeyId || (!!preferredRouteTarget && slotIdLower === preferredRouteTarget);
             });
-            const canHonorPreferredExternalRoute = !!preferred
-                && preferred.provider !== 'SystemProxy'
-                && (!suffix || isSystemRouteSuffix);
             if (preferred && isSlotHealthy(preferred) && modelSupportedBySlot(preferred)
-                && (matchesRequestedRoute(preferred) || canHonorPreferredExternalRoute)) {
-                if (!matchesRequestedRoute(preferred) && canHonorPreferredExternalRoute) {
-                    console.log(
-                        `[KeyManager] Honoring preferred external key for model=${normalizedModelId} despite route suffix='${normalizedSuffix || '(none)'}': ${preferred.name}[${preferred.id}]`
-                    );
-                }
+                && matchesRequestedRoute(preferred)) {
                 return this.prepareKeyResult(preferred);
             }
             if (!suffix) {
@@ -3269,6 +3357,7 @@ export class KeyManager {
      * Get all key slots
      */
     getSlots(): KeySlot[] {
+        this.ensureCloudHydration();
         return [...this.state.slots];
     }
 
@@ -3491,6 +3580,7 @@ export class KeyManager {
      */
     getProviders(): ThirdPartyProvider[] {
         this.loadProviders();
+        this.ensureCloudHydration();
         return [...this.providers];
     }
 
@@ -3941,23 +4031,35 @@ export class KeyManager {
 
     private persistProvidersLocal(): void {
         try {
-            localStorage.setItem(PROVIDERS_STORAGE_KEY, JSON.stringify(this.providers));
+            const storageKey = this.getProviderStorageKey();
+            if (this.userId) {
+                localStorage.removeItem(storageKey);
+                return;
+            }
+
+            localStorage.setItem(storageKey, JSON.stringify(this.providers));
+            this.providerStorageScope = 'anonymous';
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
         }
     }
 
-    private loadProviders(): void {
-        if (this.providers.length > 0) return; // Already loaded
+    private loadProviders(force = false): void {
+        if (!force && this.providers.length > 0) return; // Already loaded
 
         try {
-            const stored = localStorage.getItem(PROVIDERS_STORAGE_KEY);
+            const stored = localStorage.getItem(this.getProviderStorageKey());
             if (stored) {
                 this.providers = this.normalizeStoredProviders(JSON.parse(stored));
+                this.providerStorageScope = this.userId ? 'user' : 'anonymous';
+                return;
             }
+            this.providers = [];
+            this.providerStorageScope = 'none';
         } catch (e) {
             console.error('[KeyManager] Failed to load providers:', e);
             this.providers = [];
+            this.providerStorageScope = 'none';
         }
     }
 

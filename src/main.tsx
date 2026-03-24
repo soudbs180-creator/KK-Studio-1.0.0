@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { LocaleProvider } from './context/LocaleContext';
 
 type FatalError = {
   message: string;
@@ -13,7 +14,7 @@ type FatalError = {
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error('找不到根节点 #root，应用无法挂载');
+  throw new Error('找不到根节点 #root，应用无法挂载。');
 }
 
 const root = createRoot(rootElement);
@@ -23,7 +24,7 @@ function normalizeError(error: unknown): FatalError {
   if (error instanceof Error) {
     return {
       message: error.message || '应用启动失败',
-      details: error.stack || error.toString()
+      details: error.stack || error.toString(),
     };
   }
 
@@ -34,7 +35,7 @@ function normalizeError(error: unknown): FatalError {
   try {
     return {
       message: '应用启动失败',
-      details: JSON.stringify(error, null, 2)
+      details: JSON.stringify(error, null, 2),
     };
   } catch {
     return { message: '应用启动失败' };
@@ -68,7 +69,7 @@ function FatalScreen({ error }: { error: FatalError }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '32px'
+        padding: '32px',
       }}
     >
       <div
@@ -79,12 +80,12 @@ function FatalScreen({ error }: { error: FatalError }) {
           border: '1px solid #27272a',
           borderRadius: '16px',
           padding: '28px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+          boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
         }}
       >
         <div style={{ marginBottom: '18px' }}>
           <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>KK Studio 启动诊断</div>
-          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: '#f87171', margin: 0 }}>应用启动失败，已阻止白屏</h1>
+          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: '#f87171', margin: 0 }}>应用启动失败，已拦截白屏</h1>
         </div>
 
         <div
@@ -93,7 +94,7 @@ function FatalScreen({ error }: { error: FatalError }) {
             border: '1px solid #27272a',
             borderRadius: '12px',
             padding: '16px',
-            marginBottom: '16px'
+            marginBottom: '16px',
           }}
         >
           <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '6px' }}>错误信息</div>
@@ -108,7 +109,7 @@ function FatalScreen({ error }: { error: FatalError }) {
                 lineHeight: 1.6,
                 color: '#d4d4d8',
                 maxHeight: '320px',
-                overflow: 'auto'
+                overflow: 'auto',
               }}
             >
               {error.details}
@@ -123,7 +124,7 @@ function FatalScreen({ error }: { error: FatalError }) {
               border: '1px solid rgba(245, 158, 11, 0.28)',
               borderRadius: '12px',
               padding: '16px',
-              marginBottom: '16px'
+              marginBottom: '16px',
             }}
           >
             <div style={{ fontSize: '14px', color: '#fbbf24', marginBottom: '8px', fontWeight: 600 }}>部署检查项</div>
@@ -144,7 +145,7 @@ function FatalScreen({ error }: { error: FatalError }) {
               color: '#fff',
               borderRadius: '10px',
               padding: '10px 16px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             重新加载
@@ -161,7 +162,7 @@ function FatalScreen({ error }: { error: FatalError }) {
               color: '#fff',
               borderRadius: '10px',
               padding: '10px 16px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             清理本地缓存后重试
@@ -221,10 +222,12 @@ function bootstrap() {
 
     root.render(
       <ErrorBoundary>
-        <AuthProvider>
-          <App />
-          {/* <SpeedInsights /> */}
-        </AuthProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <App />
+            {/* <SpeedInsights /> */}
+          </AuthProvider>
+        </LocaleProvider>
       </ErrorBoundary>
     );
   } catch (error) {

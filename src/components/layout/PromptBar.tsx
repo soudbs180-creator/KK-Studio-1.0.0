@@ -24,6 +24,7 @@ import { isCreditBasedModel, getModelCredits } from '../../services/model/modelP
 import { adminModelService } from '../../services/model/adminModelService';
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
 import PromptBarFooter from './prompt-bar/PromptBarFooter';
+import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
 
 // [Animation Styles] Mode switcher animations
 const ModeSwitcherStyles = () => (
@@ -55,15 +56,26 @@ const PROMPT_TEXTAREA_MAX_ROWS = 6;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 
-// [FIX] Robust Image Component that self-heals from Storage if data is missing
-const ReferenceThumbnail: React.FC<{
+type ReferenceThumbnailProps = {
     image: { id: string, data?: string, mimeType?: string, storageId?: string, url?: string };
     onClick?: (e: React.MouseEvent<HTMLDivElement>, resolvedSrc: string) => void;
     onRecovered?: (payload: { id: string; data: string; mimeType?: string; storageId?: string }) => void;
-}> = ({ image, onClick, onRecovered }) => {
+};
+
+// [FIX] Robust Image Component that self-heals from Storage if data is missing
+const ReferenceThumbnail = React.memo(({
+    image,
+    onClick,
+    onRecovered,
+}: ReferenceThumbnailProps) => {
     const [data, setData] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const onRecoveredRef = useRef(onRecovered);
+
+    useEffect(() => {
+        onRecoveredRef.current = onRecovered;
+    }, [onRecovered]);
 
     useEffect(() => {
         // 🚀 [Fix] If parent provided data and it's NOT a blob URL, use it directly
@@ -99,7 +111,7 @@ const ReferenceThumbnail: React.FC<{
                     if (cached) {
                         setData(cached);
                         if (!cached.startsWith('blob:') && cached !== image.data) {
-                            onRecovered?.({
+                            onRecoveredRef.current?.({
                                 id: image.id,
                                 data: cached,
                                 mimeType: image.mimeType,
@@ -126,7 +138,7 @@ const ReferenceThumbnail: React.FC<{
             });
 
         return () => { active = false; };
-    }, [image.data, image.url, image.storageId, image.id, image.mimeType, onRecovered]);
+    }, [image.data, image.url, image.storageId, image.id, image.mimeType]);
 
     if (error) {
         return (
@@ -166,7 +178,15 @@ const ReferenceThumbnail: React.FC<{
             />
         </div>
     );
-};
+}, (prev, next) => (
+    prev.onClick === next.onClick
+    && prev.onRecovered === next.onRecovered
+    && prev.image.id === next.image.id
+    && prev.image.data === next.image.data
+    && prev.image.url === next.image.url
+    && prev.image.mimeType === next.image.mimeType
+    && prev.image.storageId === next.image.storageId
+));
 
 // 计算比例图标的尺寸
 const getRatioDimensions = (ratio: AspectRatio): { width: number; height: number } => {
@@ -552,6 +572,28 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
     const [inpaintImage, setInpaintImage] = useState<{ url: string } | null>(null); // [NEW] 局部重绘所需图像
 
+    const handleReferenceRecovered = useCallback((payload: { id: string; data: string; mimeType?: string; storageId?: string }) => {
+        setConfig(curr => ({
+            ...curr,
+            referenceImages: curr.referenceImages.map(ref =>
+                ref.id === payload.id
+                    ? {
+                        ...ref,
+                        data: payload.data,
+                        mimeType: payload.mimeType || ref.mimeType,
+                        storageId: payload.storageId || ref.storageId,
+                    }
+                    : ref
+            )
+        }));
+    }, [setConfig]);
+
+    const handleReferencePreview = useCallback((e: React.MouseEvent<HTMLDivElement>, resolvedSrc: string) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setPreviewImage({ url: resolvedSrc, originRect: rect });
+    }, []);
+
     const refContainerRef = useRef<HTMLDivElement>(null);
     const optionsPanelRef = useRef<HTMLDivElement>(null); // [NEW] Ref for options panel
 
@@ -902,7 +944,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const availableModels = useMemo(() => {
         const step1 = globalModels.filter(m => {
             if (m.type === 'chat') return false;
-            if (m.isSystemInternal && !canAccessSystemCreditModels) return false;
             return true;
         });
 
@@ -948,7 +989,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                 type: inferredType,
                 enabled: true,
                 description: m.description,
-                creditCost: resolvedSystemDisplay?.creditCost ?? m.creditCost,
+                creditCost: m.isSystemInternal
+                    ? (resolvedSystemDisplay?.creditCost ?? getModelCredits(m.id, config.imageSize))
+                    : undefined,
                 colorStart: resolvedSystemDisplay?.colorStart || m.colorStart,
                 colorEnd: resolvedSystemDisplay?.colorEnd || m.colorEnd,
                 colorSecondary: resolvedSystemDisplay?.colorSecondary || m.colorSecondary,
@@ -1914,12 +1957,12 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const currentModel = selectedModelMeta.currentModel;
 
     // 🚀 [Fix] 判断是否为系统积分模型
-    const isNanoBanana2 = !!currentModel?.isSystemInternal;
-    // 🚀 优先使用模型自带的 creditCost，如果没有则通过 getModelCredits 查询
-    const currentCreditCost = isModelListEmpty ? 0 :
-        (currentModel?.isSystemInternal
-            ? getModelCredits((currentModel?.id || '').split('@')[0], config.imageSize)
-            : (currentModel?.creditCost !== undefined ? currentModel.creditCost : getModelCredits((currentModel?.id || '').split('@')[0], config.imageSize)));
+    const isSystemCreditModel = !!currentModel?.isSystemInternal;
+    const currentCreditCost = isModelListEmpty
+        ? 0
+        : (currentModel?.isSystemInternal
+            ? getModelCredits(currentModel?.id || '', config.imageSize)
+            : 0);
 
     // 🚀 [NEW] 计算总成本 (单价 * 数量)
     const totalCreditCost = currentCreditCost * (config.parallelCount || 1);
@@ -2642,26 +2685,8 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             >
                                                 <ReferenceThumbnail
                                                     image={img}
-                                                    onRecovered={(payload) => {
-                                                        setConfig(curr => ({
-                                                            ...curr,
-                                                            referenceImages: curr.referenceImages.map(ref =>
-                                                                ref.id === payload.id
-                                                                    ? {
-                                                                        ...ref,
-                                                                        data: payload.data,
-                                                                        mimeType: payload.mimeType || ref.mimeType,
-                                                                        storageId: payload.storageId || ref.storageId,
-                                                                    }
-                                                                    : ref
-                                                            )
-                                                        }));
-                                                    }}
-                                                    onClick={(e, resolvedSrc) => {
-                                                        e.stopPropagation();
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        setPreviewImage({ url: resolvedSrc, originRect: rect });
-                                                    }}
+                                                    onRecovered={handleReferenceRecovered}
+                                                    onClick={handleReferencePreview}
                                                 />
                                                 {/* Mask Indicator - 当前已设置遮罩时显示高亮边框 */}
                                                 {config.maskUrl && config.editMode === 'inpaint' && (
@@ -2834,9 +2859,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             <span
                                                 className={`text-[9px] px-1.5 py-0.5 rounded border flex-shrink-0 ${getProviderBadgeColor(currentModel.provider)}`}
                                                 style={{ marginLeft: '6px', ...getProviderBadgeStyle(currentModel.provider) }}
-                                                title={currentModel.provider}
+                                                title={getCanonicalProviderDisplayName(currentModel.provider)}
                                             >
-                                                <span className="whitespace-nowrap">{truncateProviderLabel(currentModel.provider)}</span>
+                                                <span className="whitespace-nowrap">{truncateProviderLabel(getCanonicalProviderDisplayName(currentModel.provider))}</span>
                                             </span>
                                         ) : null
                                     )}
@@ -3025,9 +3050,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                             </div>
                                                                             <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                                                                                 <span className={`text-xs px-2.5 py-1 rounded-full ${badgeBgStyle} ${badgeBorderStyle} border font-semibold flex items-center gap-1`} style={textColorStyle}>
-                                                                                    ✨{model.isSystemInternal
-                                                                                        ? getModelCredits((model.id || '').split('@')[0], config.imageSize)
-                                                                                        : (model.creditCost !== undefined ? model.creditCost : getModelCredits((model.id || '').split('@')[0], config.imageSize))}
+                                                                                    ✨{getModelCredits(model.id || '', config.imageSize)}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -3054,10 +3077,13 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                         {model.provider && (
                                                                             <span
                                                                                 className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${getProviderBadgeColor(model.provider)}`}
-                                                                                title={model.provider}
+                                                                                title={getCanonicalProviderDisplayName(model.provider)}
                                                                                 style={{ maxWidth: '40%', textOverflow: 'ellipsis', ...getProviderBadgeStyle(model.provider) }}
                                                                             >
-                                                                                {model.provider.length > 10 ? model.provider.substring(0, 9) + '…' : model.provider}
+                                                                                {(() => {
+                                                                                    const displayProvider = getCanonicalProviderDisplayName(model.provider);
+                                                                                    return displayProvider.length > 10 ? displayProvider.substring(0, 9) + '…' : displayProvider;
+                                                                                })()}
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -3420,7 +3446,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 </div>
                             )}                            {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
-                                isCreditModel={isNanoBanana2}
+                                isCreditModel={isSystemCreditModel}
                                 creditCost={totalCreditCost}
                                 balance={balance}
                                 hasPrompt={!!promptDraft.trim()}
@@ -3428,15 +3454,15 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 colorEnd={currentModel?.colorEnd}
                                 textColor={currentModel?.textColor}
                                 onClick={() => {
-                                    if (isNanoBanana2 && authLoading) {
+                                    if (isSystemCreditModel && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
                                         return;
                                     }
-                                    if (isNanoBanana2 && !canAccessSystemCreditModels) {
+                                    if (isSystemCreditModel && !canAccessSystemCreditModels) {
                                         notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
                                         return;
                                     }
-                                    if (isNanoBanana2 && totalCreditCost > 0 && balance < totalCreditCost) {
+                                    if (isSystemCreditModel && totalCreditCost > 0 && balance < totalCreditCost) {
                                         notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额: ${balance}，请充值。`);
                                         setShowRechargeModal(true);
                                         return;

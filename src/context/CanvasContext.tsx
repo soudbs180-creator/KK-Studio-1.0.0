@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
+import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
 import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
@@ -18,6 +18,16 @@ import { workflowToLegacyCanvas } from '../workflow/adapters/workflowToLegacy';
 import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
+import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
+import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
+import {
+    buildImageResultIdentity,
+    buildTaskResultIdentity,
+    getCompletedTaskResultUrls,
+    getImageRecoveryCandidates,
+    getPromptCompletedTasks,
+    normalizePersistentResultUrl,
+} from '../utils/imageResultPersistence';
 
 const MAX_CANVASES = 10;
 
@@ -212,16 +222,167 @@ const getPendingTaskIdsFromPrompt = (node?: Partial<PromptNode> | null): string[
     ));
 };
 
-const getPendingSyncRequestsFromPrompt = (node?: Partial<PromptNode> | null): Array<{ requestId: string }> => {
+const getPendingSyncRequestsFromPrompt = (node?: Partial<PromptNode> | null): PromptPendingSyncRequest[] => {
     const rawPendingSyncRequests = (node?.generationMetadata as { pendingSyncRequests?: unknown } | undefined)?.pendingSyncRequests;
     if (!Array.isArray(rawPendingSyncRequests)) return [];
 
-    return rawPendingSyncRequests.filter((item): item is { requestId: string } => (
-        !!item
-        && typeof item === 'object'
-        && typeof (item as { requestId?: unknown }).requestId === 'string'
-        && String((item as { requestId: string }).requestId).trim().length > 0
-    ));
+    return rawPendingSyncRequests
+        .map((item): PromptPendingSyncRequest | null => {
+            if (!item || typeof item !== 'object') return null;
+
+            const requestId = typeof (item as { requestId?: unknown }).requestId === 'string'
+                ? String((item as { requestId: string }).requestId).trim()
+                : '';
+            if (!requestId) return null;
+
+            const index = typeof (item as { index?: unknown }).index === 'number'
+                && Number.isFinite((item as { index: number }).index)
+                ? (item as { index: number }).index
+                : 0;
+            const prompt = typeof (item as { prompt?: unknown }).prompt === 'string'
+                ? (item as { prompt: string }).prompt
+                : String(node?.prompt || '');
+            const startedAt = typeof (item as { startedAt?: unknown }).startedAt === 'number'
+                && Number.isFinite((item as { startedAt: number }).startedAt)
+                ? (item as { startedAt: number }).startedAt
+                : Date.now();
+            const keySlotId = typeof (item as { keySlotId?: unknown }).keySlotId === 'string'
+                ? (item as { keySlotId: string }).keySlotId
+                : undefined;
+
+            return {
+                requestId,
+                index,
+                prompt,
+                startedAt,
+                keySlotId,
+            };
+        })
+        .filter((item): item is PromptPendingSyncRequest => !!item);
+};
+
+type PromptRecoveryEntry = {
+    taskId: string;
+    resultIndex: number;
+    url: string;
+    completedAt?: number;
+    keySlotId?: string;
+    provider?: string;
+    providerLabel?: string;
+    model?: string;
+    modelLabel?: string;
+    cost?: number;
+    tokens?: number;
+};
+
+const getTaskResultUrlAtIndex = (urls: string[], index?: number): string | undefined => {
+    if (!urls.length) return undefined;
+    if (typeof index === 'number' && Number.isFinite(index) && index >= 0 && index < urls.length) {
+        return urls[index];
+    }
+    return urls[0];
+};
+
+const buildPromptRecoveryEntries = (
+    node: PromptNode,
+    persistedTasks: PersistedTask[] = []
+): PromptRecoveryEntry[] => {
+    const entries: PromptRecoveryEntry[] = [];
+    const seenKeys = new Set<string>();
+
+    getPromptCompletedTasks(node).forEach((task) => {
+        getCompletedTaskResultUrls(task).forEach((url, index) => {
+            const identity = buildTaskResultIdentity({
+                taskId: task.taskId,
+                resultIndex: index,
+                url,
+            });
+            if (!identity || seenKeys.has(identity)) return;
+            seenKeys.add(identity);
+            entries.push({
+                taskId: task.taskId,
+                resultIndex: index,
+                url,
+                completedAt: task.completedAt,
+                keySlotId: task.keySlotId,
+                provider: task.provider,
+                providerLabel: task.providerLabel,
+                model: task.model,
+                modelLabel: task.modelLabel,
+                cost: task.cost,
+                tokens: task.tokens,
+            });
+        });
+    });
+
+    persistedTasks.forEach((task) => {
+        const urls = (task.resultUrls || [])
+            .map((url) => normalizePersistentResultUrl(url))
+            .filter((url): url is string => !!url);
+
+        urls.forEach((url, index) => {
+            const identity = buildTaskResultIdentity({
+                taskId: task.taskId,
+                resultIndex: index,
+                url,
+            });
+            if (!identity || seenKeys.has(identity)) return;
+            seenKeys.add(identity);
+            entries.push({
+                taskId: task.taskId,
+                resultIndex: index,
+                url,
+                completedAt: task.completedAt ? Date.parse(task.completedAt) : undefined,
+                keySlotId: task.keySlotId,
+                provider: task.provider,
+                providerLabel: task.providerLabel,
+                model: task.model,
+                cost: task.cost,
+                tokens: task.tokens,
+            });
+        });
+    });
+
+    return entries;
+};
+
+const resolveImageRecoveryUrlFromMetadata = (
+    image: GeneratedImage,
+    prompt: PromptNode | undefined,
+    promptTasks: PersistedTask[] = []
+): string | undefined => {
+    const directCandidates = getImageRecoveryCandidates(image)
+        .map((candidate) => normalizePersistentResultUrl(candidate) || candidate)
+        .filter((candidate): candidate is string => !!candidate && !candidate.startsWith('blob:'));
+    if (directCandidates.length > 0) {
+        return directCandidates[0];
+    }
+
+    if (!prompt) return undefined;
+
+    const completedTask = getPromptCompletedTasks(prompt).find((task) => task.taskId === image.sourceTaskId);
+    const completedUrl = completedTask
+        ? getTaskResultUrlAtIndex(getCompletedTaskResultUrls(completedTask), image.sourceResultIndex)
+        : undefined;
+    if (completedUrl) return completedUrl;
+
+    const persistedTask = promptTasks.find((task) => task.taskId === image.sourceTaskId);
+    const persistedUrl = persistedTask
+        ? getTaskResultUrlAtIndex(
+            (persistedTask.resultUrls || [])
+                .map((url) => normalizePersistentResultUrl(url))
+                .filter((url): url is string => !!url),
+            image.sourceResultIndex
+        )
+        : undefined;
+    if (persistedUrl) return persistedUrl;
+
+    const promptCompletedEntries = buildPromptRecoveryEntries(prompt, promptTasks);
+    if (promptCompletedEntries.length === 1) {
+        return promptCompletedEntries[0].url;
+    }
+
+    return undefined;
 };
 
 const hasRecoverablePendingTask = (node?: Partial<PromptNode> | null): boolean => {
@@ -309,6 +470,7 @@ const normalizeRecoveredPromptNode = (
     const resolvedChildImageIds = resolvePromptChildImageIds(node, imageNodes);
     const pendingTaskIds = getPendingTaskIdsFromPrompt(node);
     const pendingSyncRequests = getPendingSyncRequestsFromPrompt(node);
+    const completedTasks = getPromptCompletedTasks(node);
     const expectedImageCount = getExpectedPromptImageCount(node);
     const hasRecoverablePendingState = pendingTaskIds.length > 0
         || pendingSyncRequests.length > 0
@@ -321,7 +483,7 @@ const normalizeRecoveredPromptNode = (
         && !hasRecoverablePendingState;
     const nextPendingTaskIds = isEffectivelyComplete ? [] : pendingTaskIds;
     const nextPendingSyncRequests = isEffectivelyComplete ? [] : pendingSyncRequests;
-    const shouldPersistGenerationMetadata = !!node.generationMetadata || pendingTaskIds.length > 0 || pendingSyncRequests.length > 0 || isEffectivelyComplete || shouldMarkInterrupted;
+    const shouldPersistGenerationMetadata = !!node.generationMetadata || pendingTaskIds.length > 0 || pendingSyncRequests.length > 0 || completedTasks.length > 0 || isEffectivelyComplete || shouldMarkInterrupted;
     const nextErrorDetails = isEffectivelyComplete
         ? undefined
         : shouldMarkInterrupted
@@ -346,7 +508,8 @@ const normalizeRecoveredPromptNode = (
             ? {
                 ...(node.generationMetadata || {}),
                 pendingTaskIds: nextPendingTaskIds,
-                pendingSyncRequests: nextPendingSyncRequests
+                pendingSyncRequests: nextPendingSyncRequests,
+                completedTasks,
             }
             : node.generationMetadata,
         error: isEffectivelyComplete ? undefined : (shouldMarkInterrupted ? (node.error || SYNC_GENERATION_INTERRUPTED_ERROR) : node.error),
@@ -592,8 +755,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                                     ...c,
                                                     imageNodes: c.imageNodes.map(img => ({
                                                         ...img,
-                                                        url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || '',
-                                                        originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl
+                                                        url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || img.apiResultUrl || '',
+                                                        originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl || img.apiResultUrl
                                                     })),
                                                     promptNodes: c.promptNodes.map(pn => ({
                                                         ...pn,
@@ -802,7 +965,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     // `storedUrl` here is the MICRO preview loaded for canvas performance,
                                     // not the protected original. Never hydrate it into `originalUrl`,
                                     // otherwise lightbox will mistake the thumbnail for the full image.
-                                    originalUrl: img.originalUrl
+                                    originalUrl: img.originalUrl || img.apiResultUrl
                                 };
                             }),
                             // Rehydrate reference images
@@ -1499,7 +1662,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log('[CanvasContext.addImageNodes] Starting image node insert', { count: nodes?.length, hasParentUpdates: !!parentUpdates });
 
         // Defensive filter: drop invalid nodes, but keep nodes that are still generating.
-        const validNodes = Array.isArray(nodes) ? nodes.filter(n => n && n.id && (n.url || n.isGenerating)) : [];
+        const validNodes = Array.isArray(nodes)
+            ? nodes.filter(n => n && n.id && (n.url || n.originalUrl || n.apiResultUrl || n.isGenerating))
+            : [];
         if (validNodes.length === 0) {
             console.warn('[CanvasContext.addImageNodes] No valid image nodes to add.');
             return;
@@ -1511,11 +1676,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const persistenceTasks: Promise<void>[] = [];
 
         for (const node of validNodes) {
-            let displayUrl = node.url;
+            let displayUrl = node.url || node.originalUrl || node.apiResultUrl || '';
             // If Base64, convert to Blob URL for optimized rendering
-            if (node.url.startsWith('data:')) {
+            if (displayUrl.startsWith('data:')) {
                 try {
-                    const blob = base64ToBlob(node.url);
+                    const blob = base64ToBlob(displayUrl);
                     displayUrl = URL.createObjectURL(blob);
                 } catch (e) {
                     console.error('Failed to create Blob URL', e);
@@ -1527,9 +1692,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Persistence: Save ORIGINAL (Base64) to IndexedDB
             persistenceTasks.push((async () => {
                 try {
-                    const isVideo = node.mode === 'video' || node.url.startsWith('data:video/');
+                    const sourceForTypeCheck = node.originalUrl || node.url || node.apiResultUrl || '';
+                    const isVideo = node.mode === 'video' || sourceForTypeCheck.startsWith('data:video/');
                     const storageId = node.storageId || node.id;
-                    const preferredOriginalSource = node.originalUrl || node.url;
+                    const preferredOriginalSource = node.originalUrl || node.url || node.apiResultUrl || '';
                     const stableOriginalSource = preferredOriginalSource.startsWith('blob:')
                         ? null
                         : preferredOriginalSource;
@@ -1650,19 +1816,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 let nextPromptNodes = [...c.promptNodes];
                 const existingImageIds = new Set(c.imageNodes.map(existing => existing.id));
                 const appendedNodes = stateNodes.filter(node => !existingImageIds.has(node.id));
-                const parentIdsToPromote = new Set<string>();
-
-                appendedNodes.forEach(node => {
-                    if (node.parentPromptId) {
-                        parentIdsToPromote.add(node.parentPromptId);
-                    }
-                });
-
-                if (parentUpdates) {
-                    Object.keys(parentUpdates).forEach(promptId => {
-                        if (promptId) parentIdsToPromote.add(promptId);
-                    });
-                }
 
                 const allZIndices = [
                     ...c.promptNodes.map(node => node.zIndex ?? 0),
@@ -1670,47 +1823,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     ...(c.groups || []).map(group => group.zIndex ?? 0)
                 ];
                 let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
-
-                const nextPromptZById = new Map<string, number>();
-                const nextExistingImageZById = new Map<string, number>();
-                const nextAppendedImageZById = new Map<string, number>();
-                const promotedGroupZByPromptId = new Map<string, number>();
-
-                Array.from(parentIdsToPromote).forEach(promptId => {
-                    const promotedGroupZIndex = ++maxZ;
-                    promotedGroupZByPromptId.set(promptId, promotedGroupZIndex);
-                    if (c.promptNodes.some(promptNode => promptNode.id === promptId)) {
-                        nextPromptZById.set(promptId, promotedGroupZIndex);
-                    }
-
-                    c.imageNodes
-                        .filter(imageNode => imageNode.parentPromptId === promptId)
-                        .forEach(imageNode => {
-                            nextExistingImageZById.set(imageNode.id, promotedGroupZIndex);
-                        });
+                const basePromptOrderById = new Map<string, number>();
+                c.promptNodes.forEach(promptNode => {
+                    basePromptOrderById.set(promptNode.id, promptNode.zIndex ?? 0);
                 });
-
-                appendedNodes.forEach(node => {
-                    if (node.parentPromptId) {
-                        const promotedGroupZIndex = promotedGroupZByPromptId.get(node.parentPromptId);
-                        if (promotedGroupZIndex !== undefined) {
-                            nextAppendedImageZById.set(node.id, promotedGroupZIndex);
-                            return;
-                        }
-                    }
-                    nextAppendedImageZById.set(node.id, node.zIndex ?? ++maxZ);
+                c.imageNodes.forEach(imageNode => {
+                    if (!imageNode.parentPromptId) return;
+                    const currentOrder = basePromptOrderById.get(imageNode.parentPromptId) ?? 0;
+                    basePromptOrderById.set(imageNode.parentPromptId, Math.max(currentOrder, imageNode.zIndex ?? 0));
                 });
 
                 // [Critical fix] Atomic linking: update parent nodes in the same state transaction.
                 if (parentUpdates) {
                     nextPromptNodes = nextPromptNodes.map(pn => {
                         const updates = parentUpdates[pn.id];
-                        const nextZIndex = nextPromptZById.get(pn.id);
                         if (updates) {
-                            return { ...pn, ...updates, ...(nextZIndex !== undefined ? { zIndex: nextZIndex } : {}) };
-                        }
-                        if (nextZIndex !== undefined) {
-                            return { ...pn, zIndex: nextZIndex };
+                            return { ...pn, ...updates };
                         }
                         return pn;
                     });
@@ -1724,52 +1852,28 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 return {
                                     ...pn,
                                     childImageIds: [...new Set([...(pn.childImageIds || []), ...newChildIds])],
-                                    isGenerating: false,
-                                    ...(nextPromptZById.has(pn.id) ? { zIndex: nextPromptZById.get(pn.id)! } : {})
+                                    isGenerating: false
                                 };
-                            }
-                            const nextZIndex = nextPromptZById.get(pn.id);
-                            if (nextZIndex !== undefined) {
-                                return { ...pn, zIndex: nextZIndex };
                             }
                             return pn;
                         });
                     }
                 }
 
-                let nextImageNodes = c.imageNodes.map(imageNode => {
-                    const nextZIndex = nextExistingImageZById.get(imageNode.id);
-                    if (nextZIndex !== undefined) {
-                        return { ...imageNode, zIndex: nextZIndex };
-                    }
-                    return imageNode;
-                });
-
-                nextImageNodes = [
-                    ...nextImageNodes,
+                const nextImageNodes = [
+                    ...c.imageNodes,
                     ...appendedNodes.map(node => ({
                         ...node,
-                        zIndex: nextAppendedImageZById.get(node.id) ?? node.zIndex
+                        zIndex: node.parentPromptId
+                            ? (basePromptOrderById.get(node.parentPromptId) ?? node.zIndex ?? 0)
+                            : (node.zIndex ?? ++maxZ)
                     }))
                 ];
-
-                const promotedNodeIds = new Set<string>([
-                    ...Array.from(parentIdsToPromote),
-                    ...Array.from(nextExistingImageZById.keys()),
-                    ...appendedNodes.map(node => node.id)
-                ]);
-
-                const nextGroups = (c.groups || []).map(group => (
-                    group.nodeIds.some(nodeId => promotedNodeIds.has(nodeId))
-                        ? { ...group, zIndex: ++maxZ }
-                        : group
-                ));
 
                 return {
                     ...c,
                     promptNodes: nextPromptNodes,
-                    imageNodes: nextImageNodes,
-                    groups: nextGroups
+                    imageNodes: nextImageNodes
                 };
             });
             console.log('[CanvasContext.addImageNodes] UI update completed, images are visible');
@@ -1965,6 +2069,185 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return changed ? { ...c, promptNodes: nextPromptNodes, imageNodes: nextImageNodes } : c;
         });
     }, [updateCanvas]);
+
+    useEffect(() => {
+        if (isLoading) return;
+
+        let cancelled = false;
+
+        const hydratePersistedImageSources = async () => {
+            const persistedTasks = await getAllTasks();
+            if (cancelled) return;
+
+            const tasksByPromptId = new Map<string, PersistedTask[]>();
+            persistedTasks.forEach((task) => {
+                const promptNodeId = String(task.promptNodeId || '').trim();
+                if (!promptNodeId) return;
+                const nextTasks = tasksByPromptId.get(promptNodeId) || [];
+                nextTasks.push(task);
+                tasksByPromptId.set(promptNodeId, nextTasks);
+            });
+
+            const currentState = stateRef.current;
+            const imageUpdates: Array<{ id: string; updates: Partial<GeneratedImage> }> = [];
+            const cacheWrites: Array<{ storageId: string; url: string }> = [];
+            const recoveredNodes: GeneratedImage[] = [];
+            const parentUpdates: Record<string, Partial<PromptNode>> = {};
+            const isMobileViewport = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+
+            currentState.canvases.forEach((canvas) => {
+                const promptById = new Map((canvas.promptNodes || []).map((promptNode) => [promptNode.id, promptNode] as const));
+
+                (canvas.imageNodes || []).forEach((imageNode) => {
+                    if (imageNode.url && imageNode.originalUrl) return;
+
+                    const parentPrompt = imageNode.parentPromptId ? promptById.get(imageNode.parentPromptId) : undefined;
+                    const promptTasks = parentPrompt ? (tasksByPromptId.get(parentPrompt.id) || []) : [];
+                    const recoveredUrl = resolveImageRecoveryUrlFromMetadata(imageNode, parentPrompt, promptTasks);
+                    if (!recoveredUrl) return;
+
+                    imageUpdates.push({
+                        id: imageNode.id,
+                        updates: {
+                            url: imageNode.url || recoveredUrl,
+                            originalUrl: imageNode.originalUrl || recoveredUrl,
+                            apiResultUrl: imageNode.apiResultUrl || normalizePersistentResultUrl(recoveredUrl),
+                        },
+                    });
+                    cacheWrites.push({
+                        storageId: imageNode.storageId || imageNode.id,
+                        url: recoveredUrl,
+                    });
+                });
+
+                (canvas.promptNodes || []).forEach((promptNode) => {
+                    const promptTasks = tasksByPromptId.get(promptNode.id) || [];
+                    const existingChildren = (canvas.imageNodes || []).filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+                    const seenResultKeys = new Set<string>();
+
+                    existingChildren.forEach((imageNode) => {
+                        const identity = buildImageResultIdentity(imageNode);
+                        if (identity) {
+                            seenResultKeys.add(identity);
+                        }
+                        const fallbackIdentity = buildTaskResultIdentity({
+                            taskId: imageNode.sourceTaskId,
+                            resultIndex: imageNode.sourceResultIndex,
+                            url: normalizePersistentResultUrl(imageNode.apiResultUrl || imageNode.originalUrl || imageNode.url),
+                        });
+                        if (fallbackIdentity) {
+                            seenResultKeys.add(fallbackIdentity);
+                        }
+                    });
+
+                    const recoveryEntries = buildPromptRecoveryEntries(promptNode, promptTasks);
+                    const missingEntries = recoveryEntries.filter((entry) => {
+                        const identity = buildTaskResultIdentity({
+                            taskId: entry.taskId,
+                            resultIndex: entry.resultIndex,
+                            url: entry.url,
+                        });
+                        if (!identity) return false;
+                        if (seenResultKeys.has(identity)) return false;
+                        seenResultKeys.add(identity);
+                        return true;
+                    });
+
+                    if (!missingEntries.length) {
+                        return;
+                    }
+
+                    const positions = buildGeneratedImageBatchPositions({
+                        basePosition: promptNode.position,
+                        items: missingEntries.map(() => ({
+                            aspectRatio: promptNode.aspectRatio,
+                        })),
+                        mode: promptNode.mode,
+                        isMobile: isMobileViewport,
+                    });
+
+                    const nextRecoveredNodes = missingEntries.map((entry, index) => {
+                        const imageId = `${promptNode.id}_restored_${entry.taskId.replace(/[^a-zA-Z0-9_-]/g, '_')}_${entry.resultIndex}`;
+                        const position = positions[index] || {
+                            x: promptNode.position.x,
+                            y: promptNode.position.y + 80,
+                        };
+
+                        return {
+                            id: imageId,
+                            storageId: imageId,
+                            url: entry.url,
+                            originalUrl: entry.url,
+                            apiResultUrl: entry.url,
+                            prompt: promptNode.prompt,
+                            aspectRatio: promptNode.aspectRatio,
+                            imageSize: promptNode.imageSize,
+                            timestamp: entry.completedAt || promptNode.timestamp || Date.now(),
+                            model: entry.model || promptNode.model,
+                            modelLabel: entry.modelLabel || promptNode.modelLabel,
+                            modelColorStart: promptNode.modelColorStart,
+                            modelColorEnd: promptNode.modelColorEnd,
+                            modelColorSecondary: promptNode.modelColorSecondary,
+                            modelTextColor: promptNode.modelTextColor,
+                            canvasId: canvas.id,
+                            parentPromptId: promptNode.id,
+                            position,
+                            mode: promptNode.mode,
+                            provider: entry.provider || promptNode.provider,
+                            providerLabel: entry.providerLabel || promptNode.providerLabel,
+                            keySlotId: entry.keySlotId || promptNode.keySlotId,
+                            sourceTaskId: entry.taskId,
+                            sourceResultIndex: entry.resultIndex,
+                            sourceReferenceStorageIds: (promptNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
+                            cost: entry.cost,
+                            tokens: entry.tokens,
+                        } satisfies GeneratedImage;
+                    });
+
+                    if (!nextRecoveredNodes.length) {
+                        return;
+                    }
+
+                    recoveredNodes.push(...nextRecoveredNodes);
+                    const nextChildImageIds = Array.from(new Set([
+                        ...resolvePromptChildImageIds(promptNode, canvas.imageNodes || []),
+                        ...nextRecoveredNodes.map((imageNode) => imageNode.id),
+                    ]));
+                    parentUpdates[promptNode.id] = {
+                        ...promptNode,
+                        childImageIds: nextChildImageIds,
+                        lastGenerationSuccessCount: nextChildImageIds.length,
+                        lastGenerationTotalCount: Math.max(
+                            promptNode.lastGenerationTotalCount || 0,
+                            recoveryEntries.length || nextChildImageIds.length || 1
+                        ),
+                        error: undefined,
+                        errorDetails: undefined,
+                    };
+                });
+            });
+
+            if (cancelled) return;
+
+            if (imageUpdates.length > 0) {
+                updateNodes({ imageNodes: imageUpdates });
+                cacheWrites.forEach(({ storageId, url }) => {
+                    void saveOriginalImage(storageId, url).catch(() => undefined);
+                    void saveImage(storageId, url).catch(() => undefined);
+                });
+            }
+
+            if (recoveredNodes.length > 0) {
+                await addImageNodes(recoveredNodes, parentUpdates);
+            }
+        };
+
+        void hydratePersistedImageSources();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [addImageNodes, isLoading, state.canvases, updateNodes]);
 
     const addWorkflowNode = useCallback((node: WorkflowNode) => {
         if (!isWorkflowUtilityNodeKind(node.kind)) {
@@ -3615,8 +3898,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     const localData = images.get(lookupId) || images.get(img.id);
                                     return {
                                         ...img,
-                                        url: localData?.url || img.url || '',
-                                        originalUrl: localData?.originalUrl || img.originalUrl,
+                                        url: localData?.url || img.url || img.apiResultUrl || '',
+                                        originalUrl: localData?.originalUrl || img.originalUrl || img.apiResultUrl,
                                         filename: localData?.filename || img.fileName
                                     };
                                 }),
@@ -3892,8 +4175,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             const localData = images.get(lookupId) || images.get(img.id);
                             return {
                                 ...img,
-                                url: localData?.url || img.url || '',
-                                originalUrl: localData?.originalUrl || img.originalUrl,
+                                url: localData?.url || img.url || img.apiResultUrl || '',
+                                originalUrl: localData?.originalUrl || img.originalUrl || img.apiResultUrl,
                                 fileName: localData?.filename || img.fileName
                             };
                         }),
@@ -3967,6 +4250,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 // PRIORITIZE ORIGINAL URL! otherwise we overwrite high-res with thumbnail blob
                                 if (img.originalUrl) {
                                     allImages.set(img.id, img.originalUrl);
+                                } else if (img.apiResultUrl) {
+                                    allImages.set(img.id, img.apiResultUrl);
                                 } else if (img.url) {
                                     allImages.set(img.id, img.url);
                                 }
@@ -3975,7 +4260,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                         for (const [id, url] of allImages.entries()) {
                             // Only fetch if it's a blob url (local)
-                            if (url.startsWith('blob:') || url.startsWith('data:')) {
+                            if (url.startsWith('blob:') || url.startsWith('data:') || /^https?:\/\//i.test(url)) {
                                 try {
                                     const res = await fetch(url);
                                     if (!res.ok) throw new Error('Fetch status: ' + res.status);
@@ -4285,62 +4570,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, []);
 
-    // [Layering] Auto-bring selected nodes to front when selection changes.
-    const prevSelectedRef = useRef<string[]>([]);
-    useEffect(() => {
-        const currentSelected = state.selectedNodeIds || [];
-        const prevSelected = prevSelectedRef.current;
-
-        // Only bring to front if there are newly selected nodes (not just deselection)
-        const hasNewSelection = currentSelected.length > 0 &&
-            (currentSelected.length > prevSelected.length ||
-                currentSelected.some(id => !prevSelected.includes(id)));
-
-        if (hasNewSelection) {
-            prevSelectedRef.current = [...currentSelected];
-            // Small delay to avoid state update during render
-            const timer = setTimeout(() => {
-                bringNodesToFront(currentSelected);
-            }, 0);
-            return () => clearTimeout(timer);
-        }
-
-        prevSelectedRef.current = [...currentSelected];
-    }, [state.selectedNodeIds, bringNodesToFront]);
-
-    // [Drag optimization] Real-time state updates for smooth dragging and connector lines.
-    const prevGeneratingRef = useRef<string[]>([]);
-    const prevGeneratingCanvasIdRef = useRef<string | null>(null);
-    useEffect(() => {
-        const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) {
-            prevGeneratingRef.current = [];
-            prevGeneratingCanvasIdRef.current = null;
-            return;
-        }
-
-        if (prevGeneratingCanvasIdRef.current !== currentCanvas.id) {
-            prevGeneratingRef.current = [];
-            prevGeneratingCanvasIdRef.current = currentCanvas.id;
-        }
-
-        const currentGeneratingIds = [
-            ...currentCanvas.promptNodes.filter(node => node.isGenerating).map(node => node.id),
-            ...currentCanvas.imageNodes.filter(node => node.isGenerating).map(node => node.id)
-        ];
-        const prevGeneratingSet = new Set(prevGeneratingRef.current);
-        const newGeneratingIds = currentGeneratingIds.filter(id => !prevGeneratingSet.has(id));
-
-        prevGeneratingRef.current = currentGeneratingIds;
-
-        if (newGeneratingIds.length === 0) return;
-
-        const timer = setTimeout(() => {
-            bringNodesToFront(newGeneratingIds);
-        }, 0);
-
-        return () => clearTimeout(timer);
-    }, [state.canvases, state.activeCanvasId, bringNodesToFront]);
+    // Layering is now driven by view-only group tiers in App.tsx.
+    // Keep persisted zIndex stable so selection and generation do not continuously inflate stored order.
 
     const applyMoveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
         setState(prev => {
@@ -4762,8 +4993,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     for (const img of migratedImages) {
                         // Ensure the image exists in IndexedDB.
                         const existingUrl = await getImage(img.id);
-                        if (!existingUrl && (img.url || img.originalUrl)) {
-                            const urlToSave = img.originalUrl || img.url;
+                        if (!existingUrl && (img.url || img.originalUrl || img.apiResultUrl)) {
+                            const urlToSave = img.originalUrl || img.url || img.apiResultUrl;
                             if (urlToSave && !urlToSave.startsWith('blob:')) {
                                 await saveImage(img.id, urlToSave);
                                 console.log('[MigrateNodes] Saved image ' + img.id + ' to IndexedDB');
@@ -4927,7 +5158,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 targetCanvas.imageNodes
                     .filter(node => {
                         const hasBrokenParent = !!node.parentPromptId && !node.orphaned && !promptIds.has(node.parentPromptId);
-                        const hasBrokenContent = !node.isGenerating && !node.url && !node.originalUrl;
+                        const hasBrokenContent = !node.isGenerating && !node.url && !node.originalUrl && !node.apiResultUrl;
                         const hasErrorState = !node.isGenerating && !!node.error;
                         return hasBrokenParent || hasBrokenContent || hasErrorState;
                     })

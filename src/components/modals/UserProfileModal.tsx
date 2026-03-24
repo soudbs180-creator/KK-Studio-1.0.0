@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   AlertCircle,
   ChevronLeft,
+  Chrome,
   CreditCard,
   Loader2,
   Lock,
@@ -17,6 +18,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import WechatQrModal from '../auth/WechatQrModal';
+import {
+  collectLinkedAuthProviders,
+  listLinkedAuthProviders,
+  startGoogleBind,
+} from '../../services/auth/identityLinking';
 import { startWechatBind } from '../../services/auth/wechatAuth';
 import {
   enrollTotpFactor,
@@ -25,6 +31,12 @@ import {
   type MfaStatusSnapshot,
   type TotpEnrollmentResult,
 } from '../../services/auth/mfa';
+import {
+  getDefaultPresetAvatarId,
+  getPresetAvatarById,
+  PRESET_AVATAR_OPTIONS,
+  resolveAvatarUrl,
+} from '../../utils/presetAvatars';
 
 export type UserProfileView = 'main' | 'change-password' | 'edit-profile' | 'billing' | 'security';
 
@@ -111,6 +123,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [mfaEnrollment, setMfaEnrollment] = useState<TotpEnrollmentResult | null>(null);
   const [mfaFriendlyName, setMfaFriendlyName] = useState('KK Studio');
   const [mfaCode, setMfaCode] = useState('');
+  const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
+  const defaultPresetAvatarId = useMemo(
+    () => getDefaultPresetAvatarId(user?.id || user?.email || displayName),
+    [displayName, user?.email, user?.id]
+  );
+  const selectedPresetAvatar = useMemo(() => getPresetAvatarById(avatarUrl), [avatarUrl]);
+  const avatarInputValue = selectedPresetAvatar ? '' : avatarUrl;
 
   const roleLabel = useMemo(() => {
     const role =
@@ -120,10 +139,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     return role === 'admin' ? '管理员' : '普通用户';
   }, [user]);
 
+  const sessionLinkedProviders = useMemo(
+    () => collectLinkedAuthProviders(user),
+    [user]
+  );
+  const effectiveLinkedProviders = useMemo(
+    () => (linkedProviders.length > 0 ? linkedProviders : sessionLinkedProviders),
+    [linkedProviders, sessionLinkedProviders]
+  );
   const isShadowWechatEmail = Boolean(user?.email?.endsWith('@users.kkstudio.local'));
-  const isWechatBound = isShadowWechatEmail || user?.user_metadata?.auth_provider === 'wechat';
+  const isWechatBound =
+    isShadowWechatEmail ||
+    user?.user_metadata?.auth_provider === 'wechat' ||
+    effectiveLinkedProviders.includes('wechat');
+  const isGoogleBound = effectiveLinkedProviders.includes('google');
   const canChangePassword = Boolean(user?.email) && !isTempUser && !isShadowWechatEmail;
   const canBindWechat = Boolean(user?.id) && !isTempUser && !isWechatBound;
+  const canBindGoogle = Boolean(user?.id) && !isTempUser && !isGoogleBound;
   const displayEmail = isShadowWechatEmail ? '微信授权用户' : user?.email || '未绑定邮箱';
 
   useEffect(() => {
@@ -149,8 +181,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setMfaEnrollment(null);
     setMfaFriendlyName('KK Studio');
     setMfaCode('');
+    setLinkedProviders(sessionLinkedProviders);
 
-    const defaultName = user?.user_metadata?.full_name || (isShadowWechatEmail ? '微信用户' : user?.email ? user.email.split('@')[0] : '');
+    const defaultName =
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.display_name ||
+      (isShadowWechatEmail ? '微信用户' : user?.email ? user.email.split('@')[0] : '');
     setDisplayName(defaultName);
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
@@ -161,7 +197,32 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (safeView === 'security') {
       void loadSecurityState();
     }
-  }, [canChangePassword, fetchLogs, initialView, isOpen, isShadowWechatEmail, user]);
+  }, [canChangePassword, fetchLogs, initialView, isOpen, isShadowWechatEmail, sessionLinkedProviders, user]);
+
+  useEffect(() => {
+    if (!isOpen || !user?.id || isTempUser) {
+      return;
+    }
+
+    let active = true;
+
+    const loadLinkedProviders = async () => {
+      try {
+        const providers = await listLinkedAuthProviders();
+        if (active) {
+          setLinkedProviders(providers);
+        }
+      } catch (error) {
+        console.warn('[UserProfileModal] Failed to load linked identities:', error);
+      }
+    };
+
+    void loadLinkedProviders();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, isTempUser, user?.id]);
 
   useEffect(() => {
     if (!isTempUser || !tempUserExpiry) {
@@ -350,6 +411,25 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const handleGoogleBind = async () => {
+    if (!canBindGoogle) {
+      const hint = isTempUser ? '临时账号暂不支持绑定 Google，请先登录正式账号。' : '当前账号已经绑定 Google。';
+      setMessage({ type: 'error', text: hint });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const authorizationUrl = await startGoogleBind();
+      window.location.assign(authorizationUrl);
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || '无法发起 Google 绑定，请稍后重试。' });
+      setLoading(false);
+    }
+  };
+
   const handleStartMfaEnrollment = async () => {
     if (isTempUser) {
       setMessage({ type: 'error', text: '临时账号暂不支持启用双重验证，请先登录正式账号。' });
@@ -397,8 +477,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const avatarSrc = avatarUrl || user?.user_metadata?.avatar_url || '';
-  const nickname = displayName || user?.user_metadata?.full_name || (isShadowWechatEmail ? '微信用户' : user?.email?.split('@')[0]) || '未命名用户';
+  const avatarSrc = resolveAvatarUrl(avatarUrl || user?.user_metadata?.avatar_url);
+  const nickname =
+    displayName ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.display_name ||
+    (isShadowWechatEmail ? '微信用户' : user?.email?.split('@')[0]) ||
+    '未命名用户';
 
   return (
     <>
@@ -521,6 +606,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         已绑定微信，可使用微信头像、昵称和扫码登录
                       </div>
                     )}
+                    {isGoogleBound && (
+                      <div className="mt-1 text-[11px] text-blue-300">
+                        已绑定 Google，可使用 Google 一键登录
+                      </div>
+                    )}
                     <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                       用户 ID：{user?.id || '-'}
                     </div>
@@ -558,8 +648,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <Pencil size={15} /> 编辑个人资料
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <Pencil size={15} className="shrink-0" />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">编辑个人资料</span>
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                 </button>
@@ -570,10 +661,24 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <QrCode size={15} /> {isWechatBound ? '微信已绑定' : '绑定微信'}
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <QrCode size={15} className="shrink-0" />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isWechatBound ? '微信已绑定' : '绑定微信'}</span>
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>{isWechatBound ? '已完成' : '进入'}</span>
+                </button>
+
+                <button
+                  onClick={() => void handleGoogleBind()}
+                  disabled={!canBindGoogle || loading}
+                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                >
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <Chrome size={15} className="shrink-0" />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isGoogleBound ? 'Google 已绑定' : '绑定 Google'}</span>
+                  </span>
+                  <span style={{ color: 'var(--text-tertiary)' }}>{isGoogleBound ? '已完成' : '进入'}</span>
                 </button>
 
                 {canChangePassword && (
@@ -582,8 +687,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
                     style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                   >
-                    <span className="inline-flex items-center gap-2">
-                      <Lock size={15} /> 修改密码
+                    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <Lock size={15} className="shrink-0" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">修改密码</span>
                     </span>
                     <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                   </button>
@@ -600,8 +706,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <ShieldCheck size={15} /> 双重验证
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <ShieldCheck size={15} className="shrink-0" />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">双重验证</span>
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                 </button>
@@ -611,8 +718,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <Wallet size={15} /> 账户管理
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                    <Wallet size={15} className="shrink-0" />
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">账户管理</span>
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                 </button>
@@ -622,9 +730,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     resetAndClose();
                     onSignOut();
                   }}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 text-sm text-red-300"
+                  className="flex h-11 w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg border border-red-500/30 bg-red-500/10 px-3 text-sm text-red-300"
                 >
-                  <LogOut size={15} /> 退出登录
+                  <LogOut size={15} className="shrink-0" />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">退出登录</span>
                 </button>
               </div>
             </div>
@@ -645,26 +754,83 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 />
               </label>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    预设头像
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl(defaultPresetAvatarId)}
+                      className="inline-flex h-8 items-center justify-center rounded-lg border px-3 text-xs"
+                      style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
+                    >
+                      随机分配
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl('')}
+                      className="inline-flex h-8 items-center justify-center rounded-lg border px-3 text-xs"
+                      style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
+                    >
+                      使用首字母
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {PRESET_AVATAR_OPTIONS.map((option) => {
+                    const selected = getPresetAvatarById(avatarUrl)?.id === option.id;
+
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setAvatarUrl(option.id)}
+                        className={`rounded-xl border p-2 text-left transition-all ${selected ? 'scale-[1.02]' : 'hover:-translate-y-0.5'}`}
+                        style={{
+                          borderColor: selected ? 'rgb(99 102 241 / 0.9)' : 'var(--border-light)',
+                          backgroundColor: selected ? 'rgb(99 102 241 / 0.12)' : 'var(--bg-tertiary)',
+                        }}
+                      >
+                        <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'rgb(255 255 255 / 0.08)' }}>
+                          <img src={option.url} alt={option.label} className="h-full w-full object-cover" />
+                        </div>
+                        <div className="mt-2 text-center">
+                          <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {option.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <label className="block space-y-1">
                 <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   头像链接（可选）
                 </span>
                 <input
-                  value={avatarUrl}
+                  value={avatarInputValue}
                   onChange={(event) => setAvatarUrl(event.target.value)}
-                  placeholder="请输入头像图片地址"
+                  placeholder="请输入外部图片地址，或直接点选上方预设头像"
                   className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)' }}
                 />
+                <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                  {selectedPresetAvatar ? `当前已选择预设头像：${selectedPresetAvatar.label}` : '也可以粘贴任意外部图片地址。'}
+                </div>
               </label>
 
               <button
                 onClick={() => void handleUpdateProfile()}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                保存资料
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">保存资料</span>
               </button>
             </div>
           )}
@@ -716,10 +882,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <button
                 onClick={() => void handleChangePassword()}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
-                保存新密码
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">保存新密码</span>
               </button>
             </div>
           )}
@@ -750,9 +916,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                 <button
                   onClick={() => setShowRechargeModal(true)}
-                  className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 text-sm text-white"
+                  className="mt-3 inline-flex h-9 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-amber-500 px-4 text-sm text-white"
                 >
-                  <CreditCard size={14} /> 充值余额
+                  <CreditCard size={14} className="shrink-0" />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">充值余额</span>
                 </button>
               </div>
 
@@ -763,7 +930,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                 {billingLoading ? (
                   <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                    <Loader2 size={16} className="mr-2 animate-spin" /> 正在加载...
+                    <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <Loader2 size={16} className="shrink-0 animate-spin" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
+                    </span>
                   </div>
                 ) : usageLogs.length === 0 ? (
                   <div className="rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
@@ -815,7 +985,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                 {billingLoading ? (
                   <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                    <Loader2 size={16} className="mr-2 animate-spin" /> 正在加载...
+                    <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <Loader2 size={16} className="shrink-0 animate-spin" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
+                    </span>
                   </div>
                 ) : billingLogs.length === 0 ? (
                   <div className="rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
@@ -987,7 +1160,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                 {mfaLoading ? (
                   <div className="mt-3 flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                    <Loader2 size={16} className="mr-2 animate-spin" /> 正在读取双重验证信息...
+                    <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <Loader2 size={16} className="shrink-0 animate-spin" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在读取双重验证信息...</span>
+                    </span>
                   </div>
                 ) : !mfaStatus || mfaStatus.verifiedFactors.length === 0 ? (
                   <div className="mt-3 rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>

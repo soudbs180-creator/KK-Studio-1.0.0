@@ -239,13 +239,13 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
                             {/* Base URL */}
                             <div>
                                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                                    API 地址 (Base URL)
+            接口地址（Base URL）
                                 </label>
                                 <input
                                     type="text"
                                     value={baseUrl}
                                     onChange={(e) => setBaseUrl(e.target.value)}
-                                    placeholder="https://api.example.com/v1"
+            placeholder="例如：https://api.example.com/v1"
                                     className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono text-sm"
                                 />
                             </div>
@@ -253,7 +253,7 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
                             {/* API Key */}
                             <div>
                                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
-                                    API Key
+            接口密钥（API Key）
                                 </label>
                                 <div className="relative">
                                     <input
@@ -281,7 +281,7 @@ export const AddProviderModal: React.FC<AddProviderModalProps> = ({
                                 <textarea
                                     value={models}
                                     onChange={(e) => setModels(e.target.value)}
-                                    placeholder="model-1, model-2, model-3"
+            placeholder="例如：model-1, model-2, model-3"
                                     rows={3}
                                     className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono text-sm resize-none"
                                 />

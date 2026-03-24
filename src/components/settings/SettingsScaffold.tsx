@@ -146,7 +146,7 @@ export const SETTINGS_LABEL_CLASSNAME =
   'text-[11px] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="settings-view-shell space-y-5 pb-2">{children}</div>
+  <div className="settings-view-shell settings-reference-stack space-y-6 pb-4">{children}</div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({
@@ -155,7 +155,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-2.5 py-1 text-left text-[11px] font-medium leading-[1.3] whitespace-nowrap ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left text-[11px] font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
     style={toneStyles[tone].badgeStyle}
   >
     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
@@ -188,47 +188,44 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section
-      className={`settings-hero-card space-y-4 ${className}`.trim()}
-      style={{ border: 'none', background: 'transparent', boxShadow: 'none', padding: 0, textAlign: 'left' }}
-    >
-      <div className="settings-hero-card__content space-y-4" style={{ textAlign: 'left' }}>
-        {eyebrow ? (
-          <div
-            className="text-[11px] font-semibold tracking-[0.22em]"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            {eyebrow}
-          </div>
-        ) : null}
-        <div className="settings-hero-card__header flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="settings-hero-card__lead flex min-w-0 flex-1 items-start gap-3">
+    <section className={`space-y-5 ${className}`.trim()}>
+      <div className="settings-reference-page-header">
+        <div className="settings-reference-page-header__lead">
+          {eyebrow ? (
+            <div className="settings-reference-page-header__eyebrow">
+              {eyebrow}
+            </div>
+          ) : null}
+          <div className="flex min-w-0 items-start gap-4">
             {Icon ? (
-              <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={toneStyle.iconStyle}>
+              <div
+                className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border"
+                style={toneStyle.iconStyle}
+              >
                 <Icon size={17} />
               </div>
             ) : null}
-            <div className="settings-hero-card__title-wrap min-w-0 flex-1" style={{ textAlign: 'left' }}>
-              <div className="flex flex-wrap items-center gap-2" style={{ justifyContent: 'flex-start' }}>
-                <h2
-                  className="min-w-0 break-words text-[32px] font-semibold tracking-[-0.05em]"
-                  style={{ color: 'var(--text-primary)', textAlign: 'left', overflowWrap: 'anywhere' }}
-                >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="min-w-0 break-words" style={{ overflowWrap: 'anywhere' }}>
                   {title}
                 </h2>
                 {badge}
               </div>
               {description ? (
-                <p className="mt-2 max-w-3xl break-words text-[14px] leading-6" style={{ color: 'var(--text-secondary)', textAlign: 'left', overflowWrap: 'anywhere' }}>
+                <p
+                  className="mt-2 max-w-3xl break-words text-[14px] leading-6"
+                  style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}
+                >
                   {description}
                 </p>
               ) : null}
             </div>
           </div>
-          {actions ? <div className="settings-hero-card__actions flex flex-shrink-0 flex-wrap gap-2">{actions}</div> : null}
         </div>
-        {metrics ? <div className="settings-hero-card__metrics grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics}</div> : null}
+        {actions ? <div className="settings-reference-actions">{actions}</div> : null}
       </div>
+      {metrics ? <div className="settings-reference-grid-4">{metrics}</div> : null}
     </section>
   );
 };
@@ -251,27 +248,33 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <div className="settings-metric-card h-full rounded-xl border p-3" style={SETTINGS_ELEVATED_STYLE}>
-      <div className="flex items-center justify-between gap-3">
+    <div className="settings-reference-mini-metric h-full">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="break-words text-[11px] font-medium" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
+          <div className="settings-reference-mini-metric__label break-words" style={{ overflowWrap: 'anywhere' }}>
             {label}
-          </div>
-          <div
-            className="mt-1 min-w-0 break-words text-[15px] font-semibold leading-tight [font-variant-numeric:tabular-nums]"
-            style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}
-          >
-            {value}
           </div>
         </div>
         {Icon ? (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={toneStyle.iconStyle}>
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
+            style={toneStyle.iconStyle}
+          >
             <Icon size={14} />
           </div>
         ) : null}
       </div>
+      <div
+        className="settings-reference-mini-metric__value min-w-0 break-words [font-variant-numeric:tabular-nums]"
+        style={{ overflowWrap: 'anywhere' }}
+      >
+        {value}
+      </div>
       {helper ? (
-        <div className="mt-1.5 break-words text-[11px] leading-4" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
+        <div
+          className="settings-reference-mini-metric__helper break-words"
+          style={{ overflowWrap: 'anywhere' }}
+        >
           {helper}
         </div>
       ) : null}
@@ -294,18 +297,24 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   action,
   children,
 }) => (
-  <section className="space-y-2">
-    <div className="flex items-start justify-between gap-3 px-2">
-      <h3 className="text-left text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
+  <section className="space-y-3">
+    <div className="flex items-start justify-between gap-3 px-1">
+      <h3
+        className="text-left text-[12px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: 'var(--text-tertiary)' }}
+      >
         {eyebrow || title}
       </h3>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
     </div>
-    <div className="settings-section-card rounded-[26px] border p-5" style={SETTINGS_PANEL_STYLE}>
+    <div className="settings-reference-card settings-reference-card--elevated p-5" style={SETTINGS_PANEL_STYLE}>
       {children}
     </div>
     {description ? (
-      <p className="settings-ios-footer break-words px-2 text-[13px] leading-6" style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
+      <p
+        className="settings-ios-footer break-words px-1 text-[13px] leading-6"
+        style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}
+      >
         {description}
       </p>
     ) : null}

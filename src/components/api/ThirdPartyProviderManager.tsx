@@ -660,9 +660,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                         <button
                             onClick={() => refreshManagementData(provider)}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-colors text-xs font-medium"
+                            className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-colors text-xs font-medium"
                         >
-                            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+                            <RefreshCw size={12} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
                             刷新
                         </button>
                     </div>
@@ -722,9 +722,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                     <button
                         onClick={() => updateChannelsBalance(provider)}
                         disabled={isLoading}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+                        <RefreshCw size={12} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
                         更新余额
                     </button>
                 </div>
@@ -1084,18 +1084,18 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                         <button
                             onClick={refreshAllProviders}
                             disabled={isLoading}
-                            className="group flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white/80 transition-all duration-200 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                            className="group flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white/80 transition-all duration-200 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                             title="刷新所有管理数据"
                         >
-                            <RefreshCw size={16} className={`transition-transform ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} />
+                            <RefreshCw size={16} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
                             刷新全部
                         </button>
                     )}
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="group flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98]"
+                        className="group flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98]"
                     >
-                        <Plus size={16} className="transition-transform group-hover:rotate-90" />
+                        <Plus size={16} className="shrink-0 transition-transform group-hover:rotate-90" />
                         添加服务商
                     </button>
                     {providers.length > 0 && (
@@ -1279,13 +1279,13 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                             e.stopPropagation();
                                             handleToggleProvider(provider.id);
                                         }}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                                        className={`flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
                                             provider.enabled
                                                 ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/20'
                                                 : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:bg-emerald-500/20'
                                         }`}
                                     >
-                                        <RefreshCw size={13} />
+                                        <RefreshCw size={13} className="shrink-0" />
                                         {provider.enabled ? '暂停刷新' : '恢复刷新'}
                                     </button>
 
@@ -1294,9 +1294,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                             e.stopPropagation();
                                             void openPricingModal(provider);
                                         }}
-                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all duration-200"
+                                        className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all duration-200"
                                     >
-                                        <DollarSign size={13} />
+                                        <DollarSign size={13} className="shrink-0" />
                                         价格查询
                                     </button>
 
@@ -1305,9 +1305,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                             e.stopPropagation();
                                             handleDeleteProvider(provider.id);
                                         }}
-                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-red-300 border border-red-500/20 hover:bg-red-500/10 transition-all duration-200"
+                                        className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium text-red-300 border border-red-500/20 hover:bg-red-500/10 transition-all duration-200"
                                     >
-                                        <Trash2 size={13} />
+                                        <Trash2 size={13} className="shrink-0" />
                                         删除
                                     </button>
                                 </div>
@@ -1323,13 +1323,13 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                                 e.stopPropagation();
                                                 handleToggleProvider(provider.id);
                                             }}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+                                            className={`flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
                                                 provider.enabled
                                                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
                                                     : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
                                             }`}
                                         >
-                                            {provider.enabled ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                                            {provider.enabled ? <CheckCircle size={14} className="shrink-0" /> : <AlertCircle size={14} className="shrink-0" />}
                                             {provider.enabled ? '已启用' : '已禁用'}
                                         </button>
                                         
@@ -1339,9 +1339,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                                     e.stopPropagation();
                                                     openManagementModal(provider);
                                                 }}
-                                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all duration-200"
+                                                className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2 rounded-xl text-xs font-medium bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all duration-200"
                                             >
-                                                <Settings size={14} />
+                                                <Settings size={14} className="shrink-0" />
                                                 管理
                                             </button>
                                         )}
@@ -1351,9 +1351,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                                 e.stopPropagation();
                                                 handleDeleteProvider(provider.id);
                                             }}
-                                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-all duration-200"
+                                            className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2 rounded-xl text-xs font-medium text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-all duration-200"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={14} className="shrink-0" />
                                             删除
                                         </button>
                                     </div>
@@ -1389,7 +1389,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                                         <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                                             <Coins size={12} />
                                                             {model.creditCost} 积分
-                                                            {model.isPerToken ? '/1M tokens' : '/次'}
+                                                            {model.isPerToken ? '/100万词元' : '/次'}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1601,7 +1601,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                             </div>
 
                                             <div className="space-y-2 pt-2">
-                                                {['渠道余额自动同步', '分组倍率信息获取', 'Tokens 消耗校准', '消费记录查询'].map((item, i) => (
+                                                {['渠道余额自动同步', '分组倍率信息获取', '词元消耗校准', '消费记录查询'].map((item, i) => (
                                                     <div key={i} className="flex items-center gap-2 text-xs text-white/60">
                                                         <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
                                                             <CheckCircle size={10} className="text-emerald-400" />

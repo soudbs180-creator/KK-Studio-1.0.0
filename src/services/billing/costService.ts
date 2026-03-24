@@ -6,7 +6,7 @@
 
 import { ModelType, ImageSize } from '../../types';
 import { getModelPricing, getRefImageTokenEstimate, getImageTokenEstimate } from '../model/modelPricing';
-import { keyManager, type KeySlot } from '../auth/keyManager';
+import { determineKeyType, keyManager, type KeySlot } from '../auth/keyManager';
 import { tempUserService } from '../auth/tempUserService';
 import { registerCostSyncHandler } from './costSyncBridge';
 
@@ -68,6 +68,11 @@ export interface ResolveImageCostOptions {
     promptLength?: number;
     referenceImageCount?: number;
     keySlotId?: string;
+    provider?: string;
+    providerLabel?: string;
+    promptTokens?: unknown;
+    completionTokens?: unknown;
+    totalTokens?: unknown;
     explicitCost?: unknown;
     storedCost?: unknown;
     storedCostSource?: unknown;
@@ -274,6 +279,123 @@ export function hasPricingSnapshotForKeySlot(keySlotId?: string): boolean {
     return Boolean(keyManager.getProviderForKeySlot(keySlotId)?.pricingSnapshot);
 }
 
+function isOfficialBuiltinPricingSlot(keySlotId?: string): boolean {
+    if (!keySlotId) return false;
+
+    const slot = keyManager.getEffectiveKey(keySlotId) || keyManager.getKey(keySlotId);
+    if (!slot) return false;
+
+    const provider = slot.provider;
+    const normalizedBaseUrl = String(slot.baseUrl || '').trim().toLowerCase();
+    const looksOfficialByType = slot.type === 'official';
+    const looksOfficialByRuntime = determineKeyType(provider, slot.baseUrl) === 'official';
+    const looksOfficialByLegacyStorage = !normalizedBaseUrl && (provider === 'Google' || provider === 'OpenAI');
+
+    if (!looksOfficialByType && !looksOfficialByRuntime && !looksOfficialByLegacyStorage) {
+        return false;
+    }
+
+    if (provider === 'Google') return true;
+
+    if (provider === 'OpenAI') {
+        return !normalizedBaseUrl || normalizedBaseUrl.includes('api.openai.com');
+    }
+
+    return false;
+}
+
+function normalizeProviderIdentityValue(value?: string): string {
+    return String(value || '').trim().toLowerCase();
+}
+
+function hasCanonicalOfficialProviderIdentity(provider?: string, providerLabel?: string): boolean {
+    const normalizedProvider = normalizeProviderIdentityValue(provider);
+    const normalizedLabel = normalizeProviderIdentityValue(providerLabel);
+
+    if (normalizedProvider === 'google') {
+        return normalizedLabel === ''
+            || normalizedLabel === 'google'
+            || normalizedLabel === '\u8c37\u6b4c'
+            || normalizedLabel === 'google official'
+            || normalizedLabel === 'google api'
+            || normalizedLabel === '\u8c37\u6b4c\u5b98\u65b9\u63a5\u53e3';
+    }
+
+    if (normalizedProvider === 'openai') {
+        return normalizedLabel === ''
+            || normalizedLabel === 'openai'
+            || normalizedLabel === 'openai official'
+            || normalizedLabel === 'openai api';
+    }
+
+    return false;
+}
+
+function canUseBuiltinEstimateWithoutResolvedKey(options: ResolveImageCostOptions): boolean {
+    if (!hasCanonicalOfficialProviderIdentity(options.provider, options.providerLabel)) {
+        return false;
+    }
+
+    return Boolean(getModelPricing(options.model));
+}
+
+function calculateCostFromTokenFormula(
+    model: string,
+    imageSize: ImageSize,
+    count: number,
+    usage: {
+        promptTokens?: unknown;
+        completionTokens?: unknown;
+        totalTokens?: unknown;
+    }
+): number | undefined {
+    const pricing = getModelPricing(model);
+    if (!pricing || (!pricing.inputPerMillionTokens && !pricing.outputPerMillionTokens)) {
+        return undefined;
+    }
+
+    let promptTokens = toFiniteNumber(usage.promptTokens);
+    let completionTokens = toFiniteNumber(usage.completionTokens);
+    const totalTokens = toFiniteNumber(usage.totalTokens);
+
+    if (promptTokens === undefined && completionTokens !== undefined && totalTokens !== undefined) {
+        promptTokens = Math.max(0, totalTokens - completionTokens);
+    }
+
+    if (completionTokens === undefined && promptTokens !== undefined && totalTokens !== undefined) {
+        completionTokens = Math.max(0, totalTokens - promptTokens);
+    }
+
+    if (promptTokens === undefined && completionTokens === undefined && totalTokens !== undefined) {
+        const estimatedOutputTokens = getImageTokenEstimate(model, imageSize) * Math.max(1, count || 1);
+        if (estimatedOutputTokens > 0) {
+            completionTokens = Math.min(totalTokens, estimatedOutputTokens);
+            promptTokens = Math.max(0, totalTokens - completionTokens);
+        } else {
+            promptTokens = totalTokens;
+            completionTokens = 0;
+        }
+    }
+
+    if (promptTokens === undefined && completionTokens === undefined) {
+        return undefined;
+    }
+
+    const inputCost = ((promptTokens || 0) / 1_000_000) * (pricing.inputPerMillionTokens || 0);
+    const outputCost = ((completionTokens || 0) / 1_000_000) * (pricing.outputPerMillionTokens || 0);
+    const totalCost = inputCost + outputCost;
+
+    if (!Number.isFinite(totalCost)) {
+        return undefined;
+    }
+
+    if (totalCost <= 0) {
+        return totalTokens !== undefined && totalTokens > 0 ? 0.000001 : 0;
+    }
+
+    return totalCost;
+}
+
 export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImageCost {
     const imageSize = options.imageSize || ImageSize.SIZE_1K;
     const count = Math.max(1, Number(options.count || 1));
@@ -290,7 +412,13 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
     const trustedStoredCostSource = normalizedStoredCostSource === 'explicit' || normalizedStoredCostSource === 'snapshot'
         ? normalizedStoredCostSource
         : undefined;
+    const resolvedKeySlot = options.keySlotId
+        ? keyManager.getEffectiveKey(options.keySlotId) || keyManager.getKey(options.keySlotId)
+        : undefined;
     const isKeyedModelWithoutPricingSnapshot = Boolean(options.keySlotId) && !usedPricingSnapshot;
+    const canUseBuiltinEstimateForKeyedModel = !isKeyedModelWithoutPricingSnapshot
+        || isOfficialBuiltinPricingSlot(options.keySlotId)
+        || (!resolvedKeySlot && canUseBuiltinEstimateWithoutResolvedKey(options));
 
     const estimateCost = (): number | undefined => {
         try {
@@ -307,6 +435,16 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
             return undefined;
         }
     };
+    const tokenFormulaCost = calculateCostFromTokenFormula(
+        options.model,
+        imageSize,
+        count,
+        {
+            promptTokens: options.promptTokens,
+            completionTokens: options.completionTokens,
+            totalTokens: options.totalTokens,
+        }
+    );
 
     if (usedPricingSnapshot) {
         const snapshotCost = estimateCost();
@@ -315,7 +453,7 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
         }
     }
 
-    if (isKeyedModelWithoutPricingSnapshot) {
+    if (isKeyedModelWithoutPricingSnapshot && !canUseBuiltinEstimateForKeyedModel) {
         if (explicitCost !== undefined) {
             return { cost: explicitCost, source: 'explicit', usedPricingSnapshot };
         }
@@ -328,6 +466,10 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
             };
         }
 
+        if (tokenFormulaCost !== undefined && tokenFormulaCost > 0 && canUseBuiltinEstimateForKeyedModel) {
+            return { cost: tokenFormulaCost, source: 'estimated', usedPricingSnapshot };
+        }
+
         return { cost: 0, source: 'none', usedPricingSnapshot };
     }
 
@@ -337,6 +479,10 @@ export function resolveImageCost(options: ResolveImageCostOptions): ResolvedImag
 
     if (storedCost !== undefined && (storedCost > 0 || !options.keySlotId)) {
         return { cost: storedCost, source: 'stored', usedPricingSnapshot };
+    }
+
+    if (tokenFormulaCost !== undefined && tokenFormulaCost > 0) {
+        return { cost: tokenFormulaCost, source: 'estimated', usedPricingSnapshot };
     }
 
     const estimatedCost = estimateCost();

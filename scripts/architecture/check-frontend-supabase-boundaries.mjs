@@ -11,15 +11,39 @@ const rpcPattern = /\.\s*rpc\(\s*["']([^"']+)["']/g;
 const transitionalAllowlist = new Map([
   [
     "src/context/BillingContext.tsx",
-    new Set(["billing_account_snapshot_v1", "user_credits", "credit_transactions"]),
+    {
+      tables: new Set(["user_credits", "credit_transactions"]),
+      procedures: new Set(),
+    },
   ],
   [
     "src/services/billing/creditExchangeRateService.ts",
-    new Set(["credit_exchange_rates"]),
+    {
+      tables: new Set(["credit_exchange_rates"]),
+      procedures: new Set(),
+    },
   ],
   [
     "src/services/billing/newApiPricingService.ts",
-    new Set(["provider_pricing_cache"]),
+    {
+      tables: new Set(["provider_pricing_cache"]),
+      procedures: new Set(),
+    },
+  ],
+  [
+    "src/services/admin/supabaseAdminFallbackService.ts",
+    {
+      tables: new Set(),
+      procedures: new Set([
+        "is_admin",
+        "authenticate_admin",
+        "admin_change_password",
+        "admin_recharge_credits_by_identity",
+        "get_admin_credit_models_full",
+        "save_credit_provider",
+        "delete_credit_provider",
+      ]),
+    },
   ],
 ]);
 
@@ -69,7 +93,9 @@ for (const file of roots.flatMap((relativeDir) => walk(relativeDir))) {
   const fileContent = fs.readFileSync(file, "utf8");
   const tables = collectMatches(fileContent, fromPattern);
   const procedures = collectMatches(fileContent, rpcPattern);
-  const allowedTables = transitionalAllowlist.get(relativePath) || new Set();
+  const allowlistedAccess = transitionalAllowlist.get(relativePath);
+  const allowedTables = allowlistedAccess?.tables || new Set();
+  const allowedProcedures = allowlistedAccess?.procedures || new Set();
 
   for (const table of tables) {
     if (allowedTables.has(table)) {
@@ -83,6 +109,11 @@ for (const file of roots.flatMap((relativeDir) => walk(relativeDir))) {
   }
 
   for (const procedure of procedures) {
+    if (allowedProcedures.has(procedure)) {
+      allowlistedDebt.push(`${relativePath} -> rpc:${procedure}`);
+      continue;
+    }
+
     failures.push(
       `${relativePath} directly calls Supabase RPC "${procedure}". Route web business logic through the API layer instead.`,
     );

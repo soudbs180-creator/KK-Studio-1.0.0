@@ -4,6 +4,7 @@ import { Loader2, Lock, Mail, Shield, User } from "lucide-react";
 import type { RegisterResponseDto } from "../../../packages/contracts/src/dto/auth.ts";
 import { legacyWebApiClient } from "../../services/api/kkApiClient";
 import { notify } from "../../services/system/notificationService";
+import { useLocale } from "../../context/LocaleContext";
 import { TurnstileWidget, useTurnstile } from "./TurnstileWidget";
 
 interface RegisterFormProps {
@@ -15,6 +16,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   onSuccess,
   onLoginClick,
 }) => {
+  const { pick } = useLocale();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -124,7 +126,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your@email.com"
+              placeholder={pick("请输入邮箱地址", "Enter your email")}
               className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 dark:text-white"
               required
             />

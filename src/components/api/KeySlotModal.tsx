@@ -161,7 +161,7 @@ export const KeySlotModal: React.FC<KeySlotModalProps> = ({
             >
               {modalType === 'official' && (
                 <>
-                  <option value="Google">Google Gemini</option>
+                            <option value="Google">Google</option>
                   <option value="OpenAI">OpenAI</option>
                   <option value="Anthropic">Anthropic Claude</option>
                 </>
@@ -173,7 +173,7 @@ export const KeySlotModal: React.FC<KeySlotModalProps> = ({
 
           {(formData.providerId === 'Custom' || modalType === 'third-party') && (
             <div>
-              <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Base URL</label>
+          <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>接口地址（Base URL）</label>
               <div className="relative">
                 <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
                   <Globe size={16} />
@@ -184,7 +184,7 @@ export const KeySlotModal: React.FC<KeySlotModalProps> = ({
                   onChange={(event) => setFormData({ ...formData, baseUrl: event.target.value })}
                   className="h-11 w-full rounded-xl border pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/45"
                   style={{ borderColor: 'var(--border-default)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
-                  placeholder="https://api.example.com/v1"
+            placeholder="例如：https://api.example.com/v1"
                 />
               </div>
               <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>请填写完整地址，建议包含 /v1 后缀。</p>
@@ -192,7 +192,7 @@ export const KeySlotModal: React.FC<KeySlotModalProps> = ({
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>API Key</label>
+          <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>接口密钥（API Key）</label>
             <div className="relative">
               <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
                 <Key size={16} />

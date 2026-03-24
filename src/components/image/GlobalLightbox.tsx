@@ -8,6 +8,7 @@ import { getImage, getStrictOriginalImage } from '../../services/storage/imageSt
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
 import { generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
+import { pickByDocumentLanguage } from '../../utils/localeText';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -191,7 +192,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         recoveringRef.current = true;
 
         try {
-            const current = sanitizeUrl(displaySrcRef.current || image.originalUrl || image.url || null);
+            const current = sanitizeUrl(displaySrcRef.current || image.originalUrl || image.apiResultUrl || image.url || null);
             if (current) {
                 triedSourcesRef.current.add(current);
             }
@@ -215,7 +216,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             }
 
             const fallbackCandidates = Array.from(new Set(
-                [displaySrcRef.current, image.originalUrl, image.url]
+                [displaySrcRef.current, image.originalUrl, image.apiResultUrl, image.url]
                     .map((u) => sanitizeUrl(u || null))
                     .filter((u): u is string => !!u)
             ));
@@ -229,7 +230,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         } finally {
             recoveringRef.current = false;
         }
-    }, [image.id, image.storageId, image.url, image.originalUrl, sanitizeUrl, trySwitchSource]);
+    }, [image.apiResultUrl, image.id, image.storageId, image.url, image.originalUrl, sanitizeUrl, trySwitchSource]);
 
     const resolveOriginalBlob = useCallback(async (): Promise<Blob | null> => {
         const keyCandidates = Array.from(new Set([image.storageId, image.id].filter(Boolean) as string[]));
@@ -256,7 +257,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             }
         }
 
-        const fallbackCandidates = [image.originalUrl, displaySrcRef.current, image.url]
+        const fallbackCandidates = [image.originalUrl, image.apiResultUrl, displaySrcRef.current, image.url]
             .map((value) => sanitizeUrl(value || null))
             .filter((value): value is string => !!value);
 
@@ -266,7 +267,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         }
 
         return null;
-    }, [fetchSourceBlob, image.id, image.originalUrl, image.storageId, image.url, sanitizeUrl]);
+    }, [fetchSourceBlob, image.apiResultUrl, image.id, image.originalUrl, image.storageId, image.url, sanitizeUrl]);
 
     // 1. 加载原图链路（可显示优先，失败回退）
     useEffect(() => {
@@ -281,8 +282,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         setPan({ x: 0, y: 0 });
         applyDisplaySource(null, { loading: true });
 
-        const initialOriginalHint = sanitizeUrl(image.originalUrl || null);
-        const initialFallbackSrc = sanitizeUrl(image.url || null);
+        const initialOriginalHint = sanitizeUrl(image.originalUrl || image.apiResultUrl || null);
+        const initialFallbackSrc = sanitizeUrl(image.url || image.apiResultUrl || null);
 
         const loadContent = async () => {
             try {
@@ -425,7 +426,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 target = await getStrictOriginalImage(image.storageId);
             }
 
-            target = target || image.originalUrl || displaySrc || image.url;
+            target = target || image.originalUrl || image.apiResultUrl || displaySrc || image.url;
             if (!target) return;
 
             const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
@@ -451,7 +452,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             }
         } catch (err) {
             // Final fallback: open the asset in a new tab.
-            const fallback = image.originalUrl || displaySrc || image.url;
+            const fallback = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
             if (fallback) window.open(fallback, '_blank', 'noopener,noreferrer');
         }
     };
@@ -753,10 +754,10 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                 onEditPptDeck(image);
                             }}
                             className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
-                            title="Edit layered deck"
+                            title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
                         >
                             <Pen size={16} />
-                            Edit Deck
+                            {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
                         </button>
                     )}
 
@@ -770,7 +771,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             title="编辑当前页文字"
                         >
                             <Pen size={16} />
-                            Quick Text
+                            {pickByDocumentLanguage('快速改字', 'Quick Text')}
                         </button>
                     )}
 

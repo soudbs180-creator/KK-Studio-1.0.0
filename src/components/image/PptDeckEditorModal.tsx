@@ -19,6 +19,7 @@ import {
   sortPptLayers,
   syncPptSlidesFromEditablePages,
 } from '../../utils/pptEditable';
+import { useLocale } from '../../context/LocaleContext';
 
 interface PptDeckEditorModalProps {
   promptNode: PromptNode;
@@ -60,6 +61,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { pick } = useLocale();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
@@ -235,9 +237,9 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
               <Layers3 size={18} />
             </div>
             <div>
-              <div className="text-sm font-semibold">Editable PPT Deck</div>
+              <div className="text-sm font-semibold">{pick('可编辑 PPT 页面包', 'Editable PPT Deck')}</div>
               <div className="text-xs text-white/60">
-                Edit text layers before exporting a layered PPTX package.
+                {pick('导出分层 PPTX 之前，可以先在这里调整文字图层。', 'Edit text layers before exporting a layered PPTX package.')}
               </div>
             </div>
           </div>
@@ -247,12 +249,12 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
               onClick={handleSave}
               className="rounded-full bg-sky-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-400"
             >
-              Save deck
+              {pick('保存页面包', 'Save deck')}
             </button>
             <button
               onClick={onClose}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
-              title="Close"
+              title={pick('关闭', 'Close')}
             >
               <X size={18} />
             </button>
@@ -262,13 +264,13 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
         <div className={`grid min-h-0 ${isMobile ? 'h-[calc(100%-65px)] grid-cols-1' : 'h-[calc(100%-73px)] grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
           <aside className="overflow-y-auto border-b border-white/10 bg-white/[0.03] p-4 xl:border-b-0 xl:border-r">
             <div className="mb-3 text-xs uppercase tracking-[0.16em] text-white/45">
-              Slides
+              {pick('页面列表', 'Slides')}
             </div>
             <div className="space-y-3">
               {pages.map((page, index) => {
                 const image = images[index];
                 const isActive = index === activeIndex;
-                const title = getPptTextLayer(page, 'title')?.text.trim() || `Slide ${index + 1}`;
+                const title = getPptTextLayer(page, 'title')?.text.trim() || pick(`第 ${index + 1} 页`, `Slide ${index + 1}`);
                 const subtitle = getPptTextLayer(page, 'subtitle')?.text.trim() || outlinePreview[index] || '';
 
                 return (
@@ -290,7 +292,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                       </div>
                     </div>
                     <div className="mt-2 text-sm font-medium">{title}</div>
-                    <div className="mt-1 line-clamp-2 text-xs text-white/55">{subtitle || 'No subtitle yet'}</div>
+                    <div className="mt-1 line-clamp-2 text-xs text-white/55">{subtitle || pick('暂未填写副标题', 'No subtitle yet')}</div>
                   </button>
                 );
               })}
@@ -303,13 +305,13 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                 <>
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <div className="text-xs uppercase tracking-[0.16em] text-white/45">Preview</div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('预览', 'Preview')}</div>
                       <div className="mt-1 text-lg font-semibold">
-                        {titleLayer?.text.trim() || activePage.name || `Slide ${activeIndex + 1}`}
+                        {titleLayer?.text.trim() || activePage.name || pick(`第 ${activeIndex + 1} 页`, `Slide ${activeIndex + 1}`)}
                       </div>
                     </div>
                     <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/60">
-                      1920 x 1080 layered scene
+                      {pick('1920 x 1080 分层画面', '1920 x 1080 layered scene')}
                     </div>
                   </div>
 
@@ -326,10 +328,10 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
               {activePage ? (
                 <>
                   <div className="mb-5">
-                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">Text layers</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('文字图层', 'Text layers')}</div>
                     <div className="mt-3 space-y-4">
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">Title</div>
+                        <div className="mb-1 text-xs text-white/60">{pick('标题', 'Title')}</div>
                         <textarea
                           value={titleLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'title', event.target.value))}
@@ -338,7 +340,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                       </label>
 
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">Subtitle</div>
+                        <div className="mb-1 text-xs text-white/60">{pick('副标题', 'Subtitle')}</div>
                         <textarea
                           value={subtitleLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'subtitle', event.target.value))}
@@ -347,20 +349,20 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                       </label>
 
                       <label className="block">
-                        <div className="mb-1 text-xs text-white/60">Body</div>
+                        <div className="mb-1 text-xs text-white/60">{pick('正文', 'Body')}</div>
                         <textarea
                           value={bodyLayer?.text || ''}
                           onChange={(event) => updatePage(activeIndex, (page) => patchPptTextLayer(page, 'body', event.target.value))}
                           className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-400/60"
-                          placeholder="Optional body copy or bullet-style text."
+                          placeholder={pick('可选正文，支持段落或项目符号式内容。', 'Optional body copy or bullet-style text.')}
                         />
                       </label>
                     </div>
                   </div>
 
                   <div className="mb-4 flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">Layer order</div>
-                    <div className="text-[11px] text-white/45">Top layers export later in PPTX.</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-white/45">{pick('图层顺序', 'Layer order')}</div>
+                    <div className="text-[11px] text-white/45">{pick('越靠上的图层，在 PPTX 中越晚导出。', 'Top layers export later in PPTX.')}</div>
                   </div>
 
                   <div className="space-y-2">
@@ -382,7 +384,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                           <button
                             onClick={() => updateLayerVisibility(activeIndex, layer.id, !layer.visible)}
                             className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14"
-                            title={layer.visible ? 'Hide layer' : 'Show layer'}
+                            title={layer.visible ? pick('隐藏图层', 'Hide layer') : pick('显示图层', 'Show layer')}
                           >
                             {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                           </button>
@@ -390,7 +392,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                             onClick={() => moveLayer(activeIndex, layer.id, -1)}
                             disabled={index === 0}
                             className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-30"
-                            title="Move down"
+                            title={pick('下移一层', 'Move down')}
                           >
                             <ChevronDown size={14} />
                           </button>
@@ -398,7 +400,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
                             onClick={() => moveLayer(activeIndex, layer.id, 1)}
                             disabled={index === sorted.length - 1}
                             className="rounded-full bg-white/8 p-2 text-white/70 transition-colors hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-30"
-                            title="Move up"
+                            title={pick('上移一层', 'Move up')}
                           >
                             <ChevronUp size={14} />
                           </button>

@@ -14,6 +14,10 @@ import {
   extractUserApiEntriesFromPayload,
   mergeUserApisPayload,
 } from "./user-api-payload.ts";
+import {
+  decryptUserApisPayload,
+  encryptUserApisPayload,
+} from "./user-api-secret-crypto.ts";
 
 interface ProfileUserApisRow {
   id: string;
@@ -24,12 +28,14 @@ interface ProfileUserApisRow {
 export interface SupabaseAuthDataRepositoryOptions {
   supabaseUrl: string;
   serviceRoleKey: string;
+  storageEncryptionKey?: string;
 }
 
 const tempUserExpiryMs = 24 * 60 * 60 * 1000;
 
 export class SupabaseAuthDataRepository implements AuthDataRepository {
   private readonly client: SupabaseClient;
+  private readonly storageEncryptionKey: string;
 
   constructor(options: SupabaseAuthDataRepositoryOptions) {
     this.client = createClient(options.supabaseUrl, options.serviceRoleKey, {
@@ -38,11 +44,12 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
         persistSession: false,
       },
     });
+    this.storageEncryptionKey = options.storageEncryptionKey || options.serviceRoleKey;
   }
 
   async listUserApiEntries(userId: string, email?: string): Promise<UserApiEntryDto[]> {
     const profile = await this.getOrCreateProfile(userId, email);
-    return this.extractEntries(profile?.user_apis);
+    return this.extractEntries(this.decryptPayload(profile?.user_apis));
   }
 
   async replaceUserApiEntries(
@@ -51,16 +58,17 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     entries: UserApiEntryDto[],
   ): Promise<UserApiEntryDto[]> {
     const existing = await this.getOrCreateProfile(userId, email);
-    const mergedPayload = mergeUserApisPayload(existing?.user_apis, {
+    const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), {
       entries,
     });
+    const encryptedPayload = this.encryptPayload(mergedPayload);
 
     const { error } = await this.client
       .from("profiles")
       .upsert({
         id: userId,
         email: email || existing?.email || null,
-        user_apis: mergedPayload,
+        user_apis: encryptedPayload,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: "id",
@@ -76,7 +84,7 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
 
   async getKeyManagerCloudState(userId: string, email?: string): Promise<KeyManagerCloudStateDto> {
     const profile = await this.getOrCreateProfile(userId, email);
-    return this.extractKeyManagerState(profile?.user_apis);
+    return this.extractKeyManagerState(this.decryptPayload(profile?.user_apis));
   }
 
   async replaceKeyManagerCloudState(
@@ -85,17 +93,18 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     state: ReplaceKeyManagerCloudStateRequestDto,
   ): Promise<KeyManagerCloudStateDto> {
     const existing = await this.getOrCreateProfile(userId, email);
-    const mergedPayload = mergeUserApisPayload(existing?.user_apis, {
+    const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), {
       slots: state.slots,
       providers: state.providers,
     });
+    const encryptedPayload = this.encryptPayload(mergedPayload);
 
     const { error } = await this.client
       .from("profiles")
       .upsert({
         id: userId,
         email: email || existing?.email || null,
-        user_apis: mergedPayload,
+        user_apis: encryptedPayload,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: "id",
@@ -115,6 +124,12 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     const expiresAt = new Date(now.getTime() + tempUserExpiryMs);
     const email = `${userId}@temp.local`;
     const nickname = `Guest_${userId.replace(/-/g, "").slice(0, 8)}`;
+
+    // Best-effort cleanup keeps the temp_users table aligned with the 24h TTL model.
+    await this.client
+      .from("temp_users")
+      .delete()
+      .lt("expires_at", now.toISOString());
 
     const { error } = await this.client.from("temp_users").insert({
       id: userId,
@@ -197,5 +212,13 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
       providers: payload.providers.map((provider) => ({ ...provider })),
       entries: this.extractEntries(payload.entries),
     };
+  }
+
+  private encryptPayload(raw: unknown): unknown {
+    return encryptUserApisPayload(raw, this.storageEncryptionKey);
+  }
+
+  private decryptPayload(raw: unknown): unknown {
+    return decryptUserApisPayload(raw, this.storageEncryptionKey);
   }
 }

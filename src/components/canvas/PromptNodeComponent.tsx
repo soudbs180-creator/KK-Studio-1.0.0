@@ -13,11 +13,14 @@ import ImagePreview from '../image/ImagePreview';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 import { isCreditBillingTarget } from '../../utils/creditBilling';
+import { pickByDocumentLanguage } from '../../utils/localeText';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
     return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 1))}…` : text;
 };
+
+const CARD_LAUNCH_OVERLAY_Z_INDEX = 980;
 
 const getPromptStackZIndex = (node: PromptNode, isSelected: boolean, groupLayerZIndex?: number) => {
     const persistedOrder = (groupLayerZIndex ?? node.zIndex ?? 0) * 100;
@@ -38,6 +41,7 @@ interface PromptNodeProps {
     detailLevel?: CanvasCardDetailLevel;
     groupLayerZIndex?: number;
     stackZIndexOverride?: number;
+    renderOrigin?: { x: number; y: number };
     actualChildImageCount?: number;
     onPositionChange: (id: string, newPos: { x: number; y: number }) => void;
     isSelected: boolean;
@@ -65,9 +69,12 @@ interface PromptNodeProps {
     onDisconnect?: (id: string) => void;
     onHeightChange?: (id: string, height: number) => void;
     highlighted?: boolean;
+    shadowBoost?: boolean;
+    onLivePositionChange?: (id: string, position: { x: number; y: number } | null) => void;
     onPin?: (id: string, mode: 'button' | 'drag') => void; // 🚀 [New Prop] Pin Draft
     onRemoveTag?: (id: string, tag: string) => void; // 🚀 [New Prop] Remove Tag
     onDragDelta?: (delta: { x: number; y: number }, sourceNodeId?: string) => void; // 🚀 [New Prop] Relative Drag
+    onDragStateChange?: (dragging: boolean) => void;
     onUpdateNode?: (node: PromptNode) => void; // 🚀 [New Prop] Update node externally
     isCanvasTransforming?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] Render as standard block in chat feed
@@ -258,6 +265,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     detailLevel = 'full',
     groupLayerZIndex,
     stackZIndexOverride,
+    renderOrigin,
     actualChildImageCount = 0,
 
     onPositionChange,
@@ -283,9 +291,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onDisconnect,
     onHeightChange,
     highlighted,
+    shadowBoost = false,
+    onLivePositionChange,
     onPin,
     onRemoveTag,
     onDragDelta,
+    onDragStateChange,
     onUpdateNode,
     isCanvasTransforming = false,
     isChatMode = false
@@ -304,7 +315,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
     const dragStartPos = useRef({ x: 0, y: 0 });
-    const lastMousePos = useRef({ x: 0, y: 0 });
+    const dragStartCanvasPos = useRef({ x: 0, y: 0 });
 
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
@@ -325,10 +336,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             localPosRef.current = node.position;
             // 🚀 [Fix] 只在位置差异较大时才强制更新 DOM，避免微小更新导致的抖动
             if (containerRef.current) {
+                const originX = renderOrigin?.x ?? 0;
+                const originY = renderOrigin?.y ?? 0;
                 const currentLeft = parseFloat(containerRef.current.style.left) || 0;
                 const currentTop = parseFloat(containerRef.current.style.top) || 0;
-                const targetLeft = Math.round(node.position.x - cardWidth / 2);
-                const targetTop = Math.round(node.position.y - cardHeight);
+                const targetLeft = Math.round(node.position.x - cardWidth / 2 - originX);
+                const targetTop = Math.round(node.position.y - cardHeight - originY);
                 
                 // 只在差异超过 2px 时才更新，避免微小抖动
                 if (Math.abs(currentLeft - targetLeft) > 2 || Math.abs(currentTop - targetTop) > 2) {
@@ -338,7 +351,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 }
             }
         }
-    }, [node.position.x, node.position.y, isDragging, cardWidth, cardHeight, isChatMode]);
+    }, [node.position.x, node.position.y, isDragging, cardWidth, cardHeight, isChatMode, renderOrigin]);
+
+    useEffect(() => () => {
+        onLivePositionChange?.(node.id, null);
+    }, [node.id, onLivePositionChange]);
 
     useEffect(() => {
         // 🚀 默认展示优化后的结果 (若存在)
@@ -354,6 +371,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     useEffect(() => {
         timerStartRef.current = node.timestamp || Date.now();
     }, [node.id, node.timestamp]);
+
+    useEffect(() => {
+        return () => {
+            onDragStateChange?.(false);
+        };
+    }, [onDragStateChange]);
 
     // 🚀 [丝滑优化] 统一飞入动画：从输入框中心飞向画布目标位置
     // 使用 useLayoutEffect + 单一 gsap.fromTo 避免双重动画冲突和位置跳动
@@ -393,16 +416,16 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     const timeline = gsap.timeline({
                         defaults: { force3D: true, overwrite: 'auto' },
                         onStart: () => {
-                            document.body.classList.add('is-animating-card');
-                            el.style.zIndex = String((stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex)) + 1);
+                            el.style.zIndex = String(Math.max(
+                                CARD_LAUNCH_OVERLAY_Z_INDEX,
+                                (stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex)) + 1
+                            ));
                         },
                         onComplete: () => {
-                            document.body.classList.remove('is-animating-card');
                             el.style.willChange = '';
                             el.style.zIndex = '';
                         },
                         onInterrupt: () => {
-                            document.body.classList.remove('is-animating-card');
                             el.style.willChange = '';
                             el.style.zIndex = '';
                         },
@@ -446,12 +469,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         });
                 } catch (error) {
                     console.warn('[PromptNodeComponent] Entry animation failed, restored visibility.', error);
-                    document.body.classList.remove('is-animating-card');
                     restoreVisibility();
                 }
             }).catch((error) => {
                 console.warn('[PromptNodeComponent] Failed to load GSAP, restored visibility.', error);
-                document.body.classList.remove('is-animating-card');
                 restoreVisibility();
             });
         }
@@ -514,6 +535,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
         if (isChatMode) return; // Disable drag/select logic in chat mode
+        if ('button' in e && e.button === 1) {
+            return;
+        }
         if ('button' in e && e.button === 2) {
             onBringToFront?.();
             return;
@@ -536,9 +560,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
         // Store initial mouse position
         dragStartPos.current = { x: clientX, y: clientY };
-        lastMousePos.current = { x: clientX, y: clientY };
+        dragStartCanvasPos.current = { x: node.position.x, y: node.position.y };
+        localPosRef.current = node.position;
 
         setIsDragging(true);
+        onDragStateChange?.(true);
         hasMoved.current = false;
 
         // 🚀 [添加] 触发自定义事件通知 ImagePreview 关闭
@@ -567,12 +593,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         }
 
         const scale = zoomScale || 1;
-
-        // 增量计算
-        const dx = (clientX - lastMousePos.current.x) / scale;
-        const dy = (clientY - lastMousePos.current.y) / scale;
-
-        lastMousePos.current = { x: clientX, y: clientY };
+        const nextPos = {
+            x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
+            y: dragStartCanvasPos.current.y + ((clientY - dragStartPos.current.y) / scale),
+        };
+        const dx = nextPos.x - localPosRef.current.x;
+        const dy = nextPos.y - localPosRef.current.y;
+        localPosRef.current = nextPos;
+        onLivePositionChange?.(node.id, nextPos);
 
         // 只更新 React 状态，连接线会跟随
         if (onDragDelta && (dx !== 0 || dy !== 0)) {
@@ -583,7 +611,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const handleMouseUp = () => {
         if (isDragging) {
             setIsDragging(false);
-            lastMousePos.current = { x: 0, y: 0 };
+            onDragStateChange?.(false);
+            onLivePositionChange?.(node.id, null);
         }
     };
 
@@ -602,7 +631,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
         };
-    }, [isDragging, zoomScale, onDragDelta, onPositionChange, node.id]);
+    }, [isDragging, zoomScale, onDragDelta, onLivePositionChange, onPositionChange, node.id]);
 
     const effectiveChildImageCount = Math.max(0, actualChildImageCount);
     const renderedSuccessCount = effectiveChildImageCount > 0
@@ -637,6 +666,22 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         opacity: textSoftening.secondaryOpacity,
         transition: textTransition,
     };
+    const shellCardShadow = showError
+        ? '0 0 18px rgba(239, 68, 68, 0.18), 0 0 0 1px rgba(239, 68, 68, 0.3)'
+        : isSelected
+            ? '0 0 18px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28)'
+            : shadowBoost
+                ? '0 20px 42px rgba(2, 6, 23, 0.30), 0 10px 26px rgba(2, 6, 23, 0.18)'
+                : '0 4px 16px rgba(0,0,0,0.14)';
+    const mainCardShadow = showError
+        ? '0 0 15px rgba(239, 68, 68, 0.15), 0 0 0 1px rgba(239, 68, 68, 0.5)'
+        : isSelected
+            ? '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.5)'
+            : shadowBoost
+                ? '0 24px 54px rgba(2, 6, 23, 0.34), 0 12px 30px rgba(2, 6, 23, 0.22), 0 0 0 1px rgba(255,255,255,0.05)'
+                : '0 4px 20px -2px rgba(0,0,0,0.15), 0 0 0 1px var(--border-light)';
+    const originX = renderOrigin?.x ?? 0;
+    const originY = renderOrigin?.y ?? 0;
 
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
@@ -653,8 +698,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     zIndex: stackZIndex,
                     opacity: 1,
                 } : {
-                    left: renderLeft,
-                    top: renderTop,
+                    left: renderLeft - originX,
+                    top: renderTop - originY,
                     zIndex: stackZIndex,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
@@ -679,9 +724,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             : isSelected
                                 ? 'rgba(59, 130, 246, 0.6)'
                                 : 'var(--border-light)',
-                        boxShadow: isSelected
-                            ? '0 0 18px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28)'
-                            : '0 4px 16px rgba(0,0,0,0.14)',
+                        boxShadow: shellCardShadow,
                     }}
                 >
                     {onConnectStart && !isChatMode && (
@@ -800,15 +843,15 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         <div
             ref={containerRef}
             className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
-            style={isChatMode ? {
-                zIndex: stackZIndex,
-                opacity: 1,
-            } : {
-                left: renderLeft,
-                top: renderTop,
-                zIndex: stackZIndex,
-                opacity: 1,
-                cursor: isDragging ? 'grabbing' : 'grab',
+                style={isChatMode ? {
+                    zIndex: stackZIndex,
+                    opacity: 1,
+                } : {
+                    left: renderLeft - originX,
+                    top: renderTop - originY,
+                    zIndex: stackZIndex,
+                    opacity: 1,
+                    cursor: isDragging ? 'grabbing' : 'grab',
                 willChange: isDragging ? 'transform, left, top' : 'auto', // 🚀 [性能优化] 拖拽时启用GPU加速
                 transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                 pointerEvents: 'auto',
@@ -829,11 +872,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     borderColor: showError
                         ? 'rgba(239, 68, 68, 0.5)'
                         : isSelected ? 'rgba(59, 130, 246, 0.6)' : 'var(--border-light)',
-                    boxShadow: showError
-                        ? '0 0 15px rgba(239, 68, 68, 0.15), 0 0 0 1px rgba(239, 68, 68, 0.5)'
-                        : isSelected
-                            ? '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.5)'
-                            : '0 4px 20px -2px rgba(0,0,0,0.15), 0 0 0 1px var(--border-light)',
+                    boxShadow: mainCardShadow,
                 }}
             >
                 {/* 🚀 [NEW] Connection Point - Bottom Center */}
@@ -1164,9 +1203,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     onEditPptDeck(node);
                                 }}
                                 className="px-2 py-1 rounded-md border text-[11px] leading-none bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
-                                title="Edit layered PPT content"
+                                title={pickByDocumentLanguage('编辑分层 PPT 内容', 'Edit layered PPT content')}
                             >
-                                Edit Deck
+                                {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
                             </button>
                         )}
 
@@ -1618,6 +1657,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.actualChildImageCount === next.actualChildImageCount &&
         prev.isSelected === next.isSelected &&
         prev.highlighted === next.highlighted &&
+        prev.shadowBoost === next.shadowBoost &&
         prev.detailLevel === next.detailLevel &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.zoomScale === next.zoomScale &&

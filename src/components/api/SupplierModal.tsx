@@ -235,10 +235,10 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
       
       if (result.success) {
         setTokenValid(true);
-        notify.success('Token 验证成功', '可以获取模型和价格信息', '现在可以点击"获取模型"按钮获取模型列表');
+        notify.success('访问令牌验证成功', '可以获取模型和价格信息', '现在可以点击"获取模型"按钮获取模型列表');
       } else {
         setTokenValid(false);
-        notify.error('Token 验证失败', result.error || '请检查 Token 是否正确');
+        notify.error('访问令牌验证失败', result.error || '请检查访问令牌是否正确');
       }
     } catch (error: any) {
       setTokenValid(false);
@@ -406,7 +406,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
               type="text"
               value={formData.name}
               onChange={e => updateFormData({ name: e.target.value })}
-              placeholder="例如：My AI Provider"
+              placeholder="例如：我的 AI 服务商"
               className={fieldClass}
             />
           </div>
@@ -414,13 +414,13 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           {/* Base URL */}
           <div>
             <label className={labelClass}>
-              Base URL <span className="text-red-500">*</span>
+              接口地址（Base URL）<span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.baseUrl}
               onChange={e => updateFormData({ baseUrl: e.target.value })}
-              placeholder="https://api.example.com/v1"
+              placeholder="例如：https://api.example.com/v1"
               className={fieldClass}
             />
             <p className={helperTextClass}>NewAPI 地址，用于调用模型</p>
@@ -443,7 +443,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           {/* API Key */}
           <div>
             <label className={labelClass}>
-              API Key <span className="text-red-500">*</span>
+              接口密钥（API Key）<span className="text-red-500">*</span>
             </label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
@@ -455,10 +455,10 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
               />
               <div
                 {...getKeyRootProps()}
-                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
+                className="inline-flex max-w-full min-w-0 cursor-pointer items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
               >
                 <input {...getKeyInputProps()} />
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 shrink-0" />
                 <span>上传</span>
               </div>
             </div>
@@ -468,7 +468,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           {/* System Access Token (Optional) */}
           <div>
             <label className={labelClass}>
-              System Access Token <span className="text-[var(--text-tertiary)]">(可选)</span>
+              系统访问令牌（System Access Token）<span className="text-[var(--text-tertiary)]">(可选)</span>
             </label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
@@ -478,7 +478,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                   updateFormData({ systemToken: e.target.value });
                   setTokenValid(null);
                 }}
-                placeholder="用于获取模型价格信息"
+              placeholder="用于获取模型价格信息的系统访问令牌"
                 className={compactFieldClass}
               />
               <button
@@ -488,11 +488,11 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                 className={secondaryButtonClass}
               >
                 {isVerifying ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-4 h-4 shrink-0 animate-spin" />
                 ) : tokenValid === true ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <CheckCircle className="w-4 h-4 shrink-0 text-green-400" />
                 ) : tokenValid === false ? (
-                  <AlertCircle className="w-4 h-4 text-red-400" />
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
                 ) : null}
                 验证
               </button>
@@ -517,9 +517,9 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                 type="button"
                 onClick={handleFetchModels}
                 disabled={isLoading}
-                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-blue-600 py-2 text-sm font-medium transition-colors hover:bg-blue-500 disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
                 {isLoading ? '获取中...' : '获取模型和价格'}
               </button>
             </div>
@@ -554,7 +554,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                     <span className="truncate text-sm text-[var(--text-primary)]">{model.name}</span>
                     <span className="text-xs text-[var(--text-tertiary)]">
                       {model.billingType === 'token' 
-                        ? `$${model.inputPrice}/${model.outputPrice} per 1M tokens`
+                        ? `$${model.inputPrice}/${model.outputPrice} / 100万词元`
                         : model.billingType}
                     </span>
                   </div>

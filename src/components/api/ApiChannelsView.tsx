@@ -12,6 +12,7 @@ import { resolveProviderRuntime } from '../../services/api/providerStrategy';
 import { notify } from '../../services/system/notificationService';
 import { CHAT_MODEL_PRESETS } from '../../services/model/modelPresets';
 import { maskApiKey } from '../../utils/securityUtils';
+import { useLocale } from '../../context/LocaleContext';
 
 // Helper to split model strings respecting parentheses and group labels
 const splitModelStrings = (input: string): string[] => {
@@ -61,15 +62,18 @@ const PRESET_PROVIDERS = [
     { label: 'DeepSeek Official', url: 'https://api.deepseek.com', provider: 'OpenAI', mode: 'chat', models: 'deepseek-chat, deepseek-reasoner' },
     { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1', provider: 'OpenAI', mode: 'standard', models: 'google/gemini-2.5-flash:free, google/gemini-3-flash-preview, openai/gpt-4o, anthropic/claude-3.5-sonnet' },
     { label: 'OpenAI Official', url: 'https://api.openai.com/v1', provider: 'OpenAI', mode: 'standard', models: 'dall-e-3(DALL-E 3), gpt-4o(GPT-4o), gpt-4o-mini' },
-    { label: 'Google Gemini', url: 'https://generativelanguage.googleapis.com', provider: 'Google', mode: 'standard', models: `gemini-2.5-flash, gemini-2.5-flash-image, gemini-3-pro-image-preview, imagen-4.0-generate-001, imagen-4.0-ultra-generate-001, imagen-4.0-fast-generate-001, veo-3.1-generate-preview, veo-3.1-fast-generate-preview` },
+    { label: 'Google', url: 'https://generativelanguage.googleapis.com', provider: 'Google', mode: 'standard', models: `gemini-2.5-flash, gemini-2.5-flash-image, gemini-3-pro-image-preview, imagen-4.0-generate-001, imagen-4.0-ultra-generate-001, imagen-4.0-fast-generate-001, veo-3.1-generate-preview, veo-3.1-fast-generate-preview` },
 ];
 
 export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'assets' }) => {
+    const { pick } = useLocale();
     const [slots, setSlots] = useState<KeySlot[]>(keyManager.getSlots());
     const [strategy, setStrategy] = useState(keyManager.getStrategy());
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? window.innerWidth < 768 : false
     );
+    const defaultChannelName = pick('新信道', 'New Channel');
+    const defaultApiChannelName = pick('API 信道', 'API Channel');
 
     const clampAndFormat = (value?: number) => {
         const v = Math.floor(value || 0);
@@ -153,7 +157,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                 setFormChatModels(categorized.chatModels.join(', '));
                 setFormOtherModels(categorized.otherModels?.join(', ') || '');
             }
-            if (formName === 'New Channel' || !formName) {
+            if (formName === defaultChannelName || !formName) {
                 setFormName(preset.label);
             }
         }
@@ -195,7 +199,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
 
     const openAddModal = () => {
         setEditingId(null);
-        setFormName('New Channel');
+        setFormName(defaultChannelName);
         setFormProvider('Google');
         setFormKey('');
         setFormBaseUrl('');
@@ -334,7 +338,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
     const handleTestConnection = async () => {
         if (!formKey || (!formBaseUrl && formProvider !== 'Google')) {
             setTestStatus('error');
-            setTestMessage('请先填写完整 API Key 和 接口地址');
+            setTestMessage(pick('请先填写完整的接口密钥和接口地址。', 'Please complete the API key and endpoint URL first.'));
             return;
         }
 
@@ -396,7 +400,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
         }
 
         const keyData = {
-            name: formName.trim() || 'API Channel',
+            name: formName.trim() || defaultApiChannelName,
             key: formKey.trim(),
             provider: formProvider as any, // Cast to any or Provider to fix type error
             baseUrl: formBaseUrl.trim(),
@@ -491,10 +495,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
 
                     <button
                         onClick={openAddModal}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 !text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+                        className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-500 !text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
                         style={{ color: 'white' }}
                     >
-                        <Plus size={14} />
+                        <Plus size={14} className="shrink-0" />
                         <span className="hidden sm:inline">添加信道</span>
                         <span className="sm:hidden">添加</span>
                     </button>
@@ -748,9 +752,9 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                         detectSettingsFromUrl(val);
 
                                                         // Auto-name if default
-                                                        if (val.includes('deepseek')) { setFormName(n => n === 'New Channel' || !n ? 'DeepSeek' : n); }
-                                                        else if (val.includes('silicon')) { setFormName(n => n === 'New Channel' || !n ? 'SiliconFlow' : n); }
-                                                        else if (val.includes('openrouter')) { setFormName(n => n === 'New Channel' || !n ? 'OpenRouter' : n); }
+        if (val.includes('deepseek')) { setFormName(n => n === defaultChannelName || !n ? 'DeepSeek' : n); }
+        else if (val.includes('silicon')) { setFormName(n => n === defaultChannelName || !n ? 'SiliconFlow' : n); }
+        else if (val.includes('openrouter')) { setFormName(n => n === defaultChannelName || !n ? 'OpenRouter' : n); }
                                                     }}
                                                 />
                                                 <Globe className="absolute left-3 top-2.5 text-[var(--text-secondary)] pointer-events-none" size={14} />
@@ -762,12 +766,12 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                     type="button"
                                                     onClick={handleTestConnection}
                                                     disabled={testStatus === 'testing'}
-                                                    className={`text-[10px] px-3 py-1.5 rounded border flex items-center gap-2 transition-colors ${testStatus === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                    className={`text-[10px] px-3 py-1.5 rounded border flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap transition-colors ${testStatus === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
                                                         testStatus === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                                                             'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border-[var(--border-medium)] hover:text-[var(--text-secondary)]'
                                                         }`}
                                                 >
-                                                    {testStatus === 'testing' ? <Globe size={12} className="animate-spin" /> : <Terminal size={12} />}
+                                                    {testStatus === 'testing' ? <Globe size={12} className="shrink-0 animate-spin" /> : <Terminal size={12} className="shrink-0" />}
                                                     {testStatus === 'testing' ? '测试中...' : '测试连接 (Test Connection)'}
                                                 </button>
                                             </div>
@@ -800,7 +804,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
 
                                     {/* API Key */}
                                     <div>
-                                        <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">API Key</label>
+                                        <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">{pick('接口密钥', 'API Key')}</label>
                                         <div className="relative">
                                             <input
                                                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg pl-9 pr-10 py-2.5 text-sm text-[var(--text-primary)] font-mono outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
@@ -824,7 +828,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                     setIsKeyEditing(!isKeyEditing);
                                                 }}
                                                 className="absolute right-3 top-2.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer transition-colors"
-                                                title={isKeyEditing ? "隐藏 API Key" : "显示完整 API Key"}
+                                                title={isKeyEditing ? pick('隐藏接口密钥', 'Hide API key') : pick('显示完整接口密钥', 'Show full API key')}
                                             >
                                                 {isKeyEditing ? <EyeOff size={14} /> : <Eye size={14} />}
                                             </button>
@@ -836,7 +840,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                         <button
                                             onClick={async () => {
                                                 if (!formKey) {
-                                                    notify.warning('请先输入API Key', '需要API Key才能检测');
+                                                    notify.warning(
+                                                        pick('请先输入接口密钥', 'Enter the API key first'),
+                                                        pick('需要先填写接口密钥才能进行检测。', 'An API key is required before running detection.')
+                                                    );
                                                     return;
                                                 }
                                                 setLoading(true);
@@ -856,8 +863,8 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                             setFormChatModels('gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite');
                                                             setFormOtherModels('');
 
-                                                            if (formName === 'New Channel' || !formName) {
-                                                                setFormName('Google API');
+                                                            if (formName === defaultChannelName || !formName) {
+                                                                setFormName('Google');
                                                                 setFormProvider('Google');
                                                             }
 
@@ -890,14 +897,14 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                             setFormChatModels(chatModels.join(', '));
                                                             setFormOtherModels(otherModels ? otherModels.join(', ') : '');
 
-                                                            if (formName === 'New Channel' || !formName) {
+                                                            if (formName === defaultChannelName || !formName) {
                                                                 if (formBaseUrl) {
                                                                     try {
                                                                         const url = new URL(formBaseUrl);
                                                                         const domain = url.hostname.split('.').slice(-2).join('.').split('.')[0];
                                                                         setFormName(domain.charAt(0).toUpperCase() + domain.slice(1));
                                                                     } catch (e) {
-                                                                        setFormName('API Channel');
+                                                                        setFormName(defaultApiChannelName);
                                                                     }
                                                                 }
                                                             }
@@ -958,10 +965,10 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                 }
                                             }}
                                             disabled={loading}
-                                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            className="w-full min-w-0 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap"
                                         >
-                                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-                                            {loading ? '检测中...' : '智能检测模型 (Auto Detect Models)'}
+                                            {loading ? <Loader2 size={16} className="shrink-0 animate-spin" /> : <Zap size={16} className="shrink-0" />}
+                                            {loading ? pick('检测中...', 'Detecting...') : pick('智能检测模型', 'Auto Detect Models')}
                                         </button>
                                         <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5">
                                             💡 提示: 自动检测会尝试连接接口并获取可用模型列表，并自动填充到下方。
@@ -980,7 +987,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                             <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">信道名称</label>
                                             <input
                                                 className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-indigo-500/50"
-                                                placeholder="My Channel"
+                                                placeholder={pick('例如：我的 Gemini 信道', 'For example: My Gemini channel')}
                                                 value={formName}
                                                 onChange={e => setFormName(e.target.value)}
                                             />
@@ -1021,15 +1028,15 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                     }
                                                 }}
                                             >
-                                                <option value="Google">Google / Gemini</option>
-                                                <option value="OpenAI">OpenAI Compatible</option>
+                                                <option value="Google">{pick('Google / Gemini', 'Google / Gemini')}</option>
+                                                <option value="OpenAI">{pick('OpenAI 兼容', 'OpenAI Compatible')}</option>
                                                 <option value="Anthropic">Anthropic</option>
-                                                <option value="Aliyun">Aliyun (DashScope)</option>
-                                                <option value="Tencent">Tencent (Hunyuan)</option>
-                                                <option value="Volcengine">Volcengine (Doubao)</option>
-                                                <option value="SiliconFlow">SiliconFlow</option>
+                                                <option value="Aliyun">{pick('阿里云百炼', 'Aliyun (DashScope)')}</option>
+                                                <option value="Tencent">{pick('腾讯混元', 'Tencent (Hunyuan)')}</option>
+                                                <option value="Volcengine">{pick('火山引擎豆包', 'Volcengine (Doubao)')}</option>
+                                                <option value="SiliconFlow">{pick('硅基流动', 'SiliconFlow')}</option>
                                                 <option value="DeepSeek">DeepSeek</option>
-                                                <option value="Custom">Custom</option>
+                                                <option value="Custom">{pick('自定义', 'Custom')}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1050,7 +1057,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
                                                         <span>📸</span>
-                                                        <span>图像模型 (Image)</span>
+                                                        <span>{pick('图像模型', 'Image models')}</span>
                                                     </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setFormImageModels(''); }}
@@ -1075,7 +1082,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
                                                         <span>🎬</span>
-                                                        <span>视频模型 (Video)</span>
+                                                        <span>{pick('视频模型', 'Video models')}</span>
                                                     </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setFormVideoModels(''); }}
@@ -1099,7 +1106,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
                                                         <span>💬</span>
-                                                        <span>聊天/推理 (Chat)</span>
+                                                        <span>{pick('聊天 / 推理模型', 'Chat / reasoning models')}</span>
                                                     </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setFormChatModels(''); }}
@@ -1124,7 +1131,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-secondary)]">
                                                         <span>🔧</span>
-                                                        <span>其他/多模态 (Other)</span>
+                                                        <span>{pick('其他 / 多模态模型', 'Other / multimodal models')}</span>
                                                     </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setFormOtherModels(''); }}
@@ -1150,7 +1157,7 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
                                     {/* Budget Limit */}
                                     <div>
                                         <label className="text-xs text-[var(--text-secondary)] mb-1.5 flex justify-between items-center">
-                                            <span>💰 预算限制 (Budget Limit)</span>
+                                            <span>{pick('💰 预算限制', '💰 Budget limit')}</span>
                                             <span className="text-[10px] text-[var(--text-tertiary)]">
                                                 {formBudgetLimit < 0 ? '♾️ 无限制' : `$${formBudgetLimit.toFixed(2)}`}
                                             </span>

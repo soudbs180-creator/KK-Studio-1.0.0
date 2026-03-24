@@ -63,6 +63,7 @@ interface ImageNodeProps {
     loadBand?: 0 | 1 | 2 | 3;
     groupLayerZIndex?: number;
     stackZIndexOverride?: number;
+    renderOrigin?: { x: number; y: number };
     position: { x: number; y: number };
     onPositionChange: (id: string, position: { x: number; y: number }) => void;
     onDelete: (id: string) => void;
@@ -77,6 +78,8 @@ interface ImageNodeProps {
     onSelect?: () => void;
     onBringToFront?: () => void;
     highlighted?: boolean;
+    shadowBoost?: boolean;
+    onLivePositionChange?: (id: string, position: { x: number; y: number } | null) => void;
     onPreview?: (imageId: string) => void;
     onPreviewPptStack?: (imageId: string) => void;
     onDownloadPptComposite?: (imageId: string) => void;
@@ -84,6 +87,7 @@ interface ImageNodeProps {
     isVisible?: boolean; // 🚀 视口可见性控制（从父组件传入）
     onUpdate?: (id: string, updates: Partial<GeneratedImage>) => void; // 🚀 [New] 更新回调
     onDragDelta?: (delta: { x: number; y: number }, sourceNodeId?: string) => void; // 🚀 [New] Relative Drag
+    onDragStateChange?: (dragging: boolean) => void;
     isNew?: boolean; // 🚀 [New] 是否为刚生成的图片
     isCanvasTransforming?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] 渲染为垂直聊天流中的标准块
@@ -96,6 +100,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     loadBand = 0,
     groupLayerZIndex,
     stackZIndexOverride,
+    renderOrigin,
     position,
     onPositionChange,
     onDelete,
@@ -109,6 +114,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     onSelect,
     onBringToFront,
     highlighted,
+    shadowBoost = false,
+    onLivePositionChange,
     onPreview,
     onPreviewPptStack,
     onDownloadPptComposite,
@@ -116,6 +123,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     isVisible = true, // 🚀 默认可见（向后兼容）
     onUpdate,
     onDragDelta,
+    onDragStateChange,
     isNew = false, // 🚀 [New] 是否为新生成的图片
     isCanvasTransforming = false,
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
@@ -162,7 +170,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         hasAnimatedRef.current = image.id;
         const directRenderEl = containerRef.current;
         if (directRenderEl) {
-            document.body.classList.remove('is-animating-card');
             directRenderEl.style.opacity = '1';
             directRenderEl.style.willChange = '';
             directRenderEl.style.zIndex = '';
@@ -202,16 +209,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 const timeline = gsap.timeline({
                     defaults: { force3D: true, overwrite: 'auto' },
                     onStart: () => {
-                        document.body.classList.add('is-animating-card');
                         el.style.zIndex = String((stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex)) + 1);
                     },
                     onComplete: () => {
-                        document.body.classList.remove('is-animating-card');
                         el.style.willChange = '';
                         el.style.zIndex = '';
                     },
                     onInterrupt: () => {
-                        document.body.classList.remove('is-animating-card');
                         el.style.willChange = '';
                         el.style.zIndex = '';
                     },
@@ -255,7 +259,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     });
             }).catch((error) => {
                 console.warn('[ImageCard2] Failed to load GSAP, restored visibility.', error);
-                document.body.classList.remove('is-animating-card');
                 restoreVisibility();
             });
         }
@@ -307,11 +310,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             localPosRef.current = position;
             // Force update DOM if needed
             if (containerRef.current) {
-                containerRef.current.style.left = `${Math.round(position.x - nodeWidth / 2)}px`;
-                containerRef.current.style.top = `${Math.round(position.y - nodeHeight)}px`;
+                const originX = renderOrigin?.x ?? 0;
+                const originY = renderOrigin?.y ?? 0;
+                containerRef.current.style.left = `${Math.round(position.x - nodeWidth / 2 - originX)}px`;
+                containerRef.current.style.top = `${Math.round(position.y - nodeHeight - originY)}px`;
             }
         }
-    }, [position.x, position.y, isDragging, nodeWidth, nodeHeight]);
+    }, [position.x, position.y, isDragging, nodeWidth, nodeHeight, renderOrigin]);
+
+    useEffect(() => () => {
+        onLivePositionChange?.(image.id, null);
+    }, [image.id, onLivePositionChange]);
 
     const [showLightbox, setShowLightbox] = useState(false);
     const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -331,7 +340,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const [imgError, setImgError] = useState(false);
 
     // 🚀 Robust Image Loading State - 优先使用image自带URL作为初始显示（防止刚生成的图片加载失败）
-    const initialUrl = (image.originalUrl && image.originalUrl.length > 0) ? image.originalUrl : (image.url || '');
+    const initialUrl = (image.originalUrl && image.originalUrl.length > 0)
+        ? image.originalUrl
+        : (image.apiResultUrl || image.url || '');
     const formatInitialUrl = (url: string) => {
         if (!url) return undefined;
         if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http')) {
@@ -359,7 +370,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     // 🚀 [Critical Fix] 实时同步 GeneratedImage 对象的 URL
     // 当 executeGeneration 异步更新了 node.url (如 blob:) 时，ImageCard 需要立即反应
     useEffect(() => {
-        const currentUrl = image.originalUrl || image.url;
+        const currentUrl = image.originalUrl || image.apiResultUrl || image.url;
         if (currentUrl && (currentUrl.startsWith('blob:') || currentUrl.startsWith('http') || currentUrl.startsWith('data:'))) {
             const sanitized = formatInitialUrl(currentUrl);
             if (sanitized && sanitized !== displaySrc) {
@@ -370,7 +381,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 setImgError(false); // 🚀 [Fix] 发现新 URL，强制清除旧图报错状态
             }
         }
-    }, [image.url, image.originalUrl, image.id]);
+    }, [image.apiResultUrl, image.url, image.originalUrl, image.id]);
 
     const [currentQuality, setCurrentQuality] = useState<ImageQuality>(ImageQuality.ORIGINAL);
     const qualityLoadingRef = useRef(false); // 防止重复加载
@@ -440,7 +451,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const handleMediaLoadError = useCallback(async () => {
         if (isNew) return;
 
-        const currentSrc = displaySrc || image.originalUrl || image.url;
+        const currentSrc = displaySrc || image.originalUrl || image.apiResultUrl || image.url;
         if (currentSrc) {
             failedSourcesRef.current.add(currentSrc);
         }
@@ -463,7 +474,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         }
 
         const remoteCandidates = Array.from(new Set(
-            [displaySrc, image.originalUrl, image.url]
+            [displaySrc, image.originalUrl, image.apiResultUrl, image.url]
                 .filter((u): u is string => !!u && /^https?:\/\//i.test(u))
         ));
 
@@ -475,7 +486,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         setImgError(true);
         setIsLoading(false);
-    }, [displaySrc, image.id, image.storageId, image.originalUrl, image.url, isNew, toProxyUrl, tryRecoverDisplaySrc]);
+    }, [displaySrc, image.apiResultUrl, image.id, image.storageId, image.originalUrl, image.url, isNew, toProxyUrl, tryRecoverDisplaySrc]);
 
     useEffect(() => {
         failedSourcesRef.current.clear();
@@ -491,9 +502,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         prompt: image.prompt,
         referenceImageCount: image.sourceReferenceStorageIds?.length || 0,
         keySlotId: image.keySlotId,
+        provider: image.provider,
+        providerLabel: image.providerLabel,
+        promptTokens: image.promptTokens,
+        completionTokens: image.completionTokens,
+        totalTokens: image.tokens,
         storedCost: image.cost,
         storedCostSource: image.costSource,
-    }), [image.cost, image.costSource, image.keySlotId, image.imageSize, image.model, image.prompt, image.sourceReferenceStorageIds]);
+    }), [image.completionTokens, image.cost, image.costSource, image.keySlotId, image.imageSize, image.model, image.prompt, image.promptTokens, image.provider, image.providerLabel, image.sourceReferenceStorageIds, image.tokens]);
     const displayCost = resolvedDisplayCost.cost;
     const displayTokens = typeof image.tokens === 'number' && Number.isFinite(image.tokens) ? image.tokens : 0;
     const showTokenInfo = displayTokens > 0;
@@ -610,11 +626,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         textColor: image.modelTextColor,
     }), [image.model, modelText, providerText, image.modelColorStart, image.modelColorEnd, image.modelTextColor]);
     const providerBadgeStyle = useMemo(() => getProviderBadgeStyle(providerText), [providerText]);
-    const footerTokenLabel = showTokenInfo ? `令牌 ${displayTokens}` : '';
+    const footerTokenLabel = showTokenInfo ? `词元 ${displayTokens}` : '';
     const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
     const footerSummaryTitle = isCreditModel
         ? `${footerTimeLabel} | ${creditFooterLabel}`
-        : `${footerTimeLabel} | 令牌 ${image.tokens || 0} | ${footerCostLabel}`;
+        : `${footerTimeLabel} | 词元 ${image.tokens || 0} | ${footerCostLabel}`;
 
     // 🚀 根据画布缩放自动选择合适质量 - 使用队列加载优化
     useEffect(() => {
@@ -742,7 +758,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     }
 
                     // 策略2: 使用image自带的URL作为fallback
-                    const fallbackUrl = image.originalUrl || image.url;
+                    const fallbackUrl = image.originalUrl || image.apiResultUrl || image.url;
                     if (fallbackUrl && (fallbackUrl.startsWith('data:') || fallbackUrl.startsWith('http') || fallbackUrl.startsWith('blob:'))) {
                         console.debug(`[ImageCard] Using fallback URL for ${image.id}`);
                         setDisplaySrc(sanitizeUrl(fallbackUrl));
@@ -840,15 +856,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 } else {
                     throw new Error('Unsupported storage format');
                 }
-            } else if (image.originalUrl && image.originalUrl.startsWith('http')) {
+            } else if ((image.originalUrl || image.apiResultUrl) && (image.originalUrl || image.apiResultUrl)?.startsWith('http')) {
                 // 2. 如果本地由于特殊原因找不到，回退到云端原图
                 console.log('[ImageCard] Fetching from cloud fallback');
-                const response = await fetch(image.originalUrl);
+                const response = await fetch(image.originalUrl || image.apiResultUrl!);
                 if (!response.ok) throw new Error('Cloud fetch failed');
                 blob = await response.blob();
             } else {
                 // 3. 最后兜底：使用当前显示的图片数据
-                const fallbackUrl = image.originalUrl || displaySrc || image.url;
+                const fallbackUrl = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
                 if (!fallbackUrl) throw new Error('No image data found');
 
                 if (fallbackUrl.startsWith('data:')) {
@@ -876,7 +892,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             console.error('Download failed:', err);
 
             // CORS Fallback for Remote Video URLs
-            const fallbackUrl = image.originalUrl || displaySrc || image.url;
+            const fallbackUrl = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
             if (fallbackUrl && fallbackUrl.startsWith('http') && err.message === 'Failed to fetch') {
                 console.warn('[ImageCard2] CORS blocked download, opening in new tab instead.');
                 window.open(fallbackUrl, '_blank');
@@ -905,7 +921,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     const wasDraggingRef = useRef(false);
     const suppressClickUntilRef = useRef(0);
-    const lastMousePos = useRef<{ x: number; y: number } | null>(null); // To track previous mouse position for delta
 
     const canHandleCardClick = useCallback(() => Date.now() >= suppressClickUntilRef.current, []);
 
@@ -921,11 +936,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 cancelAnimationFrame(dragRafRef.current);
                 dragRafRef.current = null;
             }
+            onDragStateChange?.(false);
         };
-    }, []);
+    }, [onDragStateChange]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         if (isChatMode) return; // 🚀 聊天模式禁用拖拽
+        if ('button' in e && e.button === 1) {
+            return;
+        }
         const target = e.target as HTMLElement | null;
         if (target?.closest?.('[data-native-drag-source="true"]')) {
             wasDraggingRef.current = false;
@@ -950,6 +969,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
         setIsDragging(true);
+        onDragStateChange?.(true);
         wasDraggingRef.current = false;
         suppressClickUntilRef.current = 0;
 
@@ -980,7 +1000,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         // Store current position as fixed base for this drag (avoid cumulative drift)
         dragStartCanvasPos.current = { x: position.x, y: position.y };
         localPosRef.current = position;
-        lastMousePos.current = { x: clientX, y: clientY }; // Initialize lastMousePos
 
         // 绑定全局事件
         const handleMouseMove = (mvEvent: MouseEvent | TouchEvent) => {
@@ -988,15 +1007,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             const mvClientX = 'touches' in mvEvent ? mvEvent.touches[0].clientX : (mvEvent as MouseEvent).clientX;
             const mvClientY = 'touches' in mvEvent ? mvEvent.touches[0].clientY : (mvEvent as MouseEvent).clientY;
 
-            // Calculate step delta in canvas coordinates
-            if (!lastMousePos.current) return;
-
             const scale = zoomScale || 1;
-            const stepX = (mvClientX - lastMousePos.current.x) / scale;
-            const stepY = (mvClientY - lastMousePos.current.y) / scale;
-
-            lastMousePos.current = { x: mvClientX, y: mvClientY };
-
             const dx = mvClientX - dragStartPos.current.x;
             const dy = mvClientY - dragStartPos.current.y;
 
@@ -1005,19 +1016,24 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 wasDraggingRef.current = true;
             }
 
-            // 1. Calculate new position in canvas coordinates
+            // Keep the card on the exact pointer trajectory instead of accumulating per-frame deltas.
             const newPos = {
-                x: localPosRef.current.x + stepX,
-                y: localPosRef.current.y + stepY
+                x: dragStartCanvasPos.current.x + (dx / scale),
+                y: dragStartCanvasPos.current.y + (dy / scale)
             };
+            const stepX = newPos.x - localPosRef.current.x;
+            const stepY = newPos.y - localPosRef.current.y;
 
             // 2. Direct DOM Update - 🚀 直接更新left/top，不使用transform
             if (containerRef.current) {
-                containerRef.current.style.left = `${Math.round(newPos.x - nodeWidth / 2)}px`;
-                containerRef.current.style.top = `${Math.round(newPos.y - nodeHeight)}px`;
+                const originX = renderOrigin?.x ?? 0;
+                const originY = renderOrigin?.y ?? 0;
+                containerRef.current.style.left = `${Math.round(newPos.x - nodeWidth / 2 - originX)}px`;
+                containerRef.current.style.top = `${Math.round(newPos.y - nodeHeight - originY)}px`;
             }
 
             localPosRef.current = newPos;
+            onLivePositionChange?.(image.id, newPos);
 
             // 3. Global Update (Logic) - 🚀 立即触发
             if (onDragDelta && (stepX !== 0 || stepY !== 0)) {
@@ -1028,13 +1044,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const handleMouseUp = () => {
             const didDrag = wasDraggingRef.current;
             setIsDragging(false);
+            onDragStateChange?.(false);
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
             dragCleanupRef.current = null;
             latestPointerRef.current = null;
-            lastMousePos.current = null;
 
             if (didDrag) {
                 suppressClickUntilRef.current = Date.now() + 220;
@@ -1045,9 +1061,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 但确保最终位置正确
             if (containerRef.current) {
                 const finalPos = localPosRef.current;
-                containerRef.current.style.left = `${Math.round(finalPos.x - nodeWidth / 2)}px`;
-                containerRef.current.style.top = `${Math.round(finalPos.y - nodeHeight)}px`;
+                const originX = renderOrigin?.x ?? 0;
+                const originY = renderOrigin?.y ?? 0;
+                containerRef.current.style.left = `${Math.round(finalPos.x - nodeWidth / 2 - originX)}px`;
+                containerRef.current.style.top = `${Math.round(finalPos.y - nodeHeight - originY)}px`;
             }
+            onLivePositionChange?.(image.id, null);
         };
 
 
@@ -1064,12 +1083,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         image.id,
         position,
         zoomScale,
+        onDragStateChange,
         onPositionChange,
         onDragDelta,
         onSelect,
         isSelected,
         nodeWidth,
-        nodeHeight
+        nodeHeight,
+        renderOrigin,
+        onLivePositionChange,
     ]);
 
     // 🚀 [New] Alias Editing Logic
@@ -1121,6 +1143,40 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         opacity: textSoftening.secondaryOpacity,
         transition: textTransition,
     };
+    const showActiveAccent = isActive;
+    const showSelectedAccent = isSelected && !showActiveAccent;
+    const showHighlightedAccent = highlighted && !showActiveAccent && !showSelectedAccent;
+    const cardBorderColor = image.error && !image.isGenerating
+        ? 'rgb(239, 68, 68)'
+        : showActiveAccent
+            ? 'var(--accent-gold)'
+            : showSelectedAccent
+                ? 'var(--selected-border)'
+                : showHighlightedAccent
+                    ? 'var(--selected-border)'
+                    : 'var(--border-default)';
+    const shellCardShadow = showActiveAccent
+        ? 'var(--glow-gold)'
+        : showSelectedAccent
+            ? 'var(--glow-blue)'
+            : showHighlightedAccent
+                ? 'var(--glow-blue)'
+            : shadowBoost
+                ? '0 22px 46px rgba(2, 6, 23, 0.30), 0 10px 28px rgba(2, 6, 23, 0.18)'
+                : 'var(--shadow-xl)';
+    const mainCardShadow = image.error && !image.isGenerating
+        ? '0 0 12px rgba(239, 68, 68, 0.3), 0 0 4px rgba(239, 68, 68, 0.2)'
+        : showActiveAccent
+            ? 'var(--glow-gold)'
+            : showSelectedAccent
+                ? 'var(--glow-blue)'
+                : showHighlightedAccent
+                    ? 'var(--glow-blue)'
+                : shadowBoost
+                    ? '0 24px 54px rgba(2, 6, 23, 0.34), 0 12px 30px rgba(2, 6, 23, 0.22)'
+                    : 'var(--shadow-xl)';
+    const originX = renderOrigin?.x ?? 0;
+    const originY = renderOrigin?.y ?? 0;
 
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
@@ -1145,8 +1201,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
-                    left: renderLeft,
-                    top: renderTop,
+                    left: renderLeft - originX,
+                    top: renderTop - originY,
                     zIndex: stackZIndex,
                     width: nodeWidth,
                     opacity: 1,
@@ -1164,19 +1220,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     className="relative w-full overflow-hidden rounded-[20px] border flex flex-col"
                     style={{
                         backgroundColor: 'var(--bg-surface)',
-                        borderColor: image.error && !image.isGenerating
-                            ? 'rgb(239, 68, 68)'
-                            : isSelected
-                                ? 'var(--selected-border)'
-                                : isActive
-                                    ? 'var(--accent-gold)'
-                                    : 'var(--border-default)',
+                        borderColor: cardBorderColor,
                         borderWidth: adaptiveBorderWidth,
-                        boxShadow: isSelected
-                            ? 'var(--glow-blue)'
-                            : highlighted
-                                ? 'var(--glow-gold)'
-                                : 'var(--shadow-xl)',
+                        boxShadow: shellCardShadow,
                     }}
                 >
                     <div
@@ -1265,8 +1311,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
-                    left: renderLeft,
-                    top: renderTop,
+                    left: renderLeft - originX,
+                    top: renderTop - originY,
                     zIndex: stackZIndex,
                     width: nodeWidth,
                     opacity: 1,
@@ -1295,24 +1341,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     `}
                     style={{
                         backgroundColor: 'var(--bg-surface)',
-                        borderColor: image.error && !image.isGenerating ?
-                            'rgb(239, 68, 68)' :
-                            isSelected ?
-                                'var(--selected-border)' :
-                                isActive ?
-                                    'var(--accent-gold)' :
-                                    highlighted ?
-                                        'var(--accent-gold)' :
-                                        'var(--border-default)',
+                        borderColor: cardBorderColor,
                         borderRadius: 'var(--radius-lg)', // 12px
                         borderWidth: adaptiveBorderWidth,
-                        boxShadow: image.error && !image.isGenerating ?
-                            '0 0 12px rgba(239, 68, 68, 0.3), 0 0 4px rgba(239, 68, 68, 0.2)' :
-                            isSelected ?
-                                'var(--glow-blue)' :
-                                highlighted ?
-                                    'var(--glow-gold)' :
-                                    'var(--shadow-xl)',
+                        boxShadow: mainCardShadow,
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'box-shadow, border-color'
                     }}
@@ -1777,7 +1809,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 ? footerSummaryTitle
                                                 : [
                                                     footerTimeLabel,
-                                                    showTokenInfo ? `令牌 ${displayTokens}` : null,
+                                                    showTokenInfo ? `词元 ${displayTokens}` : null,
                                                     hasResolvedDisplayCost ? `\u8d39\u7528 $${displayCost.toFixed(4)}` : '\u8d39\u7528 \u672a\u83b7\u53d6',
                                                 ].filter(Boolean).join(' | ')}
                                             className={joinClasses('flex items-center justify-center leading-none text-[var(--text-secondary)] relative group/info overflow-hidden whitespace-nowrap', footerInfoGapClass, isTightFooter ? 'h-[18px]' : 'h-5', footerInfoTextClass)}
@@ -1798,7 +1830,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     <span className={footerSeparatorClass}>|</span>
                                                     {showTokenInfo ? (
                                                         <>
-                                                            <span title={`Token消耗 ${displayTokens}`} className="text-emerald-400 shrink-0">{footerTokenLabel}</span>
+                                                            <span title={`词元消耗 ${displayTokens}`} className="text-emerald-400 shrink-0">{footerTokenLabel}</span>
                                                             <span className={footerSeparatorClass}>|</span>
                                                         </>
                                                     ) : null}
@@ -1857,6 +1889,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         prev.zoomScale === next.zoomScale &&
         prev.isSelected === next.isSelected &&
         prev.highlighted === next.highlighted &&
+        prev.shadowBoost === next.shadowBoost &&
         prev.isVisible === next.isVisible &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.isNew === next.isNew

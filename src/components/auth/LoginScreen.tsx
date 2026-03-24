@@ -20,6 +20,7 @@ import AnoAI from '@/components/ui/animated-shader-background';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
 import { startWechatLogin } from '../../services/auth/wechatAuth';
+import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
 import './LoginScreen.css';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
@@ -296,12 +297,15 @@ const LoginScreen: React.FC = () => {
 
     if (view === 'register') {
       const displayName = emailValue.split('@')[0] || 'New User';
+      const defaultAvatarId = getDefaultPresetAvatarId(emailValue);
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: emailValue,
         password,
         options: {
           data: {
             display_name: displayName,
+            full_name: displayName,
+            avatar_url: defaultAvatarId,
           },
           ...(captchaToken ? { captchaToken } : {}),
         },

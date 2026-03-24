@@ -21,13 +21,14 @@ import {
   OnboardingContextType 
 } from './types';
 import { useOnboardingProgress } from './useOnboardingProgress';
+import { pickByDocumentLanguage } from '../../utils/localeText';
 import './Onboarding.css';
 
 const OnboardingContext = createContext<OnboardingContextType | null>(null);
 
 export const useOnboarding = () => {
   const ctx = useContext(OnboardingContext);
-  if (!ctx) throw new Error('useOnboarding must be used within OnboardingProvider');
+  if (!ctx) throw new Error(pickByDocumentLanguage('useOnboarding 必须在 OnboardingProvider 内使用。', 'useOnboarding must be used within OnboardingProvider'));
   return ctx;
 };
 

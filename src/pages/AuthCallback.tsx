@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
 import { supabase } from '@/lib/supabase';
+import {
+  resolveBindCallbackProvider,
+  resolveBindFailureMessage,
+  resolveBindSuccessMessage,
+} from '@/services/auth/identityLinking';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
@@ -26,10 +31,6 @@ function hasSessionHints(searchParams: URLSearchParams, hashParams: URLSearchPar
     Boolean(hashParams.get('token_hash')) ||
     Boolean(hashParams.get('type'))
   );
-}
-
-function isWechatBindCallback(searchParams: URLSearchParams): boolean {
-  return searchParams.get('mode') === 'wechat-bind' || Boolean(searchParams.get('wechat_bind'));
 }
 
 async function waitForSession(): Promise<boolean> {
@@ -80,13 +81,14 @@ export default function AuthCallback() {
     };
 
     const handleCallback = async () => {
-      try {
-        const searchParams = new URLSearchParams(window.location.search);
-        const hashParams = parseHashParams();
-        const bindFlow = isWechatBindCallback(searchParams);
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashParams = parseHashParams();
+      const bindProvider = resolveBindCallbackProvider(searchParams);
+      const bindFlow = Boolean(bindProvider);
 
+      try {
         if (searchParams.get('wechat_bind') === 'success') {
-          finishWithRedirect('success', '微信绑定成功。', 1200);
+          finishWithRedirect('success', resolveBindSuccessMessage(bindProvider), 1200);
           return;
         }
 
@@ -97,7 +99,7 @@ export default function AuthCallback() {
         if (error) {
           finishWithRedirect(
             'error',
-            errorDescription || (bindFlow ? '微信绑定失败，请稍后重试。' : '登录失败，请稍后重试。'),
+            errorDescription || (bindFlow ? resolveBindFailureMessage(bindProvider) : '登录失败，请稍后重试。'),
             3000,
           );
           return;
@@ -113,30 +115,45 @@ export default function AuthCallback() {
         }
 
         if (immediateSession) {
-          finishWithRedirect('success', bindFlow ? '微信绑定成功。' : '登录成功。', 900);
-          return;
-        }
-
-        if (bindFlow) {
-          finishWithRedirect('error', '微信绑定回调无效，请重新发起绑定。', 3000);
+          finishWithRedirect(
+            'success',
+            bindFlow ? resolveBindSuccessMessage(bindProvider) : '登录成功。',
+            900,
+          );
           return;
         }
 
         if (!hasSessionHints(searchParams, hashParams)) {
-          finishWithRedirect('error', '无效的登录回调链接。', 3000);
+          finishWithRedirect(
+            'error',
+            bindFlow ? resolveBindFailureMessage(bindProvider) : '无效的登录回调链接。',
+            3000,
+          );
           return;
         }
 
         const didResolveSession = await waitForSession();
         if (!didResolveSession) {
-          finishWithRedirect('error', '登录会话创建失败，请稍后重试。', 3000);
+          finishWithRedirect(
+            'error',
+            bindFlow ? resolveBindFailureMessage(bindProvider) : '登录会话创建失败，请稍后重试。',
+            3000,
+          );
           return;
         }
 
-        finishWithRedirect('success', '登录成功。', 900);
+        finishWithRedirect(
+          'success',
+          bindFlow ? resolveBindSuccessMessage(bindProvider) : '登录成功。',
+          900,
+        );
       } catch (error) {
         console.error('Auth callback error:', error);
-        finishWithRedirect('error', '登录处理出错，请稍后重试。', 3000);
+        finishWithRedirect(
+          'error',
+          bindFlow ? resolveBindFailureMessage(bindProvider) : '登录处理出错，请稍后重试。',
+          3000,
+        );
       }
     };
 

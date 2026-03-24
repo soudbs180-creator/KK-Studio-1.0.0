@@ -7,6 +7,7 @@ import {
   type SupportedRechargeCurrency,
   upsertCreditExchangeRate,
 } from '../../../services/billing/creditExchangeRateService';
+import { useLocale } from '../../../context/LocaleContext';
 import { notify } from '../../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
@@ -27,19 +28,25 @@ const createEmptyRateState = (): Record<SupportedRechargeCurrency, CreditExchang
 const formatAmountPreview = (amount: number, currency: SupportedRechargeCurrency) =>
   currency === 'CNY' ? `¥${amount}` : `$${amount}`;
 
-const getCurrencyLabel = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '人民币充值' : '美元充值');
-
-const formatAmountRange = (rate: CreditExchangeRate, currency: SupportedRechargeCurrency) => {
-  const parts: string[] = [];
-  if (rate.minAmount !== null) parts.push(`最低 ${formatAmountPreview(rate.minAmount, currency)}`);
-  if (rate.maxAmount !== null) parts.push(`最高 ${formatAmountPreview(rate.maxAmount, currency)}`);
-  return parts.length > 0 ? parts.join(' / ') : '未限制金额范围';
-};
-
 export const ExchangeRateSettingsView: React.FC = () => {
+  const { pick } = useLocale();
   const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(createEmptyRateState);
   const [loadingRates, setLoadingRates] = useState(false);
   const [savingCurrency, setSavingCurrency] = useState<SupportedRechargeCurrency | null>(null);
+
+  const getCurrencyLabel = (currency: SupportedRechargeCurrency) =>
+    currency === 'CNY' ? pick('人民币充值', 'CNY recharge') : pick('美元充值', 'USD recharge');
+
+  const formatAmountRange = (rate: CreditExchangeRate, currency: SupportedRechargeCurrency) => {
+    const parts: string[] = [];
+    if (rate.minAmount !== null) {
+      parts.push(pick(`最低 ${formatAmountPreview(rate.minAmount, currency)}`, `Min ${formatAmountPreview(rate.minAmount, currency)}`));
+    }
+    if (rate.maxAmount !== null) {
+      parts.push(pick(`最高 ${formatAmountPreview(rate.maxAmount, currency)}`, `Max ${formatAmountPreview(rate.maxAmount, currency)}`));
+    }
+    return parts.length > 0 ? parts.join(' / ') : pick('未限制金额范围', 'No amount limit');
+  };
 
   const activeCurrencies = useMemo(
     () => currencies.filter((currency) => exchangeRates[currency].isActive).length,
@@ -61,7 +68,10 @@ export const ExchangeRateSettingsView: React.FC = () => {
       });
       setExchangeRates(nextState);
     } catch (error: any) {
-      notify.error('加载汇率失败', error?.message || '已回退到默认汇率。');
+      notify.error(
+        pick('加载汇率失败', 'Failed to load rates'),
+        error?.message || pick('已回退到默认汇率。', 'Fell back to the default exchange rates.')
+      );
     } finally {
       setLoadingRates(false);
     }
@@ -101,15 +111,24 @@ export const ExchangeRateSettingsView: React.FC = () => {
     const rate = exchangeRates[currency];
 
     if (!Number.isFinite(rate.creditsPerUnit) || Number(rate.creditsPerUnit) <= 0) {
-      notify.error('汇率无效', `${currency} 的积分汇率必须大于 0。`);
+      notify.error(
+        pick('汇率无效', 'Invalid rate'),
+        pick(`${currency} 的积分汇率必须大于 0。`, `${currency} credit rate must be greater than 0.`)
+      );
       return;
     }
     if (rate.minAmount !== null && (!Number.isFinite(rate.minAmount) || Number(rate.minAmount) < 0)) {
-      notify.error('金额范围无效', `${currency} 的最低金额不能小于 0。`);
+      notify.error(
+        pick('金额范围无效', 'Invalid amount range'),
+        pick(`${currency} 的最低金额不能小于 0。`, `${currency} minimum amount cannot be less than 0.`)
+      );
       return;
     }
     if (rate.maxAmount !== null && (!Number.isFinite(rate.maxAmount) || Number(rate.maxAmount) <= 0)) {
-      notify.error('金额范围无效', `${currency} 的最高金额必须大于 0。`);
+      notify.error(
+        pick('金额范围无效', 'Invalid amount range'),
+        pick(`${currency} 的最高金额必须大于 0。`, `${currency} maximum amount must be greater than 0.`)
+      );
       return;
     }
     if (
@@ -119,7 +138,10 @@ export const ExchangeRateSettingsView: React.FC = () => {
       Number.isFinite(rate.maxAmount) &&
       rate.minAmount > rate.maxAmount
     ) {
-      notify.error('金额范围无效', `${currency} 的最低金额不能大于最高金额。`);
+      notify.error(
+        pick('金额范围无效', 'Invalid amount range'),
+        pick(`${currency} 的最低金额不能大于最高金额。`, `${currency} minimum amount cannot exceed the maximum amount.`)
+      );
       return;
     }
 
@@ -127,9 +149,15 @@ export const ExchangeRateSettingsView: React.FC = () => {
     try {
       const saved = await upsertCreditExchangeRate({ ...rate, currencyCode: currency });
       setExchangeRates((current) => ({ ...current, [currency]: saved }));
-      notify.success('保存成功', `${currency} 汇率已更新。`);
+      notify.success(
+        pick('保存成功', 'Saved'),
+        pick(`${currency} 汇率已更新。`, `${currency} exchange rate has been updated.`)
+      );
     } catch (error: any) {
-      notify.error('保存失败', error?.message || '请稍后再试。');
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        error?.message || pick('请稍后再试。', 'Please try again later.')
+      );
     } finally {
       setSavingCurrency(null);
     }
@@ -139,30 +167,30 @@ export const ExchangeRateSettingsView: React.FC = () => {
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SettingsMetricCard
-          label="启用币种"
+          label={pick('启用币种', 'Active currencies')}
           value={`${activeCurrencies} / ${currencies.length}`}
-          helper="前台充值页会读取这里的开关"
+          helper={pick('前台充值页会读取这里的开关', 'The recharge page reads these switches directly.')}
           icon={Coins}
           tone={activeCurrencies === currencies.length ? 'emerald' : 'amber'}
         />
         <SettingsMetricCard
-          label="人民币汇率"
+          label={pick('人民币汇率', 'CNY rate')}
           value={`¥1 = ${exchangeRates.CNY.creditsPerUnit}`}
           helper={formatAmountRange(exchangeRates.CNY, 'CNY')}
           icon={Coins}
           tone={exchangeRates.CNY.isActive ? 'indigo' : 'neutral'}
         />
         <SettingsMetricCard
-          label="美元汇率"
+          label={pick('美元汇率', 'USD rate')}
           value={`$1 = ${exchangeRates.USD.creditsPerUnit}`}
           helper={formatAmountRange(exchangeRates.USD, 'USD')}
           icon={Coins}
           tone={exchangeRates.USD.isActive ? 'indigo' : 'neutral'}
         />
         <SettingsMetricCard
-          label="当前摘要"
+          label={pick('当前摘要', 'Summary')}
           value={summaryLabel}
-          helper="修改后前台充值页同步生效"
+          helper={pick('修改后前台充值页同步生效', 'Changes apply to the recharge page immediately.')}
           icon={RefreshCw}
           tone="neutral"
         />
@@ -174,15 +202,20 @@ export const ExchangeRateSettingsView: React.FC = () => {
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[15px] font-semibold text-[var(--text-primary)]">充值汇率规则</div>
-            <SettingsBadge tone="neutral">前台同步生效</SettingsBadge>
+            <div className="text-[15px] font-semibold text-[var(--text-primary)]">
+              {pick('充值汇率规则', 'Recharge exchange rules')}
+            </div>
+            <SettingsBadge tone="neutral">{pick('前台同步生效', 'Live on recharge page')}</SettingsBadge>
           </div>
           <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-            每个币种都支持独立设置兑换比例、金额范围和可见状态。保存后，充值页会立刻读取新规则。
+            {pick(
+              '每个币种都支持独立设置兑换比例、金额范围和可见状态。保存后，充值页会立刻读取新规则。',
+              'Each currency can manage its own credit rate, amount range, and visibility. Saving here updates the recharge page immediately.'
+            )}
           </div>
         </div>
         <SettingsActionButton icon={RefreshCw} loading={loadingRates} onClick={() => void loadRates()}>
-          {loadingRates ? '刷新中...' : '刷新汇率'}
+          {loadingRates ? pick('刷新中...', 'Refreshing...') : pick('刷新汇率', 'Refresh rates')}
         </SettingsActionButton>
       </div>
 
@@ -202,33 +235,36 @@ export const ExchangeRateSettingsView: React.FC = () => {
                     </div>
                     <SettingsBadge tone="neutral">{currency}</SettingsBadge>
                     <SettingsBadge tone={rate.isActive ? 'emerald' : 'neutral'}>
-                      {rate.isActive ? '前台显示中' : '前台已隐藏'}
+                      {rate.isActive ? pick('前台显示中', 'Visible on recharge page') : pick('前台已隐藏', 'Hidden on recharge page')}
                     </SettingsBadge>
                   </div>
                   <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
                     {currency === 'CNY'
-                      ? '控制人民币充值档位的积分换算与展示状态。'
-                      : '控制美元充值档位的积分换算与展示状态。'}
+                      ? pick('控制人民币充值档位的积分换算与展示状态。', 'Manage credit conversion and visibility for CNY recharges.')
+                      : pick('控制美元充值档位的积分换算与展示状态。', 'Manage credit conversion and visibility for USD recharges.')}
                   </div>
                 </div>
-                <StatusBadge status={rate.isActive ? 'online' : 'paused'} label={rate.isActive ? '已启用' : '已停用'} />
+                <StatusBadge
+                  status={rate.isActive ? 'online' : 'paused'}
+                  label={rate.isActive ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
+                />
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <SettingInput
-                  label="每 1 单位货币可得积分"
+                  label={pick('每 1 单位货币可得积分', 'Credits per 1 unit')}
                   type="number"
                   value={String(rate.creditsPerUnit)}
                   onChange={(value) => handleRateFieldChange(currency, 'creditsPerUnit', value)}
                 />
                 <SettingInput
-                  label="最小充值金额"
+                  label={pick('最小充值金额', 'Minimum recharge')}
                   type="number"
                   value={rate.minAmount === null ? '' : String(rate.minAmount)}
                   onChange={(value) => handleRateFieldChange(currency, 'minAmount', value)}
                 />
                 <SettingInput
-                  label="最大充值金额"
+                  label={pick('最大充值金额', 'Maximum recharge')}
                   type="number"
                   value={rate.maxAmount === null ? '' : String(rate.maxAmount)}
                   onChange={(value) => handleRateFieldChange(currency, 'maxAmount', value)}
@@ -237,17 +273,18 @@ export const ExchangeRateSettingsView: React.FC = () => {
 
               <div className="mt-4">
                 <SettingToggle
-                  label="允许前台显示并使用该币种"
-                  helper="关闭后，充值页会隐藏该币种入口。"
+                  label={pick('允许前台显示并使用该币种', 'Show and allow this currency on the recharge page')}
+                  helper={pick('关闭后，充值页会隐藏该币种入口。', 'When disabled, this currency is hidden on the recharge page.')}
                   checked={rate.isActive}
                   onChange={(checked) => handleRateFieldChange(currency, 'isActive', checked)}
                 />
               </div>
 
               <div className="mt-4 rounded-[20px] border p-4 text-[13px] leading-6" style={SETTINGS_OVERLAY_STYLE}>
-                <div>金额范围：{formatAmountRange(rate, currency)}</div>
+                <div>{pick('金额范围：', 'Amount range: ')}{formatAmountRange(rate, currency)}</div>
                 <div className="mt-2">
-                  充值预览：{formatAmountPreview(previewAmount, currency)} = {previewAmount * rate.creditsPerUnit} 积分
+                  {pick('充值预览：', 'Preview: ')}
+                  {formatAmountPreview(previewAmount, currency)} = {previewAmount * rate.creditsPerUnit} {pick('积分', 'credits')}
                 </div>
               </div>
 
@@ -258,7 +295,11 @@ export const ExchangeRateSettingsView: React.FC = () => {
                   loading={isSaving}
                   onClick={() => void handleSaveExchangeRate(currency)}
                 >
-                  {isSaving ? '保存中...' : `保存${currency === 'CNY' ? '人民币' : '美元'}规则`}
+                  {isSaving
+                    ? pick('保存中...', 'Saving...')
+                    : currency === 'CNY'
+                      ? pick('保存人民币规则', 'Save CNY rule')
+                      : pick('保存美元规则', 'Save USD rule')}
                 </SettingsActionButton>
               </div>
             </div>

@@ -255,11 +255,9 @@ const pickPlannerModelId = (models: ChatModel[], selected: ChatModel): string | 
     return fallback?.id || null;
 };
 
-const buildAvailableChatModels = (canAccessSystemCreditModels: boolean): ChatModel[] => {
+const buildAvailableChatModels = (): ChatModel[] => {
     const rawModels = keyManager.getGlobalModelList().filter(model => {
         const idLower = model.id.toLowerCase();
-
-        if (model.isSystemInternal && !canAccessSystemCreditModels) return false;
 
         // 🚀 Allow Image Models (for /image command usage)
         if (model.type === 'image') return true;
@@ -347,7 +345,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
-    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canAccessSystemCreditModels));
+    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels());
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
@@ -439,7 +437,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     // Subscribe to keyManager updates
     useEffect(() => {
         const updateModels = () => {
-            const models = buildAvailableChatModels(canAccessSystemCreditModels);
+            const models = buildAvailableChatModels();
             setAvailableModels(models);
 
             if (models.length > 0) {
@@ -457,12 +455,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         updateModels();
         const unsubscribe = keyManager.subscribe(updateModels);
         return unsubscribe;
-    }, [canAccessSystemCreditModels, selectedModel.id]);
+    }, [selectedModel.id]);
 
     const getRequiredCredits = useCallback((model?: ChatModel | null) => {
-        if (!model) return 0;
-        const fallbackCredits = getModelCredits(model.id);
-        return Math.max(0, Number(model.creditCost ?? fallbackCredits ?? 0));
+        if (!model?.isSystemInternal) return 0;
+        return Math.max(0, Number(getModelCredits(model.id) || 0));
     }, []);
 
     const ensureModelAccess = useCallback((model: ChatModel | undefined | null, feature: string) => {

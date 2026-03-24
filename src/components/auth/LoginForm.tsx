@@ -4,6 +4,7 @@ import { ArrowRight, Loader2, Lock, Mail, Shield } from 'lucide-react';
 import type { LoginResponseDto } from '../../../packages/contracts/src/dto/auth.ts';
 import { legacyWebApiClient, setKkApiAccessToken } from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
+import { useLocale } from '../../context/LocaleContext';
 import { TurnstileWidget, useTurnstile } from './TurnstileWidget';
 
 interface LoginFormProps {
@@ -15,6 +16,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onSuccess,
   onRegisterClick,
 }) => {
+  const { pick } = useLocale();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -105,7 +107,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your@email.com"
+              placeholder={pick('请输入邮箱地址', 'Enter your email')}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-gray-900 transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               required
             />

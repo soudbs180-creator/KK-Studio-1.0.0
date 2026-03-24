@@ -150,6 +150,8 @@ export interface GenerateImageResult {
   url: string;
   apiDurationMs?: number;
   tokens?: number;
+  promptTokens?: number;
+  completionTokens?: number;
   cost?: number;
   model?: string;
   imageSize?: ImageSize;
@@ -512,6 +514,12 @@ export const generateImage = async (
     const resolvedResultModel = result.model || model;
     const resolvedResultImageSize = (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K;
     const resolvedKeySlotId = result.keySlotId || options?.preferredKeyId;
+    const promptTokens = Number.isFinite(result.usage?.promptTokens) ? result.usage?.promptTokens : undefined;
+    const completionTokens = Number.isFinite(result.usage?.completionTokens)
+      ? result.usage?.completionTokens
+      : (Number.isFinite(result.usage?.totalTokens) && Number.isFinite(promptTokens))
+        ? Math.max(0, (result.usage?.totalTokens || 0) - (promptTokens || 0))
+        : undefined;
 
     // --- Cost Estimation Cleanup ---
     let cost = result.usage?.cost || 0;
@@ -543,6 +551,8 @@ export const generateImage = async (
       url: resultUrl,
       apiDurationMs: result.metadata?.apiDurationMs,
       tokens,
+      promptTokens,
+      completionTokens,
       cost,
       imageSize: resolvedResultImageSize,
       effectiveModel: resolvedResultModel,

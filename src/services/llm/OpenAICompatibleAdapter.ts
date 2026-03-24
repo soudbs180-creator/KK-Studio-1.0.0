@@ -753,6 +753,249 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return 'pending';
     }
 
+    private normalizePollingApiBase(baseUrl: string, withV1: boolean): string {
+        const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
+        if (!normalized) {
+            return withV1 ? 'https://api.openai.com/v1' : 'https://api.openai.com';
+        }
+
+        const withoutV1 = normalized.replace(/\/v1$/i, '');
+        return withV1 ? `${withoutV1}/v1` : withoutV1;
+    }
+
+    private extractGenericTaskId(payload: any): string {
+        return String(
+            payload?.taskId ||
+            payload?.task_id ||
+            payload?.id ||
+            payload?.data?.taskId ||
+            payload?.data?.task_id ||
+            payload?.data?.id ||
+            payload?.result?.taskId ||
+            payload?.result?.task_id ||
+            payload?.result?.id ||
+            ''
+        ).trim();
+    }
+
+    private mapGenericTaskStatus(payload: any): 'pending' | 'processing' | 'success' | 'failed' {
+        const urls = this.extractImageUrlsFromPayload(payload);
+        if (urls.length > 0) {
+            return 'success';
+        }
+
+        const statusCandidates = [
+            payload?.status,
+            payload?.state,
+            payload?.task_status,
+            payload?.taskStatus,
+            payload?.data?.status,
+            payload?.data?.state,
+            payload?.data?.task_status,
+            payload?.data?.taskStatus,
+            payload?.result?.status,
+            payload?.result?.state,
+            payload?.output?.status,
+            payload?.output?.state,
+        ];
+
+        for (const candidate of statusCandidates) {
+            if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+                if (candidate === 2 || candidate === 1) return candidate === 2 ? 'success' : 'processing';
+                if (candidate === 3 || candidate === 7 || candidate === 8) return 'failed';
+                if (candidate === 5 || candidate === 10) return candidate === 10 ? 'processing' : 'pending';
+            }
+
+            if (typeof candidate !== 'string') continue;
+            const normalized = candidate.trim().toLowerCase();
+            if (!normalized) continue;
+            if (
+                normalized.includes('success')
+                || normalized.includes('completed')
+                || normalized.includes('finish')
+                || normalized === 'done'
+            ) {
+                return 'success';
+            }
+            if (
+                normalized.includes('fail')
+                || normalized.includes('error')
+                || normalized.includes('cancel')
+                || normalized.includes('reject')
+            ) {
+                return 'failed';
+            }
+            if (
+                normalized.includes('process')
+                || normalized.includes('running')
+                || normalized.includes('progress')
+                || normalized.includes('execut')
+            ) {
+                return 'processing';
+            }
+            if (
+                normalized.includes('pending')
+                || normalized.includes('queue')
+                || normalized.includes('wait')
+                || normalized.includes('submit')
+                || normalized.includes('created')
+            ) {
+                return 'pending';
+            }
+        }
+
+        if (payload?.finished === true || payload?.success === true) {
+            return urls.length > 0 ? 'success' : 'processing';
+        }
+
+        return 'processing';
+    }
+
+    private extractTaskItemsFromPayload(payload: any): any[] {
+        const items: any[] = [];
+        const pushItems = (value: any) => {
+            if (!Array.isArray(value)) return;
+            value.forEach((item) => {
+                if (item && typeof item === 'object') {
+                    items.push(item);
+                }
+            });
+        };
+
+        pushItems(payload?.data);
+        pushItems(payload?.result);
+        pushItems(payload?.output);
+        pushItems(payload?.records);
+        pushItems(payload?.list);
+        pushItems(payload?.items);
+        pushItems(payload?.data?.records);
+        pushItems(payload?.data?.list);
+        pushItems(payload?.data?.items);
+        pushItems(payload?.result?.records);
+        pushItems(payload?.result?.list);
+        pushItems(payload?.result?.items);
+
+        return items;
+    }
+
+    private async fetchJsonTaskResponse(params: {
+        url: string;
+        keySlot: KeySlot;
+        method?: 'GET' | 'POST';
+        body?: string;
+        signal?: AbortSignal;
+        requestPath?: string;
+    }): Promise<{ payload: any; requestPath: string }> {
+        const headers = this.buildImageRequestHeaders(params.keySlot, true);
+        if (params.method === 'POST') {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        const response = await this.fetchWithTimeout(params.url, {
+            method: params.method || 'GET',
+            headers,
+            body: params.body,
+            signal: params.signal,
+        }, this.getTimeoutMs(params.keySlot, 120000), 1);
+
+        const requestPath = params.requestPath || this.getRequestPathFromUrl(params.url);
+        const raw = await response.text().catch(() => '');
+
+        if (!response.ok) {
+            throw this.buildHttpError({
+                message: `[${response.status}] ${raw.slice(0, 500) || 'Task request failed'}`,
+                status: response.status,
+                requestPath,
+                responseBody: raw.slice(0, 1600),
+                provider: params.keySlot.provider,
+            });
+        }
+
+        try {
+            return {
+                payload: raw ? JSON.parse(raw) : {},
+                requestPath,
+            };
+        } catch {
+            throw this.buildHttpError({
+                message: 'Task endpoint returned non-JSON payload',
+                requestPath,
+                responseBody: raw.slice(0, 1600),
+                provider: params.keySlot.provider,
+            });
+        }
+    }
+
+    private async fetchGenericImageTaskDetail(
+        taskId: string,
+        keySlot: KeySlot,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const cleanBase = this.normalizePollingApiBase(keySlot.baseUrl || '', true);
+        const url = `${cleanBase}/images/tasks/${encodeURIComponent(taskId)}`;
+        return this.fetchJsonTaskResponse({
+            url,
+            keySlot,
+            signal,
+            requestPath: `/v1/images/tasks/${encodeURIComponent(taskId)}`,
+        });
+    }
+
+    private async fetchMidjourneyTaskDetail(
+        taskId: string,
+        keySlot: KeySlot,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const cleanBase = this.normalizePollingApiBase(keySlot.baseUrl || '', false);
+        const url = `${cleanBase}/mj/task/${encodeURIComponent(taskId)}/fetch`;
+        return this.fetchJsonTaskResponse({
+            url,
+            keySlot,
+            signal,
+            requestPath: `/mj/task/${encodeURIComponent(taskId)}/fetch`,
+        });
+    }
+
+    private async fetchMidjourneyTasksByIds(
+        taskIds: string[],
+        keySlot: KeySlot,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const cleanBase = this.normalizePollingApiBase(keySlot.baseUrl || '', false);
+        const url = `${cleanBase}/mj/task/list-by-condition`;
+        return this.fetchJsonTaskResponse({
+            url,
+            keySlot,
+            method: 'POST',
+            body: JSON.stringify({ ids: taskIds }),
+            signal,
+            requestPath: '/mj/task/list-by-condition',
+        });
+    }
+
+    private buildPolledTaskResult(params: {
+        payload: any;
+        taskId: string;
+        requestPath: string;
+        keySlot: KeySlot;
+    }) {
+        const status = this.mapGenericTaskStatus(params.payload);
+        const urls = status === 'success' ? this.extractImageUrlsFromPayload(params.payload) : [];
+        const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
+        return {
+            urls,
+            taskId: params.taskId,
+            status: effectiveStatus,
+            provider: params.keySlot.provider,
+            providerName: params.keySlot.name,
+            keySlotId: params.keySlot.id,
+            metadata: {
+                requestPath: params.requestPath,
+                responseMessage: this.extractProviderMessage(params.payload),
+            }
+        };
+    }
+
     private async fetchWuyinTaskDetail(
         taskId: string,
         keySlot: KeySlot,
@@ -3051,8 +3294,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         };
     }
 
-    async checkTaskStatus(taskId: string, mode: GenerationMode, keySlot: KeySlot): Promise<any> {
+    async checkTaskStatus(taskId: string, mode: GenerationMode, keySlot: KeySlot, modelId?: string): Promise<any> {
         const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot);
+        const normalizedModelId = String(modelId || '').trim().toLowerCase();
+        const isMidjourneyModel = normalizedModelId.includes('midjourney')
+            || normalizedModelId.startsWith('mj-')
+            || normalizedModelId.startsWith('mj_');
 
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'wuyinkeji') {
             const { payload, requestPath } = await this.fetchWuyinTaskDetail(taskId, keySlot);
@@ -3076,7 +3323,69 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best' && isMidjourneyModel) {
+            const { payload, requestPath } = await this.fetchMidjourneyTaskDetail(taskId, keySlot);
+            return this.buildPolledTaskResult({
+                payload,
+                taskId: this.extractGenericTaskId(payload) || taskId,
+                requestPath,
+                keySlot,
+            });
+        }
+
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best') {
+            const { payload, requestPath } = await this.fetchGenericImageTaskDetail(taskId, keySlot);
+            return this.buildPolledTaskResult({
+                payload,
+                taskId: this.extractGenericTaskId(payload) || taskId,
+                requestPath,
+                keySlot,
+            });
+        }
+
         throw new Error(`Adapter for ${keySlot.provider} does not support task polling for ${mode}`);
+    }
+
+    async checkTaskStatuses(taskIds: string[], mode: GenerationMode, keySlot: KeySlot, modelId?: string): Promise<any[]> {
+        const normalizedTaskIds = Array.from(new Set(
+            (taskIds || []).filter((taskId): taskId is string => typeof taskId === 'string' && taskId.trim().length > 0)
+        ));
+        if (!normalizedTaskIds.length) {
+            return [];
+        }
+
+        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot);
+        const normalizedModelId = String(modelId || '').trim().toLowerCase();
+        const isMidjourneyModel = normalizedModelId.includes('midjourney')
+            || normalizedModelId.startsWith('mj-')
+            || normalizedModelId.startsWith('mj_');
+
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best' && isMidjourneyModel && normalizedTaskIds.length > 1) {
+            try {
+                const { payload, requestPath } = await this.fetchMidjourneyTasksByIds(normalizedTaskIds, keySlot);
+                const taskItems = this.extractTaskItemsFromPayload(payload);
+                const taskMap = new Map<string, any>();
+
+                taskItems.forEach((item) => {
+                    const itemTaskId = this.extractGenericTaskId(item);
+                    if (!itemTaskId) return;
+                    taskMap.set(itemTaskId, item);
+                });
+
+                return normalizedTaskIds.map((taskId) => this.buildPolledTaskResult({
+                    payload: taskMap.get(taskId) || { taskId, status: 'pending' },
+                    taskId,
+                    requestPath,
+                    keySlot,
+                }));
+            } catch (error) {
+                console.warn('[OpenAICompatibleAdapter] Midjourney batch polling failed, falling back to single fetch:', error);
+            }
+        }
+
+        return Promise.all(
+            normalizedTaskIds.map((taskId) => this.checkTaskStatus(taskId, mode, keySlot, modelId))
+        );
     }
 
     private async executeImageFormRequest(

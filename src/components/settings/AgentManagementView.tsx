@@ -190,7 +190,7 @@ const AgentManagementView = () => {
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                                                    最大令牌数
+                                                    最大词元数
                                                 </label>
                                                 <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                                                     {agent.maxTokens ?? 2048}
@@ -319,7 +319,7 @@ const AgentManagementView = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                                    最大令牌数
+                                    最大词元数
                                 </label>
                                 <input
                                     type="number"

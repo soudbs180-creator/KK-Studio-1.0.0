@@ -13,6 +13,8 @@ import { ImageSize, Provider } from '../../types';
 import { getProviderCapability, modelSupportedByProvider, ProviderCapabilityProfile } from './providerCapabilities';
 import { callSecureSystemProxyChat, callSecureSystemProxyImage, callSecureSystemProxyVideo, callSecureSystemProxyAudio, checkSecureSystemProxyTaskStatus } from '../model/secureModelProxy';
 import { resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderIdentity } from '../../utils/providerDisplay';
+import { getModelPricing } from '../model/modelPricing';
 
 export class LLMService {
     private static instance: LLMService;
@@ -58,6 +60,27 @@ export class LLMService {
         }
 
         return this.openAICompatibleAdapter;
+    }
+
+    private applyProviderIdentity<T extends { provider?: string; providerName?: string; keySlotId?: string }>(
+        result: T,
+        keySlot: KeySlot
+    ): T {
+        const providerIdentity = resolveProviderIdentity({
+            keySlotId: keySlot.id,
+            provider: result.provider || keySlot.provider,
+            providerLabel: result.providerName || keySlot.name,
+            type: keySlot.type,
+            baseUrl: keySlot.baseUrl,
+        });
+
+        result.provider = providerIdentity.provider || result.provider || keySlot.provider;
+        result.providerName = providerIdentity.providerLabel || result.providerName || keySlot.name || keySlot.provider;
+        if (!result.keySlotId) {
+            result.keySlotId = keySlot.id;
+        }
+
+        return result;
     }
 
     private resolveSystemBaseModelId(modelId: string): string {
@@ -225,11 +248,19 @@ export class LLMService {
                 const result = await adapter.generateImage(cleanOptions, keySlot);
                 keyManager.reportSuccess(keySlot.id);
 
+                this.applyProviderIdentity(result, keySlot);
+
                 // Track Cost & Usage
                 // If Adapter returns usage, use it. Else estimate.
 
                 let tokensForStats = result.usage?.totalTokens || 0;
                 let costForStats = result.usage?.cost || 0;
+                const promptTokens = result.usage?.promptTokens;
+                const completionTokens = Number.isFinite(result.usage?.completionTokens)
+                    ? result.usage?.completionTokens
+                    : (Number.isFinite(result.usage?.totalTokens) && Number.isFinite(promptTokens))
+                        ? Math.max(0, (result.usage?.totalTokens || 0) - (promptTokens || 0))
+                        : undefined;
 
                 const sizeRaw = (options.imageSize) || ImageSize.SIZE_1K;
                 // Note: options.imageSize is now string, locally we often use Enum '1K','2K'. 
@@ -237,6 +268,15 @@ export class LLMService {
 
                 const count = options.imageCount || 1;
                 const refCount = options.referenceImages?.length || 0;
+
+                if (costForStats === 0 && Number.isFinite(promptTokens) && Number.isFinite(completionTokens)) {
+                    const pricing = getModelPricing(result.model || options.modelId);
+                    if (pricing && (pricing.inputPerMillionTokens || pricing.outputPerMillionTokens)) {
+                        const inputCost = ((promptTokens || 0) / 1_000_000) * (pricing.inputPerMillionTokens || 0);
+                        const outputCost = ((completionTokens || 0) / 1_000_000) * (pricing.outputPerMillionTokens || 0);
+                        costForStats = inputCost + outputCost;
+                    }
+                }
 
                 if (tokensForStats === 0 || costForStats === 0) {
                     // Get estimate fallback using costService
@@ -265,17 +305,7 @@ export class LLMService {
                     if (!result.usage.totalTokens) result.usage.totalTokens = tokensForStats;
                 }
 
-                if (!result.provider) {
-                    result.provider = keySlot.provider;
-                }
-                if (!result.keySlotId) {
-                    result.keySlotId = keySlot.id;
-                }
-
                 // 𨱅?Populate Names for Display
-                if (!result.providerName) {
-                    result.providerName = keySlot.name || keySlot.provider;
-                }
                 if (!result.modelName) {
                     const metadata = getModelMetadata(result.model || options.modelId);
                     result.modelName = metadata?.name || cleanModelId;
@@ -388,14 +418,10 @@ export class LLMService {
                 const result = await targetAdapter.generateVideo!(cleanOptions, keySlot);
                 keyManager.reportSuccess(keySlot.id);
 
-                if (!result.provider) result.provider = keySlot.provider;
-                if (!result.providerName) result.providerName = keySlot.name || keySlot.provider;
+                this.applyProviderIdentity(result, keySlot);
                 if (!result.modelName) {
                     const metadata = getModelMetadata(result.model || options.modelId);
                     result.modelName = metadata?.name || cleanModelId;
-                }
-                if (!result.keySlotId) {
-                    result.keySlotId = keySlot.id;
                 }
 
                 if (keySlot.creditCost !== undefined) {
@@ -458,14 +484,10 @@ export class LLMService {
                 const result = await targetAdapter.generateAudio!(cleanOptions, keySlot);
                 keyManager.reportSuccess(keySlot.id);
 
-                if (!result.provider) result.provider = keySlot.provider;
-                if (!result.providerName) result.providerName = keySlot.name || keySlot.provider;
+                this.applyProviderIdentity(result, keySlot);
                 if (!result.modelName) {
                     const metadata = getModelMetadata(result.model || options.modelId);
                     result.modelName = metadata?.name || cleanModelId;
-                }
-                if (!result.keySlotId) {
-                    result.keySlotId = keySlot.id;
                 }
 
                 if (keySlot.creditCost !== undefined) {
@@ -490,7 +512,12 @@ export class LLMService {
     /**
      * Check status or poll background tasks until they complete.
      */
-    public async checkTaskStatus(taskId: string, mode: GenerationMode, preferredKeyId?: string | { id?: string }): Promise<any> {
+    public async checkTaskStatus(
+        taskId: string,
+        mode: GenerationMode,
+        preferredKeyId?: string | { id?: string },
+        modelId?: string
+    ): Promise<any> {
         const normalizedPreferredKeyId = typeof preferredKeyId === 'string'
             ? preferredKeyId
             : preferredKeyId?.id;
@@ -517,14 +544,59 @@ export class LLMService {
             throw new Error(`Adapter for ${keySlot.provider} does not support task polling`);
         }
 
-        const result = await adapter.checkTaskStatus(taskId, mode, keySlot);
+        const result = await adapter.checkTaskStatus(taskId, mode, keySlot, modelId);
 
         // Enrich result with provider info (consistent with generate methods)
-        if (!result.provider) result.provider = keySlot.provider;
-        if (!result.providerName) result.providerName = keySlot.name || keySlot.provider;
-        if (!result.keySlotId) result.keySlotId = keySlot.id;
+        this.applyProviderIdentity(result, keySlot);
 
         return result;
+    }
+
+    public async checkTaskStatuses(
+        taskIds: string[],
+        mode: GenerationMode,
+        preferredKeyId?: string | { id?: string },
+        modelId?: string
+    ): Promise<any[]> {
+        const normalizedTaskIds = Array.from(new Set(
+            (taskIds || []).filter((taskId): taskId is string => typeof taskId === 'string' && taskId.trim().length > 0)
+        ));
+        if (!normalizedTaskIds.length) {
+            return [];
+        }
+
+        const normalizedPreferredKeyId = typeof preferredKeyId === 'string'
+            ? preferredKeyId
+            : preferredKeyId?.id;
+
+        if (normalizedPreferredKeyId === 'system_proxy_slot' || normalizedTaskIds.every((taskId) => taskId.startsWith('system_proxy:'))) {
+            return Promise.all(
+                normalizedTaskIds.map((taskId) => this.checkTaskStatus(taskId, mode, preferredKeyId, modelId))
+            );
+        }
+
+        const nextKey = keyManager.getNextKey(
+            mode === GenerationMode.VIDEO ? 'veo-3.1-generate-preview' : 'gemini-1.5-flash',
+            normalizedPreferredKeyId
+        );
+        if (!nextKey) throw new Error('No API key available to check task status');
+
+        const keySlot = keyManager.getKey(nextKey.id);
+        if (!keySlot) throw new Error('No API key available to check task status');
+
+        const adapter = this.getAdapterForSlot(keySlot);
+        if (!adapter.checkTaskStatuses) {
+            return Promise.all(
+                normalizedTaskIds.map((taskId) => this.checkTaskStatus(taskId, mode, preferredKeyId, modelId))
+            );
+        }
+
+        const results = await adapter.checkTaskStatuses(normalizedTaskIds, mode, keySlot, modelId);
+        return results.map((result, index) => {
+            const enriched = this.applyProviderIdentity({ ...result }, keySlot);
+            if (!enriched.taskId) enriched.taskId = normalizedTaskIds[index];
+            return enriched;
+        });
     }
 }
 

@@ -5,6 +5,7 @@ const ADMIN_SESSION_STORAGE_KEY = "kk_admin_session";
 interface StoredAdminSession {
   token: string;
   expiresAt?: string;
+  userId?: string;
 }
 
 function canUseStorage(): boolean {
@@ -31,9 +32,11 @@ function normalizeStoredAdminSession(value: unknown): StoredAdminSession | undef
   }
 
   const expiresAt = String(candidate.expiresAt || "").trim();
+  const userId = String(candidate.userId || "").trim();
   return {
     token,
     expiresAt: expiresAt || undefined,
+    userId: userId || undefined,
   };
 }
 
@@ -82,7 +85,11 @@ export function getStoredAdminSessionExpiresAt(): string | undefined {
   return readStoredAdminSession()?.expiresAt;
 }
 
-export function setStoredAdminSession(token?: string, expiresAt?: string) {
+export function getStoredAdminSessionUserId(): string | undefined {
+  return readStoredAdminSession()?.userId;
+}
+
+export function setStoredAdminSession(token?: string, expiresAt?: string, userId?: string) {
   if (!canUseStorage()) {
     return;
   }
@@ -96,6 +103,7 @@ export function setStoredAdminSession(token?: string, expiresAt?: string) {
   const nextValue = JSON.stringify({
     token: normalizedToken,
     expiresAt: String(expiresAt || "").trim() || undefined,
+    userId: String(userId || "").trim() || undefined,
   });
   const previousValue = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
   if (previousValue === nextValue) {

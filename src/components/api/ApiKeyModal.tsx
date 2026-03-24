@@ -32,10 +32,10 @@ const fieldClass =
   'w-full rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-indigo-500';
 const compactFieldClass =
   'flex-1 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:border-indigo-500';
-const labelClass = 'mb-2 block text-sm font-medium text-[var(--text-secondary)]';
+const labelClass = 'mb-2 inline-flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-sm font-medium text-[var(--text-secondary)]';
 const helperTextClass = 'mt-1 text-xs text-[var(--text-tertiary)]';
 const secondaryButtonClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)] disabled:opacity-50';
+  'inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)] disabled:opacity-50';
 
 type FormDataState = {
   name: string;
@@ -151,14 +151,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
       if (result.success) {
         setTokenValid(true);
-        notify.success('Token 验证成功', '现在可以继续获取模型和价格信息。');
+        notify.success('访问令牌验证成功', '现在可以继续获取模型和价格信息。');
       } else {
         setTokenValid(false);
-        notify.error('Token 验证失败', result.error || '请检查 Token 是否正确。');
+        notify.error('访问令牌验证失败', result.error || '请检查访问令牌是否正确。');
       }
     } catch (error: any) {
       setTokenValid(false);
-      notify.error('验证失败', error.message || '请检查网络和 Token 配置。');
+      notify.error('验证失败', error.message || '请检查网络和访问令牌配置。');
     } finally {
       setIsVerifying(false);
     }
@@ -302,7 +302,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                 type="text"
                 value={formData.name}
                 onChange={(event) => setFormData((previous) => ({ ...previous, name: event.target.value }))}
-                placeholder="例如：My AI Provider"
+              placeholder="例如：我的 AI 服务商"
                 className={fieldClass}
               />
             </div>
@@ -310,14 +310,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>
-                  <Globe className="mr-1 inline h-4 w-4" />
-                  Base URL <span className="text-red-500">*</span>
+                  <Globe className="h-4 w-4 shrink-0" />
+              接口地址（Base URL）<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.baseUrl}
                   onChange={(event) => setFormData((previous) => ({ ...previous, baseUrl: event.target.value }))}
-                  placeholder="https://api.example.com/v1"
+              placeholder="例如：https://api.example.com/v1"
                   className={fieldClass}
                 />
                 <p className={helperTextClass}>填写服务商 API 根地址。</p>
@@ -344,8 +344,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
             <div>
               <label className={labelClass}>
-                <Key className="mr-1 inline h-4 w-4" />
-                API Key <span className="text-red-500">*</span>
+                <Key className="h-4 w-4 shrink-0" />
+              接口密钥（API Key）<span className="text-red-500">*</span>
               </label>
               <input
                 type="password"
@@ -358,8 +358,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
             <div>
               <label className={labelClass}>
-                <Lock className="mr-1 inline h-4 w-4" />
-                System Access Token <span className="text-[var(--text-tertiary)]">(可选)</span>
+                <Lock className="h-4 w-4 shrink-0" />
+              系统访问令牌（System Access Token）<span className="text-[var(--text-tertiary)]">(可选)</span>
               </label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
@@ -369,7 +369,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                     setFormData((previous) => ({ ...previous, systemToken: event.target.value }));
                     setTokenValid(null);
                   }}
-                  placeholder="用于拉取模型和价格信息"
+              placeholder="用于拉取模型和价格信息的系统访问令牌"
                   className={compactFieldClass}
                 />
                 <button
@@ -398,7 +398,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                   disabled={isLoading}
                   className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
                 >
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex max-w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
                     <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                     {isLoading ? '获取中...' : '获取模型和价格'}
                   </span>
@@ -408,7 +408,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
             <div>
               <label className={labelClass}>
-                <DollarSign className="mr-1 inline h-4 w-4" />
+                <DollarSign className="h-4 w-4 shrink-0" />
                 预算限制 <span className="text-[var(--text-tertiary)]">(可选)</span>
               </label>
               <input
@@ -436,7 +436,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                       <span className="truncate text-sm text-[var(--text-primary)]">{model.name}</span>
                       <span className="text-xs text-[var(--text-tertiary)]">
                         {model.billingType === 'token'
-                          ? `$${model.inputPrice}/${model.outputPrice} per 1M tokens`
+                          ? `$${model.inputPrice}/${model.outputPrice} / 100万词元`
                           : model.billingType}
                       </span>
                     </div>

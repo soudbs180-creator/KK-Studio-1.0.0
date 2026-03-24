@@ -110,40 +110,9 @@ function toActiveModelDto(
 }
 
 function buildSeedProviders(): StoredCreditProviderRecord[] {
-  return [
-    {
-      providerId: "seed-provider",
-      providerName: "Seed Provider",
-      baseUrl: "https://api.seed-provider.local/v1",
-      apiKeys: ["seed-key-1"],
-      models: [
-        {
-          recordId: "seed-provider:gpt-image-1",
-          modelId: "gpt-image-1",
-          displayName: "GPT Image 1",
-          description: "Seeded admin credit model for API migration tests.",
-          endpointType: "openai",
-          creditCost: 4,
-          isActive: true,
-          callCount: 0,
-          maxCallsLimit: null,
-          color: "#3B82F6",
-          colorSecondary: "#1D4ED8",
-          textColor: "white",
-          advancedEnabled: false,
-          mixWithSameModel: false,
-          qualityPricing: {
-            "1K": {
-              enabled: true,
-              creditCost: 4,
-            },
-          },
-          priority: 10,
-          weight: 1,
-        },
-      ],
-    },
-  ];
+  // Keep the in-memory fallback empty so only explicitly configured
+  // and enabled admin credit models surface in the runtime model list.
+  return [];
 }
 
 export class InMemoryCreditProviderRepository implements CreditProviderRepository {

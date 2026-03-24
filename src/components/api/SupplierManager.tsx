@@ -82,9 +82,9 @@ export const SupplierManager: React.FC<SupplierManagerProps> = ({ onViewPricing 
         </div>
         <button
           onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-lg text-white font-medium transition-all"
+          className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-lg text-white font-medium transition-all"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 shrink-0" />
           添加供应商
         </button>
       </div>
@@ -129,8 +129,8 @@ export const SupplierManager: React.FC<SupplierManagerProps> = ({ onViewPricing 
                       API Key: {maskKey(supplier.apiKey)}
                     </p>
                     {supplier.budgetLimit && (
-                      <p className="text-yellow-400 flex items-center gap-2">
-                        <DollarSign className="w-3.5 h-3.5" />
+                      <p className="text-yellow-400 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+                        <DollarSign className="w-3.5 h-3.5 shrink-0" />
                         预算限制: ${supplier.budgetLimit}
                       </p>
                     )}

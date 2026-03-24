@@ -106,6 +106,7 @@ export interface GeneratedImage {
   storageId?: string; // Content-based Hash ID for storage deduplication
   url: string;
   originalUrl?: string; // High-res original (if different from url)
+  apiResultUrl?: string; // Persisted remote HTTP(S) source for recovery
   prompt: string;
   aspectRatio: AspectRatio;
   imageSize?: ImageSize; // Image size/quality setting
@@ -124,6 +125,8 @@ export interface GeneratedImage {
   mode?: GenerationMode; // New: track creation mode
   tags?: string[]; // Search tags
   tokens?: number; // New: Token usage
+  promptTokens?: number;
+  completionTokens?: number;
   cost?: number; // New: Estimated cost
   costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
   billingMode?: 'credits' | 'currency';
@@ -139,6 +142,8 @@ export interface GeneratedImage {
   provider?: string; // 🎯 [New] API Provider Name (e.g., Google, OpenAI)
   providerLabel?: string; // 🎯 [New] User-defined Channel Name (e.g. 'Google Official')
   keySlotId?: string;
+  sourceTaskId?: string;
+  sourceResultIndex?: number;
   sourceReferenceStorageIds?: string[];
   requestPath?: string;
   requestBodyPreview?: string;
@@ -255,6 +260,38 @@ export interface PptEditablePage {
   layers: PptEditableLayer[];
 }
 
+export type TaskProviderType = 'generic' | 'midjourney';
+
+export interface PromptPendingSyncRequest {
+  requestId: string;
+  index: number;
+  prompt: string;
+  startedAt: number;
+  keySlotId?: string;
+}
+
+export interface PromptCompletedTask {
+  taskId: string;
+  resultUrls: string[];
+  completedAt: number;
+  provider?: string;
+  providerLabel?: string;
+  model?: string;
+  modelLabel?: string;
+  keySlotId?: string;
+  runtimeStrategyId?: string;
+  taskProviderType?: TaskProviderType;
+  cost?: number;
+  tokens?: number;
+}
+
+export interface PromptGenerationMetadata {
+  pendingTaskIds?: string[];
+  pendingSyncRequests?: PromptPendingSyncRequest[];
+  completedTasks?: PromptCompletedTask[];
+  [key: string]: unknown;
+}
+
 export interface PromptNode {
   id: string;
   prompt: string;
@@ -337,7 +374,7 @@ export interface PromptNode {
   // 🎯 [Persistence Management]
   jobId?: string; // 任务 ID（用于异步轮询和刷新状态）
   isNew?: boolean; // 🎯 [New] 是否为新生成的节点（用于触发飞出动画）
-  generationMetadata?: any; // 生成上下文元数据
+  generationMetadata?: PromptGenerationMetadata; // 生成上下文元数据
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;

@@ -140,7 +140,7 @@ export const SupplierPricing: React.FC<SupplierPricingProps> = ({
           </div>
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-400">输入 Tokens:</label>
+              <label className="text-sm text-gray-400">输入词元:</label>
               <input
                 type="number"
                 value={calculator.inputTokens}
@@ -149,7 +149,7 @@ export const SupplierPricing: React.FC<SupplierPricingProps> = ({
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-400">输出 Tokens:</label>
+              <label className="text-sm text-gray-400">输出词元:</label>
               <input
                 type="number"
                 value={calculator.outputTokens}
@@ -224,7 +224,7 @@ export const SupplierPricing: React.FC<SupplierPricingProps> = ({
                             ? 'bg-green-500/20 text-green-400'
                             : 'bg-purple-500/20 text-purple-400'
                         }`}>
-                          {model.billingType === 'token' ? '按 Token' : 
+                          {model.billingType === 'token' ? '按词元' : 
                            model.billingType === 'per_request' ? '按请求' : '倍率'}
                         </span>
                       </td>
@@ -271,7 +271,7 @@ export const SupplierPricing: React.FC<SupplierPricingProps> = ({
           href="https://docs.newapi.pro/en/docs/api" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300 ml-1"
+          className="ml-1 inline-flex max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-blue-400 hover:text-blue-300"
         >
           查看文档 <ExternalLink className="inline w-3 h-3" />
         </a>

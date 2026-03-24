@@ -25,10 +25,22 @@ import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout'
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
+import { resolveProviderIdentity } from './utils/providerDisplay';
+import { pickByDocumentLanguage } from './utils/localeText';
 
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
 const GENERATE_TIMEOUT_MS = 600000;
+
+const boundsIntersect = (
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number }
+) => !(
+  left.x + left.width <= right.x
+  || right.x + right.width <= left.x
+  || left.y + left.height <= right.y
+  || right.y + right.height <= left.y
+);
 
 type Point = { x: number; y: number };
 type SelectionBoxState = { start: Point; current: Point; active: boolean } | null;
@@ -42,6 +54,7 @@ type DragConnectionState = {
 type PromptGroupRenderItem = {
   id: string;
   kind: 'prompt-group';
+  groupView: PromptGroupView;
   node: PromptNode;
   childNodes: GeneratedImage[];
   detailLevel: CanvasCardDetailLevel;
@@ -78,6 +91,19 @@ type AgentRenderItem = {
 
 type WorkflowUtilityCanvasNode = PreviewWorkflowNode | SaveWorkflowNode | AgentWorkflowNode;
 
+type PromptGroupTier = 'base' | 'generating' | 'focused';
+
+type PromptGroupView = {
+  id: string;
+  rootPrompt: PromptNode;
+  childImages: GeneratedImage[];
+  intraGroupEdges: Array<{ fromId: string; toId: string }>;
+  bounds: { x: number; y: number; width: number; height: number };
+  baseOrder: number;
+  tier: PromptGroupTier;
+  isOverlapping: boolean;
+};
+
 type CanvasRenderItem =
   | PromptGroupRenderItem
   | ImageRenderItem
@@ -88,6 +114,12 @@ type ScheduledImageLoadState = {
   loadBand: 0 | 1 | 2 | 3;
   loadPriority: number;
   prefetchQuality: ImageQuality;
+};
+
+const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
+  base: 1,
+  generating: 2,
+  focused: 3,
 };
 
 // Lucide icons replaced with SVGs
@@ -135,6 +167,7 @@ import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
 import { apiKeyModalService } from './services/api/apiKeyModalService';
 import { MobileChatFeed, MobileHeader, MobileTabBar, MobileWorkspaceQuickBar } from './components/mobile';
+import { resolveAvatarUrl } from './utils/presetAvatars';
 import {
   AssetLibraryPanel,
   GlobalModals,
@@ -196,6 +229,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
+  const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
+  const [generatingGroupIds, setGeneratingGroupIds] = useState<string[]>([]);
+  const [groupOverlapMap, setGroupOverlapMap] = useState<Record<string, string[]>>({});
+  const [liveNodePositionById, setLiveNodePositionById] = useState<Record<string, { x: number; y: number }>>({});
+  const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
 
 
 
@@ -273,35 +311,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [selectedNodeIds]);
 
   const resolveProviderDisplay = useCallback((keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
-    if (fallbackProviderLabel) {
-      return {
-        provider: fallbackProvider,
-        providerLabel: fallbackProviderLabel,
-      };
-    }
-
-    if (keySlotId) {
-      const provider = keyManager.getProvider(keySlotId);
-      if (provider) {
-        return {
-          provider: provider.name || fallbackProvider,
-          providerLabel: provider.name || fallbackProvider || 'Custom',
-        };
-      }
-
-      const keySlot = keyManager.getKey(keySlotId);
-      if (keySlot) {
-        return {
-          provider: String(keySlot.provider || fallbackProvider || ''),
-          providerLabel: keySlot.name || String(keySlot.provider || fallbackProvider || 'Official'),
-        };
-      }
-    }
-
-    return {
+    return resolveProviderIdentity({
+      keySlotId,
       provider: fallbackProvider,
-      providerLabel: fallbackProviderLabel || fallbackProvider,
-    };
+      providerLabel: fallbackProviderLabel,
+    });
   }, []);
 
   const shouldPreferRouteProviderDisplay = useCallback((
@@ -345,7 +359,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     const routeDisplay = resolvedKeySlotId
       ? resolveProviderDisplay(resolvedKeySlotId)
       : resolveProviderDisplay(undefined, node.providerLabel, node.provider);
-    const preferRouteProviderDisplay = shouldPreferRouteProviderDisplay(node, routeDisplay);
+    const preferRouteProviderDisplay = (!!resolvedKeySlotId && !!routeDisplay.providerLabel)
+      || shouldPreferRouteProviderDisplay(node, routeDisplay);
 
     return {
       keySlotId: resolvedKeySlotId,
@@ -536,7 +551,8 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [getOrderedPptPreviewBundle]);
 
   // Reactively track KeyManager state
-  const [keyStats, setKeyStats] = useState(keyManager.getStats());
+  const [keyStats, setKeyStats] = useState(() => keyManager.getStats());
+  const [providers, setProviders] = useState(() => keyManager.getProviders());
 
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false); // New User Menu State
@@ -600,6 +616,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     const unsubscribe = keyManager.subscribe(() => {
       setKeyStats(keyManager.getStats());
+      setProviders(keyManager.getProviders());
     });
     return unsubscribe;
   }, []);
@@ -1430,6 +1447,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const dragConnectionRef = useRef<DragConnectionState>(null);
   const dragConnectionFrameRef = useRef<number | null>(null);
   const pendingDragConnectionPointRef = useRef<Point | null>(null);
+  const [isNodeDragActive, setIsNodeDragActive] = useState(false);
 
   useEffect(() => {
     dragConnectionRef.current = dragConnection;
@@ -1528,23 +1546,18 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     if (!dragConnectionRef.current?.active) return;
 
-    pendingDragConnectionPointRef.current = {
+    const nextPoint = {
       x: (e.clientX - canvasTransform.x) / canvasTransform.scale,
       y: (e.clientY - canvasTransform.y) / canvasTransform.scale,
     };
+    pendingDragConnectionPointRef.current = nextPoint;
 
-    if (dragConnectionFrameRef.current !== null) return;
+    const currentDragConnection = dragConnectionRef.current;
+    if (!currentDragConnection) return;
 
-    dragConnectionFrameRef.current = window.requestAnimationFrame(() => {
-      dragConnectionFrameRef.current = null;
-      const pendingPoint = pendingDragConnectionPointRef.current;
-      const currentDragConnection = dragConnectionRef.current;
-      if (!pendingPoint || !currentDragConnection) return;
-
-      const nextDragConnection = { ...currentDragConnection, currentPos: pendingPoint };
-      dragConnectionRef.current = nextDragConnection;
-      setDragConnection(nextDragConnection);
-    });
+    const nextDragConnection = { ...currentDragConnection, currentPos: nextPoint };
+    dragConnectionRef.current = nextDragConnection;
+    setDragConnection(nextDragConnection);
   }, [handleMouseMove, canvasTransform]);
 
   const handleRootMouseUp = useCallback((e: React.MouseEvent) => {
@@ -1560,6 +1573,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       setDragConnection(null);
     }
   }, [handleMouseUp]);
+
+  const handleCanvasNodeDragStateChange = useCallback((dragging: boolean) => {
+    setIsNodeDragActive(dragging);
+  }, []);
 
   // [Draft Sync Effect] Keep the draft node in sync with PromptBar config
   // AND [Smart Re-centering] Auto-calculate position for new/stale drafts
@@ -1939,8 +1956,22 @@ const AppContent: React.FC<AppContentProps> = () => {
   // const [showApiModal, setShowApiModal] = useState(false); // Removed
   // Duplicate showProfileModal removed
 
+  // Treat non-invalid configured channels as usable so the avatar indicator matches real routing behavior.
+  const hasUsableOfficialApi = keyManager.hasValidKeys();
+  const hasUsableProviderApi = providers.some((provider) =>
+    provider.isActive
+    && provider.status !== 'error'
+    && provider.baseUrl.trim().length > 0
+    && provider.apiKey.trim().length > 0
+  );
+  const hasProviderErrors = providers.some((provider) => provider.isActive && provider.status === 'error');
+
   // Get derived API status for UI indicator - use keyManager
-  const derivedApiStatus = keyStats.valid > 0 ? 'success' : keyStats.invalid > 0 ? 'error' : 'neutral';
+  const derivedApiStatus = hasUsableOfficialApi || hasUsableProviderApi
+    ? 'success'
+    : keyStats.invalid > 0 || hasProviderErrors
+      ? 'error'
+      : 'neutral';
 
   const focusWorkspace = useCallback(() => {
     setWorkspaceSurface('workspace');
@@ -2292,7 +2323,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
 
     import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('Deck updated', `Saved ${pages.length} editable PPT page${pages.length === 1 ? '' : 's'}.`);
+      notify.success(
+        pickByDocumentLanguage('页面包已更新', 'Deck updated'),
+        pickByDocumentLanguage(
+          `已保存 ${pages.length} 页可编辑 PPT 页面。`,
+          `Saved ${pages.length} editable PPT page${pages.length === 1 ? '' : 's'}.`
+        )
+      );
     });
   }, [buildPptPageAlias, getOrderedPptNodeBundle, updateImageNode, updatePromptNode]);
 
@@ -4562,8 +4599,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       })),
       assets: Object.fromEntries(assetFileByImageId.entries()),
       notes: [
-        'This package preserves layered PPT scene data for online editing and PPTX export.',
-        'PSD export is not reconstructed automatically from a flat AI image; it must be rebuilt from these layers.',
+        pickByDocumentLanguage(
+          '这个包会保留分层 PPT 场景数据，便于继续在线编辑或导出 PPTX。',
+          'This package preserves layered PPT scene data for online editing and PPTX export.'
+        ),
+        pickByDocumentLanguage(
+          'PSD 无法从扁平化 AI 图片自动还原，若要导出 PSD，需要基于这些图层重新构建。',
+          'PSD export is not reconstructed automatically from a flat AI image; it must be rebuilt from these layers.'
+        ),
       ],
     }, null, 2));
 
@@ -4600,14 +4643,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     }, null, 2));
 
     zip.file('editable/README.md', [
-      '# Editable PPT Package',
+      pickByDocumentLanguage('# 可编辑 PPT 页面包', '# Editable PPT Package'),
       '',
-      '- `editable/deck.json`: layered deck manifest used by KK Studio.',
-      '- `editable/slides/*.json`: per-slide editable layer data.',
-      '- `editable/assets/*`: image layer assets referenced by the slide JSON.',
-      '- `pages/*`: preview PNGs for quick inspection.',
+      pickByDocumentLanguage('- `editable/deck.json`：KK Studio 使用的分层页面包清单。', '- `editable/deck.json`: layered deck manifest used by KK Studio.'),
+      pickByDocumentLanguage('- `editable/slides/*.json`：每一页的可编辑图层数据。', '- `editable/slides/*.json`: per-slide editable layer data.'),
+      pickByDocumentLanguage('- `editable/assets/*`：页面 JSON 引用到的图像图层素材。', '- `editable/assets/*`: image layer assets referenced by the slide JSON.'),
+      pickByDocumentLanguage('- `pages/*`：用于快速查看的预览 PNG。', '- `pages/*`: preview PNGs for quick inspection.'),
       '',
-      'Use this package when you want to keep editable text and layer ordering, then export to PPTX now or rebuild PSD later.',
+      pickByDocumentLanguage(
+        '当你希望保留可编辑文字和图层顺序，并继续导出 PPTX 或后续重建 PSD 时，请使用这个包。',
+        'Use this package when you want to keep editable text and layer ordering, then export to PPTX now or rebuild PSD later.'
+      ),
     ].join('\n'));
 
     const slidesHtml = `<!doctype html>
@@ -5131,25 +5177,6 @@ ${slideLayerXml.join('\n')}
     return groupLayerMap;
   }, [activeCanvas]);
 
-  const selectedPromptGroupIds = React.useMemo(() => {
-    const groupIds = new Set<string>();
-    if (!activeCanvas) return groupIds;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      if (selectedNodeIds.includes(promptNode.id)) {
-        groupIds.add(promptNode.id);
-      }
-    });
-
-    activeCanvas.imageNodes.forEach((imageNode) => {
-      if (selectedNodeIds.includes(imageNode.id) && imageNode.parentPromptId) {
-        groupIds.add(imageNode.parentPromptId);
-      }
-    });
-
-    return groupIds;
-  }, [activeCanvas, selectedNodeIds]);
-
   const resolveCurrentPromptChildImages = useCallback((
     promptNode: PromptNode | undefined | null,
     imageNodes: GeneratedImage[],
@@ -5208,41 +5235,131 @@ ${slideLayerXml.join('\n')}
     return legacyOwnedImages;
   }, []);
 
+  const promptGroupBoundsById = React.useMemo(() => {
+    const boundsMap = new Map<string, { x: number; y: number; width: number; height: number }>();
+    if (!activeCanvas) return boundsMap;
+
+    const PADDING = 40;
+    const TOP_EXTRA = 40;
+    const BOTTOM_EXTRA = 40;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      if (promptNode.isDraft && !promptNode.isGenerating) {
+        return;
+      }
+
+      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      const addRect = (x: number, y: number, width: number, height: number) => {
+        minX = Math.min(minX, x - width / 2);
+        maxX = Math.max(maxX, x + width / 2);
+        minY = Math.min(minY, y - height);
+        maxY = Math.max(maxY, y);
+      };
+
+      addRect(promptNode.position.x, promptNode.position.y, 380, promptNode.height || 200);
+      childImages.forEach((imageNode) => {
+        const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);
+        addRect(imageNode.position.x, imageNode.position.y, width, totalHeight);
+      });
+
+      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+        return;
+      }
+
+      boundsMap.set(promptNode.id, {
+        x: minX - PADDING,
+        y: minY - (PADDING + TOP_EXTRA),
+        width: (maxX - minX) + PADDING * 2,
+        height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA,
+      });
+    });
+
+    return boundsMap;
+  }, [activeCanvas, resolveCurrentPromptChildImages]);
+
+  const generatingGroupStateSignatureRef = useRef('');
+  useEffect(() => {
+    if (!activeCanvas) {
+      setGeneratingGroupIds([]);
+      return;
+    }
+
+    const nextGeneratingGroupIds = activeCanvas.promptNodes
+      .filter((promptNode) => {
+        const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
+        return Boolean(promptNode.isGenerating) || childImages.some((imageNode) => imageNode.isGenerating);
+      })
+      .map((promptNode) => promptNode.id)
+      .sort();
+
+    const signature = nextGeneratingGroupIds.join('|');
+    if (generatingGroupStateSignatureRef.current === signature) {
+      return;
+    }
+    generatingGroupStateSignatureRef.current = signature;
+    setGeneratingGroupIds(nextGeneratingGroupIds);
+  }, [activeCanvas, resolveCurrentPromptChildImages]);
+
+  const computedGroupOverlapMap = React.useMemo(() => {
+    const nextOverlapMap: Record<string, string[]> = {};
+    const entries = Array.from(promptGroupBoundsById.entries());
+
+    entries.forEach(([groupId]) => {
+      nextOverlapMap[groupId] = [];
+    });
+
+    for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+      const [leftId, leftBounds] = entries[leftIndex];
+      for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
+        const [rightId, rightBounds] = entries[rightIndex];
+        if (!boundsIntersect(leftBounds, rightBounds)) continue;
+        nextOverlapMap[leftId].push(rightId);
+        nextOverlapMap[rightId].push(leftId);
+      }
+    }
+
+    return nextOverlapMap;
+  }, [promptGroupBoundsById]);
+
+  const groupOverlapStateSignatureRef = useRef('');
+  useEffect(() => {
+    const normalized = Object.keys(computedGroupOverlapMap)
+      .sort()
+      .map((groupId) => `${groupId}:${(computedGroupOverlapMap[groupId] || []).slice().sort().join(',')}`)
+      .join('|');
+
+    if (groupOverlapStateSignatureRef.current === normalized) {
+      return;
+    }
+    groupOverlapStateSignatureRef.current = normalized;
+    setGroupOverlapMap(computedGroupOverlapMap);
+  }, [computedGroupOverlapMap]);
+
   const promptGroupStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
     if (!activeCanvas) return stackMap;
-
-    const activePromptGroupId = activeSourceImage
-      ? activeCanvas.imageNodes.find((imageNode) => imageNode.id === activeSourceImage)?.parentPromptId
-      : undefined;
-    const now = Date.now();
+    const generatingGroupIdSet = new Set(generatingGroupIds);
 
     activeCanvas.promptNodes.forEach((promptNode) => {
       const baseLayer = promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0;
-      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
-      const isGeneratingGroup = Boolean(promptNode.isGenerating) || childImages.some((imageNode) => imageNode.isGenerating);
-      const isNewGroup = Boolean(promptNode.isNew) || childImages.some((imageNode) => now - (imageNode.timestamp || 0) < 10000);
-      const isSelectedGroup = selectedPromptGroupIds.has(promptNode.id);
-      const isActiveGroup = activePromptGroupId === promptNode.id;
-
-      let stackZIndex = baseLayer * 100;
-      if (isGeneratingGroup) {
-        stackZIndex += 40;
-      } else if (isNewGroup) {
-        stackZIndex += 30;
-      } else if (isSelectedGroup) {
-        stackZIndex += 20;
-      } else if (isActiveGroup) {
-        stackZIndex += 15;
-      } else {
-        stackZIndex += 10;
-      }
+      const isOverlapping = (groupOverlapMap[promptNode.id] || []).length > 0;
+      const tier: PromptGroupTier = focusedGroupId === promptNode.id && isOverlapping
+        ? 'focused'
+        : generatingGroupIdSet.has(promptNode.id)
+          ? 'generating'
+          : 'base';
+      const stackZIndex = (baseLayer * 100) + (PROMPT_GROUP_TIER_WEIGHT[tier] * 10);
 
       stackMap.set(promptNode.id, stackZIndex);
     });
 
     return stackMap;
-  }, [activeCanvas, activeSourceImage, promptGroupLayerById, resolveCurrentPromptChildImages, selectedPromptGroupIds]);
+  }, [activeCanvas, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupLayerById]);
 
   const standaloneImageStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
@@ -5275,6 +5392,74 @@ ${slideLayerXml.join('\n')}
 
     return stackMap;
   }, [activeCanvas, activeSourceImage, selectedNodeIds]);
+
+  const workflowUtilityStackZIndexById = React.useMemo(() => {
+    const stackMap = new Map<string, number>();
+    if (!activeCanvas?.workflow?.nodes) return stackMap;
+
+    activeCanvas.workflow.nodes.forEach((node) => {
+      if (!isWorkflowUtilityNodeKind(node.kind)) return;
+
+      const persistedOrder = (node.zIndex ?? 0) * 100;
+      const isSelectedNode = selectedNodeIds.includes(node.id);
+      stackMap.set(node.id, persistedOrder + (isSelectedNode ? 20 : 10));
+    });
+
+    return stackMap;
+  }, [activeCanvas, selectedNodeIds]);
+
+  const canvasGroupStackZIndexById = React.useMemo(() => {
+    const stackMap = new Map<string, number>();
+    if (!activeCanvas) return stackMap;
+
+    activeCanvas.groups.forEach((group) => {
+      const fallbackStack = ((group.zIndex ?? 0) * 100) + 10;
+      let highestMemberStack = Number.NEGATIVE_INFINITY;
+
+      group.nodeIds.forEach((nodeId) => {
+        const promptStack = promptGroupStackZIndexById.get(nodeId);
+        if (promptStack !== undefined) {
+          highestMemberStack = Math.max(highestMemberStack, promptStack);
+          return;
+        }
+
+        const imageNode = imageNodeById.get(nodeId);
+        if (imageNode) {
+          const imageStack = imageNode.parentPromptId
+            ? (
+              promptGroupStackZIndexById.get(imageNode.parentPromptId)
+              ?? ((promptGroupLayerById.get(imageNode.parentPromptId) ?? imageNode.zIndex ?? 0) * 100 + 10)
+            )
+            : (
+              standaloneImageStackZIndexById.get(imageNode.id)
+              ?? ((imageNode.zIndex ?? 0) * 100 + 10)
+            );
+          highestMemberStack = Math.max(highestMemberStack, imageStack);
+          return;
+        }
+
+        const workflowStack = workflowUtilityStackZIndexById.get(nodeId);
+        if (workflowStack !== undefined) {
+          highestMemberStack = Math.max(highestMemberStack, workflowStack);
+        }
+      });
+
+      const syncedStack = Number.isFinite(highestMemberStack)
+        ? Math.max(fallbackStack, highestMemberStack - 1)
+        : fallbackStack;
+
+      stackMap.set(group.id, syncedStack);
+    });
+
+    return stackMap;
+  }, [
+    activeCanvas,
+    imageNodeById,
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+    standaloneImageStackZIndexById,
+    workflowUtilityStackZIndexById,
+  ]);
 
   const canvasPerformanceProfile = React.useMemo(() => {
     const promptCount = activeCanvas?.promptNodes.length || 0;
@@ -5432,6 +5617,176 @@ ${slideLayerXml.join('\n')}
     return childIdMap;
   }, [actualChildImagesByPromptId]);
 
+  useEffect(() => {
+    if (!activeCanvas) {
+      setFocusedGroupId(null);
+      setLiveNodePositionById({});
+      setLockedGroupBoundsById({});
+      return;
+    }
+
+    if (focusedGroupId && !activeCanvas.promptNodes.some((promptNode) => promptNode.id === focusedGroupId)) {
+      setFocusedGroupId(null);
+      return;
+    }
+
+    if (selectedNodeIds.length === 0 && focusedGroupId) {
+      setFocusedGroupId(null);
+    }
+  }, [activeCanvas, focusedGroupId, selectedNodeIds]);
+
+  const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
+  useEffect(() => {
+    liveNodePositionByIdRef.current = liveNodePositionById;
+  }, [liveNodePositionById]);
+
+  const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
+    const groupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId)
+      ? nodeId
+      : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId)?.parentPromptId ?? null);
+
+    setLiveNodePositionById((prev) => {
+      if (!position) {
+        if (!(nodeId in prev)) return prev;
+        const next = { ...prev };
+        delete next[nodeId];
+        return next;
+      }
+
+      const previous = prev[nodeId];
+      if (previous && previous.x === position.x && previous.y === position.y) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [nodeId]: position,
+      };
+    });
+
+    if (!groupId) {
+      return;
+    }
+
+    setLockedGroupBoundsById((prev) => {
+      if (position) {
+        if (prev[groupId]) return prev;
+        const currentBounds = promptGroupBoundsById.get(groupId);
+        if (!currentBounds) return prev;
+        return {
+          ...prev,
+          [groupId]: currentBounds,
+        };
+      }
+
+      const hasOtherLiveNodeInGroup = Object.keys(liveNodePositionByIdRef.current).some((liveNodeId) => {
+        if (liveNodeId === nodeId) return false;
+
+        const liveGroupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === liveNodeId)
+          ? liveNodeId
+          : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === liveNodeId)?.parentPromptId ?? null);
+
+        return liveGroupId === groupId;
+      });
+
+      if (hasOtherLiveNodeInGroup || !(groupId in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+  }, [activeCanvas, promptGroupBoundsById]);
+
+  const promptGroupNodeIdsById = React.useMemo(() => {
+    const nodeIdsByGroupId = new Map<string, string[]>();
+
+    activeCanvas?.promptNodes.forEach((promptNode) => {
+      if (promptNode.isDraft && !promptNode.isGenerating) {
+        return;
+      }
+      nodeIdsByGroupId.set(promptNode.id, [
+        promptNode.id,
+        ...(actualChildImageIdsByPromptId.get(promptNode.id) || []),
+      ]);
+    });
+
+    return nodeIdsByGroupId;
+  }, [activeCanvas, actualChildImageIdsByPromptId]);
+
+  const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
+    if (!activeCanvas) return null;
+    if (activeCanvas.promptNodes.some((promptNode) => promptNode.id === nodeId)) {
+      return nodeId;
+    }
+    const imageNode = activeCanvas.imageNodes.find((node) => node.id === nodeId);
+    return imageNode?.parentPromptId || null;
+  }, [activeCanvas]);
+
+  const handleFocusPromptGroup = useCallback((groupId: string | null, options?: {
+    nodeIds?: string[];
+    keepSelection?: boolean;
+  }) => {
+    setFocusedGroupId(groupId);
+    if (!groupId || options?.keepSelection || !options?.nodeIds?.length) {
+      return;
+    }
+    selectNodes(options.nodeIds, 'replace');
+  }, [selectNodes]);
+
+  const promptGroupViews = React.useMemo<PromptGroupView[]>(() => {
+    if (!activeCanvas) return [];
+
+    return activeCanvas.promptNodes
+      .filter((promptNode) => !(promptNode.isDraft && !promptNode.isGenerating))
+      .map((promptNode) => {
+        const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+        const bounds = promptGroupBoundsById.get(promptNode.id);
+        if (!bounds) {
+          return null;
+        }
+
+        const isOverlapping = (groupOverlapMap[promptNode.id] || []).length > 0;
+        const tier: PromptGroupTier = focusedGroupId === promptNode.id && isOverlapping
+          ? 'focused'
+          : generatingGroupIds.includes(promptNode.id)
+            ? 'generating'
+            : 'base';
+
+        return {
+          id: promptNode.id,
+          rootPrompt: promptNode,
+          childImages,
+          intraGroupEdges: childImages.map((childNode) => ({ fromId: promptNode.id, toId: childNode.id })),
+          bounds,
+          baseOrder: promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0,
+          tier,
+          isOverlapping,
+        } satisfies PromptGroupView;
+      })
+      .filter((groupView): groupView is PromptGroupView => Boolean(groupView));
+  }, [activeCanvas, actualChildImagesByPromptId, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupBoundsById, promptGroupLayerById]);
+
+  const visiblePromptGroupViews = React.useMemo(() => {
+    const promptIdSet = new Set(visiblePromptNodes.map((promptNode) => promptNode.id));
+    const imageIdSet = new Set(visibleImageNodes.map((imageNode) => imageNode.id));
+
+    return promptGroupViews
+      .filter((groupView) => {
+        const isPromptVisible = promptIdSet.has(groupView.rootPrompt.id);
+        const hasVisibleChild = groupView.childImages.some((imageNode) => imageIdSet.has(imageNode.id));
+        return isPromptVisible || hasVisibleChild || groupView.tier !== 'base';
+      })
+      .sort((left, right) => {
+        const tierDiff = PROMPT_GROUP_TIER_WEIGHT[left.tier] - PROMPT_GROUP_TIER_WEIGHT[right.tier];
+        if (tierDiff !== 0) return tierDiff;
+        const orderDiff = left.baseOrder - right.baseOrder;
+        if (orderDiff !== 0) return orderDiff;
+        return left.rootPrompt.timestamp - right.rootPrompt.timestamp;
+      });
+  }, [promptGroupViews, visibleImageNodes, visiblePromptNodes]);
+
   const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -5504,11 +5859,6 @@ ${slideLayerXml.join('\n')}
     [visibleImageNodes]
   );
 
-  const visiblePromptNodeIds = React.useMemo(
-    () => new Set(visiblePromptNodes.map(node => node.id)),
-    [visiblePromptNodes]
-  );
-
   const visibleChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
     if (!activeCanvas) return childMap;
@@ -5524,8 +5874,14 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, resolveCurrentPromptChildImages, visibleImageNodes, visiblePromptNodes]);
 
   const standaloneVisibleImageNodes = React.useMemo(
-    () => visibleImageNodes.filter((imageNode) => !imageNode.parentPromptId || !visiblePromptNodeIds.has(imageNode.parentPromptId)),
-    [visibleImageNodes, visiblePromptNodeIds]
+    () => {
+      const promptGroupIdSet = new Set(promptGroupViews.map((groupView) => groupView.id));
+
+      return visibleImageNodes.filter((imageNode) => (
+        !imageNode.parentPromptId || !promptGroupIdSet.has(imageNode.parentPromptId)
+      ));
+    },
+    [promptGroupViews, visibleImageNodes]
   );
 
   const workflowUtilityNodesById = React.useMemo(
@@ -5703,6 +6059,8 @@ ${slideLayerXml.join('\n')}
     setConnectorVisibleImageNodes(snapshot.imageNodes);
   }, []);
 
+  const shouldUseLiveConnectorSnapshot = isNodeDragActive || !shouldThrottleEdges(canvasPerformanceProfile);
+
   useEffect(() => {
     return () => {
       if (connectorThrottleTimerRef.current !== null) {
@@ -5720,7 +6078,7 @@ ${slideLayerXml.join('\n')}
 
     connectorPendingSnapshotRef.current = nextSnapshot;
 
-    if (!shouldThrottleEdges(canvasPerformanceProfile)) {
+    if (shouldUseLiveConnectorSnapshot) {
       if (connectorThrottleTimerRef.current !== null) {
         window.clearTimeout(connectorThrottleTimerRef.current);
         connectorThrottleTimerRef.current = null;
@@ -5750,38 +6108,42 @@ ${slideLayerXml.join('\n')}
   }, [
     canvasPerformanceProfile,
     commitConnectorSnapshot,
+    shouldUseLiveConnectorSnapshot,
     visibleImageNodes,
     visiblePromptNodes,
   ]);
 
+  const connectorRenderPromptNodes = shouldUseLiveConnectorSnapshot ? visiblePromptNodes : connectorPromptNodes;
+  const connectorRenderVisibleImageNodes = shouldUseLiveConnectorSnapshot ? visibleImageNodes : connectorVisibleImageNodes;
+
   const connectorVisibleImageNodesById = React.useMemo(
-    () => new Map(connectorVisibleImageNodes.map((node) => [node.id, node])),
-    [connectorVisibleImageNodes]
+    () => new Map(connectorRenderVisibleImageNodes.map((node) => [node.id, node])),
+    [connectorRenderVisibleImageNodes]
   );
 
   const connectorPromptNodesById = React.useMemo(
-    () => new Map(connectorPromptNodes.map((node) => [node.id, node])),
-    [connectorPromptNodes]
+    () => new Map(connectorRenderPromptNodes.map((node) => [node.id, node])),
+    [connectorRenderPromptNodes]
   );
 
   const connectorVisibleImageNodeIds = React.useMemo(
-    () => new Set(connectorVisibleImageNodes.map((node) => node.id)),
-    [connectorVisibleImageNodes]
+    () => new Set(connectorRenderVisibleImageNodes.map((node) => node.id)),
+    [connectorRenderVisibleImageNodes]
   );
 
   const connectorChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
     if (!activeCanvas) return childMap;
 
-    connectorPromptNodes.forEach((promptNode) => {
-      const images = resolveCurrentPromptChildImages(promptNode, connectorVisibleImageNodes);
+    connectorRenderPromptNodes.forEach((promptNode) => {
+      const images = resolveCurrentPromptChildImages(promptNode, connectorRenderVisibleImageNodes);
       if (images.length > 0) {
         childMap.set(promptNode.id, images);
       }
     });
 
     return childMap;
-  }, [activeCanvas, connectorPromptNodes, connectorVisibleImageNodes, resolveCurrentPromptChildImages]);
+  }, [activeCanvas, connectorRenderPromptNodes, connectorRenderVisibleImageNodes, resolveCurrentPromptChildImages]);
 
   const expandedSelectedNodeIds = React.useMemo(
     () => Array.from(new Set(
@@ -5799,12 +6161,14 @@ ${slideLayerXml.join('\n')}
   );
 
   const handleCanvasNodeSelect = useCallback((nodeId: string) => {
+    const nextGroupId = resolvePromptGroupIdForNodeId(nodeId);
+    setFocusedGroupId(nextGroupId);
     selectNodes([nodeId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
     if ((window.event as any)?.button === 2) {
       const pos = getSelectionScreenCenter([nodeId]);
       if (pos) setSelectionMenuPosition(pos);
     }
-  }, [getSelectionScreenCenter, selectNodes]);
+  }, [getSelectionScreenCenter, resolvePromptGroupIdForNodeId, selectNodes]);
 
   const notifyWorkflowCard = useCallback((
     level: 'success' | 'warning' | 'info' | 'error',
@@ -6341,15 +6705,16 @@ ${slideLayerXml.join('\n')}
         isCanvasTransforming={isCanvasTransforming}
         isNew={(nowTimestamp || Date.now()) - (node.timestamp || 0) < 10000}
         canvasTransform={canvasTransform}
+        onDragStateChange={handleCanvasNodeDragStateChange}
         onDragDelta={(delta, sourceNodeId) => {
           if (!sourceNodeId) return;
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-            moveSelectedNodes(delta, expandedSelectedNodeIds);
+            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
             return;
           }
 
-          moveSelectedNodes(delta, sourceNodeId);
+          moveSelectedNodesImmediate(delta, sourceNodeId);
         }}
       />
     );
@@ -6363,12 +6728,14 @@ ${slideLayerXml.join('\n')}
     handleConnectEnd,
     handleDownloadPptComposite,
     handleImageClick,
+    handleCanvasNodeDragStateChange,
     handleOpenPptStackPreview,
     handleOpenPreview,
     highlightedId,
     isCanvasTransforming,
     isMobile,
     moveSelectedNodes,
+    moveSelectedNodesImmediate,
     nowTimestamp,
     selectedNodeIds,
     updateImageNode,
@@ -6377,123 +6744,290 @@ ${slideLayerXml.join('\n')}
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
-    const node = item.node;
+    const { groupView } = item;
+    const node = groupView.rootPrompt;
+    const groupBounds = lockedGroupBoundsById[node.id] ?? groupView.bounds;
+    const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
+    const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
+    const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
+    const isGeneratingGroup = generatingGroupIds.includes(node.id);
     const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
+    const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
+    const groupConnectorStroke = Math.max(1, Math.min(3, 1 / groupConnectorZoom));
+    const groupConnectorDash = `${Math.max(2, Math.min(10, 4 / groupConnectorZoom))} ${Math.max(2, Math.min(10, 4 / groupConnectorZoom))}`;
+    const groupConnectorDotRadius = Math.max(1.5, Math.min(3.5, 2 / groupConnectorZoom));
+    const groupShadowFilter = isGroupFocused
+      ? 'drop-shadow(0 28px 52px rgba(2, 6, 23, 0.34)) drop-shadow(0 12px 24px rgba(2, 6, 23, 0.24))'
+      : isGeneratingGroup
+        ? 'drop-shadow(0 24px 44px rgba(2, 6, 23, 0.28)) drop-shadow(0 10px 20px rgba(37, 99, 235, 0.16))'
+        : groupView.isOverlapping
+          ? 'drop-shadow(0 24px 44px rgba(2, 6, 23, 0.30)) drop-shadow(0 10px 20px rgba(2, 6, 23, 0.18))'
+          : 'none';
 
     return (
-      <>
-        <PromptNodeComponent
-          node={node}
-          detailLevel={promptDetailLevel}
-          groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
-          stackZIndexOverride={promptGroupStackZIndexById.get(node.id)}
-          actualChildImageCount={(actualChildImagesByPromptId.get(node.id) || []).length}
-          onPositionChange={updatePromptNodePosition}
-          isSelected={selectedNodeIds.includes(node.id)}
-          highlighted={highlightedId === node.id}
-          onBringToFront={() => bringNodesToFront([node.id])}
-          onSelect={() => handleCanvasNodeSelect(node.id)}
-          onClickPrompt={handlePromptClick}
-          onConnectStart={handleConnectStart}
-          zoomScale={canvasTransform.scale}
-          isCanvasTransforming={isCanvasTransforming}
-          isMobile={isMobile}
-          sourcePosition={node.sourceImageId
-            ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
-            : undefined
-          }
-          onCancel={handleCancelGeneration}
-          onRetry={handleRetryNode}
-          onEditPptDeck={handleOpenPptDeckEditor}
-          onExportPpt={handleExportPptPackageEditable}
-          onExportPptx={handleExportPptxEditable}
-          onRetryPptPage={handleRetryPptSinglePage}
-          onExportPptPage={handleExportPptSinglePage}
-          ioTrace={getNodeIoTrace(node.id)}
-          onOpenStorageSettings={() => {
-            setShowSettingsPanel(true);
-            setSettingsInitialView('storage-settings');
+      <div
+        className="absolute"
+        style={{
+          left: groupBounds.x,
+          top: groupBounds.y,
+          width: groupBounds.width,
+          height: groupBounds.height,
+          zIndex: groupStackZIndex,
+          isolation: 'isolate',
+          overflow: 'visible',
+          pointerEvents: 'auto',
+        }}
+      >
+        <div
+          className="absolute inset-0 rounded-[28px]"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
           }}
-          onDelete={deletePromptNode}
-          onDisconnect={handleDisconnectPrompt}
-          onUpdateNode={updatePromptNode}
-          onHeightChange={(id, height) => {
-            const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
-            const targetNode = latestNode || node;
-            if (targetNode.height !== height) {
-              updatePromptNode({ ...targetNode, height });
+          onMouseDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.stopPropagation();
+            handleFocusPromptGroup(node.id, { nodeIds: groupNodeIds });
+            if (event.button === 2) {
+              const pos = getSelectionScreenCenter(groupNodeIds);
+              if (pos) setSelectionMenuPosition(pos);
             }
           }}
-          onPin={handlePinDraft}
-          onRemoveTag={(id, tag) => {
-            const promptNode = activeCanvas?.promptNodes.find(n => n.id === id);
-            if (promptNode && promptNode.tags) {
-              const newTags = promptNode.tags.filter(t => t !== tag);
-              updatePromptNode({ ...promptNode, tags: newTags });
-            }
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            handleFocusPromptGroup(node.id, { nodeIds: groupNodeIds });
+            const pos = getSelectionScreenCenter(groupNodeIds);
+            if (pos) setSelectionMenuPosition(pos);
           }}
-          onDragDelta={(delta, sourceNodeId) => {
-            if (!sourceNodeId) return;
-
-            const mainCard = activeCanvas?.promptNodes.find(p => p.id === sourceNodeId);
-            const childImageIds = mainCard ? (actualChildImageIdsByPromptId.get(mainCard.id) || []) : [];
-
-            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-              moveSelectedNodes(delta, expandedSelectedNodeIds);
-            } else if (childImageIds.length > 0) {
-              moveSelectedNodes(delta, [sourceNodeId, ...childImageIds.filter((id): id is string => !!id)]);
-            } else {
-              moveSelectedNodes(delta, sourceNodeId);
-            }
-          }}
-          canvasTransform={canvasTransform}
         />
 
-        {item.childNodes.map((childNode) => (
-          <React.Fragment key={childNode.id}>
-            {renderImageWorkflowItem({
-              id: childNode.id,
-              kind: 'image',
-              node: childNode,
-              detailLevel: item.detailLevel,
-              groupLayerZIndex: promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0,
-              stackZIndexOverride: promptGroupStackZIndexById.get(node.id),
-              loadPriority: 1200,
-              loadBand: 0,
-            })}
-          </React.Fragment>
-        ))}
-      </>
+        <div
+          className="absolute inset-0"
+          style={{
+            overflow: 'visible',
+            filter: groupShadowFilter,
+            transition: 'filter 180ms ease',
+          }}
+        >
+          {groupView.childImages.length > 0 && (
+            <svg
+              className="absolute inset-0 pointer-events-none overflow-visible"
+              style={{ zIndex: 10 }}
+            >
+              {groupView.childImages.map((childNode) => {
+                const promptPosition = liveNodePositionById[node.id] ?? node.position;
+                const childPosition = liveNodePositionById[childNode.id] ?? childNode.position;
+                const { totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
+                let imageHeight = theoreticalHeight;
+
+                if (childNode.dimensions && typeof childNode.dimensions === 'string') {
+                  const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
+                  if (match?.[1] && match?.[2]) {
+                    const width = parseInt(match[1], 10);
+                    const height = parseInt(match[2], 10);
+                    if (width > 0 && height > 0) {
+                      const aspect = width / height;
+                      const { width: renderedWidth } = getCardDimensions(childNode.aspectRatio, false);
+                      imageHeight = (renderedWidth / aspect) + 40;
+                    }
+                  }
+                }
+
+                const startX = promptPosition.x - groupBounds.x;
+                const startY = promptPosition.y - groupBounds.y;
+                const endX = childPosition.x - groupBounds.x;
+                const endY = (childPosition.y - imageHeight) - groupBounds.y + 5;
+                const distanceY = Math.abs(endY - startY);
+                const handleLength = Math.min(distanceY * 0.4, 150);
+                const controlY1 = startY + handleLength;
+                const controlY2 = endY - handleLength;
+                const path = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+
+                return (
+                  <g key={`${node.id}-${childNode.id}`}>
+                    <circle cx={startX} cy={startY} r={groupConnectorDotRadius} fill="var(--connector-color, #6366f1)" opacity="0.55" />
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="var(--connector-color, #6366f1)"
+                      strokeWidth={groupConnectorStroke}
+                      strokeDasharray={groupConnectorDash}
+                      strokeLinecap="butt"
+                      opacity={isGroupFocused ? 0.72 : 0.42}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+
+          <PromptNodeComponent
+            node={node}
+            detailLevel={promptDetailLevel}
+            groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
+            stackZIndexOverride={20}
+            shadowBoost
+            renderOrigin={{ x: groupBounds.x, y: groupBounds.y }}
+            actualChildImageCount={groupView.childImages.length}
+            onPositionChange={updatePromptNodePosition}
+            isSelected={selectedNodeIds.includes(node.id)}
+            highlighted={highlightedId === node.id || isGroupFocused}
+            onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
+            onSelect={() => {
+              setFocusedGroupId(node.id);
+              handleCanvasNodeSelect(node.id);
+            }}
+            onClickPrompt={handlePromptClick}
+            onConnectStart={handleConnectStart}
+            zoomScale={canvasTransform.scale}
+            isCanvasTransforming={isCanvasTransforming}
+            isMobile={isMobile}
+            sourcePosition={node.sourceImageId
+              ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
+              : undefined
+            }
+            onCancel={handleCancelGeneration}
+            onRetry={handleRetryNode}
+            onEditPptDeck={handleOpenPptDeckEditor}
+            onExportPpt={handleExportPptPackageEditable}
+            onExportPptx={handleExportPptxEditable}
+            onRetryPptPage={handleRetryPptSinglePage}
+            onExportPptPage={handleExportPptSinglePage}
+            ioTrace={getNodeIoTrace(node.id)}
+            onOpenStorageSettings={() => {
+              setShowSettingsPanel(true);
+              setSettingsInitialView('storage-settings');
+            }}
+            onDelete={deletePromptNode}
+            onDisconnect={handleDisconnectPrompt}
+            onUpdateNode={updatePromptNode}
+            onLivePositionChange={handleLiveNodePositionChange}
+            onHeightChange={(id, height) => {
+              const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
+              const targetNode = latestNode || node;
+              if (targetNode.height !== height) {
+                updatePromptNode({ ...targetNode, height });
+              }
+            }}
+            onPin={handlePinDraft}
+            onRemoveTag={(id, tag) => {
+              const promptNode = activeCanvas?.promptNodes.find(n => n.id === id);
+              if (promptNode && promptNode.tags) {
+                const newTags = promptNode.tags.filter(t => t !== tag);
+                updatePromptNode({ ...promptNode, tags: newTags });
+              }
+            }}
+            onDragDelta={(delta, sourceNodeId) => {
+              if (!sourceNodeId) return;
+              if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+                moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+              } else {
+                moveSelectedNodesImmediate(delta, groupNodeIds);
+              }
+            }}
+            canvasTransform={canvasTransform}
+            onDragStateChange={handleCanvasNodeDragStateChange}
+          />
+
+          {groupView.childImages.map((childNode, childIndex) => (
+            <React.Fragment key={childNode.id}>
+              <ImageNode
+                image={childNode}
+                detailLevel="full"
+                loadPriority={1200}
+                loadBand={0}
+                groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
+                stackZIndexOverride={30 + childIndex}
+                shadowBoost
+                renderOrigin={{ x: groupBounds.x, y: groupBounds.y }}
+                position={liveNodePositionById[childNode.id] ?? childNode.position}
+                onPositionChange={updateImageNodePosition}
+                onLivePositionChange={handleLiveNodePositionChange}
+                highlighted={highlightedId === childNode.id || isGroupFocused}
+                onDimensionsUpdate={updateImageNodeDisplayMeta}
+                onUpdate={updateImageNode}
+                onDelete={deleteImageNode}
+                onConnectEnd={handleConnectEnd}
+                onClick={handleImageClick}
+                onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
+                isActive={childNode.id === activeSourceImage}
+                isSelected={selectedNodeIds.includes(childNode.id)}
+                onSelect={() => {
+                  setFocusedGroupId(node.id);
+                  handleCanvasNodeSelect(childNode.id);
+                }}
+                zoomScale={canvasTransform.scale}
+                isMobile={isMobile}
+                onPreview={handleOpenPreview}
+                onPreviewPptStack={handleOpenPptStackPreview}
+                onDownloadPptComposite={handleDownloadPptComposite}
+                isCanvasTransforming={isCanvasTransforming}
+                isNew={(nowTimestamp || Date.now()) - (childNode.timestamp || 0) < 10000}
+                canvasTransform={canvasTransform}
+                onDragStateChange={handleCanvasNodeDragStateChange}
+                onDragDelta={(delta, sourceNodeId) => {
+                  if (!sourceNodeId) return;
+
+                  if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+                    moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+                    return;
+                  }
+
+                  moveSelectedNodesImmediate(delta, [sourceNodeId]);
+                }}
+              />
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
     );
   }, [
     activeCanvas,
-    actualChildImageIdsByPromptId,
-    actualChildImagesByPromptId,
-    bringNodesToFront,
     canvasTransform,
     deletePromptNode,
+    deleteImageNode,
     expandedSelectedNodeIds,
     getNodeIoTrace,
+    getSelectionScreenCenter,
     handleCancelGeneration,
     handleCanvasNodeSelect,
     handleConnectStart,
+    handleConnectEnd,
     handleDisconnectPrompt,
+    handleDownloadPptComposite,
     handleExportPptPackageEditable,
     handleExportPptSinglePage,
     handleExportPptxEditable,
     handleOpenPptDeckEditor,
+    handleOpenPptStackPreview,
+    handleOpenPreview,
+    handleCanvasNodeDragStateChange,
+    handleLiveNodePositionChange,
+    handleFocusPromptGroup,
+    handleImageClick,
     handlePinDraft,
     handlePromptClick,
     handleRetryNode,
     handleRetryPptSinglePage,
+    focusedGroupId,
+    generatingGroupIds,
     highlightedId,
     isMobile,
-    moveSelectedNodes,
+    lockedGroupBoundsById,
+    liveNodePositionById,
+    moveSelectedNodesImmediate,
+    nowTimestamp,
+    promptGroupNodeIdsById,
     promptGroupLayerById,
     promptGroupStackZIndexById,
-    renderImageWorkflowItem,
     selectedNodeIds,
+    setSelectionMenuPosition,
     updatePromptNode,
+    updateImageNode,
+    updateImageNodeDisplayMeta,
+    updateImageNodePosition,
     updatePromptNodePosition,
   ]);
 
@@ -6586,11 +7120,12 @@ ${slideLayerXml.join('\n')}
   );
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => ([
-    ...visiblePromptNodes.map((node) => ({
-      id: node.id,
+    ...visiblePromptGroupViews.map((groupView) => ({
+      id: groupView.id,
       kind: 'prompt-group' as const,
-      node,
-      childNodes: visibleChildImagesByPromptId.get(node.id) || [],
+      groupView,
+      node: groupView.rootPrompt,
+      childNodes: groupView.childImages,
       detailLevel: canvasPerformanceProfile.cardDetailLevel,
     })),
     ...standaloneVisibleImageNodes.map((node) => ({
@@ -6641,8 +7176,7 @@ ${slideLayerXml.join('\n')}
     standaloneVisibleImageNodes,
     canvasPerformanceProfile.cardDetailLevel,
     imageLoadSchedulingById,
-    visibleChildImagesByPromptId,
-    visiblePromptNodes,
+    visiblePromptGroupViews,
     visibleWorkflowUtilityNodes,
   ]);
 
@@ -6652,6 +7186,7 @@ ${slideLayerXml.join('\n')}
         key={group.id}
         group={group}
         zoom={canvasTransform.scale}
+        stackZIndexOverride={canvasGroupStackZIndexById.get(group.id)}
         highlighted={highlightedId === group.id}
         onUngroup={removeGroup}
         onDragStart={(id, event) => {
@@ -6672,13 +7207,16 @@ ${slideLayerXml.join('\n')}
           selectNodes(nodeIds, 'toggle');
         }}
         onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
+        onDragStateChange={handleCanvasNodeDragStateChange}
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
       />
     ))
   ), [
+    canvasGroupStackZIndexById,
     canvasTransform.scale,
     getComputedGroupBounds,
+    handleCanvasNodeDragStateChange,
     highlightedId,
     moveSelectedNodesImmediate,
     removeGroup,
@@ -6762,6 +7300,7 @@ ${slideLayerXml.join('\n')}
   const derivedMobileUserName = (() => {
     const candidate =
       user?.user_metadata?.full_name ||
+      user?.user_metadata?.display_name ||
       user?.user_metadata?.name ||
       user?.email?.split('@')[0];
 
@@ -6769,10 +7308,7 @@ ${slideLayerXml.join('\n')}
       ? candidate.trim()
       : '\u7528\u6237';
   })();
-  const derivedMobileUserAvatarUrl =
-    typeof user?.user_metadata?.avatar_url === 'string' && user?.user_metadata?.avatar_url.length > 0
-      ? user?.user_metadata?.avatar_url
-      : undefined;
+  const derivedMobileUserAvatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
   const backgroundMode = (
     promptBarUiBusy
     || isCanvasTransforming
@@ -7320,6 +7856,7 @@ ${slideLayerXml.join('\n')}
           */
           // Always clear selection on empty click
           clearSelection();
+          setFocusedGroupId(null);
           setSelectionMenuPosition(null);
         }}
         onCanvasDoubleClick={() => {
@@ -7329,6 +7866,7 @@ ${slideLayerXml.join('\n')}
             setActiveSourceImage(null);
             // Also clear selection
             clearSelection();
+            setFocusedGroupId(null);
             setSelectionMenuPosition(null);
             // 🎯 [Fix] Explicitly remove draft node so preview disappears
             if (draftNodeId) {
@@ -7389,8 +7927,8 @@ ${slideLayerXml.join('\n')}
             />
           )}
 
-          {/* 1. Prompt -> Image Connections (Generation Flow) */}
-          {connectorPromptNodes.map(pn => {
+          {/* Prompt -> Image connections now render inside each prompt-group container. */}
+          {false && connectorRenderPromptNodes.map(pn => {
             const childNodes = connectorChildImagesByPromptId.get(pn.id) || [];
 
             return childNodes.map((childNode) => {
@@ -7461,7 +7999,7 @@ ${slideLayerXml.join('\n')}
 
           {/* 2. Image -> Prompt/Pending Connections (Follow-up Flow) */}
           {/* A. Existing Prompts */}
-          {connectorPromptNodes.map(pn => {
+          {connectorRenderPromptNodes.map(pn => {
             if (pn.isDraft) return null; // Draft/pending connection is rendered by pending-connection block below
             if (!pn.sourceImageId) return null;
             const sourceNode = connectorVisibleImageNodesById.get(pn.sourceImageId);

@@ -525,7 +525,7 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
           <SettingsMetricCard
             label="今日消费"
             value={`$${todayCostUsd.toFixed(2)}`}
-            helper={`Tokens ${formatMetricNumber(todayTokens)} / 调用 ${formatMetricNumber(todayUsageCount)}`}
+            helper={`词元 ${formatMetricNumber(todayTokens)} / 调用 ${formatMetricNumber(todayUsageCount)}`}
             icon={Activity}
             tone="amber"
           />

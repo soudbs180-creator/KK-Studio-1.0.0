@@ -9,11 +9,11 @@ import {
   Shield,
 } from 'lucide-react';
 
-const DashboardView = lazy(() => import('../components/settings/views/DashboardView'));
+const DashboardView = lazy(() => import('../components/settings/views/DashboardView.localized.tsx'));
 const ApiSettingsView = lazy(() => import('../components/settings/ApiSettingsView'));
 const CostEstimation = lazy(() => import('../pages/CostEstimation'));
-const StorageSettingsView = lazy(() => import('../components/settings/views/StorageSettingsView'));
-const SystemLogsView = lazy(() => import('../components/settings/views/SystemLogsView'));
+const StorageSettingsView = lazy(() => import('../components/settings/views/StorageSettingsView.localized.tsx'));
+const SystemLogsView = lazy(() => import('../components/settings/views/SystemLogsView.localized.tsx'));
 const AdminSystem = lazy(() => import('../components/settings/AdminSystem'));
 
 export type SettingsViewId =

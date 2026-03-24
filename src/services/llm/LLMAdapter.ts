@@ -273,5 +273,16 @@ export interface LLMAdapter {
     generateAudio?(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult>;
 
     // 🚀 [Persistence] Polling for async tasks
-    checkTaskStatus?: (taskId: string, mode: GenerationMode, keySlot: KeySlot) => Promise<ImageGenerationResult | VideoGenerationResult | AudioGenerationResult>;
+    checkTaskStatus?: (
+        taskId: string,
+        mode: GenerationMode,
+        keySlot: KeySlot,
+        modelId?: string
+    ) => Promise<ImageGenerationResult | VideoGenerationResult | AudioGenerationResult>;
+    checkTaskStatuses?: (
+        taskIds: string[],
+        mode: GenerationMode,
+        keySlot: KeySlot,
+        modelId?: string
+    ) => Promise<Array<ImageGenerationResult | VideoGenerationResult | AudioGenerationResult>>;
 }

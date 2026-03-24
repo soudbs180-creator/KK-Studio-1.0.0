@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, QrCode, X } from 'lucide-react';
 
 import { parseWechatAuthorizationUrl } from '../../services/auth/wechatAuthUtils.ts';
+import { localizeUserFacingText } from '../../utils/localeText';
 
 interface WechatQrModalProps {
   isOpen: boolean;
@@ -56,7 +57,12 @@ function formatExpiryText(expiresAt?: string | null): string | null {
 
 function ensureWechatLoginScript(): Promise<void> {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return Promise.reject(new Error('WeChat login widget can only run in the browser.'));
+    return Promise.reject(
+      new Error(
+        localizeUserFacingText('WeChat login widget can only run in the browser.')
+        || 'WeChat login widget can only run in the browser.'
+      )
+    );
   }
 
   if (typeof window.WxLogin === 'function') {
@@ -75,12 +81,22 @@ function ensureWechatLoginScript(): Promise<void> {
       }
 
       wechatLoginScriptPromise = null;
-      reject(new Error('WeChat login widget is unavailable after the script finished loading.'));
+        reject(
+          new Error(
+            localizeUserFacingText('WeChat login widget is unavailable after the script finished loading.')
+            || 'WeChat login widget is unavailable after the script finished loading.'
+          )
+        );
     };
 
     const handleError = () => {
       wechatLoginScriptPromise = null;
-      reject(new Error('Unable to load the official WeChat login widget.'));
+      reject(
+        new Error(
+          localizeUserFacingText('Unable to load the official WeChat login widget.')
+          || 'Unable to load the official WeChat login widget.'
+        )
+      );
     };
 
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-wechat-login-script="true"]');
@@ -168,7 +184,10 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
         const mountNode = document.getElementById(widgetMountId);
         if (!mountNode || typeof window.WxLogin !== 'function') {
-          throw new Error('WeChat login widget mount point is unavailable.');
+      throw new Error(
+        localizeUserFacingText('WeChat login widget mount point is unavailable.')
+        || 'WeChat login widget mount point is unavailable.'
+      );
         }
 
         mountNode.innerHTML = '';

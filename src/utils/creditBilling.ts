@@ -16,15 +16,6 @@ export const isCreditBillingTarget = (target: CreditBillingTarget): boolean => {
   }
 
   const modelId = String(target.model || '');
-  const lowerModelId = modelId.toLowerCase();
-
-  if (
-    target.provider === 'SystemProxy'
-    || lowerModelId.includes('@system')
-    || lowerModelId.includes('@systemproxy')
-  ) {
-    return true;
-  }
 
   return isCreditBasedModel(modelId, target.provider);
 };
