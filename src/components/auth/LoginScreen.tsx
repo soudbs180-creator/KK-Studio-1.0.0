@@ -10,6 +10,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  QrCode,
   Sparkles,
 } from 'lucide-react';
 import { Chrome } from 'lucide-react';
@@ -17,6 +18,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import AnoAI from '@/components/ui/animated-shader-background';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
+import WechatQrModal from './WechatQrModal';
+import { startWechatLogin } from '../../services/auth/wechatAuth';
 import './LoginScreen.css';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
@@ -140,6 +143,11 @@ const LoginScreen: React.FC = () => {
     confirmPassword: false,
   });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [wechatModalOpen, setWechatModalOpen] = useState(false);
+  const [wechatLoading, setWechatLoading] = useState(false);
+  const [wechatError, setWechatError] = useState<string | null>(null);
+  const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
+  const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     const body = document.body;
@@ -215,11 +223,24 @@ const LoginScreen: React.FC = () => {
       confirmPassword: false,
     });
     setFieldErrors({});
+    setWechatModalOpen(false);
+    setWechatLoading(false);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
 
     if (turnstileAvailable) {
       resetTurnstile();
     }
   }, [resetTurnstile, turnstileAvailable, view]);
+
+  const closeWechatModal = useCallback(() => {
+    setWechatModalOpen(false);
+    setWechatLoading(false);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+  }, []);
 
   const showFieldError = (field: FieldName) => Boolean(fieldErrors[field] && (submitted || fieldTouched[field]));
 
@@ -405,8 +426,58 @@ const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleWechatLogin = async () => {
+    if (loading || wechatLoading) return;
+
+    if (turnstileAvailable && !turnstileToken) {
+      setCaptchaRequiredByBackend(true);
+      setError(turnstileError || '请先完成人机验证后再使用微信扫码登录。');
+      return;
+    }
+
+    setError(null);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+    setWechatModalOpen(true);
+    setWechatLoading(true);
+
+    try {
+      const authData = await startWechatLogin();
+      setWechatAuthorizationUrl(authData.authorizationUrl);
+      setWechatExpiresAt(authData.expiresAt);
+    } catch (authError) {
+      const nextError = mapAuthError(authError, 'login');
+      setWechatError(nextError);
+      setError(nextError);
+
+      if (!isNetworkError(authError) && turnstileAvailable) {
+        resetTurnstile();
+      }
+    } finally {
+      setWechatLoading(false);
+    }
+  };
+
+  const handleOpenWechatInNewPage = useCallback(() => {
+    if (!wechatAuthorizationUrl) return;
+    window.open(wechatAuthorizationUrl, '_blank', 'noopener,noreferrer');
+  }, [wechatAuthorizationUrl]);
+
   return (
     <div className="auth-page">
+      <WechatQrModal
+        isOpen={wechatModalOpen}
+        title="使用微信扫码登录"
+        description="扫码确认后会自动回到 KK Studio，并继续沿用当前 Supabase 会话体系。"
+        authorizationUrl={wechatAuthorizationUrl}
+        expiresAt={wechatExpiresAt}
+        loading={wechatLoading}
+        error={wechatError}
+        onClose={closeWechatModal}
+        onOpenInNewPage={handleOpenWechatInNewPage}
+      />
+
       {showTempUserWarning && (
         <div className="auth-modal-mask">
           <div className="auth-modal-card">
@@ -634,6 +705,10 @@ const LoginScreen: React.FC = () => {
                 <button type="button" className="auth-btn auth-btn-google" onClick={handleGoogleLogin} disabled={loading}>
                   <Chrome size={18} />
                   使用 Google 登录
+                </button>
+                <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading}>
+                  <QrCode size={18} />
+                  使用微信扫码登录
                 </button>
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={() => setShowTempUserWarning(true)} disabled={loading}>
                   临时用户登录

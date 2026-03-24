@@ -27,13 +27,13 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
-    const lastClickedIndexRef = useRef<number>(-1); // 馃殌 璁板綍涓婃鐐瑰嚮浣嶇疆鐢ㄤ簬Shift鍖洪棿閫夋嫨
+    const lastClickedIndexRef = useRef<number>(-1); // Record the last clicked index for Shift-range selection
 
     // Normalize query
     const lowerQuery = query.toLowerCase();
 
     // Filter results
-    // 馃殌 Sorting Logic: Tag Match > Recency
+    // Sort by tag match first, then by recency.
     const nodeResults: SearchResultItem[] = (() => {
         const matching = promptNodes.filter(node =>
             node.prompt.toLowerCase().includes(lowerQuery) ||
@@ -237,7 +237,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                 <div
                                     key={item.data.id}
                                     onClick={(e) => {
-                                        // 馃殌 Implicit Multi-Select Logic
+                                        // Enter multi-select implicitly when modifier keys are used.
                                         const isModifierHeld = e.shiftKey || e.ctrlKey || e.metaKey;
 
                                         if (isMultiSelectMode || isModifierHeld) {
@@ -322,7 +322,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
                                         {isGroup && (
                                             <div className="text-xs text-[var(--text-tertiary)] mt-1">
-                                                鍖呭惈浜嗗尯鍩熷唴鐨勮妭鐐?
+                                                包含该分组内的节点
                                             </div>
                                         )}
                                     </div>
@@ -340,7 +340,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                     <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between gap-4'}`}>
                         <div className="flex flex-wrap gap-4">
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">鈫戔啌</kbd> 瀵艰埅
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">↑↓</kbd> 导航
                         </span>
                         {isMultiSelectMode ? (
                             <>

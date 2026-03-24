@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { tempUserService, type TempUserSession } from '../services/auth/tempUserService';
+import { setKkApiAccessToken } from '../services/api/kkApiClient';
+import { clearStoredAdminSession } from '../services/api/adminSession';
 
 interface AuthContextType {
     session: Session | null;
@@ -36,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cachedTempUser = tempUserService.getCachedTempUser();
         if (cachedTempUser) {
             console.log('[AuthContext] Restoring cached temp user session');
+            setKkApiAccessToken(undefined);
             setTempUserSession(cachedTempUser);
             setUser(cachedTempUser.user);
             setLoading(false);
@@ -49,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (nextSession?.user) {
                 tempUserService.clearCachedTempUser();
+                setKkApiAccessToken(nextSession.access_token || undefined);
                 setTempUserSession(null);
                 setSession(nextSession);
                 setUser(nextSession.user);
@@ -58,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             const cachedTempUser = tempUserService.getCachedTempUser();
             if (cachedTempUser) {
+                setKkApiAccessToken(undefined);
                 setTempUserSession(cachedTempUser);
                 setSession(null);
                 setUser(cachedTempUser.user);
@@ -68,6 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setTempUserSession(null);
             setSession(null);
             setUser(null);
+            setKkApiAccessToken(undefined);
+            clearStoredAdminSession();
             setLoading(false);
         };
 
@@ -101,6 +108,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        setKkApiAccessToken(undefined);
+        clearStoredAdminSession();
         // Clear temp user cache if exists
         tempUserService.clearCachedTempUser();
         setTempUserSession(null);
@@ -111,6 +120,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loginAsTempUser = async () => {
         setLoading(true);
         try {
+            await supabase.auth.signOut();
+            setKkApiAccessToken(undefined);
+            clearStoredAdminSession();
             const tempSession = await tempUserService.getOrCreateTempUser();
             setTempUserSession(tempSession);
             setSession(null);

@@ -220,15 +220,6 @@ function resolveManualChunk(id: string): string | undefined {
             return 'three-vendor';
         }
 
-        if (
-            normalizedId.includes('/jszip/') ||
-            normalizedId.includes('/file-saver/') ||
-            normalizedId.includes('/canvas-confetti/') ||
-            normalizedId.includes('/qrcode.react/')
-        ) {
-            return 'media-utils-vendor';
-        }
-
         return 'vendor';
     }
 
@@ -465,6 +456,20 @@ export default defineConfig(({ mode }) => {
             open: false, // Keep the browser stable and avoid repeated auto-open on dev server restarts
             headers: {
                 'Cache-Control': 'no-store',
+            },
+            proxy: {
+                '/api/v1': {
+                    target: 'http://127.0.0.1:3001',
+                    changeOrigin: true,
+                },
+                '/api/manifest': {
+                    target: 'http://127.0.0.1:3001',
+                    changeOrigin: true,
+                },
+                '/healthz': {
+                    target: 'http://127.0.0.1:3001',
+                    changeOrigin: true,
+                },
             },
             watch: {
                 // 🚀 [Critical Fix] 忽略应用自身生成的本地数据文档，防止 Vite HMR 触发强制刷新

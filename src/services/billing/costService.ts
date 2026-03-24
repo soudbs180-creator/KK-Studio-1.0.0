@@ -7,9 +7,8 @@
 import { ModelType, ImageSize } from '../../types';
 import { getModelPricing, getRefImageTokenEstimate, getImageTokenEstimate } from '../model/modelPricing';
 import { keyManager, type KeySlot } from '../auth/keyManager';
-import { supabase } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
-import { notify } from '../system/notificationService';
+import { registerCostSyncHandler } from './costSyncBridge';
 
 // --- Interfaces ---
 
@@ -373,7 +372,7 @@ export const calculateCost = (
     const { modelId } = parseModelSource(fullModelId);
     const normalizedId = modelId.toLowerCase();
 
-    // =============== 鏂扮増 API 鎺ュ彛鑷畾涔夎璐归€昏緫 ===============
+    // =============== 新版 API 接口自定义计费逻辑 ===============
     if (keySlotId) {
         const slot = keyManager.getEffectiveKey(keySlotId) || keyManager.getKey(keySlotId);
         const linkedProvider = keyManager.getProviderForKeySlot(keySlotId);
@@ -420,14 +419,14 @@ export const calculateCost = (
                 return { cost, details, tokens: 0 };
             }
 
-            // 濡傛灉鏄寜娆¤璐?
+            // 如果是按次计费
             if (mPrice !== undefined && !hasGroupTokenOverride) {
                 cost = mPrice * gRatio * gmRatio * sRatio * count;
                 details = `API按次: $${mPrice}/img | 组=${preferredGroup || groupRatioKey || 'default'} | 尺寸×${sRatio} | 分组×${gRatio} | 模型组×${gmRatio}`;
                 return { cost, details, tokens: 0 };
             }
 
-            // 鍚﹀垯灏濊瘯鎸?token 娣峰悎璁¤垂
+            // 否则尝试按 token 混合计费
             if (mRatio !== undefined || hasGroupTokenOverride) {
                 const textTokens = Math.ceil(promptLen / 4);
                 const refTokens = refCount * 560;
@@ -449,8 +448,8 @@ export const calculateCost = (
                     cRatio = overrideCompletionRatio;
                 }
 
-                // 璁＄畻鎬诲€嶇巼涓嬬殑鐩稿綋浜庡灏戞爣鍑?token (閫氬父 OneAPI 鐨?model_ratio 琛ㄧず鎸?500000 鐩稿綋浜?$1 鐨勮浠峰熀鍑嗕箻鏁?
-                // 鍏蜂綋璁′环甯告暟鍥犵珯鑰屽紓锛屽鏋滄病鏈夊畾涔夛紝绯荤粺鐩墠浣跨敤鍏滃簳浠锋牸锛?.002 / 1000 => 2 / 1000000
+                // 计算总倍率下的等效标准 token（通常 OneAPI 的 model_ratio 表示按 500000 等效于 $1 的计价倍率）
+                // 具体计价常数因站点而异；如果没有自定义，系统当前使用兜底价格：0.002 / 1000 => 2 / 1000000
                 const baseRate = 2.0 / 1000000; // $0.002 per 1k ratio
 
                 const effectiveModelRatio = mRatio ?? 1;
@@ -643,7 +642,7 @@ export function getTodayCosts(): DayStats {
                 }
             }
         } catch (e) {
-            // 缁熻鏁版嵁瑙ｆ瀽澶辫触锛岃繑鍥為粯璁ゅ€?
+            // 统计数据解析失败时，返回默认值
             console.warn('[CostService] Failed to parse stats:', e);
         }
     }
@@ -727,6 +726,8 @@ export async function forceSync(): Promise<boolean> {
     return true;
 }
 
+registerCostSyncHandler(forceSync);
+
 function scheduleSync() {
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
@@ -739,42 +740,23 @@ async function syncWithCloud() {
     if (tempUserService.getCachedTempUser()) return;
     isSyncing = true;
     try {
-        let todayStats = getTodayCosts(); // From updated logic
-
+        // The migrated architecture persists key-slot/provider billing state via keyManager API sync.
+        // Detailed local cost history remains browser-local until a dedicated billing summary contract exists.
+        const todayStats = getTodayCosts();
         const slots = keyManager.getSlots();
-        let totalBudget = 0;
-        let totalUsed = 0;
-        slots.forEach((s: KeySlot) => {
-            if (s.budgetLimit > 0) totalBudget += s.budgetLimit;
-            totalUsed += s.totalCost || 0;
+        const totalBudget = slots.reduce((sum, s: KeySlot) => {
+            return sum + (s.budgetLimit > 0 ? s.budgetLimit : 0);
+        }, 0);
+        const totalUsed = slots.reduce((sum, s: KeySlot) => sum + (s.totalCost || 0), 0);
+
+        console.log('[CostService] Cloud sync skipped; using migrated local summary only.', {
+            userId: currentUserId,
+            date: todayStats.date,
+            dailyCostUsd: todayStats.totalCostUsd,
+            dailyTokens: todayStats.totalTokens,
+            totalBudget: totalBudget || -1,
+            totalUsed,
         });
-
-        const { data: { user } } = await supabase.auth.getUser();
-
-        const profilePayload = {
-            id: currentUserId,
-            email: user?.email || null,
-            nickname: user?.user_metadata?.full_name || '',
-            avatar_url: user?.user_metadata?.avatar_url || '',
-            daily_cost_usd: todayStats.totalCostUsd,
-            daily_tokens: todayStats.totalTokens,
-            daily_reset_date: todayStats.date,
-            total_budget: totalBudget || -1,
-            total_used: totalUsed,
-            updated_at: new Date().toISOString()
-        };
-
-        const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert(profilePayload, {
-                onConflict: 'id',
-                ignoreDuplicates: false,
-            });
-
-        if (upsertError) {
-            throw upsertError;
-        }
-
     } catch (e) {
         console.warn('[CostService] Sync error:', e);
     } finally {

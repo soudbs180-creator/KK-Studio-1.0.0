@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useBilling } from '../../context/BillingContext';
@@ -9,6 +9,10 @@ import {
   type CreditExchangeRate,
   type SupportedRechargeCurrency,
 } from '../../services/billing/creditExchangeRateService';
+import {
+  buildPaymentSidecarAbsoluteUrl,
+  legacyWebPaymentSidecarClient,
+} from '../../services/api/paymentSidecarClient';
 import { notify } from '../../services/system/notificationService';
 import alipayIcon from '../../assets/payment/alipay.png';
 import cardIcon from '../../assets/payment/card.png';
@@ -19,9 +23,6 @@ const initialRateMap: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
   USD: { ...DEFAULT_CREDIT_EXCHANGE_RATES.USD },
 };
 
-const formatCurrencySymbol = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '¥' : '$');
-const formatRateValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
-const PAYMENT_GATEWAY_BASE_URL = (import.meta.env.VITE_PAYMENT_GATEWAY_URL || '/api/pay').trim() || '/api/pay';
 const PAYMENT_STATUS_LABELS = {
   idle: '待发起',
   pending: '等待支付',
@@ -29,6 +30,17 @@ const PAYMENT_STATUS_LABELS = {
   failed: '支付失败',
   closed: '订单关闭',
 } as const;
+
+const formatCurrencySymbol = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '¥' : '$');
+const formatRateValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+
+function buildReturnUrl(): string {
+  if (typeof window !== 'undefined') {
+    return new URL('/pay/success', window.location.origin).toString();
+  }
+
+  return 'https://kkai.plus/pay/success';
+}
 
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal, refreshBilling } = useBilling();
@@ -106,18 +118,6 @@ const RechargeModal: React.FC = () => {
   );
 
   const hasAvailableCurrency = availableCurrencies.length > 0;
-  const buildPaymentUrl = useCallback((pathSuffix: '' | '/qrcode' | '/status', params?: Record<string, string>) => {
-    const normalizedBase = PAYMENT_GATEWAY_BASE_URL
-      .replace(/\/(qrcode|status)\/?$/i, '')
-      .replace(/\/+$/, '');
-    const url = new URL(`${normalizedBase}${pathSuffix}`, window.location.origin);
-
-    Object.entries(params || {}).forEach(([key, value]) => {
-      url.searchParams.set(key, value);
-    });
-
-    return url.toString();
-  }, []);
 
   useEffect(() => {
     if (showRechargeModal) return;
@@ -140,32 +140,42 @@ const RechargeModal: React.FC = () => {
 
     const pollStatus = async () => {
       try {
-        const response = await fetch(buildPaymentUrl('/status', { outTradeNo: paymentOrderNo }));
-        const payload = await response.json().catch(() => ({}));
+        const response = await legacyWebPaymentSidecarClient.getPaymentOrderStatus(paymentOrderNo, {
+          requestId: `recharge-status-${paymentOrderNo}`,
+        });
 
         if (cancelled) return;
 
-        if (!response.ok) {
-          throw new Error(payload?.error || '支付状态查询失败');
+        if (!response.success) {
+          throw new Error(response.error.message || '支付状态查询失败。');
         }
 
-        const tradeStatus = String(payload?.tradeStatus || 'WAITING');
-        if (tradeStatus === 'TRADE_SUCCESS') {
+        if (response.data.paymentOrderStatus === 'paid' && response.data.settlementApplied) {
           setPaymentStatus('success');
-          setPaymentMessage('支付成功，积分已同步到云端余额。');
+          setPaymentMessage('支付成功，积分已经同步到当前余额。');
           await refreshBilling();
-          notify.success('充值成功', pendingCredits ? `已到账 ${pendingCredits} 积分` : '积分已同步到账。');
+          notify.success('充值成功', pendingCredits ? `已到账 ${pendingCredits} 积分` : '积分已同步到余额。');
           return;
         }
 
-        if (tradeStatus === 'TRADE_CLOSED') {
+        if (response.data.paymentOrderStatus === 'cancelled') {
           setPaymentStatus('closed');
           setPaymentMessage('订单已关闭，请重新发起充值。');
           return;
         }
 
+        if (response.data.paymentOrderStatus === 'failed' || response.data.paymentOrderStatus === 'refunded') {
+          setPaymentStatus('failed');
+          setPaymentMessage('支付未完成或已退款，请稍后重试。');
+          return;
+        }
+
         setPaymentStatus('pending');
-        setPaymentMessage('已创建订单，等待支付完成后自动同步余额。');
+        setPaymentMessage(
+          response.data.settlementApplied
+            ? '订单已创建，等待支付完成。'
+            : '支付状态已更新，系统正在同步积分余额。'
+        );
       } catch (error: any) {
         if (cancelled) return;
         setPaymentStatus('failed');
@@ -185,7 +195,7 @@ const RechargeModal: React.FC = () => {
         window.clearTimeout(timer);
       }
     };
-  }, [showRechargeModal, paymentOrderNo, paymentStatus, buildPaymentUrl, refreshBilling, pendingCredits]);
+  }, [showRechargeModal, paymentOrderNo, paymentStatus, refreshBilling, pendingCredits]);
 
   const theme = useMemo(() => {
     if (currency === 'USD') {
@@ -252,56 +262,56 @@ const RechargeModal: React.FC = () => {
     }
 
     if (!hasAvailableCurrency || !currentRate.isActive) {
-      notify.error('充值暂不可用', '当前没有启用中的充值币种，请稍后再试或联系管理员。');
+      notify.error('充值暂不可用', '当前没有启用中的充值币种，请稍后重试或联系管理员。');
       return;
     }
 
     const paymentChannel = isCny ? selectedChannel : 'paypal';
-
-    if (paymentChannel === 'alipay') {
-      setIsSubmittingPayment(true);
-      setPaymentStatus('pending');
-      setPaymentMessage('正在创建支付订单...');
-      setPendingCredits(credits);
-
-      try {
-        const response = await fetch(
-          buildPaymentUrl('/qrcode', {
-            method: 'alipay',
-            userId: user.id,
-            amount: String(amount),
-          })
-        );
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(payload?.error || '支付订单创建失败');
-        }
-
-        const nextPaymentLink = String(payload?.qrCode || '').trim();
-        const nextOrderNo = String(payload?.outTradeNo || '').trim();
-
-        if (!nextPaymentLink || !nextOrderNo) {
-          throw new Error('支付服务未返回有效订单信息');
-        }
-
-        setPaymentLink(nextPaymentLink);
-        setPaymentOrderNo(nextOrderNo);
-        setPaymentStatus('pending');
-        setPaymentMessage('订单已创建，请完成支付，余额会自动与 Supabase 同步。');
-        notify.alipay('订单已创建', '请扫码或打开支付链接完成支付，到账后会自动刷新余额。');
-      } catch (error: any) {
-        const message = error?.message || '支付订单创建失败，请稍后重试。';
-        setPaymentStatus('failed');
-        setPaymentMessage(message);
-        notify.error('创建充值订单失败', message);
-      } finally {
-        setIsSubmittingPayment(false);
-      }
-    } else if (paymentChannel === 'wechat') {
+    if (paymentChannel === 'wechat') {
       notify.wechat('微信支付维护中', '当前暂未开放在线支付，请联系管理员处理。');
-    } else {
+      return;
+    }
+
+    if (paymentChannel !== 'alipay') {
       notify.paypal('国际支付维护中', '当前暂未开放在线支付，请联系管理员处理。');
+      return;
+    }
+
+    setIsSubmittingPayment(true);
+    setPaymentStatus('pending');
+    setPaymentMessage('正在创建支付订单...');
+    setPendingCredits(credits);
+
+    try {
+      const response = await legacyWebPaymentSidecarClient.createPaymentOrder({
+        providerCode: 'alipay',
+        amount: amount.toFixed(2),
+        currency,
+        returnUrl: buildReturnUrl(),
+        notifyUrl: buildPaymentSidecarAbsoluteUrl('/payment/v1/callbacks/alipay'),
+        idempotencyKey: `recharge-${user.id}-${currency}-${amount}-${Date.now()}`,
+        userId: user.id,
+      }, {
+        requestId: `recharge-create-${user.id}-${Date.now()}`,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error.message || '支付订单创建失败。');
+      }
+
+      setPaymentLink(response.data.paymentUrl);
+      setPaymentOrderNo(response.data.merchantOrderNo);
+      setPendingCredits(response.data.creditAmount);
+      setPaymentStatus('pending');
+      setPaymentMessage('订单已创建，请完成支付，系统会自动同步积分余额。');
+      notify.alipay('订单已创建', '请扫码或打开支付链接完成支付，到账后会自动刷新余额。');
+    } catch (error: any) {
+      const message = error?.message || '支付订单创建失败，请稍后重试。';
+      setPaymentStatus('failed');
+      setPaymentMessage(message);
+      notify.error('创建充值订单失败', message);
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -367,7 +377,7 @@ const RechargeModal: React.FC = () => {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-white/10 dark:text-zinc-400">
-              当前没有启用中的充值币种，请先在管理员后台检查汇率配置。
+              当前没有启用中的充值币种，请先在管理后台检查汇率配置。
             </div>
           )}
 
@@ -505,7 +515,9 @@ const RechargeModal: React.FC = () => {
           {paymentLink && (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/5 dark:bg-zinc-900/50">
               <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${theme.light} ${theme.text}`}>
-                {paymentStatus === 'success' ? <CheckCircle2 size={14} /> : <Loader2 size={14} className={paymentStatus === 'pending' ? 'animate-spin' : ''} />}
+                {paymentStatus === 'success'
+                  ? <CheckCircle2 size={14} />
+                  : <Loader2 size={14} className={paymentStatus === 'pending' ? 'animate-spin' : ''} />}
                 {PAYMENT_STATUS_LABELS[paymentStatus]}
               </div>
 
@@ -523,7 +535,7 @@ const RechargeModal: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-zinc-500">Status</div>
-                    <div className="mt-1">{paymentMessage || '请使用支付宝完成支付，成功后会自动刷新云端余额。'}</div>
+                    <div className="mt-1">{paymentMessage || '请使用支付工具完成支付，成功后会自动刷新余额。'}</div>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-zinc-400">
                     {pendingCredits ? `本次预计到账 ${pendingCredits} 积分。` : '到账积分将按当前汇率同步。'}
@@ -549,7 +561,7 @@ const RechargeModal: React.FC = () => {
               <div>
                 <div className="font-medium text-gray-900 dark:text-white">当前充值说明</div>
                 <div className="mt-1">
-                  汇率和金额范围直接来自后台配置。支付通道恢复后，这里会按当前配置实时计算可获得积分。
+                  汇率和金额范围直接来自后台配置。支付成功后，支付边车会把结算结果回写到主 API，积分余额会自动同步。
                 </div>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../../lib/supabase';
+import { legacyWebApiClient } from '../api/kkApiClient';
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
 const TEMP_USER_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -16,22 +16,38 @@ function buildTempEmail(tempUserId: string): string {
 }
 
 function buildTempNickname(tempUserId: string): string {
-  return `临时用户_${tempUserId.replace(/-/g, '').slice(0, 8)}`;
+  return `Guest_${tempUserId.replace(/-/g, '').slice(0, 8)}`;
+}
+
+function buildTempUser(input: {
+  userId: string;
+  email: string;
+  nickname: string;
+  createdAtIso: string;
+}): User {
+  return {
+    id: input.userId,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: input.email,
+    phone: '',
+    created_at: input.createdAtIso,
+    updated_at: input.createdAtIso,
+    confirmed_at: input.createdAtIso,
+    last_sign_in_at: input.createdAtIso,
+    app_metadata: {
+      isTempUser: true,
+      provider: 'temp',
+    },
+    user_metadata: {
+      avatar_url: null,
+      full_name: input.nickname,
+      isTempUser: true,
+    },
+  };
 }
 
 class TempUserService {
-  private generateTempUserId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-      const randomValue = Math.floor(Math.random() * 16);
-      const value = char === 'x' ? randomValue : (randomValue & 0x3) | 0x8;
-      return value.toString(16);
-    });
-  }
-
   getCachedTempUser(): TempUserSession | null {
     try {
       const raw = localStorage.getItem(TEMP_USER_STORAGE_KEY);
@@ -64,54 +80,26 @@ class TempUserService {
   }
 
   async createTempUser(): Promise<TempUserSession> {
-    const now = Date.now();
-    const tempUserId = this.generateTempUserId();
-    const expiresAt = now + TEMP_USER_EXPIRY_MS;
-    const email = buildTempEmail(tempUserId);
-    const nickname = buildTempNickname(tempUserId);
-    const timestampIso = new Date(now).toISOString();
-
-    const { error } = await supabase.from('temp_users').insert({
-      id: tempUserId,
-      expires_at: new Date(expiresAt).toISOString(),
-      is_active: true,
-      metadata: {
-        email,
-        nickname,
-        lastSeenAt: timestampIso,
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      },
-    });
-
-    if (error) {
-      console.error('[TempUser] Failed to create Supabase temp user record:', error);
-      throw new Error(`创建临时用户失败：${error.message || '未知错误'}`);
+    const response = await legacyWebApiClient.createTempUser();
+    if (!response.success) {
+      console.error('[TempUser] Failed to create temp user session via API:', response.error);
+      throw new Error(response.error.message || 'Failed to create guest session.');
     }
 
-    const fakeUser: User = {
-      id: tempUserId,
-      aud: 'authenticated',
-      role: 'authenticated',
-      email,
-      phone: '',
-      created_at: timestampIso,
-      updated_at: timestampIso,
-      confirmed_at: timestampIso,
-      last_sign_in_at: timestampIso,
-      app_metadata: {
-        isTempUser: true,
-        provider: 'temp',
-      },
-      user_metadata: {
-        avatar_url: null,
-        full_name: nickname,
-        isTempUser: true,
-      },
-    };
+    const createdAt = Date.parse(response.data.createdAt) || Date.now();
+    const expiresAt = Date.parse(response.data.expiresAt) || createdAt + TEMP_USER_EXPIRY_MS;
+    const email = response.data.email || buildTempEmail(response.data.userId);
+    const nickname = response.data.nickname || buildTempNickname(response.data.userId);
+    const createdAtIso = response.data.createdAt || new Date(createdAt).toISOString();
 
     const session: TempUserSession = {
-      user: fakeUser,
-      createdAt: now,
+      user: buildTempUser({
+        userId: response.data.userId,
+        email,
+        nickname,
+        createdAtIso,
+      }),
+      createdAt,
       expiresAt,
       isTempUser: true,
     };
@@ -138,14 +126,14 @@ class TempUserService {
 
   formatTimeRemaining(session: TempUserSession | null): string {
     const remaining = this.getTimeRemaining(session);
-    if (remaining <= 0) return '已过期';
+    if (remaining <= 0) return 'Expired';
 
     const hours = Math.floor(remaining / (1000 * 60 * 60));
     const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (hours >= 24) return '约 24 小时';
-    if (hours > 0) return `${hours} 小时 ${minutes} 分钟`;
-    return `${minutes} 分钟`;
+    if (hours >= 24) return 'About 24 hours';
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   }
 }
 

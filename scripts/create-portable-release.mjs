@@ -160,6 +160,8 @@ async function main() {
       'mcpClient.js',
       'package-lock.json',
       'package.json',
+      'runtime_payment_bridge.js',
+      'settlement_bridge.js',
       'webhook.js',
     ];
 

@@ -1,6 +1,11 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, Info, Plus, ShieldAlert, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import {
+  deleteAdminCreditProvider,
+  listAdminCreditProviders,
+  saveAdminCreditProvider,
+  type AdminCreditProviderRpcGroup,
+} from '../../services/api/adminCreditProviderService';
 import { notify } from '../../services/system/notificationService';
 import { getCachedPricing, type ModelPricingInfo } from '../../services/billing/newApiPricingService';
 import {
@@ -31,7 +36,7 @@ type CreditModelRow = {
   provider_id: string;
   provider_name: string;
   base_url: string;
-  api_keys: string[] | null;
+  api_key_count: number | null;
   model_id: string;
   display_name: string;
   description: string | null;
@@ -46,31 +51,6 @@ type CreditModelRow = {
   advanced_enabled?: boolean | null;
   mix_with_same_model?: boolean | null;
   quality_pricing?: Record<string, any> | null;
-};
-
-type CreditModelRpcModel = {
-  model_id?: string | null;
-  display_name?: string | null;
-  description?: string | null;
-  endpoint_type?: string | null;
-  credit_cost?: number | null;
-  is_active?: boolean | null;
-  call_count?: number | null;
-  max_calls_limit?: number | null;
-  color?: string | null;
-  color_secondary?: string | null;
-  text_color?: 'white' | 'black' | string | null;
-  advanced_enabled?: boolean | null;
-  mix_with_same_model?: boolean | null;
-  quality_pricing?: Record<string, any> | null;
-};
-
-type CreditModelRpcProvider = {
-  provider_id?: string | null;
-  provider_name?: string | null;
-  base_url?: string | null;
-  api_keys?: string[] | null;
-  models?: CreditModelRpcModel[] | null;
 };
 
 type EditableModel = {
@@ -188,13 +168,13 @@ const formatUsdEstimate = (value: number | null): string => {
   return value >= 1 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 };
 
-const normalizeAdminCreditModelRows = (providers: CreditModelRpcProvider[]): CreditModelRow[] =>
+const normalizeAdminCreditModelRows = (providers: AdminCreditProviderRpcGroup[]): CreditModelRow[] =>
   providers.flatMap((provider) =>
     (provider.models || []).map((model) => ({
       provider_id: String(provider.provider_id || '').trim(),
       provider_name: String(provider.provider_name || provider.provider_id || '').trim(),
       base_url: String(provider.base_url || '').trim(),
-      api_keys: Array.isArray(provider.api_keys) ? provider.api_keys.filter((key): key is string => typeof key === 'string') : [],
+      api_key_count: Math.max(0, Number(provider.api_key_count || 0)),
       model_id: String(model.model_id || '').trim(),
       display_name: String(model.display_name || model.model_id || '').trim(),
       description: model.description || '',
@@ -212,10 +192,8 @@ const normalizeAdminCreditModelRows = (providers: CreditModelRpcProvider[]): Cre
     }))
   );
 
-const getConfiguredKeyCount = (apiKeys?: string[] | null): number =>
-  Array.isArray(apiKeys)
-    ? apiKeys.filter((key): key is string => typeof key === 'string' && key.trim().length > 0).length
-    : 0;
+const getConfiguredKeyCount = (apiKeyCount?: number | null): number =>
+  Math.max(0, Number(apiKeyCount || 0));
 
 const areQualityPricingEqual = (
   left: AdminModelQualityPricing,
@@ -300,7 +278,7 @@ const CreditModelSettings: React.FC = () => {
     if (!selectedProviderId) return 0;
     const entry = providers.find((item) => item.providerId === selectedProviderId);
     if (!entry) return 0;
-    return getConfiguredKeyCount(entry.items[0]?.api_keys);
+    return getConfiguredKeyCount(entry.items[0]?.api_key_count);
   }, [providers, selectedProviderId]);
 
   const activeModelCount = useMemo(
@@ -436,10 +414,8 @@ const CreditModelSettings: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_admin_credit_models_full');
-      if (error) throw error;
-
-      const normalized = normalizeAdminCreditModelRows((data || []) as CreditModelRpcProvider[]);
+      const data = await listAdminCreditProviders();
+      const normalized = normalizeAdminCreditModelRows(data);
       setRows(normalized);
       setSupportsMaxCallsLimit(true);
       setSupportsAdvancedSettings(true);
@@ -633,17 +609,13 @@ const CreditModelSettings: React.FC = () => {
           : {}),
       }));
 
-      const { error } = await supabase.rpc('save_credit_provider', {
-        p_provider_id: providerId,
-        p_provider_name: form.providerName.trim(),
-        p_base_url: form.baseUrl.trim(),
-        p_api_keys: nextApiKey ? [nextApiKey] : [],
-        p_models: payloadModels,
+      await saveAdminCreditProvider({
+        providerId,
+        providerName: form.providerName.trim(),
+        baseUrl: form.baseUrl.trim(),
+        apiKeys: nextApiKey ? [nextApiKey] : [],
+        models: payloadModels,
       });
-
-      if (error) {
-        throw error;
-      }
 
       notify.success(
         '保存成功',
@@ -662,10 +634,7 @@ const CreditModelSettings: React.FC = () => {
   const deleteProvider = async (providerId: string) => {
     if (!confirm(`确认删除供应商 ${providerId} 及其全部积分模型吗？`)) return;
     try {
-      const { error } = await supabase.rpc('delete_credit_provider', {
-        p_provider_id: providerId,
-      });
-      if (error) throw error;
+      await deleteAdminCreditProvider(providerId);
       notify.success('删除成功', '供应商积分模型已删除');
       if (selectedProviderId === providerId) resetForm();
       await load();

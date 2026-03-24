@@ -1,9 +1,13 @@
-import { supabase } from '../../lib/supabase';
-import { compressImage } from '../image/imageCompression';
 import { Canvas } from '../../types';
+import { legacyWebApiClient } from '../api/kkApiClient';
 
-const BUCKET_NAME = 'generated-images';
-const THUMB_SUFFIX = '_thumb.jpg';
+function unwrapOrThrow<T>(response: { success: boolean; data?: T; error?: { message?: string } }, fallback: string): T {
+    if (response.success && response.data !== undefined) {
+        return response.data;
+    }
+
+    throw new Error(response.error?.message || fallback);
+}
 
 /**
  * Service to handle Cloud Sync (Database + Storage)
@@ -12,46 +16,22 @@ export const syncService = {
     // --- Database Sync (Canvas State) ---
 
     async saveLayout(canvases: Canvas[]) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
         try {
-            const blob = new Blob([JSON.stringify(canvases)], { type: 'application/json' });
-            const fileName = `${user.id}/layout.json`;
-
-            const { error } = await supabase.storage
-                .from(BUCKET_NAME)
-                .upload(fileName, blob, {
-                    contentType: 'application/json',
-                    upsert: true
-                });
-
-            if (error) throw error;
-            console.log('[SyncService] Layout saved to cloud');
+            const response = await legacyWebApiClient.saveWorkspaceLayout({
+                canvases: canvases as unknown as Record<string, unknown>[],
+            });
+            unwrapOrThrow(response, 'Failed to save workspace layout.');
+            console.log('[SyncService] Layout saved via API');
         } catch (e) {
             console.error('[SyncService] Failed to save layout:', e);
         }
     },
 
     async loadLayout(): Promise<Canvas[]> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
-
         try {
-            const fileName = `${user.id}/layout.json`;
-            const { data, error } = await supabase.storage
-                .from(BUCKET_NAME)
-                .download(fileName);
-
-            if (error) {
-                // If file not found, return empty (clean state)
-                if (error.message.includes('not found') || error.name === 'StorageUnknownError') return [];
-                throw error;
-            }
-
-            const text = await data.text();
-            const canvases = JSON.parse(text) as Canvas[];
-            return canvases;
+            const response = await legacyWebApiClient.getWorkspaceLayout();
+            const data = unwrapOrThrow(response, 'Failed to load workspace layout.');
+            return (data.canvases || []) as unknown as Canvas[];
         } catch (e) {
             console.error('[SyncService] Failed to load layout:', e);
             return [];
@@ -77,37 +57,10 @@ export const syncService = {
      * This allows users to wipe their cloud footprint for images.
      */
     async cleanupAllCloudImages(): Promise<{ count: number; success: boolean }> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not logged in');
-
-        let totalDeleted = 0;
-        let hasMore = true;
-
         try {
-            while (hasMore) {
-                // List files (Supabase list limit is usually 100)
-                const { data: files, error } = await supabase.storage
-                    .from(BUCKET_NAME)
-                    .list(user.id, { limit: 100 });
-
-                if (error) throw error;
-                if (!files || files.length === 0) {
-                    hasMore = false;
-                    break;
-                }
-
-                const filesToDelete = files.map(f => `${user.id}/${f.name}`);
-                const { error: deleteError } = await supabase.storage
-                    .from(BUCKET_NAME)
-                    .remove(filesToDelete);
-
-                if (deleteError) throw deleteError;
-
-                totalDeleted += filesToDelete.length;
-                console.log(`[Cloud Cleanup] Deleted batch of ${filesToDelete.length} files.`);
-            }
-
-            return { count: totalDeleted, success: true };
+            const response = await legacyWebApiClient.cleanupCloudImages();
+            const data = unwrapOrThrow(response, 'Failed to cleanup cloud images.');
+            return { count: data.deletedCount, success: true };
         } catch (e) {
             console.error('[Cloud Cleanup] Failed:', e);
             throw e;

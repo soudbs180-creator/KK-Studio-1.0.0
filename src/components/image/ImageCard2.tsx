@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { AspectRatio, GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
@@ -8,6 +8,8 @@ import { generateTagColor } from '../../utils/colorUtils';
 import { useLazyImage } from '../../hooks/useLazyImage';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { resolveImageCost } from '../../services/billing/costService';
+import { fileSystemService } from '../../services/storage/fileSystemService';
+import { notify } from '../../services/system/notificationService';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
 import { loadImage, cancelImageLoad } from '../../services/image/imageLoader';
 import { ImageQuality, getAppropriateQuality, type ImageQualityBias } from '../../services/image/imageQuality';
@@ -818,7 +820,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         e.stopPropagation();
         try {
             const { base64ToBlob, triggerDownload } = await import('../../utils/downloadUtils');
-            const { notify } = await import('../../services/system/notificationService');
 
             // 1. 优先从 IndexedDB (受保护层) 或 磁盘恢复 获取原始未压缩数据
             let originalData = await getStrictOriginalImage(image.id);
@@ -882,7 +883,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 return;
             }
 
-            const { notify } = await import('../../services/system/notificationService');
             notify.error(
                 '下载失败',
                 '原图可能无法访问',
@@ -1465,22 +1465,20 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                         // 🚀 [NEW] 如果 URL 是 data URL，同时保存到本地文档系统
                                                         if (url.startsWith('data:')) {
                                                             const storageId = image.storageId || image.id;
-                                                            import('../../services/storage/fileSystemService').then(({ fileSystemService }) => {
-                                                                const handle = fileSystemService.getGlobalHandle();
-                                                                if (handle) {
-                                                                    const matches = url.match(/^data:[^,]+,(.+)$/);
-                                                                    if (matches && matches[1]) {
-                                                                        fileSystemService.saveReferenceImage(
-                                                                            handle,
-                                                                            storageId,
-                                                                            matches[1],
-                                                                            image.mimeType || 'image/png'
-                                                                        ).catch(err => {
-                                                                            console.warn('[ImageCard2] Failed to save reference to file system:', err);
-                                                                        });
-                                                                    }
+                                                            const handle = fileSystemService.getGlobalHandle();
+                                                            if (handle) {
+                                                                const matches = url.match(/^data:[^,]+,(.+)$/);
+                                                                if (matches && matches[1]) {
+                                                                    fileSystemService.saveReferenceImage(
+                                                                        handle,
+                                                                        storageId,
+                                                                        matches[1],
+                                                                        image.mimeType || 'image/png'
+                                                                    ).catch(err => {
+                                                                        console.warn('[ImageCard2] Failed to save reference to file system:', err);
+                                                                    });
                                                                 }
-                                                            });
+                                                            }
                                                         }
                                                     }
                                                 }}

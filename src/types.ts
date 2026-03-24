@@ -1,5 +1,5 @@
 ﻿export enum AspectRatio {
-  AUTO = 'auto', // 鑷姩鍖归厤
+  AUTO = 'auto', // 自动匹配
   SQUARE = '1:1',
   PORTRAIT_1_8 = '1:8', // 🎯 New: Nano Banana 2 & Pro
   PORTRAIT_1_4 = '1:4', // 🎯 New: Nano Banana 2 & Pro
@@ -40,24 +40,24 @@ export type WorkspacePanel = 'history' | 'details' | 'chat' | 'quick-settings' |
 export type MobilePrimaryTab = 'create' | 'library' | 'chat' | 'me';
 
 // ============================================
-// 宸茬煡妯″瀷甯搁噺 - 图像鍜岃棰戠敓鎴?
-// 鍙傝€? https://ai.google.dev/gemini-api/docs/pricing?hl=zh-cn
+// 已知模型常量 - 图像和视频生成
+// 参考: https://ai.google.dev/gemini-api/docs/pricing?hl=zh-cn
 // ============================================
 export const KnownModel = {
-  // Imagen 4 绯诲垪 (最新
+  // Imagen 4 系列（最新）
   IMAGEN_4: 'imagen-4.0-generate-001',
   IMAGEN_4_ULTRA: 'imagen-4.0-ultra-generate-001',
   IMAGEN_4_FAST: 'imagen-4.0-fast-generate-001',
 
-  // Imagen 3 绯诲垪
+  // Imagen 3 系列
   IMAGEN_3: 'imagen-3.0-generate-001',
   IMAGEN_3_LEGACY: 'imagen-3.0-generate-002',
 
-  // Gemini 鍘熺敓图像鐢熸垚绯诲垪
+  // Gemini 原生图像生成系列
   GEMINI_2_5_FLASH_IMAGE: 'gemini-2.5-flash-image',
   GEMINI_3_PRO_IMAGE: 'gemini-3-pro-image-preview',
 
-  // Veo 视频鐢熸垚绯诲垪
+  // Veo 视频生成系列
   VEO_3_1: 'veo-3.1-generate-preview',
   VEO_3_1_FAST: 'veo-3.1-fast-generate-preview',
   VEO_3: 'veo-3.0-generate-001',
@@ -79,16 +79,16 @@ export enum GenerationMode {
 }
 
 // ============================================
-// 鑱婂ぉ妯″瀷类型
-// 鍙傝€? https://ai.google.dev/gemini-api/docs/pricing?hl=zh-cn
+// 聊天模型类型
+// 参考: https://ai.google.dev/gemini-api/docs/pricing?hl=zh-cn
 // ============================================
 export enum ChatModelType {
-  // Gemini 2.5 绯诲垪 - 鎬т环姣旀渶浣?
+  // Gemini 2.5 系列 - 性价比较高
   GEMINI_2_5_PRO = 'gemini-2.5-pro',
   GEMINI_2_5_FLASH = 'gemini-2.5-flash',
   GEMINI_2_5_FLASH_LITE = 'gemini-2.5-flash-lite',
 
-  // Gemini 3 绯诲垪 - 鏈€寮烘櫤鑳?
+  // Gemini 3 系列 - 智能能力更强
   GEMINI_3_PRO = 'gemini-3-pro-preview',
   GEMINI_3_FLASH = 'gemini-3-flash-preview',
 }
@@ -128,10 +128,10 @@ export interface GeneratedImage {
   costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
   billingMode?: 'credits' | 'currency';
   creditCost?: number;
-  orphaned?: boolean; // 瀛ょ嫭鍓崱锛堟棤鐖惰妭鐐癸級
-  fileName?: string; // 原始文档鍚?
-  fileSize?: number; // 文档大小锛堝瓧鑺傦級
-  alias?: string; // 🎯 [New] 用户鑷畾涔夊娉ㄥ悕
+  orphaned?: boolean; // 孤立副卡（无父节点）
+  fileName?: string; // 原始文档名
+  fileSize?: number; // 文档大小（字节）
+  alias?: string; // 🎯 [New] 用户自定义备注名
   isGenerating?: boolean; // 🎯 [New] True when image is being generated
   error?: string; // 🎯 [New] Error message for failed generation
   mimeType?: string; // 🎯 [New] Image MIME type (e.g., 'image/png', 'image/jpeg')
@@ -143,9 +143,9 @@ export interface GeneratedImage {
   requestPath?: string;
   requestBodyPreview?: string;
   pythonSnippet?: string;
-  optimizedPromptEn?: string; // 🎯 [New] 存储优化鍚庣殑鑻辨枃提示璇?
-  optimizedPromptZh?: string; // 🎯 [New] 存储优化鍚庣殑涓枃解释
-  // 🎯 [New] 瀹屾暣鐨勬彁绀鸿瘝缂栬瘧鍣ㄧ粨鏋滃璞?
+  optimizedPromptEn?: string; // 🎯 [New] 存储优化后的英文提示词
+  optimizedPromptZh?: string; // 🎯 [New] 存储优化后的中文解释
+  // 🎯 [New] 完整的提示词优化结果对象
   promptOptimizerResult?: PromptOptimizerResult;
 
   // 🎯 [Layering] Z-index for rendering order
@@ -156,13 +156,13 @@ export type Provider =
   | 'Google'
   | 'OpenAI'
   | 'Anthropic'
-  | 'Volcengine' // 鐏北寮曟搸
-  | 'Aliyun'     // 闃块噷浜?
-  | 'Tencent'    // 鑵捐浜?
-  | 'SiliconFlow'// 纭呭熀娴佸姩
-  | '12AI'        // 12AI 涓撳睘
+  | 'Volcengine' // 火山引擎
+  | 'Aliyun'     // 阿里云
+  | 'Tencent'    // 腾讯云
+  | 'SiliconFlow'// 硅基流动
+  | '12AI'        // 12AI 专属
   | 'Custom'      // 自定义
-  | 'SystemProxy'; // 系统浠ｇ悊锛堢Н鍒嗘ā鍨嬶級
+  | 'SystemProxy'; // 系统代理（积分模型）
 
 export interface PromptOptimizerResult {
   raw_prompt_original: string;
@@ -261,7 +261,7 @@ export interface PromptNode {
   originalPrompt?: string;
   optimizedPromptEn?: string;
   optimizedPromptZh?: string;
-  promptOptimizerResult?: PromptOptimizerResult; // 🎯 [New] 瀹屾暣缂栬瘧鍣ㄧ粨鏋?
+  promptOptimizerResult?: PromptOptimizerResult; // 🎯 [New] 完整的提示词优化结果
   promptOptimizationEnabled?: boolean;
   thinkingMode?: 'minimal' | 'high';
   enableGrounding?: boolean;
@@ -270,9 +270,9 @@ export interface PromptNode {
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
   model: ModelType;
-  modelLabel?: string; // 🎯 妯″瀷显示名称锛堢敤鎴烽€夋嫨鏃剁湅鍒扮殑鍚嶅瓧锛?
-  provider?: string; // 🎯 鐢熸垚淇￠亾 provider锛堝唴閮ㄦ爣璇嗭級
-  providerLabel?: string; // 🎯 鐢熸垚淇￠亾显示名称锛堜緥濡傗€滃弽浠ｂ€濓級
+  modelLabel?: string; // 🎯 模型显示名称（用户选择时看到的名字）
+  provider?: string; // 🎯 生成信道 provider（内部标识）
+  providerLabel?: string; // 🎯 生成信道显示名称（例如“反代”）
   modelColorStart?: string;
   modelColorEnd?: string;
   modelColorSecondary?: string;
@@ -298,7 +298,7 @@ export interface PromptNode {
     model?: string;
     timestamp?: number;
   };
-  // 🎯 [添加] 绉垎閫€鍥炵姸鎬侊紝鐢ㄤ簬显示"鐢熸垚失败锛岀Н鍒嗗凡閫€鍥?
+  // 🎯 [添加] 积分退款状态，用于显示“生成失败，积分已退回”
   refundStatus?: 'pending' | 'success' | 'failed';
   creditSettlement?: 'client' | 'server';
   paymentTransactionId?: string;
@@ -308,8 +308,8 @@ export interface PromptNode {
   height?: number; // Dynamic height for connection line anchoring
   tags?: string[]; // Search tags
   isDraft?: boolean; // Preview/Draft state
-  orphaned?: boolean; // 瀛ょ嫭涓诲崱锛堟嫋鍔╬ending鍗¤浆鎹㈣€屾潵锛?
-  userMoved?: boolean; // 🎯 [New] 鏄惁琚敤鎴锋墜鍔ㄧЩ鍔ㄨ繃锛堢敤浜庢櫤鑳藉綊浣嶉€昏緫锛?
+  orphaned?: boolean; // 孤立主卡（由 pending 卡转换而来）
+  userMoved?: boolean; // 🎯 [New] 是否被用户手动移动过（用于智能归位逻辑）
 
   // Video specific
   videoResolution?: string;
@@ -332,12 +332,12 @@ export interface PromptNode {
   cost?: number; // Estimated or actual cost
   billingMode?: 'credits' | 'currency';
   creditCost?: number;
-  isPaymentProcessed?: boolean; // 🎯 [New] 鏄惁宸叉垚鍔熸墽琛屾墸璐癸紝鐢ㄤ簬失败閫€鍥炲垽瀹?
+  isPaymentProcessed?: boolean; // 🎯 [New] 是否已成功执行扣费，用于失败退款判断
 
   // 🎯 [Persistence Management]
-  jobId?: string; // 任务 ID (鐢ㄤ簬寮傛杞鍜屽埛鏂版仮澶?
-  isNew?: boolean; // 🎯 [New] 鏄惁涓烘柊鐢熸垚鐨勮妭鐐癸紙鐢ㄤ簬瑙﹀彂椋炲嚭鍔ㄧ敾锛?
-  generationMetadata?: any; // 鐢熸垚涓婁笅鏂囧厓数据
+  jobId?: string; // 任务 ID（用于异步轮询和刷新状态）
+  isNew?: boolean; // 🎯 [New] 是否为新生成的节点（用于触发飞出动画）
+  generationMetadata?: any; // 生成上下文元数据
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
@@ -468,11 +468,11 @@ export interface Canvas {
 }
 
 /**
- * 视频鍒嗚鲸鐜囦笌支持鏃堕暱鐨勬槧灏?
- * 鏍规嵁瀹樻柟文档: https://ai.google.dev/gemini-api/docs/video?hl=zh-cn
+ * 视频分辨率与支持时长的映射
+ * 根据官方文档: https://ai.google.dev/gemini-api/docs/video?hl=zh-cn
  * - 720p: 支持 4s, 6s, 8s
- * - 1080p: 浠呮敮鎸?8s
- * - 4k: 浠呮敮鎸?8s
+ * - 1080p: 仅支持 8s
+ * - 4k: 仅支持 8s
  */
 export const VIDEO_RESOLUTION_DURATION_MAP = {
   '720p': ['4s', '6s', '8s'],
@@ -495,12 +495,12 @@ export interface GenerationConfig {
   enableImageSearch?: boolean;
   thinkingMode?: 'minimal' | 'high';
   mode: GenerationMode;
-  // 视频配置瀛楁
+  // 视频配置字段
   videoResolution?: string; // '720p' | '1080p' | '4k'
-  videoDuration?: string;   // 鏍规嵁鍒嗚鲸鐜囧姩鎬佹敮鎸侊細720p支持4s/6s/8s锛?080p鍜?k浠呮敮鎸?s
-  videoAudio?: boolean;     //鐢熸垚音频
+  videoDuration?: string;   // 根据分辨率动态支持：720p 支持 4s/6s/8s，1080p 和 4k 仅支持 8s
+  videoAudio?: boolean;     // 生成音频
   // 图像编辑扩展
-  maskUrl?: string;         // Base64 钂欑増图片 (Inpaint)
+  maskUrl?: string;         // Base64 蒙版图片 (Inpaint)
   editMode?: 'inpaint' | 'outpaint' | 'vectorize' | 'reframe' | 'upscale' | 'replace-background' | 'edit';
   // 音频扩展
   audioDuration?: string;

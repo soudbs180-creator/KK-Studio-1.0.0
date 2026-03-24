@@ -1,4 +1,4 @@
-﻿import { supabase } from '../../lib/supabase';
+﻿import { legacyWebApiClient } from '../api/kkApiClient';
 
 import {
   type AdminModelQualityPricing,
@@ -124,6 +124,7 @@ class AdminModelService {
   private listeners: Array<() => void> = [];
   private loadingPromise: Promise<void> | null = null;
   private lastLoadAttemptAt = 0;
+  private modelRefreshHandler: (() => void) | null = null;
 
   private static readonly LOAD_RETRY_INTERVAL_MS = 15000;
 
@@ -147,37 +148,33 @@ class AdminModelService {
   }
 
   private async readFromRpc(): Promise<FlatModelRow[]> {
-    const rpcResult = await supabase.rpc('get_active_credit_models');
-    if (rpcResult.error) {
-      throw rpcResult.error;
+    const response = await legacyWebApiClient.listActiveCreditModels();
+    if (!response.success) {
+      throw new Error(response.error.message || 'Failed to load active credit models.');
     }
 
-    const grouped = (rpcResult.data || []) as Array<{
-      provider_id: string;
-      provider_name: string;
-      models: Array<any>;
-    }>;
+    const grouped = response.data.items || [];
 
     return grouped.flatMap((provider) =>
       (provider.models || []).map((model) => ({
-        id: model.id,
-        provider_id: provider.provider_id,
-        provider_name: provider.provider_name,
-        model_id: model.model_id,
-        display_name: model.display_name,
+        id: model.recordId,
+        provider_id: provider.providerId,
+        provider_name: provider.providerName,
+        model_id: model.modelId,
+        display_name: model.displayName,
         description: model.description,
         color: model.color,
-        color_secondary: model.color_secondary,
-        text_color: model.text_color,
-        endpoint_type: model.endpoint_type,
-        credit_cost: model.credit_cost,
+        color_secondary: model.colorSecondary,
+        text_color: model.textColor,
+        endpoint_type: model.endpointType,
+        credit_cost: model.creditCost,
         priority: model.priority,
         weight: model.weight,
-        call_count: model.call_count,
+        call_count: model.callCount,
         is_active: true,
-        advanced_enabled: model.advanced_enabled,
-        mix_with_same_model: model.mix_with_same_model,
-        quality_pricing: model.quality_pricing,
+        advanced_enabled: model.advancedEnabled,
+        mix_with_same_model: model.mixWithSameModel,
+        quality_pricing: model.qualityPricing,
       }))
     );
   }
@@ -273,9 +270,7 @@ class AdminModelService {
 
         this.models = Array.from(dedupe.values());
 
-        const { keyManager } = await import('../auth/keyManager');
-        keyManager.clearGlobalModelListCache?.();
-        keyManager.forceNotify?.();
+        this.modelRefreshHandler?.();
 
         this.notifyListeners();
       } catch (error) {
@@ -591,6 +586,10 @@ class AdminModelService {
     return () => {
       this.listeners = this.listeners.filter((listener) => listener !== callback);
     };
+  }
+
+  registerModelRefreshHandler(callback: (() => void) | null): void {
+    this.modelRefreshHandler = callback;
   }
 
   private notifyListeners() {

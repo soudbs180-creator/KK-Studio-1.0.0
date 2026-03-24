@@ -6,7 +6,7 @@
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
-import { supabase } from '../../lib/supabase';
+import { legacyWebApiClient } from '../api/kkApiClient';
 import { userApiKeyService } from '../api/userApiKeyService';
 import { callSecureSystemProxyChat } from './secureModelProxy';
 
@@ -35,18 +35,6 @@ export interface SecureCallResult {
     provider: string;
   };
 }
-
-type PublicCreditModelRpcRow = {
-  provider_id?: string | null;
-  provider_name?: string | null;
-  models?: Array<{
-    model_id?: string | null;
-    display_name?: string | null;
-    description?: string | null;
-    credit_cost?: number | null;
-    is_active?: boolean | null;
-  }> | null;
-};
 
 class SecureModelCaller {
   async call(options: SecureCallOptions): Promise<SecureCallResult> {
@@ -94,17 +82,18 @@ class SecureModelCaller {
     isActive: boolean;
   }>> {
     try {
-      const { data: providerGroups, error: adminError } = await supabase.rpc('get_active_credit_models');
+      const response = await legacyWebApiClient.listActiveCreditModels();
+      if (!response.success) {
+        throw new Error(response.error.message || 'Failed to load active credit models.');
+      }
 
-      if (adminError) throw adminError;
-
-      const adminModels = ((providerGroups || []) as PublicCreditModelRpcRow[]).flatMap((group) =>
+      const adminModels = (response.data.items || []).flatMap((group) =>
         (group.models || []).map((model) => ({
-          model_id: model.model_id,
-          display_name: model.display_name,
+          model_id: model.modelId,
+          display_name: model.displayName,
           description: model.description,
-          credit_cost: model.credit_cost,
-          is_active: model.is_active !== false,
+          credit_cost: model.creditCost,
+          is_active: true,
         }))
       );
 

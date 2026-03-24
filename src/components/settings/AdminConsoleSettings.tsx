@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { KeyRound, Shield, ShieldAlert, Wallet } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+
+import { useAuth } from '../../context/AuthContext';
+import { clearStoredAdminSession } from '../../services/api/adminSession';
+import { legacyWebApiClient } from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
 import {
   MetricCard,
@@ -9,7 +12,23 @@ import {
   SettingInput,
 } from './ui/index';
 
+const DEFAULT_RECHARGE_REMARK = '管理员手动充值';
+
+function buildRequestId(prefix: string, suffix?: string): string {
+  const uuid = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+  const safeSuffix = String(suffix || '').trim();
+  return `${prefix}-${safeSuffix || 'anonymous'}-${uuid}`;
+}
+
+function buildAdminRequestOptions(requestId?: string) {
+  return {
+    requestId,
+  };
+}
+
 const AdminConsoleSettings: React.FC = () => {
+  const { user } = useAuth();
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,7 +36,7 @@ const AdminConsoleSettings: React.FC = () => {
 
   const [identity, setIdentity] = useState('');
   const [rechargeAmount, setRechargeAmount] = useState(100);
-  const [rechargeRemark, setRechargeRemark] = useState('管理员手动充值');
+  const [rechargeRemark, setRechargeRemark] = useState(DEFAULT_RECHARGE_REMARK);
   const [recharging, setRecharging] = useState(false);
 
   const [newAdminIdentity, setNewAdminIdentity] = useState('');
@@ -25,7 +44,22 @@ const AdminConsoleSettings: React.FC = () => {
 
   const amountLabel = useMemo(() => `${rechargeAmount} 积分`, [rechargeAmount]);
 
+  const requireAdminUserId = (): string | null => {
+    const userId = user?.id;
+    if (!userId) {
+      notify.error('管理员身份缺失', '请先登录管理员账号后再继续操作。');
+      return null;
+    }
+
+    return userId;
+  };
+
   const handleChangePassword = async () => {
+    const userId = requireAdminUserId();
+    if (!userId) {
+      return;
+    }
+
     if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
       notify.error('信息不完整', '请填写旧密码、新密码和确认密码。');
       return;
@@ -43,19 +77,23 @@ const AdminConsoleSettings: React.FC = () => {
 
     setChangingPassword(true);
     try {
-      const { data, error } = await supabase.rpc('admin_change_password_secure', {
-        p_old_password: oldPassword,
-        p_new_password: newPassword,
-      });
+      const response = await legacyWebApiClient.changeAdminPassword(
+        {
+          oldPassword,
+          newPassword,
+        },
+        buildAdminRequestOptions(buildRequestId('admin-password-change', userId)),
+      );
 
-      if (error || data !== true) {
-        throw error || new Error('管理员密码修改失败。');
+      if (!response.success) {
+        throw new Error(response.error.message || '管理员密码修改失败。');
       }
 
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      notify.success('修改成功', '管理员密码已更新。');
+      clearStoredAdminSession();
+      notify.success('修改成功', '管理员密码已更新，请重新验证后台会话。');
     } catch (error: any) {
       notify.error('修改失败', error?.message || '请检查旧密码后重试。');
     } finally {
@@ -64,6 +102,11 @@ const AdminConsoleSettings: React.FC = () => {
   };
 
   const handleRecharge = async () => {
+    const userId = requireAdminUserId();
+    if (!userId) {
+      return;
+    }
+
     if (!identity.trim()) {
       notify.error('缺少目标用户', '请输入用户 ID 或邮箱。');
       return;
@@ -71,20 +114,20 @@ const AdminConsoleSettings: React.FC = () => {
 
     setRecharging(true);
     try {
-      const { data, error } = await supabase.rpc('admin_recharge_credits_by_identity', {
-        p_identity: identity.trim(),
-        p_amount: rechargeAmount,
-        p_description: rechargeRemark.trim() || '管理员手动充值',
-      });
+      const response = await legacyWebApiClient.adminRechargeCredits(
+        {
+          identity: identity.trim(),
+          creditAmount: rechargeAmount,
+          description: rechargeRemark.trim() || DEFAULT_RECHARGE_REMARK,
+        },
+        buildAdminRequestOptions(buildRequestId('admin-recharge', identity)),
+      );
 
-      if (error) throw error;
-
-      const row = Array.isArray(data) ? data[0] : data;
-      if (!row?.success) {
-        throw new Error(row?.message || '充值失败。');
+      if (!response.success) {
+        throw new Error(response.error.message || '充值失败。');
       }
 
-      notify.success('充值成功', `新余额：${row.new_balance} 积分`);
+      notify.success('充值成功', `最新余额：${response.data.balanceAfter} 积分`);
       setIdentity('');
     } catch (error: any) {
       notify.error('充值失败', error?.message || '请检查用户信息后重试。');
@@ -94,6 +137,11 @@ const AdminConsoleSettings: React.FC = () => {
   };
 
   const handleSetAdmin = async () => {
+    const userId = requireAdminUserId();
+    if (!userId) {
+      return;
+    }
+
     if (!newAdminIdentity.trim()) {
       notify.error('缺少目标用户', '请输入用户 ID 或邮箱。');
       return;
@@ -101,12 +149,17 @@ const AdminConsoleSettings: React.FC = () => {
 
     setSettingAdmin(true);
     try {
-      const { error } = await supabase.rpc('admin_set_user_role_by_identity', {
-        p_identity: newAdminIdentity.trim(),
-        p_role: 'admin',
-      });
+      const response = await legacyWebApiClient.setUserRole(
+        {
+          identity: newAdminIdentity.trim(),
+          role: 'admin',
+        },
+        buildAdminRequestOptions(buildRequestId('admin-role', newAdminIdentity)),
+      );
 
-      if (error) throw error;
+      if (!response.success) {
+        throw new Error(response.error.message || '授予管理员权限失败。');
+      }
 
       notify.success('设置成功', `已将 ${newAdminIdentity.trim()} 设为管理员。`);
       setNewAdminIdentity('');
@@ -123,19 +176,19 @@ const AdminConsoleSettings: React.FC = () => {
         <MetricCard
           value="至少 8 位"
           label="密码策略"
-          helper="建议尽快替换默认密码"
+          helper="建议尽快替换默认管理员密码"
           tone="amber"
         />
         <MetricCard
           value={amountLabel}
           label="本次充值"
-          helper="提交前可再次核对"
+          helper="提交前可再次核对金额"
           tone="emerald"
         />
         <MetricCard
           value="管理员作用域"
           label="权限范围"
-          helper="会影响后台配置与用户资产"
+          helper="影响后台配置与用户资产"
           tone="rose"
         />
         <MetricCard
@@ -174,13 +227,13 @@ const AdminConsoleSettings: React.FC = () => {
             </div>
 
             <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
-              建议使用字母、数字和符号组合。修改成功后，后续再次进入后台需要使用新密码验证。
+              建议同时使用字母、数字和符号组合。修改成功后，再次进入后台时需要使用新密码验证。
             </div>
 
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleChangePassword()} loading={changingPassword}>
                 <KeyRound size={14} className="mr-1 inline-block" />
-                {changingPassword ? '保存中...' : '保存新密码'}
+                保存新密码
               </PrimaryButton>
             </div>
           </div>
@@ -226,13 +279,13 @@ const AdminConsoleSettings: React.FC = () => {
             <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
               <div>目标用户：{identity.trim() || '尚未填写'}</div>
               <div>充值额度：{amountLabel}</div>
-              <div>备注信息：{rechargeRemark.trim() || '管理员手动充值'}</div>
+              <div>备注信息：{rechargeRemark.trim() || DEFAULT_RECHARGE_REMARK}</div>
             </div>
 
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleRecharge()} loading={recharging}>
                 <Wallet size={14} className="mr-1 inline-block" />
-                {recharging ? '充值中...' : '确认充值'}
+                确认充值
               </PrimaryButton>
             </div>
           </div>
@@ -252,12 +305,18 @@ const AdminConsoleSettings: React.FC = () => {
             <div className="flex gap-2">
               <PrimaryButton onClick={() => void handleSetAdmin()} loading={settingAdmin}>
                 <Shield size={14} className="mr-1 inline-block" />
-                {settingAdmin ? '设置中...' : '确认设为管理员'}
+                确认设为管理员
               </PrimaryButton>
             </div>
           </div>
 
-          <div className="rounded-2xl border p-4" style={{ backgroundColor: 'color-mix(in srgb, var(--warning) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--warning) 28%, transparent)' }}>
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--warning) 12%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--warning) 28%, transparent)',
+            }}
+          >
             <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
               <ShieldAlert size={16} />
               操作提醒

@@ -286,7 +286,7 @@ export class LLMService {
                 lastError = error;
                 console.warn(`[LLMService] Image attempt ${i + 1} failed: `, error);
 
-                // 馃殌 [镞ュ织澧炲己] 璁板綍鍗曟灏濊瘯澶辫触
+                // Record each failed attempt so diagnostics keep the full retry trail
                 logWarning('LLMService', `Image generation attempt ${i + 1} failed(${keySlot.name})`,
                     `Model: ${options.modelId} \nProvider: ${keySlot.provider} \nError: ${error.message} `);
 
@@ -407,7 +407,7 @@ export class LLMService {
                 lastError = error;
                 console.warn(`[LLMService] Video attempt ${i + 1} failed: `, error);
 
-                // 馃殌 [镞ュ织澧炲己] 璁板綍鍗曟灏濊瘯澶辫触
+                // Record each failed attempt so diagnostics keep the full retry trail
                 logWarning('LLMService', `Video generation attempt ${i + 1} failed(${keySlot.name})`,
                     `Model: ${options.modelId} \nProvider: ${keySlot.provider} \nError: ${error.message} `);
 
@@ -477,7 +477,7 @@ export class LLMService {
                 lastError = error;
                 console.warn(`[LLMService] Audio attempt ${i + 1} failed: `, error);
 
-                // 馃殌 [镞ュ织澧炲己] 璁板綍鍗曟灏濊瘯澶辫触
+                // Record each failed attempt so diagnostics keep the full retry trail
                 logWarning('LLMService', `Audio generation attempt ${i + 1} failed(${keySlot.name})`,
                     `Model: ${options.modelId} \nProvider: ${keySlot.provider} \nError: ${error.message} `);
 
@@ -488,7 +488,7 @@ export class LLMService {
     }
 
     /**
-     * 馃殌 [Persistence] Check status/poll for background tasks
+     * Check status or poll background tasks until they complete.
      */
     public async checkTaskStatus(taskId: string, mode: GenerationMode, preferredKeyId?: string | { id?: string }): Promise<any> {
         const normalizedPreferredKeyId = typeof preferredKeyId === 'string'

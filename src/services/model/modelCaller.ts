@@ -23,9 +23,11 @@ import {
   shouldRetryWithResponsesApi,
 } from '../api/openaiResponses';
 import { resolveProviderRuntime } from '../api/providerStrategy';
-import { keyManager, type ThirdPartyProvider } from '../auth/keyManager';
+import { legacyWebApiClient } from '../api/kkApiClient';
+import { keyManager } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';
 import { supabase } from '../../lib/supabase';
+import { adminModelService } from './adminModelService';
 import { callSecureSystemProxyChat } from './secureModelProxy';
 
 export interface CallModelOptions {
@@ -56,6 +58,17 @@ type RoutedApiConfig = {
 };
 
 class ModelCaller {
+  private buildBillingRequestId(prefix: string): string {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    return `${prefix}-${uuid || Date.now()}`;
+  }
+
+  private buildBillingRequestOptions(requestId: string) {
+    return {
+      requestId,
+    };
+  }
+
   private isModelMatch(modelId: string, candidate: string): boolean {
     const normalizedModelId = String(modelId || '').trim().toLowerCase();
     const normalizedCandidate = String(candidate || '').trim().toLowerCase();
@@ -65,9 +78,9 @@ class ModelCaller {
     }
 
     return (
-      normalizedCandidate === normalizedModelId ||
-      normalizedCandidate.endsWith(`/${normalizedModelId}`) ||
-      normalizedModelId.endsWith(`/${normalizedCandidate}`)
+      normalizedCandidate === normalizedModelId
+      || normalizedCandidate.endsWith(`/${normalizedModelId}`)
+      || normalizedModelId.endsWith(`/${normalizedCandidate}`)
     );
   }
 
@@ -109,8 +122,8 @@ class ModelCaller {
     const slots = keyManager.getSlots();
     const userSlot = slots.find(
       (slot) =>
-        slot.supportedModels?.includes(modelId) ||
-        slot.supportedModels?.some((supportedModel) => modelId.includes(supportedModel)),
+        slot.supportedModels?.includes(modelId)
+        || slot.supportedModels?.some((supportedModel) => modelId.includes(supportedModel)),
     );
     if (userSlot) {
       return this.callWithUserKey(options, {
@@ -130,20 +143,26 @@ class ModelCaller {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return { success: false, error: '请先登录。' };
+      return { success: false, error: 'Please sign in before using credit-based models.' };
     }
 
     const requiredCredits = Math.max(1, Math.ceil(Number(creditCost || 0)));
+    const billingRequestId = this.buildBillingRequestId('model-call');
+    const billingRequestOptions = this.buildBillingRequestOptions(billingRequestId);
+    const balanceResponse = await legacyWebApiClient.getCreditBalance(billingRequestOptions);
 
-    const { data: hasCredits, error: checkError } = await supabase.rpc('check_user_credits', {
-      p_user_id: user.id,
-      p_required_credits: requiredCredits,
-    });
-
-    if (checkError || !hasCredits) {
+    if (!balanceResponse.success) {
       return {
         success: false,
-        error: `积分不足，需要 ${creditCost} 积分。`,
+        error: balanceResponse.error.message || 'Unable to load credit balance.',
+      };
+    }
+
+    const availableBalance = Number(balanceResponse.data.balance || 0);
+    if (availableBalance < requiredCredits) {
+      return {
+        success: false,
+        error: `Insufficient credits. Required: ${requiredCredits}.`,
       };
     }
 
@@ -157,7 +176,7 @@ class ModelCaller {
       });
 
       if (!response.deducted) {
-        await this.deductCredits(user.id, requiredCredits, options.modelId);
+        await this.deductCredits(requiredCredits, options.modelId, billingRequestId);
       }
 
       return {
@@ -166,7 +185,7 @@ class ModelCaller {
         usage: response.usage,
       };
     } catch (error: any) {
-      return { success: false, error: error?.message || '模型调用失败。' };
+      return { success: false, error: error?.message || 'Model call failed.' };
     }
   }
 
@@ -381,27 +400,19 @@ class ModelCaller {
     if (!hasMessages) {
       return {
         success: false,
-        error: '请先配置 API Key 或选择供应商。',
+        error: 'Please configure an API key or select an available provider first.',
       };
     }
 
     return {
       success: false,
-      error: '请先配置 API Key 或选择供应商。',
+      error: 'Please configure an API key or select an available provider first.',
     };
   }
 
   private async getCreditCost(modelId: string): Promise<number> {
-    const { data, error } = await supabase.rpc('get_model_credit_cost', {
-      model_id: modelId,
-    });
-
-    if (error) {
-      console.error('[ModelCaller] Error getting credit cost:', error);
-      return 0;
-    }
-
-    return data || 0;
+    await adminModelService.loadAdminModels();
+    return Number(adminModelService.getModelCreditCost(modelId) || 0);
   }
 
   private findSupplierForModel(modelId: string): {
@@ -412,12 +423,12 @@ class ModelCaller {
   } | null {
     const configuredProvider = this.findConfiguredProviderForModel(modelId);
     if (configuredProvider) {
-        return {
-          baseUrl: configuredProvider.baseUrl,
-          apiKey: configuredProvider.apiKey,
-          provider: undefined,
-          format: configuredProvider.format || 'auto',
-        };
+      return {
+        baseUrl: configuredProvider.baseUrl,
+        apiKey: configuredProvider.apiKey,
+        provider: undefined,
+        format: configuredProvider.format || 'auto',
+      };
     }
 
     const suppliers = supplierService.getAll();
@@ -437,18 +448,27 @@ class ModelCaller {
     return null;
   }
 
-  private async deductCredits(userId: string, credits: number, modelId: string): Promise<void> {
+  private async deductCredits(
+    credits: number,
+    modelId: string,
+    billingRequestId?: string,
+  ): Promise<void> {
     const roundedCredits = Math.max(1, Math.ceil(Number(credits || 0)));
+    const requestId = billingRequestId || this.buildBillingRequestId('model-call');
+    const debitResponse = await legacyWebApiClient.debitCredits(
+      {
+        businessRefType: 'model_call',
+        businessRefId: requestId,
+        creditAmount: roundedCredits,
+        modelCode: modelId,
+        idempotencyKey: requestId,
+      },
+      this.buildBillingRequestOptions(requestId),
+    );
 
-    const { error } = await supabase.rpc('deduct_user_credits', {
-      p_user_id: userId,
-      p_credits: roundedCredits,
-      p_model_id: modelId,
-    });
-
-    if (error) {
-      console.error('[ModelCaller] 积分扣除失败:', error);
-      throw new Error('积分扣除失败。');
+    if (!debitResponse.success) {
+      console.error('[ModelCaller] Credit deduction failed:', debitResponse.error);
+      throw new Error(debitResponse.error.message || 'Credit deduction failed.');
     }
   }
 }

@@ -1,7 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const fetch = require('node-fetch');
 const { AlipaySdk } = require('alipay-sdk');
+const {
+    handleLegacySettlementFailure,
+    handleLegacySuccessfulPaymentCallback,
+} = require('./runtime_payment_bridge');
 
 const router = express.Router();
 
@@ -37,50 +40,58 @@ const alipaySdk = new AlipaySdk({
 // ============================================
 // Core recharge helper
 // ============================================
-async function addCreditsToSupabase(userId, transactionId, amount, currency, payType, billNo) {
+async function applyPaymentSettlement(userId, transactionId, amount, currency, payType, billNo, payload) {
     console.log(
-        `[payment-webhook] Syncing recharge for user ${userId}: ${currency} ${amount}, payType=${payType}, transactionId=${transactionId}, billNo=${billNo || 'n/a'}`
+        `[payment-webhook] Applying payment settlement for user ${userId}: ${currency} ${amount}, payType=${payType}, transactionId=${transactionId}, billNo=${billNo || 'n/a'}`
     );
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseSecretKey = getSupabaseServiceRoleKey();
-
-    if (!supabaseUrl || !supabaseSecretKey) {
-        console.error(
-            '[payment-webhook] Missing Supabase config. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
-        );
-        return false;
-    }
+    const bridgeOptions = {
+        baseUrl: process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001',
+        internalToken: process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN,
+        supabaseUrl: process.env.SUPABASE_URL,
+        serviceRoleKey: getSupabaseServiceRoleKey(),
+        requestId: `payment-webhook-${payType}-${billNo || transactionId}`,
+        onWarning(message, error) {
+            console.warn('[payment-webhook]', message, error || '');
+        },
+    };
 
     try {
-        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/process_payment_recharge`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${supabaseSecretKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                p_user_id: userId,
-                p_transaction_id: transactionId,
-                p_amount: amount,
-                p_currency: currency,
-                p_credits_added: null,
-                p_pay_type: payType,
-                p_bill_no: billNo || transactionId
-            })
-        });
+        const result = await handleLegacySuccessfulPaymentCallback({
+            userId,
+            callbackId: transactionId,
+            transactionId,
+            merchantOrderNo: billNo || transactionId,
+            amount,
+            currency,
+            providerCode: payType,
+            payType,
+            tradeStatus: 'TRADE_SUCCESS',
+            payload: payload || {},
+        }, bridgeOptions);
 
-        const result = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            console.error('[payment-webhook] Supabase recharge RPC failed:', result);
-            return false;
+        if (result.duplicated) {
+            console.log('[payment-webhook] Duplicate payment callback ignored:', {
+                merchantOrderNo: billNo || transactionId,
+                callbackId: transactionId,
+            });
+            return true;
         }
 
-        console.log('[payment-webhook] Recharge RPC succeeded:', result);
+        if (result.settlementSkipped) {
+            console.log('[payment-webhook] Payment callback already settled, runtime status refreshed:', result.runtimeStatus);
+            return true;
+        }
+
+        console.log('[payment-webhook] Payment settlement applied:', result.settlement?.result || result.runtimeStatus || {});
         return true;
     } catch (error) {
-        console.error('[payment-webhook] Supabase request failed:', error);
+        await handleLegacySettlementFailure({
+            merchantOrderNo: billNo || transactionId,
+            callbackId: transactionId,
+            errorMessage: error?.message || 'Payment settlement request failed.',
+        }, bridgeOptions);
+        console.error('[payment-webhook] Payment settlement request failed:', error);
         return false;
     }
 }
@@ -113,13 +124,14 @@ router.post('/alipay', async (req, res) => {
                 return res.send('success');
             }
 
-            const rechargeSuccess = await addCreditsToSupabase(
+            const rechargeSuccess = await applyPaymentSettlement(
                 userId,
                 alipayTradeNo,
                 Number(totalAmount),
                 'CNY',
                 'alipay',
-                outTradeNo
+                outTradeNo,
+                postData
             );
 
             if (rechargeSuccess) {
@@ -191,13 +203,14 @@ router.post('/wechat', async (req, res) => {
             const transactionId = decryptData.transaction_id;
 
             if (userId) {
-                const rechargeSuccess = await addCreditsToSupabase(
+                const rechargeSuccess = await applyPaymentSettlement(
                     userId,
                     transactionId,
                     amount,
                     'CNY',
                     'wechat',
-                    outTradeNo
+                    outTradeNo,
+                    decryptData
                 );
                 if (rechargeSuccess) {
                     return res.status(200).json({ code: 'SUCCESS', message: '成功' });

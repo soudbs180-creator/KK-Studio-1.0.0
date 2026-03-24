@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+﻿import { useState, useCallback, useRef, useEffect } from 'react';
 import { PromptNode, GeneratedImage, GenerationMode, AspectRatio, ImageSize, ReferenceImage } from '../types';
 import { llmService } from '../services/llm/LLMService';
 import { generateImage, cancelGeneration } from '../services/llm/geminiService';
@@ -956,8 +956,6 @@ export const useImageGeneration = (options: {
     setIsGenerating(true);
     
     try {
-      const { getImage } = await import('../services/storage/imageStorage');
-      const { fileSystemService } = await import('../services/storage/fileSystemService');
       const globalHandle = fileSystemService.getGlobalHandle();
       
       const hydratedFiles = await Promise.all(initialFiles.map(async (img) => {

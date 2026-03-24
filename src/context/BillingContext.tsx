@@ -1,6 +1,8 @@
-﻿import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+
+import type { CreditTransactionDto } from '../../packages/contracts/src/dto/billing.ts';
 import { supabase } from '../lib/supabase';
-import { creditService } from '../services/billing/creditService';
+import { legacyWebApiClient } from '../services/api/kkApiClient';
 import { useAuth } from './AuthContext';
 
 export interface CreditTransactionLog {
@@ -14,7 +16,7 @@ export interface CreditTransactionLog {
   provider_id?: string | null;
   description?: string | null;
   status?: 'pending' | 'completed' | 'failed' | 'refunded' | string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
   completed_at?: string | null;
 }
@@ -66,16 +68,193 @@ const BillingContext = createContext<BillingContextType>({
   setShowRechargeModal: () => {},
 });
 
+interface UserCreditsBalanceRow {
+  user_id: string;
+  balance: number | string | null;
+}
+
+interface CreditTransactionFallbackRow {
+  id: string;
+  user_id: string;
+  amount: number | string | null;
+  type: string;
+  balance_after?: number | string | null;
+  model_id?: string | null;
+  model_name?: string | null;
+  provider_id?: string | null;
+  description?: string | null;
+  status?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+function buildBillingRequestOptions(accessToken?: string) {
+  return accessToken ? { accessToken } : {};
+}
+
+function buildClientRequestId(prefix: string): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return `${prefix}-${uuid || Date.now()}`;
+}
+
+function toDisplayNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function extractBalanceFromErrorDetails(details: unknown): number | undefined {
+  if (!Array.isArray(details)) {
+    return undefined;
+  }
+
+  for (const item of details) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const candidate = (item as { balance?: unknown }).balance;
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function mapCreditTransaction(dto: CreditTransactionDto): CreditTransactionLog {
+  return {
+    id: dto.id,
+    user_id: dto.userId,
+    type: dto.transactionType,
+    amount: toDisplayNumber(dto.amount),
+    balance_after: typeof dto.balanceAfter === 'number' ? dto.balanceAfter : null,
+    model_id: dto.modelCode ?? null,
+    model_name: dto.modelName ?? null,
+    provider_id: dto.providerCode ?? null,
+    description: dto.description ?? null,
+    status: dto.status ?? null,
+    metadata: dto.metadata ?? null,
+    created_at: dto.createdAt,
+    completed_at: dto.completedAt ?? null,
+  };
+}
+
+function mapCreditTransactionRow(row: CreditTransactionFallbackRow): CreditTransactionLog {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: row.type,
+    amount: toDisplayNumber(row.amount),
+    balance_after: row.balance_after == null ? null : toDisplayNumber(row.balance_after),
+    model_id: row.model_id ?? null,
+    model_name: row.model_name ?? null,
+    provider_id: row.provider_id ?? null,
+    description: row.description ?? null,
+    status: row.status ?? null,
+    metadata: row.metadata ?? null,
+    created_at: row.created_at,
+    completed_at: row.completed_at ?? null,
+  };
+}
+
+function splitCreditLogs(rows: CreditTransactionLog[]) {
+  return {
+    rechargeRows: rows.filter((row) => row.type === 'recharge'),
+    usageRows: rows.filter((row) => row.type !== 'recharge'),
+  };
+}
+
 export const useBilling = () => useContext(BillingContext);
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isTempUser } = useAuth();
+  const { user, session, isTempUser } = useAuth();
 
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [billingLogs, setBillingLogs] = useState<CreditTransactionLog[]>([]);
   const [usageLogs, setUsageLogs] = useState<CreditTransactionLog[]>([]);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const apiAccessToken = session?.access_token;
+
+  const applyTransactionRows = useCallback((rows: CreditTransactionLog[]) => {
+    const { rechargeRows, usageRows } = splitCreditLogs(rows);
+    setBillingLogs(rechargeRows);
+    setUsageLogs(usageRows);
+  }, []);
+
+  const readBalanceFromSupabase = useCallback(async (): Promise<number | undefined> => {
+    if (!user || isTempUser) {
+      return 0;
+    }
+
+    const { data: creditRow, error: creditError } = await supabase
+      .from('user_credits')
+      .select('user_id, balance')
+      .eq('user_id', user.id)
+      .maybeSingle<UserCreditsBalanceRow>();
+
+    if (creditError) {
+      console.error('[BillingContext] Failed to query user_credits directly:', creditError);
+      return undefined;
+    }
+
+    return toDisplayNumber(creditRow?.balance);
+  }, [user, isTempUser]);
+
+  const fetchBalanceFromSupabase = useCallback(async () => {
+    const nextBalance = await readBalanceFromSupabase();
+    if (typeof nextBalance === 'number') {
+      setBalance(nextBalance);
+    }
+  }, [readBalanceFromSupabase]);
+
+  const fetchLogsFromSupabase = useCallback(async () => {
+    if (!user || isTempUser) {
+      setBillingLogs([]);
+      setUsageLogs([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select([
+        'id',
+        'user_id',
+        'amount',
+        'type',
+        'balance_after',
+        'model_id',
+        'model_name',
+        'provider_id',
+        'description',
+        'status',
+        'metadata',
+        'created_at',
+        'completed_at',
+      ].join(', '))
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(500)
+      .returns<CreditTransactionFallbackRow[]>();
+
+    if (error) {
+      console.error('[BillingContext] Failed to query credit transactions directly:', error);
+      return;
+    }
+
+    applyTransactionRows((data || []).map((row) => mapCreditTransactionRow(row)));
+  }, [user, isTempUser, applyTransactionRows]);
 
   const fetchBalance = useCallback(async () => {
     if (!user || isTempUser) {
@@ -84,35 +263,43 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      const { data, error } = await supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          const { data: created, error: createError } = await supabase
-            .from('user_credits')
-            .insert([{ user_id: user.id, balance: 0 }])
-            .select('balance')
-            .single();
-
-          if (!createError && created) {
-            setBalance(Number(created.balance || 0));
-          }
-          return;
-        }
-
-        console.error('[BillingContext] 读取余额失败:', error);
+      const response = await legacyWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
+      if (!response.success) {
+        console.error('[BillingContext] Failed to load credit balance from API, falling back to Supabase:', response.error);
+        await fetchBalanceFromSupabase();
         return;
       }
 
-      setBalance(Number(data?.balance || 0));
+      const resolvedUserId = String(response.data.userId || '').trim();
+      if (resolvedUserId && resolvedUserId !== user.id) {
+        console.warn('[BillingContext] Credit balance API resolved a different user id, falling back to Supabase.', {
+          expectedUserId: user.id,
+          resolvedUserId,
+        });
+        await fetchBalanceFromSupabase();
+        return;
+      }
+
+      const apiBalance = toDisplayNumber(response.data.balance);
+      if (apiBalance === 0) {
+        const supabaseBalance = await readBalanceFromSupabase();
+        if (typeof supabaseBalance === 'number' && supabaseBalance !== apiBalance) {
+          console.warn('[BillingContext] Credit balance API returned 0 while Supabase reported a different balance, using Supabase balance.', {
+            expectedUserId: user.id,
+            apiBalance,
+            supabaseBalance,
+          });
+          setBalance(supabaseBalance);
+          return;
+        }
+      }
+
+      setBalance(apiBalance);
     } catch (error) {
-      console.error('[BillingContext] 读取余额异常:', error);
+      console.error('[BillingContext] Failed to load credit balance:', error);
+      await fetchBalanceFromSupabase();
     }
-  }, [user, isTempUser]);
+  }, [user, isTempUser, apiAccessToken, fetchBalanceFromSupabase, readBalanceFromSupabase]);
 
   const fetchLogs = useCallback(async () => {
     if (!user || isTempUser) {
@@ -122,35 +309,44 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      const { data, error } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const response = await legacyWebApiClient.listCreditTransactions(
+        { limit: 500 },
+        buildBillingRequestOptions(apiAccessToken),
+      );
 
-      if (error) {
-        console.error('[BillingContext] 读取交易记录失败:', error);
+      if (!response.success) {
+        console.error('[BillingContext] Failed to load credit transactions from API, falling back to Supabase:', response.error);
+        await fetchLogsFromSupabase();
         return;
       }
 
-      const rows = (data || []) as CreditTransactionLog[];
-      const rechargeRows = rows.filter((row) => row.type === 'recharge');
-      const usageRows = rows.filter((row) => row.type !== 'recharge');
+      const rows = (response.data.items || []).map((item) => mapCreditTransaction(item));
+      const hasForeignRows = rows.some((row) => row.user_id && row.user_id !== user.id);
+      if (hasForeignRows) {
+        console.warn('[BillingContext] Credit transaction API returned rows for a different user, falling back to Supabase.', {
+          expectedUserId: user.id,
+          returnedUserIds: Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean))),
+        });
+        await fetchLogsFromSupabase();
+        return;
+      }
 
-      setBillingLogs(rechargeRows);
-      setUsageLogs(usageRows);
+      applyTransactionRows(rows);
     } catch (error) {
-      console.error('[BillingContext] 读取交易记录异常:', error);
+      console.error('[BillingContext] Failed to load credit transactions:', error);
+      await fetchLogsFromSupabase();
     }
-  }, [user, isTempUser]);
+  }, [user, isTempUser, apiAccessToken, fetchLogsFromSupabase, applyTransactionRows]);
 
   const refreshBilling = useCallback(async () => {
     await Promise.all([fetchBalance(), fetchLogs()]);
   }, [fetchBalance, fetchLogs]);
 
   const adjustBalanceOptimistically = useCallback((delta: number) => {
-    if (!Number.isFinite(delta) || delta === 0) return;
+    if (!Number.isFinite(delta) || delta === 0) {
+      return;
+    }
+
     setBalance((current) => Math.max(0, Number(current || 0) + delta));
   }, []);
 
@@ -158,15 +354,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let cancelled = false;
 
     const init = async () => {
-      if (!user) {
-        setBalance(0);
-        setBillingLogs([]);
-        setUsageLogs([]);
-        setLoading(false);
-        return;
-      }
-
-      if (isTempUser) {
+      if (!user || isTempUser) {
         setBalance(0);
         setBillingLogs([]);
         setUsageLogs([]);
@@ -176,6 +364,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setLoading(true);
       await refreshBilling();
+
       if (!cancelled) {
         setLoading(false);
       }
@@ -183,56 +372,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     void init();
 
-    if (!user || isTempUser) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const balanceChannel = supabase
-      .channel(`balance_changes_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_credits',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload: any) => {
-          if (payload?.new && typeof payload.new.balance !== 'undefined') {
-            setBalance(Number(payload.new.balance || 0));
-          }
-        }
-      )
-      .subscribe();
-
-    const transactionChannel = supabase
-      .channel(`credit_transaction_changes_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'credit_transactions',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          void fetchLogs();
-        }
-      )
-      .subscribe();
-
     return () => {
       cancelled = true;
-      void supabase.removeChannel(balanceChannel);
-      void supabase.removeChannel(transactionChannel);
     };
   }, [user, isTempUser, refreshBilling]);
 
   const consumeCreditsDetailed = useCallback(
     async (modelId: string, count: number, details: any = {}): Promise<CreditConsumeResult> => {
-      if (!user) {
+      if (!user || isTempUser) {
         return { success: false, message: 'User not authenticated' };
       }
 
@@ -241,54 +388,52 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: true, message: 'No credits required' };
       }
 
+      const businessRefType = String(details?.businessRefType || 'generation_task').trim() || 'generation_task';
+      const businessRefId = String(
+        details?.businessRefId
+          || details?.requestId
+          || details?.taskId
+          || details?.generationId
+          || modelId,
+      ).trim() || modelId;
+      const modelCode = String(details?.modelId || modelId || '').trim() || undefined;
+      const idempotencyKey = String(details?.idempotencyKey || buildClientRequestId('credit-debit')).trim();
+
       try {
-        const { data: latestBalanceRow } = await supabase
-          .from('user_credits')
-          .select('balance')
-          .eq('user_id', user.id)
-          .single();
-
-        const latestBalance = Number(latestBalanceRow?.balance ?? balance);
-        if (latestBalance < needAmount) {
-          return {
-            success: false,
-            newBalance: latestBalance,
-            message: '积分不足',
-          };
-        }
-
-        const result = await creditService.consumeCredits(
-          user.id,
-          needAmount,
+        const response = await legacyWebApiClient.debitCredits(
           {
-            model_id: String(details?.modelId || modelId || ''),
-            model_name: String(details?.modelName || modelId || ''),
-            provider_id: String(details?.providerId || details?.keySlotId || details?.provider || 'managed'),
+            businessRefType,
+            businessRefId,
+            creditAmount: needAmount,
+            modelCode,
+            idempotencyKey,
           },
-          details?.feature || `模型调用：${modelId}`
+          buildBillingRequestOptions(apiAccessToken),
         );
 
-        if (!result.success) {
+        if (!response.success) {
           return {
             success: false,
-            newBalance: result.newBalance,
-            message: result.message || '扣减积分失败',
+            newBalance: extractBalanceFromErrorDetails(response.error.details),
+            message: response.error.message || 'Credit debit failed',
           };
         }
 
-        await refreshBilling();
+        setBalance(toDisplayNumber(response.data.balanceAfter));
+        await fetchLogs();
+
         return {
           success: true,
-          transactionId: result.transactionId,
-          newBalance: result.newBalance,
-          message: result.message || '扣减积分成功',
+          transactionId: response.data.ledgerId,
+          newBalance: response.data.balanceAfter,
+          message: 'Credit debit applied',
         };
       } catch (error) {
-        console.error('[BillingContext] 扣减积分失败:', error);
-        return { success: false, message: '扣减积分失败' };
+        console.error('[BillingContext] Failed to debit credits:', error);
+        return { success: false, message: 'Credit debit failed' };
       }
     },
-    [user, balance, refreshBilling]
+    [user, isTempUser, apiAccessToken, fetchLogs],
   );
 
   const consumeCredits = useCallback(
@@ -296,7 +441,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const result = await consumeCreditsDetailed(modelId, count, details);
       return result.success;
     },
-    [consumeCreditsDetailed]
+    [consumeCreditsDetailed],
   );
 
   const refundCredits = useCallback(
@@ -305,44 +450,55 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.warn('[BillingContext] Legacy amount-based refund is disabled:', reason);
       return false;
     },
-    []
+    [],
   );
 
   const refundCreditsByTransaction = useCallback(
     async (transactionId: string, reason: string): Promise<CreditRefundResult> => {
       const safeTransactionId = String(transactionId || '').trim();
-      if (!user || safeTransactionId.length === 0) {
+      if (!user || isTempUser || safeTransactionId.length === 0) {
         return { success: false, message: 'Missing refund transaction' };
       }
 
       try {
-        const result = await creditService.refundCredits(safeTransactionId, reason);
+        const response = await legacyWebApiClient.refundCredits(
+          {
+            transactionId: safeTransactionId,
+            reason,
+          },
+          buildBillingRequestOptions(apiAccessToken),
+        );
 
-        if (result.success) {
-          await refreshBilling();
+        if (!response.success) {
+          return {
+            success: false,
+            message: response.error.message || 'Credit refund failed',
+          };
         }
 
+        setBalance(toDisplayNumber(response.data.balanceAfter));
+        await fetchLogs();
+
         return {
-          success: result.success,
-          newBalance: result.newBalance,
-          message: result.message || (result.success ? '退款成功' : '退款失败'),
+          success: true,
+          newBalance: response.data.balanceAfter,
+          message: 'Credit refund applied',
         };
       } catch (error) {
-        console.error('[BillingContext] 按交易退款失败:', reason, error);
-        return { success: false, message: '退款失败' };
+        console.error('[BillingContext] Failed to refund credits:', reason, error);
+        return { success: false, message: 'Credit refund failed' };
       }
     },
-    [user, refreshBilling]
+    [user, isTempUser, apiAccessToken, fetchLogs],
   );
 
   const recharge = useCallback(
     async (amount: number, currency: 'CNY' | 'USD') => {
       void amount;
       void currency;
-      void user;
       throw new Error('Direct client-side recharge is disabled. Use the payment gateway flow instead.');
     },
-    [user]
+    [],
   );
 
   return (

@@ -327,8 +327,8 @@ const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({
   </div>
 );
 
-const EndpointSurface: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="rounded-[26px] border p-5" style={SETTINGS_ELEVATED_STYLE}>
+const EndpointSurface: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <div className={`rounded-[26px] border p-5 ${className || ''}`} style={SETTINGS_ELEVATED_STYLE}>
     {children}
   </div>
 );
@@ -1040,7 +1040,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 const progress = getProgress(mode, mode === 'amount' ? provider.usage.totalCost : provider.usage.totalTokens, provider.budgetLimit, provider.tokenLimit);
 
                 return (
-                  <EndpointSurface key={provider.id}>
+                  <EndpointSurface key={provider.id} className="flex h-full flex-col">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[14px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
@@ -1071,7 +1071,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     {mode !== 'unlimited' ? (
                       <div className="mt-3">
                         <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
-                          <span>{getProviderUsageSummary(provider)}</span>
+                          <span>使用进度</span>
                           <span>{Math.round(progress)}%</span>
                         </div>
                         <ProgressBar progress={progress} tone={progress >= 90 ? 'rose' : progress >= 70 ? 'amber' : 'indigo'} showLabel={false} />
@@ -1084,7 +1084,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                       </div>
                     ) : null}
 
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-auto flex flex-wrap gap-2 pt-4">
                       <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditProvider(provider)}>编辑</SettingsActionButton>
                       <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>刷新</SettingsActionButton>
                       <SettingsActionButton icon={Wand2} size="sm" loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>自动获取价格</SettingsActionButton>

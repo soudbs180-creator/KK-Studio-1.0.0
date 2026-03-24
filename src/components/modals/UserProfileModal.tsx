@@ -8,14 +8,25 @@ import {
   Lock,
   LogOut,
   Pencil,
+  QrCode,
+  ShieldCheck,
   Wallet,
   X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
+import WechatQrModal from '../auth/WechatQrModal';
+import { startWechatBind } from '../../services/auth/wechatAuth';
+import {
+  enrollTotpFactor,
+  loadMfaStatus,
+  verifyTotpFactor,
+  type MfaStatusSnapshot,
+  type TotpEnrollmentResult,
+} from '../../services/auth/mfa';
 
-export type UserProfileView = 'main' | 'change-password' | 'edit-profile' | 'billing';
+export type UserProfileView = 'main' | 'change-password' | 'edit-profile' | 'billing' | 'security';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -89,6 +100,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [wechatModalOpen, setWechatModalOpen] = useState(false);
+  const [wechatLoading, setWechatLoading] = useState(false);
+  const [wechatError, setWechatError] = useState<string | null>(null);
+  const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
+  const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaActionLoading, setMfaActionLoading] = useState(false);
+  const [mfaStatus, setMfaStatus] = useState<MfaStatusSnapshot | null>(null);
+  const [mfaEnrollment, setMfaEnrollment] = useState<TotpEnrollmentResult | null>(null);
+  const [mfaFriendlyName, setMfaFriendlyName] = useState('KK Studio');
+  const [mfaCode, setMfaCode] = useState('');
 
   const roleLabel = useMemo(() => {
     const role =
@@ -98,26 +120,48 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     return role === 'admin' ? '管理员' : '普通用户';
   }, [user]);
 
+  const isShadowWechatEmail = Boolean(user?.email?.endsWith('@users.kkstudio.local'));
+  const isWechatBound = isShadowWechatEmail || user?.user_metadata?.auth_provider === 'wechat';
+  const canChangePassword = Boolean(user?.email) && !isTempUser && !isShadowWechatEmail;
+  const canBindWechat = Boolean(user?.id) && !isTempUser && !isWechatBound;
+  const displayEmail = isShadowWechatEmail ? '微信授权用户' : user?.email || '未绑定邮箱';
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const safeView: UserProfileView =
-      initialView === 'billing' || initialView === 'change-password' || initialView === 'edit-profile'
+    const requestedView: UserProfileView =
+      initialView === 'billing' || initialView === 'change-password' || initialView === 'edit-profile' || initialView === 'security'
         ? initialView
         : 'main';
+    const safeView: UserProfileView = requestedView === 'change-password' && !canChangePassword ? 'main' : requestedView;
 
     setView(safeView);
     setMessage(null);
     setLoading(false);
+    setWechatModalOpen(false);
+    setWechatLoading(false);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+    setMfaLoading(false);
+    setMfaActionLoading(false);
+    setMfaStatus(null);
+    setMfaEnrollment(null);
+    setMfaFriendlyName('KK Studio');
+    setMfaCode('');
 
-    const defaultName = user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : '');
+    const defaultName = user?.user_metadata?.full_name || (isShadowWechatEmail ? '微信用户' : user?.email ? user.email.split('@')[0] : '');
     setDisplayName(defaultName);
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
     if (safeView === 'billing') {
       void fetchLogs();
     }
-  }, [isOpen, initialView, user, fetchLogs]);
+
+    if (safeView === 'security') {
+      void loadSecurityState();
+    }
+  }, [canChangePassword, fetchLogs, initialView, isOpen, isShadowWechatEmail, user]);
 
   useEffect(() => {
     if (!isTempUser || !tempUserExpiry) {
@@ -156,12 +200,51 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setOldPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setWechatModalOpen(false);
+    setWechatLoading(false);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+    setMfaLoading(false);
+    setMfaActionLoading(false);
+    setMfaStatus(null);
+    setMfaEnrollment(null);
+    setMfaCode('');
     onClose();
   };
 
   const openBilling = () => {
     setView('billing');
     void fetchLogs();
+  };
+
+  const loadSecurityState = async () => {
+    setMfaLoading(true);
+
+    try {
+      const nextStatus = await loadMfaStatus();
+      setMfaStatus(nextStatus);
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || '读取双重验证状态失败。' });
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const openSecurity = () => {
+    setView('security');
+    setMessage(null);
+    setMfaEnrollment(null);
+    setMfaCode('');
+    void loadSecurityState();
+  };
+
+  const closeWechatModal = () => {
+    setWechatModalOpen(false);
+    setWechatLoading(false);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
   };
 
   const handleUpdateProfile = async () => {
@@ -240,30 +323,119 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const handleWechatBind = async () => {
+    if (!canBindWechat) {
+      const hint = isTempUser ? '临时账号暂不支持绑定微信，请先登录正式账号。' : '当前账号已经绑定微信。';
+      setMessage({ type: 'error', text: hint });
+      return;
+    }
+
+    setMessage(null);
+    setWechatError(null);
+    setWechatAuthorizationUrl(null);
+    setWechatExpiresAt(null);
+    setWechatModalOpen(true);
+    setWechatLoading(true);
+
+    try {
+      const authData = await startWechatBind();
+      setWechatAuthorizationUrl(authData.authorizationUrl);
+      setWechatExpiresAt(authData.expiresAt);
+    } catch (error: any) {
+      const nextMessage = error?.message || '无法发起微信绑定，请稍后重试。';
+      setWechatError(nextMessage);
+      setMessage({ type: 'error', text: nextMessage });
+    } finally {
+      setWechatLoading(false);
+    }
+  };
+
+  const handleStartMfaEnrollment = async () => {
+    if (isTempUser) {
+      setMessage({ type: 'error', text: '临时账号暂不支持启用双重验证，请先登录正式账号。' });
+      return;
+    }
+
+    setMfaActionLoading(true);
+    setMessage(null);
+
+    try {
+      const enrollment = await enrollTotpFactor(mfaFriendlyName);
+      setMfaEnrollment(enrollment);
+      setMfaCode('');
+      setMessage({ type: 'success', text: '已生成 TOTP 绑定二维码，请扫码后输入 6 位动态口令完成绑定。' });
+      await loadSecurityState();
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || '启用双重验证失败。' });
+    } finally {
+      setMfaActionLoading(false);
+    }
+  };
+
+  const handleVerifyMfaCode = async (factorId: string) => {
+    const code = mfaCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      setMessage({ type: 'error', text: '请输入 6 位动态口令。' });
+      return;
+    }
+
+    setMfaActionLoading(true);
+    setMessage(null);
+
+    try {
+      await verifyTotpFactor(factorId, code);
+      setMfaCode('');
+      setMfaEnrollment(null);
+      await loadSecurityState();
+      setMessage({ type: 'success', text: '双重验证已启用，当前会话安全等级已提升。' });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || '动态口令校验失败。' });
+    } finally {
+      setMfaActionLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const avatarSrc = avatarUrl || user?.user_metadata?.avatar_url || '';
-  const nickname = displayName || user?.user_metadata?.full_name || user?.email?.split('@')[0] || '未命名用户';
+  const nickname = displayName || user?.user_metadata?.full_name || (isShadowWechatEmail ? '微信用户' : user?.email?.split('@')[0]) || '未命名用户';
 
   return (
-    <div
-      className={`fixed inset-0 z-[10002] flex justify-center bg-black/55 backdrop-blur-sm ${
-        isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
-      }`}
-      onClick={resetAndClose}
-    >
-      <div
-        className={`w-full overflow-hidden border shadow-2xl ${
-          isMobile
-            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none'
-            : 'max-w-[860px] rounded-2xl'
-        }`}
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          borderColor: 'var(--border-light)',
+    <>
+      <WechatQrModal
+        isOpen={wechatModalOpen}
+        title="绑定微信账号"
+        description="扫码确认后，这个 KK Studio 账号就可以直接使用微信头像、昵称和扫码登录。"
+        authorizationUrl={wechatAuthorizationUrl}
+        expiresAt={wechatExpiresAt}
+        loading={wechatLoading}
+        error={wechatError}
+        onClose={closeWechatModal}
+        onOpenInNewPage={() => {
+          if (wechatAuthorizationUrl) {
+            window.open(wechatAuthorizationUrl, '_blank', 'noopener,noreferrer');
+          }
         }}
-        onClick={(event) => event.stopPropagation()}
+      />
+
+      <div
+        className={`fixed inset-0 z-[10002] flex justify-center bg-black/55 backdrop-blur-sm ${
+          isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
+        }`}
+        onClick={resetAndClose}
       >
+        <div
+          className={`w-full overflow-hidden border shadow-2xl ${
+            isMobile
+              ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none'
+              : 'max-w-[860px] rounded-2xl'
+          }`}
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-light)',
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
         <div
           className={`flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'}`}
           style={{ borderColor: 'var(--border-light)' }}
@@ -283,6 +455,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {view === 'edit-profile' && '编辑个人资料'}
               {view === 'change-password' && '修改密码'}
               {view === 'billing' && '账户管理'}
+              {view === 'security' && '双重验证'}
             </h2>
           </div>
 
@@ -341,8 +514,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       {nickname}
                     </div>
                     <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      {user?.email || '未绑定邮箱'}
+                      {displayEmail}
                     </div>
+                    {isWechatBound && (
+                      <div className="mt-1 text-[11px] text-emerald-300">
+                        已绑定微信，可使用微信头像、昵称和扫码登录
+                      </div>
+                    )}
                     <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                       用户 ID：{user?.id || '-'}
                     </div>
@@ -387,12 +565,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setView('change-password')}
+                  onClick={() => void handleWechatBind()}
+                  disabled={!canBindWechat}
+                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <QrCode size={15} /> {isWechatBound ? '微信已绑定' : '绑定微信'}
+                  </span>
+                  <span style={{ color: 'var(--text-tertiary)' }}>{isWechatBound ? '已完成' : '进入'}</span>
+                </button>
+
+                {canChangePassword && (
+                  <button
+                    onClick={() => setView('change-password')}
+                    className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Lock size={15} /> 修改密码
+                    </span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
+                  </button>
+                )}
+
+                {!canChangePassword && !isTempUser && (
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                    微信纯登录账号不需要单独密码，后续可直接扫码进入。
+                  </div>
+                )}
+
+                <button
+                  onClick={openSecurity}
                   className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Lock size={15} /> 修改密码
+                    <ShieldCheck size={15} /> 双重验证
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                 </button>
@@ -460,7 +669,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           )}
 
-          {view === 'change-password' && (
+          {view === 'change-password' && canChangePassword && (
             <div className="space-y-3">
               <label className="block space-y-1">
                 <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
@@ -527,7 +736,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       角色：{roleLabel}
                     </div>
                     <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      邮箱：{user?.email || '-'}
+                      邮箱：{displayEmail}
                     </div>
                   </div>
 
@@ -642,9 +851,211 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </section>
             </div>
           )}
+
+          {view === 'security' && (
+            <div className="space-y-4">
+              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      当前安全状态
+                    </div>
+                    <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      启用后可用于敏感操作二次校验，也能为后续 Supabase MFA 强化做好准备。
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => void loadSecurityState()}
+                    disabled={mfaLoading}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs disabled:opacity-70"
+                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
+                  >
+                    {mfaLoading ? '刷新中...' : '刷新状态'}
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                    <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>当前 AAL</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-300">
+                      {mfaStatus?.currentLevel?.toUpperCase() || '未启用'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                    <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>下一等级</div>
+                    <div className="mt-1 text-lg font-semibold text-amber-300">
+                      {mfaStatus?.nextLevel?.toUpperCase() || '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                    <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>已验证因子</div>
+                    <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {mfaStatus?.verifiedFactors.length || 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  启用 TOTP 动态口令
+                </div>
+                <p className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  推荐使用 Google Authenticator、Microsoft Authenticator、1Password 等身份验证器。
+                </p>
+
+                <label className="mt-4 block space-y-1">
+                  <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    设备名称
+                  </span>
+                  <input
+                    value={mfaFriendlyName}
+                    onChange={(event) => setMfaFriendlyName(event.target.value)}
+                    placeholder="例如：我的手机"
+                    className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
+                    style={{ borderColor: 'var(--border-light)' }}
+                  />
+                </label>
+
+                <button
+                  onClick={() => void handleStartMfaEnrollment()}
+                  disabled={mfaActionLoading}
+                  className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                >
+                  {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
+                  生成绑定二维码
+                </button>
+
+                <p className="mt-3 text-[11px] text-amber-200">
+                  完成验证后，Supabase 会提升当前会话到 `aal2`，并让其它旧会话重新登录。
+                </p>
+
+                {mfaEnrollment && (
+                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                      <div className="rounded-xl bg-white p-3">
+                        <img src={mfaEnrollment.qrCode} alt="TOTP 绑定二维码" className="mx-auto h-auto w-full max-w-[180px]" />
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs text-emerald-200/80">备用密钥</div>
+                          <div className="mt-1 break-all rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white">
+                            {mfaEnrollment.secret}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-xs text-emerald-200/80">OTP Auth URI</div>
+                          <div className="mt-1 break-all rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-200">
+                            {mfaEnrollment.uri}
+                          </div>
+                        </div>
+
+                        <label className="block space-y-1">
+                          <span className="text-xs text-emerald-200/80">6 位动态口令</span>
+                          <input
+                            value={mfaCode}
+                            onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="请输入验证码"
+                            inputMode="numeric"
+                            className="h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                          />
+                        </label>
+
+                        <button
+                          onClick={() => void handleVerifyMfaCode(mfaEnrollment.factorId)}
+                          disabled={mfaActionLoading}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                        >
+                          {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
+                          完成绑定并验证
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  已绑定因子
+                </div>
+
+                {mfaLoading ? (
+                  <div className="mt-3 flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                    <Loader2 size={16} className="mr-2 animate-spin" /> 正在读取双重验证信息...
+                  </div>
+                ) : !mfaStatus || mfaStatus.verifiedFactors.length === 0 ? (
+                  <div className="mt-3 rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
+                    还没有已验证的 MFA 因子。
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {mfaStatus.verifiedFactors.map((factor) => (
+                      <div key={factor.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                              {factor.friendlyName || '未命名验证器'}
+                            </div>
+                            <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              类型：{factor.factorType.toUpperCase()} · 创建时间：{formatDateTime(factor.createdAt)}
+                            </div>
+                          </div>
+
+                          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-300">
+                            已验证
+                          </span>
+                        </div>
+
+                        {mfaStatus.currentLevel !== 'aal2' && factor.factorType === 'totp' && (
+                          <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3">
+                            <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              当前会话还没有提升到 AAL2，输入一次动态口令即可完成二次验证。
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <input
+                                value={mfaCode}
+                                onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="6 位动态口令"
+                                inputMode="numeric"
+                                className="h-10 min-w-[180px] flex-1 rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
+                                style={{ borderColor: 'var(--border-light)' }}
+                              />
+
+                              <button
+                                onClick={() => void handleVerifyMfaCode(factor.id)}
+                                disabled={mfaActionLoading}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                              >
+                                {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
+                                验证当前会话
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {Boolean(mfaStatus?.pendingFactors.length) && (
+                  <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-xs text-amber-100">
+                    还有 {mfaStatus?.pendingFactors.length} 个未完成验证的因子，只有完成一次动态口令校验后才会真正生效。
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+        </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -5,7 +5,6 @@
  * Similar to Gemini Balance but runs entirely on frontend.
  * NOW SUPPORTS: Supabase Cloud Sync & Third-Party API Proxies
  */
-import { supabase } from '../../lib/supabase';
 import { tempUserService } from './tempUserService';
 import {
     type ApiProtocolFormat,
@@ -27,15 +26,18 @@ import {
     extractKeyManagerCloudSlots,
     extractUserApiProvidersFromPayload,
     isUserApisEnvelope,
-    mergeUserApisPayload,
 } from '../api/userApiPayload';
+import { legacyWebApiClient } from '../api/kkApiClient';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
 import { Provider } from '../../types';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
 import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
+import { requestCostSync } from '../billing/costSyncBridge';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot';
 import { fetchRawPricingCatalog, fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
+import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
+import { notify } from '../system/notificationService';
 
 const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
 
@@ -267,14 +269,14 @@ interface KeyManagerState {
  */
 export interface ThirdPartyProvider {
     id: string;
-    name: string;                 // 鏄剧ず鍚嶇О锛堝 "鏅鸿氨 AI"锛?
-    baseUrl: string;              // API 鍩虹 URL
+    name: string;                 // Display name, for example "Zhihui AI"
+    baseUrl: string;              // API base URL
     apiKey: string;               // API Key
     group?: string;
-    models: string[];             // 鏀寔鐨勬ā鍨嬪垪琛?
-    format: ApiProtocolFormat;  // 鍗忚鏍煎紡
-    icon?: string;                // 鍥炬爣 emoji
-    isActive: boolean;            // 鏄惁婵€娲?
+    models: string[];             // Supported model list
+    format: ApiProtocolFormat;    // Protocol format
+    icon?: string;                // Optional emoji icon
+    isActive: boolean;            // Whether the provider is active
     providerColor?: string;
     badgeColor?: string;
     budgetLimit?: number;
@@ -282,7 +284,7 @@ export interface ThirdPartyProvider {
     customCostMode?: 'unlimited' | 'amount' | 'tokens';
     customCostValue?: number;
 
-    // 馃敟 [Feature] 鍚庡彴鎷夊彇 New API 浠锋牸琛ㄧ殑缂撳瓨
+    // Cache of pricing data fetched from the provider's pricing endpoint
     pricingSnapshot?: ProviderPricingSnapshot;
     activitySummary?: {
         lastLatencyMs?: number | null;
@@ -291,21 +293,21 @@ export interface ThirdPartyProvider {
         updatedAt?: number | null;
     };
 
-    // 鐙珛璁¤垂
+    // Independent usage accounting
     usage: {
         totalTokens: number;
         totalCost: number;
         dailyTokens: number;
         dailyCost: number;
-        lastReset: number;        // 姣忔棩閲嶇疆鏃堕棿鎴?
+        lastReset: number;        // Daily reset timestamp
     };
 
-    // 鐘舵€?
+    // Runtime status
     status: 'active' | 'error' | 'checking';
     lastError?: string;
     lastChecked?: number;
 
-    // 鍏冩暟鎹?
+    // Metadata
     createdAt: number;
     updatedAt: number;
 }
@@ -433,10 +435,7 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
 };
 
 /**
- * 闀婎亜濮╅暀瑙勫祦閸栧搫鐑熼槂澶嬪 12AI 缂冩垵鍙ч獮鑸靛瘹閽栨垵鎮楃粩顖欏敩閻?
- */
-/**
- * 闀婎亜濮╅暀瑙勫祦閸栧搫鐑熼槂澶嬪 12AI 缂冩垵鍙ч獮鑸靛瘹閽栨垵鎮楃粩顖欏敩閻?
+ * Resolve the 12AI base URL from the region service so callers share one source of truth.
  */
 function get12AIBaseUrl(): string {
     return RegionService.get12AIBaseUrl();
@@ -445,28 +444,28 @@ function get12AIBaseUrl(): string {
 const STORAGE_KEY = 'kk_studio_key_manager';
 const PROVIDERS_STORAGE_KEY = 'kk_studio_third_party_providers';
 const DEFAULT_MAX_FAILURES = 3;
-// 闀炑呭 Gemini 濡€崇€烽敍鍩氬嚒瀵箓鏁ら敍?
+const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
+// Legacy Gemini model IDs kept for backward-compatible migrations
 const LEGACY_GOOGLE_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
 
 /**
- * 闀炑勀侀崹?ID 皤攧鐗堟煀濡€崇€?ID 闀勫嫯鍤滈敺銊︾墡濮濓絾妞犵亸鍕€?
- * 閻劋绨挅鎴濇倵閸忕厧顔愰崪宀冨殰閿枫劏绺肩粔?
+ * Canonical model migration map used to upgrade old saved model IDs to the current equivalents.
  */
 export const MODEL_MIGRATION_MAP: Record<string, string> = {
-    // Gemini 1.5 缁鍨?閳?Gemini 2.5 缁鍨?
+    // Gemini 1.5 series -> Gemini 2.5 series
     'gemini-1.5-pro': 'gemini-2.5-pro',
     'gemini-1.5-pro-latest': 'gemini-2.5-pro',
     'gemini-1.5-flash': 'gemini-2.5-flash',
     'gemini-1.5-flash-latest': 'gemini-2.5-flash',
 
-    // Gemini 2.0 缁鍨?閳?Gemini 2.5 缁鍨?
+    // Gemini 2.0 series -> Gemini 2.5 series
     'gemini-2.0-flash-exp': 'gemini-2.5-flash',
     'gemini-2.0-pro-exp': 'gemini-2.5-pro',
 
-    // Gemini 2.0 鐎逛负鐛欓晲褍娴橀晙蹇曟暁閹?閳?Gemini 2.5 Flash Image (Was mapped to Nano Banana)
+    // Gemini 2.0 image generation alias -> Gemini 2.5 Flash Image
     'gemini-2.0-flash-exp-image-generation': 'gemini-2.5-flash-image',
 
-    // Nano Banana Alias 閳?Gemini 2.5 Flash Image (Official)
+    // Nano Banana aliases -> official Gemini image models
     'nano-banana': 'gemini-2.5-flash-image',
     'nano banana': 'gemini-2.5-flash-image',
     'nano-banana-pro': 'gemini-3-pro-image-preview',
@@ -474,7 +473,7 @@ export const MODEL_MIGRATION_MAP: Record<string, string> = {
     'nano-banana-2': 'gemini-3.1-flash-image-preview',
     'nano banana 2': 'gemini-3.1-flash-image-preview',
 
-    // -latest 皤攧顐㈡倳 閳?閸忚渹皤焺閻楀牊婀?
+    // Normalize legacy "-latest" aliases
     'gemini-flash-lite-latest': 'gemini-2.5-flash-lite',
     'gemini-flash-latest': 'gemini-2.5-flash',
     'gemini-pro-latest': 'gemini-2.5-pro',
@@ -483,13 +482,13 @@ export const MODEL_MIGRATION_MAP: Record<string, string> = {
 };
 
 /**
- * 鏆椻偓鐟曚礁鐣崗銊ㄧ环濠娿倖甯€闀勫嫭膩閸?娑擆『冪箻鐞涘矁绺肩粔?瓞瀛樺复皤攧鐘绘珟)
+ * Blacklisted model patterns that should never surface in the UI.
  */
 export const BLACKLIST_MODELS = [
-    // Imagen 妫板嫯顫嶉悧?瀹侊附妫╅摼鐔锋倵缂傗偓)
+    // Imagen dated preview builds
     /^imagen-[34]\.0-(ultra-)?generate-preview-\d{2}-\d{2}$/,
     /^imagen-[34]\.0-(fast-)?generate-preview-\d{2}-\d{2}$/,
-    // Imagen 闀炑呭(generate-001)
+    // Older Imagen generate-001 aliases
     /^imagen-[34]\.0-.*generate-001$/,
 ];
 
@@ -507,21 +506,21 @@ export function normalizeModelId(modelId: string): string {
     const raw = (modelId || '').trim();
     const normalized = MODEL_MIGRATION_MAP[raw];
     if (normalized) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" 閳?"${normalized}"`);
+        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${normalized}"`);
         return normalized;
     }
 
     const lowerRaw = raw.toLowerCase();
     const lowerMapped = MODEL_MIGRATION_MAP[lowerRaw];
     if (lowerMapped) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" 閳?"${lowerMapped}"`);
+        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${lowerMapped}"`);
         return lowerMapped;
     }
 
     const dashed = lowerRaw.replace(/\s+/g, '-');
     const dashedMapped = MODEL_MIGRATION_MAP[dashed];
     if (dashedMapped) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" 閳?"${dashedMapped}"`);
+        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${dashedMapped}"`);
         return dashedMapped;
     }
 
@@ -606,7 +605,7 @@ export function appendModelVariantLabel(baseName: string, modelId: string): stri
     }
 
     if (tags.length === 0) return baseName;
-    return `${baseName} (${tags.join(' 璺?')})`;
+    return `${baseName} (${tags.join(' · ')})`;
 }
 
 /**
@@ -617,26 +616,26 @@ export function isDeprecatedModel(modelId: string): boolean {
 }
 
 /**
- * 濡偓闀嗐儲膩閸ㄥ妲搁挅锕€绨茬拠銉潶鏉╁洦鎶ら幒?
+ * Determine whether a model should be filtered from the available model list.
  */
 function shouldFilterModel(modelId: string): boolean {
     // 棣冩畬 [Strict Mode] Whitelist Override
     // If model is explicitly in our whitelist, DO NOT FILTER IT, even if it matches a ban pattern below.
     if (GOOGLE_IMAGE_WHITELIST.includes(modelId)) return false;
 
-    // 鏉╁洦鎶magen妫板嫯顫嶉悧?瀹侊附妫╅摼鐔锋倵缂傗偓)
+    // Filter dated Imagen preview builds
     if (/imagen-[34]\.0-.*-preview-\d{2}-\d{2}/.test(modelId)) {
         console.log(`[ModelFilter] Filtering Imagen preview: ${modelId}`);
         return true;
     }
 
-    // 鏉╁洦鎶magen闀炑呭(generate-001) - BUT allow whitelisted ones
+    // Filter old Imagen generate-001 aliases, except the strict whitelist
     if (/imagen-[34]\.0-.*generate-001$/.test(modelId)) {
         console.log(`[ModelFilter] Filtering old Imagen: ${modelId}`);
         return true;
     }
 
-    // 鏉╁洦鎶emini-2.0-flash-exp-image-generation
+    // Filter deprecated Gemini 2.0 image-generation model IDs
     if (modelId === 'gemini-2.0-flash-exp-image-generation') {
         console.log(`[ModelFilter] Filtering deprecated model: ${modelId}`);
         return true;
@@ -646,8 +645,8 @@ function shouldFilterModel(modelId: string): boolean {
 }
 
 /**
- * 闀撳綊鍣洪暀鈩冾劀濡€崇€佛珨勬銆冮敍鍩氥闃?& 鏉╀胶些闀?ID閿?
- * @param provider 閸欘垶鈧娈戞笟娑樼安閸熷棗鎮曠粔甯捍閻劋绨惔鏃楁暏娑撳秴鎮撻晞鍕环濠娿倗鐡ラ悾?
+ * Normalize a model list, applying migrations, deduplication, and the official Google whitelist.
+ * @param provider Optional provider label used to decide whether official Google rules apply
  */
 export function normalizeModelList(models: string[], provider?: string): string[] {
     const isOfficialGoogle = provider === 'Google';
@@ -656,14 +655,13 @@ export function normalizeModelList(models: string[], provider?: string): string[
     const normalized = models.map(id => {
         const raw = (id || '').trim();
 
-        // 闂辩偛皙綀閺?Google 濞撶娀浜鹃敍姘㈢辑閻ｐ欐暏閹村嘲锝為崘?鏉╃伃顏潻鏂挎礀闀勫嫬甯堟慨瀣侀崹?ID閵?
-        // 娓氬珨顩?nano-banana-2 鏉欒皤攧顐㈡倳閿涘苯婀晢鎰昂皤攧鍡楀絺濞撶娀浜炬稉瀣Ц闀剛鐝涢摼澶嬫櫏濡€崇€烽敍?
-        // 娑擆『冨厴瀵搫鍩楁潻浣盒╅幋?gemini-3.1-flash-image-preview閵?
+        // Non-official Google-style provider routes should keep their raw model IDs.
+        // For example, channel-specific aliases such as "nano-banana-2" may be valid upstream names.
         if (!isOfficialGoogle) {
             return raw;
         }
 
-        // 鐎规ɑ鏌?Google 濞撶娀浜鹃敍姘╁帒鐠佺浠涢摗鍡楀蕉鏉╀胶些娑撳氦顫夐敚鍐ㄥ閵?
+        // Official Google providers should migrate aliases into canonical model IDs
         const target = MODEL_MIGRATION_MAP[raw];
         if (target) return target;
         return normalizeModelId(raw);
@@ -692,7 +690,7 @@ export function normalizeModelList(models: string[], provider?: string): string[
     return unique;
 }
 
-// 皎眳?Strict Whitelist for Google Image Models
+// Strict whitelist for official Google image models
 export const GOOGLE_IMAGE_WHITELIST = [
     'gemini-2.5-flash-image',
     'gemini-3-pro-image-preview',
@@ -702,7 +700,7 @@ export const GOOGLE_IMAGE_WHITELIST = [
     'imagen-4.0-fast-generate-001'
 ];
 
-// 皎眳?Video Model Whitelist
+// Video model whitelist
 export const VIDEO_MODEL_WHITELIST = [
     'runway-gen3',
     'luma-video',
@@ -713,14 +711,14 @@ export const VIDEO_MODEL_WHITELIST = [
     'wan-v1'
 ];
 
-// 皎眳?Advanced Image Editing Whitelist
+// Advanced image editing whitelist
 export const ADVANCED_IMAGE_MODEL_WHITELIST = [
     'flux-kontext-max',
     'recraft-v3-svg',
     'ideogram-v2'
 ];
 
-// 皎眳?Audio Model Whitelist
+// Audio model whitelist
 export const AUDIO_MODEL_WHITELIST = [
     'suno-v3.5',
     'minimax-t2a-01'
@@ -731,14 +729,14 @@ const isGoogleOfficialModelId = (modelId: string): boolean => {
     return id.startsWith('gemini-') || id.startsWith('imagen-') || id.startsWith('veo-');
 };
 
-// 姒涙か顓?Google 濡€崇€佛珨勬銆冮敍鍫滅矌闀欑缁〨emini濡€崇€烽敍?
+// Default official Google model list
 export const DEFAULT_GOOGLE_MODELS = [
-    // Gemini 3.1 缁鍨敍鍫熸付閺備即顣╃憴鍫㈠閿?
+    // Gemini 3.1 series
     'gemini-3.1-pro-preview',
-    // Gemini 3 缁鍨敍鍫ヮ暕鐟欏牏澧楅敍? 闀靛﹤銇?
+    // Gemini 3 series
     'gemini-3-pro-preview',
     'gemini-3-flash-preview',
-    // Gemini 2.5 缁鍨敍鍫⑶旂€规氨澧楅敍? 闀靛﹤銇?
+    // Gemini 2.5 series
     'gemini-2.5-flash',
 
     // Strict Image Models
@@ -882,7 +880,7 @@ const inferModelType = (modelId: string): GlobalModelType => {
         id.includes('jimeng') || id.includes('cogvideo') || id.includes('hunyuanvideo');
     if (isVideo) return 'video';
 
-    // 皎眳?娴兼ˇ鍘涘Λ鈧晢銉ユ禈閻楀洤鍙ч槍顔跨槤,闃嗗灝鍘?gemini-*-image 鐞氼偉顕ゐ珨勩倓璐?chat
+    // Treat image-specific model families as image models, not chat models
     const isImage = id.includes('imagen') || id.includes('image') || id.includes('img') ||
         id.includes('dall-e') || id.includes('dalle') || id.includes('midjourney') ||
         id.includes('mj') || id.includes('nano') || id.includes('banana') ||
@@ -923,14 +921,15 @@ export class KeyManager {
     private userId: string | null = null;
     private isSyncing = false;
     private cloudSyncBackoffUntil = 0;
+    private hasHydratedCloudState = false;
 
-    // 棣冩畬 濡€崇€佛珨勬銆冪紓鎻跨摠
+    // Cached global model list snapshot
     private globalModelListCache: {
         models: any[];
         slotsHash: string;
         timestamp: number;
     } | null = null;
-    private readonly CACHE_TTL = 5000; // 5缁夋帞绱︾€?
+    private readonly CACHE_TTL = 5000; // 5 seconds
 
     constructor() {
         this.state = this.loadState();
@@ -965,7 +964,7 @@ export class KeyManager {
 
     /**
      * Add token usage to a key and update cost
-     * 妫板嫮鐣婚挜妤€鏁栭暈鎯板殰閿枫劌鐨?key 缁夎鍩岄槖鐔峰灙閾绢偄鐔?
+     * Track token usage for a key and keep its cost counters in sync.
      */
     addUsage(keyId: string, tokens: number): void {
         const now = Date.now();
@@ -976,9 +975,9 @@ export class KeyManager {
             slot.updatedAt = now; // Update timestamp
             stateChanged = true;
 
-            // Check budget - 妫板嫮鐣婚挜妤€鏁栭暈鎯板殰閿枫劏鐤嗛幑?
+            // Check budget and emit a diagnostic when the budget ceiling is reached.
             if (slot.budgetLimit > 0 && slot.totalCost >= slot.budgetLimit) {
-                console.log(`[KeyManager] API ${slot.name} 妫板嫮鐣诲鑼垛偓妤€鏁?($${slot.totalCost.toFixed(2)}/$${slot.budgetLimit})`);
+                console.log(`[KeyManager] API ${slot.name} 已达到预算上限 ($${slot.totalCost.toFixed(2)}/$${slot.budgetLimit})`);
                 // Removed strategy-based rotation, now handled by external logic or just disabled
             }
             if ((slot.tokenLimit || -1) > 0 && (slot.usedTokens || 0) >= (slot.tokenLimit || -1)) {
@@ -1041,12 +1040,12 @@ export class KeyManager {
                     );
                     const headerName = shouldOverrideHeader ? runtime.headerName : s.headerName;
                     const rawModels = Array.isArray(s.supportedModels) ? s.supportedModels : [];
-                    // 皎眳?瓞瀛樺复娴ｈ法鏁ょ€涙ˇ鍋嶉晞鍕侀崹瀚斿灙鐞?娴ｅ棗顩ч弸娌фЦ Google Provider, 闀婎亜濮╃悰銉ュ弿缂傚搫銇戦晞鍕堥弬瑙勀侀崹?
+                    // If a Google key has no stored models yet, seed it with the official defaults.
                     let supportedModels = provider === 'Google' && rawModels.length === 0
                         ? [...DEFAULT_GOOGLE_MODELS]
                         : rawModels;
 
-                    // 皎眳?闀婎亜濮╃悰銉ュ弿: 婵″倹鐏夐弰?Google Key,绾喕缂崠鍛儓鐎规ɑ鏌熷Ο鈥崇€烽敍灞借嫙閸撴棃娅庨棻鐐拆堥弬瑙勀侀崹?
+                    // Official Google keys should only keep canonical official model IDs.
                     if (provider === 'Google') {
                         supportedModels = supportedModels.filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
                         const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !supportedModels.includes(m));
@@ -1056,7 +1055,7 @@ export class KeyManager {
                         }
                     }
 
-                    // 皎眳?闀婎亜濮╅暀鈩冾劀濡€崇€佛珨勬銆冮敍鍩氱殺闀炑勀侀崹瀣讣缁夎鍩岄弬鐗埬侀崹?& 閾″鍚ㄩ敍? CRITICAL FIX for Deduplication
+                    // Normalize and deduplicate the supported model list before storing it.
                     supportedModels = normalizeModelList(supportedModels, provider);
 
                     return {
@@ -1128,7 +1127,7 @@ export class KeyManager {
                         baseUrl: '',
                         authMethod: 'query',
                         headerName: 'x-goog-api-key',
-                        type: 'official', // 皎眳?Default to official for old keys
+                        type: 'official', // Default old Google keys to the official runtime type
                         format: 'gemini',
                         updatedAt: Date.now() // Set initial timestamp
                     }));
@@ -1165,11 +1164,11 @@ export class KeyManager {
         const key = this.getStorageKey();
 
         try {
-            // 棣冩晙 Security Update:
-            // 婵″倹鐏夐悽銊﹀煕瀹歌尙姗辫ぐ鏇捍娑撳秴鍟€娣囸８ｇ摠皤攧鐗堟拱閸?localStorage閿涘矂妲诲銏＄鏆楀眰鈧?
-            // 娴犲懍缂€涙ˇ婀崘鍛摠娑擃叏绾撮獮璺烘倱濮濄儱鍩屾禍鎴狀伂閵?
+            // Security update:
+            // Logged-in users write to cloud storage and skip plain-text local persistence.
+            // Local storage is only kept as a compatibility fallback for anonymous sessions.
             if (this.userId) {
-                console.log('[KeyManager] 瀹夊叏妯″紡锛氱櫥褰曠敤鎴峰啓鍏ヤ簯绔紝璺宠繃鏈湴鏄庢枃瀛樺偍');
+                console.log('[KeyManager] 安全模式：登录用户写入云端，跳过本地明文存储');
                 // Optional: Clear existing local storage just in case
                 localStorage.removeItem(key);
 
@@ -1202,6 +1201,7 @@ export class KeyManager {
         this.unsubscribeRealtime();
 
         this.userId = userId;
+        this.hasHydratedCloudState = false;
 
         if (userId) {
             console.log('[KeyManager] User login:', userId);
@@ -1216,7 +1216,15 @@ export class KeyManager {
 
             // Then hydrate cloud state asynchronously.
             setTimeout(() => {
+                if (this.userId !== userId) {
+                    return;
+                }
+
                 this.loadFromCloud().then(() => {
+                    if (this.userId !== userId) {
+                        return;
+                    }
+
                     if (this.providers.length > 0) {
                         void this.saveToCloud(this.state).catch((syncError) => {
                             console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
@@ -1232,35 +1240,134 @@ export class KeyManager {
         }
     }
 
-    private realtimeChannel: any = null;
+    private realtimeChannel: ReturnType<typeof setInterval> | null = null;
 
     private subscribeRealtime(userId: string) {
-        console.log('[KeyManager] Connecting realtime sync channel...');
-        this.realtimeChannel = supabase.channel(`profiles:${userId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'profiles',
-                    filter: `id=eq.${userId}`
-                },
-                async (payload) => {
-                    console.log('[KeyManager] Cloud update received:', payload);
-                    if (!this.isSyncing) {
-                        await this.loadFromCloud();
-                    }
-                }
-            )
-            .subscribe();
+        this.unsubscribeRealtime();
+        console.log('[KeyManager] Starting API-backed cloud sync polling...');
+        this.realtimeChannel = setInterval(() => {
+            if (this.userId !== userId || this.isSyncing) {
+                return;
+            }
+
+            void this.loadFromCloud().catch((error) => {
+                console.warn('[KeyManager] Periodic cloud sync refresh failed:', error);
+            });
+        }, CLOUD_SYNC_POLL_INTERVAL_MS);
     }
 
     private unsubscribeRealtime() {
         if (this.realtimeChannel) {
-            console.log('[KeyManager] Disconnect realtime sync channel');
-            supabase.removeChannel(this.realtimeChannel);
+            console.log('[KeyManager] Stop cloud sync polling');
+            clearInterval(this.realtimeChannel);
             this.realtimeChannel = null;
         }
+    }
+
+    private applyCloudPayload(
+        rawPayload: unknown,
+        options?: {
+            preserveLocalProvidersOnEmpty?: boolean;
+        }
+    ) {
+        const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
+        const shouldPreserveLocalProviders =
+            options?.preserveLocalProvidersOnEmpty === true
+            && cloudProviders.length === 0
+            && this.providers.length > 0;
+
+        if (isUserApisEnvelope(rawPayload) && 'providers' in rawPayload && !shouldPreserveLocalProviders) {
+            this.providers = cloudProviders;
+            this.persistProvidersLocal();
+        }
+
+        let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
+        if (!Array.isArray(cloudSlots)) {
+            return;
+        }
+
+        const rawCloudSlots = cloudSlots;
+        const validCloudSlots = rawCloudSlots.filter((slot: any) => {
+            const key = String(slot?.key || '').trim();
+            const id = String(slot?.id || '').trim();
+            return Boolean(id && key);
+        });
+
+        if (rawCloudSlots.length > 0 && validCloudSlots.length === 0) {
+            console.warn('[KeyManager] Cloud user_apis payload is not a key-slot structure, skipping overwrite.');
+            return;
+        }
+
+        cloudSlots = validCloudSlots;
+
+        cloudSlots = cloudSlots.map(s => {
+            const provider = (s.provider as Provider) || 'Google';
+            const keyType = determineKeyType(provider, s.baseUrl);
+            const format = normalizeApiProtocolFormat(
+                (s as any).format,
+                provider === 'Google' && keyType === 'official' ? 'gemini' : 'auto'
+            );
+            const runtime = resolveProviderRuntime({
+                provider,
+                baseUrl: s.baseUrl,
+                format,
+                authMethod: s.authMethod,
+                headerName: s.headerName,
+                compatibilityMode: s.compatibilityMode,
+            });
+            const authMethod = runtime.authMethod as AuthMethod;
+
+            return {
+                ...s,
+                name: s.name || 'Cloud Key',
+                provider,
+                totalCost: s.totalCost || 0,
+                budgetLimit: s.budgetLimit !== undefined ? s.budgetLimit : -1,
+                tokenLimit: s.tokenLimit !== undefined ? s.tokenLimit : -1,
+                disabled: s.disabled || false,
+                createdAt: s.createdAt || Date.now(),
+                failCount: s.failCount || 0,
+                successCount: s.successCount || 0,
+                lastUsed: s.lastUsed || null,
+                lastError: s.lastError || null,
+                status: s.status || 'unknown',
+                weight: s.weight || 50,
+                timeout: s.timeout || 30000,
+                maxRetries: s.maxRetries || 2,
+                retryDelay: s.retryDelay || 1000,
+                type: keyType,
+                format,
+                authMethod,
+                headerName: s.headerName || runtime.headerName,
+                compatibilityMode: runtime.compatibilityMode,
+            };
+        });
+
+        cloudSlots = cloudSlots.map(s => {
+            const isGoogle = s.provider === 'Google' || (s.provider as string) === 'Gemini';
+            let newProvider = s.provider;
+            if ((s.provider as string) === 'Gemini' && !s.baseUrl) newProvider = 'Google' as Provider;
+            if (s.provider === 'Google' && s.baseUrl && !s.baseUrl.includes('googleapis.com')) newProvider = 'Custom' as Provider;
+
+            if (isGoogle) {
+                const currentModels = (s.supportedModels || []).filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
+                const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !currentModels.includes(m));
+
+                if (missingDefaults.length > 0 || newProvider !== s.provider) {
+                    console.log(`[KeyManager] Cloud Sync: Auto-adding models/fixing provider for key ${s.name}`);
+                    return {
+                        ...s,
+                        provider: 'Google',
+                        supportedModels: [...currentModels, ...missingDefaults]
+                    };
+                }
+            }
+            return s;
+        });
+
+        this.state.slots = cloudSlots;
+        console.log('[KeyManager] Cloud sync completed (overwrite mode). Keys:', this.state.slots.length);
+        this.notifyListeners();
     }
 
     /**
@@ -1274,118 +1381,29 @@ export class KeyManager {
 
         if (this.userId.startsWith('dev-user-')) return;
 
+        const activeUserId = this.userId;
+
         try {
             this.isSyncing = true;
-            console.log('[KeyManager] Loading cloud state...');
+            console.log('[KeyManager] Loading cloud state via API...');
 
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('user_apis')
-                .eq('id', this.userId)
-                .single();
-
-            if (error) {
-                if (error.code !== 'PGRST116') {
-                    console.warn('[KeyManager] Cloud fetch failed:', error);
+            const response = await legacyWebApiClient.getKeyManagerCloudState();
+            if (!response.success) {
+                if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
+                    console.warn('[KeyManager] Cloud fetch failed:', response.error);
                 }
-                // Empty cloud state: do not force-merge local keys.
                 return;
             }
 
-            if (data && data.user_apis) {
-                const rawPayload = data.user_apis;
-                const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
-                if (isUserApisEnvelope(rawPayload) && 'providers' in rawPayload) {
-                    this.providers = cloudProviders;
-                    this.persistProvidersLocal();
-                }
-
-                let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
-                if (Array.isArray(cloudSlots)) {
-                    const rawCloudSlots = cloudSlots;
-                    const validCloudSlots = rawCloudSlots.filter((slot: any) => {
-                        const key = String(slot?.key || '').trim();
-                        const id = String(slot?.id || '').trim();
-                        return Boolean(id && key);
-                    });
-
-                    if (rawCloudSlots.length > 0 && validCloudSlots.length === 0) {
-                        console.warn('[KeyManager] Cloud user_apis payload is not a key-slot structure, skipping overwrite.');
-                        return;
-                    }
-
-                    cloudSlots = validCloudSlots;
-
-                    cloudSlots = cloudSlots.map(s => {
-                        const provider = (s.provider as Provider) || 'Google';
-                        const keyType = determineKeyType(provider, s.baseUrl);
-                        const format = normalizeApiProtocolFormat(
-                            (s as any).format,
-                            provider === 'Google' && keyType === 'official' ? 'gemini' : 'auto'
-                        );
-                        const runtime = resolveProviderRuntime({
-                            provider,
-                            baseUrl: s.baseUrl,
-                            format,
-                            authMethod: s.authMethod,
-                            headerName: s.headerName,
-                            compatibilityMode: s.compatibilityMode,
-                        });
-                        const authMethod = runtime.authMethod as AuthMethod;
-
-                        return {
-                            ...s,
-                            name: s.name || 'Cloud Key',
-                            provider,
-                            totalCost: s.totalCost || 0,
-                            budgetLimit: s.budgetLimit !== undefined ? s.budgetLimit : -1,
-                            tokenLimit: s.tokenLimit !== undefined ? s.tokenLimit : -1,
-                            disabled: s.disabled || false,
-                            createdAt: s.createdAt || Date.now(),
-                            failCount: s.failCount || 0,
-                            successCount: s.successCount || 0,
-                            lastUsed: s.lastUsed || null,
-                            lastError: s.lastError || null,
-                            status: s.status || 'unknown',
-                            weight: s.weight || 50,
-                            timeout: s.timeout || 30000,
-                            maxRetries: s.maxRetries || 2,
-                            retryDelay: s.retryDelay || 1000,
-                            type: keyType,
-                            format,
-                            authMethod,
-                            headerName: s.headerName || runtime.headerName,
-                            compatibilityMode: runtime.compatibilityMode,
-                        };
-                    });
-
-                    cloudSlots = cloudSlots.map(s => {
-                        const isGoogle = s.provider === 'Google' || (s.provider as string) === 'Gemini';
-                        let newProvider = s.provider;
-                        if ((s.provider as string) === 'Gemini' && !s.baseUrl) newProvider = 'Google' as Provider;
-                        if (s.provider === 'Google' && s.baseUrl && !s.baseUrl.includes('googleapis.com')) newProvider = 'Custom' as Provider;
-
-                        if (isGoogle) {
-                            const currentModels = (s.supportedModels || []).filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
-                            const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !currentModels.includes(m));
-
-                            if (missingDefaults.length > 0 || newProvider !== s.provider) {
-                                console.log(`[KeyManager] Cloud Sync: Auto-adding models/fixing provider for key ${s.name}`);
-                                return {
-                                    ...s,
-                                    provider: 'Google',
-                                    supportedModels: [...currentModels, ...missingDefaults]
-                                };
-                            }
-                        }
-                        return s;
-                    });
-
-                    this.state.slots = cloudSlots;
-                    console.log('[KeyManager] Cloud sync completed (overwrite mode). Keys:', this.state.slots.length);
-                    this.notifyListeners();
-                }
+            if (this.userId !== activeUserId) {
+                return;
             }
+
+            const shouldPreserveLocalProviders = !this.hasHydratedCloudState && this.providers.length > 0;
+            this.hasHydratedCloudState = true;
+            this.applyCloudPayload(response.data, {
+                preserveLocalProvidersOnEmpty: shouldPreserveLocalProviders,
+            });
         } catch (e) {
             console.error('[KeyManager] Error loading from cloud:', e);
         } finally {
@@ -1440,93 +1458,55 @@ export class KeyManager {
         }
 
         try {
-            console.log('[KeyManager] Uploading to Supabase...', {
+            console.log('[KeyManager] Uploading key-manager cloud state via API...', {
                 userId: this.userId,
                 slotCount: state.slots.length
             });
 
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-            if (authError || !user) {
-                console.error('[KeyManager] User auth invalid or session expired!', authError);
-                return;
-            }
-
-            console.log('[KeyManager] User validation succeeded:', user.id);
-
-            if (user.id !== this.userId) {
-                console.error('[KeyManager] userId mismatch:', {
-                    expected: this.userId,
-                    actual: user.id
-                });
-                this.userId = user.id;
-            }
-
-            const { data: existingProfile, error: existingError } = await supabase
-                .from('profiles')
-                .select('email, user_apis')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (existingError) {
-                throw existingError;
-            }
-
-            const persistedProviders = extractUserApiProvidersFromPayload(existingProfile?.user_apis);
             const nextProviders =
-                this.providers.length > 0 || persistedProviders.length === 0
+                this.hasHydratedCloudState || this.providers.length > 0
                     ? this.providers
                     : undefined;
 
-            const uploadData = {
-                id: user.id,
-                email: existingProfile?.email || user.email || null,
-                user_apis: mergeUserApisPayload(existingProfile?.user_apis, {
-                    slots: state.slots,
-                    providers: nextProviders,
-                }),
-                updated_at: new Date().toISOString()
-            };
-
-            console.log('[KeyManager] Running update...', {
-                id: uploadData.id,
-                model_count: state.slots[0]?.supportedModels?.length
+            const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+                version: 2,
+                slots: state.slots as unknown as Record<string, unknown>[],
+                providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
             });
 
-            const { error } = await supabase
-                .from('profiles')
-                .upsert(uploadData, {
-                    onConflict: 'id',
-                    ignoreDuplicates: false,
-                });
-
-            if (error) {
-                const isNetworkError = error.message?.includes('fetch') || error.message?.includes('Network');
+            if (!response.success) {
+                const errorCode = response.error?.code || 'UNKNOWN_ERROR';
+                const errorMessage = response.error?.message || 'Unknown cloud sync failure.';
+                const isNetworkError = errorCode === 'NETWORK_ERROR'
+                    || errorMessage.includes('fetch')
+                    || errorMessage.includes('Network');
                 if (isNetworkError) {
-                    console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21 Supabase \u66F4\u65B0\uFF0C\u7A0D\u540E\u91CD\u8BD5');
+                    console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
                     this.cloudSyncBackoffUntil = Date.now() + 30_000;
                     return;
                 }
 
-                console.error('[KeyManager] Supabase update failed!', {
-                    code: error.code,
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint
+                console.error('[KeyManager] API cloud sync failed!', {
+                    code: errorCode,
+                    message: errorMessage,
+                    details: response.error?.details,
                 });
-                if (error.code === '42501' || error.message.includes('policy')) {
-                    console.error('[KeyManager] RLS policy blocked update. Check Supabase RLS settings.');
+
+                if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
+                    console.error('[KeyManager] Session is missing or expired, postponing cloud sync.');
                     this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
                     return;
                 }
-                throw error;
+
+                throw new Error(errorMessage);
             }
 
-            console.log('[KeyManager] Supabase upload succeeded!');
+            this.hasHydratedCloudState = true;
+            this.applyCloudPayload(response.data);
+            console.log('[KeyManager] API cloud sync succeeded!');
             this.cloudSyncBackoffUntil = 0;
 
-            const { forceSync } = await import('../billing/costService');
-            forceSync().catch(console.error);
+            requestCostSync().catch(console.error);
         } catch (e: any) {
             const isNetworkError = e.message?.includes('fetch') || e.message?.includes('Network');
             if (!isNetworkError) {
@@ -1817,7 +1797,7 @@ export class KeyManager {
                                 }
                             });
 
-                            // 鉁?[NEW] 灏濊瘯闈欓粯鑾峰彇 /pricing 绔偣骞跺姩鎬佹洿鏂板叏灞€浠锋牸
+                            // Try to fetch /pricing in the background and refresh the cached pricing snapshot
                             try {
                                 const sanitizedPricingBase = cleanUrl.replace(PROVIDER_MARKETING_SUFFIX_RE, '') || cleanUrl;
                                 const normalizedPricingBase = sanitizedPricingBase.replace(/\/+$/, '') || cleanUrl;
@@ -1834,8 +1814,7 @@ export class KeyManager {
                                     if (pricingRes.ok) {
                                         const pricingData = await pricingRes.json();
                                         if (pricingData && (pricingData.data || Array.isArray(pricingData))) {
-                                            const { mergeModelPricingOverrides } = await import('../model/modelPricing');
-                                            mergeModelPricingOverrides(pricingData);
+                                            applyModelPricingOverrides(pricingData);
                                         }
                                     }
                                 }).catch(e => {
@@ -1970,10 +1949,10 @@ export class KeyManager {
 
         // Normalize the requested model ID and apply migration mapping
         let normalizedModelId = baseIdPart.replace(/^models\//, '');
-        // 鍏煎 UI/鍘嗗彶鏁版嵁閲屽彲鑳藉嚭鐜扮殑灞曠ず鍚嶄綔涓?modelId
+        // Accept display-name style input that may come from old UI state or legacy records.
         const lowerRequested = normalizedModelId.toLowerCase();
-        // 浠呬慨姝ｂ€滃睍绀哄悕杈撳叆鈥濆満鏅紙绌烘牸褰㈠紡锛夛紝涓嶆敼鍐欐爣鍑嗘ā鍨婭D锛堣繛瀛楃褰㈠紡锛夈€?
-        // 杩炲瓧绗﹀舰寮忓彲鑳芥槸鍒嗗彂娓犻亾鐨勭湡瀹炴ā鍨嬪悕锛堜緥濡?nano-banana-2锛夈€?
+        // Only rewrite display-name style inputs that use spaces.
+        // Hyphenated IDs may be real upstream model names and should be preserved.
         if (lowerRequested === 'nano banana pro') {
             normalizedModelId = 'gemini-3-pro-image-preview';
         } else if (lowerRequested === 'nano banana') {
@@ -1982,28 +1961,25 @@ export class KeyManager {
             normalizedModelId = 'gemini-3.1-flash-image-preview';
         }
 
-        // 鏈夊悗缂€鏃朵唬琛ㄥ己缁戝畾鏌愪釜娓犻亾锛園xxx锛夛紝浼樺厛灏婇噸璇ユ笭閬撶殑鍘熷妯″瀷ID锛?
-        // 閬垮厤鎶婃笭閬撳唴鍒悕寮哄埗杩佺Щ涓哄畼鏂笽D瀵艰嚧鈥滄棤鍙敤娓犻亾鈥濄€?
+        // When a route suffix is present, preserve the channel-specific raw model ID.
+        // This avoids migrating provider-local aliases into official IDs and breaking routing.
         if (!suffix && MODEL_MIGRATION_MAP[normalizedModelId]) {
             normalizedModelId = MODEL_MIGRATION_MAP[normalizedModelId];
         }
 
-        // 馃殌 [Model-Driven Logic]
-        // 妫€娴嬫槸鍚︿负鈥滅Н鍒嗘ā鍨嬧€濓紙鍗冲唴缃ā鍨嬶紝濡?Nano Banana 绯诲垪锛?
-        // 杩欎簺妯″瀷濡傛灉娌℃湁鎸囧畾鍚庣紑锛岄粯璁よ蛋鍐呯疆 PROXY 绾胯矾
+        // Model-driven routing: credit-billed internal models default to the built-in proxy
+        // unless the caller explicitly requested a different route suffix.
         const isCreditModel = normalizedModelId.includes('nano-banana') ||
             normalizedModelId.includes('gemini-3.1-flash-image') ||
             normalizedModelId.includes('gemini-3-pro-image') ||
             normalizedModelId === 'gemini-2.5-flash-image' ||
             normalizedModelId.includes('lyria');
 
-        // --- SEPARATION STRATEGY ---
-        // 1. 濡傛灉鏈夋樉绀哄悗缂€ (@Suffix)锛屽己鍒跺鎵惧搴旈閬?
-        // 2. 濡傛灉鏃犲悗缂€锛?
-        //    - 濡傛灉鏄Н鍒嗘ā鍨?(Nano Banana 绛? -> 璧板唴缃?PROXY
-        //    - 濡傛灉鏄櫘閫氭ā鍨?(Gemini 1.5 绛? -> 璧扮敤鎴烽厤缃殑 Google Key
+        // Routing strategy:
+        // 1. If a suffix is present, try to match that explicit route.
+        // 2. Without a suffix, credit models prefer the built-in proxy and normal models prefer user Google keys.
 
-        // 馃殌 [Fix] 灏?providers 杞崲涓轰复鏃剁殑 KeySlot 浠ヤ究缁熶竴璋冨害
+        // Convert third-party providers into temporary KeySlot objects so routing stays unified.
         this.loadProviders();
         const providerSlots: KeySlot[] = this.providers.filter(p => p.isActive).map(p => {
             const provider = (['Google', 'OpenAI', 'Anthropic', 'Volcengine', 'Aliyun', 'Tencent', 'SiliconFlow', '12AI'].includes(p.name) ? p.name : 'Custom') as Provider;
@@ -2097,7 +2073,7 @@ export class KeyManager {
             return matchesSlotRouteSuffix(slot, suffix);
         };
 
-        // [Note] 绉垎妯″瀷寮哄埗璺敱宸茬Щ闄?
+        // Credit-model forced routing was removed; routing is now handled by the suffix and health checks.
 
         if (preferredKeyId) {
             const normalizedPreferredKeyId = String(preferredKeyId).trim().toLowerCase();
@@ -2128,16 +2104,16 @@ export class KeyManager {
         if (!suffix) {
             // [No Suffix Case]
 
-            // [Note] 绉垎妯″瀷浼樺厛閫昏緫宸茬Щ闄?
+            // Credit-model priority routing has been removed from the no-suffix branch.
 
-            // B. 闈炵Н鍒嗘ā鍨嬶細瀵绘壘鐢ㄦ埛鑷繁鐨?Google 瀹樻柟 Key (鐩磋繛妯″紡)
+            // B. For regular models, prefer the user's direct Google official key
             candidates = allSlots.filter(s => s.provider === 'Google' || (s.provider as string) === 'Gemini');
             let strictCandidates = candidates.filter(s => modelSupportedBySlot(s));
 
             if (strictCandidates.length > 0) {
                 candidates = strictCandidates;
             } else {
-                console.warn(`[KeyManager] 鎵句笉鍒板畼鏂?Key: ${normalizedModelId}`);
+                console.warn(`[KeyManager] 找不到官方 Key: ${normalizedModelId}`);
             }
 
         } else {
@@ -2146,8 +2122,8 @@ export class KeyManager {
             const isSystemRoute = normalizedSuffix.startsWith('system') || normalizedSuffix === 'systemproxy';
             const proxyAliasSet = new Set(['custom', 'proxy', 'proxied', 'system', 'builtin']);
             if (isSystemRoute) {
-                // 棣冩畬 [Fix] 閿枫劍鈧胶鏁氶幋鎰娑?SystemProxy 闀勫嫯娅勷ò?KeySlot 娴溿倗鏁?LLMService 鐟欙絾鐎?
-                // 閿茬姳璐熺粻锛勬倞閿绘﹢鍘嗙純顔炬畱缁崵绮虹粔顖氬瀻濡€崇€锋稉宥呭晙鐎涙ˇ鍙嗛摼顒€婀撮悽銊﹀煕闀愪胶娈?slots 娑?
+                // Represent the backend-managed SystemProxy route as a synthetic KeySlot so the rest
+                // of the pipeline can keep using the same selection contract.
                 return this.prepareKeyResult({
                     id: `backend_proxy_${normalizedModelId}`,
                     key: 'system-proxy-managed-key',
@@ -2166,10 +2142,10 @@ export class KeyManager {
                     createdAt: Date.now()
                 } as KeySlot);
 
-                // 鐠哄疇缁烽挅搴ｇ敾閽粈鍞悶鍡楀焼閽栧秴娲栭槂鈧珨勯鎹㈤晵蹇涙姜Google濞撶娀浜鹃挰婵堟畱闃冩槒绶?
+                // The built-in SystemProxy route has already been synthesized above, so skip external matching here.
             } else {
 
-                // Step 1: 缁墽鈥橀挅宀栃為崠褰掑巻
+                // Step 1: exact route-name match
                 const routeTarget = extractSlotRouteTarget(normalizedSuffix);
                 const nameMatchedCandidates = allSlots.filter(s => {
                     if (routeTarget) {
@@ -2193,8 +2169,8 @@ export class KeyManager {
                     candidates = [];
                 }
 
-                // Step 4: 婵″倹鐏夊▽鈩冩箒娴犺缍嶉挅宀栃為崠褰掑巻閿涘奔绗栭挅搴ｇ磻鐏炵偘绨槂姘辨暏娴狅絿鎮婐珨勵偄鎮曢敍?
-                // 閿蹭负鈧偓皤攧?娴犵粯鍓伴棻婵璷ogle闃冩岸浜炬稉顓熸暜闀屼浇顕氬Ο鈥崇€烽晞?濡€崇汉
+                // Step 4: If the suffix is a generic proxy alias and no exact route matched,
+                // fall back to any healthy non-Google provider that supports the model.
                 if (candidates.length === 0 && proxyAliasSet.has(normalizedSuffix)) {
                     candidates = allSlots.filter(s => {
                         if (s.provider === 'Google') return false;
@@ -2202,7 +2178,7 @@ export class KeyManager {
                     });
                 }
 
-                // [Note] system/builtin 閽栧海绱戞径鍕倞瀹歌尙些闂?
+                // system/builtin aliases share the same fallback behavior
 
                 console.log(
                     `[KeyManager] Suffix='${normalizedSuffix}', routeTarget='${routeTarget || ''}', NameMatched=${nameMatchedCandidates.length}, ModelFiltered=${modelFilteredCandidates.length}, FinalCandidates=${candidates.length}` +
@@ -2233,7 +2209,7 @@ export class KeyManager {
         }
 
         if (validCandidates.length === 0) {
-            // 皎眳?JIT Auto-Repair (Official Only)
+            // JIT auto-repair for official Google models only
             if (!suffix && (normalizedModelId.startsWith('gemini-') || normalizedModelId.startsWith('imagen-') || normalizedModelId.startsWith('veo-'))) {
 
                 // Find any healthy Google key
@@ -2257,7 +2233,7 @@ export class KeyManager {
                 }
             }
 
-            // [Note] 閸愬懐鐤嗛摼宥呭 Fallback 瀹歌尙些闂?
+            // No healthy fallback route was found
 
             return null;
         }
@@ -2266,7 +2242,7 @@ export class KeyManager {
         // Common Sort: Valid > Unknown > Rate Limited
         const now = Date.now();
         const cooldownFiltered = validCandidates.filter(s => {
-            // 棣冩畬 [Fix] 閸愬懐鐤嗛敺鐘烩偓鐔告箛閿?缁夘垰鍨庡Ο鈥崇€锋稉稹簝铔嬬€广垺鍩涚粩顖氥枮閸楄揪绾撮悽鍗炴倵缁旑垳绮烘稉鈧粻锛勬倞
+            // SystemProxy entries do not participate in client-side cooldown handling
             if (s.provider === 'SystemProxy' || s.id?.startsWith('backend_proxy')) return true;
             if (s.cooldownUntil && now < s.cooldownUntil) return false;
             if (s.status !== 'rate_limited') return true;
@@ -2434,9 +2410,9 @@ export class KeyManager {
                 lowerError.includes('permission denied') ||
                 lowerError.includes('permission_denied');
 
-            // 棣冩畬 [Fix] 閸愬懐鐤嗛敺鐘烩偓鐔告箛閿?缁夘垰鍨庡Ο鈥崇€锋稉稹簝铔嬬€广垺鍩涚粩顖氥枮閸楀瓨甯︷珨勮绾撮悽鍗炴倵缁旑垳绮烘稉鈧粻锛勬倞
+            // SystemProxy entries should never be pushed into the client-side cooldown flow.
             if (slot.provider === 'SystemProxy' || slot.id?.startsWith('backend_proxy')) {
-                // 娴犲懓顔囪ぐ鏇㈡晩鐠囶垽绾存稉宥嗘暭閸欐濮搁晲渚婄焊閽栧海顏紒鐔剁缁狅紕鎮婇敍?
+                // Record the error for diagnostics, but leave the route state unchanged.
                 console.warn(`[KeyManager] SystemProxy error reported but not changing cooldown state: ${error}`);
             } else if (isRateLimit) {
                 slot.status = 'rate_limited';
@@ -2505,21 +2481,17 @@ export class KeyManager {
                 const previousRatio = previousCost / slot.budgetLimit;
 
                 if (usageRatio >= 0.9 && previousRatio < 0.9) {
-                    import('../system/notificationService').then(({ notify }) => {
-                        notify.warning(
-                            'Budget warning',
-                            `API Key "${slot.name}" is using ${(usageRatio * 100).toFixed(0)}% of its budget ($${slot.totalCost.toFixed(2)} / $${slot.budgetLimit}).`
-                        );
-                    });
+                    notify.warning(
+                        'Budget warning',
+                        `API Key "${slot.name}" is using ${(usageRatio * 100).toFixed(0)}% of its budget ($${slot.totalCost.toFixed(2)} / $${slot.budgetLimit}).`
+                    );
                 }
 
                 if (usageRatio >= 1.0 && previousRatio < 1.0) {
-                    import('../system/notificationService').then(({ notify }) => {
-                        notify.error(
-                            'Budget exhausted',
-                            `API Key "${slot.name}" reached its budget limit. Recharge or increase the budget to continue.`
-                        );
-                    });
+                    notify.error(
+                        'Budget exhausted',
+                        `API Key "${slot.name}" reached its budget limit. Recharge or increase the budget to continue.`
+                    );
                 }
             }
         }
@@ -2603,7 +2575,7 @@ export class KeyManager {
         customHeaders?: Record<string, string>;
         customBody?: Record<string, any>;
     }): Promise<{ success: boolean; error?: string; id?: string }> {
-        // 皎眳?Sanitize input key: trim and remove non-ASCII chars
+        // Sanitize the input key before validation: trim whitespace and remove non-ASCII noise
         const trimmedKey = key.replace(/[^\x00-\x7F]/g, "").trim();
 
         if (!trimmedKey) {
@@ -2645,7 +2617,7 @@ export class KeyManager {
             });
         }
 
-        // 皎眳?闀婎亜濮╅暀鈩冾劀濡€崇€佛珨勬銆冮敍鍩氱殺闀炑勀侀崹瀣讣缁夎鍩岄弬鐗埬侀崹瀣剁骇
+        // Normalize provider models before the new slot enters the shared routing pool.
         supportedModels = normalizeModelList(supportedModels, options?.provider);
 
         const newSlot: KeySlot = {
@@ -2929,8 +2901,7 @@ export class KeyManager {
     }
 
     /**
-     * 棣冩畬 [New] 閿枫劍鈧椒绗傞繑銉у殠鐠侯垵黏線閻劎绮ㄩ弸?
-     * 閻㈤亶鈧倿鍘嗛崳銊ユ躬鐠囬攱鐪扮紒鎾存将閽栧氦黏線閻㈩煉绾撮悽銊ょ艾鐎圭偞妞傛棆瀛樻煀閸忋劑鍣虹痪鑳熅闀勫嫬浠存惔椋庡Ц闀?
+     * Record the result of a model call so we can update per-channel health and failure counts.
      */
     public reportCallResult(id: string, success: boolean, error?: string): void {
         const slot = this.state.slots.find(s => s.id === id);
@@ -2947,7 +2918,7 @@ export class KeyManager {
             slot.failCount++;
             slot.lastError = error || 'Unknown error';
 
-            // 闀婎亜濮╃€瑰綊鏁婇槂鏄忕帆閿涙癌顩ч弸婊嗙箾缂侇厼銇戠拹銉︻偧閺佹媽绉存潻鍥鐐肩》绾撮暀鍥鳖唶娑?invalid
+            // Repeated failures should mark the channel invalid once it crosses the threshold.
             if (slot.failCount >= (this.state.maxFailures || 5)) {
                 slot.status = 'invalid';
                 console.warn(`[KeyManager] Channel ${slot.name} (${id}) failed repeatedly and was marked invalid.`);
@@ -2980,17 +2951,17 @@ export class KeyManager {
         tokenGroup?: string;
         billingType?: string;
         endpointType?: string;
-        colorStart?: string; // 棣冩畬 [閺傛澘顤僝 缁狅紕鎮婇敾姗€鍘嗙純顔炬畱妫版粏澹?
+        colorStart?: string; // Gradient start color used in the model picker UI
         colorEnd?: string;
         colorSecondary?: string;
         textColor?: 'white' | 'black';
-        creditCost?: number; // 棣冩畬 [閺傛澘顤僝 缁夘垰鍨庡☉鍫ｂ偓?
+        creditCost?: number; // Credit cost badge shown in the model picker UI
     }[] {
-        // 棣冩畬 娴ｈ法鏁ょ紓鎻跨摠閿涙癌顩ч弸?slots 閸?adminModels 濞屸剝婀侀崣妗﹀閿涘瞼娲块幒銉ㄧ箲閿茬偟绱︾€?
+        // Cache key includes active slots, admin models, and providers so the list stays fresh.
         const activeSlots = this.state.slots.filter(s => !s.disabled && s.status !== 'invalid');
         const slotsHash = `${activeSlots.length}-${activeSlots.map(s => s.id).join(',')}`;
 
-        // 馃殌 [Fix] 娣诲姞 adminModels 鍒扮紦瀛橀敭锛岀‘淇濈鐞嗗憳閰嶇疆鍙樺寲鏃剁紦瀛樺け鏁?
+        // Include adminModels in the cache signature so admin updates invalidate the list immediately.
         const adminModels = [...adminModelService.getModels()].sort((left, right) => {
             const modelDiff = String(left.id || '').localeCompare(String(right.id || ''));
             if (modelDiff !== 0) return modelDiff;
@@ -3009,7 +2980,7 @@ export class KeyManager {
             .map(m => `${m.id}:${m.providerId || ''}:${m.providerName || ''}:${m.displayName}:${m.priority || 0}:${m.weight || 0}:${m.mixWithSameModel ? '1' : '0'}:${m.colorStart}:${m.colorEnd}:${m.colorSecondary || ''}:${m.textColor || ''}:${m.creditCost}`)
             .join(',')}`;
 
-        // 馃殌 [Fix] 娣诲姞 providers 鍒扮紦瀛橀敭锛岀‘淇濅緵搴斿晢澧炲噺鏃舵ā鍨嬮€夋嫨绔嬪嵆鍝嶅簲
+        // Include providers in the cache signature so provider changes refresh the list immediately.
         this.loadProviders();
         const providerHash = `${this.providers.length}-${this.providers
             .map(p => `${p.id}:${p.isActive ? '1' : '0'}:${p.models.length}:${p.updatedAt}`)
@@ -3039,11 +3010,11 @@ export class KeyManager {
             tokenGroup?: string;
             billingType?: string;
             endpointType?: string;
-            colorStart?: string; // 棣冩畬 [閺傛澘顤僝 缁狅紕鎮婇敾姗€鍘嗙純顔炬畱妫版粏澹?
+            colorStart?: string; // Gradient start color used in the model picker UI
             colorEnd?: string;
             colorSecondary?: string;
             textColor?: 'white' | 'black';
-            creditCost?: number; // 棣冩畬 [閺傛澘顤僝 缁夘垰鍨庡☉鍫ｂ偓?
+            creditCost?: number; // Credit cost badge shown in the model picker UI
         }>();
         const chatModelIds = new Set(GOOGLE_CHAT_MODELS.map(model => model.id));
         const normalizeUserSourceSignaturePart = (value?: string) =>
@@ -3069,7 +3040,7 @@ export class KeyManager {
 
                 cleanModels.forEach(rawModelStr => {
                     const { id, name, description } = parseModelString(rawModelStr);
-                    // 鐠哄疇缁烽暈?ID
+                    // Drop deprecated alias IDs that should not surface in the picker
                     if (id === 'nano-banana' || id === 'nano-banana-pro') return;
 
                     let distinctId = id;
@@ -3152,7 +3123,7 @@ export class KeyManager {
         const googleSlots = this.state.slots.filter(s => s.provider === 'Google' && !s.disabled && s.status !== 'invalid' && !!s.key);
         if (googleSlots.length > 0) {
             GOOGLE_CHAT_MODELS.forEach(model => {
-                // 棣冩畬 [Strict Check] 閸欘亝婀佽ぐ鎾舵暏閹撮娈?Key 绾喖鐤勯弨顖涘瘮鐠囥儲膩閸ㄥ妞傞晸宥嗗潑閿?
+                // Only expose standard Google models when a healthy compatible key exists.
                 if (!uniqueModels.has(model.id) && this.hasCustomKeyForModel(model.id)) {
                     uniqueModels.set(model.id, {
                         ...model,
@@ -3451,8 +3422,8 @@ export class KeyManager {
         const normalizedModelId = parts[0].toLowerCase().trim();
         const suffix = parts.length > 1 ? parts[1].toLowerCase().trim() : null;
 
-        // 棣冩畬 [闀欑缁╂穱顔碱槻] 婵″倹鐏夊畞锔芥箒 @system/@system_2/@12ai/@systemproxy 閽栧海绱戦敍宀冾嚛閺勫孩妲稿铏圭拨鐎规氨閮寸紒鐔哄殠鐠侯垬鈧?
-        // 鏉欘潚皎睄鍛枌娑撳绾寸紒婵呯瑝鎼存棁顕氶崠褰掑巻皤攧鎵暏閹寸柉鍤滅€规阿绠熼晞鍕堥弬?Key 闃冩槒绶妴?
+        // Built-in route suffixes such as @system, @system_2, @12ai, and @systemproxy
+        // should never be mistaken for user-managed keys or third-party channels.
         if (suffix?.startsWith('system') || suffix === '12ai' || suffix === 'systemproxy') {
             return false;
         }
@@ -3478,7 +3449,7 @@ export class KeyManager {
 
         if (hasValidSlot) return true;
 
-        // 馃殌 [Fix] 涔熻妫€鏌?ThirdPartyProvider锛屽洜涓虹敤鎴峰湪璁剧疆閲屾坊鍔犵殑鑷畾涔?API 瀛樺湪浜?providers 涓?
+        // Also inspect ThirdPartyProvider entries because custom APIs live there now.
         this.loadProviders();
         return this.providers.some(p => {
             if (!p.isActive) return false;
@@ -3510,13 +3481,13 @@ export class KeyManager {
     }
 
     // =========================================================================
-    // 棣冨晭 缁楊兛绗侀弬?API 閾惧秴濮熼崯鍡欘吀閻炲棙鏌熷▔?
+    // Third-party / proxy API provider management
     // =========================================================================
 
     private providers: ThirdPartyProvider[] = [];
 
     /**
-     * 閵嘲褰囬晸鈧摼澶岊儑娑撳鏌熼摼宥呭閸?
+     * Add a new third-party provider definition.
      */
     getProviders(): ThirdPartyProvider[] {
         this.loadProviders();
@@ -3571,7 +3542,7 @@ export class KeyManager {
         this.providers.push(provider);
         this.saveProviders();
         this.syncLegacySlotsWithProvider(provider);
-        this.globalModelListCache = null; // 馃殌 [Fix] 娓呴櫎妯″瀷缂撳瓨锛屼娇涓嬫媺妗嗙珛鍗冲埛鏂?
+        this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
 
         if (!provider.pricingSnapshot) {
@@ -3582,7 +3553,7 @@ export class KeyManager {
     }
 
     /**
-     * 鏃嬪瓨鏌婇摼宥呭閸熷棝鍘嗙純?
+     * Update an existing third-party provider.
      */
     updateProvider(id: string, updates: Partial<Omit<ThirdPartyProvider, 'id' | 'createdAt'>>): boolean {
         this.loadProviders();
@@ -3626,7 +3597,7 @@ export class KeyManager {
 
         this.saveProviders();
         this.syncLegacySlotsWithProvider(this.providers[index], previousProvider);
-        this.globalModelListCache = null; // 馃殌 [Fix] 娓呴櫎妯″瀷缂撳瓨锛屼娇涓嬫媺妗嗙珛鍗冲埛鏂?
+        this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
 
         if ((updates.baseUrl !== undefined || updates.apiKey !== undefined || updates.format !== undefined) && !updates.pricingSnapshot) {
@@ -3778,7 +3749,7 @@ export class KeyManager {
 
         this.providers.splice(index, 1);
         this.saveProviders();
-        this.globalModelListCache = null; // 馃殌 [Fix] 娓呴櫎妯″瀷缂撳瓨锛屼娇涓嬫媺妗嗙珛鍗冲埛鏂?
+        this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
         return true;
     }
@@ -3836,7 +3807,7 @@ export class KeyManager {
     }
 
     /**
-     * 鑷姩浠庝緵搴斿晢鐨?/api/pricing 鎺ュ彛鎷夊彇浠锋牸琛ㄥ苟淇濆瓨蹇収
+     * Fetch /api/pricing from a provider and persist the snapshot for later use.
      */
     async syncProviderPricingDetailed(providerId: string): Promise<{
         ok: boolean;
@@ -4007,29 +3978,33 @@ export class KeyManager {
 
 // Singleton instance
 export const keyManager = new KeyManager();
+adminModelService.registerModelRefreshHandler(() => {
+    keyManager.clearGlobalModelListCache();
+    keyManager.forceNotify();
+});
 // Force Vite HMR Cache Invalidation: 2026-03-02-03-05
 
 export default keyManager;
 
 // ============================================================================
-// 棣冨晭 闀婎亜濮╁Ο鈥崇€峰Λ鈧ù瀚旀嫲闁板矕鐤嗛敺鐔诲厴
+// API type detection helpers
 // ============================================================================
 
 /**
- * 濡偓濞村PI缁鐎?
+ * Detect the general API type from the key prefix and base URL.
  */
 export function detectApiType(apiKey: string, baseUrl?: string): 'google-official' | 'openai' | 'proxy' | 'unknown' {
-    // Google鐎规ɑ鏌烝PI
+    // Google official API
     if (apiKey.startsWith('AIza') || baseUrl?.includes('googleapis.com') || baseUrl?.includes('generativelanguage.googleapis.com')) {
         return 'google-official';
     }
 
-    // OpenAI鐎规ɑ鏌烝PI
+    // OpenAI official API
     if (apiKey.startsWith('sk-') && (!baseUrl || baseUrl.includes('api.openai.com'))) {
         return 'openai';
     }
 
-    // 缁楊兛绗侀弬閫涘敩閻炲棴绾窷ewAPI/One API缁涘绾?
+    // Other non-Google endpoints are treated as proxy-compatible APIs
     if (baseUrl && !baseUrl.includes('googleapis.com') && baseUrl.length > 0) {
         return 'proxy';
     }
@@ -4160,8 +4135,7 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
 }
 
 /**
- * 闀婎亜濮╅姰宄板絿OpenAI閸忕厧顔怉PI闀勫嫭膩閸ㄥ珨鍨悰?
- * 棣冩畬 [Enhancement] 闀婎亜濮╅摗濠氬惃閿涙氨些闂勩倕寮弫鏉挎倵缂傗偓閿涘苯褰ф穱婵堟殌閸烆垯绔撮晞鍕唨绾偓濡€崇€?
+ * Fetch models from an OpenAI-compatible endpoint and normalize the response.
  */
 export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): Promise<string[]> {
     try {
@@ -4193,9 +4167,9 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
 
         console.log('[KeyManager] /v1/models response:', { count: rawModels.length, firstModel: rawModels.length > 0 ? rawModels[0]?.id || rawModels[0] : null, dataType: typeof data.data, hasObjectField: !!data.object });
 
-        // 閾″鍚ㄧ粵鏍瑎╅敍?
-        // - 皤攧鍛滈哺閻?鐠愩劑鍣?濮ｆ柧绶ラ挅搴ｇ磻鐟欏棔璐熼挰婊冨棘閺佹澘鐎烽挅搴ｇ磻閽８ｈ嫙榭旀ˇ褰?
-        // - 韫囶偊鈧?閹便垽鈧?fast/slow)鐟欏棔璐熼挰婊嗗厴閿锋稑鐎烽挅搴ｇ磻閽８ｈ嫙娣囨繄鏆€
+        // Deduplicate models by canonical name:
+        // - Prefer the base name over stage suffixes when both exist
+        // - Collapse speed variants (for example fast/slow) to a single entry
         const rawSet = new Set(rawModels.map(m => m.id));
         const deduped = new Map<string, string>(); // canonical -> chosen model string
 
@@ -4311,14 +4285,14 @@ export function categorizeModels(models: string[]): {
             lowerModel.includes('img')) {
             categories.imageModels.push(model);
         }
-        // 娴兼ˇ鍘涚痪?: 闀靛﹤銇夊Ο鈥崇€?
+        // Heuristic: treat mainstream chat families as chat models
         else if (lowerModel.includes('gemini') ||
             lowerModel.includes('gpt') ||
             lowerModel.includes('claude') ||
             lowerModel.includes('chat')) {
             categories.chatModels.push(model);
         }
-        // 閸忔湹绮? 閾绢亜鍨庣猾缁樐侀崹?
+        // Everything else falls into the catch-all category
         else {
             categories.otherModels.push(model);
         }
@@ -4346,7 +4320,7 @@ export async function autoDetectAndConfigureModels(
         baseUrl,
         apiType === 'google-official' ? 'gemini' : 'openai'
     );
-    console.log('[KeyManager] 濡偓濞村珨鍩孉PI缁鐎?', apiType);
+    console.log('[KeyManager] API type resolved:', apiType);
 
     let models: string[] = [];
     const runtime = resolveProviderRuntime({

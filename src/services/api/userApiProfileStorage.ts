@@ -1,9 +1,6 @@
-import { supabase } from '../../lib/supabase';
+import type { ApiResponse } from '../../../packages/contracts/src/index';
 import type { ApiProtocolFormat } from './apiConfig';
-import {
-  extractUserApiEntriesFromPayload,
-  mergeUserApisPayload,
-} from './userApiPayload';
+import { legacyWebApiClient } from './kkApiClient';
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
@@ -146,100 +143,31 @@ function normalizeEntries(rawEntries: unknown): StoredUserApiEntry[] {
   return rawEntries.map((entry) => normalizeEntry(entry));
 }
 
-async function getCurrentUserOrThrow() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    throw error || new Error('User is not authenticated');
+function unwrapOrThrow<T>(response: ApiResponse<T>, fallback: string): T {
+  if (response.success) {
+    return response.data;
   }
 
-  return user;
-}
-
-async function ensureProfile(userId: string, email?: string | null) {
-  const timestamp = new Date().toISOString();
-  const { error } = await supabase.from('profiles').upsert(
-    {
-      id: userId,
-      email: email || null,
-      user_apis: [],
-      updated_at: timestamp,
-    },
-    {
-      onConflict: 'id',
-      ignoreDuplicates: false,
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
+  throw new Error(response.error?.message || fallback);
 }
 
 export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
-  const user = await getCurrentUserOrThrow();
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('user_apis')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    await ensureProfile(user.id, user.email);
-    return [];
-  }
-
-  return normalizeEntries(extractUserApiEntriesFromPayload(data.user_apis));
+  const response = await legacyWebApiClient.getUserApiEntries();
+  const data = unwrapOrThrow(response, 'Failed to load user API entries.');
+  return normalizeEntries(data.entries);
 }
 
 export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise<void> {
-  const user = await getCurrentUserOrThrow();
-  const timestamp = new Date().toISOString();
   const normalizedEntries = entries.map((entry) =>
     normalizeEntry({
       ...entry,
       updatedAt: Date.now(),
     }),
   );
-
-  const { data: existingProfile, error: existingError } = await supabase
-    .from('profiles')
-    .select('user_apis')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (existingError) {
-    throw existingError;
-  }
-
-  const mergedPayload = mergeUserApisPayload(existingProfile?.user_apis, {
+  const response = await legacyWebApiClient.replaceUserApiEntries({
     entries: normalizedEntries,
   });
-
-  const { error } = await supabase.from('profiles').upsert(
-    {
-      id: user.id,
-      email: user.email || null,
-      user_apis: mergedPayload,
-      updated_at: timestamp,
-    },
-    {
-      onConflict: 'id',
-      ignoreDuplicates: false,
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
+  unwrapOrThrow(response, 'Failed to save user API entries.');
 }
 
 export async function mutateUserApiEntries(

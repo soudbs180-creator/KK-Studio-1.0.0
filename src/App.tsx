@@ -233,10 +233,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
-    setViewportCenter, // 🎯 视口中心鍔ㄦ€佷紭鍏堢骇
-    state, // 🎯 杩佺Щ闇€瑕佽闂甤anvases列表
-    migrateNodes, // 🎯 杩佺Щ鑺傜偣鍒板叾浠栭」鐩?
-    createCanvas, // 🎯 创建鏂伴」鐩?
+    setViewportCenter, // 🎯 视口中心动态优先级
+    state, // 🎯 迁移功能需要访问 canvases 列表
+    migrateNodes, // 🎯 迁移节点到其他项目
+    createCanvas, // 🎯 创建新项目
     switchCanvas  // 🎯 切换项目
   } = useCanvas();
 
@@ -479,7 +479,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
-    // 1. 缂栫粍閫昏緫 (浼樺厛处理鐢诲竷缂栫粍)
+    // 1. Group traversal (prioritize canvas groups)
     const group = canvas.groups.find(g => g.nodeIds.includes(imageId));
     let list: GeneratedImage[] = [];
 
@@ -487,7 +487,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       list = canvas.imageNodes.filter(n => group.nodeIds.includes(n.id))
         .sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x));
     } else {
-      // 2. 提示璇嶅鏃?Lineage)閫昏緫鏍?(鍖呭惈鐖跺浘銆佸彉浣撱€佹墿鍥俱€侀噸缁樼殑鏁存潯琛嶇敓閾?
+      // 2. Prompt lineage traversal (include parent images, variants, expansions, and redraw descendants)
       const graphImages = new Set<string>();
       const queue = [imageId];
 
@@ -497,7 +497,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           graphImages.add(currId);
           const img = canvas.imageNodes.find(n => n.id === currId);
           if (img) {
-            // 鍚戜笂鎵撅細鍚岀骇鐨勫厔寮熷浘鐗囷紝浠ュ強瀛曡偛杩欎釜Prompt鐨勭埗图片
+            // Walk upward: sibling images under the same prompt, plus the parent image that spawned this prompt
             const prompt = canvas.promptNodes.find(p => p.id === img.parentPromptId);
             if (prompt) {
               prompt.childImageIds?.forEach(id => {
@@ -507,7 +507,7 @@ const AppContent: React.FC<AppContentProps> = () => {
                 queue.push(prompt.sourceImageId);
               }
             }
-            // 鍚戜笅鎵撅細浠ュ綋鍓嶅浘鐗囦綔涓虹埗鍥捐鐢熷嚭鐨勫瓙鍗＄粍图片
+            // Walk downward: child prompt groups generated from the current image
             const childPrompts = canvas.promptNodes.filter(p => p.sourceImageId === currId);
             childPrompts.forEach(cp => {
               cp.childImageIds?.forEach(id => {
@@ -607,21 +607,21 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Mobile Nav Bar Visibility (Swipe to Show, Auto Hide)
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(false);
   const mobileNavTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [isPromptFocused, setIsPromptFocused] = useState(false); // 跟踪输入妗嗙劍鐐圭姸鎬?
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false); // 跟踪渚ц竟鏍廻over状态
-  const lastMouseMoveRef = useRef<number>(Date.now()); // 记录鏈€后一娆￠紶鏍囩Щ鍔ㄦ椂闂?
+  const [isPromptFocused, setIsPromptFocused] = useState(false); // Track prompt input focus state
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false); // Track sidebar hover state
+  const lastMouseMoveRef = useRef<number>(Date.now()); // Track the last mouse movement time
 
   const handleShowMobileNav = useCallback(() => {
     const timeSinceLastMouseMove = Date.now() - lastMouseMoveRef.current;
-    const isMouseActive = timeSinceLastMouseMove < 5000; // 5绉掑唴鏈夐紶鏍囨椿鍔?
+    const isMouseActive = timeSinceLastMouseMove < 5000; // Treat the mouse as active if it moved within the last 5 seconds
 
     console.log('[handleShowMobileNav] isPromptFocused:', isPromptFocused, 'isSidebarHovered:', isSidebarHovered, 'isMouseActive:', isMouseActive);
     setIsMobileNavVisible(true);
-    // 清除鏃у畾鏃跺櫒
+    // Clear any existing timer
     if (mobileNavTimerRef.current) {
       clearTimeout(mobileNavTimerRef.current);
     }
-    // 濡傛灉输入妗嗘湁鐒︾偣銆侀紶鏍囧湪渚ц竟鏍忎笂銆佹垨榧犳爣姝ｅ湪娲诲姩,涓嶈缃嚜鍔ㄩ殣钘忓畾鏃跺櫒
+    // Skip auto-hide while the input is focused, the sidebar is hovered, or the mouse is active
     if (!isPromptFocused && !isSidebarHovered && !isMouseActive) {
       console.log('[handleShowMobileNav] 设置 5 秒自动隐藏定时器');
       mobileNavTimerRef.current = setTimeout(() => {
@@ -640,11 +640,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, []);
 
-  // 鍏ㄥ眬榧犳爣移动鐩戝惉 - 重置瀹氭椂鍣?
+  // Global mouse movement listener used to reset the timer
   useEffect(() => {
     const handleGlobalMouseMove = () => {
       lastMouseMoveRef.current = Date.now();
-      // 榧犳爣移动鏃?濡傛灉渚ц竟鏍忓彲瑙佷笖娌℃湁娲诲姩瀹氭椂鍣?重新显示骞堕噸缃畾鏃跺櫒
+      // When the mouse moves and the nav is visible, refresh the visibility timer
       if (isMobileNavVisible) {
         handleShowMobileNav();
       }
@@ -813,10 +813,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         setShowStorageModal(true);
       } else {
         // Mode exists -> Check Keys for API Panel
-        // 🎯 [修复] 浠呭棣栨用户显示 API 设置闈㈡澘锛岃繑鍥炵敤鎴蜂笉鑷姩寮瑰嚭
+        // Only show the API settings panel for first-time users; do not auto-open it for returning users
         const hasKeys = keyManager.hasValidKeys();
         if (!hasKeys && !hasLoggedInBefore && !isDevMode) {
-          // 鍙湁棣栨用户鎵嶈嚜鍔ㄥ脊鍑?API 设置闈㈡澘
+          // Only first-time users should see the API settings panel automatically
           openSettingsSurface('api-management');
         }
         setIsStorageChecked(true);
@@ -856,7 +856,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const parsed = JSON.parse(saved);
         // Merge with defaults to ensure all fields exist
         return {
-          prompt: parsed.prompt || '', // 🎯 恢复鎸佷箙鍖栫殑 Prompt
+          prompt: parsed.prompt || '', // Restore the persisted prompt
           enablePromptOptimization: parsed.enablePromptOptimization || false,
           promptOptimizationMode: parsed.promptOptimizationMode === 'custom' ? 'custom' : 'auto',
           promptOptimizationTemplateId: parsed.promptOptimizationTemplateId || getDefaultPromptOptimizerTemplateId(parsed.mode || GenerationMode.IMAGE),
@@ -864,10 +864,10 @@ const AppContent: React.FC<AppContentProps> = () => {
           aspectRatio: AspectRatio.AUTO, // [Default: Auto]
           imageSize: ImageSize.SIZE_1K,
           parallelCount: parsed.parallelCount || 1,
-          // 🎯 [Fix] 恢复鍙傝€冨浘鍏冩暟鎹紙涓嶅惈 base64锛夛紝璁?hydrate effect 浠?IndexedDB 还原图片数据
+          // Restore reference image metadata without base64; hydrate the binary data from IndexedDB later
           referenceImages: (parsed.referenceImages || []).map((img: any) => ({
             ...img,
-            data: undefined // data 闇€瑕佷粠 IndexedDB hydrate锛屼笉浠?localStorage 恢复
+            data: undefined // Binary data is hydrated from IndexedDB, not localStorage
           })),
           model: parsed.model || KnownModel.IMAGEN_4,
           enableGrounding: parsed.enableGrounding || false,
@@ -1136,21 +1136,21 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const [isCanvasTransforming, setIsCanvasTransforming] = useState(false);
 
-  // 🎯 同步视口中心鍒癈anvasContext锛堢敤浜庡姩鎬佷紭鍏堢骇加载锛?
+  // Sync the viewport center into CanvasContext for prioritized loading
   useEffect(() => {
-    // 计算当前视口中心鍦ㄧ敾甯冨潗鏍囦腑鐨勪綅缃?
+    // Compute the current viewport center in canvas coordinates
     const centerX = (window.innerWidth / 2 - canvasTransform.x) / canvasTransform.scale;
     const centerY = (window.innerHeight / 2 - canvasTransform.y) / canvasTransform.scale;
     setViewportCenter({ x: centerX, y: centerY });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasTransform]); // 🎯 移除setViewportCenter渚濊禆闃叉鏃犻檺循环
+  }, [canvasTransform]); // Exclude setViewportCenter to avoid an infinite loop
 
   // Derived Pending Position: Always Center (or linked to source)
   const pendingPosition = React.useMemo(() => {
     if (activeSourceImage && activeCanvas) {
       const sourceImage = activeCanvas.imageNodes.find(img => img.id === activeSourceImage);
       if (sourceImage) {
-        // 🎯 杩介棶模式锛氭柊涓诲崱鏀惧湪鍘熺埗鍗＄粍下方
+        // Follow-up mode: place the new parent card below the original parent group
         const parentPromptId = sourceImage.parentPromptId;
         const parentPromptRaw = activeCanvas.promptNodes.find(p => p.id === parentPromptId);
         const parentPrompt = parentPromptRaw
@@ -1158,25 +1158,25 @@ const AppContent: React.FC<AppContentProps> = () => {
           : undefined;
 
         if (parentPrompt) {
-          // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝计算鏈€澶位置
+          // Find all child cards below the parent prompt and compute the maximum Y
           const siblingImages = activeCanvas.imageNodes.filter(img => img.parentPromptId === parentPromptId);
-          let maxY = parentPrompt.position.y; // 鐖朵富鍗＄殑Y位置锛堝簳閮ㄩ敋鐐癸級
+          let maxY = parentPrompt.position.y; // Parent prompt Y position (bottom anchor)
 
-          // 计算鎵€鏈夊瓙鍗＄殑鏈€澶位置锛堝簳閮級
+          // Compute the maximum bottom Y across all child cards
           siblingImages.forEach(img => {
             const { totalHeight } = getCardDimensions(img.aspectRatio, true);
             const imgBottom = img.position.y + totalHeight;
             maxY = Math.max(maxY, imgBottom);
           });
 
-          const GAP = 60; // 鏂颁富鍗′笌瀛愬崱缁勭殑闂磋窛
+          const GAP = 60; // Gap between the new parent card and the child-card group
           return {
-            x: parentPrompt.position.x,  // 涓庣埗涓诲崱X瀵归綈
-            y: maxY + GAP  // 鏀惧湪鏈€下方瀛愬崱鐨勪笅闈?
+            x: parentPrompt.position.x,  // Align with the parent prompt on the X axis
+            y: maxY + GAP  // Place the card below the lowest child card
           };
         }
 
-        // 濡傛灉娌℃湁鐖朵富鍗★紙瀛ゅ効鍓崱锛夛紝鏀惧湪婧愬浘鐗囦笅鏂?
+        // If there is no parent prompt (orphan child card), place it below the source image
         let sourceHeight = 320;
         if (sourceImage.dimensions) {
           const [w, h] = sourceImage.dimensions.split('x').map(Number);
@@ -1198,7 +1198,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
     }
     // Smart Center Placement - Manual Mode (Always Center)
-    // 🎯 [Fix] 使用 InfiniteCanvas 鐨勫疄闄呭彲瑙佸尯鍩?+ 瀹炴椂 transform 计算绮剧‘中心
+    // Use the actual InfiniteCanvas viewport plus the live transform to compute a precise center
     const currentTf = canvasRef.current?.getCurrentTransform() || canvasTransform;
     const vpRect = canvasRef.current?.getCanvasRect() || null;
     return getViewportPreferredPosition(currentTf, vpRect, 180);
@@ -1211,14 +1211,14 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-  // 🎯 清除杩介棶婧愬浘鐗囷紝鍚屾椂删除杩介棶Draft鑺傜偣
+  // Clear the follow-up source image and remove the empty follow-up draft at the same time
   const handleClearSource = useCallback(() => {
     setActiveSourceImage(null);
-    // 濡傛灉鏈夎拷闂瓺raft涓旀病鏈夊唴瀹癸紝删除瀹?
+    // If the draft belongs to follow-up mode and is empty, remove it
     if (draftNodeId) {
       const draftNode = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
       if (draftNode && draftNode.sourceImageId && !draftNode.prompt.trim()) {
-        // 鍙湁褰揇raft鏄拷闂ā寮?鏈塻ourceImageId)涓旀病鏈夊唴瀹规椂鎵嶅垹闄?
+        // Only remove drafts that still belong to follow-up mode and have no content
         deletePromptNode(draftNodeId);
         setDraftNodeId(null);
       }
@@ -1355,7 +1355,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
         nextSelectionIds = ids;
         if (ids.length > 0) {
-          // 🎯 Shift=鍔犻€? Ctrl=鍑忛€? 鏃犱慨楗伴敭=替换
+          // Shift=add, Ctrl=remove, no modifier=replace
           const mode = e.ctrlKey ? 'remove' : (e.shiftKey ? 'add' : 'replace');
           selectNodes(ids, mode);
         } else {
@@ -1484,7 +1484,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? 'me'
         : 'create';
 
-  // 使用鏂板皝瑁呯殑 CanvasCenter API锛堝紩鍏ヨ嚜 src/utils/canvasCenter.ts锛?
+  // Use the wrapped CanvasCenter API from src/utils/canvasCenter.ts
 
   useEffect(() => {
     const handleResize = () => {
@@ -1751,13 +1751,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     return { x: screenX, y: screenY };
   }, [activeCanvas, canvasTransform, getCardDimensions]);
 
-  // 🎯 瀹氫綅鍗＄粍锛氫紭鍏堝畾浣嶉€変腑鍗＄粍锛屾棤閫変腑鏃跺畾浣嶆渶鏂?
+  // Reset view: prefer the selected group, otherwise fall back to the latest node
   const handleResetView = useCallback(() => {
     if (!activeCanvas) return;
 
-    // 1. 濡傛灉鏈夐€変腑鐨勮妭鐐癸紝浼樺厛瀹氫綅鍒伴€変腑鐨勫崱缁?
+    // 1. If there is a selection, center the view on the selected group first
     if (selectedNodeIds.length > 0) {
-      // 鎵惧埌閫変腑鐨勬彁绀鸿瘝鑺傜偣鍜屽浘鐗囪妭鐐?
+      // Collect the selected prompt and image nodes
       const selectedPrompts = activeCanvas.promptNodes.filter(p => selectedNodeIds.includes(p.id));
       const selectedImages = activeCanvas.imageNodes.filter(img => selectedNodeIds.includes(img.id));
       const selectedWorkflowNodes = (activeCanvas.workflow?.nodes || []).filter(
@@ -1833,7 +1833,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const calc = await import('./utils/imageUtils');
           const storageId = await calc.calculateImageHash(dataUrl.split(',')[1]);
 
-          // 保存鍒板瓨鍌?
+          // Persist to storage
           const storage = await import('./services/storage/imageStorage');
           await storage.saveImage(storageId, dataUrl).catch(err =>
             console.error("Failed to save dropped image", err)
@@ -2709,8 +2709,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     lastGenerateAtRef.current = now;
     lastGenerateSignatureRef.current = { value: submitSignature, at: now };
 
-    // 🎯 [鐪熷疄璁¤垂鎷︽埅涓庢墸闄
-    // 棣栧厛判断鏄惁涓虹郴缁熸寜绉垎璁¤垂鐨勬ā鍨嬶紙鑷繁添加鐨勭涓夋柟娓犻亾妯″瀷鎴栨槑纭甫鏈?@ 鍚庣紑鐨勮皟鐢ㄤ笉璧扮Н鍒嗘祦绋嬶級
+    // Real billing guard and deduction flow
+    // First determine whether this is a credit-billed system model; explicit user-channel routes should not use the credit flow
     const provider = config.model.includes('@') ? config.model.split('@')[1] : undefined;
     const customLocal = (() => {
       try {
@@ -2726,7 +2726,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       hasCustomUserKey
     );
 
-    console.log('[handleGenerate] 璁¤垂检查', {
+    console.log('[handleGenerate] 计费检查', {
       model: config.model,
       provider,
       hasCustomUserKey,
@@ -2768,7 +2768,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         return;
       }
 
-      // 闈炵郴缁熶唬鐞嗙Н鍒嗘ā鍨嬩粛娌跨敤鏃х殑鍓嶇棰勬墸璐规祦绋?
+      // Non-system routed credit models still use the legacy client-side pre-charge flow
       if (requiredCredits > 0 && !useServerSideCreditSettlement) {
         console.log('[handleGenerate] 准备扣费:', { model: config.model, requiredCredits });
         const chargeResult = await consumeCreditsDetailed(config.model, requiredCredits, {
@@ -2782,7 +2782,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           import('./services/system/notificationService').then(({ notify }) => {
             notify.error('生成失败', '您的账户余额不足，请先充值积分。');
           });
-          setShowRechargeModal(true); // 鑷姩寮瑰嚭鍏呭€煎叆鍙?
+          setShowRechargeModal(true); // Automatically open the recharge modal
           return;
         }
         paymentTransactionId = chargeResult.transactionId;
@@ -2894,7 +2894,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           if (safePos.x !== currentPos.x || safePos.y !== currentPos.y) {
             console.log('[handleGenerate] Draft collision detected, shifting to:', safePos);
-            // 馃挕 Persist the shift to canvas state so it doesn't "jump back" or collide with next card
+            // Persist the shifted position to canvas state so it cannot jump back or collide with the next card
             updatePromptNode({ ...draft, position: safePos });
             currentPos = safePos;
           }
@@ -2958,7 +2958,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       const rawPrompt = trimmedPrompt;
       let optimizedPromptEn: string | undefined;
       let optimizedPromptZh: string | undefined;
-      let promptOptimizerResult: any | undefined; // 🎯 [New] 提示璇嶇紪璇戝櫒结果
+      let promptOptimizerResult: any | undefined; // Store the full prompt-optimizer result
 
       if ((config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) && config.enablePromptOptimization && rawPrompt) {
         try {
@@ -2997,7 +2997,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           });
           optimizedPromptEn = optimized.optimizedEn;
           optimizedPromptZh = optimized.optimizedZh;
-          promptOptimizerResult = optimized.fullResult; // 🎯 捕获瀹屾暣缂栬瘧鍣ㄧ粨鏋?
+          promptOptimizerResult = optimized.fullResult; // Capture the full prompt-optimizer result
         } catch (e: any) {
           console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', e);
           import('./services/system/notificationService').then(({ notify }) => {
@@ -3036,7 +3036,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         originalPrompt: rawPrompt,
         optimizedPromptEn,
         optimizedPromptZh,
-        promptOptimizerResult, // 🎯 [New] 存储缂栬瘧鍣ㄧ粨鏋?
+        promptOptimizerResult, // Store the full prompt-optimizer result
         promptOptimizationEnabled: !!(config.enablePromptOptimization && (optimizedPromptEn || promptOptimizerResult)),
         position: currentPos,
         aspectRatio: config.aspectRatio,
@@ -3482,7 +3482,7 @@ const AppContent: React.FC<AppContentProps> = () => {
               const size = executionNode.imageSize?.toLowerCase() || '';
               if (size.includes('4k') || size.includes('ultra')) return '4k';
               if (size.includes('1080') || size.includes('hd')) return '1080p';
-              return '720p'; // 榛樿720p
+              return '720p'; // Default to 720p
             })();
             const videoAspect = executionNode.aspectRatio === '9:16' ? '9:16' : '16:9';
             const videoResult = await llmService.generateVideo({
@@ -3573,9 +3573,9 @@ const AppContent: React.FC<AppContentProps> = () => {
           // if the API downgraded it.
           let actualWidth = 1024;
           let actualHeight = 1024;
-          let displayDimensions = `${node.aspectRatio} 路 ${node.imageSize || '1K'}`;
+          let displayDimensions = `${node.aspectRatio} · ${node.imageSize || '1K'}`;
           let computedImageSize = node.imageSize || 'SIZE_1K'; // Default fallback
-          displayDimensions = `${executionNode.aspectRatio} 璺?${executionNode.imageSize || '1K'}`;
+          displayDimensions = `${executionNode.aspectRatio} · ${executionNode.imageSize || '1K'}`;
           computedImageSize = executionNode.imageSize || 'SIZE_1K';
 
           try {
@@ -3963,7 +3963,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       <div class="card">
         <img src="../${p.file}" alt="${String(p.title).replace(/"/g, '&quot;')}" />
         <div class="meta">
-          <div class="title">绗?{p.page}椤?路 ${String(p.title).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+          <div class="title">第 ${p.page} 页 · ${String(p.title).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
           <div>${String(p.prompt || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
         </div>
       </div>`).join('')}
@@ -5007,49 +5007,49 @@ ${slideLayerXml.join('\n')}
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
-    // 🎯 绔嬪嵆创建杩介棶模式鐨凞raft鑺傜偣
-    // 删除鐜版湁鐨刣raft锛堝鏋滄湁锛?
+    // Create the follow-up draft node immediately
+    // Remove the existing draft first, if any
     if (draftNodeId) {
       deletePromptNode(draftNodeId);
     }
 
-    // 计算杩介棶Draft鐨勪綅缃紙鍦ㄧ埗鍗＄粍下方锛?
+    // Compute the follow-up draft position below the parent group
     const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
     if (sourceImage) {
       const parentPromptId = sourceImage.parentPromptId;
       const parentPrompt = activeCanvas?.promptNodes.find(p => p.id === parentPromptId);
 
-      // 🎯 计算婧愬浘鐗囩殑底部Y锛堝浘鐗囦娇鐢ㄥ簳閮ㄩ敋鐐癸紝position.y灏辨槸底部锛?
+      // For images, position.y is already the bottom anchor
       const sourceBottom = sourceImage.position.y;
 
-      let draftPos = { x: sourceImage.position.x, y: sourceBottom + 100 }; // fallback锛氭簮图片下方100px
+      let draftPos = { x: sourceImage.position.x, y: sourceBottom + 100 }; // Fallback: 100px below the source image
 
       if (parentPrompt) {
-        // 鎵惧埌鐖朵富鍗′笅鎵€鏈夊瓙鍗★紝计算鏈€澶位置锛堝簳閮級
+        // Find all sibling child cards and compute the maximum bottom Y
         const siblingImages = activeCanvas?.imageNodes.filter(img => img.parentPromptId === parentPromptId) || [];
-        let maxY = parentPrompt.position.y; // 涓诲崱底部閿氱偣
+        let maxY = parentPrompt.position.y; // Parent prompt bottom anchor
 
         siblingImages.forEach(img => {
-          // 🎯 FIX: 图片使用底部閿氱偣锛宲osition.y灏辨槸底部锛屾棤闇€鍐嶅姞楂樺害
+          // Images already use a bottom anchor, so no extra height is needed
           maxY = Math.max(maxY, img.position.y);
         });
 
         draftPos = {
           x: sourceImage.position.x,
-          y: maxY + 80  // 鍦ㄦ渶底部鐨勫崱鐗囦笅鏂?0px
+          y: maxY + 80  // 80px below the lowest card
         };
       }
 
       const newId = Date.now().toString();
       addPromptNode({
         id: newId,
-        prompt: '',  // 绌簆rompt锛岀瓑寰呯敤鎴疯緭鍏?
+        prompt: '',  // Empty prompt; wait for user input
         position: draftPos,
         aspectRatio: config.aspectRatio,
         imageSize: config.imageSize,
         model: config.model,
         childImageIds: [],
-        referenceImages: [],  // 婧愬浘鐗囦細鍦╤andleGenerate鏃惰嚜鍔ㄦ坊鍔?
+        referenceImages: [],  // The source image will be attached automatically in handleGenerate
         timestamp: Date.now(),
         sourceImageId: imageId,
         isDraft: true,
@@ -5349,11 +5349,11 @@ ${slideLayerXml.join('\n')}
       })
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
-    // 2. Filter Prompt Nodes (排除绾緟鍛借崏绋匡紝浣嗕繚鐣欐鍦ㄧ敓鎴愮殑鑺傜偣)
+    // 2. Filter prompt nodes (hide idle drafts, but keep nodes that are generating)
     const visiblePromptNodes = activeCanvas.promptNodes
       .filter(n => {
-        // 🎯 [Fix] 鍙湁褰撳崱鐗囦粎浠呮槸闈欐€佽崏绋匡紙闈炵敓鎴愪腑锛夋椂鎵嶉殣钘忥紝因为瀹冪敱中心控制鏍忚礋璐ｆ覆鏌撱€?
-        // 涓€鏃﹁繘鍏ョ敓鎴愮姸鎬?(n.isGenerating)锛屽畠闇€瑕佸嚭鐜板湪鐢诲竷涓娿€?
+        // Hide a node only when it is a static draft; the active center control is responsible for rendering it
+        // Once it enters generating state, it must appear on the canvas
         if (n.isDraft && !n.isGenerating) {
           return false;
         }
@@ -7110,11 +7110,11 @@ ${slideLayerXml.join('\n')}
       )}
       {/* Selection Menu Overlay */}
       {selectionMenuPosition && selectedNodeIds.length > 0 && (() => {
-        // 🎯 计算璇︾粏统计锛氱粍鏁?图片鏁?视频鏁?
+        // Compute detailed selection stats: prompt groups, images, and videos
         const selectedPrompts = activeCanvas?.promptNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
         const selectedImages = activeCanvas?.imageNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
 
-        const groupCount = selectedPrompts.length; // 涓诲崱 = 缁?
+        const groupCount = selectedPrompts.length; // Prompt cards count as groups
         const videoCount = selectedImages.filter(img =>
           img.mode === GenerationMode.VIDEO ||
           img.url?.includes('.mp4') ||
@@ -7339,15 +7339,15 @@ ${slideLayerXml.join('\n')}
         }}
         onAutoArrange={handleAutoArrange}
         onResetView={() => {
-          // 瀹氫綅鍒版渶鏂扮敓鎴愮殑鍗＄墖
+          // Focus the most recently generated card
           const latestImage = activeCanvas?.imageNodes[activeCanvas.imageNodes.length - 1];
           const latestPrompt = activeCanvas?.promptNodes[activeCanvas.promptNodes.length - 1];
 
-          // 浼樺厛瀹氫綅鍒版渶鏂扮殑图片,濡傛灉娌℃湁鍒欏畾浣嶅埌鏈€鏂扮殑提示璇?
+          // Prefer the latest image; if none exists, fall back to the latest prompt
           const targetNode = latestImage || latestPrompt;
 
           if (targetNode && canvasRef.current) {
-            // 使用InfiniteCanvas鐨剆etView鏂规硶瀹氫綅鍒扮洰鏍囧崱鐗?
+            // Use InfiniteCanvas.setView to center the target card
             const container = document.getElementById('canvas-container');
             if (container) {
               const rect = container.getBoundingClientRect();
@@ -7687,7 +7687,7 @@ ${slideLayerXml.join('\n')}
 
 
 
-        {/* 2. 缂栫粍灞?(浣嶄簬鍗＄墖鍚庢柟) */}
+        {/* 2. Group layer (behind the cards) */}
         {false && visibleGroups.map(group => (
           <CanvasGroupComponent
             key={group.id}
@@ -7979,7 +7979,7 @@ ${slideLayerXml.join('\n')}
           onBlur={() => {
             console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
             setIsPromptFocused(false);
-            // 澶卞幓鐒︾偣鍚?绔嬪嵆重新设置5绉掑畾鏃跺櫒
+            // When focus leaves the prompt, restart the 5-second auto-hide timer immediately
             setTimeout(() => handleShowMobileNav(), 0);
           }}
         />
@@ -8114,10 +8114,10 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* [NEW] Draft Node Overlay (Fixed Center) - 🎯 [宸茬鐢╙ 用户涓嶆兂瑕佽拷闂椂鐨勯瑙堝崱鐗?*/}
+      {/* [NEW] Draft node overlay (fixed center) - disabled because users do not want a follow-up preview card */}
       {/* {draftNodeId && (() => {
         const draftNode = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
-        // 🎯 [Fix] 鍙湁褰撹妭鐐逛粛鐒舵槸鑽夌鏃舵墠显示鍙犲姞灞傦紝鐢熸垚涓殑鑺傜偣搴旇鍙湪鐢诲竷涓婃樉绀?
+        // Show the overlay only while the node is still a draft; generating nodes should render on the canvas
         if (!draftNode || !draftNode.isDraft) return null;
 
         // Mock position 0,0 for component, handle centering via container
@@ -8160,7 +8160,7 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* 鍏ㄥ眬鐏涓庢悳绱㈤潰鏉?(搜索闈㈡澘缃簬底部锛岀伅绠辩疆浜庢渶涓婂眰) */}
+      {/* Global lightbox and search panel (search sits near the bottom, the lightbox stays on top) */}
       {previewImages && (
         <Suspense fallback={null}>
           <GlobalLightbox
@@ -8172,8 +8172,8 @@ ${slideLayerXml.join('\n')}
             onDownloadPptComposite={handleDownloadPptComposite}
             onInpaint={(image, maskBase64, prompt) => {
               const userPrompt = (prompt || '局部重绘').trim();
-              // 🎯 [绠€鍖栧榻怾 杩欓噷鐨?prompt 灏嗕細杩涘叆优化鍣紝因此涓嶉渶瑕佸甫鏈夊お閲嶇殑纭紪鐮佷腑鏂囨寚浠ゃ€?
-              // 鍙渶瑕佹爣鏄庢牳蹇冩剰鍥撅細濡傛灉鏄?mask锛屽己璋冧慨鏀规秱鎶瑰尯鍩燂紱濡傛灉鏄叏灞€鍙傝€冿紝寮鸿皟閲嶇粯銆?
+              // Keep this prompt light: it will be sent through the optimizer, so we do not need heavy hard-coded instructions here
+              // Just state the core intent: masked edits should stay inside the mask, while full-image references should guide a remix
               const finalPrompt = maskBase64
                 ? `${userPrompt} (change masked area only)`
                 : `${userPrompt} (remix based on image)`;
@@ -8275,8 +8275,8 @@ ${slideLayerXml.join('\n')}
       )}
 
 
-      {/* AI鑱婂ぉ鎸夐挳 - 鍙充笅瑙掑浐瀹?*/}
-      {/* AI鑱婂ぉ鎸夐挳 - 鍙充笅瑙掑浐瀹?*/}
+      {/* AI chat button - fixed in the bottom-right corner */}
+      {/* AI chat button - fixed in the bottom-right corner */}
       {false && <div className="absolute bottom-6 z-50 transition-all duration-300 hidden md:block" style={{ right: isChatOpen ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))` : '48px' }}>
         <button
           id="chat-trigger-button"
@@ -8299,10 +8299,10 @@ ${slideLayerXml.join('\n')}
             <div className="circle circle-1"></div>
           </div>
 
-          {/* 钃濊壊鍗婇€忔槑閬僵灞?*/}
+          {/* Soft blue overlay */}
           <div className="absolute inset-0 rounded-full bg-blue-500/15 z-[1]"></div>
 
-          {/* 鏄熷厜图标 - 鎮仠鏃剁紦鎱㈡棆杞?0搴?*/}
+          {/* Spark icon - rotate slowly on hover */}
           <svg
             className="ai-chat-icon relative z-10"
             width="24"
@@ -8338,19 +8338,19 @@ ${slideLayerXml.join('\n')}
             currentCanvasId={state.activeCanvasId}
             selectedCount={selectedNodeIds.length}
             onMigrate={(targetCanvasId) => {
-          // 🎯 处理"新建项目骞惰縼绉?
+          // Handle the "create a new project and migrate" path
           if (targetCanvasId === '__new__') {
-            // 创建鏂伴」鐩紙返回鏂扮敾甯僆D锛?
+            // Create the new project and receive the new canvas ID
             const newCanvasId = createCanvas();
             if (newCanvasId) {
-              // 🎯 鐩存帴使用返回鐨勬柊鐢诲竷ID杩涜杩佺Щ锛屾棤闇€等待state更新
-              // 保存当前项目ID鐢ㄤ簬杩佺Щ
+              // Use the returned canvas ID directly for migration instead of waiting for state updates
+              // Keep the current project ID so we can migrate from it
               const originalCanvasId = state.activeCanvasId;
 
-              // 切换鍥炲師项目执行杩佺Щ
+              // Switch back to the original project before running the migration
               switchCanvas(originalCanvasId);
 
-              // 绋嶇瓑涓€涓嬬‘淇濆垏鎹㈠畬鎴愬悗执行杩佺Щ
+              // Wait briefly for the canvas switch to settle, then migrate
               setTimeout(() => {
                 migrateNodes(selectedNodeIds, newCanvasId);
                 switchCanvas(newCanvasId);
@@ -8361,7 +8361,7 @@ ${slideLayerXml.join('\n')}
               }, 50);
             }
           } else {
-            // 杩佺Щ鍒扮幇鏈夐」鐩?
+            // Migrate into an existing project
             migrateNodes(selectedNodeIds, targetCanvasId);
           }
           setShowMigrateModal(false);

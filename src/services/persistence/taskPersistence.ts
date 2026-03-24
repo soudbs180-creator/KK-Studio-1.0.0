@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { GenerationMode } from '../../types';
+import { tempUserService } from '../auth/tempUserService';
 
 export type TaskType = 'image' | 'video' | 'audio';
 
@@ -23,9 +24,97 @@ export interface PersistedTask {
   completedAt?: string;
 }
 
-/**
- * 保存任务到数据库
- */
+const TASK_STORAGE_PREFIX = 'kk_studio_generation_tasks';
+const DEFAULT_TASK_LIMIT = 50;
+
+function buildTaskRecordId(taskId: string): string {
+  return `task_${taskId}`;
+}
+
+async function resolveStorageUserId(): Promise<string | null> {
+  const tempUser = tempUserService.getCachedTempUser();
+  if (tempUser?.user?.id) {
+    return tempUser.user.id;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+}
+
+function buildStorageKey(userId: string): string {
+  return `${TASK_STORAGE_PREFIX}:${userId}`;
+}
+
+function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
+  const nowIso = new Date().toISOString();
+  return {
+    id: String(raw.id || buildTaskRecordId(String(raw.taskId || nowIso))),
+    taskId: String(raw.taskId || ''),
+    taskType: raw.taskType === 'video' || raw.taskType === 'audio' ? raw.taskType : 'image',
+    status:
+      raw.status === 'processing'
+        || raw.status === 'completed'
+        || raw.status === 'failed'
+        ? raw.status
+        : 'pending',
+    prompt: raw.prompt,
+    model: raw.model,
+    aspectRatio: raw.aspectRatio,
+    imageSize: raw.imageSize,
+    resultUrls: Array.isArray(raw.resultUrls) ? raw.resultUrls.map((item) => String(item)) : [],
+    errorMessage: raw.errorMessage,
+    cost: typeof raw.cost === 'number' ? raw.cost : undefined,
+    tokens: typeof raw.tokens === 'number' ? raw.tokens : undefined,
+    canvasId: raw.canvasId,
+    promptNodeId: raw.promptNodeId,
+    createdAt: raw.createdAt || nowIso,
+    updatedAt: raw.updatedAt || raw.createdAt || nowIso,
+    completedAt: raw.completedAt,
+  };
+}
+
+function loadTasksForUser(userId: string): PersistedTask[] {
+  try {
+    const stored = localStorage.getItem(buildStorageKey(userId));
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((task): task is Partial<PersistedTask> => Boolean(task) && typeof task === 'object')
+      .map((task) => normalizeTask(task))
+      .filter((task) => Boolean(task.taskId));
+  } catch (error) {
+    console.error('[TaskPersistence] Failed to load local tasks:', error);
+    return [];
+  }
+}
+
+function saveTasksForUser(userId: string, tasks: PersistedTask[]): void {
+  try {
+    localStorage.setItem(buildStorageKey(userId), JSON.stringify(tasks));
+  } catch (error) {
+    console.error('[TaskPersistence] Failed to save local tasks:', error);
+  }
+}
+
+async function withUserTasks<T>(
+  action: (userId: string, tasks: PersistedTask[]) => T | Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    const userId = await resolveStorageUserId();
+    if (!userId) return fallback;
+
+    const tasks = loadTasksForUser(userId);
+    return await action(userId, tasks);
+  } catch (error) {
+    console.error('[TaskPersistence] Local task persistence failed:', error);
+    return fallback;
+  }
+}
+
 export async function saveTask(params: {
   taskId: string;
   taskType: TaskType;
@@ -36,44 +125,42 @@ export async function saveTask(params: {
   canvasId?: string;
   promptNodeId?: string;
 }): Promise<PersistedTask | null> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+  return withUserTasks((userId, tasks) => {
+    const nowIso = new Date().toISOString();
+    const existingIndex = tasks.findIndex((task) => task.taskId === params.taskId);
+    const previous = existingIndex >= 0 ? tasks[existingIndex] : undefined;
 
-    const { data, error } = await supabase
-      .from('generation_tasks')
-      .upsert({
-        user_id: user.id,
-        task_id: params.taskId,
-        task_type: params.taskType,
-        status: 'pending',
-        prompt: params.prompt,
-        model: params.model,
-        aspect_ratio: params.aspectRatio,
-        image_size: params.imageSize,
-        canvas_id: params.canvasId,
-        prompt_node_id: params.promptNodeId,
-      }, {
-        onConflict: 'user_id,task_id'
-      })
-      .select()
-      .single();
+    const nextTask = normalizeTask({
+      ...previous,
+      id: previous?.id || buildTaskRecordId(params.taskId),
+      taskId: params.taskId,
+      taskType: params.taskType,
+      status: previous?.status === 'completed' || previous?.status === 'failed'
+        ? previous.status
+        : 'pending',
+      prompt: params.prompt,
+      model: params.model,
+      aspectRatio: params.aspectRatio,
+      imageSize: params.imageSize,
+      canvasId: params.canvasId,
+      promptNodeId: params.promptNodeId,
+      createdAt: previous?.createdAt || nowIso,
+      updatedAt: nowIso,
+      completedAt: previous?.completedAt,
+      resultUrls: previous?.resultUrls || [],
+    });
 
-    if (error) {
-      console.error('[TaskPersistence] Failed to save task:', error);
-      return null;
+    if (existingIndex >= 0) {
+      tasks[existingIndex] = nextTask;
+    } else {
+      tasks.unshift(nextTask);
     }
 
-    return transformTask(data);
-  } catch (error) {
-    console.error('[TaskPersistence] Error saving task:', error);
-    return null;
-  }
+    saveTasksForUser(userId, tasks.slice(0, DEFAULT_TASK_LIMIT));
+    return nextTask;
+  }, null);
 }
 
-/**
- * 更新任务状态
- */
 export async function updateTaskStatus(
   taskId: string,
   status: PersistedTask['status'],
@@ -84,185 +171,75 @@ export async function updateTaskStatus(
     tokens?: number;
   }
 ): Promise<boolean> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+  return withUserTasks((userId, tasks) => {
+    const index = tasks.findIndex((task) => task.taskId === taskId);
+    if (index < 0) return false;
 
-    const updateData: Record<string, unknown> = { status };
-    
-    if (updates?.resultUrls !== undefined) {
-      updateData.result_urls = updates.resultUrls;
-    }
-    if (updates?.errorMessage !== undefined) {
-      updateData.error_message = updates.errorMessage;
-    }
-    if (updates?.cost !== undefined) {
-      updateData.cost = updates.cost;
-    }
-    if (updates?.tokens !== undefined) {
-      updateData.tokens = updates.tokens;
-    }
-    
-    if (status === 'completed' || status === 'failed') {
-      updateData.completed_at = new Date().toISOString();
-    }
+    const nowIso = new Date().toISOString();
+    const nextTask = normalizeTask({
+      ...tasks[index],
+      status,
+      updatedAt: nowIso,
+      completedAt: status === 'completed' || status === 'failed'
+        ? nowIso
+        : undefined,
+      resultUrls: updates?.resultUrls ?? tasks[index].resultUrls,
+      errorMessage: updates?.errorMessage ?? tasks[index].errorMessage,
+      cost: updates?.cost ?? tasks[index].cost,
+      tokens: updates?.tokens ?? tasks[index].tokens,
+    });
 
-    const { error } = await supabase
-      .from('generation_tasks')
-      .update(updateData)
-      .eq('user_id', user.id)
-      .eq('task_id', taskId);
-
-    if (error) {
-      console.error('[TaskPersistence] Failed to update task:', error);
-      return false;
-    }
-
+    tasks[index] = nextTask;
+    saveTasksForUser(userId, tasks);
     return true;
-  } catch (error) {
-    console.error('[TaskPersistence] Error updating task:', error);
-    return false;
-  }
+  }, false);
 }
 
-/**
- * 获取用户的待处理任务
- */
 export async function getPendingTasks(): Promise<PersistedTask[]> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data, error } = await supabase
-      .from('generation_tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'processing'])
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[TaskPersistence] Failed to get pending tasks:', error);
-      return [];
-    }
-
-    return (data || []).map(transformTask);
-  } catch (error) {
-    console.error('[TaskPersistence] Error getting pending tasks:', error);
-    return [];
-  }
+  return withUserTasks((_userId, tasks) => {
+    return tasks
+      .filter((task) => task.status === 'pending' || task.status === 'processing')
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }, []);
 }
 
-/**
- * 获取所有任务（包括已完成）
- */
-export async function getAllTasks(limit = 50): Promise<PersistedTask[]> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data, error } = await supabase
-      .from('generation_tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('[TaskPersistence] Failed to get tasks:', error);
-      return [];
-    }
-
-    return (data || []).map(transformTask);
-  } catch (error) {
-    console.error('[TaskPersistence] Error getting tasks:', error);
-    return [];
-  }
+export async function getAllTasks(limit = DEFAULT_TASK_LIMIT): Promise<PersistedTask[]> {
+  return withUserTasks((_userId, tasks) => {
+    return [...tasks]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  }, []);
 }
 
-/**
- * 删除任务
- */
 export async function deleteTask(taskId: string): Promise<boolean> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    const { error } = await supabase
-      .from('generation_tasks')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('task_id', taskId);
-
-    if (error) {
-      console.error('[TaskPersistence] Failed to delete task:', error);
+  return withUserTasks((userId, tasks) => {
+    const nextTasks = tasks.filter((task) => task.taskId !== taskId);
+    if (nextTasks.length === tasks.length) {
       return false;
     }
 
+    saveTasksForUser(userId, nextTasks);
     return true;
-  } catch (error) {
-    console.error('[TaskPersistence] Error deleting task:', error);
-    return false;
-  }
+  }, false);
 }
 
-/**
- * 清理已完成的任务（可选）
- */
 export async function cleanupCompletedTasks(): Promise<number> {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return 0;
+  return withUserTasks((userId, tasks) => {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const nextTasks = tasks.filter((task) => {
+      if (task.status !== 'completed' && task.status !== 'failed') {
+        return true;
+      }
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const createdAt = Date.parse(task.createdAt);
+      return Number.isFinite(createdAt) && createdAt >= thirtyDaysAgo;
+    });
 
-    const { error, count } = await supabase
-      .from('generation_tasks')
-      .delete({ count: 'exact' })
-      .eq('user_id', user.id)
-      .in('status', ['completed', 'failed'])
-      .lt('created_at', thirtyDaysAgo.toISOString());
-
-    if (error) {
-      console.error('[TaskPersistence] Failed to cleanup tasks:', error);
-      return 0;
-    }
-
-    return count || 0;
-  } catch (error) {
-    console.error('[TaskPersistence] Error cleaning up tasks:', error);
-    return 0;
-  }
+    saveTasksForUser(userId, nextTasks);
+    return tasks.length - nextTasks.length;
+  }, 0);
 }
 
-/**
- * 转换数据库记录为前端类型
- */
-function transformTask(data: any): PersistedTask {
-  return {
-    id: data.id,
-    taskId: data.task_id,
-    taskType: data.task_type,
-    status: data.status,
-    prompt: data.prompt,
-    model: data.model,
-    aspectRatio: data.aspect_ratio,
-    imageSize: data.image_size,
-    resultUrls: data.result_urls || [],
-    errorMessage: data.error_message,
-    cost: data.cost,
-    tokens: data.tokens,
-    canvasId: data.canvas_id,
-    promptNodeId: data.prompt_node_id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    completedAt: data.completed_at,
-  };
-}
-
-/**
- * 将 GenerationMode 转换为 TaskType
- */
 export function modeToTaskType(mode: GenerationMode): TaskType {
   switch (mode) {
     case GenerationMode.VIDEO:

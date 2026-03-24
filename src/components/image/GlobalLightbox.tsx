@@ -4,7 +4,9 @@ import { GeneratedImage, GenerationMode } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
 import { InpaintModal } from './InpaintModal';
 import { notify } from '../../services/system/notificationService';
+import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
+import { generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 
 interface GlobalLightboxProps {
@@ -18,11 +20,11 @@ interface GlobalLightboxProps {
 }
 
 /**
- * 鍏ㄥ眬𨱔缁勪欢
- * 鐢ㄤ簬鍏ㄥ睆镆ョ湅鐢熸垚镄勫浘鐗囨垨瑙嗛锛屾敮镌佺缉鏀俱€佸钩绉诲拰𫔄楄〃瀵艰埅
- * @param images 锲剧墖瀵硅薄鏁扮粍
- * @param initialIndex 𫔄𣸣鏄剧ず镄勫浘鐗囩储寮?
- * @param onClose 鍏抽棴浜嬩欢锲炶𤾀
+ * Global lightbox viewer.
+ * Displays generated images or videos in fullscreen with zoom, pan, and gallery navigation.
+ * @param images Media items to browse.
+ * @param initialIndex Initially active item index.
+ * @param onClose Close handler.
  */
 export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onInpaint, onDownloadPptComposite }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -35,7 +37,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         typeof window !== 'undefined' ? window.innerWidth < 768 : false
     );
 
-    // 锲剧墖锷犺浇钟舵€?
+    // Image loading state
     const [displaySrc, setDisplaySrc] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
@@ -52,7 +54,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const panStartRef = useRef({ x: 0, y: 0 });
     const panStartPosRef = useRef({ x: 0, y: 0 });
 
-    // 馃殌 [Fix] Real Dimensions State
+    // Track the actual loaded media dimensions.
     const [realDimensions, setRealDimensions] = useState<string | null>(null);
 
     const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -194,7 +196,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 triedSourcesRef.current.add(current);
             }
 
-            const { getStrictOriginalImage, getImage } = await import('../../services/storage/imageStorage');
             const keyCandidates = Array.from(new Set([image.storageId, image.id].filter(Boolean) as string[]));
 
             for (const key of keyCandidates) {
@@ -231,7 +232,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, [image.id, image.storageId, image.url, image.originalUrl, sanitizeUrl, trySwitchSource]);
 
     const resolveOriginalBlob = useCallback(async (): Promise<Blob | null> => {
-        const { getStrictOriginalImage, getImage } = await import('../../services/storage/imageStorage');
         const keyCandidates = Array.from(new Set([image.storageId, image.id].filter(Boolean) as string[]));
 
         for (const key of keyCandidates) {
@@ -286,7 +286,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
         const loadContent = async () => {
             try {
-                const { getStrictOriginalImage } = await import('../../services/storage/imageStorage');
                 const keyCandidates = Array.from(new Set([image.storageId, image.id].filter(Boolean) as string[]));
                 let original: string | null = null;
 
@@ -336,7 +335,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return () => { active = false; };
     }, [applyDisplaySource, image, recoverLightboxSource, sanitizeUrl, trySwitchSource]);
 
-    // 2. 浜嬩欢𬭼戝惉 (阌洏鎺у埗)
+    // 2. Keyboard event listeners
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -345,9 +344,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentIndex, images.length]); // 阅嶆柊缁戝畾浠ヨ幏鍙栨渶鏂扮储寮?
+    }, [currentIndex, images.length]); // Rebind listeners when the active index changes.
 
-    // 3. 瀵艰埅澶勭悊鍑芥暟
+    // 3. Gallery navigation handlers
     const handlePrev = useCallback((e?: React.MouseEvent) => {
         e?.stopPropagation();
         setCurrentIndex(prev => (prev > 0 ? prev - 1 : images.length - 1));
@@ -358,7 +357,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         setCurrentIndex(prev => (prev < images.length - 1 ? prev + 1 : 0));
     }, [images.length]);
 
-    // 4. 缂╂斁/骞崇Щ阃昏緫
+    // 4. Zoom and pan interactions
     const handleWheel = useCallback((e: React.WheelEvent) => {
         e.stopPropagation();
         const delta = e.deltaY > 0 ? -0.25 : 0.25;
@@ -416,14 +415,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, [showDownloadMenu]);
 
-    // 5. 涓嬭浇阃昏緫
+    // 5. Download flow
     const handleSingleDownload = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
-            const { getStrictOriginalImage } = await import('../../services/storage/imageStorage');
-            const { triggerDownload, generateDownloadFilename } = await import('../../utils/downloadUtils');
-
-            // 浼桦厛涓嬭浇链湴铡熷浘阃氶亾锛圛DB/链湴纾佺洏镇㈠锛?
+            // Prefer the locally recovered original before remote fallbacks.
             let target = await getStrictOriginalImage(image.id);
             if (!target && image.storageId && image.storageId !== image.id) {
                 target = await getStrictOriginalImage(image.storageId);
@@ -438,7 +434,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             const exportExt = isAudioMode ? '.mp3' : (isVideoMode ? '.mp4' : '.png');
             const filename = generateDownloadFilename(exportType, exportExt);
 
-            // data/blob 𬭼存帴涓嬭浇锛沨ttp(s) 鍏堟媺鍙?blob锛岄伩鍏𡺃法锘?涓存椂 URL 瀵艰𠰷娴忚鍣ㄤ笅杞藉け璐?
+            // Download data/blob URLs directly; fetch http(s) URLs as blobs first.
             if (target.startsWith('data:') || target.startsWith('blob:')) {
                 triggerDownload(target, filename);
                 return;
@@ -454,7 +450,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
             }
         } catch (err) {
-            // 链€钖庡厹搴曪细鏂版爣绛鹃〉镓揿紑
+            // Final fallback: open the asset in a new tab.
             const fallback = image.originalUrl || displaySrc || image.url;
             if (fallback) window.open(fallback, '_blank', 'noopener,noreferrer');
         }
@@ -487,7 +483,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         }
     };
 
-    // 6. 阒叉鍙屽向杩囧揩瀵艰𠰷镄勮瑙﹀叧闂?(600ms瀹夊叏链?- 鏀寔鎱㈤€熷弻鍑?
+    // Prevent accidental double-trigger closes on rapid interactions.
     const [isReady, setIsReady] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => setIsReady(true), 600);
@@ -545,7 +541,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
             } : undefined}
         >
-            {/* 椤舵爮: 鍏抽棴镌夐挳 */}
+            {/* Top bar: close button */}
             <button
                 onClick={onClose}
                 className="absolute z-50 rounded-full bg-white/10 p-2 text-white transition-opacity hover:opacity-80"
@@ -557,7 +553,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 <X size={24} />
             </button>
 
-            {/* 瀵艰埅鍖哄烟 (闅愬舰鎴栧井寮辨彁绀? */}
+            {/* Navigation controls with subtle visual treatment */}
             {!isMobile && images.length > 1 && (
                 <>
                     <div
@@ -582,12 +578,12 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 </>
             )}
 
-            {/* 涓诲唴瀹瑰尯锘?*/}
-            {/* 楂桦害闄愬埗: 100vh - 100px (搴曢儴镙? */}
+            {/* Main content area */}
+            {/* Height budget: 100vh minus footer space */}
             <div
                 className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
                 onWheel={handleWheel}
-                onClick={(e) => e.stopPropagation()} // 阒叉镣瑰向鐢诲竷鍏抽棴
+                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the panel.
                 style={isMobile
                     ? { padding: '56px 12px 8px' }
                     : { padding: '24px 32px 16px' }}
@@ -645,7 +641,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         referrerPolicy="strict-origin-when-cross-origin"
                         className={`max-w-full max-h-full object-contain transition-transform duration-100 ${!displaySrc || hasError || isLoading ? 'opacity-0 pointer-events-none' : ''}`}
                         draggable={false}
-                        onLoad={handleImageLoad} // 馃殌 [Fix] Capture real dimensions
+                        onLoad={handleImageLoad} // Capture real rendered dimensions.
                         onMouseDown={handleMouseDown}
                         onDoubleClick={(e) => { e.preventDefault(); onClose(); }}
                         onContextMenu={(e) => {
@@ -682,8 +678,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 )}
             </div>
 
-            {/* 搴曢儴淇℃伅闱㈡澘 */}
-            {/* 锲哄畾楂桦害锛屼綅浜庡浘鐗囦笅鏂癸纴阒叉阆尅 */}
+            {/* Footer metadata panel */}
+            {/* Fixed footer below the media to avoid overlap */}
             <div
                 className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
                 onClick={e => e.stopPropagation()}
@@ -710,7 +706,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             {currentIndex + 1} / {images.length}
                         </span>
                         <span>{image.model.split('/').pop()}</span>
-                        {/* 馃殌 [Fix] Show REAL dimensions from loaded image, fallback to metadata */}
+                        {/* Prefer loaded dimensions, then fall back to metadata */}
                         <span>{realDimensions || image.dimensions || '加载中...'}</span>
                         {clampedGenerationTime > 0 && <span>{formatGenerationDurationSeconds(clampedGenerationTime)}s</span>}
                     </div>
@@ -727,7 +723,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             </button>
                         </>
                     )}
-                    {/* 鎺у埗镙?*/}
+                    {/* Action controls */}
                     <div className="flex shrink-0 items-center rounded-lg bg-[var(--bg-tertiary)] p-1">
                         <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="缩小"><ZoomOut size={16} /></button>
                         <span className="w-12 text-center text-xs">{Math.round(zoom * 100)}%</span>
@@ -735,7 +731,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
                     </div>
 
-                    {/* 灞€閮ㄩ吨缁樻寜阍?- 浠呭锲剧墖鏄剧ず */}
+                    {/* Partial redraw actions for images only */}
                     {onInpaint && !isVideo && !isAudio && displaySrc && (
                         <button
                             onClick={(e) => {
@@ -825,7 +821,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 </div>
             </div>
 
-            {/* InpaintModal - 灞€閮ㄩ吨缁桦脊绐?*/}
+            {/* Inpaint modal for partial redraw */}
             {showInpaint && displaySrc && (
                 <InpaintModal
                     imageUrl={displaySrc}

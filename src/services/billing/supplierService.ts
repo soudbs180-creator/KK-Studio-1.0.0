@@ -196,8 +196,8 @@ class SupplierService {
 
   async refreshModels(supplierId: string): Promise<SupplierModel[]> {
     const supplier = this.getById(supplierId);
-    if (!supplier) throw new Error('渚涘簲鍟嗕笉瀛樺湪');
-    if (!supplier.systemToken) throw new Error('鏈厤缃?System Access Token');
+    if (!supplier) throw new Error('供应商不存在');
+    if (!supplier.systemToken) throw new Error('未配置 System Access Token');
 
     const models = await this.fetchModelsFromNewAPI(supplier.baseUrl, supplier.systemToken);
 

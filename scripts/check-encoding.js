@@ -3,18 +3,36 @@ import path from 'path';
 
 const roots = [
   'src',
+  'apps',
   'api',
   'billing',
   'config',
+  'docs',
+  'packages',
   'payment-server',
   'scripts',
   'server',
   'supabase',
+  'tests',
   'vite.config.ts',
   'vercel.json',
 ];
 
-const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.html', '.css']);
+const extensions = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.md',
+  '.html',
+  '.css',
+  '.yaml',
+  '.yml',
+]);
+
 const suspiciousTokens = [
   '閿?',
   '闁?',
@@ -37,23 +55,77 @@ const suspiciousTokens = [
   '馃',
   '鉂',
   '鉁',
+  '瑙ｆ瀽',
+  '鐢诲竷',
+  '鍥剧墖',
+  '椤圭洰',
+  '鏈湴',
+  '鏂囨。',
+  '鍔犺浇',
+  '淇濆瓨',
+  '鎭㈠',
+  '纭繚',
+  '鍚堝苟',
+  '鏁版嵁',
+  '榛樿',
+  '缁熻',
+  '璁板綍',
+  '鏍囪',
+  '鍖呭惈',
+  '绗?',
+  '璺?',
+  '渚涘簲鍟',
+  '鎵句笉鍒',
+  '妫板嫮',
 ];
 
+const suspiciousCharSet = new Set('瑙鏋鍥鐢纭鍚鏈椤娓鎭榛闄鍏鏃鍔鍒鍙鍐寮娌缁绗鍖馃鉁鉂渚妫');
+const skipDirectories = new Set(['node_modules', 'dist', '.git', '.npm-cache', 'coverage', '.agent']);
+const ignoreFiles = new Set([
+  path.resolve(process.argv[1]),
+  path.resolve('scripts/fix-garbled-chars.cjs'),
+]);
 const issues = [];
-const selfPath = path.resolve(process.argv[1]);
 
 function shouldScan(filePath) {
   return extensions.has(path.extname(filePath));
 }
 
+function countSuspiciousChars(text) {
+  let count = 0;
+  for (const char of text) {
+    if (suspiciousCharSet.has(char)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function hasSuspiciousText(text) {
+  if (suspiciousTokens.some((token) => token && text.includes(token))) {
+    return true;
+  }
+
+  const suspiciousCharCount = countSuspiciousChars(text);
+  if (suspiciousCharCount >= 4) {
+    return true;
+  }
+
+  if (text.includes('?') && suspiciousCharCount >= 1 && /[\u4e00-\u9fff]/u.test(text)) {
+    return true;
+  }
+
+  return false;
+}
+
 function walk(targetPath) {
   if (!fs.existsSync(targetPath)) return;
-  if (path.resolve(targetPath) === selfPath) return;
+  if (ignoreFiles.has(path.resolve(targetPath))) return;
 
   const stat = fs.statSync(targetPath);
   if (stat.isDirectory()) {
     for (const entry of fs.readdirSync(targetPath, { withFileTypes: true })) {
-      if (['node_modules', 'dist', '.git', '.npm-cache', 'coverage', '.agent'].includes(entry.name)) {
+      if (skipDirectories.has(entry.name)) {
         continue;
       }
       walk(path.join(targetPath, entry.name));
@@ -65,59 +137,12 @@ function walk(targetPath) {
 
   const content = fs.readFileSync(targetPath, 'utf8');
   const lines = content.split(/\r?\n/);
-  let inBlockComment = false;
 
   lines.forEach((line, index) => {
-    let current = line;
-
-    if (inBlockComment) {
-      const end = current.indexOf('*/');
-      if (end === -1) return;
-      current = current.slice(end + 2);
-      inBlockComment = false;
-    }
-
-    while (true) {
-      const jsxCommentStart = current.indexOf('{/*');
-      const blockStart = current.indexOf('/*');
-      const lineCommentStart = current.indexOf('//');
-
-      let nextStart = -1;
-      let type = '';
-
-      for (const candidate of [
-        { index: jsxCommentStart, type: 'jsx' },
-        { index: blockStart, type: 'block' },
-        { index: lineCommentStart, type: 'line' },
-      ]) {
-        if (candidate.index !== -1 && (nextStart === -1 || candidate.index < nextStart)) {
-          nextStart = candidate.index;
-          type = candidate.type;
-        }
-      }
-
-      if (nextStart === -1) break;
-
-      if (type === 'line') {
-        current = current.slice(0, nextStart);
-        break;
-      }
-
-      const endToken = type === 'jsx' ? '*/}' : '*/';
-      const end = current.indexOf(endToken, nextStart + 2);
-      if (end === -1) {
-        current = current.slice(0, nextStart);
-        inBlockComment = true;
-        break;
-      }
-
-      current = current.slice(0, nextStart) + current.slice(end + endToken.length);
-    }
-
-    const trimmed = current.trim();
+    const trimmed = line.trim();
     if (!trimmed) return;
 
-    if (suspiciousTokens.some((token) => trimmed.includes(token))) {
+    if (hasSuspiciousText(trimmed)) {
       issues.push(`${targetPath}:${index + 1}: ${trimmed}`);
     }
   });

@@ -1,0 +1,2360 @@
+openapi: 3.1.0
+info:
+  title: KK Studio Unified API
+  version: 1.0.0
+  summary: REST + OpenAPI 3.1 contract for the modular monolith API and payment sidecar.
+  description: |
+    This contract freezes the first wave of external and internal-facing APIs used by KK Studio.
+    All routes return a unified JSON envelope and use typed DTOs.
+servers:
+  - url: https://api.kkai.plus
+    description: Main API / BFF
+  - url: https://payment.kkai.plus
+    description: Payment sidecar
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth API
+  - name: User/Profile API
+  - name: Canvas/Workflow API
+  - name: Generation Task API
+  - name: Asset Library API
+  - name: Billing/Credits API
+  - name: Model Catalog API
+  - name: Admin API
+  - name: Payment API
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth API]
+      summary: Register a user account
+      operationId: registerUser
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth API]
+      summary: Login with email and password
+      operationId: loginUser
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/temp-users:
+    post:
+      tags: [Auth API]
+      summary: Create a guest temp-user session without a full Supabase login
+      operationId: createTempUser
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '201':
+          description: Guest temp-user session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TempUserSessionResponseEnvelope'
+  /api/v1/profile:
+    get:
+      tags: [User/Profile API]
+      summary: Get current user profile
+      operationId: getProfile
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Profile payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [User/Profile API]
+      summary: Update current user profile
+      operationId: updateProfile
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/user-apis:
+    get:
+      tags: [User/Profile API]
+      summary: Get the current user's stored API-key entries
+      operationId: getUserApiEntries
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: User API entries payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserApiEntriesResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [User/Profile API]
+      summary: Replace the current user's stored API-key entries while preserving other profile payload sections
+      operationId: replaceUserApiEntries
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceUserApiEntriesRequest'
+      responses:
+        '200':
+          description: Updated user API entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserApiEntriesResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/key-manager-state:
+    get:
+      tags: [User/Profile API]
+      summary: Get the current user's key-manager cloud state
+      operationId: getKeyManagerCloudState
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Key-manager cloud state payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyManagerCloudStateResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [User/Profile API]
+      summary: Replace the current user's key-manager cloud state while preserving compatible user-api entry mirrors
+      operationId: replaceKeyManagerCloudState
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceKeyManagerCloudStateRequest'
+      responses:
+        '200':
+          description: Updated key-manager cloud state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyManagerCloudStateResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/workspaces/{workspaceId}/canvas:
+    get:
+      tags: [Canvas/Workflow API]
+      summary: Get canvas summary for a workspace
+      operationId: getWorkspaceCanvas
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Canvas summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/workspaces/layout:
+    get:
+      tags: [Canvas/Workflow API]
+      summary: Get the authenticated user's cloud-synced workspace layout
+      operationId: getWorkspaceLayout
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Workspace layout payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasLayoutResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Canvas/Workflow API]
+      summary: Replace the authenticated user's cloud-synced workspace layout snapshot
+      operationId: saveWorkspaceLayout
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCanvasLayoutRequest'
+      responses:
+        '200':
+          description: Updated workspace layout payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasLayoutResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/workspaces/layout/cloud-images:
+    delete:
+      tags: [Canvas/Workflow API]
+      summary: Delete cloud-stored user images while preserving layout metadata
+      operationId: cleanupCloudImages
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Cloud image cleanup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupCloudImagesResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/workspaces/{workspaceId}/workflows/{workflowId}:
+    get:
+      tags: [Canvas/Workflow API]
+      summary: Get a workflow document
+      operationId: getWorkflow
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Workflow detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Canvas/Workflow API]
+      summary: Save a workflow document
+      operationId: saveWorkflow
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveWorkflowRequest'
+      responses:
+        '200':
+          description: Saved workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/generation-tasks:
+    post:
+      tags: [Generation Task API]
+      summary: Create a generation task
+      operationId: createGenerationTask
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGenerationTaskRequest'
+      responses:
+        '202':
+          description: Task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationTaskResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /api/v1/generation-tasks/{taskId}:
+    get:
+      tags: [Generation Task API]
+      summary: Get generation task status and outputs
+      operationId: getGenerationTask
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationTaskResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/assets:
+    get:
+      tags: [Asset Library API]
+      summary: List current user assets
+      operationId: listAssets
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [image, video, audio, document]
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Asset page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/billing/credits/balance:
+    get:
+      tags: [Billing/Credits API]
+      summary: Get current credit balance
+      operationId: getCreditBalance
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Credit balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditBalanceResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/billing/credits/transactions:
+    get:
+      tags: [Billing/Credits API]
+      summary: List credit transactions for the current user
+      operationId: listCreditTransactions
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - in: query
+          name: transactionType
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: Credit transaction list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditTransactionListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/billing/credits/debit:
+    post:
+      tags: [Billing/Credits API]
+      summary: Debit user credits for a business action
+      operationId: debitCredits
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DebitCreditsRequest'
+      responses:
+        '200':
+          description: Credit debit result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebitCreditsResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/billing/credits/refunds:
+    post:
+      tags: [Billing/Credits API]
+      summary: Refund a completed debit transaction
+      operationId: refundCredits
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundCreditsRequest'
+      responses:
+        '200':
+          description: Credit refund result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundCreditsResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/model-catalog/models:
+    get:
+      tags: [Model Catalog API]
+      summary: List public models for the current client
+      operationId: listModels
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [chat, image, video, audio, embedding]
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelCatalogResponseEnvelope'
+  /api/v1/model-catalog/active-credit-models:
+    get:
+      tags: [Model Catalog API]
+      summary: List active system credit-model routes without exposing provider secrets
+      operationId: listActiveCreditModels
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Active credit model routes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveCreditModelResponseEnvelope'
+  /api/v1/admin/models:
+    post:
+      tags: [Admin API]
+      summary: Create an admin-managed model definition after server-side admin elevation
+      operationId: createAdminModel
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminModelRequest'
+      responses:
+        '201':
+          description: Admin model created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminModelResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/credit-providers:
+    get:
+      tags: [Admin API]
+      summary: List admin-managed credit providers without exposing upstream API keys
+      operationId: listAdminCreditProviders
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      responses:
+        '200':
+          description: Credit provider list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreditProviderResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/credit-providers/{providerId}:
+    put:
+      tags: [Admin API]
+      summary: Create or replace an admin-managed credit provider after server-side admin elevation
+      operationId: saveAdminCreditProvider
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+        - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAdminCreditProviderRequest'
+      responses:
+        '200':
+          description: Credit provider saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveAdminCreditProviderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Admin API]
+      summary: Delete an admin-managed credit provider after server-side admin elevation
+      operationId: deleteAdminCreditProvider
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+        - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '200':
+          description: Credit provider deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAdminCreditProviderResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/admin/billing/recharges:
+    post:
+      tags: [Admin API]
+      summary: Recharge credits for a user by identity after server-side admin elevation
+      operationId: adminRechargeCredits
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRechargeCreditsRequest'
+      responses:
+        '200':
+          description: Admin recharge applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRechargeCreditsResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/admin/access:
+    get:
+      tags: [Admin API]
+      summary: Resolve whether the current authenticated user has admin access and an active elevated session
+      operationId: getAdminAccess
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+      responses:
+        '200':
+          description: Admin access status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccessResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/admin/session/verify-password:
+    post:
+      tags: [Admin API]
+      summary: Verify the shared admin password and issue an elevated admin session token
+      operationId: verifyAdminPassword
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyAdminPasswordRequest'
+      responses:
+        '200':
+          description: Admin password verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyAdminPasswordResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/admin/password:
+    post:
+      tags: [Admin API]
+      summary: Change the shared admin password with an active elevated admin session
+      operationId: changeAdminPassword
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeAdminPasswordRequest'
+      responses:
+        '200':
+          description: Admin password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeAdminPasswordResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/admin/users/roles:
+    post:
+      tags: [Admin API]
+      summary: Set a target user's role by id or email identity with an active elevated admin session
+      operationId: setUserRole
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - $ref: '#/components/parameters/XAdminSessionToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetUserRoleRequest'
+      responses:
+        '200':
+          description: User role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetUserRoleResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /payment/v1/orders:
+    post:
+      tags: [Payment API]
+      summary: Create a payment order in the payment sidecar
+      operationId: createPaymentOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentOrderRequest'
+      responses:
+        '201':
+          description: Payment order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /payment/v1/orders/{merchantOrderNo}/status:
+    get:
+      tags: [Payment API]
+      summary: Get the current payment order status view
+      operationId: getPaymentOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XClientVersion'
+        - name: merchantOrderNo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment order status resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrderStatusResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /payment/v1/callbacks/alipay:
+    post:
+      tags: [Payment API]
+      summary: Receive Alipay callback and write back to main API
+      operationId: receiveAlipayCallback
+      security:
+        - internalServiceToken: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlipayCallbackRequest'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCallbackResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalServiceToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+  parameters:
+    XRequestId:
+      in: header
+      name: X-Request-Id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    XClientVersion:
+      in: header
+      name: X-Client-Version
+      required: false
+      schema:
+        type: string
+    XAdminSessionToken:
+      in: header
+      name: X-Admin-Session-Token
+      required: false
+      description: Opaque elevated admin session token returned by `verifyAdminPassword`.
+      schema:
+        type: string
+    WorkspaceId:
+      in: path
+      name: workspaceId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WorkflowId:
+      in: path
+      name: workflowId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProviderId:
+      in: path
+      name: providerId
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    Unauthorized:
+      description: Authentication is required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    Forbidden:
+      description: Caller does not have permission
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    NotFound:
+      description: Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    Conflict:
+      description: Business conflict detected
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    UnprocessableEntity:
+      description: Domain rules rejected the request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+  schemas:
+    Meta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        clientVersion:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+    PaginationMeta:
+      type: object
+      required: [limit, hasMore]
+      properties:
+        nextCursor:
+          type: string
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ErrorResponseEnvelope:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    RegisterRequest:
+      type: object
+      required: [email, password, turnstileToken]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        turnstileToken:
+          type: string
+    RegisterResponse:
+      type: object
+      required: [userId, email, status]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [registered, verification_pending]
+    RegisterResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/RegisterResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        turnstileToken:
+          type: string
+    LoginResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, profile]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        profile:
+          $ref: '#/components/schemas/Profile'
+    LoginResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/LoginResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    Profile:
+      type: object
+      required: [id, email, role, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        role:
+          type: string
+          enum: [user, admin]
+        status:
+          type: string
+          enum: [active, suspended]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 64
+        avatarUrl:
+          type: string
+          format: uri
+    ProfileResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+          success:
+            type: boolean
+            const: true
+          data:
+            $ref: '#/components/schemas/Profile'
+          meta:
+            $ref: '#/components/schemas/Meta'
+    UserApiEntry:
+      type: object
+      required:
+        [id, key, name, provider, type, format, supportedModels, disabled, createdAt, updatedAt, status,
+        failCount, successCount, totalCost, budgetLimit, tokenLimit, usedTokens, lastUsed, lastError]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        type:
+          type: string
+          enum: [official, proxy, third-party]
+        format:
+          type: string
+          enum: [gemini, openai, auto, claude]
+        baseUrl:
+          type: string
+          format: uri
+        supportedModels:
+          type: array
+          items:
+            type: string
+        disabled:
+          type: boolean
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+        status:
+          type: string
+          enum: [valid, invalid, rate_limited, unknown]
+        failCount:
+          type: integer
+          minimum: 0
+        successCount:
+          type: integer
+          minimum: 0
+        totalCost:
+          type: number
+        budgetLimit:
+          type: number
+        tokenLimit:
+          type: number
+        usedTokens:
+          type: number
+        lastUsed:
+          type: integer
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+    UserApiEntryList:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserApiEntry'
+    ReplaceUserApiEntriesRequest:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserApiEntry'
+    KeyManagerCloudRecord:
+      type: object
+      additionalProperties: true
+    KeyManagerCloudState:
+      type: object
+      required: [version, slots, providers, entries]
+      properties:
+        version:
+          type: integer
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyManagerCloudRecord'
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyManagerCloudRecord'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserApiEntry'
+    ReplaceKeyManagerCloudStateRequest:
+      type: object
+      required: [slots]
+      properties:
+        version:
+          type: integer
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyManagerCloudRecord'
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyManagerCloudRecord'
+    UserApiEntriesResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/UserApiEntryList'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    KeyManagerCloudStateResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/KeyManagerCloudState'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    TempUserSession:
+      type: object
+      required: [userId, email, nickname, createdAt, expiresAt, isTempUser]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        isTempUser:
+          type: boolean
+          const: true
+    TempUserSessionResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/TempUserSession'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CanvasSummary:
+      type: object
+      required: [workspaceId, canvasId, name, nodeCount, connectionCount, updatedAt]
+      properties:
+        workspaceId:
+          type: string
+          format: uuid
+        canvasId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        nodeCount:
+          type: integer
+        connectionCount:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+    CanvasLayoutRecord:
+      type: object
+      additionalProperties: true
+    CanvasLayout:
+      type: object
+      required: [canvases]
+      properties:
+        canvases:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasLayoutRecord'
+    SaveCanvasLayoutRequest:
+      type: object
+      required: [canvases]
+      properties:
+        canvases:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasLayoutRecord'
+    CanvasResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CanvasSummary'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CanvasLayoutResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CanvasLayout'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CleanupCloudImagesResult:
+      type: object
+      required: [deletedCount, preservedLayout]
+      properties:
+        deletedCount:
+          type: integer
+        preservedLayout:
+          type: boolean
+    CleanupCloudImagesResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CleanupCloudImagesResult'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    WorkflowNode:
+      type: object
+      required: [id, nodeType, position, config]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nodeType:
+          $ref: '#/components/schemas/WorkflowNodeType'
+        position:
+          type: object
+          required: [x, y]
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        config:
+          type: object
+          additionalProperties: true
+    WorkflowDocument:
+      type: object
+      required: [id, workspaceId, canvasId, name, status, version, nodes, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        canvasId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        version:
+          type: integer
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowNode'
+        updatedAt:
+          type: string
+          format: date-time
+    SaveWorkflowRequest:
+      type: object
+      required: [name, version, nodes]
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [draft, published, archived]
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowNode'
+    WorkflowResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/WorkflowDocument'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CreateGenerationTaskRequest:
+      type: object
+      required: [workspaceId, workflowId, modelCode, taskType, prompt, idempotencyKey]
+      properties:
+        workspaceId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+        taskType:
+          type: string
+          enum: [image, video, audio, document]
+        prompt:
+          type: string
+        references:
+          type: array
+          items:
+            type: string
+            format: uuid
+        idempotencyKey:
+          type: string
+    GenerationResult:
+      type: object
+      required: [id, assetId, sequenceNo]
+      properties:
+        id:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        sequenceNo:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+    GenerationTask:
+      type: object
+      required: [id, workspaceId, workflowId, modelCode, taskType, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+        taskType:
+          type: string
+          enum: [image, video, audio, document]
+        status:
+          $ref: '#/components/schemas/GenerationTaskStatus'
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenerationResult'
+    GenerationTaskResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/GenerationTask'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    Asset:
+      type: object
+      required: [id, kind, storagePath, mimeType, sizeBytes, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [image, video, audio, document]
+        storagePath:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    AssetList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+    AssetListResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AssetList'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CreditBalance:
+      type: object
+      required: [accountId, userId, balance, frozenBalance, updatedAt]
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        balance:
+          type: integer
+        frozenBalance:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+    CreditBalanceResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CreditBalance'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CreditTransaction:
+      type: object
+      required: [id, transactionType, amount, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        transactionType:
+          type: string
+        amount:
+          type: integer
+        balanceAfter:
+          type: integer
+        modelCode:
+          type: string
+        modelName:
+          type: string
+        providerCode:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        businessRefType:
+          type: string
+        businessRefId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+    CreditTransactionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditTransaction'
+    CreditTransactionListResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CreditTransactionList'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    DebitCreditsRequest:
+      type: object
+      required: [businessRefType, businessRefId, creditAmount, idempotencyKey]
+      properties:
+        businessRefType:
+          type: string
+        businessRefId:
+          type: string
+        creditAmount:
+          type: integer
+          minimum: 1
+        modelCode:
+          type: string
+        idempotencyKey:
+          type: string
+    DebitCreditsResponse:
+      type: object
+      required: [ledgerId, balanceAfter, transactionType]
+      properties:
+        ledgerId:
+          type: string
+          format: uuid
+        balanceAfter:
+          type: integer
+        transactionType:
+          $ref: '#/components/schemas/CreditTransactionType'
+    DebitCreditsResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/DebitCreditsResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    RefundCreditsRequest:
+      type: object
+      required: [transactionId]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+    RefundCreditsResponse:
+      type: object
+      required: [originalTransactionId, balanceAfter, transactionType]
+      properties:
+        originalTransactionId:
+          type: string
+          format: uuid
+        refundedLedgerId:
+          type: string
+          format: uuid
+        balanceAfter:
+          type: integer
+        transactionType:
+          $ref: '#/components/schemas/CreditTransactionType'
+    RefundCreditsResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/RefundCreditsResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    AdminRechargeCreditsRequest:
+      type: object
+      required: [identity, creditAmount]
+      properties:
+        identity:
+          type: string
+        creditAmount:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+    AdminRechargeCreditsResponse:
+      type: object
+      required: [identity, subjectId, balanceAfter, creditedAmount]
+      properties:
+        identity:
+          type: string
+        subjectId:
+          type: string
+        balanceAfter:
+          type: integer
+        creditedAmount:
+          type: integer
+        subjectEmail:
+          type: string
+          format: email
+    AdminRechargeCreditsResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AdminRechargeCreditsResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    AdminAccess:
+      type: object
+      required: [userId, role, isAdmin, requiresPasswordChange, adminSessionActive]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, admin]
+        isAdmin:
+          type: boolean
+        requiresPasswordChange:
+          type: boolean
+        adminSessionActive:
+          type: boolean
+        adminSessionExpiresAt:
+          type: string
+          format: date-time
+    AdminAccessResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AdminAccess'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    VerifyAdminPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+    VerifyAdminPasswordResponse:
+      type: object
+      required: [verified, requiresPasswordChange, adminSessionToken, adminSessionExpiresAt]
+      properties:
+        verified:
+          type: boolean
+        requiresPasswordChange:
+          type: boolean
+        adminSessionToken:
+          type: string
+        adminSessionExpiresAt:
+          type: string
+          format: date-time
+    VerifyAdminPasswordResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/VerifyAdminPasswordResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    ChangeAdminPasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+    ChangeAdminPasswordResponse:
+      type: object
+      required: [changed]
+      properties:
+        changed:
+          type: boolean
+    ChangeAdminPasswordResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/ChangeAdminPasswordResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    SetUserRoleRequest:
+      type: object
+      required: [identity, role]
+      properties:
+        identity:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+    SetUserRoleResponse:
+      type: object
+      required: [identity, subjectId, role]
+      properties:
+        identity:
+          type: string
+        subjectId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, admin]
+        subjectEmail:
+          type: string
+          format: email
+    SetUserRoleResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/SetUserRoleResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    ModelCatalogItem:
+      type: object
+      required: [id, modelCode, displayName, kind, availability]
+      properties:
+        id:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+        displayName:
+          type: string
+        kind:
+          type: string
+          enum: [chat, image, video, audio, embedding]
+        availability:
+          $ref: '#/components/schemas/ModelAvailability'
+        billingMode:
+          type: string
+          enum: [credits, currency]
+        defaultCreditCost:
+          type: integer
+    ModelCatalogList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelCatalogItem'
+    ModelCatalogResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+          success:
+          type: boolean
+          const: true
+          data:
+            $ref: '#/components/schemas/ModelCatalogList'
+          meta:
+            $ref: '#/components/schemas/Meta'
+    QualityPricingRule:
+      type: object
+      required: [enabled, creditCost]
+      properties:
+        enabled:
+          type: boolean
+        creditCost:
+          type: integer
+          minimum: 1
+    ActiveCreditModel:
+      type: object
+      required:
+        [modelId, displayName, endpointType, creditCost, priority, weight, callCount, advancedEnabled, mixWithSameModel]
+      properties:
+        recordId:
+          type: string
+        modelId:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        endpointType:
+          type: string
+        creditCost:
+          type: integer
+          minimum: 1
+        priority:
+          type: integer
+        weight:
+          type: integer
+        callCount:
+          type: integer
+          minimum: 0
+        color:
+          type: string
+        colorSecondary:
+          type: string
+        textColor:
+          type: string
+          enum: [white, black]
+        advancedEnabled:
+          type: boolean
+        mixWithSameModel:
+          type: boolean
+        qualityPricing:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/QualityPricingRule'
+    ActiveCreditModelProvider:
+      type: object
+      required: [providerId, providerName, models]
+      properties:
+        providerId:
+          type: string
+        providerName:
+          type: string
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveCreditModel'
+    ActiveCreditModelList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveCreditModelProvider'
+    ActiveCreditModelResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/ActiveCreditModelList'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    AdminCreditProviderModel:
+      type: object
+      required:
+        [modelId, displayName, endpointType, creditCost, isActive, callCount, advancedEnabled, mixWithSameModel]
+      properties:
+        modelId:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        endpointType:
+          type: string
+        creditCost:
+          type: integer
+          minimum: 1
+        isActive:
+          type: boolean
+        callCount:
+          type: integer
+          minimum: 0
+        maxCallsLimit:
+          type: integer
+          nullable: true
+        color:
+          type: string
+        colorSecondary:
+          type: string
+        textColor:
+          type: string
+          enum: [white, black]
+        advancedEnabled:
+          type: boolean
+        mixWithSameModel:
+          type: boolean
+        qualityPricing:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/QualityPricingRule'
+    AdminCreditProvider:
+      type: object
+      required: [providerId, providerName, baseUrl, apiKeyCount, models]
+      properties:
+        providerId:
+          type: string
+        providerName:
+          type: string
+        baseUrl:
+          type: string
+          format: uri
+        apiKeyCount:
+          type: integer
+          minimum: 0
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCreditProviderModel'
+    AdminCreditProviderList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCreditProvider'
+    AdminCreditProviderResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AdminCreditProviderList'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CreateAdminModelRequest:
+      type: object
+      required: [modelCode, displayName, kind, availability]
+      properties:
+        modelCode:
+          type: string
+        displayName:
+          type: string
+        kind:
+          type: string
+          enum: [chat, image, video, audio, embedding]
+        availability:
+          $ref: '#/components/schemas/ModelAvailability'
+        billingMode:
+          type: string
+          enum: [credits, currency]
+        defaultCreditCost:
+          type: integer
+    AdminModelResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+          success:
+          type: boolean
+          const: true
+          data:
+            $ref: '#/components/schemas/ModelCatalogItem'
+          meta:
+            $ref: '#/components/schemas/Meta'
+    SaveAdminCreditProviderModel:
+      type: object
+      required:
+        [modelId, displayName, endpointType, creditCost, advancedEnabled, mixWithSameModel, qualityPricing, priority,
+        weight, isActive, color, textColor]
+      properties:
+        modelId:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        endpointType:
+          type: string
+        creditCost:
+          type: integer
+          minimum: 1
+        advancedEnabled:
+          type: boolean
+        mixWithSameModel:
+          type: boolean
+        qualityPricing:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/QualityPricingRule'
+        priority:
+          type: integer
+        weight:
+          type: integer
+        isActive:
+          type: boolean
+        color:
+          type: string
+        colorSecondary:
+          type: string
+          nullable: true
+        textColor:
+          type: string
+          enum: [white, black]
+        maxCallsLimit:
+          type: integer
+          nullable: true
+        autoPauseOnLimit:
+          type: boolean
+    SaveAdminCreditProviderRequest:
+      type: object
+      required: [providerName, baseUrl, apiKeys, models]
+      properties:
+        providerName:
+          type: string
+        baseUrl:
+          type: string
+          format: uri
+        apiKeys:
+          type: array
+          items:
+            type: string
+        models:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SaveAdminCreditProviderModel'
+    SaveAdminCreditProviderResponse:
+      type: object
+      required: [providerId, providerName, apiKeyCount, modelCount, saved]
+      properties:
+        providerId:
+          type: string
+        providerName:
+          type: string
+        apiKeyCount:
+          type: integer
+          minimum: 0
+        modelCount:
+          type: integer
+          minimum: 0
+        saved:
+          type: boolean
+          const: true
+    SaveAdminCreditProviderResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/SaveAdminCreditProviderResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    DeleteAdminCreditProviderResponse:
+      type: object
+      required: [providerId, deleted]
+      properties:
+        providerId:
+          type: string
+        deleted:
+          type: boolean
+          const: true
+    DeleteAdminCreditProviderResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/DeleteAdminCreditProviderResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    CreatePaymentOrderRequest:
+      type: object
+      required: [providerCode, amount, currency, returnUrl, notifyUrl, idempotencyKey]
+      properties:
+        providerCode:
+          type: string
+        amount:
+          type: string
+          description: Decimal string to avoid float precision loss
+        currency:
+          type: string
+        creditAmount:
+          type: integer
+          description: Optional legacy client hint. The server resolves the final credit amount from amount and currency.
+        returnUrl:
+          type: string
+          format: uri
+        notifyUrl:
+          type: string
+          format: uri
+        idempotencyKey:
+          type: string
+    PaymentOrder:
+      type: object
+      required: [id, merchantOrderNo, status, amount, currency, creditAmount, paymentUrl]
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchantOrderNo:
+          type: string
+        status:
+          $ref: '#/components/schemas/PaymentOrderStatus'
+        amount:
+          type: string
+        currency:
+          type: string
+        creditAmount:
+          type: integer
+        paymentUrl:
+          type: string
+          format: uri
+    PaymentOrderResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/PaymentOrder'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    PaymentOrderStatusView:
+      type: object
+      required:
+        [paymentOrderId, merchantOrderNo, paymentOrderStatus, tradeStatus, creditAmount, amount, currency, settlementApplied]
+      properties:
+        paymentOrderId:
+          type: string
+          format: uuid
+        merchantOrderNo:
+          type: string
+        paymentOrderStatus:
+          $ref: '#/components/schemas/PaymentOrderStatus'
+        tradeStatus:
+          type: string
+        creditAmount:
+          type: integer
+        amount:
+          type: string
+        currency:
+          type: string
+        settlementApplied:
+          type: boolean
+        settlementLedgerId:
+          type: string
+    PaymentOrderStatusResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/PaymentOrderStatusView'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    AlipayCallbackRequest:
+      type: object
+      required: [callbackId, merchantOrderNo, tradeStatus, payload]
+      properties:
+        callbackId:
+          type: string
+        merchantOrderNo:
+          type: string
+        tradeStatus:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    PaymentCallbackResult:
+      type: object
+      required: [accepted, paymentOrderStatus]
+      properties:
+        accepted:
+          type: boolean
+        paymentOrderStatus:
+          $ref: '#/components/schemas/PaymentOrderStatus'
+    PaymentCallbackResponseEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/PaymentCallbackResult'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    GenerationTaskStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled, refunded]
+    PaymentOrderStatus:
+      type: string
+      enum: [created, pending, paid, failed, cancelled, refunded]
+    CreditTransactionType:
+      type: string
+      enum: [recharge, debit, refund, freeze, unfreeze]
+    WorkflowNodeType:
+      type: string
+      enum: [prompt, image, video-input, video-analyze, storyboard, preview, save, agent]
+    ModelAvailability:
+      type: string
+      enum: [public, internal, disabled]

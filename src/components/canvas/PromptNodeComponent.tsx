@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PromptNode, AspectRatio, GenerationMode } from '../../types';
 import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { getModelDisplayName } from '../../services/model/modelCapabilities';
 import { notify } from '../../services/system/notificationService';
+import { getImage } from '../../services/storage/imageStorage';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
@@ -92,30 +93,28 @@ const ReferenceThumbnail: React.FC<{
         // If data missing OR is a blob URL (may be expired), try recover from IDB
         let active = true;
         setLoading(true);
-        import('../../services/storage/imageStorage').then(({ getImage }) => {
-            // Add 3s timeout to prevent infinite spinning if IDB hangs
-            const timeoutPromise = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
-            // Prefer storageId if available, otherwise fallback to id
-            const lookupId = (image as any).storageId || image.id;
+        // Add 3s timeout to prevent infinite spinning if IDB hangs
+        const timeoutPromise = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
+        // Prefer storageId if available, otherwise fallback to id
+        const lookupId = (image as any).storageId || image.id;
 
-            Promise.race([getImage(lookupId), timeoutPromise])
-                .then(cached => {
-                    if (active && typeof cached === 'string') {
-                        setData(cached);
-                    } else if (active && image.data) {
-                        // Fallback to original data if IDB returns nothing
-                        setData(image.data);
-                    }
-                    if (active) setLoading(false);
-                })
-                .catch((e) => {
-                    // Fallback to original data on error
-                    if (active && image.data) {
-                        setData(image.data);
-                    }
-                    if (active) setLoading(false);
-                });
-        });
+        Promise.race([getImage(lookupId), timeoutPromise])
+            .then(cached => {
+                if (active && typeof cached === 'string') {
+                    setData(cached);
+                } else if (active && image.data) {
+                    // Fallback to original data if IDB returns nothing
+                    setData(image.data);
+                }
+                if (active) setLoading(false);
+            })
+            .catch(() => {
+                // Fallback to original data on error
+                if (active && image.data) {
+                    setData(image.data);
+                }
+                if (active) setLoading(false);
+            });
 
         return () => { active = false; };
     }, [image.id, (image as any).storageId, image.data]);

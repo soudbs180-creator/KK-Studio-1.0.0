@@ -3,6 +3,7 @@ import type { PromptNode } from '../types';
 import { GenerationMode } from '../types';
 import {
   getPendingTasks,
+  saveTask,
   updateTaskStatus,
   modeToTaskType
 } from '../services/persistence/taskPersistence';
@@ -134,8 +135,6 @@ export async function persistTask(
   canvasId?: string
 ): Promise<void> {
   try {
-    const { saveTask } = await import('../services/persistence/taskPersistence');
-
     await saveTask({
       taskId,
       taskType: modeToTaskType(node.mode || GenerationMode.IMAGE),

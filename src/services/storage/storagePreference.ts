@@ -1,8 +1,10 @@
-/**
+﻿/**
  * Storage Preference Service
  * Manages user's storage mode preference (local folder vs browser IndexedDB vs OPFS)
  */
 
+import { getAllImageIds, getImage, getImageMetadata } from './imageStorage';
+import { notify } from '../system/notificationService';
 
 // 🚀 添加OPFS模式支持手机端
 export type StorageMode = 'local' | 'browser' | 'opfs';
@@ -91,19 +93,15 @@ export async function setStorageMode(mode: StorageMode): Promise<boolean> {
         localStorage.setItem(STORAGE_MODE_KEY, mode);
         cachedMode = mode;
 
-        import('../system/notificationService').then(({ notify }) => {
-            notify.success('存储设置成功', mode === 'browser' ? '原图将保存在浏览器中' : '原图将保存到本地文档夹');
-        });
+        notify.success('存储设置成功', mode === 'browser' ? '原图将保存在浏览器中' : '原图将保存到本地文档夹');
         return true;
     } catch (e: any) {
         console.error('[StoragePreference] Error setting storage mode:', e);
-        import('../system/notificationService').then(({ notify }) => {
-            notify.error(
-                '存储设置失败',
-                '无法保存设置',
-                `LocalStorage Error: ${e.message || e}`
-            );
-        });
+        notify.error(
+            '存储设置失败',
+            '无法保存设置',
+            `LocalStorage Error: ${e.message || e}`
+        );
         return false;
     }
 }
@@ -229,14 +227,11 @@ export async function selectLocalFolder(): Promise<FileSystemDirectoryHandle | n
     } catch (e: any) {
         if (e.name !== 'AbortError') {
             console.error('[StoragePreference] Folder selection failed:', e);
-            // Dynamic import of notify for error display
-            import('../system/notificationService').then(({ notify }) => {
-                notify.error(
-                    '文档夹选择失败',
-                    '无法获取文档夹访问权限',
-                    `StoragePreference Error: ${e.message || e}`
-                );
-            });
+            notify.error(
+                '文档夹选择失败',
+                '无法获取文档夹访问权限',
+                `StoragePreference Error: ${e.message || e}`
+            );
         }
         return null;
     }
@@ -301,10 +296,7 @@ export async function mergeStorages(): Promise<void> {
     console.log('[StoragePreference] Starting storage merge...');
 
     try {
-        // Dynamic import to avoid circular dependencies
-        const { getAllImageIds, getImage, getImageMetadata } = await import('./imageStorage');
         const { dataURLToBlob } = await import('./blobUtils');
-
         const ids = await getAllImageIds();
         console.log(`[StoragePreference] Found ${ids.length} images in browser cache to check`);
 
@@ -312,9 +304,7 @@ export async function mergeStorages(): Promise<void> {
         let skippedCount = 0;
 
         // Notify user about start
-        import('../system/notificationService').then(({ notify }) => {
-            notify.info('正在同步图片', `正在将 ${ids.length} 张图片同步到本地文档夹...`);
-        });
+        notify.info('正在同步图片', `正在将 ${ids.length} 张图片同步到本地文档夹...`);
 
         for (const id of ids) {
             const metadata = await getImageMetadata(id);
@@ -358,17 +348,13 @@ export async function mergeStorages(): Promise<void> {
         console.log(`[StoragePreference] Merge complete. Synced ${mergedCount} images, skipped ${skippedCount}.`);
 
         if (mergedCount > 0 || skippedCount > 0) {
-            import('../system/notificationService').then(({ notify }) => {
-                notify.success('同步完成', `成功同步 ${mergedCount} 张图片，跳过 ${skippedCount} 张重复图片`);
-            });
+            notify.success('同步完成', `成功同步 ${mergedCount} 张图片，跳过 ${skippedCount} 张重复图片`);
         }
 
 
     } catch (e) {
         console.error('[StoragePreference] Merge failed:', e);
-        import('../system/notificationService').then(({ notify }) => {
-            notify.error('同步失败', '合并存储时发生错误');
-        });
+        notify.error('同步失败', '合并存储时发生错误');
     }
 }
 

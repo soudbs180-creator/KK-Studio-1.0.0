@@ -1,6 +1,7 @@
 import { ImageSize } from '../../types';
 import { keyManager } from '../auth/keyManager';
 import { adminModelService } from './adminModelService';
+import { registerModelPricingOverrideHandler } from './modelPricingOverrideBridge';
 
 export type ModelPricing = {
   inputPerMillionTokens?: number;
@@ -490,3 +491,5 @@ export const isCreditBasedModel = (
 };
 
 export const MODEL_PRICING_STORAGE_KEY = STORAGE_KEY;
+
+registerModelPricingOverrideHandler(mergeModelPricingOverrides);

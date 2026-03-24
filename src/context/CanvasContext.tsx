@@ -1,13 +1,16 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
-import { saveImage, getImage, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
 import { calculateImageHash } from '../utils/imageUtils';
 import { getCardDimensions } from '../utils/styleUtils';
 import { supabase } from '../lib/supabase'; // Import supabase for auth check
-import { notify } from '../services/system/notificationService';
+import { notificationService, notify } from '../services/system/notificationService';
+import { logError, logInfo } from '../services/system/systemLogService';
+import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
+import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
 import { canvasToWorkflow, syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
@@ -445,40 +448,40 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.log('[CanvasProvider] localStorage restore status:', stored ? 'Found persisted canvas data' : 'No data');
             if (stored) {
                 const parsed: CanvasState = JSON.parse(stored);
-                console.log('[CanvasProvider] 瑙ｆ瀽鎴愬姛:', `鐢诲竷鏁? ${parsed.canvases?.length || 0}`);
+                console.log('[CanvasProvider] 解析成功:', `画布数: ${parsed.canvases?.length || 0}`);
 
-                // 鏋舵瀯杩佺Щ 1: 纭繚 history 瀛樺湪
+                // Migration step 1: ensure history exists.
                 if (!parsed.history) parsed.history = {};
                 if (!parsed.selectedNodeIds) parsed.selectedNodeIds = [];
 
-                // 鏋舵瀯杩佺Щ 2: 娓呮礂鑺傜偣鏁版嵁 (淇鏃ф暟鎹殑閲嶅彔/鍔熻兘鎹熷潖闂)
+                // Migration step 2: normalize recovered node data from older payloads.
                 parsed.canvases = parsed.canvases.map(canvas => ({
                     ...canvas,
-                    // 淇 Image Nodes
+                    // Repair recovered image nodes.
                     imageNodes: (canvas.imageNodes || []).map(img => ({
                         ...img,
-                        // 纭繚鏂板瓧娈靛瓨鍦?
+                        // Ensure newer fields always exist.
                         generationTime: clampGenerationDurationMs(img.generationTime),
                         canvasId: img.canvasId || canvas.id,
                         parentPromptId: img.parentPromptId || 'unknown',
                         prompt: img.prompt || '',
-                        dimensions: img.dimensions || "1024x1024", // 榛樿瀛楃涓?
+                        dimensions: img.dimensions || "1024x1024", // Default dimensions fallback.
                         aspectRatio: img.aspectRatio || AspectRatio.SQUARE,
                         model: img.model || KnownModel.IMAGEN_4 // 回退到当前默认官方模型
                     })),
                 })).map(normalizeCanvasPromptRecovery);
 
-                // 馃殌 [Critical Fix] FileSystemHandle 涓嶈兘浠?localStorage 鎭㈠ (浼氬彉鎴愭櫘閫氬璞?
-                // 蹇呴』寮哄埗璁句负 null锛屼緷璧?useEffect + IndexedDB 鎭㈠
+                // [Critical fix] FileSystemHandle cannot be restored from localStorage.
+                // Force it to null and let the restore flow recover it from IndexedDB.
                 parsed.fileSystemHandle = null;
-                // FolderName 鍙互淇濈暀鐢ㄤ簬 UI 鏄剧ず锛屼絾濡傛灉涓嶈繛鎺ヤ篃娌℃剰涔夛紝涓嶈繃淇濈暀鐫€涔熸病鍧忓
+                // folderName may remain for UI display even before the folder is reconnected.
                 // parsed.folderName = null;
 
                 return parsed;
             }
         } catch (e) {
-            // [CRITICAL FIX] 鎹曡幏鍒濆鍖栨椂鐨?Stack Overflow 鎴栬В鏋愰敊璇?
-            // 濡傛灉鏈湴鏁版嵁鎹熷潖瀵艰嚧宕╂簝锛屽繀椤婚噸缃苟娓呴櫎 localStorage锛岄槻姝㈡棤闄愬穿婧冨惊鐜?
+            // [Critical fix] Catch initialization parse failures, including stack overflows.
+            // If persisted data is corrupted, clear localStorage to avoid an infinite crash loop.
             console.error('[CanvasProvider] Failed to parse stored state (Resetting):', e);
             try {
                 localStorage.removeItem(STORAGE_KEY);
@@ -490,7 +493,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return DEFAULT_STATE;
     });
 
-    // 馃殌 [闃插埛鏂颁涪澶盷 杩借釜鏈畬鎴愮殑淇濆瓨浠诲姟
+    // Track in-flight save tasks to reduce data loss during refresh.
     const pendingSavesRef = useRef<Set<Promise<void>>>(new Set());
     const stateRef = useRef(state);
     const lastUserActivityAtRef = useRef<number>(Date.now());
@@ -517,7 +520,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, []);
 
-    // 馃殌 [闃插埛鏂颁涪澶盷 beforeunload 浜嬩欢璀﹀憡鐢ㄦ埛
+    // [Refresh guard] beforeunload warning for in-flight work.
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             const currentState = stateRef.current;
@@ -541,113 +544,106 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const init = async () => {
             try {
                 // 1. Restore Local Folder Handle (Fix for 0B issue)
-                import('../services/storage/storagePreference').then(async ({ getLocalFolderHandle }) => {
-                    import('../services/system/systemLogService').then(async ({ logInfo, logError }) => {
-                        try {
-                            const handle = await getLocalFolderHandle();
-                            if (handle) {
-                                // Verify permission before setting state (Cloud/Web requirement)
-                                // @ts-ignore
-                                const perm = await handle.queryPermission({ mode: 'readwrite' });
-                                if (perm === 'granted') {
-                                    logInfo('CanvasContext', `宸叉仮澶嶆湰鍦版枃妗ｅす`, `folder: ${handle.name}`);
+                try {
+                    const handle = await getLocalFolderHandle();
+                    if (handle) {
+                        // Verify permission before setting state (Cloud/Web requirement)
+                        // @ts-ignore
+                        const perm = await handle.queryPermission({ mode: 'readwrite' });
+                        if (perm === 'granted') {
+                            logInfo('CanvasContext', '已恢复本地文件夹', `folder: ${handle.name}`);
 
-                                    // [NEW] Load actual project data from disk to ensure sync
-                                    // This overrides localStorage state with the true file state
-                                    try {
-                                        const { fileSystemService } = await import('../services/storage/fileSystemService');
-                                        logInfo('CanvasContext', '寮€濮嬩粠纭洏鍔犺浇椤圭洰鏁版嵁', handle.name);
-                                        const { canvases, images, activeCanvasId: savedActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
-                                        logInfo('CanvasContext', '纭洏鏁版嵁鍔犺浇瀹屾垚', `鐢诲竷鏁? ${canvases.length}, 鍥剧墖鏁? ${images.size}, 娲诲姩ID: ${savedActiveCanvasId}`);
+                            // [NEW] Load actual project data from disk to ensure sync
+                            // This overrides localStorage state with the true file state
+                            try {
+                                logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
+                                const { canvases, images, activeCanvasId: savedActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
+                                logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
 
-                                        // Hydrate IDB images (Background)
-                                        for (const [id, data] of images.entries()) {
-                                            if (data.url) saveImage(id, data.url).catch(e => console.warn('Cache failed', e));
-                                        }
-
-                                        // 馃殌 [NEW] 鍔犺浇鍙傝€冨浘鏄犲皠骞剁敤浜庢仮澶嶄涪澶辩殑鍙傝€冨浘
-                                        let refUrls = new Map<string, string>();
-                                        try {
-                                            refUrls = await fileSystemService.loadAllReferenceImages(handle);
-                                        } catch (e) {
-                                            console.warn('[CanvasContext] Failed to load reference images', e);
-                                        }
-
-                                        if (canvases.length > 0) {
-                                            setState(prev => {
-                                                // 馃殌 [鍏抽敭淇] 鍚堝苟纭洏鐨?project.json 鍜屽垰浠?localStorage 鍔犺浇鐨勬渶鏂?state
-                                                // 濡傛灉鍒氬埛鏂伴〉闈紝localStorage 閫氬父浼氶€氳繃 beforeunload 淇濆瓨鏈€鏂扮姸鎬侊紝
-                                                // 鑰?project.json 鍙兘鍥犱负寮傛鏉ヤ笉鍙婂啓鑰岄檲鏃э紝鎵€浠ヨ鍙屽悜鍚堝苟闃茶鐩?
-                                                const mergedCanvases = mergeCanvases(prev.canvases, canvases);
-                                                const finalActiveId = resolvePreferredActiveCanvasId(
-                                                    prev.activeCanvasId,
-                                                    savedActiveCanvasId,
-                                                    mergedCanvases
-                                                );
-
-                                                return {
-                                                    ...prev,
-                                                    canvases: mergedCanvases.map(c => {
-                                                        // 纭洏鏁版嵁鍙兘澶氬嚭宸茬粦瀹氱殑 url锛岄渶瑕佷笌 merge 鍚庣殑鍖归厤
-                                                        const diskSpecificCanvas = canvases.find(dc => dc.id === c.id);
-                                                        return {
-                                                            ...c,
-                                                            imageNodes: c.imageNodes.map(img => ({
-                                                                ...img,
-                                                                url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || '',
-                                                                originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl
-                                                            })),
-                                                            promptNodes: c.promptNodes.map(pn => ({
-                                                                ...pn,
-                                                                // 馃殌 鎭㈠涓㈠け鐨勫弬鑰冨浘锛氬鏋渄ata涓虹┖浣嗘湁storageId锛屽皾璇曚粠refs/鎭㈠
-                                                                referenceImages: pn.referenceImages?.map(ref => ({
-                                                                    ...ref,
-                                                                    ...((!ref.data && ref.storageId && refUrls.has(ref.storageId)) ? {
-                                                                        data: refUrls.get(ref.storageId)
-                                                                    } : {})
-                                                                })) || []
-                                                            }))
-                                                        };
-                                                    }),
-                                                    activeCanvasId: finalActiveId,
-                                                    fileSystemHandle: handle,
-                                                    folderName: handle.name
-                                                };
-                                            });
-                                        } else {
-                                            // Empty project on disk? Just connect.
-                                            setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
-                                        }
-                                    } catch (err) {
-                                        console.error('Failed to load project from restored handle', err);
-                                        // Fallback just connect
-                                        setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
-                                    }
-                                } else {
-                                    logInfo('CanvasContext', `鏈湴鏂囨。澶规潈闄愮瓑寰呬腑`, `permission: ${perm}`);
+                                // Hydrate IDB images (Background)
+                                for (const [id, data] of images.entries()) {
+                                    if (data.url) saveImage(id, data.url).catch(e => console.warn('Cache failed', e));
                                 }
-                            } else {
-                                logInfo('CanvasContext', '鏈壘鍒板凡淇濆瓨鐨勬湰鍦版枃妗ｅす', 'no persisted handle found');
-                            }
-                        } catch (e) {
-                            logError('CanvasContext', e, '恢复文件夹句柄失败');
-                        }
-                    });
-                });
 
-                // 2. Load Images from IndexedDB (浼樺寲锛氭寜闇€鍔犺浇)
+                                // Load the reference-image map so missing references can be restored.
+                                let refUrls = new Map<string, string>();
+                                try {
+                                    refUrls = await fileSystemService.loadAllReferenceImages(handle);
+                                } catch (e) {
+                                    console.warn('[CanvasContext] Failed to load reference images', e);
+                                }
+
+                                if (canvases.length > 0) {
+                                    setState(prev => {
+                                        // [Key fix] Merge disk project.json with the latest localStorage state.
+                                        // A hard refresh usually leaves fresher state in localStorage via beforeunload.
+                                        // project.json may lag behind due to async writes, so both sources must be merged carefully.
+                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases);
+                                        const finalActiveId = resolvePreferredActiveCanvasId(
+                                            prev.activeCanvasId,
+                                            savedActiveCanvasId,
+                                            mergedCanvases
+                                        );
+
+                                        return {
+                                            ...prev,
+                                            canvases: mergedCanvases.map(c => {
+                                                return {
+                                                    ...c,
+                                                    imageNodes: c.imageNodes.map(img => ({
+                                                        ...img,
+                                                        url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || '',
+                                                        originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl
+                                                    })),
+                                                    promptNodes: c.promptNodes.map(pn => ({
+                                                        ...pn,
+                                                        // Restore missing reference data from refs/ when storageId is available.
+                                                        referenceImages: pn.referenceImages?.map(ref => ({
+                                                            ...ref,
+                                                            ...((!ref.data && ref.storageId && refUrls.has(ref.storageId)) ? {
+                                                                data: refUrls.get(ref.storageId)
+                                                            } : {})
+                                                        })) || []
+                                                    }))
+                                                };
+                                            }),
+                                            activeCanvasId: finalActiveId,
+                                            fileSystemHandle: handle,
+                                            folderName: handle.name
+                                        };
+                                    });
+                                } else {
+                                    // Empty project on disk? Just connect.
+                                    setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                }
+                            } catch (err) {
+                                console.error('Failed to load project from restored handle', err);
+                                // Fallback just connect
+                                setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                            }
+                        } else {
+                            logInfo('CanvasContext', '等待本地文件夹权限', `permission: ${perm}`);
+                        }
+                    } else {
+                        logInfo('CanvasContext', '未找到已保存的本地文件夹', 'no persisted handle found');
+                    }
+                } catch (e) {
+                    logError('CanvasContext', e, '恢复文件夹句柄失败');
+                }
+
+                // 2. Load images from IndexedDB on demand.
                 console.log('[CanvasContext] Starting optimized image loading...');
                 const totalImages = await getImageCount();
                 console.log(`[CanvasContext] Total images in DB: ${totalImages}`);
 
-                // 馃殌 鏀堕泦褰撳墠鐘舵€佷腑闇€瑕佺殑鍥剧墖ID
+                // Collect the image IDs required by the current state.
                 const requiredImageIds = new Set<string>();
                 state.canvases.forEach(c => {
-                    // 鏀堕泦鐢熸垚鐨勫浘鐗嘔D - 浣跨敤storageId浼樺厛锛堜繚瀛樻椂鐢ㄧ殑鏄痵torageId锛?
+                    // Generated image IDs: prefer storageId because persistence uses that key.
                     c.imageNodes.forEach(img => {
                         requiredImageIds.add(img.storageId || img.id);
                     });
-                    // 鏀堕泦鍙傝€冨浘鐗嘔D
+                    // Reference image IDs.
                     c.promptNodes.forEach(pn => {
                         if (pn.referenceImages) {
                             pn.referenceImages.forEach(ref => {
@@ -660,16 +656,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 console.log(`[CanvasContext] Found ${requiredImageIds.size} images needed in current state`);
 
-                // 馃殌 鍒嗙鍙傝€冨浘鍜岀敓鎴愬浘
+                // Separate reference images from generated images.
                 const referenceImageIds = new Set<string>();
                 const generatedImageIds = new Set<string>();
 
                 state.canvases.forEach(c => {
-                    // 鐢熸垚鐨勫浘鐗?
+                    // Generated images.
                     c.imageNodes.forEach(img => {
                         generatedImageIds.add(img.storageId || img.id);
                     });
-                    // 鍙傝€冨浘 - 鍗曠嫭鏀堕泦锛岀‘淇濅紭鍏堝姞杞?
+                    // Reference images: collect separately so they load first.
                     c.promptNodes.forEach(pn => {
                         if (pn.referenceImages) {
                             pn.referenceImages.forEach(ref => {
@@ -679,12 +675,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 });
 
-                // 馃殌 [淇] 鍙傝€冨浘蹇呴』鍏ㄩ儴鍔犺浇锛屼笉鍙楅檺鍒?
-                // 鐢熸垚鍥炬墠闄愬埗鏁伴噺
+                // [Fix] Always load all reference images.
+                // Only the generated-image set is capped.
                 const MAX_GENERATED_LOAD = 5;
                 let generatedIdsArray = Array.from(generatedImageIds);
 
-                // 馃殌 浼樺厛鍔犺浇闈犺繎瑙嗗彛涓績鐨勭敓鎴愬浘
+                // Prioritize generated images closest to the viewport center.
                 const viewportX = state.viewportCenter.x;
                 const viewportY = state.viewportCenter.y;
                 const imagesWithDistance = generatedIdsArray.map(id => {
@@ -701,11 +697,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return { id, distance: minDistance };
                 });
 
-                // 鎸夎窛绂绘帓搴忥紝浼樺厛鍔犺浇涓績鍖哄煙
+                // Sort by distance so center-adjacent images load first.
                 imagesWithDistance.sort((a, b) => a.distance - b.distance);
                 generatedIdsArray = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
 
-                // 馃殌 [鍏抽敭淇] 鍚堝苟锛氬弬鑰冨浘 + 闄愬埗鍚庣殑鐢熸垚鍥?
+                // [Key fix] Combine all references with the capped generated set.
                 const imageIdsArray = [...Array.from(referenceImageIds), ...generatedIdsArray];
 
                 if (generatedImageIds.size > MAX_GENERATED_LOAD) {
@@ -713,15 +709,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
                 console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} generated images`);
 
-                // 馃殌 鎸夐渶鍔犺浇锛氬彧鍔犺浇褰撳墠鐘舵€侀渶瑕佺殑鍥剧墖
+                // Load only the images needed by the current state.
                 const imageMap = new Map<string, string>();
-                const BATCH_SIZE = 5; // 鍑忓皬鎵归噺澶у皬锛岄伩鍏嶅唴瀛樺嘲鍊?
+                const BATCH_SIZE = 5; // Smaller batches reduce peak memory usage.
 
                 for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
                     const batch = imageIdsArray.slice(i, i + BATCH_SIZE);
-                    // 馃殌 [OOM淇] 鍔犺浇MICRO璐ㄩ噺锛堟渶灏忕缉鐣ュ浘<50KB锛夎€屼笉鏄疶HUMBNAIL
-                    const { getImageByQuality } = await import('../services/storage/imageStorage');
-                    const { ImageQuality } = await import('../services/image/imageQuality');
+                    // [OOM fix] Load MICRO quality (<50KB) instead of THUMBNAIL.
                     const batchPromises = batch.map(id => getImageByQuality(id, ImageQuality.MICRO));
                     const batchResults = await Promise.all(batchPromises);
 
@@ -971,7 +965,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return canvases[0]?.id || 'default';
     };
 
-    // 馃殌 Cloud Sync: Load & Merge on Init
+    // Cloud sync: load and merge on init.
     useEffect(() => {
         const loadCloud = async () => {
             // Wait for auth?
@@ -987,7 +981,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         if (JSON.stringify(merged) !== JSON.stringify(prev.canvases)) {
                             console.log('[CanvasContext] Merged cloud layout.', { local: prev.canvases.length, cloud: cloudCanvases.length, merged: merged.length });
 
-                            // 馃殌 Hydrate newly added nodes (simulated)
+                            // Hydrate newly added nodes after sync (simulated).
                             // Since we don't have URLs, we rely on IDB hydration loop or trigger it?
                             // Re-triggering full init is heavy.
                             // Let's rely on lazy hydration if accessed?
@@ -1008,7 +1002,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const hydrateMergedImages = async (canvases: Canvas[]) => {
             // Try to find images in IDB for nodes that are missing URLs
-            const { getImage } = await import('../services/storage/imageStorage');
             let hasUpdates = false;
 
             // Map IDs to URLs
@@ -1051,7 +1044,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isLoading) loadCloud();
     }, [isLoading]);
 
-    // 馃殌 Cloud Sync: Auto-Save
+    // Cloud sync: auto-save.
     useEffect(() => {
         if (isLoading || state.canvases.length === 0) return;
 
@@ -1063,7 +1056,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => clearTimeout(timer);
     }, [state.canvases, isLoading]);
     const isLoadingRef = useRef(isLoading);
-    // 馃殌 [闃插埛鏂版紡娲瀅 鐢ㄤ簬鏍囪闇€瑕佺揣鎬ュ嚭鐩?缁曡繃200ms闃叉姈)鐨勫叧閿搷浣?
+    // Mark operations that need an urgent flush and should bypass the 200ms debounce.
     const urgentSaveRef = useRef(false);
     useLayoutEffect(() => {
         stateRef.current = state;
@@ -1086,7 +1079,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         let timer: any;
         if (urgentSaveRef.current) {
-            // 馃殌 绱ф€ユ儏鍐碉細绔嬪嵆鎵ц淇濆瓨锛岀粫杩囬槻鎶栵紝骞堕噸缃爣蹇?
+            // Urgent path: save immediately, bypass debounce, and reset the flag.
             urgentSaveRef.current = false;
             saveState();
         } else {
@@ -1192,20 +1185,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return null; // Max reached
         }
 
-        // Find next available number for "椤圭洰X"
+        // Find the next available number for "项目X".
         const existingNumbers = state.canvases
             .map(c => {
-                const match = c.name.match(/^椤圭洰(\d+)$/);
+                const match = c.name.match(/^项目(\d+)$/);
                 return match ? parseInt(match[1], 10) : 0;
             })
             .filter(n => n > 0);
         const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
 
-        const canvasName = `椤圭洰${nextNumber}`;
+        const canvasName = `项目${nextNumber}`;
         const newCanvas: Canvas = {
             id: generateId(),
             name: canvasName,
-            folderName: canvasName, // 銆愰噸瑕併€戦娆″垱寤烘椂鍐荤粨鐗╃悊鏂囨。澶瑰悕锛屾鍚庢敼鍚嶅彧鏀?name 涓嶆敼杩欎釜
+            folderName: canvasName, // Freeze the physical folder name on first creation; later renames only update the display name.
             promptNodes: [],
             imageNodes: [],
             groups: [] as CanvasGroup[],
@@ -1213,17 +1206,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             workflow: createCanvasWorkflow(),
             lastModified: Date.now()
         };
-        urgentSaveRef.current = true; // 鏂板缓鍚庡己鍒剁珛鍗充繚瀛?
+        urgentSaveRef.current = true; // Force an immediate save after creating a canvas.
         setState(prev => ({
             ...prev,
             canvases: [...prev.canvases, newCanvas],
             activeCanvasId: newCanvas.id
         }));
-        return newCanvas.id; // 杩斿洖鏂扮敾甯僆D渚夸簬杩佺Щ
+        return newCanvas.id; // Return the new canvas ID for follow-up flows.
     }, [state.canvases.length, state.canvases]);
 
     const switchCanvas = useCallback((id: string) => {
-        urgentSaveRef.current = true; // 鍒囨崲鍚庡己鍒剁珛鍗充繚瀛?
+        urgentSaveRef.current = true; // Force an immediate save after switching canvases.
         setState(prev => ({ ...prev, activeCanvasId: id }));
     }, []);
 
@@ -1235,18 +1228,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (oldName === finalNewName) return;
 
-        // 銆愯交閲忕骇蹇嵎鏂瑰紡閲嶅懡鍚嶃€戠墿鐞嗘枃妗ｅす鍚嶅瓧姘歌繙涓嶅彉锛屽彧淇敼 project.json 鍐呯殑鏄剧ず鍚?
-        // 骞跺湪鏂囨。澶归噷鍐欏叆涓€涓鏄庢€ф枃鏈枃妗ｅ厖褰?蹇嵎鏂瑰紡"鏍囪
-        import('../services/storage/storagePreference').then(async ({ getLocalFolderHandle }) => {
-            const handle = await getLocalFolderHandle();
+        // Lightweight rename: keep the physical folder name stable and only update the display name in project.json.
+        // Also write a small hint file into the folder so the rename is discoverable on disk.
+        void getLocalFolderHandle().then(async (handle) => {
             if (handle) {
                 try {
-                    // 鐗╃悊鏂囨。澶瑰悕浣跨敤棣栨鍒涘缓鏃跺浐瀹氱殑 folderName锛屽鏋滄病鏈夊垯鐢ㄦ棫鍚?
+                    // Reuse the original physical folder name; fall back to the old display name if needed.
                     const physicalFolderName = (targetCanvas.folderName || oldName).trim().replace(/[\\/:*?"<>|]/g, '_');
                     // @ts-ignore
                     const projectDir = await handle.getDirectoryHandle(physicalFolderName);
 
-                    // 1. 鏇存柊 project.json 鐨?canvas.name
+                    // 1. Update canvas.name in project.json.
                     try {
                         // @ts-ignore
                         const pFile = await projectDir.getFileHandle('project.json');
@@ -1260,9 +1252,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const writable = await pFile.createWritable();
                         await writable.write(JSON.stringify(pData, null, 2));
                         await writable.close();
-                    } catch (e) { /* project.json 涓嶅瓨鍦ㄦ椂蹇界暐锛屼笅娆′繚瀛樹細鍒涘缓 */ }
+                    } catch (e) { /* Ignore if project.json does not exist yet; the next save will create it. */ }
 
-                    // 2. 娓呴櫎鏃х殑蹇嵎鏂瑰紡鎻愮ず鏂囨。
+                    // 2. Remove older rename hint files.
                     try {
                         // @ts-ignore
                         for await (const entry of projectDir.values()) {
@@ -1271,9 +1263,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 await projectDir.removeEntry(entry.name);
                             }
                         }
-                    } catch (e) { /* 蹇界暐 */ }
+                    } catch (e) { /* Ignore. */ }
 
-                    // 3. 鍐欏叆鏂扮殑蹇嵎鏂瑰紡鎻愮ず鏂囨。
+                    // 3. Write the new rename hint file.
                     const hintFileName = `project-renamed-to_${finalNewName.replace(/[\\/:*?"<>|]/g, '_')}.txt`;
                     // @ts-ignore
                     const hintFile = await projectDir.getFileHandle(hintFileName, { create: true });
@@ -1289,7 +1281,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         });
 
-        // 绔嬪嵆鏇存柊 UI 鐘舵€侊紙folderName 淇濇寔涓嶅彉锛?
+        // Update the UI immediately while keeping folderName stable.
         setState(prev => ({
             ...prev,
             canvases: prev.canvases.map(c =>
@@ -1333,7 +1325,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id, prompt: node.prompt?.substring(0, 50) });
 
         try {
-            // 馃殌 [闃插尽鎬т慨澶峕 鍏堟坊鍔犺妭鐐瑰埌鐘舵€侊紝淇濊瘉UI绔嬪嵆鏄剧ず
+            // [Defensive fix] Add the node to state first so the UI shows it immediately.
             updateCanvas(c => {
                 const allZIndices = [
                     ...c.promptNodes.map(n => n.zIndex ?? 0),
@@ -1342,7 +1334,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ];
                 let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
 
-                // 璧嬩簣鏂板垱寤虹殑 PromptNode 鏈€楂樺眰绾э紝纭繚涓嶈鏃у崱鐗囬伄鎸?
+                // Give the new PromptNode the highest z-index so older cards do not cover it.
                 const nodeWithZIndex = { ...node, zIndex: maxZ + 1 };
 
                 return {
@@ -1354,7 +1346,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             console.log('[CanvasContext.addPromptNode] Prompt card added to canvas');
 
-            // 馃殌 [鍏抽敭淇] 寮傛淇濆瓨鍙傝€冨浘 - 鍗充娇澶辫触涔熶笉褰卞搷鍗＄墖鏄剧ず
+            // [Key fix] Save reference images asynchronously; failures must not block card rendering.
             if (node.referenceImages && node.referenceImages.length > 0) {
                 console.log(`[CanvasContext.addPromptNode] Saving ${node.referenceImages.length} reference images`);
                 const saveTasks = node.referenceImages.map(async (ref, index) => {
@@ -1369,23 +1361,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             console.log(`[CanvasContext.addPromptNode] Reference image ${index + 1}/${node.referenceImages?.length || 0} saved:`, ref.id);
                         } catch (e: any) {
                             console.error(`[CanvasContext.addPromptNode] Failed to save reference image ${index + 1}:`, ref.id, e?.message || e);
-                            // 馃敂 閫氱煡鐢ㄦ埛锛堜絾涓嶉樆姝㈡祦绋嬶級
-                            import('../services/system/notificationService').then(({ notificationService }) => {
-                                notificationService.warning('参考图保存失败', `参考图 ${index + 1} 保存失败，刷新后可能丢失`);
-                            });
+                            // Notify the user, but do not interrupt the flow.
+                            notificationService.warning('参考图保存失败', `参考图 ${index + 1} 保存失败，刷新后可能丢失`);
                         }
                     }
                 });
-                await Promise.allSettled(saveTasks); // 浣跨敤 allSettled 鑰屼笉鏄?all锛岀‘淇濇墍鏈変换鍔″畬鎴?
+                await Promise.allSettled(saveTasks); // Use allSettled so one failed reference does not abort the rest.
                 console.log('[CanvasContext.addPromptNode] Reference image persistence finished');
             }
         } catch (error: any) {
-            // 馃毃 鑷村懡閿欒锛氭坊鍔犲崱鐗囧け璐?
+            // Fatal error: adding the card failed.
             console.error('[CanvasContext.addPromptNode] Failed to add prompt node', error);
-            import('../services/system/notificationService').then(({ notificationService }) => {
-                notificationService.error('添加卡片失败', '无法创建卡片：' + (error?.message || '未知错误'));
-            });
-            // 鈿狅笍 涓峵hrow锛岄伩鍏嶄腑鏂悗缁祦绋嬶紙鍥剧墖鐢熸垚锛?
+            notificationService.error('添加卡片失败', '无法创建卡片：' + (error?.message || '未知错误'));
+            // Do not rethrow here; avoid interrupting the downstream image-generation flow.
         }
     }, [updateCanvas]);
 
@@ -1414,7 +1402,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [state.activeCanvasId, state.canvases]);
 
     const updatePromptNode = useCallback(async (node: PromptNode) => {
-        // 馃殌 [鍏抽敭淇] 鍏堜繚瀛樺弬鑰冨浘鍐嶆洿鏂拌妭鐐?- 闃叉鍒锋柊涓㈠け
+        // [Key fix] Save reference images before updating the node to avoid losing them on refresh.
         if (node.referenceImages && node.referenceImages.length > 0) {
             const saveTasks = node.referenceImages.map(async ref => {
                 if (ref.data) {
@@ -1437,28 +1425,28 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ...c,
             promptNodes: c.promptNodes.map(n => {
                 if (n.id === node.id) {
-                    // 馃洝锔?[Defensive Merge]
+                    // [Defensive merge]
                     // We must ensure we don't accidentally overwrite existing valid data with empty data
                     // especially during rapid status updates (generating -> success)
                     const merged: PromptNode = {
                         ...n,
                         ...node,
-                        // 馃殌 If the incoming node has empty prompt/refs, but the existing one has them, KEEP existing ones!
+                        // If the incoming node has empty prompt/refs but the existing one has them, keep the existing values.
                         // Unless we are explicitly clearing them (which usually happens via setConfig/delete)
                         // But updatePromptNode is mostly used for status updates.
                         prompt: (node.prompt && node.prompt.length > 0) ? node.prompt : n.prompt,
                         referenceImages: (node.referenceImages && node.referenceImages.length > 0) ? node.referenceImages : n.referenceImages
                     };
 
-                    // 馃殌 [Bugfix] 闃叉闄堟棫鍥炶皟鎶婂凡瀹屾垚/宸插け璐ヨ妭鐐归敊璇湴鏀瑰洖鈥滄鍦ㄧ敓鎴愨€?
-                    // 鍏稿瀷鍦烘櫙锛歊esizeObserver(onHeightChange)鍙犲姞闂寘绔炰簤锛屾惡甯︽棫node蹇収瑕嗙洊鏈€鏂扮姸鎬?
+                    // [Bugfix] Prevent stale callbacks from flipping completed/failed cards back to "generating".
+                    // Typical case: ResizeObserver/onHeightChange races carry older node snapshots over newer state.
                     const hasFinished = resolvePromptChildImageIds(n, c.imageNodes).length > 0;
                     const hasFailed = !!n.error;
 
                     if ((hasFinished || hasFailed) && node.isGenerating === true && n.isGenerating === false) {
                         merged.isGenerating = false;
-                        // 鍚屾椂涔熶繚鎶?error 涓嶈鏃у揩鐓х殑 undefined 瑕嗙洊
-                        // 馃殌 [Fix] 浣嗗厑璁告樉寮忔竻闄?error锛堝綋璋冪敤鏂逛紶鍏?error: undefined 鏃讹級
+                        // Also preserve error so stale undefined values do not overwrite it.
+                        // [Fix] Still allow callers to clear error explicitly with error: undefined.
                         if (hasFailed && !merged.error && !('error' in node)) {
                             merged.error = n.error;
                             merged.errorDetails = n.errorDetails;
@@ -1473,7 +1461,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [updateCanvas]);
 
     const urgentUpdatePromptNode = useCallback((node: PromptNode) => {
-        // 馃殌 [Persistence] We bypass the debounced save and force an immediate state save
+        // [Persistence] Bypass the debounced save and force an immediate state write.
         // 1. Update React State (UI will reflect change)
         updateCanvas(c => ({
             ...c,
@@ -1510,7 +1498,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const addImageNodes = useCallback(async (nodes: GeneratedImage[], parentUpdates?: Record<string, Partial<PromptNode>>) => {
         console.log('[CanvasContext.addImageNodes] Starting image node insert', { count: nodes?.length, hasParentUpdates: !!parentUpdates });
 
-        // 馃洝锔?闃插尽鎬ф鏌ワ細杩囨护鎺夋棤鏁堣妭鐐?(鍏佽 isGenerating 鐘舵€佺殑鑺傜偣)
+        // Defensive filter: drop invalid nodes, but keep nodes that are still generating.
         const validNodes = Array.isArray(nodes) ? nodes.filter(n => n && n.id && (n.url || n.isGenerating)) : [];
         if (validNodes.length === 0) {
             console.warn('[CanvasContext.addImageNodes] No valid image nodes to add.');
@@ -1547,10 +1535,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         : preferredOriginalSource;
                     const previewSource = stableOriginalSource || preferredOriginalSource;
 
-                    // 馃殌 [鍏抽敭淇] 鍏堜繚瀛樺師鍥惧埌鏈湴鏂囨。绯荤粺锛堟渶瀹夊叏鐨勫瓨鍌級
-                    // A. File System First (鎸佷箙鍖栧埌鏈湴纾佺洏 - 浼樺厛绾ф渶楂?
-                    // 馃殌 [闂寘淇] 浣跨敤getLocalFolderHandle鍔ㄦ€佽幏鍙栨渶鏂癶andle锛屼笉渚濊禆闄堟棫鐨剆tate
-                    const { getLocalFolderHandle, getStorageMode } = await import('../services/storage/storagePreference');
+                    // [Key fix] Save the original asset to the most durable store first.
+                    // A. File system first: persist to local disk when available.
+                    // [Closure fix] Read the latest handle dynamically instead of relying on stale state.
                     const selectedStorageMode = await getStorageMode();
                     const currentHandle = selectedStorageMode === 'local' ? await getLocalFolderHandle() : null;
 
@@ -1566,11 +1553,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             }
                         }
                     } else if (selectedStorageMode === 'opfs') {
-                        // 馃殌 [娣诲姞] 娌℃湁鏈湴鏂囨。澶规椂锛屾娴嬫槸鍚︽敮鎸丱PFS锛堟墜鏈虹锛?
+                        // [Addition] If there is no local folder, check whether OPFS is available.
                         const { isOPFSAvailable, saveToOPFS } = await import('../services/storage/opfsService');
 
                         if (isOPFSAvailable()) {
-                            // 鎵嬫満绔細浣跨敤OPFS淇濆瓨鍘熷浘
+                            // Browser/mobile fallback: store the original asset in OPFS.
                             try {
                                 const res = await fetch(previewSource);
                                 const blob = await res.blob();
@@ -1594,18 +1581,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         console.log(`[CanvasContext] Browser storage mode selected, skipping local/OPFS for ${storageId}`);
                     }
 
-                    // B. IndexedDB (娴忚鍣ㄧ紦瀛? - 濮嬬粓淇濆瓨涓€浠藉彲蹇€熸仮澶嶇殑鏁版嵁
+                    // B. IndexedDB cache: always keep a fast recovery copy.
                     if (isVideo) {
-                        // 瑙嗛锛氱洿鎺ヤ繚瀛橈紝涓嶅帇缂?
-                        const { saveImage } = await import('../services/storage/imageStorage');
+                        // Videos are stored directly without thumbnail compression.
                         await saveImage(storageId, previewSource);
                         console.log(`[CanvasContext] Saved video ${storageId} to IndexedDB cache`);
                     } else {
-                        const { saveImage, saveOriginalImage } = await import('../services/storage/imageStorage');
-                        const { getQualityStorageId, ImageQuality } = await import('../services/image/imageQuality');
-
-                        // 馃殌 鍙屼繚闄╋細鏃犺鏄惁鏈夋湰鍦?OPFS锛岄兘淇濆瓨 ORIGINAL 鍒?IndexedDB
-                        // 杩欐牱棣栧睆涓庨噸杞介兘鑳介€氳繃 storageId 绉掔骇鍛戒腑锛屼笉蹇呯瓑寰呯鐩樺洖璇?
+                        // Keep an ORIGINAL copy in IndexedDB even when local disk or OPFS is available.
+                        // That makes first paint and reload hit storageId immediately without waiting on disk reads.
                         if (stableOriginalSource) {
                             await saveOriginalImage(storageId, stableOriginalSource);
                             console.log(`[CanvasContext] Saved ORIGINAL for ${storageId} to IndexedDB cache`);
@@ -1613,12 +1596,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             console.debug(`[CanvasContext] Skip ORIGINAL IDB save for transient blob ${storageId}`);
                         }
 
-                        // 馃殌 [浼樺寲] 浣跨敤Web Worker鐢熸垚缂╃暐鍥撅紝涓嶉樆濉炰富绾跨▼
+                        // [Optimization] Generate thumbnails in a Web Worker to avoid blocking the main thread.
                         try {
                             const { generateThumbnailWithPreset } = await import('../workers/thumbnailService');
                             const { blob } = await generateThumbnailWithPreset(previewSource, 'MICRO');
 
-                            // 杞崲涓篵ase64淇濆瓨鍒癐ndexedDB
+                            // Convert the worker output to base64 before storing it in IndexedDB.
                             const reader = new FileReader();
                             const microData = await new Promise<string>((resolve, reject) => {
                                 reader.onload = () => resolve(reader.result as string);
@@ -1634,13 +1617,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 await fileSystemService.saveThumbnailToHandle(currentHandle, storageId, blob);
                             }
 
-                            // 棰勮妗ｅ厹搴曞埌鍘熷浘锛岄伩鍏?PREVIEW 绾ц鍙栨椂鍑虹幇绌烘礊
+                            // Mirror the preview slot to the original asset to avoid blank preview reads.
                             const previewId = getQualityStorageId(storageId, ImageQuality.PREVIEW);
                             await saveImage(previewId, previewSource);
                         } catch (workerError) {
-                            // Worker澶辫触鏃跺洖閫€鍒颁富绾跨▼
+                            // Fall back to main-thread compression if the worker fails.
                             console.warn(`[CanvasContext] Worker failed, falling back to main thread:`, workerError);
-                            const { compressImageToQuality, QUALITY_CONFIGS } = await import('../services/image/imageQuality');
                             const microData = await compressImageToQuality(previewSource, QUALITY_CONFIGS[ImageQuality.MICRO]);
                             const microId = getQualityStorageId(storageId, ImageQuality.MICRO);
                             await saveImage(microId, microData);
@@ -1661,7 +1643,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             })());
         }
 
-        // 馃殌 [淇] 鍏堢珛鍗虫樉绀哄浘鐗囷紙涔愯鏇存柊锛夛紝淇濇寔杩炵画鍙戦€佽兘鍔?
+        // [Fix] Update the UI first so continuous sends stay responsive.
         console.log('[CanvasContext.addImageNodes] Updating UI immediately with nodes:', stateNodes.length);
         try {
             updateCanvas(c => {
@@ -1719,7 +1701,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     nextAppendedImageZById.set(node.id, node.zIndex ?? ++maxZ);
                 });
 
-                // 馃殌 [Critical Fix] Atomic linking: update parent nodes in the same state transaction
+                // [Critical fix] Atomic linking: update parent nodes in the same state transaction.
                 if (parentUpdates) {
                     nextPromptNodes = nextPromptNodes.map(pn => {
                         const updates = parentUpdates[pn.id];
@@ -1792,17 +1774,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             console.log('[CanvasContext.addImageNodes] UI update completed, images are visible');
         } catch (uiError: any) {
-            // 馃毃 鑷村懡閿欒锛歎I鏇存柊澶辫触
+            // Fatal UI error: the new images could not be rendered into state.
             console.error('[CanvasContext.addImageNodes] UI update failed!', uiError);
-            import('../services/system/notificationService').then(({ notificationService }) => {
-                notificationService.error('显示图片失败', '无法显示图片：' + (uiError?.message || '未知错误'));
-            });
+            notificationService.error('显示图片失败', '无法显示图片：' + (uiError?.message || '未知错误'));
             throw uiError;
         }
 
-        // 馃殌 鍚庡彴鎵ц鎸佷箙鍖栦换鍔★紙涓嶉樆濉濽I锛?
+        // Run persistence tasks in the background without blocking the UI.
         console.log('[CanvasContext.addImageNodes] Starting background persistence tasks:', persistenceTasks.length);
-        // 浣跨敤鍏ㄥ眬杩借釜鍣ㄩ槻姝㈠埛鏂版椂涓㈠け
+        // Track the task globally so refresh does not drop in-flight saves.
         const savePromise = Promise.allSettled(persistenceTasks).then((results) => {
             const successful = results.filter(r => r.status === 'fulfilled').length;
             const failed = results.filter(r => r.status === 'rejected').length;
@@ -1810,15 +1790,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             if (failed > 0) {
                 console.warn('[CanvasContext.addImageNodes] Some image persistence tasks failed; data may be missing after refresh');
-                import('../services/system/notificationService').then(({ notificationService }) => {
-                    notificationService.warning('图片保存失败', failed + ' 张图片保存失败，建议重新保存或重试。');
-                });
+                notificationService.warning('图片保存失败', failed + ' 张图片保存失败，建议重新保存或重试。');
             }
         }).catch(e => {
             console.error('[CanvasContext.addImageNodes] Persistence task failed:', e);
         });
 
-        // 杩借釜鏈畬鎴愮殑淇濆瓨浠诲姟
+        // Track this in-flight persistence task.
         pendingSavesRef.current.add(savePromise);
         savePromise.finally(() => {
             pendingSavesRef.current.delete(savePromise);
@@ -1950,7 +1928,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     }, [updateCanvas]);
 
-    // 馃殌 [Batch Update] Implementation for stacking or massive moves
+    // [Batch update] Support stacking and other large-move operations.
     const updateNodes = useCallback((batch: {
         promptNodes?: { id: string, updates: Partial<PromptNode> }[],
         imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
@@ -2142,7 +2120,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Delete from IndexedDB (existing logic)
         deleteImage(id);
 
-        // 馃殌 [鍏抽敭淇] 璁?storageAdapter 鍘诲皾璇曞垹闄ゅ叏灞€纾佺洏鏂囨。/OPFS
+        // [Key fix] Ask storageAdapter to delete persisted disk and OPFS artifacts too.
         import('../services/storage/storageAdapter').then(({ deleteImage: deleteImageFromDisk }) => {
             deleteImageFromDisk({
                 id: id,
@@ -2154,7 +2132,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         }).catch(e => console.error('Failed to invoke safe physical deletion', e));
 
-        urgentSaveRef.current = true; // 鍒犻櫎鍚庡己鍒舵寕杞藉瓨鍌?
+        urgentSaveRef.current = true; // Force an immediate persistence flush after deletion.
         updateCanvas(c => {
             // Revoke Blob URL to free memory
             const node = c.imageNodes.find(n => n.id === id);
@@ -2326,15 +2304,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // --- Configuration ---
         const PROMPT_WIDTH = 320;
         const PROMPT_HEIGHT = 160; // Base height, dynamic in reality but fixed for grid slot
-        const GAP_X = 100;  // 鉁?澧炲ぇ姘村钩闂磋窛闃叉鍫嗗彔
-        const GAP_Y = 120;  // 鉁?澧炲ぇ鍨傜洿闂磋窛闃叉鍫嗗彔
-        const IMAGE_GAP = 40; // 鉁?澧炲ぇ鍥剧墖闂磋窛
-        const AUTO_ARRANGE_GROUPS_PER_ROW = 20; // 鉁?姣忚鍥哄畾鎸?0涓崱缁勬崲琛?
-        const AUTO_ARRANGE_SUB_COLUMNS = 20; // 鉁?鍓崱榛樿灏介噺妯悜鎺掑紑锛?寮犱篃淇濇寔鍗曡
-        const AUTO_ARRANGE_GROUP_GAP_X = 56; // 鉁?鑷姩鏁寸悊鏃跺崱缁勬í鍚戣繘涓€姝ユ斁瀹?
-        const AUTO_ARRANGE_GROUP_GAP_Y = 120; // 鉁?鑷姩鏁寸悊鏃跺崱缁勮璺濇槑鏄惧鍔?
-        const AUTO_ARRANGE_SUB_IMAGE_GAP = 32; // 鉁?鍓崱涔嬮棿杩涗竴姝ユ媺寮€
-        const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56; // 鉁?涓诲崱涓庡壇鍗′箣闂村鍔犳洿鏄庢樉鐣欑櫧
+        const GAP_X = 100;  // Larger horizontal gap to prevent overlap.
+        const GAP_Y = 120;  // Larger vertical gap to prevent overlap.
+        const IMAGE_GAP = 40; // Larger gap between images.
+        const AUTO_ARRANGE_GROUPS_PER_ROW = 20; // Wrap after a fixed 20 groups per row.
+        const AUTO_ARRANGE_SUB_COLUMNS = 20; // Keep sub-cards laid out horizontally when possible.
+        const AUTO_ARRANGE_GROUP_GAP_X = 56; // Extra horizontal spacing between auto-arranged groups.
+        const AUTO_ARRANGE_GROUP_GAP_Y = 120; // Extra vertical spacing between auto-arranged group rows.
+        const AUTO_ARRANGE_SUB_IMAGE_GAP = 32; // Additional spacing between sub-cards.
+        const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56; // Larger gap between the prompt card and its sub-cards.
 
         // --- Helper: Get dimensions ---
         const getImageDims = (aspectRatio?: string, dimensions?: string) => {
@@ -2374,7 +2352,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const isPromptOnly = selectedPrompts.length > 0 && selectedImages.length === 0;
                 const isImageOnly = selectedPrompts.length === 0 && selectedImages.length > 0;
 
-                // [NEW] 鍗曢€変富鍗℃椂: 瀵瑰叾鍓崱搴旂敤鎺掑垪妯″紡杞崲
+                // [New] When only a prompt is selected, rotate its child-card layout mode.
                 if (isPromptOnly && selectedPrompts.length === 1) {
                     const prompt = selectedPrompts[0];
                     const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
@@ -2384,7 +2362,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const SUB_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP;
                         const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
 
-                        // 璁＄畻鍓崱灏哄
+                        // Compute child-card bounds.
                         const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
                         const avgWidth = imageDims.reduce((sum, d) => sum + d.w, 0) / imageDims.length;
                         const avgHeight = imageDims.reduce((sum, d) => sum + d.h, 0) / imageDims.length;
@@ -2405,7 +2383,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 currentX += dims.w + SUB_GAP;
                             });
                         } else if (targetMode === 'grid') {
-                            // 瀹牸鎺掑垪: 4鍒楃綉鏍?灞呬腑瀵归綈
+                            // Grid layout: use a 4-column grid with centered alignment.
                             const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, childImages.length);
                             const rows = Math.ceil(childImages.length / columns);
                             const totalWidth = columns * avgWidth + (columns - 1) * SUB_GAP;
@@ -2421,7 +2399,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 };
                             });
                         } else {
-                            // 绔栧悜鎺掑垪: 鍓崱鍨傜洿鎺掓垚涓€鍒?灞呬腑瀵归綈
+                            // Vertical layout: stack child cards in one centered column.
                             let currentY = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
 
                             childImages.forEach((img, i) => {
@@ -2431,9 +2409,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             });
                         }
 
-                        // 杞崲鍒颁笅涓€涓ā寮?
+                        // Rotate to the next layout mode.
 
-                        // 搴旂敤浣嶇疆鍙樻洿
+                        // Apply the position changes.
                         const newCanvases = state.canvases.map(c => {
                             if (c.id !== state.activeCanvasId) return c;
                             return {
@@ -2455,14 +2433,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 let syncChildren = false;
 
                 if (isPromptOnly) {
-                    // [MODE A] Prompt Only: 馃殌 鏀逛负鍚屾瀛愬崱锛屽疄鐜板崱缁勬暣浣撴暣鐞?
+                    // [Mode A] Prompt only: also sync child cards so the whole group arranges together.
                     roots = selectedPrompts.map(p => ({
                         id: p.id, type: 'prompt', obj: p,
                         x: p.position.x, y: p.position.y,
                         width: PROMPT_WIDTH, height: p.height || 200,
                         visualCx: p.position.x, visualCy: p.position.y - (p.height || 200) / 2
                     }));
-                    syncChildren = true; // 馃殌 鍚敤瀛愬崱鍚屾锛岃鍓崱璺熼殢涓诲崱绉诲姩
+                    syncChildren = true; // Enable child-card sync so sub-cards follow the prompt during moves.
                 }
                 else if (isImageOnly) {
                     // [MODE B] Image Only: Sort Images independent of parents
@@ -2507,7 +2485,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         let width, height;
 
                         if (r.type === 'prompt') {
-                            // 馃殌 [FIX] Calculate Bounding Box of Prompt + All Children
+                            // [Fix] Calculate the bounding box of the prompt and all children.
                             const children = currentCanvas.imageNodes.filter(img => img.parentPromptId === node.id);
 
                             // 1. Initial Bounds (Prompt itself) - Anchor: Bottom Center
@@ -2552,8 +2530,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 if (roots.length >= 2) {
                     // 2. 浣跨敤浼犲叆鐨刴ode纭畾绛栫暐
                     const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
-                    const GAP = 120; // 鉁?澧炲ぇ鍒嗙粍闂磋窛 (Was 80)
-                    const GRID_COLUMNS = 6; // 瀹牸妯″紡鍥哄畾6鍒?
+                    const GAP = 120; // Larger gap between groups (was 80).
+                    const GRID_COLUMNS = 6; // Grid mode uses 6 fixed columns.
 
                     // 3. Arrange
                     const newPositions: Record<string, { x: number, y: number }> = {};
@@ -2565,7 +2543,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             return a.visualCx - b.visualCx;
                         });
 
-                        // 浣跨敤鍥哄畾6鍒?
+                        // Use a fixed 6-column grid.
                         const columns = GRID_COLUMNS;
                         // Center around average center
                         const avgX = roots.reduce((s, r) => s + r.x, 0) / roots.length;
@@ -2900,10 +2878,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         return;
                     }
                 }
-                // 鉁?妗嗛€夋暣鐞? 鎸夊崱缁勫鐞?鏀寔鍓崱椤堕儴瀵归綈鍜屽氨杩戝師鍒?
+                // Selection arrange: process the selection as card groups and keep nearby/top-aligned layouts stable.
 
-                // 1. 鏋勫缓鍗＄粍鍒楄〃 (绫讳技鍏ㄥ眬鏁寸悊)
-                const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // 鍓崱榛樿妯帓锛?寮犱篃涓嶆姌琛?
+                // 1. Build the selected group list, similar to the global arrange flow.
+                const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // Default horizontal sub-card columns.
                 const SUB_IMAGE_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP;
                 const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
                 const GROUP_GAP_X = AUTO_ARRANGE_GROUP_GAP_X;
@@ -2921,7 +2899,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const groups: SelectionGroup[] = [];
                 const processedImageIds = new Set<string>();
 
-                // 2a. 澶勭悊閫変腑鐨勪富鍗″強鍏跺壇鍗?
+                // 2a. Process selected prompt cards together with their child image cards.
                 selectedPrompts.forEach(prompt => {
                     const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
                     const promptHeight = prompt.height || 200;
@@ -2953,13 +2931,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 });
 
-                // 2b. 澶勭悊閫変腑浣嗘棤涓诲崱鐨勫绔嬪壇鍗?
+                // 2b. Process selected standalone image cards without a parent prompt.
                 selectedImages.filter(img => !processedImageIds.has(img.id)).forEach(img => {
                     const dims = getImageDims(img.aspectRatio, img.dimensions);
                     groups.push({
                         images: [img],
                         width: dims.w,
-                        height: dims.h + 200 + PROMPT_TO_SUB_GAP, // 鍋囪鏈変富鍗￠珮搴?
+                        height: dims.h + 200 + PROMPT_TO_SUB_GAP, // Reserve prompt height for standalone images.
                         originalX: img.position.x,
                         originalY: img.position.y
                     });
@@ -2967,18 +2945,18 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 if (groups.length === 0) return;
 
-                // 3. 鎸夊師浣嶇疆鎺掑簭 (灏辫繎鍘熷垯)
+                // 3. Sort by original position to preserve spatial proximity.
                 groups.sort((a, b) => {
                     const rowDiff = Math.floor(a.originalY / 200) - Math.floor(b.originalY / 200);
                     if (rowDiff !== 0) return rowDiff;
                     return a.originalX - b.originalX;
                 });
 
-                // 4. 璁＄畻閫変腑鍖哄煙涓績 (灏辫繎鍘熷垯)
+                // 4. Compute the center of the selected area.
                 const centerX = groups.reduce((sum, g) => sum + g.originalX, 0) / groups.length;
                 const centerY = groups.reduce((sum, g) => sum + g.originalY, 0) / groups.length;
 
-                // 5. 涓ら亶澶勭悊: 鍏堝垎琛?鍐嶈缃綅缃?
+                // 5. Two-pass layout: assign rows first, then set final positions.
                 const gridColumns = Math.min(AUTO_ARRANGE_GROUPS_PER_ROW, Math.max(1, groups.length));
                 const layoutRows: Array<{ groups: SelectionGroup[]; maxPromptHeight: number; maxTotalHeight: number }> = [];
                 let currentRow: typeof layoutRows[0] = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0 };
@@ -2994,7 +2972,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 });
                 if (currentRow.groups.length > 0) layoutRows.push(currentRow);
 
-                // 6. 璁＄畻鎬诲昂瀵稿苟浠庝腑蹇冪偣寮€濮嬪竷灞€
+                // 6. Compute overall bounds and start layout from the center.
                 const maxGroupWidth = Math.max(...groups.map(g => g.width));
                 const totalLayoutWidth = gridColumns * maxGroupWidth + (gridColumns - 1) * GROUP_GAP_X;
                 const totalLayoutHeight = layoutRows.reduce((sum, r) => sum + r.maxTotalHeight, 0) + (layoutRows.length - 1) * GROUP_GAP_Y;
@@ -3004,25 +2982,25 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const newPositions: Record<string, { x: number; y: number }> = {};
                 const movedPrompts = new Set<string>();
 
-                // 7. 璁剧疆浣嶇疆 (鍓崱椤堕儴瀵归綈)
+                // 7. Apply positions with top-aligned sub-cards.
                 layoutRows.forEach(layoutRow => {
                     let rowX = startX;
                     const rowMaxPromptHeight = layoutRow.maxPromptHeight;
                     const subCardsStartY = startY + rowMaxPromptHeight + PROMPT_TO_SUB_GAP;
 
                     layoutRow.groups.forEach(group => {
-                        // 馃殌 [淇] 浣跨敤褰撳墠缁勭殑瀹為檯瀹藉害璁＄畻涓績鐐?
+                        // [Fix] Use the current group's actual width when calculating its center.
                         const groupCenterX = rowX + group.width / 2;
 
                         if (group.prompt) {
                             const promptHeight = group.prompt.height || 200;
                             newPositions[group.prompt.id] = {
                                 x: groupCenterX,
-                                y: startY + promptHeight // 鉁?纭繚鎵€鏈変富鍗＄殑椤堕儴姝ｅソ骞抽綈瀵归綈鍦?startY
+                                y: startY + promptHeight // Keep prompt tops aligned at startY.
                             };
                             movedPrompts.add(group.prompt.id);
 
-                            // 鍓崱浣嶇疆
+                            // Sub-card positions.
                             if (group.images.length > 0) {
                                 const imageDims = group.images.map(img => getImageDims(img.aspectRatio, img.dimensions));
                                 const maxWidth = Math.max(...imageDims.map(d => d.w));
@@ -3041,20 +3019,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 });
                             }
                         } else if (group.images[0]) {
-                            // 瀛ょ珛鍓崱
+                            // Standalone image card.
                             const img = group.images[0];
                             const dims = getImageDims(img.aspectRatio, img.dimensions);
                             newPositions[img.id] = { x: groupCenterX, y: subCardsStartY + dims.h };
                         }
 
-                        // 馃殌 [淇] 浣跨敤褰撳墠缁勭殑瀹為檯瀹藉害鑰屼笉鏄痬axGroupWidth锛岄槻姝㈤噸鍙?
+                        // [Fix] Advance by the real group width, not maxGroupWidth, to avoid overlap.
                         rowX += group.width + GROUP_GAP_X;
                     });
 
                     startY += layoutRow.maxTotalHeight + GROUP_GAP_Y;
                 });
 
-                // 8. 搴旂敤浣嶇疆
+                // 8. Apply positions.
                 const newCanvases = state.canvases.map(c => {
                     if (c.id !== state.activeCanvasId) return c;
                     return {
@@ -3070,37 +3048,37 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
-        // --- 鏂板竷灞€閫昏緫: 浠庡乏涓婅寮€濮?姣忚20缁?---
-        // 閰嶇疆
-        const GROUPS_PER_ROW = AUTO_ARRANGE_GROUPS_PER_ROW;  // 姣忚鍥哄畾20涓崱缁?
-        const GROUP_GAP_X = AUTO_ARRANGE_GROUP_GAP_X;     // 鉁?鍗＄粍涔嬮棿鐨勬í鍚戦棿璺?
-        const GROUP_GAP_Y = AUTO_ARRANGE_GROUP_GAP_Y;     // 鉁?琛屼箣闂寸殑绾靛悜闂磋窛
-        const START_X = -2000;      // 鐢诲竷宸︿笂瑙掕捣濮媂
-        const START_Y = 200;        // 鐢诲竷宸︿笂瑙掕捣濮媃
+        // --- New layout logic: start from the upper-left and place up to 20 groups per row. ---
+        // Configuration
+        const GROUPS_PER_ROW = AUTO_ARRANGE_GROUPS_PER_ROW;  // Fixed 20 groups per row.
+        const GROUP_GAP_X = AUTO_ARRANGE_GROUP_GAP_X;     // Horizontal gap between groups.
+        const GROUP_GAP_Y = AUTO_ARRANGE_GROUP_GAP_Y;     // Vertical gap between rows.
+        const START_X = -2000;      // Upper-left layout origin X.
+        const START_Y = 200;        // Upper-left layout origin Y.
 
-        // 1. 鍒嗙被鍗＄墖
+        // 1. Classify cards.
         const errorPrompts = currentCanvas.promptNodes.filter(p => p.error);
         const errorPromptIds = new Set(errorPrompts.map(p => p.id));
 
-        // 姝ｇ‘鐨凱rompt鍗?鏈夊瓙鍗＄殑)
+        // Normal prompt cards with child images.
         const normalPrompts = currentCanvas.promptNodes.filter(p =>
             !errorPromptIds.has(p.id) &&
             currentCanvas.imageNodes.some(img => img.parentPromptId === p.id)
         );
 
-        // 瀛ょ嫭鐨凱rompt鍗?娌℃湁瀛愬崱鐨?
+        // Orphan prompt cards without child images.
         const orphanPrompts = currentCanvas.promptNodes.filter(p =>
             !errorPromptIds.has(p.id) &&
             !currentCanvas.imageNodes.some(img => img.parentPromptId === p.id)
         );
 
-        // 瀛ょ嫭鐨処mage鍗?娌℃湁鐖禤rompt鐨?
+        // Orphan image cards without a parent prompt.
         const orphanImages = currentCanvas.imageNodes.filter(img =>
             !img.parentPromptId ||
             !currentCanvas.promptNodes.some(p => p.id === img.parentPromptId)
         );
 
-        // 2. 鏋勫缓鍗＄粍鍒楄〃
+        // 2. Build layout groups.
         type LayoutGroupType = 'normal' | 'orphan-prompt' | 'orphan-image' | 'error';
         type LayoutGroup = {
             type: LayoutGroupType;
@@ -3115,10 +3093,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const promptById = new Map(currentCanvas.promptNodes.map(prompt => [prompt.id, prompt]));
         const imageById = new Map(currentCanvas.imageNodes.map(img => [img.id, img]));
 
-        // 2a. 姝ｇ‘鐨勫崱缁?Prompt + 瀛怚mage)
-        const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // 鉁?鍓崱榛樿妯帓锛?寮犱篃涓嶆姌琛?
-        const SUB_IMAGE_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP; // 瀛愬崱闂磋窛
-        const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP; // 涓诲崱鍜屽壇鍗′箣闂寸殑闂磋窛
+        // 2a. Normal card groups (prompt + child images).
+        const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // Default horizontal sub-card columns.
+        const SUB_IMAGE_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP; // Child-card gap.
+        const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP; // Gap between prompt and child cards.
 
         normalPrompts.forEach(prompt => {
             const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
@@ -3129,7 +3107,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ? sourceImage.parentPromptId
                 : undefined;
 
-            // 璁＄畻瀛愬崱灏哄
+            // Compute child-card bounds.
             let maxSubWidth = 0;
             let maxSubHeight = 0;
             childImages.forEach(img => {
@@ -3138,11 +3116,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 maxSubHeight = Math.max(maxSubHeight, dims.h);
             });
 
-            // 瀹為檯鍒楁暟 (涓嶈秴杩囧浘鐗囨暟閲?
+            // Actual column count, capped by image count.
             const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
             const rows = Math.ceil(childImages.length / SUB_COLUMNS);
 
-            // 瀛愬崱鍧楀昂瀵?
+            // Child-card block size.
             const subBlockWidth = actualColumns > 0
                 ? actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP
                 : 0;
@@ -3150,7 +3128,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ? rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP
                 : 0;
 
-            // 鍗＄粍鎬诲搴﹀拰楂樺害
+            // Total group width and height.
             const groupWidth = Math.max(promptWidth, subBlockWidth);
             const groupHeight = promptHeight + (childImages.length > 0 ? PROMPT_TO_SUB_GAP + subBlockHeight : 0);
 
@@ -3164,7 +3142,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
-        // 2b. 瀛ょ嫭鐨凱rompt鍗?
+        // 2b. Orphan prompt cards.
         orphanPrompts.forEach(prompt => {
             const sourceImage = prompt.sourceImageId ? imageById.get(prompt.sourceImageId) : undefined;
             const sourcePromptId = sourceImage?.parentPromptId && promptById.has(sourceImage.parentPromptId)
@@ -3180,7 +3158,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
-        // 2c. 瀛ょ嫭鐨処mage鍗?
+        // 2c. Orphan image cards.
         orphanImages.forEach(img => {
             const dims = getImageDims(img.aspectRatio, img.dimensions);
             layoutGroups.push({
@@ -3191,10 +3169,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
-        // 3. 甯冨眬姝ｅ父鍗＄粍 + 瀛ょ嫭鍗＄粍 (姣忚鍥哄畾20缁?
-        // 鉁?涓ら亶澶勭悊:
-        //   绗竴閬? 鍒嗛厤鍗＄粍鍒拌,璁＄畻姣忚鐨勬渶澶т富鍗￠珮搴?
-        //   绗簩閬? 鏍规嵁姣忚鐨勬渶澶т富鍗￠珮搴﹁缃綅缃?瀹炵幇鍓崱椤堕儴瀵归綈
+        // 3. Layout normal + orphan groups with 20 groups per row.
+        // Two-pass layout:
+        //   Pass 1: assign groups to rows and compute each row's max prompt height.
+        //   Pass 2: place groups using those row metrics so sub-card tops align.
 
         const followUpGroups = layoutGroups.filter(group => !!group.sourcePromptId && group.prompt);
         const rootLayoutGroups = layoutGroups.filter(group => !group.sourcePromptId);
@@ -3224,11 +3202,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             group.layoutHeight = computeLayoutHeight(group);
         });
 
-        // 鉁?绗竴閬? 灏嗗崱缁勫垎閰嶅埌琛?
+        // Pass 1: assign groups to rows.
         const rows: Array<{
             groups: LayoutGroup[];
-            maxPromptHeight: number;  // 璇ヨ鏈€楂樹富鍗￠珮搴?
-            maxTotalHeight: number;   // 璇ヨ鏈€楂樺崱缁勬€婚珮搴?
+            maxPromptHeight: number;  // Tallest prompt in the row.
+            maxTotalHeight: number;   // Tallest full group in the row.
             startX: number;
         }> = [];
 
@@ -3238,17 +3216,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         rootLayoutGroups.forEach((group) => {
             const groupsInCurrentRow = currentRow.groups.length;
 
-            // 鎹㈣妫€鏌ワ細鍙寜鍗＄粍鏁版崲琛岋紝涓嶆寜鍗＄粍瀹藉害鎻愬墠鎹㈣
+            // Wrap only by group count, not by width.
             if (groupsInCurrentRow >= GROUPS_PER_ROW) {
                 rows.push(currentRow);
                 currentX = START_X;
                 currentRow = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
             }
 
-            // 娣诲姞鍒板綋鍓嶈
+            // Add to the current row.
             currentRow.groups.push(group);
 
-            // 鏇存柊璇ヨ鏈€澶т富鍗￠珮搴?
+            // Update row height metrics.
             const promptHeight = group.prompt?.height || 200;
             currentRow.maxPromptHeight = Math.max(currentRow.maxPromptHeight, promptHeight);
             currentRow.maxTotalHeight = Math.max(currentRow.maxTotalHeight, group.layoutHeight || group.height);
@@ -3256,12 +3234,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentX += group.width + GROUP_GAP_X;
         });
 
-        // 娣诲姞鏈€鍚庝竴琛?
+        // Push the last row.
         if (currentRow.groups.length > 0) {
             rows.push(currentRow);
         }
 
-        // 鉁?绗簩閬? 鏍规嵁姣忚鐨勬渶澶т富鍗￠珮搴﹁缃綅缃?
+        // Pass 2: place groups using the computed row metrics.
         const positions: { [id: string]: { x: number; y: number } } = {};
         const placedBounds = new Map<string, { left: number; top: number; right: number; bottom: number; width: number; height: number }>();
         const followUpRightEdge = new Map<string, number>();
@@ -3379,22 +3357,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
-        // 4. 閿欒鍗＄墖鍗曠嫭鎹㈣鎺掑垪
+        // 4. Arrange error card groups on their own rows.
         if (errorPrompts.length > 0) {
-            // 鏂拌寮€濮?- 鉁?浣跨敤鏂扮殑灞€閮ㄥ彉閲?
+            // Start a fresh error row.
             let errorX = START_X;
             let errorRowMaxHeight = 0;
             let errorGroupsInRow = 0;
-            currentY += GROUP_GAP_Y + 50; // 棰濆50px鍒嗛殧
+            currentY += GROUP_GAP_Y + 50; // Extra 50px separation.
 
-            const ERROR_GAP_X = 40; // 閿欒鍗＄墖涔嬮棿鏇寸揣鍑?
+            const ERROR_GAP_X = 40; // Tighter spacing between error groups.
 
             errorPrompts.forEach(prompt => {
                 const promptWidth = 320;
                 const promptHeight = prompt.height || 200;
                 const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
 
-                // 璁＄畻閿欒鍗＄粍灏哄 (浣跨敤涓庢甯稿崱缁勭浉鍚岀殑4鍒楀竷灞€)
+                // Compute error-group bounds using the same child-card layout.
                 let groupWidth = promptWidth;
                 let groupHeight = promptHeight;
 
@@ -3414,7 +3392,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     groupHeight = promptHeight + PROMPT_TO_SUB_GAP + subBlockHeight;
                 }
 
-                // 鎹㈣妫€鏌ワ細閿欒鍗＄粍涔熷彧鎸夊崱缁勬暟鎹㈣
+                // Wrap error groups only by group count.
                 if (errorGroupsInRow >= GROUPS_PER_ROW) {
                     errorX = START_X;
                     currentY += errorRowMaxHeight + GROUP_GAP_Y;
@@ -3424,22 +3402,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 const groupCenterX = errorX + groupWidth / 2;
 
-                // Prompt浣嶇疆
+                // Prompt position.
                 positions[prompt.id] = {
                     x: groupCenterX,
                     y: currentY + promptHeight
                 };
 
-                // 瀛怚mage浣嶇疆: 妯悜4鍒楀眳涓?椤堕儴瀵归綈
+                // Child image positions: centered columns with top alignment.
                 if (childImages.length > 0) {
                     const promptBottom = currentY + promptHeight + PROMPT_TO_SUB_GAP;
 
-                    // 璁＄畻瀛愬崱灏哄
+                    // Compute child-card bounds.
                     const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
                     const maxWidth = Math.max(...imageDims.map(d => d.w));
                     const maxHeight = Math.max(...imageDims.map(d => d.h));
 
-                    // 璁＄畻瀹為檯鍒楁暟
+                    // Compute the actual column count.
                     const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
                     const blockWidth = actualColumns * maxWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
                     const blockStartX = groupCenterX - blockWidth / 2;
@@ -3448,7 +3426,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const col = i % SUB_COLUMNS;
                         const row = Math.floor(i / SUB_COLUMNS);
                         const cardCenterX = blockStartX + col * (maxWidth + SUB_IMAGE_GAP) + maxWidth / 2;
-                        // 椤堕儴瀵归綈: y = 椤堕儴浣嶇疆 + 鍗＄墖楂樺害 (搴曢儴閿氱偣)
+                        // Top-aligned: y = top position + card height (bottom anchor).
                         const cardTopY = promptBottom + row * (maxHeight + SUB_IMAGE_GAP);
                         const dims = imageDims[i];
                         positions[img.id] = {
@@ -3465,7 +3443,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         setState(prev => {
-            // 馃殌 浣跨敤prev鑾峰彇鏈€鏂扮姸鎬侊紝閲嶆柊璁＄畻newCanvases
+            // Recompute from prev so we always use the latest state.
             const updatedCanvases = prev.canvases.map(c =>
                 c.id === prev.activeCanvasId ? {
                     ...c,
@@ -3475,7 +3453,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 } : c
             );
 
-            // Force Save - 浣跨敤鏇存柊鍚庣殑鐘舵€?
+            // Force save with the updated canvas state.
             if (!prev.fileSystemHandle) {
                 try {
                     persistCanvasStateToLocalStorage({
@@ -3491,7 +3469,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return { ...prev, canvases: updatedCanvases };
         });
 
-    }, [pushToHistory]); // 馃殌 绉婚櫎state渚濊禆锛屼娇鐢ㄥ嚱鏁板紡鏇存柊
+    }, [pushToHistory]); // Removed the direct state dependency; use functional updates instead.
 
     // --- File System Implementation ---
 
@@ -3501,17 +3479,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             // 1. Try Optimized Restore (Permission Prompt instead of Picker)
             try {
-                const { restoreLocalFolderConnection } = await import('../services/storage/storagePreference');
                 handle = await restoreLocalFolderConnection();
             } catch (err) {
-                // 鎭㈠鏈湴鏂囨。澶硅繛鎺ュけ璐ワ紝灏嗙户缁娇鐢ㄦ枃妗ｉ€夋嫨鍣?
+                // Restore failed; continue with the full directory picker.
                 console.warn('[CanvasContext] Failed to restore local folder:', err);
             }
 
             // 2. Fallback to Full Picker
             if (!handle) {
                 handle = await fileSystemService.selectDirectory();
-                const { setLocalFolderHandle } = await import('../services/storage/storagePreference');
                 await setLocalFolderHandle(handle);
             }
 
@@ -3531,7 +3507,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // [NEW] Migration: Save currently loaded images (Temp) to the new Local Folder
                     // This ensures work done in Temp mode is not lost/abandoned when switching
                     if (handle) {
-                        // 馃殌 涓嶅啀璋冪敤getAllImages锛屽彧杩佺Щ褰撳墠鐘舵€侀渶瑕佺殑鍥剧墖
+                        // Do not call getAllImages; migrate only the assets required by the current state.
 
                         // Helper to save base64/blob to disk
                         const saveToDisk = async (id: string, urlOrData: string, isVideo: boolean = false) => {
@@ -3546,7 +3522,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     blob = await res.blob();
                                 }
 
-                                // 馃殌 浣跨敤鏂扮増 saveImageToHandle (鏀寔瑙嗛鍜屽浘鐗囧垎绂?
+                                // Use the newer saveImageToHandle helper for both images and videos.
                                 await fileSystemService.saveImageToHandle(handle!, id, blob, isVideo);
 
                                 if (!isVideo) {
@@ -3559,12 +3535,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             }
                         };
 
-                        // 馃殌 鍙縼绉诲綋鍓嶇姸鎬佸疄闄呴渶瑕佺殑鍥剧墖
+                        // Migrate only the assets currently needed by the active state.
                         const promises: Promise<void>[] = [];
                         state.canvases.forEach(c => {
                             c.imageNodes.forEach(img => {
                                 if (img.id && img.url) {
-                                    // 妫€鏌ユ槸鍚︽槸瑙嗛
+                                    // Detect whether this asset is a video.
                                     const isVideo = img.url.startsWith('data:video/') || img.model?.includes('veo') || false;
                                     const lookupId = img.storageId || img.id;
                                     promises.push(saveToDisk(lookupId, img.url, isVideo));
@@ -3572,7 +3548,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             });
                             c.promptNodes.forEach(pn => {
                                 pn.referenceImages?.forEach(ref => {
-                                    // 馃殌 浣跨敤涓撻棬鐨?saveReferenceImage 鍑芥暟锛堜繚瀛樺埌 refs/ 骞跺帇缂╋級
+                                    // Use saveReferenceImage so refs go to refs/ with compression.
                                     if (ref.storageId && ref.data) {
                                         // saveReferenceImage expects base64 string without "data:mimeType;base64," prefix
                                         const base64Data = ref.data.startsWith('data:') ? ref.data.split(',')[1] : ref.data;
@@ -3591,7 +3567,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             });
                         });
 
-                        // 绛夊緟鎵€鏈変繚瀛樺畬鎴?
+                        // Wait for every migration save to finish.
                         try {
                             await Promise.allSettled(promises);
                         } catch (e) {
@@ -3600,7 +3576,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                         if (promises.length > 0) {
                             // eslint-disable-next-line @typescript-eslint/no-var-requires
-                            const { notify } = await import('../services/system/notificationService');
                             notify.success('数据迁移', '已将 ' + promises.length + ' 张临时图片保存到本地文件夹。');
                         }
                     }
@@ -3677,10 +3652,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }));
                     }
 
-                    // 馃殌 [Fix] Persist handle to IndexedDB so it can be restored on reload
-                    import('../services/storage/storagePreference').then(({ setLocalFolderHandle }) => {
-                        if (handle) setLocalFolderHandle(handle);
-                    });
+                    // [Fix] Persist the handle to IndexedDB so reload can restore it.
+                    if (handle) {
+                        void setLocalFolderHandle(handle);
+                    }
                 } catch (backgroundError) {
                     console.error('[CanvasContext] Failed to hydrate local folder in background:', backgroundError);
                 }
@@ -3738,7 +3713,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
 
         // 3. Notify
-        const { notify } = await import('../services/system/notificationService');
         notify.success('已切换到临时模式', '项目数据已保留。');
 
     }, [state.canvases, state.activeCanvasId]);
@@ -3778,10 +3752,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     folderName: newHandle.name
                 }));
 
-                // 馃殌 [Fix] Persist new handle
-                import('../services/storage/storagePreference').then(({ setLocalFolderHandle }) => {
-                    setLocalFolderHandle(newHandle);
-                });
+                // [Fix] Persist the new handle after a move.
+                void setLocalFolderHandle(newHandle);
 
                 notify.success('移动成功', '项目已成功移动到新位置。');
 
@@ -3797,15 +3769,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, [state.fileSystemHandle, state.folderName]);
 
-    // 馃殌 宸插け璐ョ殑鍥剧墖 ID 缂撳瓨锛岄伩鍏嶆瘡 15 绉掗噸澶嶆姤閿欏埛灞?
+    // Cache failed image IDs to avoid repeating the same reload errors every 15 seconds.
     const failedReloadIdsRef = useRef<Set<string>>(new Set());
-    // 馃殌 [Fix] 鍐欏叆閿侊紝闃叉 refresh 涓?save 绔炴€佹潯浠?
+    // [Fix] Write lock to prevent refresh/save races.
     const isSavingRef = useRef(false);
 
     const runLocalFolderRefresh = useCallback(async (reason: 'manual' | 'interval' = 'manual') => {
         const currentState = stateRef.current;
         if (!currentState.fileSystemHandle) return;
-        // 馃殌 [Fix] 鑻ユ鍦ㄤ繚瀛橈紝璺宠繃鏈疆鍒锋柊锛岄伩鍏嶈鍒板崐鍐欏叆鐨?project.json
+        // [Fix] Skip this refresh cycle while a save is in progress to avoid half-written project.json.
         if (isSavingRef.current) {
             console.debug('[CanvasContext] Skipping refresh: save in progress');
             return;
@@ -3848,11 +3820,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             for (const [id, data] of images.entries()) {
                 const blobUrl = data.url;
                 if (blobUrl) {
-                    // 馃殌 璺宠繃宸茬煡澶辫触鐨?ID锛屼笉鍐嶉噸澶嶅皾璇曞拰鎶ラ敊
+                    // Skip known-failed IDs so we do not retry and log the same failure repeatedly.
                     if (failedReloadIdsRef.current.has(id)) continue;
 
                     try {
-                        // 妫€鏌ユ槸鍚︽槸鏈夋晥鐨?blob URL
+                        // Check whether this is still a valid blob URL.
                         if (blobUrl.startsWith('blob:')) {
                             const res = await fetch(blobUrl);
                             const blob = await res.blob();
@@ -3866,7 +3838,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             reader.readAsDataURL(blob);
                         }
                     } catch (e) {
-                        // blob URL 宸茶繃鏈燂紝灏濊瘯浠庢湰鍦版枃妗ｇ郴缁熼噸鏂板姞杞?
+                        // The blob URL has expired; try loading again from local storage.
                         console.debug('[CanvasContext] Blob URL expired for ' + id + ', trying to reload from local file system');
                         try {
                             const file = await fileSystemService.loadOriginalFromDisk(handle, id);
@@ -3881,7 +3853,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             };
                             reader.readAsDataURL(file);
                         } catch (fsErr) {
-                            // 馃殌 璁板綍澶辫触鐨?ID锛屽悗缁笉鍐嶉噸璇?
+                            // Record the failed ID so we do not retry it again immediately.
                             failedReloadIdsRef.current.add(id);
                             console.debug('[CanvasContext] Failed to reload ' + id + ' from local file system (will skip future retries)');
                         }
@@ -3952,7 +3924,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, []);
 
-    // Auto-Sync: Poll local folder every 15 seconds if connected (闄嶄綆棰戠巼浠ュ噺灏戠珵鎬佸啿绐?
+    // Auto-sync: poll the local folder every 15 seconds when connected to reduce sync drift.
     const refreshLocalFolder = useCallback(async () => {
         await runLocalFolderRefresh('manual');
     }, [runLocalFolderRefresh]);
@@ -3970,7 +3942,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (isLoading) return;
 
         const saveState = async () => {
-            // 馃殌 [Fix] 璁剧疆鍐欏叆閿侊紝闃叉 refresh 璇诲埌鍗婂啓鍏ョ姸鎬?
+            // [Fix] Set the write lock so refresh cannot read half-written state.
             isSavingRef.current = true;
             try {
                 // 1. Save to LocalStorage (Only if NOT using File System)
@@ -4010,7 +3982,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     const blob = await res.blob();
                                     imagesToSave.set(id, blob);
                                 } catch (err: any) {
-                                    // 馃殌 [Fix] Ignore known blob errors to prevent console spam
+                                    // [Fix] Ignore known blob errors to prevent console spam.
                                     if (err.message && err.message.includes('ERR_UPLOAD_FILE_CHANGED')) {
                                         console.warn('[CanvasContext] Blob reference lost for ' + id + ' (file changed/moved), skipping save.');
                                     } else if (err instanceof TypeError && String(err.message || '').includes('Failed to fetch')) {
@@ -4023,7 +3995,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
 
                         // Prepare Clean State for JSON
-                        // 馃洝锔?[闃插尽鎬т慨澶峕 纭繚 canvases 涓嶄负绌轰笖鍖呭惈 activeCanvasId
+                        // [Defensive fix] Ensure canvases is non-empty and still contains activeCanvasId.
                         const cleanCanvases = stripImageUrls(state.canvases);
                         if (cleanCanvases.length === 0) {
                             console.error('[CanvasContext] Aborting save: canvases array is empty! This would wipe project.json');
@@ -4049,7 +4021,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     }
                 }
             } finally {
-                // 馃殌 [Fix] 閲婃斁鍐欏叆閿?
+                // [Fix] Release the write lock.
                 isSavingRef.current = false;
             }
         };
@@ -4074,7 +4046,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     break;
 
                 case 'add':
-                    // 娣诲姞鍒伴€夋嫨锛圫hift+妗嗛€夛級
+                    // Add to selection (Shift + marquee).
                     ids.forEach(id => current.add(id));
                     newSelectedIds = Array.from(current);
                     break;
@@ -4086,7 +4058,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     break;
 
                 case 'toggle':
-                    // 鍒囨崲閫夋嫨锛圕trl+鐐瑰嚮锛?
+                    // Toggle selection (Ctrl + click).
                     ids.forEach(id => {
                         if (current.has(id)) {
                             current.delete(id);
@@ -4109,7 +4081,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setState(prev => ({ ...prev, selectedNodeIds: [] }));
     }, []);
 
-    // 馃殌 [Layering] Bring nodes to front by assigning higher zIndex
+    // [Layering] Bring nodes to front by assigning a higher zIndex.
     const bringNodesToFront = useCallback((nodeIds: string[]) => {
         if (nodeIds.length === 0) return;
 
@@ -4313,7 +4285,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, []);
 
-    // 馃殌 [Layering] Auto-bring selected nodes to front when selection changes
+    // [Layering] Auto-bring selected nodes to front when selection changes.
     const prevSelectedRef = useRef<string[]>([]);
     useEffect(() => {
         const currentSelected = state.selectedNodeIds || [];
@@ -4336,7 +4308,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         prevSelectedRef.current = [...currentSelected];
     }, [state.selectedNodeIds, bringNodesToFront]);
 
-    // 馃殌 [Drag Optimization] Real-time state update for smooth drag and connection lines
+    // [Drag optimization] Real-time state updates for smooth dragging and connector lines.
     const prevGeneratingRef = useRef<string[]>([]);
     const prevGeneratingCanvasIdRef = useRef<string | null>(null);
     useEffect(() => {
@@ -4631,9 +4603,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [state]);
 
     /**
-     * 鏌ユ壘涓嬩竴涓崱缁勭殑缃戞牸浣嶇疆
-     * 瑙勫垯锛氫紭鍏堝悜鍙虫帓鍒楋紝姣忔帓30涓崱缁勫悗鎹㈣
-     * 杩斿洖涓诲崱锛堟彁绀鸿瘝锛夌殑搴曢儴涓績浣嶇疆
+     * Find the grid position for the next card group.
+     * Strategy: place groups left-to-right and wrap after 30 groups per row.
+     * Return the bottom-center anchor position of the main prompt card.
      *
      * Card Group Layout Strategy:
      * - Each group consists of a Main Card (Prompt) and Sub Cards (Images)
@@ -4641,46 +4613,46 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
      * - Dynamic width calculation based on existing sub-cards
      */
     const findNextGroupPosition = useCallback((): { x: number; y: number } => {
-        // 鍗＄粍甯冨眬鍙傛暟
-        const SUB_CARD_WIDTH = 280;      // 鍓崱瀹藉害
-        const SUB_CARD_GAP = 16;         // 鍓崱涔嬮棿闂磋窛
-        const GROUP_BASE_WIDTH = 380;   // 鍗曞壇鍗℃椂鐨勫崱缁勫熀纭€瀹藉害
-        const GROUP_HEIGHT = 600;        // 涓诲崱 + 闂磋窛 + 鍓崱楂樺害
-        const GAP_X = 40;                // 鍗＄粍姘村钩闂磋窛
-        const GAP_Y = 80;                // 鎺掗棿鍨傜洿闂磋窛
-        const GROUPS_PER_ROW = 30;       // 姣忔帓鏈€澶у崱缁勬暟
+        // Card-group layout constants.
+        const SUB_CARD_WIDTH = 280;      // Sub-card width.
+        const SUB_CARD_GAP = 16;         // Gap between sub-cards.
+        const GROUP_BASE_WIDTH = 380;   // Base width when a group has a single sub-card column.
+        const GROUP_HEIGHT = 600;        // Prompt height + gaps + sub-card height.
+        const GAP_X = 40;                // Horizontal gap between groups.
+        const GAP_Y = 80;                // Vertical gap between rows.
+        const GROUPS_PER_ROW = 30;       // Maximum groups per row.
 
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
         if (!currentCanvas) return { x: 0, y: 200 };
 
         const groupCount = currentCanvas.promptNodes.length;
 
-        // 濡傛灉娌℃湁鐜版湁鍗＄粍锛岃繑鍥炲垵濮嬩綅缃?
+        // Return the initial position when there are no existing groups.
         if (groupCount === 0) {
             return { x: 0, y: 200 };
         }
 
-        // 璁＄畻姣忎釜鐜版湁鍗＄粍鐨勫疄闄呭搴︼紙鍩轰簬鍓崱鏁伴噺锛?
+        // Compute each existing group's actual width from its child-card count.
         const getGroupWidth = (promptId: string): number => {
             const childCount = currentCanvas.imageNodes.filter(
                 img => img.parentPromptId === promptId
             ).length;
 
-            // 鍓崱鏈€澶?鍒楁帓鍒?
+            // Child cards use at most two columns.
             const cols = Math.min(Math.max(childCount, 1), 2);
             const width = cols * SUB_CARD_WIDTH + (cols - 1) * SUB_CARD_GAP + 40;
             return Math.max(GROUP_BASE_WIDTH, width);
         };
 
-        // 璁＄畻褰撳墠琛屽彿鍜屽垪鍙?
+        // Compute the current row and column index.
         const row = Math.floor(groupCount / GROUPS_PER_ROW);
         const col = groupCount % GROUPS_PER_ROW;
 
-        // 璁＄畻褰撳墠琛岀殑绱НX鍋忕Щ
+        // Compute the accumulated X offset within the current row.
         const startRowIdx = row * GROUPS_PER_ROW;
         let xOffset = 0;
 
-        // 绱姞褰撳墠琛屼腑鎵€鏈夊凡瀛樺湪鍗＄粍鐨勫搴?
+        // Sum the width of every existing group in this row.
         for (let i = startRowIdx; i < groupCount; i++) {
             const prompt = currentCanvas.promptNodes[i];
             if (prompt) {
@@ -4688,14 +4660,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
-        // 缁熶竴宸﹀榻愭帓甯?
+        // Keep the layout left-aligned.
         const startX = 0;
 
-        // 鏂板崱缁刋浣嶇疆 = 璧峰X + 绱Н鍋忕Щ + 鏂板崱缁勫搴︾殑涓€鍗婏紙灞呬腑閿氱偣锛?
+        // New group position = startX + accumulated offset + half the new group width.
         const newGroupWidth = GROUP_BASE_WIDTH;
         const x = startX + xOffset + newGroupWidth / 2;
 
-        // Y浣嶇疆鏍规嵁琛屽彿璁＄畻
+        // Compute Y from the row index.
         const y = 200 + row * (GROUP_HEIGHT + GAP_Y);
 
         return { x, y };
@@ -4746,32 +4718,32 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
     }, [updateCanvas]);
 
-    // 馃殌 瑙嗗彛涓績鍔ㄦ€佸姞杞?- 浣跨敤useCallback闃叉鏃犻檺寰幆
+    // Track viewport-center updates with useCallback to avoid needless loops.
     const setViewportCenter = useCallback((center: { x: number; y: number }) => {
         setState(prev => ({ ...prev, viewportCenter: center }));
     }, []);
 
-    // 馃殌 杩佺Щ閫変腑鑺傜偣鍒板叾浠栭」鐩?
+    // Migrate selected nodes to another canvas.
     const migrateNodes = useCallback((nodeIds: string[], targetCanvasId: string) => {
         setState(prev => {
             const sourceCanvas = prev.canvases.find(c => c.id === prev.activeCanvasId);
             const targetCanvas = prev.canvases.find(c => c.id === targetCanvasId);
             if (!sourceCanvas || !targetCanvas) return prev;
 
-            // 鎵惧嚭瑕佽縼绉荤殑鑺傜偣
+            // Collect the nodes to migrate.
             const promptsToMigrate = sourceCanvas.promptNodes.filter(n => nodeIds.includes(n.id));
             const imagesToMigrate = sourceCanvas.imageNodes.filter(n => nodeIds.includes(n.id));
 
-            // 濡傛灉杩佺Щ鐨勬槸涓诲崱,涔熻縼绉诲叾瀛愬浘鐗?
+            // If a prompt card is being moved, move its child images too.
             const childImageIds = promptsToMigrate.flatMap(p => p.childImageIds || []);
             const childImagesToMigrate = sourceCanvas.imageNodes.filter(n => childImageIds.includes(n.id) && !nodeIds.includes(n.id));
 
-            // 璁＄畻鍋忕Щ閲?鏀惧湪鐩爣鐢诲竷鍙充晶)
+            // Compute the offset so migrated nodes land to the right of the target canvas content.
             const offsetX = targetCanvas.promptNodes.length > 0
                 ? Math.max(...targetCanvas.promptNodes.map(n => n.position.x)) + 500
                 : 0;
 
-            // 鏇存柊杩佺Щ鑺傜偣鐨勪綅缃?- 馃敡 淇濈暀鍥剧墖URL纭繚鑳芥纭樉绀?
+            // Update migrated node positions while preserving image URLs.
             const migratedPrompts = promptsToMigrate.map(p => ({
                 ...p,
                 position: { x: p.position.x + offsetX, y: p.position.y }
@@ -4779,17 +4751,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const migratedImages = [...imagesToMigrate, ...childImagesToMigrate].map(img => ({
                 ...img,
                 position: { x: img.position.x + offsetX, y: img.position.y },
-                // 馃敡 鍏抽敭锛氱‘淇漊RL瀹屾暣淇濈暀浠ヤ究瀛樺偍灞傝兘姝ｇ‘淇濆瓨
+                // Preserve complete URLs so storage can persist them correctly.
                 url: img.url || '',
                 originalUrl: img.originalUrl || ''
             }));
 
-            // 馃敡 杩佺Щ鍚庣珛鍗充繚瀛樺浘鐗囧埌IndexedDB锛堝紓姝ワ紝涓嶉樆濉濽I锛?
+            // Immediately cache migrated images in IndexedDB without blocking the UI.
             (async () => {
                 try {
-                    const { saveImage, getImage } = await import('../services/storage/imageStorage');
                     for (const img of migratedImages) {
-                        // 纭繚鍥剧墖宸插瓨鍦ㄤ簬IndexedDB
+                        // Ensure the image exists in IndexedDB.
                         const existingUrl = await getImage(img.id);
                         if (!existingUrl && (img.url || img.originalUrl)) {
                             const urlToSave = img.originalUrl || img.url;
@@ -4804,7 +4775,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
             })();
 
-            // 浠庢簮鐢诲竷鍒犻櫎,娣诲姞鍒扮洰鏍囩敾甯?
+            // Remove from the source canvas and add to the target canvas.
             const allMigratedImageIds = [...imagesToMigrate, ...childImagesToMigrate].map(i => i.id);
             const updatedCanvases = prev.canvases.map(c => {
                 if (c.id === prev.activeCanvasId) {
@@ -5068,11 +5039,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return summary;
     }, []);
 
-    // 馃殌 [鎬ц兘浼樺寲] 缂撳瓨 Context Value锛岄槻姝㈤珮棰?state锛堝 viewportCenter锛夋敼鍙樻椂鎵€鏈夋秷璐圭粍浠跺叏閲忛噸娓叉煋
+    // [Performance] Cache the context value so high-frequency state like viewportCenter does not rerender every consumer.
     const contextValue = React.useMemo(() => ({
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
-        updateNodes, // 馃殌 Batch Update
+        updateNodes, // Batch update
         addWorkflowNode, updateWorkflowNode, updateWorkflowNodePosition, deleteWorkflowNode,
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,

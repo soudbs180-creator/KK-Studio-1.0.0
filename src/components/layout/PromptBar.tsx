@@ -1,4 +1,4 @@
-import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
+﻿import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
 import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
@@ -1800,44 +1800,42 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                         // [NEW] If no data but storageId exists, hydrate it!
                         if (!finalData && storageId) {
-                            import('../../services/storage/imageStorage').then(({ getImage }) => {
-                                getImage(storageId).then((loadedData) => {
-                                    if (loadedData) {
-                                        setConfig(curr => ({
-                                            ...curr,
-                                            referenceImages: curr.referenceImages.map(img =>
-                                                img.id === newRef.id ? { ...img, data: loadedData } : img
-                                            )
-                                        }));
-                                    } else {
-                                        // 🚀 [Fix] IndexedDB 中没有数据，尝试从 URL 获取
-                                        const url = e.dataTransfer.getData('text/plain');
-                                        if (url && (url.startsWith('data:') || url.startsWith('blob:'))) {
-                                            fetch(url)
-                                                .then(res => res.blob())
-                                                .then(blob => {
-                                                    const reader = new FileReader();
-                                                    reader.onloadend = () => {
-                                                        const result = reader.result as string;
-                                                        const matches = result.match(/^data:(.+);base64,(.+)$/);
-                                                        if (matches) {
-                                                            const base64Data = matches[2];
-                                                            // 保存到 IndexedDB 以便下次恢复
-                                                            saveImage(storageId, result).catch(() => { });
-                                                            setConfig(curr => ({
-                                                                ...curr,
-                                                                referenceImages: curr.referenceImages.map(img =>
-                                                                    img.id === newRef.id ? { ...img, data: base64Data, mimeType: matches[1] } : img
-                                                                )
-                                                            }));
-                                                        }
-                                                    };
-                                                    reader.readAsDataURL(blob);
-                                                })
-                                                .catch(err => console.error('[PromptBar] Failed to fetch image from URL:', err));
-                                        }
+                            getImage(storageId).then((loadedData) => {
+                                if (loadedData) {
+                                    setConfig(curr => ({
+                                        ...curr,
+                                        referenceImages: curr.referenceImages.map(img =>
+                                            img.id === newRef.id ? { ...img, data: loadedData } : img
+                                        )
+                                    }));
+                                } else {
+                                    // 🚀 [Fix] IndexedDB 中没有数据，尝试从 URL 获取
+                                    const url = e.dataTransfer.getData('text/plain');
+                                    if (url && (url.startsWith('data:') || url.startsWith('blob:'))) {
+                                        fetch(url)
+                                            .then(res => res.blob())
+                                            .then(blob => {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    const result = reader.result as string;
+                                                    const matches = result.match(/^data:(.+);base64,(.+)$/);
+                                                    if (matches) {
+                                                        const base64Data = matches[2];
+                                                        // 保存到 IndexedDB 以便下次恢复
+                                                        saveImage(storageId, result).catch(() => { });
+                                                        setConfig(curr => ({
+                                                            ...curr,
+                                                            referenceImages: curr.referenceImages.map(img =>
+                                                                img.id === newRef.id ? { ...img, data: base64Data, mimeType: matches[1] } : img
+                                                            )
+                                                        }));
+                                                    }
+                                                };
+                                                reader.readAsDataURL(blob);
+                                            })
+                                            .catch(err => console.error('[PromptBar] Failed to fetch image from URL:', err));
                                     }
-                                });
+                                }
                             });
                         }
 

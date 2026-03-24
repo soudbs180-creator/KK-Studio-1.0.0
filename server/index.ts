@@ -20,9 +20,9 @@ try {
     listen: (_port: number, _cb?: Function) => _cb?.(),
   }
 }
-import { mountBillingRoutes } from './billing_routes'
-import { mountTurnstileRoutes } from './turnstile_routes'
-import { mountAuthRoutes } from './auth_routes'
+import { mountBillingRoutes } from './billing_routes.ts'
+import { mountTurnstileRoutes } from './turnstile_routes.ts'
+import { mountAuthRoutes } from './auth_routes.ts'
 
 mountBillingRoutes(app)
 mountTurnstileRoutes(app)
