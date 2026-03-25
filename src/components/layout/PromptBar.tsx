@@ -6,7 +6,7 @@ import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; /
 import { getModelCapabilities, modelSupportsGrounding, getModelDisplayInfo, getModelDescription, getModelThemeColor, getModelThemeBgColor, getModelDisplayName } from '../../services/model/modelCapabilities';
 import ModelLogo from '../common/ModelLogo';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
-import { calculateImageHash, compressImageFile } from '../../utils/imageUtils';
+import { calculateImageHash, compressImageFile, type PreparedImageFile } from '../../utils/imageUtils';
 import { saveImage, getImage } from '../../services/storage/imageStorage'; // [NEW] Import getImage
 import { fileSystemService } from '../../services/storage/fileSystemService'; // 🚀 参考图持久化
 import { notify } from '../../services/system/notificationService';
@@ -1279,6 +1279,27 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         commitPromptToConfig(nextValue);
     }, [commitPromptToConfig, resizePromptTextarea]);
 
+    const formatReferenceImageError = useCallback((err: unknown, fileName?: string) => {
+        const fileLabel = fileName ? `“${fileName}”` : '当前文件';
+
+        if (err instanceof DOMException) {
+            if (err.name === 'NotReadableError') {
+                return `${fileLabel} 无法读取。通常是因为文件来自临时位置、云盘占位文件，或被其他程序占用。请先保存到本地后再上传，或改用上传按钮/复制粘贴重试。`;
+            }
+
+            if (err.name === 'AbortError') {
+                return `${fileLabel} 的读取被中断了，请再试一次。`;
+            }
+        }
+
+        const message = err instanceof Error ? err.message : String(err || '');
+        if (message === 'INVALID_IMAGE_DATA_FORMAT') {
+            return `${fileLabel} 的图片数据格式无效，请换一张图片试试。`;
+        }
+
+        return `${fileLabel} 处理失败${message ? `：${message}` : '。'}`;
+    }, []);
+
     const processFiles = useCallback(async (files: FileList | File[]) => {
         // 🚀 [修复] 根据模型动态获取最大参考图数量
         const modelCaps = getModelCapabilities(config.model);
@@ -1327,16 +1348,23 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                 referenceImages: [...prev.referenceImages, ...placeholders]
             }));
 
-            const readAsDataUrl = (file: File) =>
+            const readAsDataUrl = (file: File | PreparedImageFile) =>
                 new Promise<string>((resolve, reject) => {
+                    const preparedDataUrl = (file as PreparedImageFile).__kkPreparedDataUrl;
+                    if (preparedDataUrl && preparedDataUrl.startsWith('data:')) {
+                        resolve(preparedDataUrl);
+                        return;
+                    }
+
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result as string);
-                    reader.onerror = () => reject(reader.error);
+                    reader.onerror = () => reject(reader.error ?? new Error('REFERENCE_IMAGE_READ_FAILED'));
+                    reader.onabort = () => reject(reader.error ?? new DOMException('The file read was aborted.', 'AbortError'));
                     reader.readAsDataURL(file);
                 });
 
             await Promise.allSettled(placeholders.map(async (placeholder, index) => {
-                let file = filesToProcess[index];
+                let file = filesToProcess[index] as File | PreparedImageFile;
                 try {
                     // Downscale image if it is too massive, avoiding memory or size limit issues
                     if (file.type.startsWith('image/')) {
@@ -1401,7 +1429,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     }
                 } catch (err) {
                     console.error('[PromptBar] Failed to process reference image:', err);
-                    notify.error('参考图处理失败', String(err));
+                    notify.error('参考图处理失败', formatReferenceImageError(err, file.name));
                     if (placeholder.url.startsWith('blob:')) {
                         URL.revokeObjectURL(placeholder.url);
                     }
@@ -1419,7 +1447,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             }
         } finally {
         }
-    }, [config.referenceImages, setConfig]);
+    }, [config.referenceImages, config.model, formatReferenceImageError, setConfig]);
 
     const toggleMenu = useCallback((menu: string) => {
         setShowOptionsPanel(false); // 关闭Options Panel
@@ -3475,7 +3503,20 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     </PromptBarFooter>
                 </div>
 
-                <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={(e) => e.target.files && processFiles(e.target.files)} />
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                        if (e.target.files) {
+                            processFiles(e.target.files);
+                        }
+                        // Allow retrying the exact same file after a failed read.
+                        e.target.value = '';
+                    }}
+                />
 
                 {/* 参考图放大浮层 */}
                 {

@@ -492,6 +492,10 @@ export default defineConfig(({ mode }) => {
             emptyOutDir: true,
             chunkSizeWarningLimit: 1000,
             rollupOptions: {
+                input: {
+                    index: path.resolve(__dirname, 'index.html'),
+                    'turnstile-diagnostic': path.resolve(__dirname, 'turnstile-diagnostic.html'),
+                },
                 output: {
                     manualChunks: resolveManualChunk,
                 },

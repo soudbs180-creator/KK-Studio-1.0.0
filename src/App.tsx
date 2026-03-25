@@ -53,16 +53,88 @@ function getSoftConnectorControlPoints(startX: number, startY: number, endX: num
   const distanceX = Math.abs(deltaX);
   const distanceY = Math.abs(endY - startY);
   const directionX = deltaX === 0 ? 0 : Math.sign(deltaX);
-  const startPullX = Math.min(Math.max(distanceX * 0.08, 10), 56) * directionX;
-  const endPullX = Math.min(Math.max(distanceX * 0.18, 18), 110) * directionX;
-  const startPullY = Math.min(Math.max(distanceY * 0.38, 28), 150);
-  const endPullY = Math.min(Math.max(distanceY * 0.16, 18), 72);
+  const horizontalPull = Math.min(distanceX * 0.22, 64) * directionX;
+  const startPullY = Math.min(Math.max(distanceY * 0.42, 24), Math.max(distanceY * 0.72, 24));
+  const endPullY = Math.min(Math.max(distanceY * 0.24, 18), Math.max(distanceY * 0.44, 18));
 
   return {
-    control1X: startX + startPullX,
+    control1X: startX + horizontalPull,
     control1Y: startY + startPullY,
-    control2X: endX - endPullX,
+    control2X: endX - horizontalPull,
     control2Y: endY - endPullY,
+  };
+}
+
+type CubicBezierSegment = {
+  startX: number;
+  startY: number;
+  control1X: number;
+  control1Y: number;
+  control2X: number;
+  control2Y: number;
+  endX: number;
+  endY: number;
+};
+
+function getSoftConnectorBezierSegment(startX: number, startY: number, endX: number, endY: number): CubicBezierSegment {
+  return {
+    startX,
+    startY,
+    ...getSoftConnectorControlPoints(startX, startY, endX, endY),
+    endX,
+    endY,
+  };
+}
+
+function buildCubicBezierPath(segment: CubicBezierSegment) {
+  return `M${segment.startX},${segment.startY} C${segment.control1X},${segment.control1Y} ${segment.control2X},${segment.control2Y} ${segment.endX},${segment.endY}`;
+}
+
+function interpolatePoint(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  t: number
+) {
+  return {
+    x: from.x + ((to.x - from.x) * t),
+    y: from.y + ((to.y - from.y) * t),
+  };
+}
+
+function splitCubicBezierSegment(segment: CubicBezierSegment, t: number) {
+  const p0 = { x: segment.startX, y: segment.startY };
+  const p1 = { x: segment.control1X, y: segment.control1Y };
+  const p2 = { x: segment.control2X, y: segment.control2Y };
+  const p3 = { x: segment.endX, y: segment.endY };
+
+  const p01 = interpolatePoint(p0, p1, t);
+  const p12 = interpolatePoint(p1, p2, t);
+  const p23 = interpolatePoint(p2, p3, t);
+  const p012 = interpolatePoint(p01, p12, t);
+  const p123 = interpolatePoint(p12, p23, t);
+  const p0123 = interpolatePoint(p012, p123, t);
+
+  return {
+    left: {
+      startX: p0.x,
+      startY: p0.y,
+      control1X: p01.x,
+      control1Y: p01.y,
+      control2X: p012.x,
+      control2Y: p012.y,
+      endX: p0123.x,
+      endY: p0123.y,
+    } satisfies CubicBezierSegment,
+    right: {
+      startX: p0123.x,
+      startY: p0123.y,
+      control1X: p123.x,
+      control1Y: p123.y,
+      control2X: p23.x,
+      control2Y: p23.y,
+      endX: p3.x,
+      endY: p3.y,
+    } satisfies CubicBezierSegment,
   };
 }
 
@@ -81,6 +153,23 @@ function getSoftConnectorPointAt(startX: number, startY: number, endX: number, e
     x: getCubicBezierPoint(startX, control1X, control2X, endX, t),
     y: getCubicBezierPoint(startY, control1Y, control2Y, endY, t),
   };
+}
+
+function estimateCubicBezierLength(segment: CubicBezierSegment, samples: number = 18) {
+  let totalLength = 0;
+  let previousPoint = { x: segment.startX, y: segment.startY };
+
+  for (let index = 1; index <= samples; index += 1) {
+    const t = index / samples;
+    const point = {
+      x: getCubicBezierPoint(segment.startX, segment.control1X, segment.control2X, segment.endX, t),
+      y: getCubicBezierPoint(segment.startY, segment.control1Y, segment.control2Y, segment.endY, t),
+    };
+    totalLength += Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y);
+    previousPoint = point;
+  }
+
+  return totalLength;
 }
 
 type Point = { x: number; y: number };
@@ -6991,7 +7080,9 @@ ${slideLayerXml.join('\n')}
     const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
     const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
     const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
-    const groupConnectorDash = `${Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom))} ${Math.max(3.5, Math.min(12, 6 / groupConnectorZoom))}`;
+    const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
+    const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
+    const groupConnectorDash = `${groupConnectorDashLength} ${groupConnectorGapLength}`;
     const groupConnectorDotRadius = Math.max(1.5, Math.min(3.5, 2 / groupConnectorZoom));
     const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping;
     const connectorLayerZIndex = groupStackZIndex + 5;
@@ -7023,13 +7114,15 @@ ${slideLayerXml.join('\n')}
       const startY = promptConnectorPosition.y + 5000;
       const endX = childConnectorPosition.x + 5000;
       const endY = (childConnectorPosition.y - resolvedImageHeight) + 5000;
-      const directionX = endX === startX ? 0 : Math.sign(endX - startX);
-      const endApproachX = Math.min(Math.max(Math.abs(endX - startX) * 0.14, 18), 54) * directionX;
-      const curveEndX = endX - endApproachX;
-      const curveEndY = Math.min(endY - connectorCenterStub, endY);
-      const path = buildSoftConnectorPath(startX, startY, curveEndX, curveEndY);
-      const stubControlY = curveEndY + ((endY - curveEndY) * 0.55);
-      const stubPath = `M${curveEndX},${curveEndY} Q${endX},${stubControlY} ${endX},${endY}`;
+      const fullSegment = getSoftConnectorBezierSegment(startX, startY, endX, endY);
+      const verticalDistance = Math.max(1, endY - startY);
+      const overlayRatio = Math.min(0.24, connectorCenterStub / verticalDistance);
+      const splitT = Math.max(0.72, Math.min(0.9, 1 - overlayRatio));
+      const { left: backgroundSegment, right: foregroundSegment } = splitCubicBezierSegment(fullSegment, splitT);
+      const dashPeriod = groupConnectorDashLength + groupConnectorGapLength;
+      const foregroundDashOffset = dashPeriod > 0
+        ? -((estimateCubicBezierLength(backgroundSegment) % dashPeriod))
+        : 0;
 
       return {
         key: `${node.id}-${childNode.id}`,
@@ -7037,9 +7130,9 @@ ${slideLayerXml.join('\n')}
         startY,
         endX,
         endY,
-        curveEndY,
-        path,
-        stubPath,
+        backgroundPath: buildCubicBezierPath(backgroundSegment),
+        foregroundPath: buildCubicBezierPath(foregroundSegment),
+        foregroundDashOffset,
       };
     });
 
@@ -7063,7 +7156,7 @@ ${slideLayerXml.join('\n')}
                 <g key={segment.key}>
                   <circle cx={segment.startX} cy={segment.startY} r={groupConnectorDotRadius} fill="var(--connector-color, #6366f1)" opacity="0.55" />
                   <path
-                    d={segment.path}
+                    d={segment.backgroundPath}
                     fill="none"
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
@@ -7094,11 +7187,12 @@ ${slideLayerXml.join('\n')}
             {groupConnectorSegments.map((segment) => (
               <g key={`${segment.key}-stub`}>
                 <path
-                  d={segment.stubPath}
+                  d={segment.foregroundPath}
                   fill="none"
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
                   strokeDasharray={groupConnectorDash}
+                  strokeDashoffset={segment.foregroundDashOffset}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   opacity={isGroupFocused ? 0.74 : 0.54}

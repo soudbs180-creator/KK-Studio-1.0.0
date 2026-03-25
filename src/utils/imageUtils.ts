@@ -25,6 +25,10 @@ export async function calculateImageHash(data: string): Promise<string> {
     return (hash >>> 0).toString(16) + '_' + data.length.toString(16);
 }
 
+export interface PreparedImageFile extends File {
+    __kkPreparedDataUrl?: string;
+}
+
 /**
  * Compress and downscale an image file if it exceeds safety limits.
  * @param file The original image file
@@ -32,15 +36,24 @@ export async function calculateImageHash(data: string): Promise<string> {
  * @param quality The JPEG/WEBP compression quality (0 to 1, default 0.85)
  * @returns A promise that resolves to the compressed File or the original if no compression needed
  */
-export async function compressImageFile(file: File, maxDimension: number = 2048, quality: number = 0.85): Promise<File> {
+export async function compressImageFile(file: File, maxDimension: number = 2048, quality: number = 0.85): Promise<PreparedImageFile> {
     // If it's a GIF or SVG, don't try to compress with canvas as we might lose animation or vector properties
     if (file.type === 'image/gif' || file.type === 'image/svg+xml') {
-        return file;
+        return file as PreparedImageFile;
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+        const resolveWithData = (nextFile: File, dataUrl?: string) => {
+            const preparedFile = nextFile as PreparedImageFile;
+            if (dataUrl && dataUrl.startsWith('data:')) {
+                preparedFile.__kkPreparedDataUrl = dataUrl;
+            }
+            resolve(preparedFile);
+        };
+
         const reader = new FileReader();
         reader.onload = (e) => {
+            const sourceDataUrl = typeof e.target?.result === 'string' ? e.target.result : '';
             const img = new Image();
             img.onload = () => {
                 let width = img.width;
@@ -48,7 +61,7 @@ export async function compressImageFile(file: File, maxDimension: number = 2048,
 
                 // Check if resizing is necessary
                 if (width <= maxDimension && height <= maxDimension && file.size < 2 * 1024 * 1024) {
-                    resolve(file); // Return original if it's already small enough and under 2MB
+                    resolveWithData(file, sourceDataUrl); // Return original if it's already small enough and under 2MB
                     return;
                 }
 
@@ -71,7 +84,7 @@ export async function compressImageFile(file: File, maxDimension: number = 2048,
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
-                    resolve(file); // Fallback to original if 2d context fails
+                    resolveWithData(file, sourceDataUrl); // Fallback to original if 2d context fails
                     return;
                 }
 
@@ -87,23 +100,24 @@ export async function compressImageFile(file: File, maxDimension: number = 2048,
                                 type: blob.type,
                                 lastModified: Date.now(),
                             });
-                            resolve(newFile);
+                            const preparedDataUrl = canvas.toDataURL(blob.type, blob.type === 'image/png' ? undefined : quality);
+                            resolveWithData(newFile, preparedDataUrl);
                         } else {
-                            resolve(file); // Fallback
+                            resolveWithData(file, sourceDataUrl); // Fallback
                         }
                     },
                     outMime,
                     quality
                 );
             };
-            img.onerror = () => resolve(file); // If image fails to load, just return the original file to let the upstream handler complain
-            if (e.target?.result) {
-                img.src = e.target.result as string;
+            img.onerror = () => resolveWithData(file, sourceDataUrl); // If image fails to load, keep the original readable payload
+            if (sourceDataUrl) {
+                img.src = sourceDataUrl;
             } else {
-                resolve(file);
+                resolveWithData(file);
             }
         };
-        reader.onerror = () => resolve(file);
+        reader.onerror = () => resolveWithData(file);
         reader.readAsDataURL(file);
     });
 }

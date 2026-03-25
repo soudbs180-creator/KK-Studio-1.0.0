@@ -516,15 +516,37 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       .slice(0, 4);
   }, [getOfficialDisplayName, officialSlots, thirdPartyProviders]);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setSlots(keyManager.getSlots());
     setProviders(keyManager.getProviders());
-  };
+  }, []);
+
+  const refreshCloudData = useCallback(async (silent = false) => {
+    try {
+      await keyManager.refreshFromCloudNow();
+    } catch (error) {
+      refresh();
+
+      if (!silent) {
+        const message =
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : pick('暂时无法从云端拉取最新配置。', 'Unable to pull the latest cloud configuration right now.');
+
+        notify.warning(pick('刷新失败', 'Refresh failed'), message);
+      }
+
+      return;
+    }
+
+    refresh();
+  }, [pick, refresh]);
 
   useEffect(() => {
     refresh();
+    void refreshCloudData(true);
     return keyManager.subscribe(refresh);
-  }, []);
+  }, [refresh, refreshCloudData]);
 
   useEffect(() => {
     if (isOfficialEditorRoute) {
@@ -1137,7 +1159,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         }
         actions={
           <>
-            <SettingsActionButton icon={RefreshCw} onClick={refresh}>{pick('刷新数据', 'Refresh data')}</SettingsActionButton>
+            <SettingsActionButton
+              icon={RefreshCw}
+              loading={busy === 'cloud-refresh'}
+              onClick={() => void run('cloud-refresh', () => refreshCloudData())}
+            >
+              {pick('刷新数据', 'Refresh data')}
+            </SettingsActionButton>
             <SettingsActionButton icon={Plus} tone="primary" onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
               {activeTab === 'official' ? pick('新增官方接口', 'New official endpoint') : pick('新增供应商', 'New provider')}
             </SettingsActionButton>

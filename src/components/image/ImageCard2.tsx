@@ -1185,24 +1185,36 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         transition: textTransition,
     };
     const showActiveAccent = isActive;
-    const showSelectedAccent = isSelected && !showActiveAccent;
+    const showSelectedAccent = isSelected;
     const showHighlightedAccent = highlighted && !showActiveAccent && !showSelectedAccent;
+    const showSelectionBorder = showSelectedAccent || showHighlightedAccent;
     const cardBorderColor = image.error && !image.isGenerating
         ? 'rgb(239, 68, 68)'
-        : showActiveAccent
-            ? 'var(--accent-gold)'
-            : showSelectedAccent
-                ? 'var(--selected-border)'
-                : showHighlightedAccent
-                    ? 'var(--selected-border)'
-                    : 'var(--border-default)';
+        : showSelectionBorder
+            ? 'var(--selected-border)'
+            : showActiveAccent
+                ? 'var(--accent-gold)'
+                : 'var(--border-default)';
     const imageCardAccent = image.error && !image.isGenerating
         ? 'red'
         : showActiveAccent
             ? 'gold'
-            : (showSelectedAccent || showHighlightedAccent ? 'blue' : undefined);
-    const shellCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
-    const mainCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
+            : (showSelectionBorder ? 'blue' : undefined);
+    const baseCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
+    const activeRingWidth = Math.max(1, 1.25 / borderScale);
+    const selectionRingWidth = Math.max(1.25, 1.7 / borderScale);
+    const accentRingShadow = image.error && !image.isGenerating
+        ? ''
+        : showSelectionBorder && showActiveAccent
+            ? `0 0 0 ${activeRingWidth}px rgba(245, 158, 11, 0.26), 0 0 0 ${activeRingWidth + selectionRingWidth}px rgba(59, 130, 246, 0.18)`
+            : showSelectionBorder
+                ? `0 0 0 ${selectionRingWidth}px rgba(59, 130, 246, 0.18)`
+                : showActiveAccent
+                    ? `0 0 0 ${activeRingWidth}px rgba(245, 158, 11, 0.26)`
+                    : '';
+    const cardSurfaceShadow = accentRingShadow
+        ? `${accentRingShadow}, ${baseCardShadow}`
+        : baseCardShadow;
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
         const shellTitle = image.alias || image.fileName || image.prompt || 'Image';
@@ -1248,7 +1260,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         backgroundColor: 'var(--bg-surface)',
                         borderColor: cardBorderColor,
                         borderWidth: adaptiveBorderWidth,
-                        boxShadow: shellCardShadow,
+                        boxShadow: cardSurfaceShadow,
                     }}
                 >
                     <div
@@ -1371,7 +1383,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         borderColor: cardBorderColor,
                         borderRadius: 'var(--radius-lg)', // 12px
                         borderWidth: adaptiveBorderWidth,
-                        boxShadow: mainCardShadow,
+                        boxShadow: cardSurfaceShadow,
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'box-shadow, border-color'
                     }}
