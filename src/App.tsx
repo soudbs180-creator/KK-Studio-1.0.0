@@ -42,6 +42,47 @@ const boundsIntersect = (
   || right.y + right.height <= left.y
 );
 
+function buildSoftConnectorPath(startX: number, startY: number, endX: number, endY: number) {
+  const { control1X, control1Y, control2X, control2Y } = getSoftConnectorControlPoints(startX, startY, endX, endY);
+
+  return `M${startX},${startY} C${control1X},${control1Y} ${control2X},${control2Y} ${endX},${endY}`;
+}
+
+function getSoftConnectorControlPoints(startX: number, startY: number, endX: number, endY: number) {
+  const deltaX = endX - startX;
+  const distanceX = Math.abs(deltaX);
+  const distanceY = Math.abs(endY - startY);
+  const directionX = deltaX === 0 ? 0 : Math.sign(deltaX);
+  const startPullX = Math.min(Math.max(distanceX * 0.08, 10), 56) * directionX;
+  const endPullX = Math.min(Math.max(distanceX * 0.18, 18), 110) * directionX;
+  const startPullY = Math.min(Math.max(distanceY * 0.38, 28), 150);
+  const endPullY = Math.min(Math.max(distanceY * 0.16, 18), 72);
+
+  return {
+    control1X: startX + startPullX,
+    control1Y: startY + startPullY,
+    control2X: endX - endPullX,
+    control2Y: endY - endPullY,
+  };
+}
+
+function getCubicBezierPoint(start: number, control1: number, control2: number, end: number, t: number) {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const t2 = t * t;
+
+  return (mt * mt2 * start) + (3 * mt2 * t * control1) + (3 * mt * t2 * control2) + (t * t2 * end);
+}
+
+function getSoftConnectorPointAt(startX: number, startY: number, endX: number, endY: number, t: number) {
+  const { control1X, control1Y, control2X, control2Y } = getSoftConnectorControlPoints(startX, startY, endX, endY);
+
+  return {
+    x: getCubicBezierPoint(startX, control1X, control2X, endX, t),
+    y: getCubicBezierPoint(startY, control1Y, control2Y, endY, t),
+  };
+}
+
 type Point = { x: number; y: number };
 type SelectionBoxState = { start: Point; current: Point; active: boolean } | null;
 type DragConnectionState = {
@@ -7509,18 +7550,6 @@ ${slideLayerXml.join('\n')}
   const connectorHitStroke = Math.max(16, Math.min(40, 20 / zoomForConnectors));
   const connectorDotStart = Math.max(2, Math.min(4.5, 3 / zoomForConnectors));
   const connectorDotEnd = Math.max(1.5, Math.min(3.5, 2 / zoomForConnectors));
-  const buildSoftConnectorPath = useCallback((startX: number, startY: number, endX: number, endY: number) => {
-    const deltaX = endX - startX;
-    const distanceX = Math.abs(deltaX);
-    const distanceY = Math.abs(endY - startY);
-    const directionX = deltaX === 0 ? 0 : Math.sign(deltaX);
-    const startPullX = Math.min(Math.max(distanceX * 0.08, 10), 56) * directionX;
-    const endPullX = Math.min(Math.max(distanceX * 0.18, 18), 110) * directionX;
-    const startPullY = Math.min(Math.max(distanceY * 0.38, 28), 150);
-    const endPullY = Math.min(Math.max(distanceY * 0.16, 18), 72);
-
-    return `M${startX},${startY} C${startX + startPullX},${startY + startPullY} ${endX - endPullX},${endY - endPullY} ${endX},${endY}`;
-  }, []);
   const derivedMobileUserName = (() => {
     const candidate =
       user?.user_metadata?.full_name ||
@@ -8236,15 +8265,7 @@ ${slideLayerXml.join('\n')}
 
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
-            // Midpoint for Button (t=0.5)
-            // B(t) = (1-t)^3 P0 + ...
-            const t = 0.5;
-            const mt = 1 - t;
-            const mt2 = mt * mt;
-            const t2 = t * t;
-
-            const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
-            const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
+            const { x: btnX, y: btnY } = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
 
             /* Follow-up connector colors mirror the active generation mode. */
             const baseColor = pn.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
@@ -8328,13 +8349,7 @@ ${slideLayerXml.join('\n')}
 
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
-            // Midpoint (t=0.5)
-            const t = 0.5;
-            const mt = 1 - t;
-            const mt2 = mt * mt;
-            const t2 = t * t;
-            const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
-            const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
+            const { x: btnX, y: btnY } = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
 
             /* Pending connection colors follow the active generation mode. */
             const baseColor = config.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
