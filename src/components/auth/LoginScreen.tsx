@@ -126,6 +126,7 @@ const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
   const turnstileAvailable = canUseTurnstile();
   const turnstileMissingSiteKey = TURNSTILE_ENV_ENABLED && !TURNSTILE_HAS_SITE_KEY;
+  const showTurnstileBlock = turnstileAvailable || turnstileMissingSiteKey;
   const {
     token: turnstileToken,
     error: turnstileError,
@@ -692,7 +693,7 @@ const LoginScreen: React.FC = () => {
               </label>
             )}
 
-            {turnstileAvailable && (
+            {showTurnstileBlock && (
               <div className="auth-turnstile-block">
                 <div className="auth-turnstile-head">
                   <span>安全验证</span>
@@ -700,15 +701,23 @@ const LoginScreen: React.FC = () => {
                     {turnstileToken ? '已就绪' : '加载中'}
                   </span>
                 </div>
-                <TurnstileWidget
-                  onVerify={handleTurnstileVerify}
-                  onError={handleTurnstileError}
-                  onExpire={handleTurnstileExpire}
-                  appearance="always"
-                  action={turnstileAction}
-                  className="auth-turnstile-shell"
-                />
-                <div className="auth-turnstile-help">{turnstileHint}</div>
+                {turnstileAvailable ? (
+                  <>
+                    <TurnstileWidget
+                      onVerify={handleTurnstileVerify}
+                      onError={handleTurnstileError}
+                      onExpire={handleTurnstileExpire}
+                      appearance="always"
+                      action={turnstileAction}
+                      className="auth-turnstile-shell"
+                    />
+                    <div className="auth-turnstile-help">{turnstileHint}</div>
+                  </>
+                ) : (
+                  <div className="auth-turnstile-inline-error" role="alert">
+                    {TURNSTILE_MISSING_SITE_KEY_MESSAGE}
+                  </div>
+                )}
               </div>
             )}
 
