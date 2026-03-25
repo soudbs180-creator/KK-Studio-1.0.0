@@ -538,6 +538,26 @@ body.auth-screen-active #root {
   margin-top: 6px;
 }
 
+.auth-version-badge {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 14, 26, 0.58);
+  backdrop-filter: blur(10px);
+  color: #9fb4d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .auth-temp-entry {
   width: fit-content;
   height: 32px;
@@ -611,6 +631,13 @@ body.auth-screen-active #root {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+@media (max-width: 767px) {
+  .auth-version-badge {
+    right: 16px;
+    bottom: 14px;
+  }
 }
 
 @media (min-width: 1024px) {

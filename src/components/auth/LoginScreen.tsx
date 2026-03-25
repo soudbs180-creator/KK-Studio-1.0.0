@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Chrome } from 'lucide-react';
+import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import AnoAI from '@/components/ui/animated-shader-background';
@@ -39,6 +40,12 @@ type StarPoint = {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TURNSTILE_ENV_ENABLED = String(import.meta.env.VITE_TURNSTILE_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
+const TURNSTILE_HAS_SITE_KEY = Boolean(String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim());
+const TURNSTILE_MISSING_SITE_KEY_MESSAGE =
+  '当前部署未配置 Turnstile 前端 Site Key，请在 Vercel 项目环境变量中添加 VITE_TURNSTILE_SITE_KEY 后重新部署。';
+const TURNSTILE_DISABLED_MESSAGE =
+  '当前部署已禁用 Turnstile，但服务端仍要求验证码，请检查 VITE_TURNSTILE_ENABLED 与登录风控配置。';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -118,6 +125,8 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
   const turnstileAvailable = canUseTurnstile();
+  const shouldShowTurnstileBlock = TURNSTILE_ENV_ENABLED;
+  const turnstileMissingSiteKey = TURNSTILE_ENV_ENABLED && !TURNSTILE_HAS_SITE_KEY;
   const {
     token: turnstileToken,
     error: turnstileError,
@@ -149,6 +158,23 @@ const LoginScreen: React.FC = () => {
   const [wechatError, setWechatError] = useState<string | null>(null);
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
+
+  const resolveAuthErrorMessage = useCallback(
+    (authError: unknown, targetView: AuthView) => {
+      if (isCaptchaError(authError)) {
+        if (turnstileMissingSiteKey) {
+          return TURNSTILE_MISSING_SITE_KEY_MESSAGE;
+        }
+
+        if (!TURNSTILE_ENV_ENABLED) {
+          return TURNSTILE_DISABLED_MESSAGE;
+        }
+      }
+
+      return mapAuthError(authError, targetView);
+    },
+    [turnstileMissingSiteKey]
+  );
 
   useEffect(() => {
     const body = document.body;
@@ -202,8 +228,10 @@ const LoginScreen: React.FC = () => {
   );
 
   const turnstileAction = view === 'forgot-password' ? 'reset-password' : view;
-  const turnstileHint = turnstileError
-    ? turnstileError
+  const turnstileHint = turnstileMissingSiteKey
+    ? TURNSTILE_MISSING_SITE_KEY_MESSAGE
+    : turnstileError
+      ? turnstileError
     : captchaRequiredByBackend && !turnstileToken
       ? '当前请求需要先完成人机验证，验证通过后再提交。'
       : turnstileToken
@@ -286,7 +314,7 @@ const LoginScreen: React.FC = () => {
     try {
       await loginAsTempUser();
     } catch (tempError) {
-      setError(mapAuthError(tempError, 'login'));
+      setError(resolveAuthErrorMessage(tempError, 'login'));
     } finally {
       setLoading(false);
     }
@@ -392,7 +420,7 @@ const LoginScreen: React.FC = () => {
     if (isNetworkError(lastError)) {
       setError(`网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录。`);
     } else {
-      setError(mapAuthError(lastError, view));
+      setError(resolveAuthErrorMessage(lastError, view));
       if (turnstileAvailable) {
         resetTurnstile();
       }
@@ -422,7 +450,7 @@ const LoginScreen: React.FC = () => {
       });
       if (oauthError) throw oauthError;
     } catch (oauthError) {
-      setError(mapAuthError(oauthError, 'login'));
+      setError(resolveAuthErrorMessage(oauthError, 'login'));
       if (!isNetworkError(oauthError) && turnstileAvailable) {
         resetTurnstile();
       }
@@ -451,7 +479,7 @@ const LoginScreen: React.FC = () => {
       setWechatAuthorizationUrl(authData.authorizationUrl);
       setWechatExpiresAt(authData.expiresAt);
     } catch (authError) {
-      const nextError = mapAuthError(authError, 'login');
+      const nextError = resolveAuthErrorMessage(authError, 'login');
       setWechatError(nextError);
       setError(nextError);
 
@@ -665,7 +693,7 @@ const LoginScreen: React.FC = () => {
               </label>
             )}
 
-            {turnstileAvailable && (
+            {shouldShowTurnstileBlock && (
               <div className="auth-turnstile-block">
                 <div className="auth-turnstile-head">
                   <span>安全验证</span>
@@ -745,6 +773,9 @@ const LoginScreen: React.FC = () => {
           </form>
         </div>
       </section>
+      <div className="auth-version-badge" aria-label={`App version ${APP_DISPLAY_VERSION}`}>
+        {APP_DISPLAY_VERSION}
+      </div>
     </div>
   );
 };
