@@ -60,6 +60,7 @@ const PRESET_PROVIDERS = [
     { label: 'Aliyun (阿里云百炼)', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', provider: 'Aliyun', mode: 'chat', models: 'qwen-max, qwen-plus, qwen-turbo, wanx-v1' },
     { label: 'Tencent Cloud (腾讯云)', url: 'https://api.hunyuan.cloud.tencent.com/v1', provider: 'Tencent', mode: 'chat', models: 'hunyuan-pro, hunyuan-lite, hunyuan-vision' },
     { label: 'DeepSeek Official', url: 'https://api.deepseek.com', provider: 'OpenAI', mode: 'chat', models: 'deepseek-chat, deepseek-reasoner' },
+    { label: 'Wuyin Keji (NanoBanana2)', url: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2', provider: 'Custom', mode: 'standard', models: 'image_nanoBanana2' },
     { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1', provider: 'OpenAI', mode: 'standard', models: 'google/gemini-2.5-flash:free, google/gemini-3-flash-preview, openai/gpt-4o, anthropic/claude-3.5-sonnet' },
     { label: 'OpenAI Official', url: 'https://api.openai.com/v1', provider: 'OpenAI', mode: 'standard', models: 'dall-e-3(DALL-E 3), gpt-4o(GPT-4o), gpt-4o-mini' },
     { label: 'Google', url: 'https://generativelanguage.googleapis.com', provider: 'Google', mode: 'standard', models: `gemini-2.5-flash, gemini-2.5-flash-image, gemini-3-pro-image-preview, imagen-4.0-generate-001, imagen-4.0-ultra-generate-001, imagen-4.0-fast-generate-001, veo-3.1-generate-preview, veo-3.1-fast-generate-preview` },

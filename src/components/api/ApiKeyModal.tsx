@@ -90,6 +90,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     outputPrice?: number;
   }> | null>(null);
   const [formData, setFormData] = useState<FormDataState>(() => buildDefaultFormData(initialType));
+  const requiresSystemToken = supplierService.requiresSystemToken(formData.baseUrl);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -140,7 +141,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   };
 
   const handleVerifyToken = async () => {
-    if (!formData.systemToken) {
+    if (!requiresSystemToken) {
+      setTokenValid(true);
+      notify.success('无需 System Access Token', '该供应商可直接从公开目录获取模型信息');
+      return;
+    }
+    if (requiresSystemToken && !formData.systemToken) {
       notify.warning('请输入 System Access Token', '请先填写 System Access Token 后再进行验证。');
       return;
     }
@@ -165,7 +171,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   };
 
   const handleFetchModels = async () => {
-    if (!formData.systemToken) {
+    if (requiresSystemToken && !formData.systemToken) {
       notify.warning('请输入 System Access Token', '请先填写 System Access Token。');
       return;
     }
@@ -375,7 +381,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                 <button
                   type="button"
                   onClick={handleVerifyToken}
-                  disabled={isVerifying || !formData.systemToken}
+                  disabled={isVerifying || (requiresSystemToken && !formData.systemToken)}
                   className={secondaryButtonClass}
                 >
                   {isVerifying ? (
@@ -390,7 +396,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
               </div>
             </div>
 
-            {formData.systemToken ? (
+            {formData.systemToken || !requiresSystemToken ? (
               <div className="flex gap-2">
                 <button
                   type="button"

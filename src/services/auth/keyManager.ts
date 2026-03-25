@@ -423,6 +423,13 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
         format: 'gemini',
         icon: '\u{1F34C}'
     },
+    'wuyinkeji-nanobanana2': {
+        name: 'Wuyin Keji NanoBanana2',
+        baseUrl: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2',
+        models: ['image_nanoBanana2'],
+        format: 'openai',
+        icon: '\u{1F96D}'
+    },
     'gpt-best': {
         name: 'GPT-Best',
         baseUrl: '',
@@ -4499,5 +4506,4 @@ export async function autoDetectAndConfigureModels(
 }
 
 // Re-export ProxyModelConfig for convenience
-
 

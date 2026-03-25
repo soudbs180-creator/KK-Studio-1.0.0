@@ -235,6 +235,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [liveNodePositionById, setLiveNodePositionById] = useState<Record<string, { x: number; y: number }>>({});
   const [imageCardHeightById, setImageCardHeightById] = useState<Record<string, number>>({});
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
+  const nodeDragReleaseFrameRef = useRef<number | null>(null);
 
 
 
@@ -1575,8 +1576,31 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [handleMouseUp]);
 
+  useEffect(() => {
+    return () => {
+      if (nodeDragReleaseFrameRef.current !== null) {
+        cancelAnimationFrame(nodeDragReleaseFrameRef.current);
+      }
+    };
+  }, []);
+
   const handleCanvasNodeDragStateChange = useCallback((dragging: boolean) => {
-    setIsNodeDragActive(dragging);
+    if (nodeDragReleaseFrameRef.current !== null) {
+      cancelAnimationFrame(nodeDragReleaseFrameRef.current);
+      nodeDragReleaseFrameRef.current = null;
+    }
+
+    if (dragging) {
+      setIsNodeDragActive(true);
+      return;
+    }
+
+    // Keep connector rendering in live mode for one more frame so the
+    // final drag delta can commit before we fall back to the throttled snapshot.
+    nodeDragReleaseFrameRef.current = requestAnimationFrame(() => {
+      nodeDragReleaseFrameRef.current = null;
+      setIsNodeDragActive(false);
+    });
   }, []);
 
   // [Draft Sync Effect] Keep the draft node in sync with PromptBar config
@@ -5626,6 +5650,7 @@ ${slideLayerXml.join('\n')}
     if (!activeCanvas) {
       setFocusedGroupId(null);
       liveNodePositionByIdRef.current = {};
+      liveDerivedNodeIdsByOwnerRef.current = {};
       setLiveNodePositionById({});
       setLockedGroupBoundsById({});
       return;
@@ -5642,6 +5667,8 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
 
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
+  const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
+  const liveNodePositionFrameRef = useRef<number | null>(null);
   const syncLiveNodePositionState = useCallback(() => {
     const next = liveNodePositionByIdRef.current;
     setLiveNodePositionById((prev) => {
@@ -5656,6 +5683,112 @@ ${slideLayerXml.join('\n')}
       return { ...next };
     });
   }, []);
+  const scheduleLiveNodePositionStateSync = useCallback(() => {
+    if (liveNodePositionFrameRef.current !== null) {
+      return;
+    }
+
+    liveNodePositionFrameRef.current = requestAnimationFrame(() => {
+      liveNodePositionFrameRef.current = null;
+      syncLiveNodePositionState();
+    });
+  }, [syncLiveNodePositionState]);
+  const flushLiveNodePositionStateSync = useCallback(() => {
+    if (liveNodePositionFrameRef.current !== null) {
+      cancelAnimationFrame(liveNodePositionFrameRef.current);
+      liveNodePositionFrameRef.current = null;
+    }
+    syncLiveNodePositionState();
+  }, [syncLiveNodePositionState]);
+
+  useEffect(() => {
+    return () => {
+      if (liveNodePositionFrameRef.current !== null) {
+        cancelAnimationFrame(liveNodePositionFrameRef.current);
+      }
+    };
+  }, []);
+
+  const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
+    const livePosition = liveNodePositionByIdRef.current[nodeId];
+    if (livePosition) {
+      return livePosition;
+    }
+
+    const promptNode = activeCanvas?.promptNodes.find((node) => node.id === nodeId);
+    if (promptNode) {
+      return promptNode.position;
+    }
+
+    const imageNode = activeCanvas?.imageNodes.find((node) => node.id === nodeId);
+    if (imageNode) {
+      return imageNode.position;
+    }
+
+    const workflowNode = activeCanvas?.workflow?.nodes?.find((node) => node.id === nodeId);
+    return workflowNode?.position ?? null;
+  }, [activeCanvas]);
+
+  const applyLiveNodeDeltaToDraggedSet = useCallback((
+    ownerId: string,
+    nodeIds: string[],
+    delta: { x: number; y: number },
+  ) => {
+    if (!ownerId || nodeIds.length === 0 || (delta.x === 0 && delta.y === 0)) {
+      return;
+    }
+
+    const companionIds = Array.from(new Set(
+      nodeIds.filter((nodeId) => Boolean(nodeId) && nodeId !== ownerId)
+    ));
+
+    const previousCompanionIds = liveDerivedNodeIdsByOwnerRef.current[ownerId] || [];
+    let nextLivePositions = liveNodePositionByIdRef.current;
+    let hasLivePositionChanged = false;
+
+    previousCompanionIds.forEach((nodeId) => {
+      if (companionIds.includes(nodeId) || !(nodeId in nextLivePositions)) {
+        return;
+      }
+
+      if (nextLivePositions === liveNodePositionByIdRef.current) {
+        nextLivePositions = { ...nextLivePositions };
+      }
+      delete nextLivePositions[nodeId];
+      hasLivePositionChanged = true;
+    });
+
+    companionIds.forEach((nodeId) => {
+      const basePosition = resolveCanvasNodePositionForLiveDrag(nodeId);
+      if (!basePosition) {
+        return;
+      }
+
+      const nextPosition = {
+        x: basePosition.x + delta.x,
+        y: basePosition.y + delta.y,
+      };
+      const previousPosition = nextLivePositions[nodeId];
+
+      if (!previousPosition || previousPosition.x !== nextPosition.x || previousPosition.y !== nextPosition.y) {
+        if (nextLivePositions === liveNodePositionByIdRef.current) {
+          nextLivePositions = { ...nextLivePositions };
+        }
+        nextLivePositions[nodeId] = nextPosition;
+        hasLivePositionChanged = true;
+      }
+    });
+
+    liveDerivedNodeIdsByOwnerRef.current = {
+      ...liveDerivedNodeIdsByOwnerRef.current,
+      [ownerId]: companionIds,
+    };
+
+    if (hasLivePositionChanged) {
+      liveNodePositionByIdRef.current = nextLivePositions;
+      scheduleLiveNodePositionStateSync();
+    }
+  }, [resolveCanvasNodePositionForLiveDrag, scheduleLiveNodePositionStateSync]);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
     const groupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId)
@@ -5666,10 +5799,30 @@ ${slideLayerXml.join('\n')}
     let hasLivePositionChanged = false;
 
     if (!position) {
+      const derivedNodeIds = liveDerivedNodeIdsByOwnerRef.current[nodeId] || [];
+
       if (nodeId in nextLivePositions) {
         nextLivePositions = { ...nextLivePositions };
         delete nextLivePositions[nodeId];
         hasLivePositionChanged = true;
+      }
+
+      derivedNodeIds.forEach((derivedNodeId) => {
+        if (!(derivedNodeId in nextLivePositions)) {
+          return;
+        }
+
+        if (nextLivePositions === liveNodePositionByIdRef.current) {
+          nextLivePositions = { ...nextLivePositions };
+        }
+        delete nextLivePositions[derivedNodeId];
+        hasLivePositionChanged = true;
+      });
+
+      if (nodeId in liveDerivedNodeIdsByOwnerRef.current) {
+        const nextDerivedNodeIdsByOwner = { ...liveDerivedNodeIdsByOwnerRef.current };
+        delete nextDerivedNodeIdsByOwner[nodeId];
+        liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
       }
     } else {
       const previous = nextLivePositions[nodeId];
@@ -5684,12 +5837,14 @@ ${slideLayerXml.join('\n')}
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
-      syncLiveNodePositionState();
 
       if (!position) {
+        flushLiveNodePositionStateSync();
         // Flush the last queued drag delta so the persisted canvas position lands
         // exactly where the live drag visual finished before we clear the live state.
         moveSelectedNodesImmediate({ x: 0, y: 0 });
+      } else {
+        scheduleLiveNodePositionStateSync();
       }
     }
 
@@ -5726,7 +5881,7 @@ ${slideLayerXml.join('\n')}
       delete next[groupId];
       return next;
     });
-  }, [activeCanvas, moveSelectedNodesImmediate, promptGroupBoundsById, syncLiveNodePositionState]);
+  }, [activeCanvas, flushLiveNodePositionStateSync, moveSelectedNodesImmediate, promptGroupBoundsById, scheduleLiveNodePositionStateSync]);
 
   const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
     if (!(height > 0)) return;
@@ -6776,6 +6931,7 @@ ${slideLayerXml.join('\n')}
           if (!sourceNodeId) return;
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+            applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
             moveSelectedNodes(delta, expandedSelectedNodeIds);
             return;
           }
@@ -6802,6 +6958,7 @@ ${slideLayerXml.join('\n')}
     highlightedId,
     isCanvasTransforming,
     isMobile,
+    applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodes,
     moveSelectedNodes,
     nowTimestamp,
@@ -6820,14 +6977,16 @@ ${slideLayerXml.join('\n')}
     const isGeneratingGroup = generatingGroupIds.includes(node.id);
     const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
     const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
-    const groupConnectorStroke = Math.max(1, Math.min(3, 1 / groupConnectorZoom));
-    const groupConnectorDash = `${Math.max(2, Math.min(10, 4 / groupConnectorZoom))} ${Math.max(2, Math.min(10, 4 / groupConnectorZoom))}`;
+    const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
+    const groupConnectorDash = `${Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom))} ${Math.max(3.5, Math.min(12, 6 / groupConnectorZoom))}`;
     const groupConnectorDotRadius = Math.max(1.5, Math.min(3.5, 2 / groupConnectorZoom));
     const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping;
     const connectorLayerZIndex = groupStackZIndex + 5;
     const promptCardZIndex = groupStackZIndex + 20;
     const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
-    const connectorCenterStub = Math.max(8, Math.min(18, 12 / groupConnectorZoom));
+    // Keep the foreground overlay longer than the card shadow bloom so the dashed
+    // connector does not appear clipped before it reaches the sub-card.
+    const connectorCenterStub = Math.max(22, Math.min(36, 28 / groupConnectorZoom));
     const groupConnectorSegments = groupView.childImages.map((childNode) => {
       const childConnectorPosition = resolveLiveImagePosition(childNode) ?? childNode.position;
       const { totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
@@ -6874,7 +7033,7 @@ ${slideLayerXml.join('\n')}
         {groupConnectorSegments.length > 0 && (
           <svg
             className="absolute top-0 left-0 pointer-events-none"
-            shapeRendering="geometricPrecision"
+            shapeRendering="auto"
             style={{
               width: '10000px',
               height: '10000px',
@@ -6891,11 +7050,12 @@ ${slideLayerXml.join('\n')}
                   <path
                     d={segment.path}
                     fill="none"
-                    stroke="var(--connector-color, #6366f1)"
-                    strokeWidth={groupConnectorStroke}
-                    strokeDasharray={groupConnectorDash}
-                    strokeLinecap="butt"
-                    opacity={isGroupFocused ? 0.72 : 0.42}
+                  stroke="var(--connector-color, #6366f1)"
+                  strokeWidth={groupConnectorStroke}
+                  strokeDasharray={groupConnectorDash}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={isGroupFocused ? 0.7 : 0.34}
                   />
                 </g>
               );
@@ -6906,7 +7066,7 @@ ${slideLayerXml.join('\n')}
         {groupConnectorSegments.length > 0 && (
           <svg
             className="absolute top-0 left-0 pointer-events-none"
-            shapeRendering="geometricPrecision"
+            shapeRendering="auto"
             style={{
               width: '10000px',
               height: '10000px',
@@ -6923,8 +7083,10 @@ ${slideLayerXml.join('\n')}
                   fill="none"
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
+                  strokeDasharray={groupConnectorDash}
                   strokeLinecap="round"
-                  opacity={isGroupFocused ? 0.72 : 0.58}
+                  strokeLinejoin="round"
+                  opacity={isGroupFocused ? 0.74 : 0.54}
                 />
                 <circle
                   cx={segment.endX}
@@ -6996,8 +7158,10 @@ ${slideLayerXml.join('\n')}
           onDragDelta={(delta, sourceNodeId) => {
             if (!sourceNodeId) return;
             if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+              applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
               moveSelectedNodes(delta, expandedSelectedNodeIds);
             } else {
+              applyLiveNodeDeltaToDraggedSet(sourceNodeId, groupNodeIds, delta);
               moveSelectedNodes(delta, groupNodeIds);
             }
           }}
@@ -7045,6 +7209,7 @@ ${slideLayerXml.join('\n')}
                 if (!sourceNodeId) return;
 
                 if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+                  applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
                   moveSelectedNodes(delta, expandedSelectedNodeIds);
                   return;
                 }
@@ -7088,6 +7253,7 @@ ${slideLayerXml.join('\n')}
     imageCardHeightById,
     highlightedId,
     isMobile,
+    applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodes,
     nowTimestamp,
     promptGroupNodeIdsById,

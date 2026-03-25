@@ -308,27 +308,53 @@ function normalizeProviderIdentityValue(value?: string): string {
     return String(value || '').trim().toLowerCase();
 }
 
+const GOOGLE_OFFICIAL_PROVIDER_ALIASES = new Set([
+    'google',
+    'google api',
+    'google official',
+    'google official api',
+    '\u8c37\u6b4c',
+    '\u8c37\u6b4c\u5b98\u65b9\u63a5\u53e3',
+]);
+
+const OPENAI_OFFICIAL_PROVIDER_ALIASES = new Set([
+    'openai',
+    'openai api',
+    'openai official',
+    'openai official api',
+    'openai \u5b98\u65b9\u63a5\u53e3',
+]);
+
+function hasOfficialAliasMatch(
+    provider: string,
+    providerLabel: string,
+    aliases: ReadonlySet<string>
+): boolean {
+    const providerMatches = provider !== '' && aliases.has(provider);
+    const labelMatches = providerLabel !== '' && aliases.has(providerLabel);
+
+    if (!providerMatches && !labelMatches) {
+        return false;
+    }
+
+    // If one side explicitly points to another provider, do not infer "official".
+    if (provider !== '' && !providerMatches) {
+        return false;
+    }
+
+    if (providerLabel !== '' && !labelMatches) {
+        return false;
+    }
+
+    return true;
+}
+
 function hasCanonicalOfficialProviderIdentity(provider?: string, providerLabel?: string): boolean {
     const normalizedProvider = normalizeProviderIdentityValue(provider);
     const normalizedLabel = normalizeProviderIdentityValue(providerLabel);
 
-    if (normalizedProvider === 'google') {
-        return normalizedLabel === ''
-            || normalizedLabel === 'google'
-            || normalizedLabel === '\u8c37\u6b4c'
-            || normalizedLabel === 'google official'
-            || normalizedLabel === 'google api'
-            || normalizedLabel === '\u8c37\u6b4c\u5b98\u65b9\u63a5\u53e3';
-    }
-
-    if (normalizedProvider === 'openai') {
-        return normalizedLabel === ''
-            || normalizedLabel === 'openai'
-            || normalizedLabel === 'openai official'
-            || normalizedLabel === 'openai api';
-    }
-
-    return false;
+    return hasOfficialAliasMatch(normalizedProvider, normalizedLabel, GOOGLE_OFFICIAL_PROVIDER_ALIASES)
+        || hasOfficialAliasMatch(normalizedProvider, normalizedLabel, OPENAI_OFFICIAL_PROVIDER_ALIASES);
 }
 
 function canUseBuiltinEstimateWithoutResolvedKey(options: ResolveImageCostOptions): boolean {

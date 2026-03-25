@@ -58,6 +58,11 @@ class SupplierService {
     return this.suppliers.find((supplier) => supplier.id === id);
   }
 
+  requiresSystemToken(baseUrl: string): boolean {
+    const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
+    return runtime.strategyId !== 'wuyinkeji';
+  }
+
   clearLegacyStorage(): void {
     this.suppliers = [];
 
@@ -92,7 +97,7 @@ class SupplierService {
 
     console.log('[SupplierService] Supplier created:', supplier.id);
 
-    if (data.systemToken) {
+    if (!this.requiresSystemToken(data.baseUrl) || data.systemToken) {
       this.fetchModelsAsync(supplier.id, data.baseUrl, data.systemToken);
     }
 
@@ -122,8 +127,11 @@ class SupplierService {
 
     console.log('[SupplierService] Supplier updated:', id);
 
-    if (shouldRefetch && data.systemToken) {
-      this.fetchModelsAsync(id, data.baseUrl || supplier.baseUrl, data.systemToken);
+    const nextBaseUrl = data.baseUrl || supplier.baseUrl;
+    const nextSystemToken = data.systemToken ?? supplier.systemToken;
+
+    if (shouldRefetch && (!this.requiresSystemToken(nextBaseUrl) || nextSystemToken)) {
+      this.fetchModelsAsync(id, nextBaseUrl, nextSystemToken);
     }
 
     return this.suppliers[index];
@@ -143,10 +151,10 @@ class SupplierService {
     return true;
   }
 
-  private async fetchModelsAsync(supplierId: string, baseUrl: string, systemToken: string) {
+  private async fetchModelsAsync(supplierId: string, baseUrl: string, systemToken?: string) {
     try {
       console.log('[SupplierService] Fetching models for:', supplierId);
-      const models = await this.fetchModelsFromNewAPI(baseUrl, systemToken);
+      const models = await this.fetchModelsFromNewAPI(baseUrl, systemToken || '');
 
       const index = this.suppliers.findIndex((supplier) => supplier.id === supplierId);
       if (index !== -1) {
@@ -161,7 +169,7 @@ class SupplierService {
     }
   }
 
-  async fetchModelsFromNewAPI(baseUrl: string, systemToken: string): Promise<SupplierModel[]> {
+  async fetchModelsFromNewAPI(baseUrl: string, systemToken = ''): Promise<SupplierModel[]> {
     const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
     if (runtime.strategyId === 'wuyinkeji') {
       const pricing = selectWuyinCatalogModels(baseUrl, await fetchWuyinPricingCatalog(baseUrl));
@@ -176,6 +184,10 @@ class SupplierService {
         displayPrice: model.displayPrice,
         supportsGroups: false,
       }));
+    }
+
+    if (!systemToken.trim()) {
+      throw new Error('System Access Token is required for this supplier');
     }
 
     console.log('[SupplierService] Calling NewAPI for models:', baseUrl);
@@ -196,10 +208,12 @@ class SupplierService {
 
   async refreshModels(supplierId: string): Promise<SupplierModel[]> {
     const supplier = this.getById(supplierId);
-    if (!supplier) throw new Error('供应商不存在');
-    if (!supplier.systemToken) throw new Error('未配置 System Access Token');
+    if (!supplier) throw new Error('Supplier not found');
+    if (this.requiresSystemToken(supplier.baseUrl) && !supplier.systemToken) {
+      throw new Error('System Access Token is required for this supplier');
+    }
 
-    const models = await this.fetchModelsFromNewAPI(supplier.baseUrl, supplier.systemToken);
+    const models = await this.fetchModelsFromNewAPI(supplier.baseUrl, supplier.systemToken || '');
 
     const index = this.suppliers.findIndex((item) => item.id === supplierId);
     if (index !== -1) {

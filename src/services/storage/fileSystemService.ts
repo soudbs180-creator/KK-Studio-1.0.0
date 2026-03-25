@@ -956,12 +956,28 @@ export const fileSystemService = {
      * Store new generated image as Blob
      * [重构版] - 统一写入根目录 originals/，不再拆分到子项目目录
      */
-    async saveImageToHandle(handle: FileSystemDirectoryHandle, id: string, blob: Blob, isVideo: boolean = false, canvasDirName?: string): Promise<string> {
+    async saveImageToHandle(
+        handle: FileSystemDirectoryHandle,
+        id: string,
+        blob: Blob,
+        isVideo: boolean = false,
+        canvasDirName?: string,
+        overwriteExisting: boolean = false
+    ): Promise<string> {
         try {
             // @ts-ignore
             const originalsDir = await handle.getDirectoryHandle(DIRS.ORIGINALS, { create: true });
             const existingFileName = await findExistingFileNameByStoredId(originalsDir, id, MEDIA_EXTENSIONS);
             if (existingFileName) {
+                if (overwriteExisting) {
+                    // @ts-ignore
+                    const fileHandle = await originalsDir.getFileHandle(existingFileName, { create: true });
+                    // @ts-ignore
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return existingFileName;
+                }
                 return existingFileName;
             }
 
@@ -1232,13 +1248,8 @@ export const fileSystemService = {
 
             // 3. 增量保存原图到根目录 originals/
             if (imagesToSave.size > 0) {
-                // @ts-ignore
-                const originalsDir = await handle.getDirectoryHandle(DIRS.ORIGINALS, { create: true });
-
                 for (const [id, blob] of imagesToSave.entries()) {
-                    const existingFileName = await findExistingFileNameByStoredId(originalsDir, id, MEDIA_EXTENSIONS);
-                    if (existingFileName) continue;
-                    await this.saveImageToHandle(handle, id, blob, false);
+                    await this.saveImageToHandle(handle, id, blob, false, undefined, true);
                 }
             }
 

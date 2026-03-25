@@ -39,6 +39,15 @@ type WuyinResolvedRoute = {
     endpointUrl?: string;
 };
 
+type AceDataServiceId = 'flux' | 'nano-banana';
+
+type AceDataImageRoute = {
+    serviceId: AceDataServiceId;
+    endpointPath: string;
+    taskPath: string;
+    aliases: string[];
+};
+
 const WUYIN_DEFAULT_BASE_URL = 'https://api.wuyinkeji.com';
 const WUYIN_DETAIL_PATH = '/api/async/detail';
 const WUYIN_IMAGE_ROUTES: WuyinImageRoute[] = [
@@ -106,6 +115,36 @@ const WUYIN_SUPPORTED_ASPECT_RATIOS = new Set([
     '4:5',
     '21:9',
 ]);
+
+const ACEDATA_DEFAULT_BASE_URL = 'https://api.acedata.cloud';
+const ACEDATA_IMAGE_ROUTES: AceDataImageRoute[] = [
+    {
+        serviceId: 'flux',
+        endpointPath: '/flux/images',
+        taskPath: '/flux/tasks',
+        aliases: [
+            'flux',
+            'flux-dev',
+            'flux-schnell',
+            'flux-pro',
+            'flux-kontext',
+            'flux-kontext-pro',
+            'flux-kontext-max',
+        ],
+    },
+    {
+        serviceId: 'nano-banana',
+        endpointPath: '/nano-banana/images',
+        taskPath: '/nano-banana/tasks',
+        aliases: [
+            'nano-banana',
+            'nanobanana',
+            'banana',
+            'gemini-2.5-flash-image',
+            'gemini-2.0-flash-exp-image-generation',
+        ],
+    },
+];
 
 export class OpenAICompatibleAdapter implements LLMAdapter {
     id = 'openai-compatible-adapter';
@@ -753,6 +792,272 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return 'pending';
     }
 
+    private normalizeAceDataBaseUrl(baseUrl: string): string {
+        const raw = String(baseUrl || '').trim();
+        if (!raw) return ACEDATA_DEFAULT_BASE_URL;
+
+        const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+        try {
+            const parsed = new URL(withProtocol);
+            if (/^api\.acedata\.cloud$/i.test(parsed.hostname)) {
+                return `${parsed.protocol}//${parsed.host}`;
+            }
+
+            const sanitizedPath = parsed.pathname
+                .replace(/\/+(flux|nano-banana)\/(images|tasks)$/i, '')
+                .replace(/\/+$/, '');
+            return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
+        } catch {
+            return ACEDATA_DEFAULT_BASE_URL;
+        }
+    }
+
+    private extractAceDataDirectRoute(baseUrl: string): AceDataImageRoute | null {
+        const raw = String(baseUrl || '').trim();
+        if (!raw) return null;
+
+        const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`];
+        for (const candidate of candidates) {
+            try {
+                const parsed = new URL(candidate);
+                const pathname = parsed.pathname.replace(/\/+$/, '').toLowerCase();
+                const matchedRoute = ACEDATA_IMAGE_ROUTES.find((route) =>
+                    pathname.endsWith(route.endpointPath) || pathname.endsWith(route.taskPath)
+                );
+                if (matchedRoute) {
+                    return matchedRoute;
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private normalizeAceDataAlias(value: string): string {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/^models\//i, '')
+            .replace(/\|.*$/, '')
+            .replace(/@.*$/, '')
+            .replace(/[^a-z0-9]+/g, '');
+    }
+
+    private resolveAceDataImageRoute(baseUrl: string, modelId?: string): AceDataImageRoute {
+        const directRoute = this.extractAceDataDirectRoute(baseUrl);
+        if (directRoute) {
+            return directRoute;
+        }
+
+        const normalized = this.normalizeAceDataAlias(modelId || '');
+        const matchedRoute = ACEDATA_IMAGE_ROUTES.find((route) =>
+            route.aliases.some((alias) => this.normalizeAceDataAlias(alias) === normalized)
+        );
+        if (matchedRoute) {
+            return matchedRoute;
+        }
+
+        if (normalized.includes('flux') || normalized.includes('kontext')) {
+            return ACEDATA_IMAGE_ROUTES[0];
+        }
+        if (normalized.includes('banana') || normalized.includes('gemini25flashimage') || normalized.includes('gemini20flashexpimagegeneration')) {
+            return ACEDATA_IMAGE_ROUTES[1];
+        }
+
+        throw new Error(`AceData provider does not know how to route image model "${modelId || ''}". Please use a Flux or Nano Banana model ID.`);
+    }
+
+    private resolveAceDataCandidateRoutes(baseUrl: string, modelId?: string): AceDataImageRoute[] {
+        const routes: AceDataImageRoute[] = [];
+        const pushUnique = (route: AceDataImageRoute | null | undefined) => {
+            if (!route) return;
+            if (routes.some((item) => item.serviceId === route.serviceId)) return;
+            routes.push(route);
+        };
+
+        pushUnique(this.extractAceDataDirectRoute(baseUrl));
+
+        try {
+            pushUnique(this.resolveAceDataImageRoute(baseUrl, modelId));
+        } catch {
+            // Fall back to probing known AceData task routes when the model is unavailable.
+        }
+
+        ACEDATA_IMAGE_ROUTES.forEach(pushUnique);
+        return routes;
+    }
+
+    private normalizeAceDataReferenceImage(
+        ref: string | { data: string; mimeType: string; url?: string },
+        index: number
+    ): string {
+        const sourceUrl = typeof (ref as { url?: string })?.url === 'string'
+            ? String((ref as { url?: string }).url || '').trim()
+            : '';
+        if (/^https?:\/\//i.test(sourceUrl)) {
+            return sourceUrl;
+        }
+
+        const { data, mimeType } = extractRefImageData(ref);
+        const raw = String(data || '').trim();
+        if (!raw) {
+            throw new Error(`AceData reference image ${index + 1} is empty.`);
+        }
+
+        if (/^https?:\/\//i.test(raw)) {
+            return raw;
+        }
+
+        if (/^blob:/i.test(raw)) {
+            throw new Error(`AceData reference image ${index + 1} is still a local blob URL. Please wait for image processing to finish and try again.`);
+        }
+
+        if (/^data:/i.test(raw)) {
+            return raw;
+        }
+
+        const cleaned = raw.replace(/^data:[^;]+;base64,/i, '').replace(/\s+/g, '');
+        if (!cleaned) {
+            throw new Error(`AceData reference image ${index + 1} is not a valid URL or Base64 payload.`);
+        }
+
+        return `data:${mimeType || 'image/png'};base64,${cleaned}`;
+    }
+
+    private resolveAceDataImageSize(options: ImageGenerationOptions): string {
+        return this.resolveOpenAIImageSize(options, 'gpt-image-1');
+    }
+
+    // AceData image tasks appear to follow the same retrieve / retrieve_batch task pattern
+    // used across other AceData services such as Luma.
+    private async fetchAceDataTaskDetail(
+        taskId: string,
+        keySlot: KeySlot,
+        modelId?: string,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        const candidateRoutes = this.resolveAceDataCandidateRoutes(keySlot.baseUrl || '', modelId);
+        let lastError: any = null;
+
+        for (const route of candidateRoutes) {
+            try {
+                const requestPath = route.taskPath;
+                return await this.fetchJsonTaskResponse({
+                    url: `${cleanBase}${route.taskPath}`,
+                    keySlot,
+                    method: 'POST',
+                    body: JSON.stringify({ id: taskId, action: 'retrieve' }),
+                    signal,
+                    requestPath,
+                });
+            } catch (error: any) {
+                lastError = error;
+                const status = Number(error?.status);
+                if (status === 400 || status === 404) {
+                    continue;
+                }
+                throw error;
+            }
+        }
+
+        throw lastError || new Error(`AceData task lookup failed for task ${taskId}`);
+    }
+
+    private async fetchAceDataTaskDetails(
+        taskIds: string[],
+        keySlot: KeySlot,
+        modelId?: string,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const route = this.resolveAceDataImageRoute(keySlot.baseUrl || '', modelId);
+        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        return this.fetchJsonTaskResponse({
+            url: `${cleanBase}${route.taskPath}`,
+            keySlot,
+            method: 'POST',
+            body: JSON.stringify({ ids: taskIds, action: 'retrieve_batch' }),
+            signal,
+            requestPath: route.taskPath,
+        });
+    }
+
+    private async pollAceDataImageTask(
+        taskId: string,
+        keySlot: KeySlot,
+        options: ImageGenerationOptions,
+        requestMeta?: { submitPath?: string; requestBodyPreview?: string }
+    ): Promise<ImageGenerationResult> {
+        const startTime = Date.now();
+        const maxDurationMs = 10 * 60 * 1000;
+        let pollIntervalMs = 2500;
+        const maxIntervalMs = 12000;
+
+        while (Date.now() - startTime < maxDurationMs) {
+            if (options.signal?.aborted) {
+                throw new Error('Image generation cancelled');
+            }
+
+            const { payload, requestPath } = await this.fetchAceDataTaskDetail(taskId, keySlot, options.modelId, options.signal);
+            const status = this.mapGenericTaskStatus(payload);
+            const message = this.extractProviderMessage(payload);
+
+            if (status === 'success') {
+                const urls = this.extractImageUrlsFromPayload(payload);
+                if (!urls.length) {
+                    throw this.buildHttpError({
+                        message: 'AceData task completed, but no image URL was returned',
+                        requestPath,
+                        requestBody: requestMeta?.requestBodyPreview,
+                        responseBody: JSON.stringify(payload).slice(0, 1600),
+                        provider: keySlot.provider,
+                    });
+                }
+
+                keyManager.reportCallResult(keySlot.id, true);
+                return {
+                    urls,
+                    taskId,
+                    provider: keySlot.provider,
+                    providerName: keySlot.name,
+                    model: options.modelId,
+                    imageSize: options.imageSize || this.resolveAceDataImageSize(options),
+                    keySlotId: keySlot.id,
+                    metadata: {
+                        requestPath: requestMeta?.submitPath || requestPath,
+                        requestBodyPreview: requestMeta?.requestBodyPreview,
+                        apiDurationMs: Date.now() - startTime,
+                    }
+                };
+            }
+
+            if (status === 'failed') {
+                const errorMessage = message || 'AceData image generation failed';
+                keyManager.reportCallResult(keySlot.id, false, errorMessage);
+                throw this.buildHttpError({
+                    message: errorMessage,
+                    requestPath,
+                    requestBody: requestMeta?.requestBodyPreview,
+                    responseBody: JSON.stringify(payload).slice(0, 1600),
+                    provider: keySlot.provider,
+                });
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+            pollIntervalMs = Math.min(Math.round(pollIntervalMs * 1.4), maxIntervalMs);
+        }
+
+        throw this.buildHttpError({
+            message: 'AceData image generation timed out after 10 minutes',
+            requestPath: requestMeta?.submitPath || '/tasks',
+            requestBody: requestMeta?.requestBodyPreview,
+            provider: keySlot.provider,
+        });
+    }
+
     private normalizePollingApiBase(baseUrl: string, withV1: boolean): string {
         const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
         if (!normalized) {
@@ -1243,6 +1548,174 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         return finalResult;
+    }
+
+    private async generateImageAceData(
+        options: ImageGenerationOptions,
+        keySlot: KeySlot
+    ): Promise<ImageGenerationResult> {
+        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        const route = this.resolveAceDataImageRoute(keySlot.baseUrl || '', options.modelId);
+        const url = `${cleanBase}${route.endpointPath}`;
+        const requestPath = route.endpointPath;
+        const resolvedSize = this.resolveAceDataImageSize(options);
+        const count = this.clampImageCount(options.imageCount, 10);
+        const normalizedRefs = Array.isArray(options.referenceImages)
+            ? options.referenceImages.map((ref, index) =>
+                this.normalizeAceDataReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
+            )
+            : [];
+
+        const body: Record<string, any> = {
+            action: route.serviceId === 'flux' && normalizedRefs.length > 0 ? 'edits' : 'generate',
+            prompt: options.prompt,
+            model: options.modelId,
+            size: resolvedSize,
+        };
+
+        if (count > 1) {
+            body.count = count;
+        }
+
+        if (normalizedRefs.length > 0) {
+            if (route.serviceId === 'flux') {
+                body.image_url = normalizedRefs[0];
+                if (normalizedRefs.length > 1) {
+                    body.image_urls = normalizedRefs;
+                }
+            } else if (normalizedRefs.length === 1) {
+                body.image_url = normalizedRefs[0];
+            } else {
+                body.image_urls = normalizedRefs;
+            }
+        }
+
+        const headers = this.buildImageRequestHeaders(keySlot, true);
+        const payload = this.applyCustomBody(body, keySlot);
+        const payloadStr = JSON.stringify(payload);
+        const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
+
+        const bridgedResult = await this.executeRecoverableSyncImageRequest({
+            options,
+            parserType: 'openai-compatible-image',
+            url,
+            headers,
+            body: payloadStr,
+            timeoutMs: this.getTimeoutMs(keySlot, 400000),
+            requestPath,
+            requestBodyPreview,
+            provider: keySlot.provider,
+        });
+        if (bridgedResult) {
+            return {
+                urls: bridgedResult.urls,
+                provider: keySlot.provider,
+                providerName: keySlot.name,
+                model: options.modelId,
+                imageSize: resolvedSize,
+                keySlotId: keySlot.id,
+                metadata: {
+                    requestPath,
+                    requestBodyPreview,
+                    referenceImages: normalizedRefs.length > 0
+                        ? {
+                            input: normalizedRefs.length,
+                            used: normalizedRefs.length,
+                            dropped: 0,
+                            maxAllowed: normalizedRefs.length,
+                        }
+                        : undefined,
+                }
+            };
+        }
+
+        const response = await this.fetchWithTimeout(url, {
+            method: 'POST',
+            headers,
+            body: payloadStr,
+            signal: options.signal,
+        }, this.getTimeoutMs(keySlot, 400000), 1);
+
+        const raw = await response.text().catch(() => '');
+        if (!response.ok) {
+            keyManager.reportCallResult(keySlot.id, false, raw.slice(0, 300) || `HTTP ${response.status}`);
+            throw this.buildHttpError({
+                message: `[${response.status}] ${raw.slice(0, 500) || 'AceData image request failed'}`,
+                status: response.status,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        let submitPayload: any = {};
+        try {
+            submitPayload = raw ? JSON.parse(raw) : {};
+        } catch {
+            throw this.buildHttpError({
+                message: 'AceData image endpoint returned non-JSON payload',
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        if (submitPayload?.success === false) {
+            const errorMessage = this.extractProviderMessage(submitPayload) || 'AceData image generation failed';
+            keyManager.reportCallResult(keySlot.id, false, errorMessage);
+            throw this.buildHttpError({
+                message: errorMessage,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        const taskId = this.extractGenericTaskId(submitPayload);
+        const immediateUrls = this.extractImageUrlsFromPayload(submitPayload);
+        if (immediateUrls.length > 0) {
+            keyManager.reportCallResult(keySlot.id, true);
+            return {
+                urls: immediateUrls,
+                taskId: taskId || undefined,
+                provider: keySlot.provider,
+                providerName: keySlot.name,
+                model: options.modelId,
+                imageSize: resolvedSize,
+                keySlotId: keySlot.id,
+                metadata: {
+                    requestPath,
+                    requestBodyPreview,
+                    referenceImages: normalizedRefs.length > 0
+                        ? {
+                            input: normalizedRefs.length,
+                            used: normalizedRefs.length,
+                            dropped: 0,
+                            maxAllowed: normalizedRefs.length,
+                        }
+                        : undefined,
+                }
+            };
+        }
+
+        if (!taskId) {
+            throw this.buildHttpError({
+                message: 'AceData submit succeeded but no image URL or task ID was returned',
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        options.onTaskId?.(taskId);
+        return this.pollAceDataImageTask(taskId, keySlot, options, {
+            submitPath: requestPath,
+            requestBodyPreview,
+        });
     }
 
     private mergeExtraBody(
@@ -2198,6 +2671,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (channelRuntime.strategyId === 'wuyinkeji') {
             console.log(`[OpenAICompatibleAdapter] 使用 Wuyin async image API -> ${keySlot.name}`);
             return this.generateImageWuyinAsync(options, keySlot);
+        }
+        if (channelRuntime.strategyId === 'acedata') {
+            console.log(`[OpenAICompatibleAdapter] 使用 AceData image API -> ${keySlot.name}`);
+            return this.generateImageAceData(options, keySlot);
         }
         const forceGeminiNativeOn12AI = channelRuntime.strategyId === '12ai' && channelRuntime.geminiNative && isGeminiImage;
 
@@ -3323,6 +3800,16 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === 'acedata') {
+            const { payload, requestPath } = await this.fetchAceDataTaskDetail(taskId, keySlot, modelId);
+            return this.buildPolledTaskResult({
+                payload,
+                taskId: this.extractGenericTaskId(payload) || taskId,
+                requestPath,
+                keySlot,
+            });
+        }
+
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best' && isMidjourneyModel) {
             const { payload, requestPath } = await this.fetchMidjourneyTaskDetail(taskId, keySlot);
             return this.buildPolledTaskResult({
@@ -3359,6 +3846,29 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const isMidjourneyModel = normalizedModelId.includes('midjourney')
             || normalizedModelId.startsWith('mj-')
             || normalizedModelId.startsWith('mj_');
+
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === 'acedata' && normalizedTaskIds.length > 1) {
+            try {
+                const { payload, requestPath } = await this.fetchAceDataTaskDetails(normalizedTaskIds, keySlot, modelId);
+                const taskItems = this.extractTaskItemsFromPayload(payload);
+                const taskMap = new Map<string, any>();
+
+                taskItems.forEach((item) => {
+                    const itemTaskId = this.extractGenericTaskId(item);
+                    if (!itemTaskId) return;
+                    taskMap.set(itemTaskId, item);
+                });
+
+                return normalizedTaskIds.map((currentTaskId) => this.buildPolledTaskResult({
+                    payload: taskMap.get(currentTaskId) || { taskId: currentTaskId, status: 'pending' },
+                    taskId: currentTaskId,
+                    requestPath,
+                    keySlot,
+                }));
+            } catch (error) {
+                console.warn('[OpenAICompatibleAdapter] AceData batch polling failed, falling back to single fetch:', error);
+            }
+        }
 
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best' && isMidjourneyModel && normalizedTaskIds.length > 1) {
             try {

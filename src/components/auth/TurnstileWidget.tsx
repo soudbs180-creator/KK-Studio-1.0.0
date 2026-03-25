@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localizeUserFacingText } from '../../utils/localeText';
+import { TURNSTILE_ENABLED, TURNSTILE_HAS_ENV_SITE_KEY, TURNSTILE_SITE_KEY } from '../../config/turnstile';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
-const TURNSTILE_ENABLED = String(import.meta.env.VITE_TURNSTILE_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
 const TURNSTILE_TIMEOUT_MS = 12000;
 const TURNSTILE_SCRIPT_SELECTOR = 'script[data-turnstile-script="true"]';
 
@@ -77,6 +76,11 @@ function getDebugState(): TurnstileDebugState {
 function getResolvedSiteKey(): string {
   const debugState = getDebugState();
   return debugState.sitekey || TURNSTILE_SITE_KEY;
+}
+
+function getSiteKeySourceLabel(debugSiteKey?: string): string {
+  if (debugSiteKey) return 'URL 参数';
+  return TURNSTILE_HAS_ENV_SITE_KEY ? '环境变量' : '内置默认值';
 }
 
 function previewSiteKey(sitekey: string): string {
@@ -373,7 +377,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         <div className="auth-turnstile-debug" role="status">
           <strong>Turnstile 调试状态</strong>
           <span>状态：{status}</span>
-          <span>site key 来源：{debugState.sitekey ? 'URL 参数' : '环境变量'}</span>
+          <span>site key 来源：{getSiteKeySourceLabel(debugState.sitekey)}</span>
           <span>site key 预览：{previewSiteKey(siteKey)}</span>
           <span>appearance：{resolvedAppearance}</span>
           <span>action：{action}</span>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Chrome } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
+import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import AnoAI from '@/components/ui/animated-shader-background';
@@ -40,8 +41,6 @@ type StarPoint = {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TURNSTILE_ENV_ENABLED = String(import.meta.env.VITE_TURNSTILE_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
-const TURNSTILE_HAS_SITE_KEY = Boolean(String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim());
 const TURNSTILE_MISSING_SITE_KEY_MESSAGE =
   '当前部署未配置 Turnstile 前端 Site Key，请在 Vercel 项目环境变量中添加 VITE_TURNSTILE_SITE_KEY 后重新部署。';
 const TURNSTILE_DISABLED_MESSAGE =
@@ -125,7 +124,7 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
   const turnstileAvailable = canUseTurnstile();
-  const turnstileMissingSiteKey = TURNSTILE_ENV_ENABLED && !TURNSTILE_HAS_SITE_KEY;
+  const turnstileMissingSiteKey = TURNSTILE_ENABLED && !TURNSTILE_HAS_SITE_KEY;
   const showTurnstileBlock = turnstileAvailable || turnstileMissingSiteKey;
   const {
     token: turnstileToken,
@@ -166,7 +165,7 @@ const LoginScreen: React.FC = () => {
           return TURNSTILE_MISSING_SITE_KEY_MESSAGE;
         }
 
-        if (!TURNSTILE_ENV_ENABLED) {
+        if (!TURNSTILE_ENABLED) {
           return TURNSTILE_DISABLED_MESSAGE;
         }
       }

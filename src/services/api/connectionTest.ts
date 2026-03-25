@@ -30,6 +30,7 @@ import {
   shouldRetryWithResponsesApi,
 } from './openaiResponses';
 import { resolveProviderRuntime } from './providerStrategy';
+import { fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
 import keyManager from '../auth/keyManager';
 
 export interface TestResult {
@@ -441,6 +442,23 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
     const resolved = resolveConfig(config);
     const cleanBase = getCleanBaseUrl(resolved.baseUrl);
     const runtime = resolveConnectionRuntime(resolved, cleanBase);
+    if (runtime.strategyId === 'wuyinkeji') {
+      const pricingCatalog = selectWuyinCatalogModels(
+        cleanBase || resolved.baseUrl,
+        await fetchWuyinPricingCatalog(cleanBase || resolved.baseUrl)
+      );
+
+      return {
+        success: true,
+        message: `成功获取 ${pricingCatalog.length} 个模型`,
+        details: {
+          modelCount: pricingCatalog.length,
+          models: pricingCatalog.slice(0, 5).map((item) => item.modelId || item.modelName),
+          source: 'wuyin-catalog',
+        },
+        responseTime: Date.now() - startTime,
+      };
+    }
     const nativeGemini = runtime.protocolFamily === 'gemini-native';
     const nativeClaude = runtime.protocolFamily === 'claude-native';
     const listUrl = nativeGemini

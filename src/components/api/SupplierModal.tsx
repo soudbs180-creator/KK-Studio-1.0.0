@@ -129,6 +129,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
   );
   
   const [formData, setFormData] = useState<SupplierDraftFormData>(() => createDefaultFormData());
+  const requiresSystemToken = supplierService.requiresSystemToken(formData.baseUrl);
 
   const [fetchedModels, setFetchedModels] = useState<Array<{
     id: string;
@@ -221,7 +222,12 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
 
   // Verify System Access Token
   const handleVerifyToken = async () => {
-    if (!formData.systemToken) {
+    if (!requiresSystemToken) {
+      setTokenValid(true);
+      notify.success('无需 System Access Token', '该供应商可直接从公开目录获取模型信息');
+      return;
+    }
+    if (requiresSystemToken && !formData.systemToken) {
       notify.warning('请输入 System Access Token', 'System Access Token 不能为空');
       return;
     }
@@ -250,7 +256,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
 
   // Fetch models using System Access Token
   const handleFetchModels = async () => {
-    if (!formData.systemToken) {
+    if (requiresSystemToken && !formData.systemToken) {
       notify.warning('请输入 System Access Token', 'System Access Token 不能为空');
       return;
     }
@@ -484,7 +490,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
               <button
                 type="button"
                 onClick={handleVerifyToken}
-                disabled={isVerifying || !formData.systemToken}
+                disabled={isVerifying || (requiresSystemToken && !formData.systemToken)}
                 className={secondaryButtonClass}
               >
                 {isVerifying ? (
@@ -511,7 +517,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           </div>
 
           {/* Fetch Models Button */}
-          {formData.systemToken && (
+          {(formData.systemToken || !requiresSystemToken) && (
             <div className="flex gap-2">
               <button
                 type="button"

@@ -1,6 +1,6 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
-import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
@@ -199,6 +199,75 @@ const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas
         })),
         workflow: sanitizeWorkflowForStorage(c.workflow, aggressive)
     }));
+};
+
+type LocalMediaCacheEntry = {
+    url?: string;
+    originalUrl?: string;
+    filename?: string;
+};
+
+const normalizeMediaCacheSource = (value?: string | null): string => (
+    typeof value === 'string' ? value.trim() : ''
+);
+
+const isVideoFileName = (filename?: string | null): boolean => (
+    typeof filename === 'string' && /\.(mp4|webm|mov)$/i.test(filename)
+);
+
+const hydrateRecoveredMediaCacheEntry = async (
+    id: string,
+    entry?: LocalMediaCacheEntry | null
+): Promise<void> => {
+    const displayUrl = normalizeMediaCacheSource(entry?.url);
+    const originalUrl = normalizeMediaCacheSource(entry?.originalUrl);
+    const primaryOriginalSource = originalUrl || displayUrl;
+
+    if (!primaryOriginalSource) {
+        return;
+    }
+
+    if (isVideoFileName(entry?.filename)) {
+        await saveImage(id, primaryOriginalSource);
+        return;
+    }
+
+    await saveOriginalImage(id, primaryOriginalSource);
+
+    if (displayUrl && displayUrl !== primaryOriginalSource) {
+        await Promise.allSettled([
+            saveImage(getQualityStorageId(id, ImageQuality.MICRO), displayUrl),
+            saveImage(getQualityStorageId(id, ImageQuality.THUMBNAIL), displayUrl),
+        ]);
+    }
+};
+
+const isGeneratedMediaVideoLike = (image?: Partial<GeneratedImage> | null): boolean => (
+    image?.mode === GenerationMode.VIDEO || image?.mode === GenerationMode.AUDIO
+);
+
+const resolveOriginalPersistSourceForDisk = async (
+    image: Pick<GeneratedImage, 'id' | 'storageId' | 'originalUrl' | 'apiResultUrl' | 'url' | 'mode'>
+): Promise<string | null> => {
+    const explicitOriginal = normalizeMediaCacheSource(image.originalUrl)
+        || normalizeMediaCacheSource(image.apiResultUrl);
+    if (explicitOriginal) {
+        return explicitOriginal;
+    }
+
+    const storageId = image.storageId || image.id;
+    if (storageId) {
+        const cachedOriginal = await getStrictOriginalImage(storageId);
+        if (cachedOriginal) {
+            return cachedOriginal;
+        }
+    }
+
+    if (isGeneratedMediaVideoLike(image)) {
+        return normalizeMediaCacheSource(image.url) || null;
+    }
+
+    return null;
 };
 
 const buildStorageState = (state: CanvasState, aggressive: boolean = false): CanvasState => ({
@@ -723,9 +792,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 const { canvases, images, activeCanvasId: savedActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
                                 logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
 
-                                // Hydrate IDB images (Background)
+                                // Hydrate the cache without ever letting thumbnails overwrite the original slot.
                                 for (const [id, data] of images.entries()) {
-                                    if (data.url) saveImage(id, data.url).catch(e => console.warn('Cache failed', e));
+                                    void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
+                                        console.warn('[CanvasContext] Cache hydration failed', id, error);
+                                    });
                                 }
 
                                 // Load the reference-image map so missing references can be restored.
@@ -2233,7 +2304,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 updateNodes({ imageNodes: imageUpdates });
                 cacheWrites.forEach(({ storageId, url }) => {
                     void saveOriginalImage(storageId, url).catch(() => undefined);
-                    void saveImage(storageId, url).catch(() => undefined);
                 });
             }
 
@@ -3822,11 +3892,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const promises: Promise<void>[] = [];
                         state.canvases.forEach(c => {
                             c.imageNodes.forEach(img => {
-                                if (img.id && img.url) {
-                                    // Detect whether this asset is a video.
-                                    const isVideo = img.url.startsWith('data:video/') || img.model?.includes('veo') || false;
-                                    const lookupId = img.storageId || img.id;
-                                    promises.push(saveToDisk(lookupId, img.url, isVideo));
+                                const lookupId = img.storageId || img.id;
+                                if (img.id && lookupId) {
+                                    promises.push((async () => {
+                                        const sourceUrl = await resolveOriginalPersistSourceForDisk(img);
+                                        if (!sourceUrl) return;
+
+                                        // Detect whether this asset is a video.
+                                        const isVideo = sourceUrl.startsWith('data:video/') || img.mode === GenerationMode.VIDEO || img.model?.includes('veo') || false;
+                                        await saveToDisk(lookupId, sourceUrl, isVideo);
+                                    })());
                                 }
                             });
                             c.promptNodes.forEach(pn => {
@@ -3865,26 +3940,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                     const { canvases, images } = await fileSystemService.loadProjectWithThumbs(handle);
 
-                    // Hydrate images map to IndexedDB for performance/caching
+                    // Hydrate caches without collapsing original and thumbnail into the same storage slot.
                     for (const [id, data] of images.entries()) {
-                        // Determine what to cache: the display URL (thumbnail or original if small)
-                        const blobUrl = data.url;
-                        if (blobUrl) {
-                            try {
-                                const res = await fetch(blobUrl);
-                                const blob = await res.blob();
-                                const reader = new FileReader();
-                                reader.onloadend = async () => {
-                                    const base64data = reader.result as string;
-                                    if (base64data) {
-                                        await saveImage(id, base64data);
-                                    }
-                                };
-                                reader.readAsDataURL(blob);
-                            } catch (e) {
-                                console.error('[CanvasContext] Failed to cache image ' + id, e);
-                            }
-                        }
+                        void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
+                            console.error('[CanvasContext] Failed to cache image ' + id, error);
+                        });
                     }
 
                     // If found existing project in the folder, MERGE instead of overwrite
@@ -4099,49 +4159,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const handle = currentState.fileSystemHandle;
             const { canvases, images } = await fileSystemService.loadProjectWithThumbs(handle);
 
-            // Hydrate images map to IndexedDB
+            // Hydrate caches without letting thumbnail reads overwrite original-image storage.
             for (const [id, data] of images.entries()) {
-                const blobUrl = data.url;
-                if (blobUrl) {
-                    // Skip known-failed IDs so we do not retry and log the same failure repeatedly.
-                    if (failedReloadIdsRef.current.has(id)) continue;
+                if (failedReloadIdsRef.current.has(id)) continue;
+                if (!data.url && !data.originalUrl) continue;
 
-                    try {
-                        // Check whether this is still a valid blob URL.
-                        if (blobUrl.startsWith('blob:')) {
-                            const res = await fetch(blobUrl);
-                            const blob = await res.blob();
-                            const reader = new FileReader();
-                            reader.onloadend = async () => {
-                                const base64data = reader.result as string;
-                                if (base64data) {
-                                    await saveImage(id, base64data);
-                                }
-                            };
-                            reader.readAsDataURL(blob);
-                        }
-                    } catch (e) {
-                        // The blob URL has expired; try loading again from local storage.
-                        console.debug('[CanvasContext] Blob URL expired for ' + id + ', trying to reload from local file system');
-                        try {
-                            const file = await fileSystemService.loadOriginalFromDisk(handle, id);
-                            if (!file) throw new Error('file not found');
-                            const reader = new FileReader();
-                            reader.onloadend = async () => {
-                                const base64data = reader.result as string;
-                                if (base64data) {
-                                    await saveImage(id, base64data);
-                                    console.log('[CanvasContext] Reloaded ' + id + ' from local file system');
-                                }
-                            };
-                            reader.readAsDataURL(file);
-                        } catch (fsErr) {
-                            // Record the failed ID so we do not retry it again immediately.
-                            failedReloadIdsRef.current.add(id);
-                            console.debug('[CanvasContext] Failed to reload ' + id + ' from local file system (will skip future retries)');
-                        }
-                    }
-                }
+                void hydrateRecoveredMediaCacheEntry(id, data)
+                    .then(() => {
+                        failedReloadIdsRef.current.delete(id);
+                    })
+                    .catch(() => {
+                        failedReloadIdsRef.current.add(id);
+                        console.debug('[CanvasContext] Failed to refresh cache for ' + id + ' from local folder (will skip future retries)');
+                    });
             }
 
             // Reload state only if changed
@@ -4247,18 +4277,23 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const allImages = new Map<string, string>();
                         state.canvases.forEach(c => {
                             c.imageNodes.forEach(img => {
-                                // PRIORITIZE ORIGINAL URL! otherwise we overwrite high-res with thumbnail blob
-                                if (img.originalUrl) {
-                                    allImages.set(img.id, img.originalUrl);
-                                } else if (img.apiResultUrl) {
-                                    allImages.set(img.id, img.apiResultUrl);
-                                } else if (img.url) {
-                                    allImages.set(img.id, img.url);
-                                }
+                                const storageId = img.storageId || img.id;
+                                if (!storageId) return;
+                                allImages.set(storageId, '');
                             });
                         });
 
-                        for (const [id, url] of allImages.entries()) {
+                        for (const [id] of allImages.entries()) {
+                            const imageNode = state.canvases
+                                .flatMap(canvas => canvas.imageNodes)
+                                .find(img => (img.storageId || img.id) === id);
+                            if (!imageNode) continue;
+
+                            const url = await resolveOriginalPersistSourceForDisk(imageNode);
+                            if (!url) {
+                                continue;
+                            }
+
                             // Only fetch if it's a blob url (local)
                             if (url.startsWith('blob:') || url.startsWith('data:') || /^https?:\/\//i.test(url)) {
                                 try {
