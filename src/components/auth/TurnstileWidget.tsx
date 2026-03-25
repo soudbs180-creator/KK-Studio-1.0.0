@@ -4,7 +4,6 @@ import {
   TURNSTILE_ENABLED,
   TURNSTILE_HAS_ENV_SITE_KEY,
   TURNSTILE_SITE_KEY,
-  TURNSTILE_USING_FALLBACK_SITE_KEY,
 } from '../../config/turnstile';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -117,9 +116,6 @@ function mapTurnstileError(error: unknown): string {
 
   switch (code) {
     case '400020':
-      if (TURNSTILE_USING_FALLBACK_SITE_KEY) {
-        return 'Cloudflare 返回 Invalid sitekey。当前部署没有注入 VITE_TURNSTILE_SITE_KEY，应用正在使用内置回退 key。请在 Vercel 项目环境变量中设置正确的 VITE_TURNSTILE_SITE_KEY 后重新部署。';
-      }
       return 'Cloudflare 返回 Invalid sitekey，请检查前端 VITE_TURNSTILE_SITE_KEY 是否与当前 widget 的 site key 一致。';
     case '400070':
       return '当前 Turnstile site key 已被禁用，请到 Cloudflare 后台检查 widget 状态。';

@@ -186,13 +186,13 @@
   </main>
 
   <script>
-    const ENV_TURNSTILE_SITE_KEY = '%VITE_TURNSTILE_SITE_KEY%'.trim();
-    const DEFAULT_TURNSTILE_SITE_KEY =
-      !ENV_TURNSTILE_SITE_KEY || ENV_TURNSTILE_SITE_KEY === '%VITE_TURNSTILE_SITE_KEY%'
-        ? '0x4AAAAAACsemgRLdRYJhUE0dEe7M04a3gg'
-        : ENV_TURNSTILE_SITE_KEY;
+    const RAW_ENV_TURNSTILE_SITE_KEY = '%VITE_TURNSTILE_SITE_KEY%'.trim();
+    const ENV_TURNSTILE_SITE_KEY =
+      !RAW_ENV_TURNSTILE_SITE_KEY || RAW_ENV_TURNSTILE_SITE_KEY === '%VITE_TURNSTILE_SITE_KEY%'
+        ? ''
+        : RAW_ENV_TURNSTILE_SITE_KEY;
     const SITE_KEY_OVERRIDE = new URLSearchParams(window.location.search).get('sitekey')?.trim() || '';
-    const TURNSTILE_SITE_KEY = SITE_KEY_OVERRIDE || DEFAULT_TURNSTILE_SITE_KEY;
+    const TURNSTILE_SITE_KEY = SITE_KEY_OVERRIDE || ENV_TURNSTILE_SITE_KEY;
     const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
     const LOGS = document.getElementById('logs');
 
@@ -262,12 +262,12 @@
       setText('meta-location', window.location.href);
       setText('meta-hostname', window.location.hostname || '(empty)');
       setText('meta-sitekey', TURNSTILE_SITE_KEY || '(empty)');
-      setText('meta-sitekey-source', SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : '.env');
+      setText('meta-sitekey-source', SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : ENV_TURNSTILE_SITE_KEY ? '.env' : '未配置');
       setText('meta-ua', navigator.userAgent);
       setText('meta-script-url', TURNSTILE_SCRIPT_URL);
 
       appendLog('开始诊断');
-      appendLog(`当前使用的 site key 来源: ${SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : '.env'}`);
+      appendLog(`当前使用的 site key 来源: ${SITE_KEY_OVERRIDE ? 'URL 参数覆盖' : ENV_TURNSTILE_SITE_KEY ? '.env' : '未配置'}`);
 
       if (!TURNSTILE_SITE_KEY) {
         setOverallStatus('error', '未配置 Site Key');

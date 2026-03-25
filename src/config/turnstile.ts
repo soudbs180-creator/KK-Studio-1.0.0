@@ -1,8 +1,8 @@
 const ENV_TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
 
-// Cloudflare Turnstile site keys are public by design, so we keep the shared
-// project key here as the default for both local and deployed builds.
-export const DEFAULT_TURNSTILE_SITE_KEY = "0x4AAAAAACsemgRLdRYJhUE0dEe7M04a3gg";
+// Turnstile must use an explicit site key from the current deployment
+// environment. Falling back to a stale hard-coded key can break auth entirely.
+export const DEFAULT_TURNSTILE_SITE_KEY = "";
 export const TURNSTILE_ENABLED =
   String(import.meta.env.VITE_TURNSTILE_ENABLED ?? "true").trim().toLowerCase() !== "false";
 export const TURNSTILE_ENV_SITE_KEY = ENV_TURNSTILE_SITE_KEY;
