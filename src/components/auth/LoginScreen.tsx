@@ -125,7 +125,6 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
   const turnstileAvailable = canUseTurnstile();
-  const shouldShowTurnstileBlock = TURNSTILE_ENV_ENABLED;
   const turnstileMissingSiteKey = TURNSTILE_ENV_ENABLED && !TURNSTILE_HAS_SITE_KEY;
   const {
     token: turnstileToken,
@@ -693,7 +692,7 @@ const LoginScreen: React.FC = () => {
               </label>
             )}
 
-            {shouldShowTurnstileBlock && (
+            {turnstileAvailable && (
               <div className="auth-turnstile-block">
                 <div className="auth-turnstile-head">
                   <span>安全验证</span>
