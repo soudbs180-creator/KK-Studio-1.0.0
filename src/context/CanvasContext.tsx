@@ -2655,7 +2655,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const promptBottom = prompt.position.y;
 
                         if (targetMode === 'row') {
-                            // 妯悜鎺掑垪: 鍓崱姘村钩鎺掓垚涓€琛?灞呬腑瀵归綈
+                            // Horizontal layout: arrange child cards in a single centered row.
                             const totalWidth = childImages.length * avgWidth + (childImages.length - 1) * SUB_GAP;
                             let currentX = promptCenterX - totalWidth / 2 + avgWidth / 2;
                             const y = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
@@ -2811,7 +2811,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
 
                 if (roots.length >= 2) {
-                    // 2. 浣跨敤浼犲叆鐨刴ode纭畾绛栫暐
+                    // 2. Use the requested mode to choose the layout strategy.
                     const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
                     const GAP = 120; // Larger gap between groups (was 80).
                     const GRID_COLUMNS = 6; // Grid mode uses 6 fixed columns.
@@ -4271,7 +4271,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     if (err.message && err.message.includes('ERR_UPLOAD_FILE_CHANGED')) {
                                         console.warn('[CanvasContext] Blob reference lost for ' + id + ' (file changed/moved), skipping save.');
                                     } else if (err instanceof TypeError && String(err.message || '').includes('Failed to fetch')) {
-                                        // blob/data URL 鍦ㄧ敓鍛藉懆鏈熸湯鏈熷彲鑳藉凡澶辨晥锛岃繖绫婚敊璇彲瀹夊叏蹇界暐
+                                        // blob/data URLs can expire before save completes; this failure is safe to ignore.
                                     } else {
                                         console.warn('[CanvasContext] Skip saving image ' + id + ' (fetch failed):', err);
                                     }

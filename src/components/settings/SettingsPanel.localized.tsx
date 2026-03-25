@@ -717,8 +717,8 @@ const SettingsMobileShell: React.FC<{
   const { pick } = useLocale();
   const fallbackNavItem: NavItem = {
     id: 'dashboard',
-    label: pick('鎬昏', 'Dashboard'),
-    description: pick('鏌ョ湅鏍稿績鎸囨爣銆佽繍琛岀姸鎬佸拰鏈€杩戞椿鍔ㄣ€?', 'Check key metrics, runtime health, and recent activity.'),
+    label: pick('总览', 'Dashboard'),
+    description: pick('查看核心指标、运行状态和最近活动。', 'Check key metrics, runtime health, and recent activity.'),
     icon: LayoutDashboard,
     section: 'workspace',
     path: NAV_PATHS.dashboard,

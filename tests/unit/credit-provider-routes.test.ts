@@ -17,7 +17,36 @@ import {
 
 describe("credit provider routes", () => {
   test("lists active credit models without exposing secrets", async () => {
-    const service = new CreditProviderService(new InMemoryCreditProviderRepository());
+    const repository = new InMemoryCreditProviderRepository();
+    const service = new CreditProviderService(repository);
+
+    await repository.saveAdminProvider("public-provider", {
+      providerName: "Public Provider",
+      baseUrl: "https://provider.public.local/v1",
+      apiKeys: ["public-secret-1"],
+      models: [
+        {
+          modelId: "public-model",
+          displayName: "Public Model",
+          endpointType: "openai",
+          creditCost: 2,
+          advancedEnabled: false,
+          mixWithSameModel: false,
+          qualityPricing: {
+            "1K": {
+              enabled: true,
+              creditCost: 2,
+            },
+          },
+          priority: 1,
+          weight: 1,
+          isActive: true,
+          color: "#2563EB",
+          textColor: "white",
+        },
+      ],
+    });
+
     const result = await handleListActiveCreditModels(service, {
       "x-request-id": "req-credit-provider-public-list",
     });

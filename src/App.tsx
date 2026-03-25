@@ -233,6 +233,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [generatingGroupIds, setGeneratingGroupIds] = useState<string[]>([]);
   const [groupOverlapMap, setGroupOverlapMap] = useState<Record<string, string[]>>({});
   const [liveNodePositionById, setLiveNodePositionById] = useState<Record<string, { x: number; y: number }>>({});
+  const [imageCardHeightById, setImageCardHeightById] = useState<Record<string, number>>({});
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
 
 
@@ -243,10 +244,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     addPromptNode,
     updatePromptNode,
     addImageNodes,
-    updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // 🎯
+    updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // canvas mutation helpers
     deletePromptNode,
     deleteImageNode,
-    urgentUpdatePromptNode, // 🎯 [New] 绱ф€ョ姸鎬佸悓姝?
+    urgentUpdatePromptNode, // hot-path prompt updates for transient generation state
     linkNodes,
     unlinkNodes,
     undo,
@@ -1037,7 +1038,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       mode: config.mode,
       pptSlides: config.pptSlides || [],
       pptStyleLocked: config.pptStyleLocked !== false,
-      // 🎯 [New] 琛ラ綈缂哄け鐨勮棰戙€侀煶棰戝強提示璇嶅瓧娈?
+      // Preserve prompt, video, and audio settings introduced by newer workflows.
       prompt: config.prompt || '',
       videoResolution: config.videoResolution,
       videoDuration: config.videoDuration,
@@ -1798,7 +1799,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
     }
 
-    // 2. 鏃犻€変腑鏃讹紝瀹氫綅鍒版渶鏂扮敓鎴愮殑鍗＄粍
+    // 2. If there are no prompt cards, jump to the newest generated image card.
     const prompts = activeCanvas.promptNodes;
     if (prompts.length === 0) {
       const latestImage = [...activeCanvas.imageNodes].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
@@ -2829,7 +2830,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     try {
 
       // 4. Calculate Position
-      // 鏅€氭ā寮忓簲使用当前视口中心锛涜拷闂ā寮忎繚鐣欏師鏈夎崏绋垮畾浣嶉€昏緫
+      // Normal mode uses the current viewport center; follow-up mode keeps the existing linked placement flow.
       const isFollowUp = !!activeSourceImage;
       const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
       const viewportRect = canvasRef.current?.getCanvasRect() || null;
@@ -2868,7 +2869,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           } else {
             // 🎯 [Auto-Center Fallback] If draft is off-screen, snap it to current view center
             // This fixes the issue where users pan away from a draft and then generate, causing the result to be "lost"
-            // 🎯 使用瀹炴椂 transform锛堝寘鎷嫋鍔ㄤ腑鐨勪綅缃級
+            // Use the live transform, including any in-progress drag offset.
             const currentTransformForVisibility = canvasRef.current?.getCurrentTransform() || canvasTransform;
             const vLeft = -currentTransformForVisibility.x / currentTransformForVisibility.scale;
             const vTop = -currentTransformForVisibility.y / currentTransformForVisibility.scale;
@@ -3102,7 +3103,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         refundStatus: undefined,
         creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
         paymentTransactionId,
-        isNew: isNewAnim, // 🎯 启用鍔ㄧ敾标记
+        isNew: isNewAnim, // Mark the node as newly created so the launch animation can run.
         parallelCount: pptCount,
         sourceImageId: activeSourceImage || undefined,
         mode: config.mode,
@@ -3234,8 +3235,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('发送失败', e?.message || '请重试');
       });
     } finally {
-      // 🎯 [Fix] 涓嶅湪姝ゅ setIsGenerating(false)锛屽洜涓?executeGeneration 内部宸茬鐞嗘状态
-      // 鍙戦€佽妭娴佺敱 lastGenerateAtRef 控制锛屼笉鍐嶄緷璧栨暣杞敓鎴愮粨鏉熸墠瑙ｉ攣
+      // executeGeneration manages isGenerating internally; avoid resetting it here.
+      // Request throttling is controlled by lastGenerateAtRef instead of waiting for the full run to settle.
     }
   }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel]);
 
@@ -5618,8 +5619,13 @@ ${slideLayerXml.join('\n')}
   }, [actualChildImagesByPromptId]);
 
   useEffect(() => {
+    setImageCardHeightById({});
+  }, [activeCanvas?.id]);
+
+  useEffect(() => {
     if (!activeCanvas) {
       setFocusedGroupId(null);
+      liveNodePositionByIdRef.current = {};
       setLiveNodePositionById({});
       setLockedGroupBoundsById({});
       return;
@@ -5636,33 +5642,56 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
 
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
-  useEffect(() => {
-    liveNodePositionByIdRef.current = liveNodePositionById;
-  }, [liveNodePositionById]);
+  const syncLiveNodePositionState = useCallback(() => {
+    const next = liveNodePositionByIdRef.current;
+    setLiveNodePositionById((prev) => {
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length === nextKeys.length && prevKeys.every((key) => (
+        next[key] && prev[key]?.x === next[key].x && prev[key]?.y === next[key].y
+      ))) {
+        return prev;
+      }
+
+      return { ...next };
+    });
+  }, []);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
     const groupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId)
       ? nodeId
       : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId)?.parentPromptId ?? null);
 
-    setLiveNodePositionById((prev) => {
+    let nextLivePositions = liveNodePositionByIdRef.current;
+    let hasLivePositionChanged = false;
+
+    if (!position) {
+      if (nodeId in nextLivePositions) {
+        nextLivePositions = { ...nextLivePositions };
+        delete nextLivePositions[nodeId];
+        hasLivePositionChanged = true;
+      }
+    } else {
+      const previous = nextLivePositions[nodeId];
+      if (!previous || previous.x !== position.x || previous.y !== position.y) {
+        nextLivePositions = {
+          ...nextLivePositions,
+          [nodeId]: position,
+        };
+        hasLivePositionChanged = true;
+      }
+    }
+
+    if (hasLivePositionChanged) {
+      liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
+
       if (!position) {
-        if (!(nodeId in prev)) return prev;
-        const next = { ...prev };
-        delete next[nodeId];
-        return next;
+        // Flush the last queued drag delta so the persisted canvas position lands
+        // exactly where the live drag visual finished before we clear the live state.
+        moveSelectedNodesImmediate({ x: 0, y: 0 });
       }
-
-      const previous = prev[nodeId];
-      if (previous && previous.x === position.x && previous.y === position.y) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        [nodeId]: position,
-      };
-    });
+    }
 
     if (!groupId) {
       return;
@@ -5697,7 +5726,23 @@ ${slideLayerXml.join('\n')}
       delete next[groupId];
       return next;
     });
-  }, [activeCanvas, promptGroupBoundsById]);
+  }, [activeCanvas, moveSelectedNodesImmediate, promptGroupBoundsById, syncLiveNodePositionState]);
+
+  const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
+    if (!(height > 0)) return;
+
+    setImageCardHeightById((prev) => {
+      const previousHeight = prev[imageId];
+      if (previousHeight && Math.abs(previousHeight - height) <= 1) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [imageId]: height,
+      };
+    });
+  }, []);
 
   const promptGroupNodeIdsById = React.useMemo(() => {
     const nodeIdsByGroupId = new Map<string, string[]>();
@@ -5846,6 +5891,11 @@ ${slideLayerXml.join('\n')}
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
+    [activeCanvas]
+  );
+
+  const promptNodesById = React.useMemo(
+    () => new Map((activeCanvas?.promptNodes || []).map(node => [node.id, node])),
     [activeCanvas]
   );
 
@@ -6130,6 +6180,20 @@ ${slideLayerXml.join('\n')}
     () => new Set(connectorRenderVisibleImageNodes.map((node) => node.id)),
     [connectorRenderVisibleImageNodes]
   );
+
+  const resolveLivePromptPosition = useCallback((promptNode: PromptNode | undefined | null) => {
+    if (!promptNode) return null;
+    return liveNodePositionById[promptNode.id]
+      ?? promptNodesById.get(promptNode.id)?.position
+      ?? promptNode.position;
+  }, [liveNodePositionById, promptNodesById]);
+
+  const resolveLiveImagePosition = useCallback((imageNode: GeneratedImage | undefined | null) => {
+    if (!imageNode) return null;
+    return liveNodePositionById[imageNode.id]
+      ?? imageNodesById.get(imageNode.id)?.position
+      ?? imageNode.position;
+  }, [imageNodesById, liveNodePositionById]);
 
   const connectorChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -6687,6 +6751,8 @@ ${slideLayerXml.join('\n')}
         stackZIndexOverride={item.stackZIndexOverride}
         position={node.position}
         onPositionChange={updateImageNodePosition}
+        onLivePositionChange={handleLiveNodePositionChange}
+        onHeightChange={handleImageCardHeightChange}
         highlighted={highlightedId === node.id}
         onDimensionsUpdate={updateImageNodeDisplayMeta}
         onUpdate={updateImageNode}
@@ -6710,11 +6776,11 @@ ${slideLayerXml.join('\n')}
           if (!sourceNodeId) return;
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+            moveSelectedNodes(delta, expandedSelectedNodeIds);
             return;
           }
 
-          moveSelectedNodesImmediate(delta, sourceNodeId);
+          moveSelectedNodes(delta, sourceNodeId);
         }}
       />
     );
@@ -6728,14 +6794,16 @@ ${slideLayerXml.join('\n')}
     handleConnectEnd,
     handleDownloadPptComposite,
     handleImageClick,
+    handleImageCardHeightChange,
     handleCanvasNodeDragStateChange,
+    handleLiveNodePositionChange,
     handleOpenPptStackPreview,
     handleOpenPreview,
     highlightedId,
     isCanvasTransforming,
     isMobile,
     moveSelectedNodes,
-    moveSelectedNodesImmediate,
+    moveSelectedNodes,
     nowTimestamp,
     selectedNodeIds,
     updateImageNode,
@@ -6746,7 +6814,6 @@ ${slideLayerXml.join('\n')}
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
     const { groupView } = item;
     const node = groupView.rootPrompt;
-    const groupBounds = lockedGroupBoundsById[node.id] ?? groupView.bounds;
     const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
     const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
@@ -6756,232 +6823,238 @@ ${slideLayerXml.join('\n')}
     const groupConnectorStroke = Math.max(1, Math.min(3, 1 / groupConnectorZoom));
     const groupConnectorDash = `${Math.max(2, Math.min(10, 4 / groupConnectorZoom))} ${Math.max(2, Math.min(10, 4 / groupConnectorZoom))}`;
     const groupConnectorDotRadius = Math.max(1.5, Math.min(3.5, 2 / groupConnectorZoom));
-    const groupShadowFilter = isGroupFocused
-      ? 'drop-shadow(0 28px 52px rgba(2, 6, 23, 0.34)) drop-shadow(0 12px 24px rgba(2, 6, 23, 0.24))'
-      : isGeneratingGroup
-        ? 'drop-shadow(0 24px 44px rgba(2, 6, 23, 0.28)) drop-shadow(0 10px 20px rgba(37, 99, 235, 0.16))'
-        : groupView.isOverlapping
-          ? 'drop-shadow(0 24px 44px rgba(2, 6, 23, 0.30)) drop-shadow(0 10px 20px rgba(2, 6, 23, 0.18))'
-          : 'none';
+    const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping;
+    const connectorLayerZIndex = groupStackZIndex + 5;
+    const promptCardZIndex = groupStackZIndex + 20;
+    const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
+    const connectorCenterStub = Math.max(8, Math.min(18, 12 / groupConnectorZoom));
+    const groupConnectorSegments = groupView.childImages.map((childNode) => {
+      const childConnectorPosition = resolveLiveImagePosition(childNode) ?? childNode.position;
+      const { totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
+      let imageHeight = theoreticalHeight;
+
+      if (childNode.dimensions && typeof childNode.dimensions === 'string') {
+        const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
+        if (match?.[1] && match?.[2]) {
+          const width = parseInt(match[1], 10);
+          const height = parseInt(match[2], 10);
+          if (width > 0 && height > 0) {
+            const aspect = width / height;
+            const { width: renderedWidth } = getCardDimensions(childNode.aspectRatio, false);
+            imageHeight = (renderedWidth / aspect) + 40;
+          }
+        }
+      }
+
+      const resolvedImageHeight = imageCardHeightById[childNode.id] ?? imageHeight;
+      const startX = promptConnectorPosition.x + 5000;
+      const startY = promptConnectorPosition.y + 5000;
+      const endX = childConnectorPosition.x + 5000;
+      const endY = (childConnectorPosition.y - resolvedImageHeight) + 5000;
+      const curveEndY = Math.min(endY - connectorCenterStub, endY);
+      const distanceY = Math.abs(curveEndY - startY);
+      const handleLength = Math.min(distanceY * 0.4, 150);
+      const controlY1 = startY + handleLength;
+      const controlY2 = curveEndY - handleLength;
+      const path = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${curveEndY}`;
+
+      return {
+        key: `${node.id}-${childNode.id}`,
+        startX,
+        startY,
+        endX,
+        endY,
+        curveEndY,
+        path,
+      };
+    });
 
     return (
-      <div
-        className="absolute"
-        style={{
-          left: groupBounds.x,
-          top: groupBounds.y,
-          width: groupBounds.width,
-          height: groupBounds.height,
-          zIndex: groupStackZIndex,
-          isolation: 'isolate',
-          overflow: 'visible',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          className="absolute inset-0 rounded-[28px]"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            boxShadow: 'none',
+      <>
+        {groupConnectorSegments.length > 0 && (
+          <svg
+            className="absolute top-0 left-0 pointer-events-none"
+            shapeRendering="geometricPrecision"
+            style={{
+              width: '10000px',
+              height: '10000px',
+              left: '-5000px',
+              top: '-5000px',
+              overflow: 'visible',
+              zIndex: connectorLayerZIndex,
+            }}
+          >
+            {groupConnectorSegments.map((segment) => {
+              return (
+                <g key={segment.key}>
+                  <circle cx={segment.startX} cy={segment.startY} r={groupConnectorDotRadius} fill="var(--connector-color, #6366f1)" opacity="0.55" />
+                  <path
+                    d={segment.path}
+                    fill="none"
+                    stroke="var(--connector-color, #6366f1)"
+                    strokeWidth={groupConnectorStroke}
+                    strokeDasharray={groupConnectorDash}
+                    strokeLinecap="butt"
+                    opacity={isGroupFocused ? 0.72 : 0.42}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        )}
+
+        {groupConnectorSegments.length > 0 && (
+          <svg
+            className="absolute top-0 left-0 pointer-events-none"
+            shapeRendering="geometricPrecision"
+            style={{
+              width: '10000px',
+              height: '10000px',
+              left: '-5000px',
+              top: '-5000px',
+              overflow: 'visible',
+              zIndex: promptCardZIndex + 200,
+            }}
+          >
+            {groupConnectorSegments.map((segment) => (
+              <g key={`${segment.key}-stub`}>
+                <path
+                  d={`M${segment.endX},${segment.curveEndY} L${segment.endX},${segment.endY}`}
+                  fill="none"
+                  stroke="var(--connector-color, #6366f1)"
+                  strokeWidth={groupConnectorStroke}
+                  strokeLinecap="round"
+                  opacity={isGroupFocused ? 0.72 : 0.58}
+                />
+                <circle
+                  cx={segment.endX}
+                  cy={segment.endY}
+                  r={groupConnectorDotRadius}
+                  fill="var(--connector-color, #6366f1)"
+                  opacity={0.68}
+                />
+              </g>
+            ))}
+          </svg>
+        )}
+
+        <PromptNodeComponent
+          node={node}
+          detailLevel={promptDetailLevel}
+          groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
+          stackZIndexOverride={promptCardZIndex}
+          shadowBoost={shadowBoost}
+          actualChildImageCount={groupView.childImages.length}
+          onPositionChange={updatePromptNodePosition}
+          isSelected={selectedNodeIds.includes(node.id)}
+          highlighted={highlightedId === node.id || isGroupFocused}
+          onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
+          onSelect={() => {
+            setFocusedGroupId(node.id);
+            handleCanvasNodeSelect(node.id);
           }}
-          onMouseDown={(event) => {
-            if (event.target !== event.currentTarget) return;
-            event.stopPropagation();
-            handleFocusPromptGroup(node.id, { nodeIds: groupNodeIds });
-            if (event.button === 2) {
-              const pos = getSelectionScreenCenter(groupNodeIds);
-              if (pos) setSelectionMenuPosition(pos);
+          onClickPrompt={handlePromptClick}
+          onConnectStart={handleConnectStart}
+          zoomScale={canvasTransform.scale}
+          isCanvasTransforming={isCanvasTransforming}
+          isMobile={isMobile}
+          sourcePosition={node.sourceImageId
+            ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
+            : undefined
+          }
+          onCancel={handleCancelGeneration}
+          onRetry={handleRetryNode}
+          onEditPptDeck={handleOpenPptDeckEditor}
+          onExportPpt={handleExportPptPackageEditable}
+          onExportPptx={handleExportPptxEditable}
+          onRetryPptPage={handleRetryPptSinglePage}
+          onExportPptPage={handleExportPptSinglePage}
+          ioTrace={getNodeIoTrace(node.id)}
+          onOpenStorageSettings={() => {
+            setShowSettingsPanel(true);
+            setSettingsInitialView('storage-settings');
+          }}
+          onDelete={deletePromptNode}
+          onDisconnect={handleDisconnectPrompt}
+          onUpdateNode={updatePromptNode}
+          onLivePositionChange={handleLiveNodePositionChange}
+          onHeightChange={(id, height) => {
+            const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
+            const targetNode = latestNode || node;
+            if (targetNode.height !== height) {
+              updatePromptNode({ ...targetNode, height });
             }
           }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleFocusPromptGroup(node.id, { nodeIds: groupNodeIds });
-            const pos = getSelectionScreenCenter(groupNodeIds);
-            if (pos) setSelectionMenuPosition(pos);
+          onPin={handlePinDraft}
+          onRemoveTag={(id, tag) => {
+            const promptNode = activeCanvas?.promptNodes.find(n => n.id === id);
+            if (promptNode && promptNode.tags) {
+              const newTags = promptNode.tags.filter(t => t !== tag);
+              updatePromptNode({ ...promptNode, tags: newTags });
+            }
           }}
+          onDragDelta={(delta, sourceNodeId) => {
+            if (!sourceNodeId) return;
+            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+              moveSelectedNodes(delta, expandedSelectedNodeIds);
+            } else {
+              moveSelectedNodes(delta, groupNodeIds);
+            }
+          }}
+          canvasTransform={canvasTransform}
+          onDragStateChange={handleCanvasNodeDragStateChange}
         />
 
-        <div
-          className="absolute inset-0"
-          style={{
-            overflow: 'visible',
-            filter: groupShadowFilter,
-            transition: 'filter 180ms ease',
-          }}
-        >
-          {groupView.childImages.length > 0 && (
-            <svg
-              className="absolute inset-0 pointer-events-none overflow-visible"
-              style={{ zIndex: 10 }}
-            >
-              {groupView.childImages.map((childNode) => {
-                const promptPosition = liveNodePositionById[node.id] ?? node.position;
-                const childPosition = liveNodePositionById[childNode.id] ?? childNode.position;
-                const { totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
-                let imageHeight = theoreticalHeight;
+        {groupView.childImages.map((childNode, childIndex) => (
+          <React.Fragment key={childNode.id}>
+            <ImageNode
+              image={childNode}
+              detailLevel="full"
+              loadPriority={1200}
+              loadBand={0}
+              groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
+              stackZIndexOverride={promptCardZIndex + 10 + childIndex}
+              shadowBoost={shadowBoost}
+              position={childNode.position}
+              onPositionChange={updateImageNodePosition}
+              onLivePositionChange={handleLiveNodePositionChange}
+              onHeightChange={handleImageCardHeightChange}
+              highlighted={highlightedId === childNode.id || isGroupFocused}
+              onDimensionsUpdate={updateImageNodeDisplayMeta}
+              onUpdate={updateImageNode}
+              onDelete={deleteImageNode}
+              onConnectEnd={handleConnectEnd}
+              onClick={handleImageClick}
+              onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
+              isActive={childNode.id === activeSourceImage}
+              isSelected={selectedNodeIds.includes(childNode.id)}
+              onSelect={() => {
+                setFocusedGroupId(node.id);
+                handleCanvasNodeSelect(childNode.id);
+              }}
+              zoomScale={canvasTransform.scale}
+              isMobile={isMobile}
+              onPreview={handleOpenPreview}
+              onPreviewPptStack={handleOpenPptStackPreview}
+              onDownloadPptComposite={handleDownloadPptComposite}
+              isCanvasTransforming={isCanvasTransforming}
+              isNew={(nowTimestamp || Date.now()) - (childNode.timestamp || 0) < 10000}
+              canvasTransform={canvasTransform}
+              onDragStateChange={handleCanvasNodeDragStateChange}
+              onDragDelta={(delta, sourceNodeId) => {
+                if (!sourceNodeId) return;
 
-                if (childNode.dimensions && typeof childNode.dimensions === 'string') {
-                  const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-                  if (match?.[1] && match?.[2]) {
-                    const width = parseInt(match[1], 10);
-                    const height = parseInt(match[2], 10);
-                    if (width > 0 && height > 0) {
-                      const aspect = width / height;
-                      const { width: renderedWidth } = getCardDimensions(childNode.aspectRatio, false);
-                      imageHeight = (renderedWidth / aspect) + 40;
-                    }
-                  }
+                if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+                  moveSelectedNodes(delta, expandedSelectedNodeIds);
+                  return;
                 }
 
-                const startX = promptPosition.x - groupBounds.x;
-                const startY = promptPosition.y - groupBounds.y;
-                const endX = childPosition.x - groupBounds.x;
-                const endY = (childPosition.y - imageHeight) - groupBounds.y + 5;
-                const distanceY = Math.abs(endY - startY);
-                const handleLength = Math.min(distanceY * 0.4, 150);
-                const controlY1 = startY + handleLength;
-                const controlY2 = endY - handleLength;
-                const path = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
-
-                return (
-                  <g key={`${node.id}-${childNode.id}`}>
-                    <circle cx={startX} cy={startY} r={groupConnectorDotRadius} fill="var(--connector-color, #6366f1)" opacity="0.55" />
-                    <path
-                      d={path}
-                      fill="none"
-                      stroke="var(--connector-color, #6366f1)"
-                      strokeWidth={groupConnectorStroke}
-                      strokeDasharray={groupConnectorDash}
-                      strokeLinecap="butt"
-                      opacity={isGroupFocused ? 0.72 : 0.42}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-          )}
-
-          <PromptNodeComponent
-            node={node}
-            detailLevel={promptDetailLevel}
-            groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
-            stackZIndexOverride={20}
-            shadowBoost
-            renderOrigin={{ x: groupBounds.x, y: groupBounds.y }}
-            actualChildImageCount={groupView.childImages.length}
-            onPositionChange={updatePromptNodePosition}
-            isSelected={selectedNodeIds.includes(node.id)}
-            highlighted={highlightedId === node.id || isGroupFocused}
-            onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-            onSelect={() => {
-              setFocusedGroupId(node.id);
-              handleCanvasNodeSelect(node.id);
-            }}
-            onClickPrompt={handlePromptClick}
-            onConnectStart={handleConnectStart}
-            zoomScale={canvasTransform.scale}
-            isCanvasTransforming={isCanvasTransforming}
-            isMobile={isMobile}
-            sourcePosition={node.sourceImageId
-              ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
-              : undefined
-            }
-            onCancel={handleCancelGeneration}
-            onRetry={handleRetryNode}
-            onEditPptDeck={handleOpenPptDeckEditor}
-            onExportPpt={handleExportPptPackageEditable}
-            onExportPptx={handleExportPptxEditable}
-            onRetryPptPage={handleRetryPptSinglePage}
-            onExportPptPage={handleExportPptSinglePage}
-            ioTrace={getNodeIoTrace(node.id)}
-            onOpenStorageSettings={() => {
-              setShowSettingsPanel(true);
-              setSettingsInitialView('storage-settings');
-            }}
-            onDelete={deletePromptNode}
-            onDisconnect={handleDisconnectPrompt}
-            onUpdateNode={updatePromptNode}
-            onLivePositionChange={handleLiveNodePositionChange}
-            onHeightChange={(id, height) => {
-              const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
-              const targetNode = latestNode || node;
-              if (targetNode.height !== height) {
-                updatePromptNode({ ...targetNode, height });
-              }
-            }}
-            onPin={handlePinDraft}
-            onRemoveTag={(id, tag) => {
-              const promptNode = activeCanvas?.promptNodes.find(n => n.id === id);
-              if (promptNode && promptNode.tags) {
-                const newTags = promptNode.tags.filter(t => t !== tag);
-                updatePromptNode({ ...promptNode, tags: newTags });
-              }
-            }}
-            onDragDelta={(delta, sourceNodeId) => {
-              if (!sourceNodeId) return;
-              if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-                moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
-              } else {
-                moveSelectedNodesImmediate(delta, groupNodeIds);
-              }
-            }}
-            canvasTransform={canvasTransform}
-            onDragStateChange={handleCanvasNodeDragStateChange}
-          />
-
-          {groupView.childImages.map((childNode, childIndex) => (
-            <React.Fragment key={childNode.id}>
-              <ImageNode
-                image={childNode}
-                detailLevel="full"
-                loadPriority={1200}
-                loadBand={0}
-                groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
-                stackZIndexOverride={30 + childIndex}
-                shadowBoost
-                renderOrigin={{ x: groupBounds.x, y: groupBounds.y }}
-                position={liveNodePositionById[childNode.id] ?? childNode.position}
-                onPositionChange={updateImageNodePosition}
-                onLivePositionChange={handleLiveNodePositionChange}
-                highlighted={highlightedId === childNode.id || isGroupFocused}
-                onDimensionsUpdate={updateImageNodeDisplayMeta}
-                onUpdate={updateImageNode}
-                onDelete={deleteImageNode}
-                onConnectEnd={handleConnectEnd}
-                onClick={handleImageClick}
-                onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-                isActive={childNode.id === activeSourceImage}
-                isSelected={selectedNodeIds.includes(childNode.id)}
-                onSelect={() => {
-                  setFocusedGroupId(node.id);
-                  handleCanvasNodeSelect(childNode.id);
-                }}
-                zoomScale={canvasTransform.scale}
-                isMobile={isMobile}
-                onPreview={handleOpenPreview}
-                onPreviewPptStack={handleOpenPptStackPreview}
-                onDownloadPptComposite={handleDownloadPptComposite}
-                isCanvasTransforming={isCanvasTransforming}
-                isNew={(nowTimestamp || Date.now()) - (childNode.timestamp || 0) < 10000}
-                canvasTransform={canvasTransform}
-                onDragStateChange={handleCanvasNodeDragStateChange}
-                onDragDelta={(delta, sourceNodeId) => {
-                  if (!sourceNodeId) return;
-
-                  if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
-                    moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
-                    return;
-                  }
-
-                  moveSelectedNodesImmediate(delta, [sourceNodeId]);
-                }}
-              />
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
+                moveSelectedNodes(delta, [sourceNodeId]);
+              }}
+            />
+          </React.Fragment>
+        ))}
+      </>
     );
   }, [
     activeCanvas,
@@ -6990,7 +7063,6 @@ ${slideLayerXml.join('\n')}
     deleteImageNode,
     expandedSelectedNodeIds,
     getNodeIoTrace,
-    getSelectionScreenCenter,
     handleCancelGeneration,
     handleCanvasNodeSelect,
     handleConnectStart,
@@ -7013,17 +7085,17 @@ ${slideLayerXml.join('\n')}
     handleRetryPptSinglePage,
     focusedGroupId,
     generatingGroupIds,
+    imageCardHeightById,
     highlightedId,
     isMobile,
-    lockedGroupBoundsById,
-    liveNodePositionById,
-    moveSelectedNodesImmediate,
+    moveSelectedNodes,
     nowTimestamp,
     promptGroupNodeIdsById,
     promptGroupLayerById,
     promptGroupStackZIndexById,
+    resolveLiveImagePosition,
+    resolveLivePromptPosition,
     selectedNodeIds,
-    setSelectionMenuPosition,
     updatePromptNode,
     updateImageNode,
     updateImageNodeDisplayMeta,
@@ -8004,16 +8076,18 @@ ${slideLayerXml.join('\n')}
             if (!pn.sourceImageId) return null;
             const sourceNode = connectorVisibleImageNodesById.get(pn.sourceImageId);
             if (!sourceNode) return null;
+            const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
+            const promptPosition = resolveLivePromptPosition(pn) ?? pn.position;
 
             // Source: Image Bottom Center (+5000 offset)
-            const startX = sourceNode.position.x + 5000;
-            const startY = sourceNode.position.y + 5000;
+            const startX = sourcePosition.x + 5000;
+            const startY = sourcePosition.y + 5000;
 
             // Target: Prompt Top Center (+5000 offset)
             // Use exact height if available, otherwise estimate
             const height = pn.height || getPromptHeight(pn.prompt);
-            const endX = pn.position.x + 5000;
-            const endY = (pn.position.y - height) + 5000;
+            const endX = promptPosition.x + 5000;
+            const endY = (promptPosition.y - height) + 5000;
 
             // Waterfall Bezier - Straightens when close
             const distY = Math.abs(endY - startY);
@@ -8032,7 +8106,7 @@ ${slideLayerXml.join('\n')}
             const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
             const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
 
-            /* 🎯 鏂伴鑹查€昏緫锛氶噸缁樹负缁胯壊锛岃拷闂负閲戣壊 */
+            /* Follow-up connector colors mirror the active generation mode. */
             const baseColor = pn.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
             const hoverClass = pn.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
@@ -8102,10 +8176,11 @@ ${slideLayerXml.join('\n')}
             if (!connectorVisibleImageNodeIds.has(activeSourceImage)) return null;
             const sourceNode = connectorVisibleImageNodesById.get(activeSourceImage);
             if (!sourceNode) return null;
+            const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
 
             // Position + 5000 Offset
-            const startX = sourceNode.position.x + 5000;
-            const startY = sourceNode.position.y + 5000;
+            const startX = sourcePosition.x + 5000;
+            const startY = sourcePosition.y + 5000;
 
             // Pending Node Position (Bottom Center)
             const endX = pendingPosition.x + 5000;
@@ -8125,7 +8200,7 @@ ${slideLayerXml.join('\n')}
             const btnX = mt * mt2 * startX + 3 * mt2 * t * startX + 3 * mt * t2 * endX + t * t2 * endX;
             const btnY = mt * mt2 * startY + 3 * mt2 * t * controlY1 + 3 * mt * t2 * controlY2 + t * t2 * endY;
 
-            /* 🎯 鏂伴鑹查€昏緫瀵逛簬寰呯敓鎴愯繛鎺ワ細利用配置涓殑模式判断 */
+            /* Pending connection colors follow the active generation mode. */
             const baseColor = config.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
             const hoverClass = config.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
@@ -8186,9 +8261,11 @@ ${slideLayerXml.join('\n')}
             const sourceImage = connectorVisibleImageNodesById.get(edge.from);
             const sourceUtility = visibleWorkflowUtilityNodesById.get(edge.from);
             if (!sourcePrompt && !sourceImage && !sourceUtility) return null;
+            const sourcePromptPosition = resolveLivePromptPosition(sourcePrompt);
+            const sourceImagePosition = resolveLiveImagePosition(sourceImage);
 
-            const startX = (sourcePrompt?.position.x || sourceImage?.position.x || sourceUtility?.position.x || 0) + 5000;
-            const startY = (sourcePrompt?.position.y || sourceImage?.position.y || sourceUtility?.position.y || 0) + 5000;
+            const startX = (sourcePromptPosition?.x || sourceImagePosition?.x || sourceUtility?.position.x || 0) + 5000;
+            const startY = (sourcePromptPosition?.y || sourceImagePosition?.y || sourceUtility?.position.y || 0) + 5000;
             const targetHeight = targetNode.height || 176;
             const endX = targetNode.position.x + 5000;
             const endY = (targetNode.position.y - targetHeight) + 5000;
@@ -8276,7 +8353,7 @@ ${slideLayerXml.join('\n')}
               onBringToFront={() => bringNodesToFront([node.id])}
               onSelect={() => {
                 selectNodes([node.id], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-                // 棣冩畬 Right Click triggers Selection Menu centered on node bounds
+                // Right click opens the selection menu centered on the current node bounds.
                 if ((window.event as any)?.button === 2) {
                   const pos = getSelectionScreenCenter([node.id]);
                   if (pos) setSelectionMenuPosition(pos);
@@ -8345,9 +8422,9 @@ ${slideLayerXml.join('\n')}
                 } else {
                   moveSelectedNodes(delta, sourceNodeId);
                 }
-                // 棣冩畬 [Fix] Force re-render for real-time connection line updates
-              }} // 棣冩畬 Enable Safe Relative Drag
-              canvasTransform={canvasTransform} // 棣冩畬 Pass Transform for Animation Calculation
+                // Force a re-render so connection lines stay in sync while dragging.
+              }} // Enable safe relative drag.
+              canvasTransform={canvasTransform} // Pass transform data for connection-line animation math.
             />
 
             {(visibleChildImagesByPromptId.get(node.id) || []).map(childNode => (
@@ -8909,7 +8986,7 @@ ${slideLayerXml.join('\n')}
         </Suspense>
       )}
 
-      {/* 🎯 鍏ㄥ眬鍏呭€兼ā鎬佹 */}
+      {/* Global recharge modal */}
       {showRechargeModal && (
         <Suspense fallback={null}>
           <RechargeModal />

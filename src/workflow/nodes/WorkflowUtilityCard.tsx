@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { WorkflowNode } from '../../types';
+import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
 
@@ -153,7 +154,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
 
   return (
     <div
-      className={`absolute rounded-[22px] border shadow-2xl transition-all ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
+      className={`absolute rounded-[22px] border transition-all ${accentClassName} ${highlighted ? 'ring-2 ring-amber-300/70' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-default'}`}
       style={{
         left: node.position.x - width / 2,
         top: node.position.y - height,
@@ -163,8 +164,8 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
         background: 'linear-gradient(180deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.86) 100%)',
         borderColor: isSelected ? 'rgba(96, 165, 250, 0.72)' : 'rgba(148, 163, 184, 0.18)',
         boxShadow: isSelected
-          ? '0 24px 60px rgba(15, 23, 42, 0.45), 0 0 0 1px rgba(96, 165, 250, 0.22)'
-          : '0 18px 40px rgba(2, 6, 23, 0.24)',
+          ? getCanvasCardShadow({ accent: 'blue', boost: true, zoomScale })
+          : getCanvasCardShadow({ boost: true, zoomScale }),
       }}
       onMouseDown={(event) => {
         event.stopPropagation();

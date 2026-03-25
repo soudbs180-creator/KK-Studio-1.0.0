@@ -269,6 +269,53 @@ class AdminModelService {
     );
   }
 
+  private mapLegacyProviderRows(
+    grouped: Array<{
+      providerId?: string | null;
+      providerName?: string | null;
+      models?: Array<{
+        recordId?: string | null;
+        modelId?: string | null;
+        displayName?: string | null;
+        description?: string | null;
+        endpointType?: string | null;
+        creditCost?: number | null;
+        priority?: number | null;
+        weight?: number | null;
+        callCount?: number | null;
+        color?: string | null;
+        colorSecondary?: string | null;
+        textColor?: string | null;
+        advancedEnabled?: boolean | null;
+        mixWithSameModel?: boolean | null;
+        qualityPricing?: Record<string, any> | null;
+      }> | null;
+    }>
+  ): FlatModelRow[] {
+    return grouped.flatMap((provider) =>
+      (provider.models || []).map((model) => ({
+        id: model.recordId ?? undefined,
+        provider_id: provider.providerId ?? undefined,
+        provider_name: provider.providerName ?? undefined,
+        model_id: model.modelId ?? undefined,
+        display_name: model.displayName ?? undefined,
+        description: model.description ?? undefined,
+        color: model.color ?? undefined,
+        color_secondary: model.colorSecondary ?? undefined,
+        text_color: model.textColor ?? undefined,
+        endpoint_type: model.endpointType ?? undefined,
+        credit_cost: model.creditCost ?? undefined,
+        priority: model.priority ?? undefined,
+        weight: model.weight ?? undefined,
+        call_count: model.callCount ?? undefined,
+        is_active: true,
+        advanced_enabled: model.advancedEnabled ?? undefined,
+        mix_with_same_model: model.mixWithSameModel ?? undefined,
+        quality_pricing: model.qualityPricing ?? undefined,
+      }))
+    );
+  }
+
   async loadAdminModels(force = false): Promise<void> {
     const now = Date.now();
 
@@ -289,69 +336,43 @@ class AdminModelService {
   }
 
   private async readFromRpc(): Promise<FlatModelRow[]> {
-    const [legacyResult, supabaseResult] = await Promise.allSettled([
-      legacyWebApiClient.listActiveCreditModels(),
-      listActiveCreditModelsViaSupabase(),
-    ]);
+    let legacyRows: FlatModelRow[] | null = null;
+    let legacyError: unknown = null;
 
-    if (supabaseResult.status === 'fulfilled') {
-      const supabaseRows = this.mapActiveProviderRows(supabaseResult.value);
-      if (supabaseRows.length > 0) {
-        return supabaseRows;
+    try {
+      const response = await legacyWebApiClient.listActiveCreditModels();
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Failed to load active credit models.');
       }
-    }
 
-    if (legacyResult.status === 'fulfilled') {
-      const response = legacyResult.value;
-      if (response.success) {
-        const grouped = response.data.items || [];
-
-        return grouped.flatMap((provider) =>
-          (provider.models || []).map((model) => ({
-            id: model.recordId,
-            provider_id: provider.providerId,
-            provider_name: provider.providerName,
-            model_id: model.modelId,
-            display_name: model.displayName,
-            description: model.description,
-            color: model.color,
-            color_secondary: model.colorSecondary,
-            text_color: model.textColor,
-            endpoint_type: model.endpointType,
-            credit_cost: model.creditCost,
-            priority: model.priority,
-            weight: model.weight,
-            call_count: model.callCount,
-            is_active: true,
-            advanced_enabled: model.advancedEnabled,
-            mix_with_same_model: model.mixWithSameModel,
-            quality_pricing: model.qualityPricing,
-          }))
-        );
+      legacyRows = this.mapLegacyProviderRows(response.data.items || []);
+      if (legacyRows.length > 0) {
+        return legacyRows;
       }
+    } catch (error) {
+      legacyError = error;
+      console.warn('[AdminModelService] Web API active-model fetch failed, trying Supabase fallback:', error);
     }
 
-    if (supabaseResult.status === 'fulfilled') {
-      return this.mapActiveProviderRows(supabaseResult.value);
-    }
+    try {
+      const fallbackRows = this.mapActiveProviderRows(await listActiveCreditModelsViaSupabase());
+      if (fallbackRows.length > 0 || !legacyRows) {
+        return fallbackRows;
+      }
+    } catch (fallbackError) {
+      if (legacyRows) {
+        return legacyRows;
+      }
 
-    const legacyError = legacyResult.status === 'rejected'
-      ? legacyResult.reason
-      : new Error(
-        legacyResult.value.success
-          ? 'Failed to load active credit models.'
-          : (legacyResult.value.error.message || 'Failed to load active credit models.')
+      throw new Error(
+        this.getErrorMessage(
+          fallbackError,
+          this.getErrorMessage(legacyError, 'Failed to load active credit models.')
+        )
       );
-    const supabaseError = supabaseResult.status === 'rejected'
-      ? supabaseResult.reason
-      : new Error('Failed to load active credit models.');
+    }
 
-    throw new Error(
-      this.getErrorMessage(
-        supabaseError,
-        this.getErrorMessage(legacyError, 'Failed to load active credit models.')
-      )
-    );
+    return legacyRows || [];
   }
 
   private normalizeHexColor(input?: string | null, fallback = '#3B82F6'): string {

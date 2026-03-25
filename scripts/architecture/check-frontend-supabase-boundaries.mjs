@@ -40,6 +40,7 @@ const transitionalAllowlist = new Map([
         "admin_change_password",
         "admin_recharge_credits_by_identity",
         "get_admin_credit_models_full",
+        "get_active_credit_models",
         "save_credit_provider",
         "delete_credit_provider",
       ]),

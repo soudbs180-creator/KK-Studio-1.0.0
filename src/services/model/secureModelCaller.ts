@@ -6,8 +6,8 @@
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
-import { legacyWebApiClient } from '../api/kkApiClient';
 import { userApiKeyService } from '../api/userApiKeyService';
+import { adminModelService } from './adminModelService';
 import { callSecureSystemProxyChat } from './secureModelProxy';
 
 export interface SecureCallOptions {
@@ -82,29 +82,16 @@ class SecureModelCaller {
     isActive: boolean;
   }>> {
     try {
-      const response = await legacyWebApiClient.listActiveCreditModels();
-      if (!response.success) {
-        throw new Error(response.error.message || 'Failed to load active credit models.');
-      }
-
-      const adminModels = (response.data.items || []).flatMap((group) =>
-        (group.models || []).map((model) => ({
-          model_id: model.modelId,
-          display_name: model.displayName,
-          description: model.description,
-          credit_cost: model.creditCost,
-          is_active: true,
-        }))
-      );
-
+      await adminModelService.loadAdminModels();
+      const adminModels = adminModelService.getModels();
       const userKeys = await userApiKeyService.getUserApiKeys();
 
       return [
-        ...(adminModels || []).map((model: any) => ({
-          id: model.model_id,
-          name: model.display_name,
-          description: model.description,
-          creditCost: model.credit_cost,
+        ...adminModels.map((model) => ({
+          id: model.id,
+          name: model.displayName,
+          description: model.advantages,
+          creditCost: model.creditCost,
           source: 'system' as const,
           isActive: true,
         })),

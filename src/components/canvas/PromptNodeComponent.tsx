@@ -13,6 +13,7 @@ import ImagePreview from '../image/ImagePreview';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 import { isCreditBillingTarget } from '../../utils/creditBilling';
+import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 
 const truncateByChars = (text: string, maxChars: number): string => {
@@ -313,6 +314,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const baseCardWidth = 320;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
     const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
+    const originX = renderOrigin?.x ?? 0;
+    const originY = renderOrigin?.y ?? 0;
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
     const dragStartPos = useRef({ x: 0, y: 0 });
     const dragStartCanvasPos = useRef({ x: 0, y: 0 });
@@ -328,6 +331,31 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const cardRef = useRef<HTMLDivElement>(null);
     const localPosRef = useRef(node.position);
     const hasAnimatedRef = useRef<string | null>(null);
+    const onDragDeltaRef = useRef(onDragDelta);
+    const onLivePositionChangeRef = useRef(onLivePositionChange);
+    const onDragStateChangeRef = useRef(onDragStateChange);
+    const dragRenderMetricsRef = useRef({
+        cardWidth,
+        cardHeight,
+        originX,
+        originY,
+        zoomScale: zoomScale || 1,
+        nodeId: node.id,
+    });
+
+    useEffect(() => {
+        onDragDeltaRef.current = onDragDelta;
+        onLivePositionChangeRef.current = onLivePositionChange;
+        onDragStateChangeRef.current = onDragStateChange;
+        dragRenderMetricsRef.current = {
+            cardWidth,
+            cardHeight,
+            originX,
+            originY,
+            zoomScale: zoomScale || 1,
+            nodeId: node.id,
+        };
+    }, [cardHeight, cardWidth, node.id, onDragDelta, onDragStateChange, onLivePositionChange, originX, originY, zoomScale]);
 
     // Sync ref when node.position updates externally (and not dragging)
     // 🚀 [Fix] 使用更宽松的条件，避免拖动结束后位置回弹
@@ -336,12 +364,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             localPosRef.current = node.position;
             // 🚀 [Fix] 只在位置差异较大时才强制更新 DOM，避免微小更新导致的抖动
             if (containerRef.current) {
-                const originX = renderOrigin?.x ?? 0;
-                const originY = renderOrigin?.y ?? 0;
                 const currentLeft = parseFloat(containerRef.current.style.left) || 0;
                 const currentTop = parseFloat(containerRef.current.style.top) || 0;
-                const targetLeft = Math.round(node.position.x - cardWidth / 2 - originX);
-                const targetTop = Math.round(node.position.y - cardHeight - originY);
+                const targetLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1) - originX;
+                const targetTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1) - originY;
                 
                 // 只在差异超过 2px 时才更新，避免微小抖动
                 if (Math.abs(currentLeft - targetLeft) > 2 || Math.abs(currentTop - targetTop) > 2) {
@@ -351,11 +377,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 }
             }
         }
-    }, [node.position.x, node.position.y, isDragging, cardWidth, cardHeight, isChatMode, renderOrigin]);
+    }, [node.position.x, node.position.y, isDragging, cardWidth, cardHeight, isChatMode, originX, originY, zoomScale]);
 
     useEffect(() => () => {
-        onLivePositionChange?.(node.id, null);
-    }, [node.id, onLivePositionChange]);
+        onLivePositionChangeRef.current?.(node.id, null);
+    }, [node.id]);
 
     useEffect(() => {
         // 🚀 默认展示优化后的结果 (若存在)
@@ -374,9 +400,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     useEffect(() => {
         return () => {
-            onDragStateChange?.(false);
+            onDragStateChangeRef.current?.(false);
         };
-    }, [onDragStateChange]);
+    }, []);
 
     // 🚀 [丝滑优化] 统一飞入动画：从输入框中心飞向画布目标位置
     // 使用 useLayoutEffect + 单一 gsap.fromTo 避免双重动画冲突和位置跳动
@@ -535,6 +561,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
         if (isChatMode) return; // Disable drag/select logic in chat mode
+        e.stopPropagation();
+        if (e.cancelable) {
+            e.preventDefault();
+        }
         if ('button' in e && e.button === 1) {
             return;
         }
@@ -600,19 +630,37 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         const dx = nextPos.x - localPosRef.current.x;
         const dy = nextPos.y - localPosRef.current.y;
         localPosRef.current = nextPos;
-        onLivePositionChange?.(node.id, nextPos);
+        onLivePositionChangeRef.current?.(node.id, nextPos);
+
+        if (containerRef.current) {
+            const { cardWidth: liveCardWidth, cardHeight: liveCardHeight, originX: liveOriginX, originY: liveOriginY, zoomScale: liveZoomScale } = dragRenderMetricsRef.current;
+            const nextLeft = snapCanvasCoordinate(nextPos.x - liveCardWidth / 2, liveZoomScale) - liveOriginX;
+            const nextTop = snapCanvasCoordinate(nextPos.y - liveCardHeight, liveZoomScale) - liveOriginY;
+            containerRef.current.style.left = `${nextLeft}px`;
+            containerRef.current.style.top = `${nextTop}px`;
+        }
 
         // 只更新 React 状态，连接线会跟随
-        if (onDragDelta && (dx !== 0 || dy !== 0)) {
-            onDragDelta({ x: dx, y: dy }, node.id);
+        const dragDeltaHandler = onDragDeltaRef.current;
+        const draggedNodeId = dragRenderMetricsRef.current.nodeId;
+        if (dragDeltaHandler && (dx !== 0 || dy !== 0)) {
+            dragDeltaHandler({ x: dx, y: dy }, draggedNodeId);
         }
     };
 
     const handleMouseUp = () => {
         if (isDragging) {
             setIsDragging(false);
-            onDragStateChange?.(false);
-            onLivePositionChange?.(node.id, null);
+            onDragStateChangeRef.current?.(false);
+            if (containerRef.current) {
+                const finalPos = localPosRef.current;
+                const { cardWidth: liveCardWidth, cardHeight: liveCardHeight, originX: liveOriginX, originY: liveOriginY, zoomScale: liveZoomScale } = dragRenderMetricsRef.current;
+                const finalLeft = snapCanvasCoordinate(finalPos.x - liveCardWidth / 2, liveZoomScale) - liveOriginX;
+                const finalTop = snapCanvasCoordinate(finalPos.y - liveCardHeight, liveZoomScale) - liveOriginY;
+                containerRef.current.style.left = `${finalLeft}px`;
+                containerRef.current.style.top = `${finalTop}px`;
+            }
+            onLivePositionChangeRef.current?.(dragRenderMetricsRef.current.nodeId, null);
         }
     };
 
@@ -631,7 +679,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
         };
-    }, [isDragging, zoomScale, onDragDelta, onLivePositionChange, onPositionChange, node.id]);
+    }, [isDragging]);
 
     const effectiveChildImageCount = Math.max(0, actualChildImageCount);
     const renderedSuccessCount = effectiveChildImageCount > 0
@@ -649,8 +697,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     ).trim();
     const shellReferenceImages = node.referenceImages?.slice(0, isThumbnailShell ? 1 : 2) || [];
     const stackZIndex = stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex);
-    const renderLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1);
-    const renderTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1);
+    const renderPos = isDragging ? localPosRef.current : node.position;
+    const renderLeft = snapCanvasCoordinate(renderPos.x - cardWidth / 2, zoomScale || 1);
+    const renderTop = snapCanvasCoordinate(renderPos.y - cardHeight, zoomScale || 1);
     const textSoftening = getCanvasTextSofteningProfile(
         zoomScale || 1,
         detailLevel === 'compact' || isCanvasTransforming
@@ -667,22 +716,15 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         transition: textTransition,
     };
     const shellCardShadow = showError
-        ? '0 0 18px rgba(239, 68, 68, 0.18), 0 0 0 1px rgba(239, 68, 68, 0.3)'
+        ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
         : isSelected
-            ? '0 0 18px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.28)'
-            : shadowBoost
-                ? '0 20px 42px rgba(2, 6, 23, 0.30), 0 10px 26px rgba(2, 6, 23, 0.18)'
-                : '0 4px 16px rgba(0,0,0,0.14)';
+            ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
+            : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
     const mainCardShadow = showError
-        ? '0 0 15px rgba(239, 68, 68, 0.15), 0 0 0 1px rgba(239, 68, 68, 0.5)'
+        ? getCanvasCardShadow({ accent: 'red', boost: shadowBoost, zoomScale })
         : isSelected
-            ? '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.5)'
-            : shadowBoost
-                ? '0 24px 54px rgba(2, 6, 23, 0.34), 0 12px 30px rgba(2, 6, 23, 0.22), 0 0 0 1px rgba(255,255,255,0.05)'
-                : '0 4px 20px -2px rgba(0,0,0,0.15), 0 0 0 1px var(--border-light)';
-    const originX = renderOrigin?.x ?? 0;
-    const originY = renderOrigin?.y ?? 0;
-
+            ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
+            : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
@@ -693,7 +735,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
-                className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
+                className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
                 style={isChatMode ? {
                     zIndex: stackZIndex,
                     opacity: 1,
@@ -842,7 +884,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     return (
         <div
             ref={containerRef}
-            className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
+            className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
                 style={isChatMode ? {
                     zIndex: stackZIndex,
                     opacity: 1,
@@ -1517,7 +1559,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                             {/* 副占位卡 */}
                                             <div
-                                                className="absolute rounded-xl overflow-hidden shadow-lg"
+                                                className="absolute rounded-xl overflow-hidden"
                                                 style={{
                                                     width: w,
                                                     height: h,
@@ -1527,6 +1569,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                     zIndex: stackZIndex + 100, // 🚀 [Fix] 使用更高的 z-index 确保置顶
                                                     background: 'var(--bg-surface)',
                                                     border: '1px solid var(--border-light)',
+                                                    boxShadow: getCanvasCardShadow({ boost: shadowBoost, zoomScale }),
                                                     cursor: isDragging ? 'grabbing' : 'grab' // 🚀 Allow grab cursor to bubble
                                                 }}
                                             >

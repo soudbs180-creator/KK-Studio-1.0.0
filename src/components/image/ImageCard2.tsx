@@ -17,6 +17,7 @@ import { getModelThemeBgColor } from '../../services/model/modelCapabilities';
 import { getCanvasTextSofteningProfile, type CanvasCardDetailLevel } from '../../canvas/performanceProfile';
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
+import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { getResolvedCreditCost, isCreditBillingTarget } from '../../utils/creditBilling';
 
 const truncateByChars = (text: string, maxChars: number): string => {
@@ -70,6 +71,7 @@ interface ImageNodeProps {
     onConnectEnd?: (imageId: string) => void;
     onClick?: (imageId: string) => void;
     onDimensionsUpdate?: (id: string, dimensions: string) => void;
+    onHeightChange?: (id: string, height: number) => void;
     isActive?: boolean;
     canvasTransform?: { x: number; y: number; scale: number }; // Deprecated in favor of zoomScale
     zoomScale?: number;
@@ -107,6 +109,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     onConnectEnd,
     onClick,
     onDimensionsUpdate,
+    onHeightChange,
     isActive = false,
     zoomScale = 1,
     isMobile = false,
@@ -140,6 +143,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             ? 'thumbnail-preferred'
             : detailQualityBias;
     const containerRef = useRef<HTMLDivElement>(null);
+    const cardSurfaceRef = useRef<HTMLDivElement>(null);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const dragCleanupRef = useRef<(() => void) | null>(null); // 🚀 [Fix] Drag Cleanup Ref
     const dragRafRef = useRef<number | null>(null);
@@ -298,7 +302,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return { w: finalWidth, h: finalHeight };
     };
     const { w: nodeWidth, h: nodeHeight } = getDims();
+    const [cardHeight, setCardHeight] = useState(nodeHeight);
     const [footerDensity, setFooterDensity] = useState<FooterDensity>(nodeWidth < 260 ? 'compact' : 'normal');
+    const originX = renderOrigin?.x ?? 0;
+    const originY = renderOrigin?.y ?? 0;
+
+    useEffect(() => {
+        setCardHeight((prev) => (Math.abs(prev - nodeHeight) > 2 ? nodeHeight : prev));
+    }, [image.id, nodeHeight]);
 
     // Local display position to avoid global re-renders during drag
     // Ref to track latest localPos without triggering effect re-runs
@@ -310,17 +321,43 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             localPosRef.current = position;
             // Force update DOM if needed
             if (containerRef.current) {
-                const originX = renderOrigin?.x ?? 0;
-                const originY = renderOrigin?.y ?? 0;
-                containerRef.current.style.left = `${Math.round(position.x - nodeWidth / 2 - originX)}px`;
-                containerRef.current.style.top = `${Math.round(position.y - nodeHeight - originY)}px`;
+                const targetLeft = snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX;
+                const targetTop = snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY;
+                containerRef.current.style.left = `${targetLeft}px`;
+                containerRef.current.style.top = `${targetTop}px`;
             }
         }
-    }, [position.x, position.y, isDragging, nodeWidth, nodeHeight, renderOrigin]);
+    }, [position.x, position.y, isDragging, nodeWidth, cardHeight, originX, originY, zoomScale]);
 
     useEffect(() => () => {
         onLivePositionChange?.(image.id, null);
     }, [image.id, onLivePositionChange]);
+
+    useLayoutEffect(() => {
+        const updateHeight = () => {
+            const surface = cardSurfaceRef.current;
+            if (!surface) return;
+
+            const measuredHeight = surface.offsetHeight;
+            if (!(measuredHeight > 0)) return;
+
+            setCardHeight((prev) => (Math.abs(prev - measuredHeight) > 1 ? measuredHeight : prev));
+            onHeightChange?.(image.id, measuredHeight);
+        };
+
+        updateHeight();
+
+        if (typeof ResizeObserver === 'undefined') {
+            return;
+        }
+
+        const observer = new ResizeObserver(() => updateHeight());
+        if (cardSurfaceRef.current) {
+            observer.observe(cardSurfaceRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [detailLevel, footerDensity, image.id, onHeightChange]);
 
     const [showLightbox, setShowLightbox] = useState(false);
     const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -963,6 +1000,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         // 阻止事件冒泡到 Canvas，通过 global listeners 处理拖拽
         e.stopPropagation();
+        if (e.cancelable) {
+            e.preventDefault();
+        }
         onBringToFront?.();
 
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -1026,10 +1066,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
             // 2. Direct DOM Update - 🚀 直接更新left/top，不使用transform
             if (containerRef.current) {
-                const originX = renderOrigin?.x ?? 0;
-                const originY = renderOrigin?.y ?? 0;
-                containerRef.current.style.left = `${Math.round(newPos.x - nodeWidth / 2 - originX)}px`;
-                containerRef.current.style.top = `${Math.round(newPos.y - nodeHeight - originY)}px`;
+                const nextLeft = snapCanvasCoordinate(newPos.x - nodeWidth / 2, zoomScale || 1) - originX;
+                const nextTop = snapCanvasCoordinate(newPos.y - cardHeight, zoomScale || 1) - originY;
+                containerRef.current.style.left = `${nextLeft}px`;
+                containerRef.current.style.top = `${nextTop}px`;
             }
 
             localPosRef.current = newPos;
@@ -1061,10 +1101,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 但确保最终位置正确
             if (containerRef.current) {
                 const finalPos = localPosRef.current;
-                const originX = renderOrigin?.x ?? 0;
-                const originY = renderOrigin?.y ?? 0;
-                containerRef.current.style.left = `${Math.round(finalPos.x - nodeWidth / 2 - originX)}px`;
-                containerRef.current.style.top = `${Math.round(finalPos.y - nodeHeight - originY)}px`;
+                const finalLeft = snapCanvasCoordinate(finalPos.x - nodeWidth / 2, zoomScale || 1) - originX;
+                const finalTop = snapCanvasCoordinate(finalPos.y - cardHeight, zoomScale || 1) - originY;
+                containerRef.current.style.left = `${finalLeft}px`;
+                containerRef.current.style.top = `${finalTop}px`;
             }
             onLivePositionChange?.(image.id, null);
         };
@@ -1089,8 +1129,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         onSelect,
         isSelected,
         nodeWidth,
-        nodeHeight,
-        renderOrigin,
+        cardHeight,
+        originX,
+        originY,
         onLivePositionChange,
     ]);
 
@@ -1127,7 +1168,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const renderPos = isDragging ? localPosRef.current : position;
     const stackZIndex = stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex);
     const renderLeft = snapCanvasCoordinate(renderPos.x - nodeWidth / 2, zoomScale || 1);
-    const renderTop = snapCanvasCoordinate(renderPos.y - nodeHeight, zoomScale || 1);
+    const renderTop = snapCanvasCoordinate(renderPos.y - cardHeight, zoomScale || 1);
     const textSoftening = getCanvasTextSofteningProfile(
         zoomScale || 1,
         detailLevel === 'compact' || isCanvasTransforming
@@ -1155,29 +1196,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 : showHighlightedAccent
                     ? 'var(--selected-border)'
                     : 'var(--border-default)';
-    const shellCardShadow = showActiveAccent
-        ? 'var(--glow-gold)'
-        : showSelectedAccent
-            ? 'var(--glow-blue)'
-            : showHighlightedAccent
-                ? 'var(--glow-blue)'
-            : shadowBoost
-                ? '0 22px 46px rgba(2, 6, 23, 0.30), 0 10px 28px rgba(2, 6, 23, 0.18)'
-                : 'var(--shadow-xl)';
-    const mainCardShadow = image.error && !image.isGenerating
-        ? '0 0 12px rgba(239, 68, 68, 0.3), 0 0 4px rgba(239, 68, 68, 0.2)'
+    const imageCardAccent = image.error && !image.isGenerating
+        ? 'red'
         : showActiveAccent
-            ? 'var(--glow-gold)'
-            : showSelectedAccent
-                ? 'var(--glow-blue)'
-                : showHighlightedAccent
-                    ? 'var(--glow-blue)'
-                : shadowBoost
-                    ? '0 24px 54px rgba(2, 6, 23, 0.34), 0 12px 30px rgba(2, 6, 23, 0.22)'
-                    : 'var(--shadow-xl)';
-    const originX = renderOrigin?.x ?? 0;
-    const originY = renderOrigin?.y ?? 0;
-
+            ? 'gold'
+            : (showSelectedAccent || showHighlightedAccent ? 'blue' : undefined);
+    const shellCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
+    const mainCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
         const shellTitle = image.alias || image.fileName || image.prompt || 'Image';
@@ -1195,7 +1220,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
-                className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     zIndex: stackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
@@ -1216,6 +1241,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 onTouchStart={handleMouseDown}
             >
                 <div
+                    ref={cardSurfaceRef}
                     data-canvas-surface="image"
                     className="relative w-full overflow-hidden rounded-[20px] border flex flex-col"
                     style={{
@@ -1305,7 +1331,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         <>
             <div
                 ref={containerRef}
-                className={`${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
+                className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     zIndex: stackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
@@ -1331,6 +1357,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             >
                 {/* 🚀 统一容器 - 图片和信息模块在同一卡片内 */}
                 <div
+                    ref={cardSurfaceRef}
                     data-canvas-surface="image"
                     className={`
                         relative w-full overflow-hidden flex flex-col

@@ -499,14 +499,14 @@ export const BLACKLIST_MODELS = [
 ];
 
 /**
- * 瀹告彃绾悽銊ф畱濡€崇€佛珨勬銆?閻劋绨潻浣盒?
+ * Deprecated model IDs kept for backward-compatibility checks.
  */
 export const DEPRECATED_MODELS = Object.keys(MODEL_MIGRATION_MAP);
 
 /**
- * 闀婎亜濮╅暀鈩冾劀濡€崇€?ID
- * @param modelId - 閾＄喎顫愬Ο鈥崇€?ID
- * @returns 闀欌剝顒滈挅搴ｆ畱濡€崇€?ID閿涘煔顩ч弸婊堟付鐟曚焦鐗庡锝忕骇閹存牕甯堟慨?ID
+ * Normalize a legacy model ID to the current canonical ID.
+ * @param modelId - Raw model ID from persisted state or user input
+ * @returns Canonical model ID when a migration mapping exists; otherwise the original ID
  */
 export function normalizeModelId(modelId: string): string {
     const raw = (modelId || '').trim();
@@ -625,7 +625,7 @@ export function isDeprecatedModel(modelId: string): boolean {
  * Determine whether a model should be filtered from the available model list.
  */
 function shouldFilterModel(modelId: string): boolean {
-    // 棣冩畬 [Strict Mode] Whitelist Override
+    // Strict mode: explicit whitelist entries always win over block rules.
     // If model is explicitly in our whitelist, DO NOT FILTER IT, even if it matches a ban pattern below.
     if (GOOGLE_IMAGE_WHITELIST.includes(modelId)) return false;
 
@@ -748,7 +748,7 @@ export const DEFAULT_GOOGLE_MODELS = [
     // Strict Image Models
     ...GOOGLE_IMAGE_WHITELIST,
 
-    // Veo 鐟欏棝顣堕悽鐔稿灇
+    // Veo 视频生成
     'veo-3.1-generate-preview',
     'veo-3.1-fast-generate-preview'
 ];
@@ -929,6 +929,7 @@ export class KeyManager {
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
     private providerStorageScope: ProviderStorageScope = 'none';
+    private pendingProviderCloudSync = false;
 
     // Cached global model list snapshot
     private globalModelListCache: {
@@ -957,7 +958,7 @@ export class KeyManager {
             this.syncLegacySlotsWithProvider(provider);
         });
 
-        // 棣冩畬 Subscribe to admin model changes
+        // Keep downstream UI in sync when admin model routes change.
         adminModelService.subscribe(() => {
             console.log('[KeyManager] Admin models updated, notifying listeners');
             this.notifyListeners();
@@ -1284,16 +1285,29 @@ export class KeyManager {
         }
     ) {
         const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
+        const hasProviderEnvelope = isUserApisEnvelope(rawPayload) && 'providers' in rawPayload;
         const shouldPreserveLocalProviders =
             options?.preserveLocalProvidersOnEmpty === true
             && this.providerStorageScope === 'user'
             && cloudProviders.length === 0
             && this.providers.length > 0;
+        const shouldPreserveUnsyncedProviders =
+            hasProviderEnvelope
+            && !!this.userId
+            && cloudProviders.length === 0
+            && this.providers.length > 0
+            && (
+                this.pendingProviderCloudSync
+                || this.providerStorageScope === 'user'
+                || this.providerStorageScope === 'none'
+            );
 
-        if (isUserApisEnvelope(rawPayload) && 'providers' in rawPayload && !shouldPreserveLocalProviders) {
+        if (hasProviderEnvelope && !shouldPreserveLocalProviders && !shouldPreserveUnsyncedProviders) {
             this.providers = cloudProviders;
             this.providerStorageScope = 'cloud';
             this.persistProvidersLocal();
+        } else if (shouldPreserveUnsyncedProviders) {
+            console.warn('[KeyManager] Preserving unsynced providers because cloud payload returned an empty provider list.');
         }
 
         let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
@@ -1458,6 +1472,9 @@ export class KeyManager {
             console.error('[KeyManager] Error loading from cloud:', e);
         } finally {
             this.isSyncing = false;
+            if (this.userId === activeUserId && this.pendingProviderCloudSync) {
+                this.flushPendingProviderCloudSync();
+            }
         }
     }
 
@@ -1530,6 +1547,7 @@ export class KeyManager {
                     providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
                 }, this.userId || undefined);
 
+                this.pendingProviderCloudSync = false;
                 this.hasHydratedCloudState = true;
                 this.applyCloudPayload(savedPayload);
                 console.log('[KeyManager] Supabase cloud sync succeeded!');
@@ -1580,6 +1598,7 @@ export class KeyManager {
                 throw new Error(errorMessage);
             }
 
+            this.pendingProviderCloudSync = false;
             this.hasHydratedCloudState = true;
             this.applyCloudPayload(response.data);
             console.log('[KeyManager] API cloud sync succeeded!');
@@ -1630,7 +1649,7 @@ export class KeyManager {
      * Notify all listeners of state change
      */
     private notifyListeners(): void {
-        // 棣冩畬 濞撳懘娅庡Ο鈥崇€佛珨勬銆冪紓鎻跨摠閿涘澃lots 閸欐垹鏁氶崣妗﹀闀炶绾?
+        // Invalidate the merged model-list cache before notifying subscribers.
         this.globalModelListCache = null;
         this.listeners.forEach(fn => fn());
     }
@@ -1644,7 +1663,7 @@ export class KeyManager {
     }
 
     /**
-     * 棣冩畬 濞撳懘娅庨崗銊ョ湰濡€崇€佛珨勬銆冪紓鎻跨摠閿涘煔皤焺 adminModelService 閺佺増宓佹棆瀛樻煀闀炴儼黏線閻㈩煉绾?
+     * Clear the global model-list cache so admin model updates are reflected immediately.
      */
     clearGlobalModelListCache(): void {
         this.globalModelListCache = null;
@@ -1652,7 +1671,7 @@ export class KeyManager {
     }
 
     /**
-     * 棣冩畬 瀵搫鍩楅槂姘辩叀闀撯偓閾惧顓归槖鍛扳偓鍜冪焊瑜?adminModelService 閺佺増宓佹棆瀛樻煀闀炴儼黏線閻㈩煉绾?
+     * Force a listener notification after external state changes such as admin model refreshes.
      */
     forceNotify(): void {
         console.log('[KeyManager] Force notifying all listeners');
@@ -1710,7 +1729,7 @@ export class KeyManager {
                 }
                 // headers['Content-Type'] = 'application/json'; // Not strictly triggered for GET
             } else {
-                // OpenAI Compatible Logic - 棣冩畬 [Fix] Use /v1/models for proxy compatibility
+                // OpenAI-compatible proxies should always be probed through /v1/models.
                 const cleanBaseUrl = cleanUrl.replace(/\/v1$/, '').replace(/\/v1\/models$/, '').replace(/\/models$/, '');
                 targetUrl = `${cleanBaseUrl}/v1/models`;
                 const headerValue = resolvedHeader.toLowerCase() === 'authorization'
@@ -2161,7 +2180,7 @@ export class KeyManager {
         };
 
         const matchesRequestedRoute = (slot: KeySlot) => {
-            // 鏃犲悗缂€ = 瀹樻柟鐩磋繛锛屽彧鍏佽 Google
+            // No suffix means the official direct route, which only applies to Google slots.
             if (!suffix) {
                 return slot.provider === 'Google';
             }
@@ -2243,11 +2262,11 @@ export class KeyManager {
                     return matchesSlotRouteSuffix(s, normalizedSuffix);
                 });
 
-                // Step 2: 鐎电懓鎮曠粔鏉垮爱闁板矕娈戠偧穑棆鈧绻樼悰灞灸侀崹瀣环濠?
+                // Step 2: filter the name-matched candidates by model capability.
                 let modelFilteredCandidates = nameMatchedCandidates.filter(s => modelSupportedBySlot(s));
 
-                // Step 3: 婵″倹鐏夐挅宀栃為崠褰掑巻闀撴儳鍩屾禍鍡涱暥闃嗘墤绲惧Ο鈥崇€锋潻鍥ㄦ姢閽栧簼璐熺粚鐚寸捍
-                // 娣団€叉崲閽栧矕袨閸栧綊鍘?閽?鐠囥儵顣堕槅鎻垮建閼宠棄濮╅晲浣规暜闀屼焦娲挎径穑睗膩閸ㄥ绲鹃摼顒€婀答珨勬銆冮摼顏勬倱濮?
+                // Step 3: if model filtering removes every explicit route-name match, fall back to the name matches so manual routing still wins.
+                // This keeps explicit slot routing stable even when a slot's advertised model list is incomplete or temporarily stale.
                 if (nameMatchedCandidates.length > 0 && modelFilteredCandidates.length === 0) {
                     console.log(`[KeyManager] Name-matched candidates for suffix '${normalizedSuffix}' but model filter rejected '${normalizedModelId}', fallback to name matches.`);
                     candidates = nameMatchedCandidates;
@@ -2509,7 +2528,7 @@ export class KeyManager {
                 slot.status = 'invalid';
                 slot.cooldownUntil = undefined;
             } else {
-                // 閻㈢喐鍨氭径杈Е/缂冩垹绮堕繑鏍уЗ/娑撳﹥鐖跺鍌氱埗娑撳秴绨插闀愮畽闀欏洨瀛╂稉?invalid閿涘苯娲栶珨?unknown 閸忎浇顔忛挅搴ｇ敾闀婎亜濮╅晣銏狀槻
+                // Transient network or provider failures should back off and fall back to unknown, not hard-invalid.
                 slot.status = 'unknown';
                 const transientBackoff = Math.min(15000, 2000 * Math.max(1, slot.failCount));
                 slot.cooldownUntil = Date.now() + transientBackoff;
@@ -2903,7 +2922,7 @@ export class KeyManager {
     }
     /**
      * Refresh a single key
-     * 棣冩畬 Now also synchronizes model list!
+     * Also re-sync the derived model list after refreshing.
      */
     async refreshKey(id: string): Promise<void> {
         const slot = this.state.slots.find(s => s.id === id);
@@ -3120,7 +3139,7 @@ export class KeyManager {
 
         // 1. Add models from all active keys (Proxies/Custom) - THESE GO FIRST
         this.state.slots.forEach(slot => {
-            // 棣冩畬 [Strict Mode] Skip disabled, invalid OR empty key slots
+            // Strict mode: ignore disabled, invalid, or empty key slots.
             if (slot.disabled || slot.status === 'invalid' || !slot.key) return;
 
             if (slot.supportedModels && slot.supportedModels.length > 0) {
@@ -3133,7 +3152,7 @@ export class KeyManager {
 
                     let distinctId = id;
                     const suffix = slot.name || slot.proxyConfig?.serverName || slot.provider || 'Custom';
-                    // 婵″倹鐏夋稉宥嗘Ц鐎规ɑ鏌熼摗鐔烘暁濞撶娀浜鹃敍灞藉繁皤攧璺虹敨閽栧海绱戦梾鏃楊瀲
+                    // Non-Google providers get a route-qualified model ID so parallel upstreams stay distinct.
                     if (slot.provider !== 'Google') {
                         distinctId = buildUserSlotRouteId(id, slot.id || suffix);
                     }
@@ -3224,9 +3243,8 @@ export class KeyManager {
             });
         }
 
-        // 3. Add System Internal Models (Built-in 12AI Proxy) - 棣冩畬 [娣囶喗鏁糫 娴?adminModelService 閿风姾娴囩粻锛勬倞閿绘﹢鍘嗙純顔炬畱濡€崇€?
-        // adminModels 瀹告彃婀稉濠囨簝婢圭増妲戦悽銊ょ艾缂傛徔鐡ㄩ槍顔款吀缁犳绾答煎瓨甯存担璺ㄦ暏
-        // 棣冩畬 [Fix] 鐠虹喕閲滈挅灞肩 model_id 閸戣櫣骞囬晞鍕偧閺佸府绾存稉杞扮瑝閽栧矂鍘嗙純顔炬暁閹存劕鏁稉鈧晞鍕兇缂佺儺D
+        // 3. Add system internal models (built-in 12AI proxy).
+        // Group admin models by base model ID so multiple provider routes share one logical entry.
         const adminModelsByBaseId = new Map<string, typeof adminModels>();
         adminModels.forEach(adminModel => {
             const baseId = String(adminModel.id || '').trim();
@@ -3503,8 +3521,8 @@ export class KeyManager {
     }
 
     /**
-     * 棣冩畬 [閺傛澘濮涢懗绲?濡偓闀嗐儲妲搁挅锕€鐡ㄩ崷銊ф暏閹寸柉鍤滅€规阿绠熼晞鍕箒閺佸牏娈?API Key 閺€顖涘瘮鐠囥儲膩閸?
-     * 娑撳秴瀵橉ò绢剛閮寸紒鐔峰敶缂冾喚娈戦敺銊︹偓?PROXY 鐎靛棝鎸?
+     * Determine whether a model can be served by any active custom API key or provider route.
+     * Built-in system routes such as @system or @12ai are excluded from this check.
      */
     hasCustomKeyForModel(modelIdFull: string): boolean {
         const parts = (modelIdFull || '').split('@');
@@ -3585,7 +3603,7 @@ export class KeyManager {
     }
 
     /**
-     * 閵嘲褰囬崡鏇氶嚋閾惧秴濮熼崯?
+     * Returns a provider by ID.
      */
     getProvider(id: string): ThirdPartyProvider | undefined {
         this.loadProviders();
@@ -3607,7 +3625,7 @@ export class KeyManager {
     }
 
     /**
-     * 濞ｈ濮為弬鎵畱缁楊兛绗侀弬瑙勬箛閿封€虫櫌
+     * 添加新的第三方供应商配置。
      */
     addProvider(config: Omit<ThirdPartyProvider, 'id' | 'usage' | 'status' | 'createdAt' | 'updatedAt'>): ThirdPartyProvider {
         this.loadProviders();
@@ -3845,7 +3863,7 @@ export class KeyManager {
     }
 
     /**
-     * 鐠佹澘缍嶉摼宥呭閸熷棔濞囬悽銊╁櫤
+     * 记录服务商使用量
      */
     addProviderUsage(providerId: string, tokens: number, cost: number): void {
         const provider = this.applyProviderUsageDelta(providerId, tokens, cost);
@@ -3855,7 +3873,7 @@ export class KeyManager {
     }
 
     /**
-     * 閵嘲褰囬摼宥呭閸熷棛绮虹拋鈥蹭繆闀?
+     * Returns aggregated provider statistics.
      */
     getProviderStats(): {
         total: number;
@@ -3874,7 +3892,7 @@ export class KeyManager {
     }
 
     /**
-     * 浠庨璁惧垱寤烘湇鍔″晢
+     * 从预设创建服务商
      */
     createProviderFromPreset(presetKey: string, apiKey: string, customModels?: string[]): ThirdPartyProvider | null {
         const preset = PROVIDER_PRESETS[presetKey];
@@ -3890,7 +3908,7 @@ export class KeyManager {
             isActive: true
         });
 
-        // 鑷姩鎷夊彇瀹氫环
+        // 自动拉取定价
         this.syncProviderPricing(provider.id);
 
         return provider;
@@ -4069,11 +4087,20 @@ export class KeyManager {
     private saveProviders(): void {
         this.persistProvidersLocal();
 
-        if (this.userId && !this.isSyncing) {
-            void this.saveToCloud(this.state).catch((error) => {
-                console.error('[KeyManager] Failed to sync providers to cloud:', error);
-            });
+        if (this.userId) {
+            this.pendingProviderCloudSync = true;
+            this.flushPendingProviderCloudSync();
         }
+    }
+
+    private flushPendingProviderCloudSync(): void {
+        if (!this.userId || !this.pendingProviderCloudSync || this.isSyncing) {
+            return;
+        }
+
+        void this.saveToCloud(this.state).catch((error) => {
+            console.error('[KeyManager] Failed to sync providers to cloud:', error);
+        });
     }
 
 }
@@ -4183,7 +4210,7 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
     }
 }
 
-// 姒涙か顓籊oogle濡€崇€佛珨勬銆?婢跺洭鈧鏌熷?
+// Shared Google defaults used when no custom model list is available.
 function getDefaultGoogleModels(): string[] {
     return DEFAULT_GOOGLE_MODELS;
 }
@@ -4342,8 +4369,8 @@ function extractModelIdsFromPricingData(pricingData: any[]): string[] {
 }
 
 /**
- * 闀婎亜濮珨勫棛琚Ο鈥崇€?- 婢х偛宸遍悧?
- * 闀屽绱崗鍫㈤獓皤攧鍡欒: 閿叉儳鍎?閳?鐟欏棝顣?閳?闀靛﹤銇?閳?閸忔湹绮?
+ * Categorize model IDs into image, video, chat, or other buckets.
+ * This drives grouped rendering in the channel and provider editors.
  */
 export function categorizeModels(models: string[]): {
     imageModels: string[];
@@ -4361,7 +4388,7 @@ export function categorizeModels(models: string[]): {
     models.forEach(model => {
         const lowerModel = model.toLowerCase();
 
-        // 娴兼ˇ鍘涚痪?: 鐟欏棝顣跺Ο鈥崇€?
+        // Heuristic: video-oriented model families
         if (lowerModel.includes('veo') ||
             lowerModel.includes('runway') ||
             lowerModel.includes('luma') ||
@@ -4372,7 +4399,7 @@ export function categorizeModels(models: string[]): {
             lowerModel.includes('video')) {
             categories.videoModels.push(model);
         }
-        // 娴兼ˇ鍘涚痪?: 閿叉儳鍎氬Ο鈥崇€?
+        // Heuristic: image-oriented model families
         else if (lowerModel.includes('imagen') ||
             lowerModel.includes('dall-e') ||
             lowerModel.includes('midjourney') ||
@@ -4404,7 +4431,7 @@ export function categorizeModels(models: string[]): {
 }
 
 /**
- * 闀婎亜濮╁Λ鈧ù瀚旇嫙闁板矕鐤咥PI闀勫嫭澧嶉摼澶嬆侀崹?
+ * Auto-detect available models from the configured API endpoint and infer its protocol family.
  */
 export async function autoDetectAndConfigureModels(
     apiKey: string,
@@ -4454,11 +4481,11 @@ export async function autoDetectAndConfigureModels(
     } else if (models.length === 0 && apiType === 'proxy' && baseUrl) {
         models = await fetchOpenAICompatModels(apiKey, baseUrl);
     } else if (models.length === 0 && apiType === 'openai') {
-        // OpenAI鐎规ɑ鏌熼敍灞煎▏閻劌鍑￠惌銉δ侀崹瀚斿灙鐞?
+        // OpenAI falls back to a small built-in model list when discovery returns nothing.
         models = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
     }
 
-    // 鎼存棗鏁ゅΟ鈥崇€烽暀鈩冾劀
+    // Normalize the discovered models before categorizing them.
     const normalizedModels = normalizeModelList(models, resolvedFormat === 'gemini' ? 'Google' : 'Proxy');
 
     const categories = categorizeModels(normalizedModels);
@@ -4472,8 +4499,5 @@ export async function autoDetectAndConfigureModels(
 }
 
 // Re-export ProxyModelConfig for convenience
-
-
-
 
 
