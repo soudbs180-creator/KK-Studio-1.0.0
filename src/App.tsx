@@ -5668,7 +5668,6 @@ ${slideLayerXml.join('\n')}
 
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
-  const liveNodePositionFrameRef = useRef<number | null>(null);
   const syncLiveNodePositionState = useCallback(() => {
     const next = liveNodePositionByIdRef.current;
     setLiveNodePositionById((prev) => {
@@ -5682,31 +5681,6 @@ ${slideLayerXml.join('\n')}
 
       return { ...next };
     });
-  }, []);
-  const scheduleLiveNodePositionStateSync = useCallback(() => {
-    if (liveNodePositionFrameRef.current !== null) {
-      return;
-    }
-
-    liveNodePositionFrameRef.current = requestAnimationFrame(() => {
-      liveNodePositionFrameRef.current = null;
-      syncLiveNodePositionState();
-    });
-  }, [syncLiveNodePositionState]);
-  const flushLiveNodePositionStateSync = useCallback(() => {
-    if (liveNodePositionFrameRef.current !== null) {
-      cancelAnimationFrame(liveNodePositionFrameRef.current);
-      liveNodePositionFrameRef.current = null;
-    }
-    syncLiveNodePositionState();
-  }, [syncLiveNodePositionState]);
-
-  useEffect(() => {
-    return () => {
-      if (liveNodePositionFrameRef.current !== null) {
-        cancelAnimationFrame(liveNodePositionFrameRef.current);
-      }
-    };
   }, []);
 
   const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
@@ -5786,9 +5760,9 @@ ${slideLayerXml.join('\n')}
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
-      scheduleLiveNodePositionStateSync();
+      syncLiveNodePositionState();
     }
-  }, [resolveCanvasNodePositionForLiveDrag, scheduleLiveNodePositionStateSync]);
+  }, [resolveCanvasNodePositionForLiveDrag, syncLiveNodePositionState]);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
     const groupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId)
@@ -5837,14 +5811,12 @@ ${slideLayerXml.join('\n')}
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
 
       if (!position) {
-        flushLiveNodePositionStateSync();
         // Flush the last queued drag delta so the persisted canvas position lands
         // exactly where the live drag visual finished before we clear the live state.
         moveSelectedNodesImmediate({ x: 0, y: 0 });
-      } else {
-        scheduleLiveNodePositionStateSync();
       }
     }
 
@@ -5881,7 +5853,7 @@ ${slideLayerXml.join('\n')}
       delete next[groupId];
       return next;
     });
-  }, [activeCanvas, flushLiveNodePositionStateSync, moveSelectedNodesImmediate, promptGroupBoundsById, scheduleLiveNodePositionStateSync]);
+  }, [activeCanvas, moveSelectedNodesImmediate, promptGroupBoundsById, syncLiveNodePositionState]);
 
   const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
     if (!(height > 0)) return;
@@ -7010,12 +6982,13 @@ ${slideLayerXml.join('\n')}
       const startY = promptConnectorPosition.y + 5000;
       const endX = childConnectorPosition.x + 5000;
       const endY = (childConnectorPosition.y - resolvedImageHeight) + 5000;
+      const directionX = endX === startX ? 0 : Math.sign(endX - startX);
+      const endApproachX = Math.min(Math.max(Math.abs(endX - startX) * 0.14, 18), 54) * directionX;
+      const curveEndX = endX - endApproachX;
       const curveEndY = Math.min(endY - connectorCenterStub, endY);
-      const distanceY = Math.abs(curveEndY - startY);
-      const handleLength = Math.min(distanceY * 0.4, 150);
-      const controlY1 = startY + handleLength;
-      const controlY2 = curveEndY - handleLength;
-      const path = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${curveEndY}`;
+      const path = buildSoftConnectorPath(startX, startY, curveEndX, curveEndY);
+      const stubControlY = curveEndY + ((endY - curveEndY) * 0.55);
+      const stubPath = `M${curveEndX},${curveEndY} Q${endX},${stubControlY} ${endX},${endY}`;
 
       return {
         key: `${node.id}-${childNode.id}`,
@@ -7025,6 +6998,7 @@ ${slideLayerXml.join('\n')}
         endY,
         curveEndY,
         path,
+        stubPath,
       };
     });
 
@@ -7079,7 +7053,7 @@ ${slideLayerXml.join('\n')}
             {groupConnectorSegments.map((segment) => (
               <g key={`${segment.key}-stub`}>
                 <path
-                  d={`M${segment.endX},${segment.curveEndY} L${segment.endX},${segment.endY}`}
+                  d={segment.stubPath}
                   fill="none"
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
@@ -7528,13 +7502,25 @@ ${slideLayerXml.join('\n')}
   const connectorDashA = Math.max(2, Math.min(10, 4 / zoomForConnectors));
   const connectorDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
   const connectorStrokeDasharray = `${connectorDashA} ${connectorDashB}`;
-  const connectorStrokeLinecap: 'butt' | 'round' = 'butt';
+  const connectorStrokeLinecap: 'butt' | 'round' = 'round';
   const activeDragStroke = Math.max(2, Math.min(6, 3 / zoomForConnectors));
   const activeDragDashA = Math.max(3, Math.min(12, 6 / zoomForConnectors));
   const activeDragDashB = Math.max(2, Math.min(10, 4 / zoomForConnectors));
   const connectorHitStroke = Math.max(16, Math.min(40, 20 / zoomForConnectors));
   const connectorDotStart = Math.max(2, Math.min(4.5, 3 / zoomForConnectors));
   const connectorDotEnd = Math.max(1.5, Math.min(3.5, 2 / zoomForConnectors));
+  const buildSoftConnectorPath = useCallback((startX: number, startY: number, endX: number, endY: number) => {
+    const deltaX = endX - startX;
+    const distanceX = Math.abs(deltaX);
+    const distanceY = Math.abs(endY - startY);
+    const directionX = deltaX === 0 ? 0 : Math.sign(deltaX);
+    const startPullX = Math.min(Math.max(distanceX * 0.08, 10), 56) * directionX;
+    const endPullX = Math.min(Math.max(distanceX * 0.18, 18), 110) * directionX;
+    const startPullY = Math.min(Math.max(distanceY * 0.38, 28), 150);
+    const endPullY = Math.min(Math.max(distanceY * 0.16, 18), 72);
+
+    return `M${startX},${startY} C${startX + startPullX},${startY + startPullY} ${endX - endPullX},${endY - endPullY} ${endX},${endY}`;
+  }, []);
   const derivedMobileUserName = (() => {
     const candidate =
       user?.user_metadata?.full_name ||
@@ -8205,14 +8191,7 @@ ${slideLayerXml.join('\n')}
               }
               const endX = childNode.position.x + 5000;
               const endY = (childNode.position.y - imageHeight) + 5005;
-
-              // Bezier Logic (Waterfall) - Straightens when close
-              const distY = Math.abs(endY - startY);
-              // handleLen proportional to distance, no minimum - straightens when close
-              const handleLen = Math.min(distY * 0.4, 150);
-              const controlY1 = startY + handleLen;
-              const controlY2 = endY - handleLen;
-              const d = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+              const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
               return (
                 <g key={`${pn.id}-${childNode.id}`}>
@@ -8255,12 +8234,7 @@ ${slideLayerXml.join('\n')}
             const endX = promptPosition.x + 5000;
             const endY = (promptPosition.y - height) + 5000;
 
-            // Waterfall Bezier - Straightens when close
-            const distY = Math.abs(endY - startY);
-            const handleLen = Math.min(distY * 0.4, 150);
-            const controlY1 = startY + handleLen;
-            const controlY2 = endY - handleLen;
-            const d = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+            const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
             // Midpoint for Button (t=0.5)
             // B(t) = (1-t)^3 P0 + ...
@@ -8352,11 +8326,7 @@ ${slideLayerXml.join('\n')}
             const endX = pendingPosition.x + 5000;
             const endY = (pendingPosition.y - 140) + 5000;
 
-            const distY = Math.abs(endY - startY);
-            const handleLen = Math.min(distY * 0.4, 150);
-            const controlY1 = startY + handleLen;
-            const controlY2 = endY - handleLen;
-            const d = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+            const d = buildSoftConnectorPath(startX, startY, endX, endY);
 
             // Midpoint (t=0.5)
             const t = 0.5;
@@ -8435,11 +8405,7 @@ ${slideLayerXml.join('\n')}
             const targetHeight = targetNode.height || 176;
             const endX = targetNode.position.x + 5000;
             const endY = (targetNode.position.y - targetHeight) + 5000;
-            const distY = Math.abs(endY - startY);
-            const handleLen = Math.min(distY * 0.4, 150);
-            const controlY1 = startY + handleLen;
-            const controlY2 = endY - handleLen;
-            const d = `M${startX},${startY} C${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+            const d = buildSoftConnectorPath(startX, startY, endX, endY);
             const strokeColor = targetNode.kind === 'preview'
               ? '#38bdf8'
               : targetNode.kind === 'save'
