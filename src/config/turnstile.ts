@@ -1,8 +1,9 @@
 const ENV_TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
 
-// Turnstile must use an explicit site key from the current deployment
-// environment. Falling back to a stale hard-coded key can break auth entirely.
-export const DEFAULT_TURNSTILE_SITE_KEY = "";
+// Cloudflare Turnstile site keys are public by design. We keep the current
+// kkai.plus widget key here so deployments still work if build-time env vars
+// are temporarily missing.
+export const DEFAULT_TURNSTILE_SITE_KEY = "0x4AAAAAACsemsOXCYwfwDll";
 export const TURNSTILE_ENABLED =
   String(import.meta.env.VITE_TURNSTILE_ENABLED ?? "true").trim().toLowerCase() !== "false";
 export const TURNSTILE_ENV_SITE_KEY = ENV_TURNSTILE_SITE_KEY;
