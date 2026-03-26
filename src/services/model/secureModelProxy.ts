@@ -1,8 +1,6 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
 import { waitForAuthSessionChange } from '../auth/authSessionEvents';
-import { clearStoredAdminSession } from '../api/adminSession';
-import { setKkApiAccessToken } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -106,6 +104,10 @@ type CloudSessionResolution = {
   accessToken: string;
 };
 
+type ResolveCloudSessionOptions = {
+  forceRefresh?: boolean;
+};
+
 type SecureProxyBoundaryErrorCode =
   | typeof SECURE_PROXY_SESSION_REAUTH_CODE
   | typeof SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE;
@@ -117,7 +119,6 @@ type SecureProxyBoundaryError = Error & {
   feature?: string;
 };
 
-let forcedReauthPromise: Promise<void> | null = null;
 let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = null;
 
 function getSecureProxyEndpoint(): string {
@@ -165,47 +166,10 @@ export function isSecureProxyGuestModeError(error: unknown): error is SecureProx
   );
 }
 
-async function forceSecureProxyReauth(): Promise<void> {
-  if (forcedReauthPromise) {
-    return forcedReauthPromise;
-  }
-
-  forcedReauthPromise = (async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn('[secureModelProxy] signOut failed during forced reauth:', error);
-    }
-
-    try {
-      setKkApiAccessToken(undefined);
-    } catch (error) {
-      console.warn('[secureModelProxy] Failed to clear compatibility access token:', error);
-    }
-
-    try {
-      clearStoredAdminSession();
-    } catch (error) {
-      console.warn('[secureModelProxy] Failed to clear stored admin session:', error);
-    }
-
-    try {
-      tempUserService.clearCachedTempUser();
-    } catch (error) {
-      console.warn('[secureModelProxy] Failed to clear cached temp user:', error);
-    }
-  })().finally(() => {
-    forcedReauthPromise = null;
-  });
-
-  return forcedReauthPromise;
-}
-
-async function buildSessionReauthError(
+function buildSessionReauthError(
   feature: string,
   responseBody = ''
-): Promise<SecureProxyBoundaryError> {
-  await forceSecureProxyReauth();
+): SecureProxyBoundaryError {
   return buildSecureProxyBoundaryError(SECURE_PROXY_SESSION_REAUTH_MESSAGE, {
     code: SECURE_PROXY_SESSION_REAUTH_CODE,
     status: 401,
@@ -230,89 +194,107 @@ function buildCloudSessionError(feature: string): SecureProxyBoundaryError {
   });
 }
 
-async function resolveCloudSession(feature: string): Promise<CloudSessionResolution> {
-  const getStableSession = async (): Promise<CloudSessionResolution | null> => {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
+async function readCloudSession(feature: string) {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
 
-    if (error) {
-      throw new Error(error.message || `Unable to verify login state for ${feature}.`);
+  if (error) {
+    throw new Error(error.message || `Unable to verify login state for ${feature}.`);
+  }
+
+  return session;
+}
+
+function hasUsableCloudSession(session: Awaited<ReturnType<typeof readCloudSession>>): session is NonNullable<Awaited<ReturnType<typeof readCloudSession>>> {
+  const expiresAtMs = typeof session?.expires_at === 'number'
+    ? session.expires_at * 1000
+    : 0;
+
+  return Boolean(
+    session?.access_token
+    && (expiresAtMs <= 0 || expiresAtMs > Date.now() + 60_000),
+  );
+}
+
+async function recoverCloudSession(feature: string): Promise<CloudSessionResolution | null> {
+  if (refreshCloudSessionPromise) {
+    return refreshCloudSessionPromise;
+  }
+
+  refreshCloudSessionPromise = (async () => {
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.warn('[secureModelProxy] refreshSession failed:', refreshError);
     }
 
-    const expiresAtMs = typeof session?.expires_at === 'number'
-      ? session.expires_at * 1000
-      : 0;
-    const hasUsableSession = Boolean(
-      session?.access_token
-      && (expiresAtMs <= 0 || expiresAtMs > Date.now() + 60_000),
-    );
+    const refreshedSession = !refreshError && refreshData.session?.access_token
+      ? refreshData.session
+      : null;
 
-    if (hasUsableSession) {
+    if (refreshedSession?.access_token) {
       return {
-        accessToken: session!.access_token,
+        accessToken: refreshedSession.access_token,
       };
     }
 
-    if (refreshCloudSessionPromise) {
-      return refreshCloudSessionPromise;
+    const sessionEvent = await waitForAuthSessionChange(
+      (detail) => detail.hasSession && !detail.isTempUser,
+      1500,
+    );
+
+    if (sessionEvent?.accessToken) {
+      return {
+        accessToken: sessionEvent.accessToken,
+      };
     }
 
-    refreshCloudSessionPromise = (async () => {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.warn('[secureModelProxy] refreshSession failed:', refreshError);
-      }
-
-      const refreshedSession = !refreshError && refreshData.session?.access_token
-        ? refreshData.session
-        : null;
-
-      if (refreshedSession?.access_token) {
-        return {
-          accessToken: refreshedSession.access_token,
-        };
-      }
-
-      const sessionEvent = await waitForAuthSessionChange(
-        (detail) => detail.hasSession && !detail.isTempUser,
-        1500,
-      );
-
-      if (sessionEvent?.accessToken) {
-        return {
-          accessToken: sessionEvent.accessToken,
-        };
-      }
-
-      const {
-        data: { session: recoveredSession },
-      } = await supabase.auth.getSession();
-
+    try {
+      const recoveredSession = await readCloudSession(feature);
       if (recoveredSession?.access_token) {
         return {
           accessToken: recoveredSession.access_token,
         };
       }
+    } catch (error) {
+      console.warn('[secureModelProxy] Failed to re-read session after refresh attempt:', error);
+    }
 
-      return null;
-    })().finally(() => {
-      refreshCloudSessionPromise = null;
-    });
+    return null;
+  })().finally(() => {
+    refreshCloudSessionPromise = null;
+  });
 
-    return refreshCloudSessionPromise;
-  };
+  return refreshCloudSessionPromise;
+}
 
-  const resolvedSession = await getStableSession();
+async function resolveCloudSession(
+  feature: string,
+  options: ResolveCloudSessionOptions = {},
+): Promise<CloudSessionResolution> {
+  const session = await readCloudSession(feature);
+  const shouldForceRefresh = options.forceRefresh === true;
+
+  if (!shouldForceRefresh && hasUsableCloudSession(session)) {
+    return {
+      accessToken: session.access_token,
+    };
+  }
+
+  const resolvedSession = await recoverCloudSession(feature);
+  if (!resolvedSession?.accessToken && !shouldForceRefresh && session?.access_token) {
+    return {
+      accessToken: session.access_token,
+    };
+  }
+
   if (!resolvedSession?.accessToken) {
     // secure-model-proxy is backed by Supabase auth and must never use the
-    // legacy compatibility token from the web API login flow.
-    const sessionError = buildCloudSessionError(feature);
-    if (isSecureProxySessionReauthError(sessionError)) {
-      await forceSecureProxyReauth();
-    }
-    throw sessionError;
+    // legacy compatibility token from the web API login flow. Surface the
+    // reauth requirement to the caller, but do not force a sign-out here:
+    // transient 401s should not eject an otherwise logged-in user.
+    throw buildCloudSessionError(feature);
   }
 
   return resolvedSession;
@@ -429,7 +411,8 @@ async function invokeSecureSystemProxy(
 
   if (result.response?.status === 401) {
     try {
-      const recoveredSession = await resolveCloudSession(feature);
+      console.warn('[secureModelProxy] Proxy returned 401, forcing session refresh before retry');
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
       if (recoveredSession.accessToken) {
         result = await invokeWithToken(recoveredSession.accessToken);
       }
