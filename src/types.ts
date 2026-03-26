@@ -273,6 +273,7 @@ export interface PromptPendingSyncRequest {
 export interface PromptCompletedTask {
   taskId: string;
   resultUrls: string[];
+  resultStorageIds?: Record<string, string>;
   completedAt: number;
   provider?: string;
   providerLabel?: string;
@@ -282,10 +283,12 @@ export interface PromptCompletedTask {
   runtimeStrategyId?: string;
   taskProviderType?: TaskProviderType;
   cost?: number;
+  costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
   tokens?: number;
 }
 
 export interface PromptGenerationMetadata {
+  attemptStartedAt?: number;
   pendingTaskIds?: string[];
   pendingSyncRequests?: PromptPendingSyncRequest[];
   completedTasks?: PromptCompletedTask[];

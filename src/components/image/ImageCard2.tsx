@@ -1188,13 +1188,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const showSelectedAccent = isSelected;
     const showHighlightedAccent = highlighted && !showActiveAccent && !showSelectedAccent;
     const showSelectionBorder = showSelectedAccent || showHighlightedAccent;
+    const selectedBorderColor = 'rgba(59, 130, 246, 0.78)';
+    const highlightedBorderColor = 'rgba(59, 130, 246, 0.46)';
+    const activeBorderColor = 'rgba(245, 158, 11, 0.72)';
     const cardBorderColor = image.error && !image.isGenerating
         ? 'rgb(239, 68, 68)'
-        : showSelectionBorder
-            ? 'var(--selected-border)'
-            : showActiveAccent
-                ? 'var(--accent-gold)'
-                : 'var(--border-default)';
+        : showSelectedAccent
+            ? selectedBorderColor
+            : showHighlightedAccent
+                ? highlightedBorderColor
+                : showActiveAccent
+                    ? activeBorderColor
+                    : 'var(--border-default)';
     const imageCardAccent = image.error && !image.isGenerating
         ? 'red'
         : showActiveAccent
@@ -1215,6 +1220,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const cardSurfaceShadow = accentRingShadow
         ? `${accentRingShadow}, ${baseCardShadow}`
         : baseCardShadow;
+    const cardSurfaceScale = isDragging
+        ? 1
+        : showSelectedAccent
+            ? 1.016
+            : (showHighlightedAccent || showActiveAccent ? 1.01 : 1);
+    const cardSurfaceTransform = `scale(${cardSurfaceScale})`;
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
         const shellTitle = image.alias || image.fileName || image.prompt || 'Image';
@@ -1261,6 +1272,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         borderColor: cardBorderColor,
                         borderWidth: adaptiveBorderWidth,
                         boxShadow: cardSurfaceShadow,
+                        transform: cardSurfaceTransform,
+                        transformOrigin: '50% 50%',
+                        transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
+                        transitionProperty: 'transform, box-shadow, border-color',
                     }}
                 >
                     <div
@@ -1376,7 +1391,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         border shadow-xl
                         ${isDragging ? '' : 'transition-shadow'}
                         ${isSelected ? 'shadow-2xl' : 'hover:shadow-2xl'}
-                        ${highlighted ? 'scale-[1.02] z-50' : ''}
                     `}
                     style={{
                         backgroundColor: 'var(--bg-surface)',
@@ -1384,8 +1398,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         borderRadius: 'var(--radius-lg)', // 12px
                         borderWidth: adaptiveBorderWidth,
                         boxShadow: cardSurfaceShadow,
+                        transform: cardSurfaceTransform,
+                        transformOrigin: '50% 50%',
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
-                        transitionProperty: 'box-shadow, border-color'
+                        transitionProperty: 'transform, box-shadow, border-color'
                     }}
                 >
                     {/* Connection Point */}

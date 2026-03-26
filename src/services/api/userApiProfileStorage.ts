@@ -1,6 +1,7 @@
 import type { ApiResponse } from '../../../packages/contracts/src/index';
 import type { ApiProtocolFormat } from './apiConfig';
 import { legacyWebApiClient } from './kkApiClient';
+import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth';
 import { extractUserApiEntriesFromPayload } from './userApiPayload';
 import {
   loadUserApisPayloadViaSupabase,
@@ -200,6 +201,10 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
     });
     return;
   } catch (supabaseError) {
+    if (isKkApiPersistenceUnavailableError(supabaseError)) {
+      throw supabaseError;
+    }
+
     const response = await legacyWebApiClient.replaceUserApiEntries({
       entries: normalizedEntries,
     });

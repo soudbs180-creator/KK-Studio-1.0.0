@@ -184,6 +184,24 @@ export interface ApiServerOptions {
   verifyTurnstileToken?: TurnstileVerifier;
 }
 
+type RepositoryBackend = "memory" | "supabase" | "custom";
+
+function resolveRepositoryBackend(
+  repository: unknown,
+  inMemoryCtor: abstract new (...args: any[]) => unknown,
+  supabaseCtor: abstract new (...args: any[]) => unknown,
+): RepositoryBackend {
+  if (repository instanceof inMemoryCtor) {
+    return "memory";
+  }
+
+  if (repository instanceof supabaseCtor) {
+    return "supabase";
+  }
+
+  return "custom";
+}
+
 function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig): AdminConsoleRepository {
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase admin console repository", {
@@ -315,17 +333,20 @@ export function createApiServer(
   options: ApiServerOptions = {},
 ) {
   const serverSupabaseConfig = resolveServerSupabaseConfig();
+  const authDataRepository = createAuthDataRepository(serverSupabaseConfig);
+  const adminConsoleRepository =
+    options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
+  const creditAccountRepository =
+    options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig);
+  const creditProviderRepository = createCreditProviderRepository(serverSupabaseConfig);
+  const workspaceLayoutRepository = createWorkspaceLayoutRepository(serverSupabaseConfig);
   const authService = new AuthService({
     verifyTurnstileToken: options.verifyTurnstileToken || defaultTurnstileVerifier,
   });
-  const authDataService = new AuthDataService(createAuthDataRepository(serverSupabaseConfig));
-  const adminConsoleService = new AdminConsoleService(
-    options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig),
-  );
+  const authDataService = new AuthDataService(authDataRepository);
+  const adminConsoleService = new AdminConsoleService(adminConsoleRepository);
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
-  const creditAccountService = new CreditAccountService(
-    options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig),
-  );
+  const creditAccountService = new CreditAccountService(creditAccountRepository);
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: (accessToken) => {
       const resolvedOverride = options.resolveAccessToken?.(accessToken);
@@ -349,14 +370,42 @@ export function createApiServer(
   });
   const generationService = new GenerationService(new InMemoryGenerationTaskRepository());
   const modelCatalogService = new ModelCatalogService(new InMemoryModelCatalogRepository());
-  const creditProviderService = new CreditProviderService(createCreditProviderRepository(serverSupabaseConfig));
+  const creditProviderService = new CreditProviderService(creditProviderRepository);
   const workflowRepository = new InMemoryWorkflowRepository();
   const workflowService = new WorkflowService(workflowRepository);
   const workspaceCanvasService = new WorkspaceCanvasService(
     workflowRepository,
-    createWorkspaceLayoutRepository(serverSupabaseConfig),
+    workspaceLayoutRepository,
   );
   const wechatAuthService = createWechatAuthService(serverSupabaseConfig);
+  const repositoryModes = {
+    adminConsole: resolveRepositoryBackend(
+      adminConsoleRepository,
+      InMemoryAdminConsoleRepository,
+      SupabaseAdminConsoleRepository,
+    ),
+    authData: resolveRepositoryBackend(
+      authDataRepository,
+      InMemoryAuthDataRepository,
+      SupabaseAuthDataRepository,
+    ),
+    creditAccounts: resolveRepositoryBackend(
+      creditAccountRepository,
+      InMemoryCreditAccountRepository,
+      SupabaseCreditAccountRepository,
+    ),
+    creditProviders: resolveRepositoryBackend(
+      creditProviderRepository,
+      InMemoryCreditProviderRepository,
+      SupabaseCreditProviderRepository,
+    ),
+    workspaceLayout: resolveRepositoryBackend(
+      workspaceLayoutRepository,
+      InMemoryWorkspaceLayoutRepository,
+      SupabaseWorkspaceLayoutRepository,
+    ),
+  } as const;
+  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig);
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -400,6 +449,19 @@ export function createApiServer(
             data: {
               service: "kk-studio-api",
               status: "ok",
+              config: configSummary,
+              repositories: repositoryModes,
+              persistence: {
+                userApiKeys:
+                  repositoryModes.authData === "supabase"
+                  && configSummary.hasUserApiEncryptionSecret,
+                keyManager:
+                  repositoryModes.authData === "supabase"
+                  && configSummary.hasUserApiEncryptionSecret,
+                credits: repositoryModes.creditAccounts === "supabase",
+                creditProviders: repositoryModes.creditProviders === "supabase",
+                workspaceLayout: repositoryModes.workspaceLayout === "supabase",
+              },
             },
             meta: {
               requestId,

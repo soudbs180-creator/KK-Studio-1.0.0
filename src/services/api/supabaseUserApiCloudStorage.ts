@@ -1,12 +1,13 @@
-import { supabase } from '../../lib/supabase';
-import { legacyWebApiClient } from './kkApiClient';
+import { supabase } from '../../lib/supabase.ts';
+import { legacyWebApiClient } from './kkApiClient.ts';
+import { assertKkApiUserDataWritable } from './kkApiServerHealth.ts';
 import {
   extractKeyManagerCloudSlots,
   extractUserApiEntriesFromPayload,
   extractUserApiProvidersFromPayload,
   isUserApisEnvelope,
   mergeUserApisPayload,
-} from './userApiPayload';
+} from './userApiPayload.ts';
 
 interface AuthenticatedProfileContext {
   userId: string;
@@ -16,12 +17,14 @@ interface ProfileUserApisRow {
   user_apis: unknown;
 }
 
-interface UserApisEnvelope {
+export interface UserApisEnvelope {
   version: number;
   slots: unknown[];
   providers: unknown[];
   entries: unknown[];
 }
+
+type JsonRecord = Record<string, unknown>;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error && 'message' in error) {
@@ -49,8 +52,77 @@ function unwrapOrThrow<T>(
   throw new Error(response.error?.message || fallback);
 }
 
+function unwrapOrUndefined<T>(
+  response: {
+    success: boolean;
+    data?: T;
+    error?: { message?: string | null };
+  },
+): T | undefined {
+  return response.success ? (response.data as T) : undefined;
+}
+
+function getApiFailureMessage(
+  response: {
+    success: boolean;
+    error?: { message?: string | null };
+  },
+): string | undefined {
+  if (response.success) {
+    return undefined;
+  }
+
+  return response.error?.message || undefined;
+}
+
 function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isEncryptedSecretEnvelope(value: unknown): boolean {
+  return isRecord(value) && value.__kkUserApiSecret === true;
+}
+
+function payloadHasEncryptedSecrets(rawPayload: unknown): boolean {
+  const payload = normalizeEnvelope(rawPayload);
+
+  const slotsContainEncryptedKey = payload.slots.some((slot) => isRecord(slot) && isEncryptedSecretEnvelope(slot.key));
+  const providersContainEncryptedKey = payload.providers.some((provider) => isRecord(provider) && isEncryptedSecretEnvelope(provider.apiKey));
+  const entriesContainEncryptedKey = payload.entries.some((entry) => isRecord(entry) && isEncryptedSecretEnvelope(entry.key));
+
+  return slotsContainEncryptedKey || providersContainEncryptedKey || entriesContainEncryptedKey;
+}
+
+async function loadUserApisPayloadDirectlyFromProfile(
+  userId: string,
+): Promise<unknown | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_apis')
+    .eq('id', userId)
+    .maybeSingle<ProfileUserApisRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.user_apis ?? null;
+}
+
+export async function loadUserApisPayloadMetadataViaSupabase(
+  expectedUserId?: string,
+): Promise<unknown | null> {
+  const context = await getAuthenticatedProfileContext(expectedUserId);
+  if (!context) {
+    return null;
+  }
+
+  const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
+  return normalizeEnvelope(directProfilePayload);
 }
 
 function normalizeEnvelope(rawPayload: unknown): UserApisEnvelope {
@@ -100,6 +172,34 @@ export function getUserApisPayloadDensity(rawPayload: unknown): number {
   );
 }
 
+export function combineUserApisEnvelopeSources(
+  keyManagerStateRaw: unknown,
+  userApiEntriesRaw?: unknown,
+  options?: {
+    preferUserApiEntries?: boolean;
+  },
+): UserApisEnvelope {
+  const keyManagerState = normalizeEnvelope(keyManagerStateRaw);
+  const userApiEntries = toArray(
+    isUserApisEnvelope(userApiEntriesRaw)
+      ? (userApiEntriesRaw as Record<string, unknown>).entries
+      : (userApiEntriesRaw as { entries?: unknown[] } | null | undefined)?.entries
+        ?? extractUserApiEntriesFromPayload(userApiEntriesRaw),
+  );
+
+  const entries =
+    options?.preferUserApiEntries
+      ? (userApiEntries.length > 0 ? userApiEntries : keyManagerState.entries)
+      : (keyManagerState.entries.length > 0 ? keyManagerState.entries : userApiEntries);
+
+  return {
+    version: keyManagerState.version,
+    slots: keyManagerState.slots,
+    providers: keyManagerState.providers,
+    entries,
+  };
+}
+
 export async function loadUserApisPayloadViaSupabase(
   expectedUserId?: string,
 ): Promise<unknown | null> {
@@ -108,40 +208,50 @@ export async function loadUserApisPayloadViaSupabase(
     return null;
   }
 
-  let directPayload: unknown = null;
-  let directReadError: unknown = null;
+  const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
+  const directProfileDensity = getUserApisPayloadDensity(directProfilePayload);
+  const directProfileHasEncryptedSecrets = payloadHasEncryptedSecrets(directProfilePayload);
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('user_apis')
-      .eq('id', context.userId)
-      .maybeSingle<ProfileUserApisRow>();
+  const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
+    legacyWebApiClient.getKeyManagerCloudState(),
+    legacyWebApiClient.getUserApiEntries(),
+  ]);
 
-    if (error) {
-      throw error;
-    }
-
-    directPayload = normalizeEnvelope(data?.user_apis);
-    if (getUserApisPayloadDensity(directPayload) > 0) {
-      return directPayload;
-    }
-  } catch (error) {
-    directReadError = error;
-    console.warn('[UserApisCloudStorage] Direct Supabase read failed, falling back to API route:', error);
-  }
-
-  const payload = unwrapOrThrow(
-    await legacyWebApiClient.getKeyManagerCloudState(),
-    'Failed to load key-manager cloud state.',
+  const keyManagerState = unwrapOrUndefined(
+    keyManagerResponse,
   );
+  const userApiEntries = unwrapOrUndefined(
+    userApiEntriesResponse,
+  );
+  const combinedApiPayload =
+    keyManagerState || userApiEntries
+      ? combineUserApisEnvelopeSources(keyManagerState, userApiEntries)
+      : null;
+  const combinedApiDensity = getUserApisPayloadDensity(combinedApiPayload);
 
-  const normalizedApiPayload = normalizeEnvelope(payload);
-  if (getUserApisPayloadDensity(normalizedApiPayload) > 0 || directReadError) {
-    return normalizedApiPayload;
+  if (combinedApiDensity > 0) {
+    return combinedApiPayload;
   }
 
-  return directPayload;
+  if (directProfileDensity > 0 && !directProfileHasEncryptedSecrets) {
+    return normalizeEnvelope(directProfilePayload);
+  }
+
+  if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
+    throw new Error(
+      'Supabase profile contains encrypted user_apis payload, but the local API server is not available to decrypt it.',
+    );
+  }
+
+  if (!keyManagerState && !userApiEntries) {
+    throw new Error(
+      getApiFailureMessage(keyManagerResponse)
+      || getApiFailureMessage(userApiEntriesResponse)
+      || 'Failed to load key-manager cloud state.',
+    );
+  }
+
+  return combinedApiPayload;
 }
 
 export async function saveUserApisPayloadViaSupabase(
@@ -153,36 +263,44 @@ export async function saveUserApisPayloadViaSupabase(
     throw new Error('Authenticated Supabase session is required to save user_apis.');
   }
 
-  const payload = normalizeEnvelope(rawPayload);
+  await assertKkApiUserDataWritable();
 
-  const keyManagerState = unwrapOrThrow(
-    await legacyWebApiClient.replaceKeyManagerCloudState({
+  const payload = normalizeEnvelope(rawPayload);
+  const keyManagerStateResponse = await legacyWebApiClient.replaceKeyManagerCloudState({
       version: payload.version,
       slots: payload.slots as Record<string, unknown>[],
       providers: payload.providers as Record<string, unknown>[],
-    }),
+    });
+  const keyManagerState = unwrapOrThrow(
+    keyManagerStateResponse,
     'Failed to save key-manager cloud state.',
   ) as {
     version?: number;
     slots?: unknown[];
     providers?: unknown[];
+    entries?: unknown[];
   };
 
-  const userApiState = unwrapOrThrow(
-    await legacyWebApiClient.replaceUserApiEntries({
+  const userApiResponse = await legacyWebApiClient.replaceUserApiEntries({
       entries: payload.entries as any[],
-    }),
+    });
+  const userApiState = unwrapOrThrow(
+    userApiResponse,
     'Failed to save user API entries.',
   ) as {
     entries?: unknown[];
   };
 
-  return {
-    version: Number(keyManagerState.version || payload.version || 2),
-    slots: toArray(keyManagerState.slots),
-    providers: toArray(keyManagerState.providers),
-    entries: toArray(userApiState.entries),
-  };
+  return combineUserApisEnvelopeSources(
+    {
+      version: Number(keyManagerState.version || payload.version || 2),
+      slots: toArray(keyManagerState.slots),
+      providers: toArray(keyManagerState.providers),
+      entries: toArray(keyManagerState.entries),
+    },
+    { entries: toArray(userApiState.entries) },
+    { preferUserApiEntries: true },
+  );
 }
 
 export async function mergeUserApisPayloadViaSupabase(

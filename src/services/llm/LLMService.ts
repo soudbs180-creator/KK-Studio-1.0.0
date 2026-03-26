@@ -209,29 +209,29 @@ export class LLMService {
                 break;
             }
 
-            if (keySlot.provider === 'SystemProxy') {
-                const response = await callSecureSystemProxyImage({
-                    modelId: options.modelId,
-                    prompt: options.prompt,
-                    aspectRatio: options.aspectRatio,
-                    imageSize: options.imageSize,
-                    imageCount: options.imageCount,
-                    referenceImages: options.referenceImages,
-                });
-
-                const cleanModelId = options.modelId.split('@')[0];
-                return {
-                    urls: response.urls,
-                    usage: response.usage,
-                    provider: 'SystemProxy',
-                    providerName: '系统积分模型',
-                    modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
-                    model: options.modelId,
-                    keySlotId: keySlot.id,
-                };
-            }
-
             try {
+                if (keySlot.provider === 'SystemProxy') {
+                    const response = await callSecureSystemProxyImage({
+                        modelId: options.modelId,
+                        prompt: options.prompt,
+                        aspectRatio: options.aspectRatio,
+                        imageSize: options.imageSize,
+                        imageCount: options.imageCount,
+                        referenceImages: options.referenceImages,
+                    });
+
+                    const cleanModelId = options.modelId.split('@')[0];
+                    return {
+                        urls: response.urls,
+                        usage: response.usage,
+                        provider: 'SystemProxy',
+                        providerName: '系统积分模型',
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
+                }
+
                 const adapter = this.getAdapterForSlot(keySlot, options.modelId);
 
                 if (!adapter.supports(options.modelId)) {
@@ -377,36 +377,36 @@ export class LLMService {
                 break;
             }
 
-            if (keySlot.provider === 'SystemProxy') {
-                const cleanModelId = options.modelId.split('@')[0];
-                const response = await callSecureSystemProxyVideo({
-                    modelId: options.modelId,
-                    prompt: options.prompt,
-                    aspectRatio: options.aspectRatio,
-                    resolution: options.resolution,
-                    duration: options.duration,
-                    videoDuration: options.videoDuration,
-                    imageUrl: options.imageUrl,
-                    imageTailUrl: options.imageTailUrl,
-                });
+            try {
+                if (keySlot.provider === 'SystemProxy') {
+                    const cleanModelId = options.modelId.split('@')[0];
+                    const response = await callSecureSystemProxyVideo({
+                        modelId: options.modelId,
+                        prompt: options.prompt,
+                        aspectRatio: options.aspectRatio,
+                        resolution: options.resolution,
+                        duration: options.duration,
+                        videoDuration: options.videoDuration,
+                        imageUrl: options.imageUrl,
+                        imageTailUrl: options.imageTailUrl,
+                    });
 
-                if (response.taskId) {
-                    onTaskId?.(response.taskId);
+                    if (response.taskId) {
+                        onTaskId?.(response.taskId);
+                    }
+
+                    return {
+                        url: response.url || '',
+                        taskId: response.taskId,
+                        status: response.status,
+                        provider: 'SystemProxy',
+                        providerName: '系统积分模型',
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
                 }
 
-                return {
-                    url: response.url || '',
-                    taskId: response.taskId,
-                    status: response.status,
-                    provider: 'SystemProxy',
-                    providerName: '系统积分模型',
-                    modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
-                    model: options.modelId,
-                    keySlotId: keySlot.id,
-                };
-            }
-
-            try {
                 const adapter = this.getAdapterForSlot(keySlot, options.modelId);
                 const targetAdapter = adapter.generateVideo ? adapter : this.videoAdapter;
 
@@ -454,26 +454,26 @@ export class LLMService {
                 break;
             }
 
-            if (keySlot.provider === 'SystemProxy') {
-                const cleanModelId = options.modelId.split('@')[0];
-                const response = await callSecureSystemProxyAudio({
-                    modelId: options.modelId,
-                    prompt: options.prompt,
-                });
-
-                return {
-                    url: response.url,
-                    status: 'success',
-                    usage: response.usage,
-                    provider: 'SystemProxy',
-                    providerName: '系统积分模型',
-                    modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
-                    model: options.modelId,
-                    keySlotId: keySlot.id,
-                };
-            }
-
             try {
+                if (keySlot.provider === 'SystemProxy') {
+                    const cleanModelId = options.modelId.split('@')[0];
+                    const response = await callSecureSystemProxyAudio({
+                        modelId: options.modelId,
+                        prompt: options.prompt,
+                    });
+
+                    return {
+                        url: response.url,
+                        status: 'success',
+                        usage: response.usage,
+                        provider: 'SystemProxy',
+                        providerName: '系统积分模型',
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
+                }
+
                 const adapter = this.getAdapterForSlot(keySlot, options.modelId);
                 const targetAdapter = adapter.generateAudio ? adapter : this.audioAdapter;
 

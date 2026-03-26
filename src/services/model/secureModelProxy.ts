@@ -1,5 +1,7 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
+import { clearStoredAdminSession } from '../api/adminSession';
+import { setKkApiAccessToken } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -88,6 +90,11 @@ export interface SecureProxyTaskStatusResponse {
   deducted?: boolean;
 }
 
+export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
+export const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
+export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '登录已过期，请重新登录后继续使用系统积分模型。';
+export const SECURE_PROXY_GUEST_MODE_MESSAGE = '游客模式不支持云同步和系统积分模型，请先登录正式账号。';
+
 type SecureProxyInvokeResult = {
   data: any;
   error: any;
@@ -98,16 +105,127 @@ type CloudSessionResolution = {
   accessToken: string;
 };
 
+type SecureProxyBoundaryErrorCode =
+  | typeof SECURE_PROXY_SESSION_REAUTH_CODE
+  | typeof SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE;
+
+type SecureProxyBoundaryError = Error & {
+  code?: SecureProxyBoundaryErrorCode;
+  status?: number;
+  responseBody?: string;
+  feature?: string;
+};
+
+let forcedReauthPromise: Promise<void> | null = null;
+
 function getSecureProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
 }
 
-function buildCloudSessionError(feature: string): Error {
-  if (tempUserService.getCachedTempUser()) {
-    return new Error('Guest mode does not have a real Supabase session, so cloud sync and system credit models are unavailable.');
+function buildSecureProxyBoundaryError(
+  message: string,
+  meta?: {
+    code?: SecureProxyBoundaryErrorCode;
+    status?: number;
+    responseBody?: string;
+    feature?: string;
+  }
+): SecureProxyBoundaryError {
+  const normalized = new Error(message) as SecureProxyBoundaryError;
+  if (meta?.code) {
+    normalized.code = meta.code;
+  }
+  if (meta?.status !== undefined) {
+    normalized.status = meta.status;
+  }
+  if (meta?.responseBody) {
+    normalized.responseBody = meta.responseBody;
+  }
+  if (meta?.feature) {
+    normalized.feature = meta.feature;
+  }
+  return normalized;
+}
+
+export function isSecureProxySessionReauthError(error: unknown): error is SecureProxyBoundaryError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as SecureProxyBoundaryError).code === SECURE_PROXY_SESSION_REAUTH_CODE
+  );
+}
+
+export function isSecureProxyGuestModeError(error: unknown): error is SecureProxyBoundaryError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as SecureProxyBoundaryError).code === SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE
+  );
+}
+
+async function forceSecureProxyReauth(): Promise<void> {
+  if (forcedReauthPromise) {
+    return forcedReauthPromise;
   }
 
-  return new Error(`Please sign in before using ${feature}.`);
+  forcedReauthPromise = (async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn('[secureModelProxy] signOut failed during forced reauth:', error);
+    }
+
+    try {
+      setKkApiAccessToken(undefined);
+    } catch (error) {
+      console.warn('[secureModelProxy] Failed to clear compatibility access token:', error);
+    }
+
+    try {
+      clearStoredAdminSession();
+    } catch (error) {
+      console.warn('[secureModelProxy] Failed to clear stored admin session:', error);
+    }
+
+    try {
+      tempUserService.clearCachedTempUser();
+    } catch (error) {
+      console.warn('[secureModelProxy] Failed to clear cached temp user:', error);
+    }
+  })().finally(() => {
+    forcedReauthPromise = null;
+  });
+
+  return forcedReauthPromise;
+}
+
+async function buildSessionReauthError(
+  feature: string,
+  responseBody = ''
+): Promise<SecureProxyBoundaryError> {
+  await forceSecureProxyReauth();
+  return buildSecureProxyBoundaryError(SECURE_PROXY_SESSION_REAUTH_MESSAGE, {
+    code: SECURE_PROXY_SESSION_REAUTH_CODE,
+    status: 401,
+    responseBody,
+    feature,
+  });
+}
+
+function buildCloudSessionError(feature: string): SecureProxyBoundaryError {
+  if (tempUserService.getCachedTempUser()) {
+    return buildSecureProxyBoundaryError(SECURE_PROXY_GUEST_MODE_MESSAGE, {
+      code: SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE,
+      status: 403,
+      feature,
+    });
+  }
+
+  return buildSecureProxyBoundaryError(SECURE_PROXY_SESSION_REAUTH_MESSAGE, {
+    code: SECURE_PROXY_SESSION_REAUTH_CODE,
+    status: 401,
+    feature,
+  });
 }
 
 async function resolveCloudSession(feature: string): Promise<CloudSessionResolution> {
@@ -132,13 +250,19 @@ async function resolveCloudSession(feature: string): Promise<CloudSessionResolut
     if (refreshError) {
       console.warn('[secureModelProxy] refreshSession failed:', refreshError);
     }
-    if (!refreshError && refreshData.session?.access_token) {
-      activeSession = refreshData.session;
-    }
+    activeSession = !refreshError && refreshData.session?.access_token
+      ? refreshData.session
+      : null;
   }
 
   if (!activeSession?.access_token) {
-    throw buildCloudSessionError(feature);
+    // secure-model-proxy is backed by Supabase auth and must never use the
+    // legacy compatibility token from the web API login flow.
+    const sessionError = buildCloudSessionError(feature);
+    if (isSecureProxySessionReauthError(sessionError)) {
+      await forceSecureProxyReauth();
+    }
+    throw sessionError;
   }
 
   return {
@@ -151,6 +275,10 @@ async function buildInvocationError(
   error: any,
   response?: Response
 ): Promise<Error> {
+  if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
+    return error;
+  }
+
   const status = response?.status;
   let responseBody = '';
 
@@ -164,7 +292,7 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
-    message = `System credit ${feature} failed because your login session expired. Please sign in again and retry.`;
+    return buildSessionReauthError(feature, responseBody);
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;
   } else if (responseBody) {
@@ -176,15 +304,11 @@ async function buildInvocationError(
     }
   }
 
-  const normalized = new Error(message);
-  if (status !== undefined) {
-    (normalized as Error & { status?: number }).status = status;
-  }
-  if (responseBody) {
-    (normalized as Error & { responseBody?: string }).responseBody = responseBody;
-  }
-
-  return normalized;
+  return buildSecureProxyBoundaryError(message, {
+    status,
+    responseBody,
+    feature,
+  });
 }
 
 async function invokeSecureSystemProxyHttp(

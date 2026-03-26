@@ -319,6 +319,99 @@ async function writeFetchResponse(
     res.end(Buffer.from(await response.arrayBuffer()));
 }
 
+function shouldProxyToLocalApi(requestPath: string): boolean {
+    return requestPath === '/healthz'
+        || requestPath === '/api/manifest'
+        || requestPath.startsWith('/api/v1/');
+}
+
+function buildLocalApiProxyUrl(rawUrl: string | undefined, targetOrigin: string): string {
+    const requestUrl = new URL(rawUrl || '/', 'http://localhost');
+    return new URL(`${requestUrl.pathname}${requestUrl.search}`, targetOrigin).toString();
+}
+
+let localApiServerPromise: Promise<void> | null = null;
+
+async function canReachLocalApi(targetOrigin: string): Promise<boolean> {
+    try {
+        const response = await fetch(new URL('/healthz', targetOrigin), { method: 'GET' });
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
+async function ensureLocalApiServer(targetOrigin: string): Promise<void> {
+    if (await canReachLocalApi(targetOrigin)) {
+        return;
+    }
+
+    if (!localApiServerPromise) {
+        localApiServerPromise = (async () => {
+            await import('./scripts/run-api-dev.mjs');
+
+            for (let attempt = 0; attempt < 40; attempt += 1) {
+                if (await canReachLocalApi(targetOrigin)) {
+                    return;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+
+            throw new Error(`Timed out waiting for local API at ${targetOrigin}`);
+        })().catch((error) => {
+            localApiServerPromise = null;
+            throw error;
+        });
+    }
+
+    await localApiServerPromise;
+}
+
+function kkApiProxyPlugin(targetOrigin = 'http://127.0.0.1:3001'): Plugin {
+    return {
+        name: 'kk-api-proxy',
+        configureServer(server) {
+            void ensureLocalApiServer(targetOrigin).catch((error) => {
+                console.error('[kk-api-proxy] Failed to start local API server:', error);
+            });
+
+            server.middlewares.use(async (req, res, next) => {
+                const requestPath = getRequestPath(req.url);
+                if (!shouldProxyToLocalApi(requestPath)) {
+                    return next();
+                }
+
+                try {
+                    await ensureLocalApiServer(targetOrigin);
+
+                    const body = req.method && !['GET', 'HEAD'].includes(req.method.toUpperCase())
+                        ? await readIncomingBody(req)
+                        : undefined;
+
+                    const response = await fetch(buildLocalApiProxyUrl(req.url, targetOrigin), {
+                        method: req.method || 'GET',
+                        headers: createProxyRequestHeaders(req.headers),
+                        body,
+                    });
+
+                    await writeFetchResponse(res, response);
+                } catch (error: any) {
+                    res.statusCode = 502;
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: {
+                            code: 'LOCAL_API_PROXY_ERROR',
+                            message: error?.message || 'Failed to reach local API service.',
+                        },
+                    }));
+                }
+            });
+        },
+    };
+}
+
 /**
  * 开发环境价格扫描代理插件
  * 从服务端去爬取供应商的 /pricing 页面数据（实际请求 /api/pricing）
@@ -476,7 +569,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [pricingProxyPlugin(), nutrientDocumentProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

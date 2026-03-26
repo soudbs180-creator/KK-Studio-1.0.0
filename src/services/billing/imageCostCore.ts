@@ -51,6 +51,7 @@ export interface ImageCostResolver {
   getEffectiveKey?: (keySlotId?: string) => KeySlotLike | undefined
   getKey?: (keySlotId?: string) => KeySlotLike | undefined
   getProviderForKeySlot?: (keySlotId?: string) => ProviderLike | undefined
+  isOfficialBuiltinSlot?: (keySlotId?: string) => boolean
   estimateFallbackCost?: (input: {
     fullModelId: string
     size: string
@@ -350,6 +351,8 @@ export function resolveImageCostWithResolver(
     ? normalizedStoredCostSource
     : undefined
   const isKeyedModelWithoutPricingSnapshot = Boolean(options.keySlotId) && !usedPricingSnapshot
+  const canUseFallbackEstimateForKeyedModel = !isKeyedModelWithoutPricingSnapshot
+    || resolver.isOfficialBuiltinSlot?.(options.keySlotId) === true
 
   const estimateCost = (): number | undefined => {
     const snapshotEstimate = calculateSnapshotCost(
@@ -381,7 +384,7 @@ export function resolveImageCostWithResolver(
     }
   }
 
-  if (isKeyedModelWithoutPricingSnapshot) {
+  if (isKeyedModelWithoutPricingSnapshot && !canUseFallbackEstimateForKeyedModel) {
     if (explicitCost !== undefined) {
       return { cost: explicitCost, source: 'explicit', usedPricingSnapshot }
     }

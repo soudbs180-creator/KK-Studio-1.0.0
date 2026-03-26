@@ -278,14 +278,15 @@ export const PrimaryButton: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
   loading?: boolean;
+  disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, loading, className = '' }) => {
+}> = ({ children, onClick, loading, disabled = false, className = '' }) => {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={loading}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:opacity-50 ${className}`}
+      disabled={loading || disabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'transparent',
         background: 'var(--settings-button-primary-bg)',
@@ -303,13 +304,15 @@ export const PrimaryButton: React.FC<{
 export const SecondaryButton: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, className = '' }) => {
+}> = ({ children, onClick, disabled = false, className = '' }) => {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 ${className}`}
+      disabled={disabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
         background: 'var(--settings-button-secondary-bg)',
@@ -324,13 +327,15 @@ export const SecondaryButton: React.FC<{
 export const DangerButton: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
   className?: string;
-}> = ({ children, onClick, className = '' }) => {
+}> = ({ children, onClick, disabled = false, className = '' }) => {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 ${className}`}
+      disabled={disabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
         background: 'var(--settings-button-danger-bg)',

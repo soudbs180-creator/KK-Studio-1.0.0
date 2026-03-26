@@ -38,6 +38,13 @@ import {
   normalizePersistentResultUrl,
 } from '../utils/imageResultPersistence';
 import { resolveProviderIdentity } from '../utils/providerDisplay';
+import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
+import {
+  isSecureProxyGuestModeError,
+  isSecureProxySessionReauthError,
+  SECURE_PROXY_GUEST_MODE_MESSAGE,
+  SECURE_PROXY_SESSION_REAUTH_MESSAGE,
+} from '../services/model/secureModelProxy';
 
 const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
@@ -104,6 +111,11 @@ const toFiniteNumber = (value: unknown): number | undefined => {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
+};
+
+const getPromptAttemptStartedAt = (node?: Partial<PromptNode> | null): number | undefined => {
+  const rawAttemptStartedAt = (node?.generationMetadata as { attemptStartedAt?: unknown } | undefined)?.attemptStartedAt;
+  return toFiniteTimestamp(toFiniteNumber(rawAttemptStartedAt));
 };
 
 const splitMetricAcrossItems = (value: number | undefined, count: number): number | undefined => {
@@ -217,6 +229,50 @@ export const useImageGeneration = (options: {
       && Number(target?.cost || 0) > 0
   ), []);
 
+  const resolveFailedBillingState = useCallback(async (
+    target: Pick<PromptNode, 'id' | 'billingMode' | 'creditSettlement' | 'isPaymentProcessed' | 'paymentTransactionId' | 'refundStatus' | 'cost'>,
+    options?: { forceServerRefundFailure?: boolean }
+  ) => {
+    const refundableTransactionId = String(target.paymentTransactionId || '').trim();
+    const shouldRefundCurrentAttempt =
+      target.billingMode === 'credits'
+      && target.creditSettlement === 'client'
+      && target.isPaymentProcessed === true
+      && refundableTransactionId.length > 0;
+    const shouldRefreshServerSideAttempt = shouldRefreshServerBillingState(target);
+
+    let refundStatus = target.refundStatus;
+    let isPaymentProcessed = target.isPaymentProcessed;
+    let paymentTransactionId = target.paymentTransactionId;
+
+    if (shouldRefundCurrentAttempt) {
+      const refundResult = await refundCreditsByTransaction(refundableTransactionId, `退款 ${target.id}`);
+      refundStatus = refundResult.success ? 'success' : 'failed';
+      if (refundResult.success) {
+        isPaymentProcessed = false;
+        paymentTransactionId = undefined;
+      }
+    } else if (shouldRefreshServerSideAttempt) {
+      if (options?.forceServerRefundFailure) {
+        refundStatus = 'failed';
+      } else {
+        try {
+          await refreshBilling();
+          refundStatus = 'success';
+        } catch (error) {
+          console.error('[useImageGeneration] Failed to refresh billing after server-side credit failure:', error);
+          refundStatus = 'failed';
+        }
+      }
+    }
+
+    return {
+      refundStatus,
+      isPaymentProcessed,
+      paymentTransactionId,
+    };
+  }, [refundCreditsByTransaction, refreshBilling, shouldRefreshServerBillingState]);
+
   // --- Helpers ---
 
   const extractErrorDetails = useCallback((error: any, fallbackModel?: string) => {
@@ -234,6 +290,18 @@ export const useImageGeneration = (options: {
     if (error?.responseBody) details.responseBody = typeof error.responseBody === 'string' ? error.responseBody : JSON.stringify(error.responseBody, null, 2);
     if (error?.message && !details.responseBody) details.responseBody = String(error.message);
     return details;
+  }, []);
+
+  const getDisplayableGenerationError = useCallback((error: any) => {
+    if (isSecureProxySessionReauthError(error)) {
+      return SECURE_PROXY_SESSION_REAUTH_MESSAGE;
+    }
+
+    if (isSecureProxyGuestModeError(error)) {
+      return SECURE_PROXY_GUEST_MODE_MESSAGE;
+    }
+
+    return error?.message || 'Unknown error';
   }, []);
 
   const isRecoverableSyncBridgeFailure = useCallback((params: {
@@ -435,6 +503,7 @@ export const useImageGeneration = (options: {
             taskProviderType: runtimeSnapshot.taskProviderType,
             model: item.model || fallback.model,
             modelLabel: item.modelName || item.modelLabel || fallback.modelLabel,
+            costSource: item.costSource,
           },
           urlToIndex: new Map<string, number>(),
         };
@@ -458,6 +527,10 @@ export const useImageGeneration = (options: {
       const resolvedCost = toFiniteNumber(item.cost);
       if (resolvedCost !== undefined) {
         group.record.cost = (group.record.cost || 0) + resolvedCost;
+      }
+
+      if (!group.record.costSource && item.costSource) {
+        group.record.costSource = item.costSource;
       }
 
       const resolvedTokens = toFiniteNumber(item.tokens);
@@ -574,9 +647,10 @@ export const useImageGeneration = (options: {
 
   const buildRetroPendingSyncRequests = useCallback((node: PromptNode): PendingSyncRequest[] => {
     const expectedCount = getExpectedGenerationCount(node);
-    const baseStartedAt = typeof node.errorDetails?.timestamp === 'number'
-      ? node.errorDetails.timestamp
-      : (node.timestamp || Date.now());
+    const baseStartedAt = getPromptAttemptStartedAt(node)
+      ?? toFiniteTimestamp(node.errorDetails?.timestamp)
+      ?? toFiniteTimestamp(node.timestamp)
+      ?? Date.now();
 
     return Array.from({ length: expectedCount }).map((_, index) => ({
       requestId: `${node.id}-${index}`,
@@ -782,6 +856,7 @@ export const useImageGeneration = (options: {
         model: latestNode.model,
         modelName: latestNode.modelLabel,
         cost: splitMetricAcrossItems(recoveredUsage.cost, bridgeResult.urls.length),
+        costSource: recoveredUsage.costSource,
         tokens: splitMetricAcrossItems(recoveredUsage.tokens, bridgeResult.urls.length),
       })), {
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
@@ -1058,7 +1133,7 @@ export const useImageGeneration = (options: {
           }));
           if (imageUrls.length > 0) {
             const resolvedResultImageSize = ((result as any).imageSize || latestNode.imageSize) as ImageSize | undefined;
-            const recoveredUsage = latestNode.mode === GenerationMode.IMAGE
+            const recoveredUsage: ReturnType<typeof resolveUsageMetrics> = latestNode.mode === GenerationMode.IMAGE
               ? resolveUsageMetrics({
                   model: (result as any).model || latestNode.model,
                   imageSize: resolvedResultImageSize,
@@ -1076,7 +1151,9 @@ export const useImageGeneration = (options: {
                   tokens: toFiniteNumber((result as any).usage?.totalTokens),
                   promptTokens: toFiniteNumber((result as any).usage?.promptTokens),
                   completionTokens: toFiniteNumber((result as any).usage?.completionTokens),
-                  costSource: toFiniteNumber((result as any).usage?.cost) !== undefined ? 'explicit' : 'none',
+                  costSource: toFiniteNumber((result as any).usage?.cost) !== undefined
+                    ? 'explicit'
+                    : 'none',
                 };
             const { completedTasks, preparedItems } = prepareCompletedTaskResults(node.id, uniqueImageUrls.map((url) => ({
               taskId: targetTaskId,
@@ -1088,6 +1165,7 @@ export const useImageGeneration = (options: {
               model: (result as any).model || latestNode.model,
               modelName: (result as any).modelName || latestNode.modelLabel,
               cost: splitMetricAcrossItems(recoveredUsage.cost, uniqueImageUrls.length || imageUrls.length),
+              costSource: recoveredUsage.costSource,
               tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
             })), {
               keySlotId: (result as any).keySlotId || latestNode.keySlotId,
@@ -1136,6 +1214,22 @@ export const useImageGeneration = (options: {
                 alias: latestNode.mode === GenerationMode.PPT ? buildPptPageAlias(latestNode.pptSlides?.[layoutIndex], layoutIndex) : undefined,
               };
             });
+            const finalizedCompletedTasks = completedTasks.map((task) => ({
+              ...task,
+              resultStorageIds: { ...(task.resultStorageIds || {}) },
+            }));
+            const completedTaskById = new Map(finalizedCompletedTasks.map((task) => [task.taskId, task]));
+
+            recoveredImageNodes.forEach((imageNode: any) => {
+              const task = completedTaskById.get(imageNode.sourceTaskId);
+              const storageId = String(imageNode.storageId || imageNode.id || '').trim();
+              if (!task || !storageId) return;
+
+              task.resultStorageIds = {
+                ...(task.resultStorageIds || {}),
+                [String(imageNode.sourceResultIndex)]: storageId,
+              };
+            });
 
             const mergedChildIds = Array.from(new Set([...currentChildIds, ...recoveredImageNodes.map((img: any) => img.id)]));
             const nextSuccessCount = mergedChildIds.length;
@@ -1150,7 +1244,7 @@ export const useImageGeneration = (options: {
               lastGenerationFailCount: nextFailCount,
               lastGenerationTotalCount: expectedCount,
               generationMetadata: nextGenerationMetadata,
-            }, completedTasks);
+            }, finalizedCompletedTasks);
 
             urgentUpdatePromptNode(persistedPromptState);
 
@@ -1169,9 +1263,11 @@ export const useImageGeneration = (options: {
 
             void markTaskCompleted(
               targetTaskId,
-              completedTasks.find((task) => task.taskId === targetTaskId)?.resultUrls || imageUrls,
+              finalizedCompletedTasks.find((task) => task.taskId === targetTaskId)?.resultUrls || imageUrls,
               recoveredUsage.cost,
-              recoveredUsage.tokens
+              recoveredUsage.tokens,
+              recoveredUsage.costSource,
+              finalizedCompletedTasks.find((task) => task.taskId === targetTaskId)?.resultStorageIds
             );
 
             if (shouldRefreshServerBillingState(latestNode)) {
@@ -1187,13 +1283,23 @@ export const useImageGeneration = (options: {
           }
         } else {
           // Failed
-          urgentUpdatePromptNode({ ...latestNode, isGenerating: nextPendingTaskIds.length > 0, jobId: nextJobId, generationMetadata: nextGenerationMetadata, error: nextPendingTaskIds.length === 0 ? 'Task failed on backend' : undefined });
+          const failedBillingState = nextPendingTaskIds.length === 0
+            ? await resolveFailedBillingState(latestNode)
+            : {
+                refundStatus: latestNode.refundStatus,
+                isPaymentProcessed: latestNode.isPaymentProcessed,
+                paymentTransactionId: latestNode.paymentTransactionId,
+              };
+          urgentUpdatePromptNode({
+            ...latestNode,
+            isGenerating: nextPendingTaskIds.length > 0,
+            jobId: nextJobId,
+            generationMetadata: nextGenerationMetadata,
+            error: nextPendingTaskIds.length === 0 ? 'Task failed on backend' : undefined,
+            ...failedBillingState,
+          });
           // 轮询失败，更新数据库状态
           void markTaskFailed(targetTaskId, 'Task failed on backend');
-
-          if (shouldRefreshServerBillingState(latestNode)) {
-            await refreshBilling();
-          }
         }
       } else {
         // Still pending
@@ -1208,17 +1314,22 @@ export const useImageGeneration = (options: {
       if (/credit rollback failed/i.test(message)) {
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === node.id) || node;
         const { nextPendingTaskIds, nextJobId, nextGenerationMetadata } = resolvePendingTaskState(latestNode, targetTaskId);
+        const failedBillingState = nextPendingTaskIds.length === 0
+          ? await resolveFailedBillingState(latestNode, { forceServerRefundFailure: true })
+          : {
+              refundStatus: latestNode.refundStatus,
+              isPaymentProcessed: latestNode.isPaymentProcessed,
+              paymentTransactionId: latestNode.paymentTransactionId,
+            };
         urgentUpdatePromptNode({
           ...latestNode,
           isGenerating: nextPendingTaskIds.length > 0,
           jobId: nextJobId,
           generationMetadata: nextGenerationMetadata,
           error: message,
-          errorDetails: extractErrorDetails(err, latestNode.model)
+          errorDetails: extractErrorDetails(err, latestNode.model),
+          ...failedBillingState,
         });
-        if (shouldRefreshServerBillingState(latestNode)) {
-          await refreshBilling();
-        }
         return;
       }
       setTimeout(() => {
@@ -1226,7 +1337,7 @@ export const useImageGeneration = (options: {
         if (freshNode?.isGenerating) pollTaskStatus(freshNode, targetTaskId);
       }, 15000);
     }
-  }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults]);
+  }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
   useTaskRecovery(pollTaskStatus);
 
@@ -1288,19 +1399,19 @@ export const useImageGeneration = (options: {
       
       const hydratedFiles = await Promise.all(initialFiles.map(async (img) => {
         if (img.data && img.data.length > 100) return img;
-        if (img.storageId) {
+        for (const lookupId of getReferenceImageLookupIds(img)) {
           try {
-            const dataUrl = await getImage(img.storageId);
+            const dataUrl = await getImage(lookupId);
             if (dataUrl) {
               const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
-              if (matches && matches[2]) return { ...img, data: matches[2], mimeType: matches[1] || img.mimeType || 'image/png' };
-              return { ...img, data: dataUrl };
+              if (matches && matches[2]) return { ...img, storageId: img.storageId || lookupId, data: matches[2], mimeType: matches[1] || img.mimeType || 'image/png' };
+              return { ...img, storageId: img.storageId || lookupId, data: dataUrl };
             }
           } catch {}
           if (globalHandle) {
              try {
-               const base64Data = await fileSystemService.loadReferenceImage(globalHandle, img.storageId);
-               if (base64Data) return { ...img, data: base64Data, mimeType: 'image/jpeg' };
+               const base64Data = await fileSystemService.loadReferenceImage(globalHandle, lookupId);
+               if (base64Data) return { ...img, storageId: img.storageId || lookupId, data: base64Data, mimeType: 'image/jpeg' };
              } catch {}
           }
         }
@@ -1350,9 +1461,11 @@ export const useImageGeneration = (options: {
       const effectiveSlideLines = isPpt ? normalizePptSlidesForCount(executionNode.pptSlides, executionNode.prompt, count) : [];
       const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
 
+      const generationAttemptStartedAt = Date.now();
       urgentUpdatePromptNode({
         ...latestNode,
         ...executionNode,
+        timestamp: generationAttemptStartedAt,
         isGenerating: true,
         jobId: undefined,
         childImageIds: [],
@@ -1362,6 +1475,7 @@ export const useImageGeneration = (options: {
         error: undefined,
         errorDetails: undefined,
         generationMetadata: buildGenerationMetadata(latestNode, {
+          attemptStartedAt: generationAttemptStartedAt,
           pendingTaskIds: [],
           pendingSyncRequests: [],
         }),
@@ -1446,7 +1560,7 @@ export const useImageGeneration = (options: {
                 // 持久化任务到数据库
                 void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
               },
-              onSyncBridgeRegistered: (requestId: string) => {
+              onSyncBridgeRegistered: (requestId: string, startedAt?: number) => {
                 markSyncBridgeRequestActive(requestId);
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
                 if (!fresh) return;
@@ -1454,7 +1568,7 @@ export const useImageGeneration = (options: {
                   requestId,
                   index,
                   prompt: taskPrompt,
-                  startedAt: Date.now(),
+                  startedAt: toFiniteTimestamp(startedAt) ?? Date.now(),
                   keySlotId: executionNode.keySlotId
                 }));
               }
@@ -1498,7 +1612,12 @@ export const useImageGeneration = (options: {
             imageSize: resolvedImageSize, aspectRatio: resolvedAspectRatio, dimensions: resolvedExactDimensions, tokens: resolvedTokens, promptTokens: resolvedPromptTokens, completionTokens: resolvedCompletionTokens, cost: resolvedCost, costSource: resolvedCostSource,
           };
         } catch (error: any) {
-          return { error: error.message || 'Unknown error', errorDetails: extractErrorDetails(error, executionNode.model), taskId: taskIdForRecovery, requestId: currentRequestId };
+          return {
+            error: getDisplayableGenerationError(error),
+            errorDetails: extractErrorDetails(error, executionNode.model),
+            taskId: taskIdForRecovery,
+            requestId: currentRequestId,
+          };
         } finally {
           releaseSyncBridgeRequestActive(currentRequestId);
         }
@@ -1559,6 +1678,7 @@ export const useImageGeneration = (options: {
           model: item.model || executionNode.model,
           modelName: item.modelName || executionNode.modelLabel,
           cost: item.cost,
+          costSource: item.costSource,
           tokens: item.tokens,
         })), {
           keySlotId: executionNode.keySlotId,
@@ -1617,6 +1737,23 @@ export const useImageGeneration = (options: {
           };
         });
 
+        const finalizedCompletedTasks = completedTasks.map((task) => ({
+          ...task,
+          resultStorageIds: { ...(task.resultStorageIds || {}) },
+        }));
+        const completedTaskById = new Map(finalizedCompletedTasks.map((task) => [task.taskId, task]));
+
+        results.forEach((result) => {
+          const task = completedTaskById.get(result.sourceTaskId);
+          const storageId = String(result.storageId || result.id || '').trim();
+          if (!task || !storageId) return;
+
+          task.resultStorageIds = {
+            ...(task.resultStorageIds || {}),
+            [String(result.sourceResultIndex)]: storageId,
+          };
+        });
+
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
         const pendingIds = getPendingTaskIds(latestNode).filter(tid => !validImageData.some(v => v.taskId === tid));
         const completedSyncRequestIds = imageData
@@ -1646,7 +1783,7 @@ export const useImageGeneration = (options: {
           provider: resolvedSuccessDisplay.provider || executionNode.provider,
           providerLabel: resolvedSuccessDisplay.providerLabel || executionNode.providerLabel,
           modelLabel: firstSuccess?.modelName || executionNode.modelLabel,
-        }, completedTasks);
+        }, finalizedCompletedTasks);
 
         urgentUpdatePromptNode(persistedPromptState);
         
@@ -1665,9 +1802,9 @@ export const useImageGeneration = (options: {
             .map((item) => (typeof item.taskId === 'string' ? item.taskId.trim() : ''))
             .filter((taskId): taskId is string => taskId.length > 0)
         );
-        completedTasks.forEach((task) => {
+        finalizedCompletedTasks.forEach((task) => {
           if (!persistedTaskIds.has(task.taskId)) return;
-          void markTaskCompleted(task.taskId, task.resultUrls, task.cost, task.tokens);
+          void markTaskCompleted(task.taskId, task.resultUrls, task.cost, task.tokens, task.costSource, task.resultStorageIds);
         });
         completedSyncRequestIds.forEach((requestId) => {
           void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
@@ -1742,39 +1879,17 @@ export const useImageGeneration = (options: {
     } catch (err: any) {
       console.error('[useImageGeneration] Execution error:', err);
       const latest = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
-      const refundableTransactionId = String(latest.paymentTransactionId || '').trim();
-      const shouldRefundCurrentAttempt =
-        latest.billingMode === 'credits'
-        && latest.creditSettlement === 'client'
-        && latest.isPaymentProcessed === true
-        && refundableTransactionId.length > 0;
-      let refundStatus = latest.refundStatus;
-      let isPaymentProcessed = latest.isPaymentProcessed;
-      let paymentTransactionId = latest.paymentTransactionId;
-
-      if (shouldRefundCurrentAttempt) {
-        const refundResult = await refundCreditsByTransaction(refundableTransactionId, `退款 ${latest.id}`);
-        refundStatus = refundResult.success ? 'success' : 'failed';
-        if (refundResult.success) {
-          isPaymentProcessed = false;
-          paymentTransactionId = undefined;
-        }
-      }
+      const failedBillingState = await resolveFailedBillingState(latest);
       await updatePromptNode({
         ...latest,
         isGenerating: false,
         lastGenerationSuccessCount: latest.lastGenerationSuccessCount ?? 0,
         lastGenerationFailCount: Math.max(latest.lastGenerationFailCount ?? 0, actualCount),
         lastGenerationTotalCount: latest.lastGenerationTotalCount ?? actualCount,
-        error: err.message,
+        error: getDisplayableGenerationError(err),
         errorDetails: extractErrorDetails(err, node.model),
-        refundStatus,
-        isPaymentProcessed,
-        paymentTransactionId,
+        ...failedBillingState,
       });
-      if (shouldRefreshServerBillingState(latest)) {
-        await refreshBilling();
-      }
       return;
     } finally {
       setIsGenerating(false);
@@ -1795,10 +1910,10 @@ export const useImageGeneration = (options: {
     pollTaskStatus,
     shouldRefreshServerBillingState,
     extractErrorDetails,
+    getDisplayableGenerationError,
     normalizePptSlidesForCount,
     buildAutoPptSlides,
     rememberPreferredKeyForMode,
-    refundCreditsByTransaction,
     refreshBilling,
     resolveProviderDisplay,
     shouldPreferRouteProviderDisplay,
@@ -1808,6 +1923,7 @@ export const useImageGeneration = (options: {
     filterUniqueGeneratedSources,
     attachCompletedTasksToPrompt,
     prepareCompletedTaskResults,
+    resolveFailedBillingState,
     markSyncBridgeRequestActive,
     releaseSyncBridgeRequestActive
   ]);

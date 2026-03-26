@@ -1,4 +1,5 @@
 import type { CanvasWorkflow, PromptNode, WorkflowNode } from '../../types';
+import { normalizeReferenceImagesStorage } from '../../utils/referenceImageStorage';
 import { dedupeWorkflowEdges } from '../schema';
 import { createEmptyWorkflowGraph } from '../types';
 
@@ -6,7 +7,7 @@ const stripReferenceImageData = (
   referenceImages: PromptNode['referenceImages'],
   aggressive: boolean,
 ): PromptNode['referenceImages'] => (
-  referenceImages?.map((ref) => {
+  normalizeReferenceImagesStorage(referenceImages)?.map((ref) => {
     const shouldKeep = !aggressive && ref.data && ref.data.length < 500000;
     return {
       ...ref,

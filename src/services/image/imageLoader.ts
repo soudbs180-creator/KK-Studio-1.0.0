@@ -7,7 +7,7 @@
  * 3. 支持取消请求（离开视口时取消）
  */
 
-import { getImage, getImageByQuality } from '../storage/imageStorage';
+import { getImage, getImageByQuality, getStrictOriginalImage } from '../storage/imageStorage';
 import { ImageQuality } from './imageQuality';
 
 // 最大并发请求数（浏览器同域限制约6个）
@@ -143,7 +143,10 @@ class ImageLoaderQueue {
             let url: string | null = null;
 
             if (item.quality === ImageQuality.ORIGINAL) {
-                url = await getImage(item.imageId);
+                url = await getStrictOriginalImage(item.imageId);
+                if (!url) {
+                    url = await getImage(item.imageId);
+                }
             } else {
                 url = await getImageByQuality(item.imageId, item.quality);
             }

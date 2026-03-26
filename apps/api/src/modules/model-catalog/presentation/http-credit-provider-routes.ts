@@ -88,6 +88,24 @@ export function validateSaveAdminCreditProviderRequest(body: unknown): ApiErrorD
     details.push({ field: "apiKeys", reason: "apiKeys must contain only strings." });
   }
 
+  if (
+    candidate.retainApiKeyFingerprints !== undefined
+    && !Array.isArray(candidate.retainApiKeyFingerprints)
+  ) {
+    details.push({
+      field: "retainApiKeyFingerprints",
+      reason: "retainApiKeyFingerprints must be an array when provided.",
+    });
+  } else if (
+    Array.isArray(candidate.retainApiKeyFingerprints)
+    && candidate.retainApiKeyFingerprints.some((item) => typeof item !== "string")
+  ) {
+    details.push({
+      field: "retainApiKeyFingerprints",
+      reason: "retainApiKeyFingerprints must contain only strings.",
+    });
+  }
+
   if (!Array.isArray(candidate.models) || candidate.models.length === 0) {
     details.push({ field: "models", reason: "models must contain at least one model." });
   } else {

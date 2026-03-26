@@ -287,21 +287,10 @@ function isOfficialBuiltinPricingSlot(keySlotId?: string): boolean {
 
     const provider = slot.provider;
     const normalizedBaseUrl = String(slot.baseUrl || '').trim().toLowerCase();
-    const looksOfficialByType = slot.type === 'official';
     const looksOfficialByRuntime = determineKeyType(provider, slot.baseUrl) === 'official';
     const looksOfficialByLegacyStorage = !normalizedBaseUrl && (provider === 'Google' || provider === 'OpenAI');
 
-    if (!looksOfficialByType && !looksOfficialByRuntime && !looksOfficialByLegacyStorage) {
-        return false;
-    }
-
-    if (provider === 'Google') return true;
-
-    if (provider === 'OpenAI') {
-        return !normalizedBaseUrl || normalizedBaseUrl.includes('api.openai.com');
-    }
-
-    return false;
+    return looksOfficialByRuntime || looksOfficialByLegacyStorage;
 }
 
 function normalizeProviderIdentityValue(value?: string): string {

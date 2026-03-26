@@ -101,6 +101,38 @@ describe('Billing Physical Separation - Image Cost Resolution', () => {
     assert.equal(resolved.cost, 0.195)
   })
 
+  test('allows official keyed models to use fallback estimates without a pricing snapshot', () => {
+    const resolver = createResolver()
+    resolver.isOfficialBuiltinSlot = () => true
+    resolver.estimateFallbackCost = () => 0.0680935
+
+    const resolved = resolveImageCostWithResolver({
+      model: 'gemini-3.1-flash-image-preview',
+      imageSize: '1K',
+      prompt: 'prompt',
+      keySlotId: 'slot-1',
+    }, resolver)
+
+    assert.equal(resolved.source, 'estimated')
+    assert.equal(resolved.cost, 0.0680935)
+  })
+
+  test('keeps third-party keyed models from using fallback estimates without a pricing snapshot', () => {
+    const resolver = createResolver()
+    resolver.isOfficialBuiltinSlot = () => false
+    resolver.estimateFallbackCost = () => 0.0680935
+
+    const resolved = resolveImageCostWithResolver({
+      model: 'gemini-3.1-flash-image-preview',
+      imageSize: '1K',
+      prompt: 'prompt',
+      keySlotId: 'slot-1',
+    }, resolver)
+
+    assert.equal(resolved.source, 'none')
+    assert.equal(resolved.cost, 0)
+  })
+
   test('matches 4K aliases when applying snapshot size ratios', () => {
     const resolver = createResolver()
     resolver.getProviderForKeySlot = () => ({

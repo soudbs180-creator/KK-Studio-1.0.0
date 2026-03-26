@@ -310,7 +310,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         requestPath: string;
         requestBodyPreview?: string;
         provider?: string;
-    }): Promise<{ urls: string[]; responseStatus?: number; responseBodyPreview?: string } | null> {
+    }): Promise<{
+        urls: string[];
+        responseStatus?: number;
+        responseBodyPreview?: string;
+        startedAt?: number;
+        completedAt?: number;
+        apiDurationMs?: number;
+    } | null> {
         const { options, parserType, url, method = 'POST', headers, body, timeoutMs } = params;
         const requestId = String(options.syncBridgeRequestId || '').trim();
         if (!requestId || !isSyncImageBridgeSupported()) {
@@ -330,7 +337,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         if (startResult.status === 'pending') {
             try {
-                options.onSyncBridgeRegistered?.(requestId);
+                options.onSyncBridgeRegistered?.(requestId, startResult.startedAt);
             } catch (error) {
                 console.warn('[OpenAICompatibleAdapter] Failed to register sync bridge request early:', error);
             }
@@ -342,10 +349,18 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (result.status === 'success') {
+            const apiDurationMs = typeof result.startedAt === 'number'
+                && typeof result.completedAt === 'number'
+                && result.completedAt >= result.startedAt
+                ? result.completedAt - result.startedAt
+                : undefined;
             return {
                 urls: result.urls,
                 responseStatus: result.responseStatus,
                 responseBodyPreview: result.responseBodyPreview,
+                startedAt: result.startedAt,
+                completedAt: result.completedAt,
+                apiDurationMs,
             };
         }
 
@@ -767,11 +782,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             payload?.msg,
             payload?.message,
             payload?.error,
+            payload?.error?.message,
             payload?.data?.message,
             payload?.data?.msg,
             payload?.data?.error,
+            payload?.data?.error?.message,
             payload?.result?.message,
             payload?.result?.error,
+            payload?.result?.error?.message,
             payload?.debug?.message,
             payload?.debug,
         ];
@@ -1116,7 +1134,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (!normalized) continue;
             if (
                 normalized.includes('success')
+                || normalized === 'complete'
                 || normalized.includes('completed')
+                || normalized.includes('partial_complete')
+                || normalized.includes('partial-complete')
+                || (normalized.includes('partial') && normalized.includes('complete'))
                 || normalized.includes('finish')
                 || normalized === 'done'
             ) {
@@ -1190,8 +1212,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         body?: string;
         signal?: AbortSignal;
         requestPath?: string;
+        headers?: Record<string, string>;
     }): Promise<{ payload: any; requestPath: string }> {
-        const headers = this.buildImageRequestHeaders(params.keySlot, true);
+        const headers = params.headers
+            ? { ...params.headers }
+            : this.buildImageRequestHeaders(params.keySlot, true);
         if (params.method === 'POST') {
             headers['Content-Type'] = 'application/json';
         }
@@ -1299,6 +1324,209 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 responseMessage: this.extractProviderMessage(params.payload),
             }
         };
+    }
+
+    private async fetch12AIAsyncImageTaskDetail(
+        taskId: string,
+        keySlot: KeySlot,
+        signal?: AbortSignal
+    ): Promise<{ payload: any; requestPath: string }> {
+        const cleanBase = this.normalize12AIBaseUrl(keySlot.baseUrl || '');
+        const requestPath = `/v1/images/async/generations/${encodeURIComponent(taskId)}`;
+        const url = `${cleanBase}${requestPath}`;
+
+        return this.fetchJsonTaskResponse({
+            url,
+            keySlot,
+            signal,
+            requestPath,
+            headers: this.build12AIAsyncImageHeaders(keySlot),
+        });
+    }
+
+    private async poll12AIAsyncImageTask(
+        taskId: string,
+        keySlot: KeySlot,
+        options: ImageGenerationOptions,
+        requestMeta?: {
+            submitPath?: string;
+            requestBodyPreview?: string;
+            imageSize?: string;
+        }
+    ): Promise<ImageGenerationResult> {
+        const startTime = Date.now();
+        const maxDurationMs = 10 * 60 * 1000;
+        let pollIntervalMs = 2500;
+        const maxIntervalMs = 12000;
+
+        while (Date.now() - startTime < maxDurationMs) {
+            if (options.signal?.aborted) {
+                throw new Error('Image generation cancelled');
+            }
+
+            const { payload, requestPath } = await this.fetch12AIAsyncImageTaskDetail(taskId, keySlot, options.signal);
+            const result = this.buildPolledTaskResult({
+                payload,
+                taskId: this.extractGenericTaskId(payload) || taskId,
+                requestPath,
+                keySlot,
+            });
+
+            if (result.status === 'success') {
+                const urls = Array.isArray(result.urls) ? result.urls : [];
+                if (!urls.length) {
+                    throw this.buildHttpError({
+                        message: '12AI async task completed, but no image URL was returned',
+                        requestPath,
+                        requestBody: requestMeta?.requestBodyPreview,
+                        responseBody: JSON.stringify(payload).slice(0, 1600),
+                        provider: keySlot.provider,
+                    });
+                }
+
+                keyManager.reportCallResult(keySlot.id, true);
+                return {
+                    urls,
+                    taskId,
+                    provider: keySlot.provider,
+                    providerName: keySlot.name,
+                    model: options.modelId,
+                    imageSize: requestMeta?.imageSize || options.imageSize || this.resolve12AIAsyncImageSize(options),
+                    keySlotId: keySlot.id,
+                    metadata: {
+                        requestPath: requestMeta?.submitPath || requestPath,
+                        requestBodyPreview: requestMeta?.requestBodyPreview,
+                        apiDurationMs: Date.now() - startTime,
+                    }
+                };
+            }
+
+            if (result.status === 'failed') {
+                const message = String(result.metadata?.responseMessage || this.extractProviderMessage(payload) || '12AI async image generation failed').trim();
+                keyManager.reportCallResult(keySlot.id, false, message);
+                throw this.buildHttpError({
+                    message,
+                    requestPath,
+                    requestBody: requestMeta?.requestBodyPreview,
+                    responseBody: JSON.stringify(payload).slice(0, 1600),
+                    provider: keySlot.provider,
+                });
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+            pollIntervalMs = Math.min(Math.round(pollIntervalMs * 1.4), maxIntervalMs);
+        }
+
+        throw this.buildHttpError({
+            message: '12AI async image generation timed out after 10 minutes',
+            requestPath: requestMeta?.submitPath || '/v1/images/async/generations',
+            requestBody: requestMeta?.requestBodyPreview,
+            provider: keySlot.provider,
+        });
+    }
+
+    private async generateImage12AIAsync(
+        options: ImageGenerationOptions,
+        keySlot: KeySlot
+    ): Promise<ImageGenerationResult> {
+        const cleanBase = this.normalize12AIBaseUrl(keySlot.baseUrl || '');
+        const requestPath = '/v1/images/async/generations';
+        const url = `${cleanBase}${requestPath}`;
+        const size = this.resolve12AIAsyncImageSize(options);
+        const body: Record<string, any> = {
+            model: options.modelId,
+            prompt: options.prompt,
+            n: this.clampImageCount(options.imageCount, 10),
+            size,
+        };
+        const quality = this.resolve12AIAsyncImageQuality(options);
+        if (quality) {
+            body.quality = quality;
+        }
+
+        if (options.referenceImages?.length) {
+            const refs = options.referenceImages
+                .map((ref) => this.normalize12AIAsyncReferenceImage(ref))
+                .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+
+            if (refs.length === 1) {
+                body.image = refs[0];
+            } else if (refs.length > 1) {
+                body.images = refs;
+            }
+        }
+
+        const payload = this.applyCustomBody(body, keySlot);
+        const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
+        const response = await this.fetchWithTimeout(url, {
+            method: 'POST',
+            headers: this.build12AIAsyncImageHeaders(keySlot),
+            body: JSON.stringify(payload),
+            signal: options.signal,
+        }, this.getTimeoutMs(keySlot, 120000), 1);
+
+        const raw = await response.text().catch(() => '');
+        if (!response.ok) {
+            keyManager.reportCallResult(keySlot.id, false, raw.slice(0, 300) || `HTTP ${response.status}`);
+            throw this.buildHttpError({
+                message: `[${response.status}] ${raw.slice(0, 500) || '12AI async image request failed'}`,
+                status: response.status,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        let submitPayload: any = {};
+        try {
+            submitPayload = raw ? JSON.parse(raw) : {};
+        } catch {
+            throw this.buildHttpError({
+                message: '12AI async image submit endpoint returned non-JSON payload',
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        const immediateUrls = this.extractImageUrlsFromPayload(submitPayload);
+        if (immediateUrls.length > 0) {
+            keyManager.reportCallResult(keySlot.id, true);
+            return {
+                urls: immediateUrls,
+                taskId: this.extractGenericTaskId(submitPayload) || undefined,
+                provider: keySlot.provider,
+                providerName: keySlot.name,
+                model: options.modelId,
+                imageSize: size,
+                keySlotId: keySlot.id,
+                metadata: {
+                    requestPath,
+                    requestBodyPreview,
+                }
+            };
+        }
+
+        const taskId = this.extractGenericTaskId(submitPayload);
+        if (!taskId) {
+            const message = this.extractProviderMessage(submitPayload) || '12AI async submit succeeded but no task ID was returned';
+            throw this.buildHttpError({
+                message,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        options.onTaskId?.(taskId);
+        return this.poll12AIAsyncImageTask(taskId, keySlot, options, {
+            submitPath: requestPath,
+            requestBodyPreview,
+            imageSize: size,
+        });
     }
 
     private async fetchWuyinTaskDetail(
@@ -1615,6 +1843,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 imageSize: resolvedSize,
                 keySlotId: keySlot.id,
                 metadata: {
+                    apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview,
                     referenceImages: normalizedRefs.length > 0
@@ -1801,6 +2030,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const suffixes = [
             '/v1/chat/completions',
             '/chat/completions',
+            '/v1/images/async/generations',
+            '/images/async/generations',
             '/v1/images/generations',
             '/images/generations',
             '/v1beta/models',
@@ -1840,6 +2071,76 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         return clean;
+    }
+
+    private is12AIAsyncImageModel(modelId?: string): boolean {
+        const normalized = String(modelId || '').trim().toLowerCase();
+        if (!normalized) return false;
+
+        return normalized.includes('gemini-2.5-flash-image')
+            || normalized.includes('gemini-3.1-flash-image-preview')
+            || normalized.includes('gemini-3-pro-image-preview')
+            || normalized.includes('nano-banana')
+            || normalized.includes('nanobanana');
+    }
+
+    private resolve12AIAsyncImageSize(options: ImageGenerationOptions): string {
+        const explicitSize = String(options.providerConfig?.openai?.size || '').trim();
+        if (explicitSize) {
+            return explicitSize;
+        }
+
+        const requestedAspectRatio = this.normalizeRequestedAspectRatio(options.aspectRatio);
+        if (requestedAspectRatio) {
+            return requestedAspectRatio;
+        }
+
+        return this.resolveOpenAIImageSize(options, this.getOpenAIImageProfile(options.modelId));
+    }
+
+    private resolve12AIAsyncImageQuality(options: ImageGenerationOptions): string | undefined {
+        const explicitQuality = String(options.providerConfig?.openai?.quality || '').trim();
+        if (explicitQuality) {
+            return explicitQuality;
+        }
+
+        const normalizedImageSize = String(options.imageSize || '').trim().toUpperCase();
+        if (!normalizedImageSize) {
+            return undefined;
+        }
+
+        if (normalizedImageSize.includes('4K')) return '4K';
+        if (normalizedImageSize.includes('2K') || normalizedImageSize.includes('HD')) return 'hd';
+        return 'standard';
+    }
+
+    private normalize12AIAsyncReferenceImage(ref: string | { data: string; mimeType: string }): string {
+        const { data, mimeType } = extractRefImageData(ref);
+        const normalizedData = String(data || '').trim();
+        if (!normalizedData) {
+            return '';
+        }
+
+        if (/^(https?:)?\/\//i.test(normalizedData) || normalizedData.startsWith('data:')) {
+            return normalizedData;
+        }
+
+        return `data:${mimeType || 'image/png'};base64,${normalizedData}`;
+    }
+
+    private build12AIAsyncImageHeaders(keySlot: KeySlot): Record<string, string> {
+        const token = String(keySlot.key || '').trim();
+        const headers: Record<string, string> = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': formatAuthorizationHeaderValue(token, 'bearer'),
+        };
+
+        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
+            headers[keySlot.headerName] = token;
+        }
+
+        return this.applyCustomHeaders(headers, keySlot);
     }
 
     /**
@@ -2676,6 +2977,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             console.log(`[OpenAICompatibleAdapter] 使用 AceData image API -> ${keySlot.name}`);
             return this.generateImageAceData(options, keySlot);
         }
+        if (channelRuntime.strategyId === '12ai' && this.is12AIAsyncImageModel(options.modelId)) {
+            console.log(`[OpenAICompatibleAdapter] 使用 12AI async image API -> ${keySlot.name}`);
+            return this.generateImage12AIAsync(options, keySlot);
+        }
         const forceGeminiNativeOn12AI = channelRuntime.strategyId === '12ai' && channelRuntime.geminiNative && isGeminiImage;
 
         if (keySlot.compatibilityMode === 'chat' && !forceGeminiNativeOn12AI) {
@@ -2914,6 +3219,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 model: options.modelId,
                 imageSize: sizeString,
                 metadata: {
+                    apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview,
                     pythonSnippet
@@ -3129,6 +3435,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 imageSize: reportedImageSize,
                 metadata: {
                     aspectRatio,
+                    apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview,
                     pythonSnippet
@@ -3712,6 +4019,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 model: is12AIChannel ? options.modelId : effectiveModelId,
                 imageSize: requestedImageSize,
                 metadata: {
+                    apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview: this.buildSafeRequestBodyPreview(payload)
                 }
@@ -3798,6 +4106,16 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     responseMessage: message,
                 }
             };
+        }
+
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === '12ai' && this.is12AIAsyncImageModel(modelId)) {
+            const { payload, requestPath } = await this.fetch12AIAsyncImageTaskDetail(taskId, keySlot);
+            return this.buildPolledTaskResult({
+                payload,
+                taskId: this.extractGenericTaskId(payload) || taskId,
+                requestPath,
+                keySlot,
+            });
         }
 
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'acedata') {
@@ -4002,6 +4320,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 model: options.modelId,
                 imageSize: body.size || body.image_size || 'Unknown',
                 metadata: {
+                    apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview,
                     pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${JSON.stringify(body, null, 2)}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`

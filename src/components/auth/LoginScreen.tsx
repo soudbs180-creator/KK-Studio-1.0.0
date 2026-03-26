@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Chrome } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
+import { buildAuthRedirectUrl } from '../../config/authRedirect';
 import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -359,7 +360,7 @@ const LoginScreen: React.FC = () => {
     }
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailValue, {
-      redirectTo: window.location.origin,
+      redirectTo: buildAuthRedirectUrl('/'),
       ...(captchaToken ? { captchaToken } : {}),
     });
     if (resetError) throw resetError;
@@ -417,7 +418,7 @@ const LoginScreen: React.FC = () => {
     }
 
     if (isNetworkError(lastError)) {
-      setError(`网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录。`);
+      setError(`网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录，继续体验本地功能。`);
     } else {
       setError(resolveAuthErrorMessage(lastError, view));
       if (turnstileAvailable) {
@@ -443,7 +444,7 @@ const LoginScreen: React.FC = () => {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: buildAuthRedirectUrl(),
           ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
         },
       });
@@ -516,8 +517,8 @@ const LoginScreen: React.FC = () => {
               <Clock size={24} />
             </div>
             <h3>临时用户登录</h3>
-            <p>无需注册即可体验全部功能，账号有效期 24 小时。</p>
-            <p>临时账号到期后会自动清理本地数据，请勿存放重要内容。</p>
+            <p>无需注册即可体验本地功能，账号有效期 24 小时。</p>
+            <p>临时账号不支持云同步、充值和管理员配置的积分模型，到期后会自动清理本地数据，请勿存放重要内容。</p>
             <div className="auth-modal-actions">
               <button type="button" className="auth-btn auth-btn-ghost" onClick={() => setShowTempUserWarning(false)}>
                 取消

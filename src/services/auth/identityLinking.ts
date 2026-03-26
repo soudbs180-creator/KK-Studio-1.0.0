@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import { resolveAuthRedirectOrigin } from '../../config/authRedirect.ts';
 
 export type BindableAuthProvider = 'google' | 'wechat';
 export type BindCallbackMode = `${BindableAuthProvider}-bind`;
@@ -8,11 +9,7 @@ type IdentityLike = {
 };
 
 function resolveBrowserOrigin(): string {
-  if (typeof window === 'undefined' || !window.location?.origin) {
-    throw new Error('Identity linking is only available in the browser.');
-  }
-
-  return window.location.origin;
+  return resolveAuthRedirectOrigin();
 }
 
 function normalizeProviderName(provider: unknown): string | undefined {
@@ -25,7 +22,7 @@ function normalizeProviderName(provider: unknown): string | undefined {
 }
 
 async function getSupabaseClient() {
-  const module = await import('../../lib/supabase');
+  const module = await import('../../lib/supabase.ts');
   return module.supabase;
 }
 

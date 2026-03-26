@@ -19,8 +19,10 @@ export interface PersistedTask {
   aspectRatio?: string;
   imageSize?: string;
   resultUrls?: string[];
+  resultStorageIds?: Record<string, string>;
   errorMessage?: string;
   cost?: number;
+  costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
   tokens?: number;
   canvasId?: string;
   promptNodeId?: string;
@@ -52,6 +54,18 @@ function buildStorageKey(userId: string): string {
 
 function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
   const nowIso = new Date().toISOString();
+  const resultStorageIds = raw.resultStorageIds && typeof raw.resultStorageIds === 'object'
+    ? Object.fromEntries(
+        Object.entries(raw.resultStorageIds)
+          .filter(([key, value]) => (
+            String(key).trim().length > 0
+            && typeof value === 'string'
+            && value.trim().length > 0
+          ))
+          .map(([key, value]) => [String(key).trim(), value.trim()])
+      )
+    : undefined;
+
   return {
     id: String(raw.id || buildTaskRecordId(String(raw.taskId || nowIso))),
     taskId: String(raw.taskId || ''),
@@ -72,8 +86,17 @@ function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
     aspectRatio: raw.aspectRatio,
     imageSize: raw.imageSize,
     resultUrls: Array.isArray(raw.resultUrls) ? raw.resultUrls.map((item) => String(item)) : [],
+    resultStorageIds: resultStorageIds && Object.keys(resultStorageIds).length > 0 ? resultStorageIds : undefined,
     errorMessage: raw.errorMessage,
     cost: typeof raw.cost === 'number' ? raw.cost : undefined,
+    costSource:
+      raw.costSource === 'snapshot'
+      || raw.costSource === 'explicit'
+      || raw.costSource === 'stored'
+      || raw.costSource === 'estimated'
+      || raw.costSource === 'none'
+        ? raw.costSource
+        : undefined,
     tokens: typeof raw.tokens === 'number' ? raw.tokens : undefined,
     canvasId: raw.canvasId,
     promptNodeId: raw.promptNodeId,
@@ -168,6 +191,7 @@ export async function saveTask(params: {
       updatedAt: nowIso,
       completedAt: previous?.completedAt,
       resultUrls: previous?.resultUrls || [],
+      resultStorageIds: previous?.resultStorageIds,
     });
 
     if (existingIndex >= 0) {
@@ -186,8 +210,10 @@ export async function updateTaskStatus(
   status: PersistedTask['status'],
   updates?: {
     resultUrls?: string[];
+    resultStorageIds?: Record<string, string>;
     errorMessage?: string;
     cost?: number;
+    costSource?: PersistedTask['costSource'];
     tokens?: number;
   }
 ): Promise<boolean> {
@@ -204,8 +230,10 @@ export async function updateTaskStatus(
         ? nowIso
         : undefined,
       resultUrls: updates?.resultUrls ?? tasks[index].resultUrls,
+      resultStorageIds: updates?.resultStorageIds ?? tasks[index].resultStorageIds,
       errorMessage: updates?.errorMessage ?? tasks[index].errorMessage,
       cost: updates?.cost ?? tasks[index].cost,
+      costSource: updates?.costSource ?? tasks[index].costSource,
       tokens: updates?.tokens ?? tasks[index].tokens,
     });
 

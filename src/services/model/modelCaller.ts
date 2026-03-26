@@ -143,7 +143,7 @@ class ModelCaller {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return { success: false, error: 'Please sign in before using credit-based models.' };
+      return { success: false, error: 'Please sign in with a full account before using credit-based models.' };
     }
 
     const requiredCredits = Math.max(1, Math.ceil(Number(creditCost || 0)));

@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { readRuntimeEnv } from '../utils/runtimeEnv.ts';
 
 const BUILTIN_SUPABASE_URL = 'https://ovdjhdofjysanamgkfng.supabase.co';
 const BUILTIN_SUPABASE_ANON_KEY = 'sb_publishable_UvP5c6ShzuoYDtnZppd1yA_3L_m13l0';
 
-const envSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const envSupabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const envSupabaseUrl = readRuntimeEnv('VITE_SUPABASE_URL') || '';
+const envSupabaseAnonKey = readRuntimeEnv('VITE_SUPABASE_ANON_KEY') || '';
 
 const supabaseUrl = envSupabaseUrl || BUILTIN_SUPABASE_URL;
 const supabaseAnonKey = envSupabaseAnonKey || BUILTIN_SUPABASE_ANON_KEY;

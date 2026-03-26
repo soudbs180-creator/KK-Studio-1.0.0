@@ -51,9 +51,7 @@ export async function compressImageFile(file: File, maxDimension: number = 2048,
             resolve(preparedFile);
         };
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const sourceDataUrl = typeof e.target?.result === 'string' ? e.target.result : '';
+        const handleSourceDataUrl = (sourceDataUrl: string) => {
             const img = new Image();
             img.onload = () => {
                 let width = img.width;
@@ -116,6 +114,18 @@ export async function compressImageFile(file: File, maxDimension: number = 2048,
             } else {
                 resolveWithData(file);
             }
+        };
+
+        const preparedDataUrl = (file as PreparedImageFile).__kkPreparedDataUrl;
+        if (preparedDataUrl && preparedDataUrl.startsWith('data:')) {
+            handleSourceDataUrl(preparedDataUrl);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const sourceDataUrl = typeof e.target?.result === 'string' ? e.target.result : '';
+            handleSourceDataUrl(sourceDataUrl);
         };
         reader.onerror = () => resolveWithData(file);
         reader.readAsDataURL(file);

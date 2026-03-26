@@ -14,6 +14,7 @@ import ReactDOM from 'react-dom';
 import { AspectRatio, ImageSize } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
+import ModelLogo from '../common/ModelLogo';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -255,8 +256,10 @@ const pickPlannerModelId = (models: ChatModel[], selected: ChatModel): string | 
     return fallback?.id || null;
 };
 
-const buildAvailableChatModels = (): ChatModel[] => {
+const buildAvailableChatModels = (includeSystemCreditModels = true): ChatModel[] => {
     const rawModels = keyManager.getGlobalModelList().filter(model => {
+        if (model.isSystemInternal && !includeSystemCreditModels) return false;
+
         const idLower = model.id.toLowerCase();
 
         // 🚀 Allow Image Models (for /image command usage)
@@ -342,10 +345,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, setShowRechargeModal } = useBilling();
     const canAccessSystemCreditModels = !!user && !isTempUser;
+    const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
-    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels());
+    const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
@@ -437,7 +441,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     // Subscribe to keyManager updates
     useEffect(() => {
         const updateModels = () => {
-            const models = buildAvailableChatModels();
+            const models = buildAvailableChatModels(canBrowseSystemCreditModels);
             setAvailableModels(models);
 
             if (models.length > 0) {
@@ -455,7 +459,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         updateModels();
         const unsubscribe = keyManager.subscribe(updateModels);
         return unsubscribe;
-    }, [selectedModel.id]);
+    }, [canBrowseSystemCreditModels, selectedModel.id]);
 
     const getRequiredCredits = useCallback((model?: ChatModel | null) => {
         if (!model?.isSystemInternal) return 0;
@@ -2067,7 +2071,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                         </>
                                     ) : (
                                         <>
-                                            <span className="text-base">{selectedModel.icon || '🤖'}</span>
+                                            <ModelLogo
+                                                modelId={selectedModel.id}
+                                                provider={selectedModel.provider}
+                                                modelName={modelCustomizations[selectedModel.id]?.alias || getModelDisplayInfo(selectedModel).displayName}
+                                                size={18}
+                                            />
                                             <span
                                                 className={`truncate ${getModelThemeColor(selectedModel.id)}`}
                                             >
@@ -2164,8 +2173,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                                 }}
                                                                                 className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selectedModel.id === model.id ? 'bg-white/10 ring-1 ring-white/20' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] border border-transparent'}`}
                                                                             >
-                                                                                <span className="mt-0.5 text-base relative shrink-0">
-                                                                                    {model.icon || '🤖'}
+                                                                                <span className="mt-0.5 relative shrink-0 inline-flex h-5 w-5 items-center justify-center">
+                                                                                    <ModelLogo
+                                                                                        modelId={model.id}
+                                                                                        provider={model.provider}
+                                                                                        modelName={displayInfo.displayName}
+                                                                                        size={18}
+                                                                                        active={selectedModel.id === model.id}
+                                                                                    />
                                                                                     {isPinned && <span className="absolute -top-1 -right-1 text-[8px]">📌</span>}
                                                                                 </span>
                                                                                 <div className="flex flex-col gap-0.5 w-full min-w-0">

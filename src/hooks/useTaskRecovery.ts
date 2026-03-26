@@ -230,16 +230,32 @@ export async function markTaskCompleted(
   taskId: string,
   resultUrls: string[],
   cost?: number,
-  tokens?: number
+  tokens?: number,
+  costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none',
+  resultStorageIds?: Record<string, string>
 ): Promise<void> {
   try {
     const persistedUrls = resultUrls
       .map((url) => normalizePersistentResultUrl(url))
       .filter((url): url is string => !!url);
 
+    const persistedStorageIds = resultStorageIds && typeof resultStorageIds === 'object'
+      ? Object.fromEntries(
+          Object.entries(resultStorageIds)
+            .filter(([key, value]) => (
+              String(key).trim().length > 0
+              && typeof value === 'string'
+              && value.trim().length > 0
+            ))
+            .map(([key, value]) => [String(key).trim(), value.trim()])
+        )
+      : undefined;
+
     await updateTaskStatus(taskId, 'completed', {
       resultUrls: persistedUrls,
+      resultStorageIds: persistedStorageIds,
       cost,
+      costSource,
       tokens,
     });
     console.log(`[TaskPersistence] Task completed: ${taskId}`);

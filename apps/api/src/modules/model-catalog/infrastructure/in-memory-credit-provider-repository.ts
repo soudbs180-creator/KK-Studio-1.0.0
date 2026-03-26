@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   ActiveCreditModelDto,
   ActiveCreditModelProviderDto,
@@ -66,6 +68,43 @@ function cloneQualityPricing(
     : undefined;
 }
 
+function buildApiKeyPreview(value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.length <= 8) {
+    return `${normalized.slice(0, 2)}...${normalized.slice(-2)}`;
+  }
+
+  return `${normalized.slice(0, 4)}...${normalized.slice(-4)}`;
+}
+
+function buildApiKeyFingerprint(value: string): string {
+  return createHash("sha256")
+    .update(String(value || "").trim(), "utf8")
+    .digest("hex")
+    .slice(0, 16);
+}
+
+function normalizeUniqueApiKeys(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const normalized = String(value || "").trim();
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    result.push(normalized);
+  });
+
+  return result;
+}
+
 function toAdminModelDto(
   model: StoredCreditProviderModelRecord,
 ): AdminCreditProviderDto["models"][number] {
@@ -130,6 +169,15 @@ export class InMemoryCreditProviderRepository implements CreditProviderRepositor
       providerName: provider.providerName,
       baseUrl: provider.baseUrl,
       apiKeyCount: provider.apiKeys.filter((item) => item.trim()).length,
+      apiKeyEntries: provider.apiKeys
+        .filter((item) => item.trim())
+        .map((item) => ({
+          fingerprint: buildApiKeyFingerprint(item),
+          preview: buildApiKeyPreview(item),
+        })),
+      apiKeyPreviews: provider.apiKeys
+        .filter((item) => item.trim())
+        .map((item) => buildApiKeyPreview(item)),
       models: provider.models.map((model) => toAdminModelDto(model)),
     }));
   }
@@ -151,9 +199,18 @@ export class InMemoryCreditProviderRepository implements CreditProviderRepositor
     input: SaveAdminCreditProviderRequestDto,
   ): Promise<SavedCreditProviderRecord> {
     const existing = this.providers.get(providerId);
+    const hasExplicitRetainList = Array.isArray(input.retainApiKeyFingerprints);
+    const retainFingerprints = normalizeUniqueApiKeys(input.retainApiKeyFingerprints || []);
+    const baseApiKeys = existing
+      ? (
+          hasExplicitRetainList
+            ? existing.apiKeys.filter((value) => retainFingerprints.includes(buildApiKeyFingerprint(value)))
+            : existing.apiKeys
+        )
+      : [];
     const nextApiKeys = input.apiKeys.length > 0
-      ? input.apiKeys.filter((value) => value.trim())
-      : existing?.apiKeys || [];
+      ? normalizeUniqueApiKeys([...baseApiKeys, ...input.apiKeys])
+      : baseApiKeys;
     const nextProvider: StoredCreditProviderRecord = {
       providerId,
       providerName: input.providerName,

@@ -2,11 +2,13 @@ import {
   createKkApiClient,
   type KkApiClient,
 } from "../../../packages/contracts/src/client/kk-api-client.ts";
-import { getPreferredKkApiAccessToken } from "./authAccessToken";
+import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
+import { getPreferredKkApiAccessToken } from "./authAccessToken.ts";
 
 function getWindowOrigin(): string {
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
+  const runtimeOrigin = readRuntimeOrigin();
+  if (runtimeOrigin) {
+    return runtimeOrigin;
   }
 
   return "http://127.0.0.1:8080";
@@ -20,7 +22,7 @@ function stripKnownPaymentPath(pathOrUrl: string): string {
 }
 
 export function resolvePaymentSidecarBaseUrl(): string {
-  const configured = String(import.meta.env.VITE_PAYMENT_GATEWAY_URL || "").trim();
+  const configured = readRuntimeEnv("VITE_PAYMENT_GATEWAY_URL") || "";
   if (!configured) {
     return getWindowOrigin();
   }

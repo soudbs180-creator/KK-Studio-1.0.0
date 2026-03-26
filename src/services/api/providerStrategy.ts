@@ -718,17 +718,30 @@ export function resolveProviderKeyType(
     baseUrl?: string,
 ): 'official' | 'proxy' | 'third-party' {
     const normalizedProvider = normalizeProviderName(provider);
+    const normalizedBase = normalizeBaseUrl(baseUrl);
     const runtime = resolveProviderRuntime({
         provider,
         baseUrl,
     });
+    const googleOfficialHost = runtime.providerFamily === 'google-official';
+    const openaiOfficialHost = runtime.host === 'api.openai.com';
+    const allowsOfficialHostFallback =
+        normalizedProvider === ''
+        || normalizedProvider === 'custom'
+        || normalizedProvider === 'google'
+        || normalizedProvider === 'gemini'
+        || normalizedProvider === 'openai';
 
     if (
-        normalizedProvider === 'google'
-        && (
-            !normalizeBaseUrl(baseUrl)
-            || runtime.providerFamily === 'google-official'
-        )
+        (normalizedProvider === 'google' && !normalizedBase)
+        || (googleOfficialHost && allowsOfficialHostFallback)
+    ) {
+        return 'official';
+    }
+
+    if (
+        (normalizedProvider === 'openai' && !normalizedBase)
+        || (openaiOfficialHost && allowsOfficialHostFallback)
     ) {
         return 'official';
     }

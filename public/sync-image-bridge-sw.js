@@ -35,6 +35,14 @@ async function writeCachedResult(requestId, result) {
   );
 }
 
+async function persistCachedResult(requestId, result) {
+  try {
+    await writeCachedResult(requestId, result);
+  } catch (error) {
+    console.warn('[sync-image-bridge-sw] Failed to persist cached result:', error);
+  }
+}
+
 async function deleteCachedResult(requestId) {
   const cache = await caches.open(RESULT_CACHE);
   await cache.delete(toCacheUrl(requestId));
@@ -278,7 +286,7 @@ async function runJob(payload) {
     }
 
     JOBS.set(requestId, finalResult);
-    await writeCachedResult(requestId, finalResult);
+    await persistCachedResult(requestId, finalResult);
     return finalResult;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || 'Sync image bridge request failed');
@@ -291,7 +299,7 @@ async function runJob(payload) {
       completedAt: Date.now(),
     };
     JOBS.set(requestId, finalResult);
-    await writeCachedResult(requestId, finalResult);
+    await persistCachedResult(requestId, finalResult);
     return finalResult;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);

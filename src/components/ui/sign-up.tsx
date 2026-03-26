@@ -366,7 +366,7 @@ export const AuthComponent = ({
   onRegister,
   onForgotPassword,
   onTempLogin,
-  tempUserLabel = "临时用户登录（24 小时体验）",
+  tempUserLabel = "临时用户登录（仅本地体验）",
 }: AuthComponentProps) => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [registerStep, setRegisterStep] = useState<RegisterStep>("email");

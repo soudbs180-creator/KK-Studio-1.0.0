@@ -32,6 +32,7 @@ import {
     loadUserApisPayloadViaSupabase,
     mergeUserApisPayloadViaSupabase,
 } from '../api/supabaseUserApiCloudStorage';
+import { isKkApiPersistenceUnavailableError } from '../api/kkApiServerHealth';
 import { legacyWebApiClient } from '../api/kkApiClient';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
@@ -1563,6 +1564,14 @@ export class KeyManager {
                 requestCostSync().catch(console.error);
                 return;
             } catch (supabaseError) {
+                if (isKkApiPersistenceUnavailableError(supabaseError)) {
+                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
+                    if (options?.throwOnError) {
+                        throw supabaseError;
+                    }
+                    return;
+                }
+
                 console.warn('[KeyManager] Supabase cloud sync failed, falling back to API route:', supabaseError);
             }
 
@@ -1613,6 +1622,13 @@ export class KeyManager {
 
             requestCostSync().catch(console.error);
         } catch (e: any) {
+            if (isKkApiPersistenceUnavailableError(e)) {
+                if (!options?.throwOnError) {
+                    notify.warning('Cloud sync unavailable', e.message);
+                }
+                return;
+            }
+
             const isNetworkError = e.message?.includes('fetch') || e.message?.includes('Network');
             if (!isNetworkError) {
                 console.error('[KeyManager] saveToCloud failed:', e);
@@ -4506,4 +4522,3 @@ export async function autoDetectAndConfigureModels(
 }
 
 // Re-export ProxyModelConfig for convenience
-

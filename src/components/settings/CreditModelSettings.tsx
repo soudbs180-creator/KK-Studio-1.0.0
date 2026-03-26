@@ -37,6 +37,8 @@ type CreditModelRow = {
   provider_name: string;
   base_url: string;
   api_key_count: number | null;
+  api_key_entries?: Array<{ fingerprint?: string | null; preview?: string | null }> | null;
+  api_key_previews?: string[] | null;
   model_id: string;
   display_name: string;
   description: string | null;
@@ -69,11 +71,17 @@ type EditableModel = {
   qualityPricing: AdminModelQualityPricing;
 };
 
+type SavedApiKeyEntry = {
+  fingerprint: string | null;
+  preview: string;
+};
+
 type EditableProvider = {
   providerId: string;
   providerName: string;
   baseUrl: string;
-  apiKey: string;
+  savedApiKeyEntries: SavedApiKeyEntry[];
+  apiKeys: string[];
   models: EditableModel[];
 };
 
@@ -123,6 +131,68 @@ const normalizeHexColor = (value?: string | null, fallback = '#3B82F6'): string 
   return `#${hexPart.toUpperCase()}`;
 };
 
+const buildApiKeyPreview = (value: string): string => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized.length <= 8) {
+    return `${normalized.slice(0, 2)}...${normalized.slice(-2)}`;
+  }
+
+  return `${normalized.slice(0, 4)}...${normalized.slice(-4)}`;
+};
+
+const isRealApiKeyFingerprint = (value?: string | null): boolean => {
+  const normalized = String(value || '').trim();
+  return Boolean(normalized && !normalized.startsWith('preview:'));
+};
+
+const normalizeUniqueValues = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    result.push(normalized);
+  });
+
+  return result;
+};
+
+const normalizeSavedApiKeyEntries = (
+  entries?: Array<{ fingerprint?: string | null; preview?: string | null }> | null,
+  previews?: string[] | null,
+): SavedApiKeyEntry[] => {
+  const normalizedFromEntries = Array.isArray(entries)
+    ? entries
+        .map((entry) => ({
+          fingerprint: String(entry?.fingerprint || '').trim() || null,
+          preview: String(entry?.preview || '').trim(),
+        }))
+        .filter((entry) => entry.preview)
+    : [];
+
+  if (normalizedFromEntries.length > 0) {
+    return normalizedFromEntries;
+  }
+
+  return Array.isArray(previews)
+    ? previews
+        .map((preview, index) => ({
+          fingerprint: `preview:${index}:${String(preview || '').trim()}`,
+          preview: String(preview || '').trim(),
+        }))
+        .filter((entry) => entry.preview)
+    : [];
+};
+
 const newModel = (): EditableModel => ({
   modelId: '',
   displayName: '',
@@ -143,7 +213,8 @@ const emptyProvider = (): EditableProvider => ({
   providerId: '',
   providerName: '',
   baseUrl: '',
-  apiKey: '',
+  savedApiKeyEntries: [],
+  apiKeys: [''],
   models: [newModel()],
 });
 
@@ -175,6 +246,10 @@ const normalizeAdminCreditModelRows = (providers: AdminCreditProviderRpcGroup[])
       provider_name: String(provider.provider_name || provider.provider_id || '').trim(),
       base_url: String(provider.base_url || '').trim(),
       api_key_count: Math.max(0, Number(provider.api_key_count || 0)),
+      api_key_entries: normalizeSavedApiKeyEntries(provider.api_key_entries, provider.api_key_previews),
+      api_key_previews: Array.isArray(provider.api_key_previews)
+        ? provider.api_key_previews.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : [],
       model_id: String(model.model_id || '').trim(),
       display_name: String(model.display_name || model.model_id || '').trim(),
       description: model.description || '',
@@ -280,6 +355,10 @@ const CreditModelSettings: React.FC = () => {
     if (!entry) return 0;
     return getConfiguredKeyCount(entry.items[0]?.api_key_count);
   }, [providers, selectedProviderId]);
+
+  const isEditingSelectedProvider = Boolean(
+    selectedProviderId && selectedProviderId === form.providerId.trim()
+  );
 
   const activeModelCount = useMemo(
     () => rows.filter((row) => row.is_active).length,
@@ -444,8 +523,9 @@ const CreditModelSettings: React.FC = () => {
       providerId: first.provider_id,
       providerName: first.provider_name,
       baseUrl: first.base_url,
+      savedApiKeyEntries: normalizeSavedApiKeyEntries(first.api_key_entries, first.api_key_previews),
       // Existing upstream keys are intentionally never hydrated back into the client UI.
-      apiKey: '',
+      apiKeys: [''],
       models: entry.items.map((row) => ({
         modelId: normalizeBaseModelId(row.model_id),
         displayName: row.display_name,
@@ -513,6 +593,49 @@ const CreditModelSettings: React.FC = () => {
     }));
   };
 
+  const addApiKeyField = () => {
+    setForm((prev) => ({
+      ...prev,
+      apiKeys: [...prev.apiKeys, ''],
+    }));
+  };
+
+  const updateApiKeyAt = (index: number, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      apiKeys: prev.apiKeys.map((item, i) => (i === index ? value : item)),
+    }));
+  };
+
+  const removeApiKeyAt = (index: number) => {
+    setForm((prev) => {
+      const next = prev.apiKeys.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        apiKeys: next.length > 0 ? next : [''],
+      };
+    });
+  };
+
+  const removeSavedApiKeyAt = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      savedApiKeyEntries: prev.savedApiKeyEntries.filter((_, i) => i !== index),
+    }));
+  };
+
+  const replaceSavedApiKeyAt = (index: number) => {
+    const target = form.savedApiKeyEntries[index];
+    removeSavedApiKeyAt(index);
+    addApiKeyField();
+    notify.info(
+      '已标记替换',
+      target?.preview
+        ? `旧密钥 ${target.preview} 将在保存后移除，请在下方新增密钥输入框中填写新的值。`
+        : '旧密钥将在保存后移除，请填写新的密钥。'
+    );
+  };
+
   const applySuggestionToModel = (index: number) => {
     const entry = modelSuggestions[index];
     if (!entry) return;
@@ -558,16 +681,37 @@ const CreditModelSettings: React.FC = () => {
 
   const saveProvider = async () => {
     const providerId = form.providerId.trim();
-    const nextApiKey = form.apiKey.trim();
-    const canKeepExistingApiKeys =
-      selectedProviderId === providerId && selectedProviderKeyCount > 0;
+    const nextApiKeys = normalizeUniqueValues(form.apiKeys);
+    const hasSavedKeyEdits =
+      isEditingSelectedProvider && form.savedApiKeyEntries.length !== selectedProviderKeyCount;
+    const canSafelyEditSavedKeys = form.savedApiKeyEntries.every((entry) =>
+      isRealApiKeyFingerprint(entry.fingerprint)
+    );
+    const retainApiKeyFingerprints = hasSavedKeyEdits
+      ? (
+          canSafelyEditSavedKeys
+            ? form.savedApiKeyEntries
+                .map((entry) => String(entry.fingerprint || '').trim())
+                .filter(Boolean)
+            : undefined
+        )
+      : undefined;
+    const retainedKeyCount =
+      Array.isArray(retainApiKeyFingerprints)
+        ? retainApiKeyFingerprints.length
+        : (isEditingSelectedProvider ? selectedProviderKeyCount : 0);
+    const finalKeyCount = retainedKeyCount + nextApiKeys.length;
 
     if (!form.providerId.trim() || !form.providerName.trim() || !form.baseUrl.trim()) {
       notify.error('缺少字段', '供应商 ID、名称和基础 地址 为必填项');
       return;
     }
-    if (!nextApiKey && !canKeepExistingApiKeys) {
-      notify.error('缺少 接口密钥', '请填写上游 接口密钥');
+    if (hasSavedKeyEdits && !canSafelyEditSavedKeys) {
+      notify.error('无法修改已保存密钥', '当前只能看到预览，暂不支持逐条删除或替换，请切回 API 服务模式后重试。');
+      return;
+    }
+    if (finalKeyCount === 0) {
+      notify.error('缺少 接口密钥', '至少需要保留或新增一个上游 接口密钥');
       return;
     }
 
@@ -613,13 +757,32 @@ const CreditModelSettings: React.FC = () => {
         providerId,
         providerName: form.providerName.trim(),
         baseUrl: form.baseUrl.trim(),
-        apiKeys: nextApiKey ? [nextApiKey] : [],
+        apiKeys: nextApiKeys,
+        retainApiKeyFingerprints,
         models: payloadModels,
       });
 
       notify.success(
         '保存成功',
-        nextApiKey ? '积分模型配置已更新' : '积分模型配置已更新，并保留了现有上游密钥'
+        Array.isArray(retainApiKeyFingerprints)
+          ? (
+              nextApiKeys.length > 0
+                ? (
+                    retainApiKeyFingerprints.length > 0
+                      ? `积分模型配置已更新，已保留 ${retainApiKeyFingerprints.length} 个旧密钥并新增 ${nextApiKeys.length} 个密钥`
+                      : `积分模型配置已更新，已用 ${nextApiKeys.length} 个新密钥替换原有密钥`
+                  )
+                : `积分模型配置已更新，当前保留 ${retainApiKeyFingerprints.length} 个已保存密钥`
+            )
+          : (
+              nextApiKeys.length > 0
+                ? (
+                    isEditingSelectedProvider
+                      ? `积分模型配置已更新，并追加了 ${nextApiKeys.length} 个上游密钥`
+                      : `积分模型配置已更新，并保存了 ${nextApiKeys.length} 个上游密钥`
+                  )
+                : '积分模型配置已更新，并保留了现有上游密钥'
+            )
       );
       await load();
       setSelectedProviderId(providerId);
@@ -759,26 +922,107 @@ const CreditModelSettings: React.FC = () => {
                   className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm"
                 />
               </label>
-              <label className="space-y-1">
-                <span className="text-[11px] text-[var(--text-tertiary)]">上游 接口密钥</span>
-                <input
-                  type="password"
-                  value={form.apiKey}
-                  onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-                  autoComplete="new-password"
-                  placeholder={
-                    selectedProviderId && selectedProviderId === form.providerId.trim() && selectedProviderKeyCount > 0
-                      ? '留空则保留现有密钥，填写则替换'
-                      : '请输入上游 接口密钥'
-                  }
-                  className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm"
-                />
-                <div className="text-[11px] leading-5 text-[var(--text-tertiary)]">
-                  {selectedProviderId && selectedProviderId === form.providerId.trim() && selectedProviderKeyCount > 0
-                    ? `当前已配置 ${selectedProviderKeyCount} 个上游密钥。为了安全，前端不会回显真实值；留空将保留现有密钥。`
-                    : '为了安全，已有上游密钥不会回显到前端。新增或轮换时请输入新的密钥。'}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-[var(--text-tertiary)]">上游 接口密钥</span>
+                  <button
+                    type="button"
+                    onClick={addApiKeyField}
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    新增一条
+                  </button>
                 </div>
-              </label>
+
+                {isEditingSelectedProvider && form.savedApiKeyEntries.length > 0 && (
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
+                    <div className="text-[11px] font-medium text-[var(--text-primary)]">
+                      已保存密钥预览
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {form.savedApiKeyEntries.map((entry, index) => (
+                        <div
+                          key={`${entry.fingerprint || entry.preview}-${index}`}
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2"
+                        >
+                          <div className="text-[10px] text-[var(--text-tertiary)]">Key #{index + 1}</div>
+                          <div className="mt-1 font-mono text-xs text-[var(--text-primary)]">{entry.preview}</div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => replaceSavedApiKeyAt(index)}
+                              disabled={!isRealApiKeyFingerprint(entry.fingerprint)}
+                              className="text-[10px] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              替换
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeSavedApiKeyAt(index)}
+                              disabled={!isRealApiKeyFingerprint(entry.fingerprint)}
+                              className="text-[10px] text-[var(--text-tertiary)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {form.savedApiKeyEntries.some((entry) => !isRealApiKeyFingerprint(entry.fingerprint)) && (
+                      <div className="mt-2 text-[11px] leading-5 text-[var(--text-tertiary)]">
+                        当前处于回退模式，只能展示预览，暂不支持逐条删除或替换已保存密钥。
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {form.apiKeys.map((apiKey, index) => (
+                    <div
+                      key={`api-key-${index}`}
+                      className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[11px] font-medium text-[var(--text-primary)]">
+                          待新增密钥 #{index + 1}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeApiKeyAt(index)}
+                          className="text-[11px] text-[var(--text-tertiary)] transition hover:text-[var(--danger)]"
+                          disabled={form.apiKeys.length === 1 && !apiKey.trim()}
+                        >
+                          移除
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => updateApiKeyAt(index, e.target.value)}
+                        autoComplete="new-password"
+                        placeholder={
+                          isEditingSelectedProvider && selectedProviderKeyCount > 0
+                            ? '输入后会追加保存到现有密钥列表'
+                            : '请输入上游 接口密钥'
+                        }
+                        className="mt-2 w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm"
+                      />
+                      {apiKey.trim() && (
+                        <div className="mt-2 text-[11px] leading-5 text-[var(--text-tertiary)]">
+                          预览：<span className="font-mono text-[var(--text-secondary)]">{buildApiKeyPreview(apiKey)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="text-[11px] leading-5 text-[var(--text-tertiary)]">
+                  {isEditingSelectedProvider && selectedProviderKeyCount > 0
+                    ? `当前原有 ${selectedProviderKeyCount} 个上游密钥，保存后将保留 ${form.savedApiKeyEntries.length} 个已保存密钥。为了安全，只显示前后缀预览；你可以逐条删除、替换，或继续追加新的密钥。`
+                    : '支持添加多个上游密钥。为了安全，保存后只显示前后缀预览，不回显完整值。'}
+                </div>
+              </div>
             </div>
           </div>
 

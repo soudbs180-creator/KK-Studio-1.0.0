@@ -71,6 +71,7 @@
         "vite": "^6.2.0"
     },
     "overrides": {
+        "lodash": "4.17.23",
         "tar": "7.5.11",
         "minimatch": "9.0.7"
     }

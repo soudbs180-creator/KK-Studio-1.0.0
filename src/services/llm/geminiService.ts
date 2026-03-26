@@ -10,6 +10,12 @@ import { llmService } from './LLMService';
 import { ImageGenerationOptions, ProviderConfig } from './LLMAdapter';
 import { getMaxRefImages } from '../model/modelCapabilities';
 import { abortSyncImageBridgeRequest } from './syncImageBridge';
+import {
+  isSecureProxyGuestModeError,
+  isSecureProxySessionReauthError,
+  SECURE_PROXY_GUEST_MODE_MESSAGE,
+  SECURE_PROXY_SESSION_REAUTH_MESSAGE,
+} from '../model/secureModelProxy';
 
 
 // Fallback control: allow config/env-driven auto-backoff when quota is exhausted
@@ -90,7 +96,9 @@ function normalizeError(error: any): Error {
 
   const rawMessage = error?.message || error?.toString?.() || '未知错误';
   const msg = rawMessage.toLowerCase();
-  const status = error?.status || error?.code;
+  const status = typeof error?.status === 'number'
+    ? error.status
+    : (typeof error?.code === 'number' ? error.code : undefined);
   const failure = classifyApiFailure({
     error,
     status,
@@ -108,6 +116,14 @@ function normalizeError(error: any): Error {
     if (error?.responseBody !== undefined) out.responseBody = error.responseBody;
     return out as Error;
   };
+
+  if (isSecureProxySessionReauthError(error)) {
+    return withMeta(new Error(SECURE_PROXY_SESSION_REAUTH_MESSAGE));
+  }
+
+  if (isSecureProxyGuestModeError(error)) {
+    return withMeta(new Error(SECURE_PROXY_GUEST_MODE_MESSAGE));
+  }
   
   if (msg.includes('cancelled')) return withMeta(new Error("任务已取消"));
 
@@ -247,7 +263,7 @@ export const generateImage = async (
     enableImageSearch?: boolean;
     thinkingMode?: 'minimal' | 'high';
     onTaskId?: (id: string) => void;
-    onSyncBridgeRegistered?: (requestId: string) => void;
+    onSyncBridgeRegistered?: (requestId: string, startedAt?: number) => void;
   }
 ): Promise<GenerateImageResult> => {
   // 🚀 Parse Model Suffix (Consistency)

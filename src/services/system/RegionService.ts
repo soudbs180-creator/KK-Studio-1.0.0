@@ -7,6 +7,8 @@
  * - Otherwise use region-aware defaults
  */
 
+import { readRuntimeEnv } from '../../utils/runtimeEnv.ts';
+
 export class RegionService {
     private static isCNCache: boolean | null = null;
 
@@ -49,7 +51,7 @@ export class RegionService {
         const GLOBAL_GATEWAY = 'https://new.12ai.org';
 
         // Priority 1: Environment Variable Override
-        const envUrl = import.meta.env.VITE_PAYMENT_GATEWAY_URL;
+        const envUrl = readRuntimeEnv('VITE_PAYMENT_GATEWAY_URL');
         if (envUrl && typeof envUrl === 'string' && envUrl.startsWith('http')) {
             return this.normalizeUrl(envUrl);
         }

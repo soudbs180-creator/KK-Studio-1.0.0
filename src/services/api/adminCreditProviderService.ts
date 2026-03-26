@@ -33,6 +33,8 @@ export interface AdminCreditProviderRpcGroup {
   provider_name?: string | null;
   base_url?: string | null;
   api_key_count?: number | null;
+  api_key_entries?: Array<{ fingerprint?: string | null; preview?: string | null }> | null;
+  api_key_previews?: string[] | null;
   models?: AdminCreditProviderRpcModel[] | null;
 }
 
@@ -60,6 +62,7 @@ export interface SaveAdminCreditProviderInput {
   providerName: string;
   baseUrl: string;
   apiKeys: string[];
+  retainApiKeyFingerprints?: string[];
   models: SaveAdminCreditProviderModelInput[];
 }
 
@@ -92,6 +95,13 @@ function mapAdminCreditProviderGroup(
     provider_name: provider.providerName,
     base_url: provider.baseUrl,
     api_key_count: provider.apiKeyCount,
+    api_key_entries: Array.isArray(provider.apiKeyEntries)
+      ? provider.apiKeyEntries.map((entry) => ({
+          fingerprint: entry.fingerprint,
+          preview: entry.preview,
+        }))
+      : [],
+    api_key_previews: Array.isArray(provider.apiKeyPreviews) ? provider.apiKeyPreviews : [],
     models: provider.models.map((model) => mapAdminCreditProviderModel(model)),
   };
 }
@@ -176,6 +186,8 @@ export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpc
         provider_name: row.provider_name || row.provider_id || null,
         base_url: row.base_url || null,
         api_key_count: row.api_key_count ?? 0,
+        api_key_entries: Array.isArray(row.api_key_entries) ? row.api_key_entries : [],
+        api_key_previews: Array.isArray(row.api_key_previews) ? row.api_key_previews : [],
         models: Array.isArray(row.models) ? row.models : [],
       }));
     },
@@ -191,6 +203,7 @@ export async function saveAdminCreditProvider(input: SaveAdminCreditProviderInpu
           providerName: input.providerName,
           baseUrl: input.baseUrl,
           apiKeys: input.apiKeys,
+          retainApiKeyFingerprints: input.retainApiKeyFingerprints,
           models: input.models.map((model) => mapSaveModelInput(model)),
         }),
         'Failed to save admin credit provider.',

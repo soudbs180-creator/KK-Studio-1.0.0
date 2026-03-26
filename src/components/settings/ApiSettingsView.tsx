@@ -19,6 +19,12 @@ import {
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
+import { getKkApiServerHealth, type KkApiServerHealth } from '../../services/api/kkApiServerHealth';
+import { loadUserApisPayloadMetadataViaSupabase } from '../../services/api/supabaseUserApiCloudStorage';
+import {
+  extractKeyManagerCloudSlots,
+  extractUserApiProvidersFromPayload,
+} from '../../services/api/userApiPayload';
 import { useLocale } from '../../context/LocaleContext';
 import keyManager, {
   autoDetectAndConfigureModels,
@@ -35,6 +41,7 @@ import {
   SettingsHero,
   SettingsMetricCard,
   SettingsSection,
+  SETTINGS_WARNING_STYLE,
   SettingsViewShell,
 } from './SettingsScaffold';
 import {
@@ -105,6 +112,10 @@ const providerDefaults: ProviderForm = {
   value: '',
 };
 
+const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
+const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com';
+
 const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 const ROUTE_NEW_ITEM = 'new';
 
@@ -128,6 +139,194 @@ const decodeRouteParam = (value?: string) => {
 };
 
 const normalizeRouteMatchValue = (value?: string | null) => decodeRouteParam(String(value || '')).trim().toLowerCase();
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function normalizeTimestamp(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getTime();
+    }
+  }
+
+  return fallback;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => normalizeString(item)).filter(Boolean)
+    : [];
+}
+
+function hasStoredSecret(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  return isRecord(value) && value.__kkUserApiSecret === true;
+}
+
+function normalizeProtocolFormat(value: unknown, fallback: ApiProtocolFormat = 'auto'): ApiProtocolFormat {
+  return value === 'auto' || value === 'openai' || value === 'gemini' || value === 'claude'
+    ? value
+    : fallback;
+}
+
+function normalizeOfficialProvider(value: unknown): Provider {
+  const normalized = normalizeString(value).toLowerCase();
+  if (normalized === 'openai') return 'OpenAI' as Provider;
+  if (normalized === 'google' || normalized === 'gemini') return 'Google' as Provider;
+  return (normalizeString(value) || 'Google') as Provider;
+}
+
+function normalizeOptionalTimestamp(value: unknown): number | null {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  return normalizeTimestamp(value, Date.now());
+}
+
+function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
+  const raw = isRecord(rawValue) ? rawValue : null;
+  if (!raw) return null;
+
+  const id = normalizeString(raw.id);
+  if (!id) return null;
+
+  const now = Date.now();
+  const createdAt = normalizeTimestamp(raw.createdAt ?? raw.created_at, now);
+  const provider = normalizeOfficialProvider(raw.provider);
+  const defaultBaseUrl =
+    provider === 'Google'
+      ? DEFAULT_GOOGLE_BASE_URL
+      : provider === 'OpenAI'
+        ? DEFAULT_OPENAI_BASE_URL
+        : undefined;
+  const baseUrl = normalizeString(raw.baseUrl ?? raw.base_url) || defaultBaseUrl;
+
+  return {
+    id,
+    key: hasStoredSecret(raw.key) ? READONLY_SECRET_PLACEHOLDER : '',
+    name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
+    provider,
+    type: provider === 'Google' || provider === 'OpenAI' ? 'official' : (baseUrl ? 'proxy' : 'third-party'),
+    format: normalizeProtocolFormat(raw.format, provider === 'Google' ? 'gemini' : 'openai'),
+    baseUrl,
+    supportedModels: normalizeStringArray(raw.supportedModels ?? raw.supported_models),
+    disabled:
+      typeof raw.disabled === 'boolean'
+        ? raw.disabled
+        : typeof raw.is_active === 'boolean'
+          ? !raw.is_active
+          : false,
+    status:
+      raw.status === 'valid' || raw.status === 'invalid' || raw.status === 'rate_limited'
+        ? raw.status
+        : 'unknown',
+    failCount: normalizeNumber(raw.failCount ?? raw.fail_count),
+    successCount: normalizeNumber(raw.successCount ?? raw.success_count),
+    lastUsed: normalizeOptionalTimestamp(raw.lastUsed ?? raw.last_used),
+    lastError: normalizeString(raw.lastError ?? raw.last_error) || null,
+    createdAt,
+    updatedAt: normalizeTimestamp(raw.updatedAt ?? raw.updated_at, createdAt),
+    avgResponseTime: normalizeNumber(raw.avgResponseTime ?? raw.avg_response_time, 0) || undefined,
+    lastResponseTime: normalizeNumber(raw.lastResponseTime ?? raw.last_response_time, 0) || undefined,
+    usedTokens: normalizeNumber(raw.usedTokens ?? raw.used_tokens),
+    totalCost: normalizeNumber(raw.totalCost ?? raw.total_cost),
+    budgetLimit: Number.isFinite(Number(raw.budgetLimit)) ? Number(raw.budgetLimit) : -1,
+    tokenLimit: Number.isFinite(Number(raw.tokenLimit)) ? Number(raw.tokenLimit) : -1,
+  };
+}
+
+function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
+  const raw = isRecord(rawValue) ? rawValue : null;
+  if (!raw) return null;
+
+  const id = normalizeString(raw.id);
+  if (!id) return null;
+
+  const now = Date.now();
+  const createdAt = normalizeTimestamp(raw.createdAt ?? raw.created_at, now);
+  const usageRaw = isRecord(raw.usage) ? raw.usage : {};
+
+  return {
+    id,
+    name: normalizeString(raw.name) || 'Provider',
+    baseUrl: normalizeString(raw.baseUrl ?? raw.base_url),
+    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? READONLY_SECRET_PLACEHOLDER : '',
+    models: normalizeStringArray(raw.models ?? raw.supportedModels ?? raw.supported_models),
+    format: normalizeProtocolFormat(raw.format),
+    group: normalizeString(raw.group) || undefined,
+    providerColor: normalizeString(raw.providerColor ?? raw.color) || '#60A5FA',
+    isActive:
+      typeof raw.isActive === 'boolean'
+        ? raw.isActive
+        : typeof raw.is_active === 'boolean'
+          ? raw.is_active
+          : true,
+    budgetLimit: Number.isFinite(Number(raw.budgetLimit)) ? Number(raw.budgetLimit) : undefined,
+    tokenLimit: Number.isFinite(Number(raw.tokenLimit)) ? Number(raw.tokenLimit) : undefined,
+    customCostMode:
+      raw.customCostMode === 'unlimited' || raw.customCostMode === 'amount' || raw.customCostMode === 'tokens'
+        ? raw.customCostMode
+        : 'unlimited',
+    customCostValue: Number.isFinite(Number(raw.customCostValue)) ? Number(raw.customCostValue) : undefined,
+    usage: {
+      totalTokens: normalizeNumber(usageRaw.totalTokens ?? raw.usedTokens ?? raw.used_tokens),
+      totalCost: normalizeNumber(usageRaw.totalCost ?? raw.totalCost ?? raw.total_cost),
+      dailyTokens: normalizeNumber(usageRaw.dailyTokens),
+      dailyCost: normalizeNumber(usageRaw.dailyCost),
+      lastReset: normalizeTimestamp(usageRaw.lastReset, createdAt),
+    },
+    status: raw.status === 'active' || raw.status === 'error' || raw.status === 'checking' ? raw.status : 'checking',
+    lastError: normalizeString(raw.lastError ?? raw.last_error) || undefined,
+    lastChecked: normalizeOptionalTimestamp(raw.lastChecked ?? raw.last_checked) ?? undefined,
+    createdAt,
+    updatedAt: normalizeTimestamp(raw.updatedAt ?? raw.updated_at, createdAt),
+    activitySummary: isRecord(raw.activitySummary)
+      ? {
+          lastLatencyMs: normalizeNumber(raw.activitySummary.lastLatencyMs, 0) || null,
+          lastTokens: normalizeNumber(raw.activitySummary.lastTokens, 0) || null,
+          lastAmount: normalizeNumber(raw.activitySummary.lastAmount, 0) || null,
+          updatedAt: normalizeOptionalTimestamp(raw.activitySummary.updatedAt) ?? undefined,
+        }
+      : undefined,
+  };
+}
 
 const formatUsd = (value: number) =>
   new Intl.NumberFormat('zh-CN', {
@@ -450,9 +649,34 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [editorSource, setEditorSource] = useState<EditorSource>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
+  const [readonlyOfficialSlots, setReadonlyOfficialSlots] = useState<KeySlot[]>([]);
+  const [readonlyProviders, setReadonlyProviders] = useState<ThirdPartyProvider[]>([]);
 
-  const officialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
-  const thirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
+  const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
+  const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
+  const isUserApiPersistenceDegraded =
+    apiHealth !== null
+    && (
+      !apiHealth.reachable
+      || !apiHealth.persistence.userApiKeys
+      || !apiHealth.persistence.keyManager
+    );
+  const shouldUseReadonlyProfileFallback =
+    isUserApiPersistenceDegraded
+    && runtimeOfficialSlots.length === 0
+    && runtimeThirdPartyProviders.length === 0;
+  const officialSlots = useMemo(
+    () => (shouldUseReadonlyProfileFallback ? readonlyOfficialSlots : runtimeOfficialSlots),
+    [readonlyOfficialSlots, runtimeOfficialSlots, shouldUseReadonlyProfileFallback]
+  );
+  const thirdPartyProviders = useMemo(
+    () => (shouldUseReadonlyProfileFallback ? readonlyProviders : runtimeThirdPartyProviders),
+    [readonlyProviders, runtimeThirdPartyProviders, shouldUseReadonlyProfileFallback]
+  );
+  const isUsingReadonlyProfileFallback =
+    shouldUseReadonlyProfileFallback
+    && (readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0);
   const routeOfficialId = useMemo(() => decodeRouteParam(officialId), [officialId]);
   const routeProviderId = useMemo(() => decodeRouteParam(providerId || legacySupplierId), [legacySupplierId, providerId]);
   const selectedOfficialSlot = useMemo(
@@ -487,6 +711,55 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     officialSlots.filter((slot) => slot.disabled || slot.status === 'invalid' || slot.status === 'rate_limited').length +
     thirdPartyProviders.filter((provider) => !provider.isActive || provider.status === 'error').length;
   const connectedChannels = officialSlots.filter((slot) => !slot.disabled).length + activeProviders;
+  const userApiPersistenceWarning = useMemo(() => {
+    if (!apiHealth) {
+      return null;
+    }
+
+    if (!apiHealth.reachable) {
+      return pick(
+        '当前本地 API 服务不可用，设置页无法安全读取或保存完整的加密密钥状态。Supabase 中已有的数据不会丢失，但现在只能依赖只读兜底显示。',
+        'The local API server is unavailable, so this page cannot safely read or save the full encrypted key state. Existing Supabase data is still preserved, but only read-only fallbacks are available right now.',
+      );
+    }
+
+    if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
+      return pick(
+        '当前本地 API 正在使用内存仓库，而不是 Supabase 持久化仓库。Supabase 里的 user_apis 数据仍然存在，但完整密钥状态需要服务端解密，所以现在不应继续写入。',
+        'The local API server is using in-memory repositories instead of Supabase-backed persistence. The user_apis data in Supabase still exists, but the full key state needs server-side decryption, so writes should stay blocked for now.',
+      );
+    }
+
+    return null;
+  }, [apiHealth, pick]);
+  const userApiPersistenceHelper = useMemo(() => {
+    if (!apiHealth) {
+      return null;
+    }
+
+    if (!apiHealth.reachable) {
+      return pick(
+        '先确认本地 API 进程已启动，然后再重试刷新。',
+        'Start the local API server first, then try refreshing again.',
+      );
+    }
+
+    if (!apiHealth.config.hasServiceRoleKey) {
+      return pick(
+        '需要为 API 进程补上 SUPABASE_SERVICE_ROLE_KEY，并建议同时配置 USER_API_ENCRYPTION_SECRET，随后重启 3001 端口上的服务。',
+        'Add SUPABASE_SERVICE_ROLE_KEY to the API process, and preferably USER_API_ENCRYPTION_SECRET as well, then restart the service running on port 3001.',
+      );
+    }
+
+    return null;
+  }, [apiHealth, pick]);
+  const userApiActionsDisabled = isUserApiPersistenceDegraded;
+  const userApiReadOnlyHelper = isUsingReadonlyProfileFallback
+    ? pick(
+        '当前展示的是 Supabase 中的只读元数据，等本地 API 恢复到 Supabase 持久化模式后才能继续编辑、测试或切换。',
+        'The current cards are read-only metadata from Supabase. Editing, testing, and toggling can resume after the local API is back on Supabase-backed persistence.',
+      )
+    : null;
   const showInlineOfficialCreate = editorMode === null && activeTab === 'official';
   const showInlineProviderCreate = editorMode === null && activeTab === 'third-party';
   const showOfficialEditor = editorMode === 'official' || showInlineOfficialCreate;
@@ -521,11 +794,42 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     setProviders(keyManager.getProviders());
   }, []);
 
+  const refreshReadonlyProfileFallback = useCallback(async () => {
+    try {
+      const payload = await loadUserApisPayloadMetadataViaSupabase();
+      const nextOfficialSlots = extractKeyManagerCloudSlots(payload)
+        .map((slot) => toReadonlyOfficialSlot(slot))
+        .filter((slot): slot is KeySlot => Boolean(slot))
+        .filter(isOfficialSlot);
+      const nextProviders = extractUserApiProvidersFromPayload(payload)
+        .map((provider) => toReadonlyProvider(provider))
+        .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
+        .sort((left, right) => right.updatedAt - left.updatedAt);
+
+      setReadonlyOfficialSlots(nextOfficialSlots);
+      setReadonlyProviders(nextProviders);
+    } catch (error) {
+      console.warn('[ApiSettingsView] Failed to load read-only Supabase metadata fallback:', error);
+      setReadonlyOfficialSlots([]);
+      setReadonlyProviders([]);
+    }
+  }, []);
+
+  const refreshApiHealth = useCallback(async (forceRefresh = false) => {
+    const health = await getKkApiServerHealth({ forceRefresh });
+    setApiHealth(health);
+    return health;
+  }, []);
+
   const refreshCloudData = useCallback(async (silent = false) => {
     try {
-      await keyManager.refreshFromCloudNow();
+      await Promise.all([
+        keyManager.refreshFromCloudNow(),
+        refreshApiHealth(!silent),
+      ]);
     } catch (error) {
       refresh();
+      void refreshApiHealth(true);
 
       if (!silent) {
         const message =
@@ -540,13 +844,24 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     refresh();
-  }, [pick, refresh]);
+  }, [pick, refresh, refreshApiHealth]);
 
   useEffect(() => {
     refresh();
+    void refreshApiHealth();
     void refreshCloudData(true);
     return keyManager.subscribe(refresh);
-  }, [refresh, refreshCloudData]);
+  }, [refresh, refreshApiHealth, refreshCloudData]);
+
+  useEffect(() => {
+    if (!shouldUseReadonlyProfileFallback) {
+      setReadonlyOfficialSlots([]);
+      setReadonlyProviders([]);
+      return;
+    }
+
+    void refreshReadonlyProfileFallback();
+  }, [refreshReadonlyProfileFallback, shouldUseReadonlyProfileFallback]);
 
   useEffect(() => {
     if (isOfficialEditorRoute) {
@@ -621,6 +936,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     try {
       await task();
       refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : pick('褰撳墠鎿嶄綔鏆傛椂鏃犳硶瀹屾垚銆?', 'The current action could not be completed right now.');
+
+      notify.error(pick('鎿嶄綔澶辫触', 'Action failed'), message);
     } finally {
       setBusy((current) => (current === key ? null : current));
     }
@@ -709,6 +1031,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           key: officialForm.key.trim(),
           ...payload,
         });
+        await keyManager.syncToCloudNow();
         notify.success(
           pick('保存成功', 'Saved'),
           pick('官方接口配置已更新。', 'Official endpoint settings have been updated.')
@@ -729,6 +1052,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           );
           return;
         }
+        await keyManager.syncToCloudNow();
         notify.success(
           pick('新增成功', 'Created'),
           pick('官方接口已加入当前链路。', 'The official endpoint has been added to the current routing chain.')
@@ -829,6 +1153,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
       await keyManager.updateKey(slot.id, { disabled: nextDisabled });
+      await keyManager.syncToCloudNow();
       notify.success(
         nextDisabled ? pick('已暂停', 'Paused') : pick('已启用', 'Enabled'),
         pick(`${slot.name} 的调度状态已更新。`, `${slot.name} scheduling status has been updated.`)
@@ -840,6 +1165,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
       keyManager.updateProvider(provider.id, { isActive: nextActive });
+      await keyManager.syncToCloudNow();
       notify.success(
         nextActive ? pick('已启用', 'Enabled') : pick('已暂停', 'Paused'),
         pick(`${provider.name} 的调度状态已更新。`, `${provider.name} scheduling status has been updated.`)
@@ -1020,6 +1346,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               {selectedOfficialSlot ? (
                 <SettingsActionButton
                   icon={RefreshCw}
+                  disabled={userApiActionsDisabled}
                   loading={busy === `official-check:${selectedOfficialSlot.id}`}
                   onClick={() => void refreshOfficial(selectedOfficialSlot)}
                 >
@@ -1088,6 +1415,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 <>
                   <SettingsActionButton
                     icon={RefreshCw}
+                    disabled={userApiActionsDisabled}
                     loading={busy === `provider-check:${selectedProvider.id}`}
                     onClick={() => void refreshProvider(selectedProvider)}
                   >
@@ -1095,6 +1423,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                   </SettingsActionButton>
                   <SettingsActionButton
                     icon={Wand2}
+                    disabled={userApiActionsDisabled}
                     loading={busy === `provider-price:${selectedProvider.id}`}
                     onClick={() => void syncPricing(selectedProvider)}
                   >
@@ -1149,12 +1478,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           'Manage official endpoints, third-party providers, protocols, and budgets in one place. Each action now maps to one clear behavior.'
         )}
         icon={Key}
-        tone={attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}
+        tone={isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}
         badge={
-          <SettingsBadge tone={attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}>
-            {connectedChannels > 0
-              ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
-              : pick('尚未接入链路', 'No routes connected yet')}
+          <SettingsBadge tone={isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}>
+            {isUsingReadonlyProfileFallback
+              ? pick('来自 Supabase 的只读回显', 'Read-only data from Supabase')
+              : isUserApiPersistenceDegraded
+                ? pick('本地 API 未连接 Supabase 持久化', 'Local API is not using Supabase persistence')
+                : connectedChannels > 0
+                  ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
+                  : pick('尚未接入链路', 'No routes connected yet')}
           </SettingsBadge>
         }
         actions={
@@ -1166,13 +1499,22 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             >
               {pick('刷新数据', 'Refresh data')}
             </SettingsActionButton>
-            <SettingsActionButton icon={Plus} tone="primary" onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
+            <SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
               {activeTab === 'official' ? pick('新增官方接口', 'New official endpoint') : pick('新增供应商', 'New provider')}
             </SettingsActionButton>
           </>
         }
         metrics={
           <>
+            {isUserApiPersistenceDegraded ? (
+              <SettingsMetricCard
+                label={pick('持久化状态', 'Persistence status')}
+                value={isUsingReadonlyProfileFallback ? pick('正在展示 Supabase 只读数据', 'Showing read-only Supabase data') : pick('本地 API 仍在内存模式', 'Local API still uses memory mode')}
+                helper={userApiReadOnlyHelper || userApiPersistenceHelper || pick('Supabase 中的数据仍在，但完整密钥状态需要服务端解密后才能安全使用。', 'Supabase data is still there, but the full key state must be decrypted server-side before it can be used safely.')}
+                icon={RefreshCw}
+                tone="rose"
+              />
+            ) : null}
             <SettingsMetricCard
               label={pick('官方接口', 'Official endpoints')}
               value={`${officialSlots.length}`}
@@ -1268,7 +1610,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             '适合直连 OpenAI 和 Gemini 官方接口，用于承担稳定、核心的生产流量。',
             'Best for direct OpenAI and Gemini traffic that needs a stable primary route.'
           )}
-          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
+          action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
         >
           {officialSlots.length === 0 ? (
             <EmptyState
@@ -1277,7 +1619,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 '先添加 OpenAI 或 Gemini 官方接口，再让它们进入调度。',
                 'Add an OpenAI or Gemini endpoint first, then bring it into routing.'
               )}
-              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
+              action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
@@ -1322,7 +1664,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     key={slot.id}
                     title={getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
                     subtitle={slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint')}
-                    meta={pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)}
+                    meta={isUsingReadonlyProfileFallback
+                      ? pick('只读回显：密钥已在服务端加密保存', 'Read-only view: secret is stored encrypted on the server')
+                      : pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)}
                     avatar={avatar}
                     status={status}
                     metrics={metrics}
@@ -1330,9 +1674,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     error={slot.lastError}
                     actions={
                       <>
-                        <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
-                        <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" onClick={() => void toggleOfficial(slot)}>
+                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={userApiActionsDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
+                        <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleOfficial(slot)}>
                           {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
                         </SettingsActionButton>
                       </>
@@ -1351,7 +1695,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
             'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
           )}
-          action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
+          action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
@@ -1360,7 +1704,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 '先添加一个供应商，再配置协议、预算和自动价格同步。',
                 'Add a provider first, then configure its protocol, budget, and pricing sync.'
               )}
-              action={<SettingsActionButton icon={Plus} tone="primary" onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
+              action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
@@ -1420,16 +1764,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     footer={activityLine ? <div className="text-[13px] text-[var(--text-secondary)]">{activityLine}</div> : null}
                     actions={
                       <>
-                        <SettingsActionButton icon={Edit3} size="sm" onClick={() => startEditProvider(provider)}>
+                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditProvider(provider)}>
                           {pick('编辑', 'Edit')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={userApiActionsDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
                           {pick('刷新', 'Refresh')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={Wand2} size="sm" loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
+                        <SettingsActionButton icon={Wand2} size="sm" disabled={userApiActionsDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
                           {pick('自动获取价格', 'Sync pricing')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" onClick={() => void toggleProvider(provider)}>
+                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleProvider(provider)}>
                           {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
                         </SettingsActionButton>
                       </>
@@ -1535,7 +1879,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
+              <PrimaryButton disabled={userApiActionsDisabled} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
                 {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增官方接口', 'Create endpoint')}
               </PrimaryButton>
@@ -1543,7 +1887,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingOfficialId ? (
-                <DangerButton onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto">
+                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteOfficial(editingOfficialId)} className="ml-auto">
                   <Trash2 size={16} className="mr-1" />
                   {pick('删除接口', 'Delete endpoint')}
                 </DangerButton>
@@ -1670,6 +2014,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingProviderId ? (
                   <SettingsActionButton
                     icon={Wand2}
+                    disabled={userApiActionsDisabled}
                     loading={busy === `provider-price:${editingProviderId}`}
                     onClick={() => {
                       const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
@@ -1702,7 +2047,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
+              <PrimaryButton disabled={userApiActionsDisabled} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
                 {editingProviderId ? pick('保存变更', 'Save changes') : pick('新增供应商', 'Create provider')}
               </PrimaryButton>
@@ -1710,7 +2055,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingProviderId ? (
-                <DangerButton onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
+                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
                   <Trash2 size={16} className="mr-1" />
                   {pick('删除供应商', 'Delete provider')}
                 </DangerButton>

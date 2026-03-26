@@ -8,6 +8,7 @@ import ModelLogo from '../common/ModelLogo';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
 import { calculateImageHash, compressImageFile, type PreparedImageFile } from '../../utils/imageUtils';
 import { saveImage, getImage } from '../../services/storage/imageStorage'; // [NEW] Import getImage
+import { blobToDataURL } from '../../services/storage/blobUtils';
 import { fileSystemService } from '../../services/storage/fileSystemService'; // 🚀 参考图持久化
 import { notify } from '../../services/system/notificationService';
 import ImageOptionsPanel from '../image/ImageOptionsPanel';
@@ -624,6 +625,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
     const canAccessSystemCreditModels = !!user && !isTempUser;
+    const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
     // 🚀 [NEW] 模型手动锁定标识 - 解决更换 API 或模式后自动跳第一个的需求
     const [isModelManuallyLocked, setIsModelManuallyLocked] = useState<boolean>(() => {
@@ -943,6 +945,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     // Get available models based on global list and current mode
     const availableModels = useMemo(() => {
         const step1 = globalModels.filter(m => {
+            if (m.isSystemInternal && !canBrowseSystemCreditModels) return false;
             if (m.type === 'chat') return false;
             return true;
         });
@@ -1037,7 +1040,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         });
 
         return Array.from(displayGroupedModels.values());
-    }, [globalModels, config.mode, config.imageSize, canAccessSystemCreditModels]);
+    }, [globalModels, config.mode, config.imageSize, canBrowseSystemCreditModels]);
 
     const sortedAvailableModels = useMemo(() => {
         return filterAndSortModels(availableModels, '', modelCustomizations);
@@ -1479,9 +1482,80 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         }
     }, [flushPromptDraftToConfig, onGenerate]);
 
-    const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const primeClipboardImageFiles = useCallback(async (files: File[]) => {
+        const preparedFiles = await Promise.all(files.map(async (file) => {
+            const preparedFile = file as PreparedImageFile;
+            if (preparedFile.__kkPreparedDataUrl?.startsWith('data:')) {
+                return preparedFile;
+            }
+
+            try {
+                const dataUrl = await blobToDataURL(file);
+                if (dataUrl.startsWith('data:')) {
+                    preparedFile.__kkPreparedDataUrl = dataUrl;
+                }
+            } catch (error) {
+                console.warn('[PromptBar] Failed to snapshot pasted image file:', error);
+            }
+
+            return preparedFile;
+        }));
+
+        return preparedFiles;
+    }, []);
+
+    const readClipboardImagesFromNavigator = useCallback(async () => {
+        if (typeof navigator === 'undefined' || !navigator.clipboard?.read) {
+            return [] as PreparedImageFile[];
+        }
+
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            const imageFiles = await Promise.all(clipboardItems.map(async (item, index) => {
+                const imageType = item.types.find(type => type.startsWith('image/'));
+                if (!imageType) {
+                    return null;
+                }
+
+                try {
+                    const blob = await item.getType(imageType);
+                    if (!blob || blob.size === 0) {
+                        return null;
+                    }
+
+                    const ext = (imageType.split('/')[1] || 'png').replace(/[^a-z0-9.+-]/gi, '') || 'png';
+                    const file = new File([blob], `clipboard-image-${Date.now()}-${index}.${ext}`, {
+                        type: imageType,
+                        lastModified: Date.now(),
+                    }) as PreparedImageFile;
+
+                    try {
+                        const dataUrl = await blobToDataURL(blob);
+                        if (dataUrl.startsWith('data:')) {
+                            file.__kkPreparedDataUrl = dataUrl;
+                        }
+                    } catch (error) {
+                        console.warn('[PromptBar] Failed to materialize clipboard blob:', error);
+                    }
+
+                    return file;
+                } catch (error) {
+                    console.warn('[PromptBar] Failed to read clipboard image item:', error);
+                    return null;
+                }
+            }));
+
+            return imageFiles.filter((file): file is PreparedImageFile => Boolean(file));
+        } catch (error) {
+            console.warn('[PromptBar] navigator.clipboard.read failed:', error);
+            return [] as PreparedImageFile[];
+        }
+    }, []);
+
+    const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
         const imageFiles: File[] = [];
         let hasImage = false;
+        const plainTextReaders: Array<Promise<string>> = [];
 
         // 1. Prioritize native files collection (OS copied files)
         if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
@@ -1508,35 +1582,53 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     }
                 } else if (!hasImage && items[i].type === 'text/plain') {
                     // Handle Image URL Paste if no image files were directly copied
-                    items[i].getAsString((text) => {
-                        const url = text.trim();
-                        if (url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || url.startsWith('http')) {
-                            fetch(url)
-                                .then(res => {
-                                    if (!res.ok) throw new Error('Fetch failed');
-                                    const contentType = res.headers.get('content-type');
-                                    if (contentType && contentType.startsWith('image/')) {
-                                        return res.blob();
-                                    }
-                                    throw new Error('Not an image');
-                                })
-                                .then(blob => {
-                                    const file = new File([blob], "pasted_image.png", { type: blob.type });
-                                    (file as File & { __kkSourceUrl?: string }).__kkSourceUrl = url;
-                                    processFiles([file]);
-                                })
-                                .catch(() => { });
-                        }
-                    });
+                    plainTextReaders.push(new Promise((resolve) => {
+                        items[i].getAsString((text) => resolve(text));
+                    }));
                 }
             }
         }
 
-        if (imageFiles.length > 0) {
+        if (hasImage) {
             e.preventDefault();
-            processFiles(imageFiles);
+            const clipboardFiles = await readClipboardImagesFromNavigator();
+            const fallbackFiles = await primeClipboardImageFiles(imageFiles);
+            processFiles(clipboardFiles.length > 0 ? clipboardFiles : fallbackFiles);
+            return;
         }
-    }, [processFiles]);
+
+        const plainText = (e.clipboardData?.getData('text/plain') || '').trim();
+        if (!plainText) {
+            const clipboardFiles = await readClipboardImagesFromNavigator();
+            if (clipboardFiles.length > 0) {
+                e.preventDefault();
+                processFiles(clipboardFiles);
+                return;
+            }
+        }
+
+        for (const textPromise of plainTextReaders) {
+            const url = (await textPromise).trim();
+            if (url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || url.startsWith('http')) {
+                fetch(url)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Fetch failed');
+                        const contentType = res.headers.get('content-type');
+                        if (contentType && contentType.startsWith('image/')) {
+                            return res.blob();
+                        }
+                        throw new Error('Not an image');
+                    })
+                    .then(blob => {
+                        const file = new File([blob], "pasted_image.png", { type: blob.type });
+                        (file as File & { __kkSourceUrl?: string }).__kkSourceUrl = url;
+                        processFiles([file]);
+                    })
+                    .catch(() => { });
+                break;
+            }
+        }
+    }, [primeClipboardImageFiles, processFiles, readClipboardImagesFromNavigator]);
 
     const dragCounter = useRef(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -3068,6 +3160,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                                     <ModelLogo
                                                                                         modelId={model.id}
                                                                                         provider={model.provider}
+                                                                                        modelName={displayName}
                                                                                         size={20}
                                                                                         active={isActive}
                                                                                     />
@@ -3093,6 +3186,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                                 <ModelLogo
                                                                                     modelId={model.id}
                                                                                     provider={model.provider}
+                                                                                    modelName={displayName}
                                                                                     size={16}
                                                                                     active={isActive}
                                                                                 />

@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase.ts";
 
 const accessTokenStorageKey = "kk.api.access_token";
 

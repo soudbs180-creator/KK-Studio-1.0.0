@@ -1,19 +1,16 @@
 import type { WechatAuthStartResponseDto } from "../../../packages/contracts/src/index.ts";
 import { legacyWebApiClient } from "../api/kkApiClient.ts";
+import { buildAuthRedirectUrl, resolveAuthRedirectOrigin } from "../../config/authRedirect.ts";
 import { resolveWechatStartErrorMessage } from "./wechatAuthUtils.ts";
 
 export type WechatFlowMode = "login" | "bind";
 
 function resolveBrowserOrigin(): string {
-  if (typeof window === "undefined" || !window.location?.origin) {
-    throw new Error("WeChat login is only available in the browser.");
-  }
-
-  return window.location.origin;
+  return resolveAuthRedirectOrigin();
 }
 
 export function buildWechatCallbackUrl(mode: WechatFlowMode): string {
-  const callbackUrl = new URL("/auth/callback", resolveBrowserOrigin());
+  const callbackUrl = new URL(buildAuthRedirectUrl(), `${resolveBrowserOrigin()}/`);
 
   if (mode === "bind") {
     callbackUrl.searchParams.set("mode", "wechat-bind");

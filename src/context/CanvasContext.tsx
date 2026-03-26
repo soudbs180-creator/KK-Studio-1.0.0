@@ -19,6 +19,11 @@ import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/sche
 import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
+import {
+    getReferenceImageLookupIds,
+    normalizeReferenceImagesStorage,
+    toReferenceImageDataUrl,
+} from '../utils/referenceImageStorage';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
 import {
     buildImageResultIdentity,
@@ -170,7 +175,7 @@ const stripReferenceImageData = (
     referenceImages: PromptNode['referenceImages'],
     aggressive: boolean
 ): PromptNode['referenceImages'] => (
-    referenceImages?.map(ref => {
+    normalizeReferenceImagesStorage(referenceImages)?.map(ref => {
         // [CRITICAL FIX] Keep small reference images in localStorage to prevent data loss on fast refresh.
         // If storage quota is exceeded, we retry with aggressive mode that strips all ref data.
         const shouldKeep = !aggressive && ref.data && ref.data.length < 500000;
@@ -221,20 +226,27 @@ const hydrateRecoveredMediaCacheEntry = async (
 ): Promise<void> => {
     const displayUrl = normalizeMediaCacheSource(entry?.url);
     const originalUrl = normalizeMediaCacheSource(entry?.originalUrl);
-    const primaryOriginalSource = originalUrl || displayUrl;
+    const primaryOriginalSource = originalUrl;
 
-    if (!primaryOriginalSource) {
+    if (!displayUrl && !primaryOriginalSource) {
         return;
     }
 
     if (isVideoFileName(entry?.filename)) {
-        await saveImage(id, primaryOriginalSource);
+        const videoSource = primaryOriginalSource || displayUrl;
+        if (!videoSource) return;
+        await saveImage(id, videoSource);
         return;
     }
 
-    await saveOriginalImage(id, primaryOriginalSource);
+    // Never promote a thumbnail/display asset into the protected original slot.
+    // If disk recovery only found a thumbnail, keep it in the preview tiers and
+    // preserve any existing original already stored in IndexedDB/OPFS.
+    if (primaryOriginalSource) {
+        await saveOriginalImage(id, primaryOriginalSource);
+    }
 
-    if (displayUrl && displayUrl !== primaryOriginalSource) {
+    if (displayUrl) {
         await Promise.allSettled([
             saveImage(getQualityStorageId(id, ImageQuality.MICRO), displayUrl),
             saveImage(getQualityStorageId(id, ImageQuality.THUMBNAIL), displayUrl),
@@ -333,7 +345,8 @@ const getPendingSyncRequestsFromPrompt = (node?: Partial<PromptNode> | null): Pr
 type PromptRecoveryEntry = {
     taskId: string;
     resultIndex: number;
-    url: string;
+    url?: string;
+    storageId?: string;
     completedAt?: number;
     keySlotId?: string;
     provider?: string;
@@ -341,6 +354,7 @@ type PromptRecoveryEntry = {
     model?: string;
     modelLabel?: string;
     cost?: number;
+    costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
     tokens?: number;
 };
 
@@ -352,6 +366,71 @@ const getTaskResultUrlAtIndex = (urls: string[], index?: number): string | undef
     return urls[0];
 };
 
+const normalizeTaskResultStorageIds = (value?: Record<string, string> | null): Record<string, string> => {
+    if (!value || typeof value !== 'object') return {};
+
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(([key, storageId]) => (
+                String(key).trim().length > 0
+                && typeof storageId === 'string'
+                && storageId.trim().length > 0
+            ))
+            .map(([key, storageId]) => [String(key).trim(), storageId.trim()])
+    );
+};
+
+const getTaskResultStorageIdAtIndex = (
+    storageIds?: Record<string, string> | null,
+    index?: number
+): string | undefined => {
+    const normalizedStorageIds = normalizeTaskResultStorageIds(storageIds);
+    if (typeof index === 'number' && Number.isFinite(index)) {
+        const directMatch = normalizedStorageIds[String(index)];
+        if (directMatch) return directMatch;
+    }
+
+    const firstKey = Object.keys(normalizedStorageIds)[0];
+    return firstKey ? normalizedStorageIds[firstKey] : undefined;
+};
+
+const resolveStoredResultSource = async (storageId?: string | null): Promise<string | undefined> => {
+    const normalizedStorageId = typeof storageId === 'string' ? storageId.trim() : '';
+    if (!normalizedStorageId) return undefined;
+
+    try {
+        const original = await getStrictOriginalImage(normalizedStorageId);
+        if (original) return original;
+    } catch {
+        // noop
+    }
+
+    try {
+        const cached = await getImage(normalizedStorageId);
+        if (cached) return cached;
+    } catch {
+        // noop
+    }
+
+    return undefined;
+};
+
+const resolvePromptRecoveryEntrySource = async (
+    entry?: PromptRecoveryEntry | null
+): Promise<string | undefined> => {
+    if (!entry) return undefined;
+
+    const storedSource = await resolveStoredResultSource(entry.storageId);
+    if (storedSource) return storedSource;
+
+    const normalizedUrl = normalizePersistentResultUrl(entry.url) || entry.url;
+    if (normalizedUrl && !normalizedUrl.startsWith('blob:')) {
+        return normalizedUrl;
+    }
+
+    return undefined;
+};
+
 const buildPromptRecoveryEntries = (
     node: PromptNode,
     persistedTasks: PersistedTask[] = []
@@ -360,7 +439,18 @@ const buildPromptRecoveryEntries = (
     const seenKeys = new Set<string>();
 
     getPromptCompletedTasks(node).forEach((task) => {
-        getCompletedTaskResultUrls(task).forEach((url, index) => {
+        const urls = getCompletedTaskResultUrls(task);
+        const storageIds = normalizeTaskResultStorageIds(task.resultStorageIds);
+        const resultIndexes = Array.from(new Set([
+            ...urls.map((_, index) => index),
+            ...Object.keys(storageIds)
+                .map((key) => Number.parseInt(key, 10))
+                .filter((value) => Number.isFinite(value) && value >= 0),
+        ])).sort((left, right) => left - right);
+
+        resultIndexes.forEach((index) => {
+            const url = getTaskResultUrlAtIndex(urls, index);
+            const storageId = storageIds[String(index)];
             const identity = buildTaskResultIdentity({
                 taskId: task.taskId,
                 resultIndex: index,
@@ -372,6 +462,7 @@ const buildPromptRecoveryEntries = (
                 taskId: task.taskId,
                 resultIndex: index,
                 url,
+                storageId,
                 completedAt: task.completedAt,
                 keySlotId: task.keySlotId,
                 provider: task.provider,
@@ -379,6 +470,7 @@ const buildPromptRecoveryEntries = (
                 model: task.model,
                 modelLabel: task.modelLabel,
                 cost: task.cost,
+                costSource: task.costSource,
                 tokens: task.tokens,
             });
         });
@@ -388,8 +480,17 @@ const buildPromptRecoveryEntries = (
         const urls = (task.resultUrls || [])
             .map((url) => normalizePersistentResultUrl(url))
             .filter((url): url is string => !!url);
+        const storageIds = normalizeTaskResultStorageIds(task.resultStorageIds);
+        const resultIndexes = Array.from(new Set([
+            ...urls.map((_, index) => index),
+            ...Object.keys(storageIds)
+                .map((key) => Number.parseInt(key, 10))
+                .filter((value) => Number.isFinite(value) && value >= 0),
+        ])).sort((left, right) => left - right);
 
-        urls.forEach((url, index) => {
+        resultIndexes.forEach((index) => {
+            const url = getTaskResultUrlAtIndex(urls, index);
+            const storageId = storageIds[String(index)];
             const identity = buildTaskResultIdentity({
                 taskId: task.taskId,
                 resultIndex: index,
@@ -401,12 +502,14 @@ const buildPromptRecoveryEntries = (
                 taskId: task.taskId,
                 resultIndex: index,
                 url,
+                storageId,
                 completedAt: task.completedAt ? Date.parse(task.completedAt) : undefined,
                 keySlotId: task.keySlotId,
                 provider: task.provider,
                 providerLabel: task.providerLabel,
                 model: task.model,
                 cost: task.cost,
+                costSource: task.costSource,
                 tokens: task.tokens,
             });
         });
@@ -415,11 +518,21 @@ const buildPromptRecoveryEntries = (
     return entries;
 };
 
-const resolveImageRecoveryUrlFromMetadata = (
+const resolveImageRecoveryUrlFromMetadata = async (
     image: GeneratedImage,
     prompt: PromptNode | undefined,
     promptTasks: PersistedTask[] = []
-): string | undefined => {
+): Promise<string | undefined> => {
+    const directStorageCandidates = Array.from(new Set([
+        image.storageId,
+        image.id,
+    ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)));
+
+    for (const storageId of directStorageCandidates) {
+        const storedSource = await resolveStoredResultSource(storageId);
+        if (storedSource) return storedSource;
+    }
+
     const directCandidates = getImageRecoveryCandidates(image)
         .map((candidate) => normalizePersistentResultUrl(candidate) || candidate)
         .filter((candidate): candidate is string => !!candidate && !candidate.startsWith('blob:'));
@@ -430,12 +543,22 @@ const resolveImageRecoveryUrlFromMetadata = (
     if (!prompt) return undefined;
 
     const completedTask = getPromptCompletedTasks(prompt).find((task) => task.taskId === image.sourceTaskId);
+    const completedStoredSource = await resolveStoredResultSource(
+        getTaskResultStorageIdAtIndex(completedTask?.resultStorageIds, image.sourceResultIndex)
+    );
+    if (completedStoredSource) return completedStoredSource;
+
     const completedUrl = completedTask
         ? getTaskResultUrlAtIndex(getCompletedTaskResultUrls(completedTask), image.sourceResultIndex)
         : undefined;
     if (completedUrl) return completedUrl;
 
     const persistedTask = promptTasks.find((task) => task.taskId === image.sourceTaskId);
+    const persistedStoredSource = await resolveStoredResultSource(
+        getTaskResultStorageIdAtIndex(persistedTask?.resultStorageIds, image.sourceResultIndex)
+    );
+    if (persistedStoredSource) return persistedStoredSource;
+
     const persistedUrl = persistedTask
         ? getTaskResultUrlAtIndex(
             (persistedTask.resultUrls || [])
@@ -448,7 +571,7 @@ const resolveImageRecoveryUrlFromMetadata = (
 
     const promptCompletedEntries = buildPromptRecoveryEntries(prompt, promptTasks);
     if (promptCompletedEntries.length === 1) {
-        return promptCompletedEntries[0].url;
+        return resolvePromptRecoveryEntrySource(promptCompletedEntries[0]);
     }
 
     return undefined;
@@ -568,7 +691,7 @@ const normalizeRecoveredPromptNode = (
     return {
         ...node,
         childImageIds: resolvedChildImageIds,
-        referenceImages: node.referenceImages || [],
+        referenceImages: normalizeReferenceImagesStorage(node.referenceImages) || [],
         parallelCount: node.parallelCount || 1,
         tags: node.tags || [],
         isGenerating: Boolean(node.isGenerating) && !isEffectivelyComplete && !shouldMarkInterrupted,
@@ -832,12 +955,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                                     promptNodes: c.promptNodes.map(pn => ({
                                                         ...pn,
                                                         // Restore missing reference data from refs/ when storageId is available.
-                                                        referenceImages: pn.referenceImages?.map(ref => ({
-                                                            ...ref,
-                                                            ...((!ref.data && ref.storageId && refUrls.has(ref.storageId)) ? {
-                                                                data: refUrls.get(ref.storageId)
-                                                            } : {})
-                                                        })) || []
+                                                        referenceImages: normalizeReferenceImagesStorage(pn.referenceImages)?.map(ref => {
+                                                            const recoveredData = !ref.data
+                                                                ? getReferenceImageLookupIds(ref)
+                                                                    .map((lookupId) => refUrls.get(lookupId))
+                                                                    .find((value): value is string => typeof value === 'string' && value.length > 0)
+                                                                : undefined;
+
+                                                            return recoveredData
+                                                                ? { ...ref, data: recoveredData }
+                                                                : ref;
+                                                        }) || []
                                                     }))
                                                 };
                                             }),
@@ -987,12 +1115,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     c.promptNodes.forEach(pn => {
                         if (pn.referenceImages) {
                             pn.referenceImages.forEach(ref => {
-                                if (ref.data && !imageMap.has(ref.id)) {
+                                const lookupIds = getReferenceImageLookupIds(ref);
+                                if (ref.data && lookupIds.some((lookupId) => !imageMap.has(lookupId))) {
                                     // Reconstruct data URL if needed or just store raw base64 depending on storage format
                                     // referenceImages.data is typically just the base64 string, not full URL
-                                    const fullUrl = ref.data.startsWith('data:') ? ref.data : `data:${ref.mimeType};base64,${ref.data}`;
-                                    imagesToMigrate.push({ id: ref.id, url: fullUrl });
-                                    needsMigration = true;
+                                    const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType);
+                                    lookupIds.forEach((lookupId) => {
+                                        if (!imageMap.has(lookupId)) {
+                                            imagesToMigrate.push({ id: lookupId, url: fullUrl });
+                                            needsMigration = true;
+                                        }
+                                    });
                                 }
                             });
                         }
@@ -1367,12 +1500,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 let nodeUpdated = false;
                 const newRefs = await Promise.all(node.referenceImages.map(async (ref) => {
                     // If data is missing (stripped), try to load from IDB
-                    if ((!ref.data || ref.data === '') && ref.id) {
+                    if (!ref.data || ref.data === '') {
                         try {
-                            const data = await getImage(ref.id);
-                            if (data) {
-                                nodeUpdated = true;
-                                return { ...ref, data };
+                            for (const lookupId of getReferenceImageLookupIds(ref)) {
+                                const data = await getImage(lookupId);
+                                if (data) {
+                                    nodeUpdated = true;
+                                    return { ...ref, storageId: ref.storageId || lookupId, data };
+                                }
                             }
                         } catch (e) {
                             // console.warn('Failed to hydrate ref', ref.id);
@@ -1585,16 +1720,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 console.log(`[CanvasContext.addPromptNode] Saving ${node.referenceImages.length} reference images`);
                 const saveTasks = node.referenceImages.map(async (ref, index) => {
                     if (ref.data) {
-                        const mime = ref.mimeType || 'image/png';
-                        let fullUrl = ref.data;
-                        if (!fullUrl.startsWith('data:') && !fullUrl.startsWith('blob:') && !fullUrl.startsWith('http')) {
-                            fullUrl = `data:${mime};base64,${ref.data}`;
-                        }
+                        const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType || 'image/png');
+                        const lookupIds = getReferenceImageLookupIds(ref);
                         try {
-                            await saveImage(ref.id, fullUrl);
-                            console.log(`[CanvasContext.addPromptNode] Reference image ${index + 1}/${node.referenceImages?.length || 0} saved:`, ref.id);
+                            await Promise.allSettled(lookupIds.map((lookupId) => saveImage(lookupId, fullUrl)));
+                            console.log(`[CanvasContext.addPromptNode] Reference image ${index + 1}/${node.referenceImages?.length || 0} saved:`, lookupIds[0] || ref.id);
                         } catch (e: any) {
-                            console.error(`[CanvasContext.addPromptNode] Failed to save reference image ${index + 1}:`, ref.id, e?.message || e);
+                            console.error(`[CanvasContext.addPromptNode] Failed to save reference image ${index + 1}:`, lookupIds[0] || ref.id, e?.message || e);
                             // Notify the user, but do not interrupt the flow.
                             notificationService.warning('参考图保存失败', `参考图 ${index + 1} 保存失败，刷新后可能丢失`);
                         }
@@ -1640,15 +1772,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (node.referenceImages && node.referenceImages.length > 0) {
             const saveTasks = node.referenceImages.map(async ref => {
                 if (ref.data) {
-                    const mime = ref.mimeType || 'image/png';
-                    let fullUrl = ref.data;
-                    if (!fullUrl.startsWith('data:') && !fullUrl.startsWith('blob:') && !fullUrl.startsWith('http')) {
-                        fullUrl = `data:${mime};base64,${ref.data}`;
-                    }
+                    const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType || 'image/png');
                     try {
-                        await saveImage(ref.id, fullUrl);
+                        await Promise.allSettled(
+                            getReferenceImageLookupIds(ref).map((lookupId) => saveImage(lookupId, fullUrl))
+                        );
                     } catch (e) {
-                        console.error(`[CanvasContext] Failed to save reference image ${ref.id}`, e);
+                        console.error(`[CanvasContext] Failed to save reference image ${ref.storageId || ref.id}`, e);
                     }
                 }
             });
@@ -1763,10 +1893,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Persistence: Save ORIGINAL (Base64) to IndexedDB
             persistenceTasks.push((async () => {
                 try {
-                    const sourceForTypeCheck = node.originalUrl || node.url || node.apiResultUrl || '';
+                    const sourceForTypeCheck = node.originalUrl || node.apiResultUrl || node.url || '';
                     const isVideo = node.mode === 'video' || sourceForTypeCheck.startsWith('data:video/');
                     const storageId = node.storageId || node.id;
-                    const preferredOriginalSource = node.originalUrl || node.url || node.apiResultUrl || '';
+                    const preferredOriginalSource = node.originalUrl || node.apiResultUrl || node.url || '';
                     const stableOriginalSource = preferredOriginalSource.startsWith('blob:')
                         ? null
                         : preferredOriginalSource;
@@ -2166,16 +2296,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const parentUpdates: Record<string, Partial<PromptNode>> = {};
             const isMobileViewport = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
-            currentState.canvases.forEach((canvas) => {
+            for (const canvas of currentState.canvases) {
                 const promptById = new Map((canvas.promptNodes || []).map((promptNode) => [promptNode.id, promptNode] as const));
 
-                (canvas.imageNodes || []).forEach((imageNode) => {
-                    if (imageNode.url && imageNode.originalUrl) return;
+                for (const imageNode of canvas.imageNodes || []) {
+                    if (imageNode.url && imageNode.originalUrl) continue;
 
                     const parentPrompt = imageNode.parentPromptId ? promptById.get(imageNode.parentPromptId) : undefined;
                     const promptTasks = parentPrompt ? (tasksByPromptId.get(parentPrompt.id) || []) : [];
-                    const recoveredUrl = resolveImageRecoveryUrlFromMetadata(imageNode, parentPrompt, promptTasks);
-                    if (!recoveredUrl) return;
+                    const recoveredUrl = await resolveImageRecoveryUrlFromMetadata(imageNode, parentPrompt, promptTasks);
+                    if (!recoveredUrl) continue;
 
                     imageUpdates.push({
                         id: imageNode.id,
@@ -2189,9 +2319,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         storageId: imageNode.storageId || imageNode.id,
                         url: recoveredUrl,
                     });
-                });
+                }
 
-                (canvas.promptNodes || []).forEach((promptNode) => {
+                for (const promptNode of canvas.promptNodes || []) {
                     const promptTasks = tasksByPromptId.get(promptNode.id) || [];
                     const existingChildren = (canvas.imageNodes || []).filter((imageNode) => imageNode.parentPromptId === promptNode.id);
                     const seenResultKeys = new Set<string>();
@@ -2224,20 +2354,28 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         return true;
                     });
 
-                    if (!missingEntries.length) {
-                        return;
-                    }
+                    if (!missingEntries.length) continue;
+
+                    const resolvedMissingEntries = (
+                        await Promise.all(missingEntries.map(async (entry) => {
+                            const sourceUrl = await resolvePromptRecoveryEntrySource(entry);
+                            if (!sourceUrl) return null;
+                            return { entry, sourceUrl };
+                        }))
+                    ).filter((item): item is { entry: PromptRecoveryEntry; sourceUrl: string } => !!item);
+
+                    if (!resolvedMissingEntries.length) continue;
 
                     const positions = buildGeneratedImageBatchPositions({
                         basePosition: promptNode.position,
-                        items: missingEntries.map(() => ({
+                        items: resolvedMissingEntries.map(() => ({
                             aspectRatio: promptNode.aspectRatio,
                         })),
                         mode: promptNode.mode,
                         isMobile: isMobileViewport,
                     });
 
-                    const nextRecoveredNodes = missingEntries.map((entry, index) => {
+                    const nextRecoveredNodes = resolvedMissingEntries.map(({ entry, sourceUrl }, index) => {
                         const imageId = `${promptNode.id}_restored_${entry.taskId.replace(/[^a-zA-Z0-9_-]/g, '_')}_${entry.resultIndex}`;
                         const position = positions[index] || {
                             x: promptNode.position.x,
@@ -2246,10 +2384,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                         return {
                             id: imageId,
-                            storageId: imageId,
-                            url: entry.url,
-                            originalUrl: entry.url,
-                            apiResultUrl: entry.url,
+                            storageId: entry.storageId || imageId,
+                            url: sourceUrl,
+                            originalUrl: sourceUrl,
+                            apiResultUrl: normalizePersistentResultUrl(entry.url),
                             prompt: promptNode.prompt,
                             aspectRatio: promptNode.aspectRatio,
                             imageSize: promptNode.imageSize,
@@ -2271,6 +2409,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             sourceResultIndex: entry.resultIndex,
                             sourceReferenceStorageIds: (promptNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                             cost: entry.cost,
+                            costSource: entry.costSource,
                             tokens: entry.tokens,
                         } satisfies GeneratedImage;
                     });
@@ -2295,8 +2434,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         error: undefined,
                         errorDetails: undefined,
                     };
-                });
-            });
+                }
+            }
 
             if (cancelled) return;
 
@@ -5029,9 +5168,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         // Ensure the image exists in IndexedDB.
                         const existingUrl = await getImage(img.id);
                         if (!existingUrl && (img.url || img.originalUrl || img.apiResultUrl)) {
-                            const urlToSave = img.originalUrl || img.url || img.apiResultUrl;
+                            const originalSource = img.originalUrl || img.apiResultUrl;
+                            const urlToSave = originalSource || img.url;
                             if (urlToSave && !urlToSave.startsWith('blob:')) {
-                                await saveImage(img.id, urlToSave);
+                                if (originalSource) {
+                                    await saveOriginalImage(img.id, originalSource);
+                                } else {
+                                    await saveImage(img.id, urlToSave);
+                                }
                                 console.log('[MigrateNodes] Saved image ' + img.id + ' to IndexedDB');
                             }
                         }

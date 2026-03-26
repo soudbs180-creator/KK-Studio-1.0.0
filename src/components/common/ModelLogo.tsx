@@ -1,234 +1,254 @@
-import React, { useMemo } from 'react';
-import geminiLogo from '../../assets/icons/google-gemini.svg';
-import { useTheme } from '../../context/ThemeContext';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getLobeIconCDN } from '@lobehub/icons/es/features/getLobeIconCDN';
+import eigenAiIcon from '../../assets/model-logos/eigen-ai.svg';
+import higgsfieldIcon from '../../assets/model-logos/higgsfield.png';
+import imagineArtIcon from '../../assets/model-logos/imagineart.png';
+import reveIcon from '../../assets/model-logos/reve.svg';
+import riffusionProducerIcon from '../../assets/model-logos/riffusion-producer.png';
 
 interface ModelLogoProps {
     modelId: string;
     provider?: string;
+    modelName?: string;
     size?: number;
     active?: boolean;
     className?: string;
 }
 
-interface LogoDescriptor {
-    background: string;
-    borderColor: string;
-    color: string;
-    imageSrc?: string;
-    label: string;
-    title: string;
-}
+type IconVariant = 'color' | 'mono';
 
-const BRAND_LOGOS: Array<{ match: string[]; descriptor: Omit<LogoDescriptor, 'title'> }> = [
-    {
-        match: ['gemini', 'google', 'nano-banana'],
-        descriptor: {
-            background: 'linear-gradient(135deg, rgba(66,133,244,0.14), rgba(52,168,83,0.18))',
-            borderColor: 'rgba(66,133,244,0.24)',
-            color: '#4285F4',
-            imageSrc: geminiLogo,
-            label: 'GM',
-        },
-    },
-    {
-        match: ['gpt', 'openai', 'o1', 'o3', 'o4'],
-        descriptor: {
-            background: '#111827',
-            borderColor: 'rgba(17,24,39,0.35)',
-            color: '#FFFFFF',
-            label: 'AI',
-        },
-    },
-    {
-        match: ['claude', 'anthropic'],
-        descriptor: {
-            background: '#D97757',
-            borderColor: 'rgba(217,119,87,0.35)',
-            color: '#FFF7ED',
-            label: 'CL',
-        },
-    },
-    {
-        match: ['deepseek'],
-        descriptor: {
-            background: '#2563EB',
-            borderColor: 'rgba(37,99,235,0.3)',
-            color: '#EFF6FF',
-            label: 'DS',
-        },
-    },
-    {
-        match: ['qwen', 'tongyi', 'alibaba', 'dashscope'],
-        descriptor: {
-            background: '#7C3AED',
-            borderColor: 'rgba(124,58,237,0.28)',
-            color: '#F5F3FF',
-            label: 'QW',
-        },
-    },
-    {
-        match: ['grok', 'xai'],
-        descriptor: {
-            background: '#0F172A',
-            borderColor: 'rgba(15,23,42,0.35)',
-            color: '#E2E8F0',
-            label: 'GX',
-        },
-    },
-    {
-        match: ['llama', 'meta'],
-        descriptor: {
-            background: '#2563EB',
-            borderColor: 'rgba(37,99,235,0.3)',
-            color: '#DBEAFE',
-            label: 'MT',
-        },
-    },
-    {
-        match: ['doubao'],
-        descriptor: {
-            background: '#0F766E',
-            borderColor: 'rgba(15,118,110,0.28)',
-            color: '#CCFBF1',
-            label: 'DB',
-        },
-    },
-    {
-        match: ['kimi', 'moonshot'],
-        descriptor: {
-            background: '#DB2777',
-            borderColor: 'rgba(219,39,119,0.25)',
-            color: '#FCE7F3',
-            label: 'KM',
-        },
-    },
-    {
-        match: ['mistral'],
-        descriptor: {
-            background: '#EA580C',
-            borderColor: 'rgba(234,88,12,0.25)',
-            color: '#FFF7ED',
-            label: 'MS',
-        },
-    },
-    {
-        match: ['flux', 'fal'],
-        descriptor: {
-            background: '#4F46E5',
-            borderColor: 'rgba(79,70,229,0.3)',
-            color: '#EEF2FF',
-            label: 'FX',
-        },
-    },
+const NANO_BANANA_KEYWORDS = [
+    'gemini-2.5-flash-image',
+    'gemini-3.1-flash-image-preview',
+    'gemini-3-pro-image-preview',
+    'image_nanobanana',
+    'image nanobanana',
+    'image_nanobanana2',
+    'image nanobanana2',
+    'image_nanobanana_pro',
+    'image nanobanana pro',
+    'nano banana',
+    'nanobanana',
 ];
 
-function getInitials(value: string): string {
-    const cleaned = value
+const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
+    { iconId: 'google', keywords: ['gemini', 'imagen', 'veo', 'learnlm', 'lyria', 'nano banana', 'nanobanana', 'google'] },
+    { iconId: 'openai', keywords: ['gpt', 'chatgpt', 'dall-e', 'dalle', 'codex', 'openai', 'sora', 'o1', 'o3', 'o4'] },
+    { iconId: 'anthropic', keywords: ['claude', 'anthropic'] },
+    { iconId: 'deepseek', keywords: ['deepseek'] },
+    { iconId: 'qwen', keywords: ['qwen', 'qwq', 'qvq', 'wanx', 'tongyi', 'wan 2', 'wan2', 'wan video', 'wan image'] },
+    { iconId: 'midjourney', keywords: ['midjourney', 'mj', 'niji', 'nijijourney'] },
+    { iconId: 'runway', keywords: ['runway', 'runwayml', 'gen-2', 'gen-3', 'gen-4', 'gen 2', 'gen 3', 'gen 4'] },
+    { iconId: 'luma', keywords: ['luma', 'dream machine', 'lumadreammachine', 'ray2', 'ray3', 'ray 2', 'ray 3'] },
+    { iconId: 'kling', keywords: ['kling'] },
+    { iconId: 'pika', keywords: ['pika'] },
+    { iconId: 'ideogram', keywords: ['ideogram'] },
+    { iconId: 'recraft', keywords: ['recraft'] },
+    { iconId: 'adobe', keywords: ['adobe', 'firefly'] },
+    { iconId: 'suno', keywords: ['suno'] },
+    { iconId: 'udio', keywords: ['udio'] },
+    { iconId: 'elevenlabs', keywords: ['elevenlabs', 'eleven'] },
+    { iconId: 'fishaudio', keywords: ['fish audio', 'fish-audio', 'fishaudio'] },
+    { iconId: 'pixverse', keywords: ['pixverse'] },
+    { iconId: 'viggle', keywords: ['viggle'] },
+    { iconId: 'hailuo', keywords: ['hailuo'] },
+    { iconId: 'vidu', keywords: ['vidu'] },
+    { iconId: 'bytedance', keywords: ['jimeng', 'seedream', 'seedance', 'bytedance'] },
+    { iconId: 'moonshot', keywords: ['moonshot', 'kimi'] },
+    { iconId: 'baidu', keywords: ['baidu', 'ernie', 'wenxin'] },
+    { iconId: 'zhipu', keywords: ['zhipu', 'glm', 'bigmodel', 'cogview', 'cogvideo'] },
+    { iconId: 'zeroone', keywords: ['yi-', 'yi ', '01.ai', '01 ai', 'lingyi'] },
+    { iconId: 'xiaomimimo', keywords: ['xiaomi mimo', 'xiaomimimo', 'mimo'] },
+    { iconId: 'aws', keywords: ['amazon nova', 'nova'] },
+    { iconId: 'xai', keywords: ['grok', 'xai'] },
+    { iconId: 'meta', keywords: ['llama', 'meta'] },
+    { iconId: 'mistral', keywords: ['mistral'] },
+    { iconId: 'perplexity', keywords: ['perplexity', 'sonar'] },
+    { iconId: 'cohere', keywords: ['cohere', 'command-r'] },
+    { iconId: 'groq', keywords: ['groq'] },
+    { iconId: 'minimax', keywords: ['minimax', 'abab', 'hailuo'] },
+    { iconId: 'volcengine', keywords: ['volcengine', 'doubao'] },
+    { iconId: 'tencentcloud', keywords: ['tencent cloud', 'tencent', 'hunyuan'] },
+    { iconId: 'bailian', keywords: ['aliyun', 'alibaba cloud', 'bailian'] },
+    { iconId: 'siliconcloud', keywords: ['siliconflow', 'siliconcloud'] },
+    { iconId: 'openrouter', keywords: ['openrouter'] },
+    { iconId: 'vertexai', keywords: ['vertex ai', 'vertexai'] },
+    { iconId: 'azure', keywords: ['azure openai', 'azure'] },
+    { iconId: 'bedrock', keywords: ['bedrock'] },
+    { iconId: 'together', keywords: ['together'] },
+    { iconId: 'fal', keywords: ['fal'] },
+    { iconId: 'bfl', keywords: ['flux', 'black forest labs', 'black-forest-labs'] },
+    { iconId: 'stability', keywords: ['stability', 'stable-diffusion', 'stable video', 'sv3d', 'svd'] },
+];
+
+const CUSTOM_ICON_MATCHERS: Array<{ iconUrl: string; keywords: string[] }> = [
+    { iconUrl: eigenAiIcon, keywords: ['eigen', 'eigen image'] },
+    { iconUrl: higgsfieldIcon, keywords: ['higgsfield'] },
+    { iconUrl: imagineArtIcon, keywords: ['imagineart', 'imagine art'] },
+    { iconUrl: reveIcon, keywords: ['reve', 'reve v1'] },
+    { iconUrl: riffusionProducerIcon, keywords: ['riffusion'] },
+];
+
+function normalizeValue(value?: string): string {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[@/_.-]+/g, ' ')
+        .replace(/[^a-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ');
+}
+
+function matchesKeyword(candidate: string, keyword: string): boolean {
+    const normalizedKeyword = normalizeValue(keyword);
+    if (!candidate || !normalizedKeyword) return false;
+
+    if (candidate === normalizedKeyword) return true;
+
+    if (normalizedKeyword.length <= 2) {
+        return candidate
+            .split(' ')
+            .filter(Boolean)
+            .some((token) => token === normalizedKeyword || token.startsWith(normalizedKeyword));
+    }
+
+    return candidate.includes(normalizedKeyword);
+}
+
+function resolveIconId(modelId: string, provider?: string, modelName?: string): string | undefined {
+    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const matched = ICON_MATCHERS.find(({ keywords }) =>
+            keywords.some((keyword) => matchesKeyword(candidate, keyword))
+        );
+
+        if (matched) {
+            return matched.iconId;
+        }
+    }
+
+    return undefined;
+}
+
+function resolveCustomIconUrl(modelId: string, provider?: string, modelName?: string): string | undefined {
+    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const matched = CUSTOM_ICON_MATCHERS.find(({ keywords }) =>
+            keywords.some((keyword) => matchesKeyword(candidate, keyword))
+        );
+
+        if (matched) {
+            return matched.iconUrl;
+        }
+    }
+
+    return undefined;
+}
+
+function isNanoBananaSeries(modelId: string, provider?: string, modelName?: string): boolean {
+    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
+
+    return candidates.some((candidate) =>
+        NANO_BANANA_KEYWORDS.some((keyword) => candidate.includes(keyword))
+    );
+}
+
+function getFallbackInitials(modelId: string, provider?: string): string {
+    const source = (provider || modelId || 'AI')
         .replace(/[@/_-]+/g, ' ')
         .replace(/[^a-zA-Z0-9 ]/g, ' ')
         .trim();
 
-    if (!cleaned) return 'AI';
+    if (!source) return 'AI';
 
-    const parts = cleaned.split(/\s+/).filter(Boolean);
+    const parts = source.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
         return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
     }
 
-    return cleaned.slice(0, 2).toUpperCase();
-}
-
-function getFallbackDescriptor(modelId: string, provider?: string): LogoDescriptor {
-    const source = (provider || modelId || 'AI').trim();
-    const hueSeed = source
-        .split('')
-        .reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-
-    return {
-        background: `linear-gradient(135deg, hsla(${hueSeed}, 78%, 48%, 0.92), hsla(${(hueSeed + 36) % 360}, 72%, 42%, 0.92))`,
-        borderColor: `hsla(${hueSeed}, 78%, 48%, 0.24)`,
-        color: '#FFFFFF',
-        label: getInitials(source),
-        title: source,
-    };
-}
-
-function neutralizeDescriptor(theme: 'light' | 'dark', descriptor: LogoDescriptor): LogoDescriptor {
-    return {
-        ...descriptor,
-        background: theme === 'light' ? '#F3F4F6' : '#1F2937',
-        borderColor: theme === 'light' ? 'rgba(209,213,219,0.9)' : 'rgba(75,85,99,0.9)',
-        color: theme === 'light' ? '#4B5563' : '#D1D5DB',
-    };
-}
-
-function resolveLogoDescriptor(modelId: string, provider?: string): LogoDescriptor {
-    const lowerModelId = modelId.toLowerCase();
-    const lowerProvider = (provider || '').toLowerCase();
-
-    for (const item of BRAND_LOGOS) {
-        if (item.match.some((keyword) => lowerModelId.includes(keyword) || lowerProvider.includes(keyword))) {
-            return {
-                ...item.descriptor,
-                title: provider || modelId,
-            };
-        }
-    }
-
-    return getFallbackDescriptor(modelId, provider);
+    return source.slice(0, 2).toUpperCase();
 }
 
 const ModelLogo: React.FC<ModelLogoProps> = ({
     modelId,
     provider,
+    modelName,
     size = 18,
     active = true,
     className = '',
 }) => {
-    const { resolvedTheme } = useTheme();
+    const [variant, setVariant] = useState<IconVariant>('color');
+    const [hasError, setHasError] = useState(false);
+    const isNanoBanana = useMemo(() => isNanoBananaSeries(modelId, provider, modelName), [modelId, modelName, provider]);
+    const iconId = useMemo(() => resolveIconId(modelId, provider, modelName), [modelId, modelName, provider]);
+    const customIconUrl = useMemo(() => resolveCustomIconUrl(modelId, provider, modelName), [modelId, modelName, provider]);
+    const fallbackInitials = useMemo(() => getFallbackInitials(modelName || modelId, provider), [modelId, modelName, provider]);
 
-    const descriptor = useMemo(() => {
-        const resolved = resolveLogoDescriptor(modelId, provider);
-        const shouldUseBrandStyle = resolvedTheme === 'dark' || active;
-        return shouldUseBrandStyle ? resolved : neutralizeDescriptor(resolvedTheme, resolved);
-    }, [active, modelId, provider, resolvedTheme]);
+    useEffect(() => {
+        setVariant('color');
+        setHasError(false);
+    }, [customIconUrl, iconId]);
 
-    const innerSize = Math.max(10, Math.round(size * 0.72));
-    const textSize = Math.max(9, Math.round(size * 0.42));
+    const iconUrl = iconId
+        ? getLobeIconCDN(iconId, {
+            cdn: 'aliyun',
+            format: 'svg',
+            type: variant,
+        })
+        : null;
+    const displayIconUrl = iconUrl || customIconUrl || null;
 
     return (
         <span
-            title={descriptor.title}
-            className={`inline-flex items-center justify-center overflow-hidden transition-all duration-200 ${active ? '' : 'opacity-50'} ${className}`}
-            style={{
-                width: size,
-                height: size,
-                borderRadius: Math.max(6, Math.round(size * 0.34)),
-                background: descriptor.background,
-                border: `1px solid ${descriptor.borderColor}`,
-                color: descriptor.color,
-                boxShadow: resolvedTheme === 'dark'
-                    ? '0 6px 18px rgba(15, 23, 42, 0.18)'
-                    : '0 4px 14px rgba(15, 23, 42, 0.08)',
-            }}
+            title={provider || modelId}
+            className={`inline-flex items-center justify-center overflow-hidden ${active ? '' : 'opacity-60'} ${className}`}
+            style={{ width: size, height: size }}
         >
-            {descriptor.imageSrc ? (
+            {isNanoBanana ? (
+                <span
+                    role="img"
+                    aria-label="Nano Banana"
+                    style={{
+                        width: size,
+                        height: size,
+                        fontSize: Math.max(12, Math.round(size * 0.92)),
+                        lineHeight: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    {'\u{1F34C}'}
+                </span>
+            ) : displayIconUrl && !hasError ? (
                 <img
-                    src={descriptor.imageSrc}
-                    alt={descriptor.title}
-                    style={{ width: innerSize, height: innerSize }}
+                    src={displayIconUrl}
+                    alt={provider || modelId}
+                    width={size}
+                    height={size}
                     className="object-contain"
+                    onError={() => {
+                        if (iconUrl && variant === 'color') {
+                            setVariant('mono');
+                            return;
+                        }
+
+                        setHasError(true);
+                    }}
                 />
             ) : (
                 <span
+                    className="inline-flex items-center justify-center rounded-[30%] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
                     style={{
-                        fontSize: textSize,
+                        width: size,
+                        height: size,
+                        fontSize: Math.max(8, Math.round(size * 0.42)),
                         fontWeight: 700,
-                        letterSpacing: '0.02em',
                         lineHeight: 1,
                     }}
                 >
-                    {descriptor.label}
+                    {fallbackInitials}
                 </span>
             )}
         </span>

@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { PromptNode, AspectRatio, GenerationMode } from '../../types';
+import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata } from '../../types';
 import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -21,6 +21,20 @@ const truncateByChars = (text: string, maxChars: number): string => {
     return text.length > maxChars ? `${text.slice(0, Math.max(1, maxChars - 1))}…` : text;
 };
 
+const getCreditFailureSuffix = (
+    node: Pick<PromptNode, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'refundStatus'>
+) => {
+    const isCreditModel = isCreditBillingTarget(node);
+    if (!isCreditModel) return '';
+    if (node.refundStatus === 'success') return '，积分已退回';
+    if (node.refundStatus === 'failed') return '，积分退款失败';
+    return '';
+};
+
+const getPromptFailureLabel = (
+    node: Pick<PromptNode, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'refundStatus'>
+) => `生成失败${getCreditFailureSuffix(node)}`;
+
 const CARD_LAUNCH_OVERLAY_Z_INDEX = 980;
 
 const getPromptStackZIndex = (node: PromptNode, isSelected: boolean, groupLayerZIndex?: number) => {
@@ -35,6 +49,23 @@ const getPromptStackZIndex = (node: PromptNode, isSelected: boolean, groupLayerZ
 const snapCanvasCoordinate = (value: number, scale: number = 1) => {
     if (!Number.isFinite(value) || !Number.isFinite(scale) || scale <= 0) return value;
     return Math.round(value * scale) / scale;
+};
+
+const getFiniteTimerStart = (value: unknown): number | undefined => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
+);
+
+const resolveGenerationTimerStart = (node: PromptNode): number | undefined => {
+    const metadata = node.generationMetadata as PromptGenerationMetadata | undefined;
+    const pendingSyncStarts = (metadata?.pendingSyncRequests || [])
+        .map((item) => getFiniteTimerStart(item.startedAt))
+        .filter((value): value is number => value !== undefined);
+
+    if (pendingSyncStarts.length > 0) {
+        return Math.min(...pendingSyncStarts);
+    }
+
+    return getFiniteTimerStart(metadata?.attemptStartedAt) ?? getFiniteTimerStart(node.timestamp);
 };
 
 interface PromptNodeProps {
@@ -325,7 +356,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
     const [showErrorDetails, setShowErrorDetails] = useState(false);
     const [showTraceDetails, setShowTraceDetails] = useState(false);
-    const timerStartRef = useRef<number>(node.timestamp || Date.now());
+    const resolvedTimerStart = resolveGenerationTimerStart(node);
+    const timerStartRef = useRef<number>(resolvedTimerStart ?? Date.now());
 
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -395,8 +427,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     }, [node.id]);
 
     useEffect(() => {
-        timerStartRef.current = node.timestamp || Date.now();
-    }, [node.id, node.timestamp]);
+        if (resolvedTimerStart !== undefined) {
+            timerStartRef.current = resolvedTimerStart;
+        }
+    }, [node.id, resolvedTimerStart]);
 
     useEffect(() => {
         return () => {
@@ -725,6 +759,19 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         : isSelected
             ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
             : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
+    const promptCardBorderColor = showError
+        ? 'rgba(239, 68, 68, 0.5)'
+        : isSelected
+            ? 'rgba(59, 130, 246, 0.78)'
+            : highlighted
+                ? 'rgba(59, 130, 246, 0.44)'
+                : 'var(--border-light)';
+    const promptCardScale = isDragging
+        ? 1
+        : isSelected
+            ? 1.016
+            : (highlighted ? 1.01 : 1);
+    const promptCardTransform = `scale(${promptCardScale})`;
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
@@ -761,12 +808,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         width: isChatMode ? '100%' : cardWidth,
                         maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
                         backgroundColor: 'var(--bg-overlay)',
-                        borderColor: showError
-                            ? 'rgba(239, 68, 68, 0.45)'
-                            : isSelected
-                                ? 'rgba(59, 130, 246, 0.6)'
-                                : 'var(--border-light)',
+                        borderColor: promptCardBorderColor,
                         boxShadow: shellCardShadow,
+                        transform: promptCardTransform,
+                        transformOrigin: '50% 50%',
+                        transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
+                        transitionProperty: 'transform, box-shadow, border-color',
                     }}
                 >
                     {onConnectStart && !isChatMode && (
@@ -798,7 +845,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <Sparkles size={12} />
                             )}
                             <span className="truncate">
-                                {showError ? '生成异常' : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
+                                {showError ? getPromptFailureLabel(node) : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
                             </span>
                         </div>
                         <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
@@ -911,10 +958,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     width: isChatMode ? '100%' : cardWidth,
                     maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
                     backgroundColor: 'var(--bg-overlay)',
-                    borderColor: showError
-                        ? 'rgba(239, 68, 68, 0.5)'
-                        : isSelected ? 'rgba(59, 130, 246, 0.6)' : 'var(--border-light)',
+                    borderColor: promptCardBorderColor,
                     boxShadow: mainCardShadow,
+                    transform: promptCardTransform,
+                    transformOrigin: '50% 50%',
+                    transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
+                    transitionProperty: 'transform, box-shadow, border-color',
                 }}
             >
                 {/* 🚀 [NEW] Connection Point - Bottom Center */}
@@ -951,14 +1000,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     </svg>
                                 </div>
                                 <span className="text-[13px] font-medium tracking-wide truncate text-red-500" title={node.error}>
-                                    {'\u751f\u6210\u5931\u8d25'}{(() => {
-                                        // Keep refund messaging aligned with the same credit-billing detection used by subcards.
-                                        const isCreditModel = isCreditBillingTarget(node);
-                                        if (!isCreditModel) return '';
-                                        if (node.refundStatus === 'success') return '\uff0c\u79ef\u5206\u5df2\u9000\u56de';
-                                        if (node.refundStatus === 'failed') return '\uff0c\u79ef\u5206\u9000\u6b3e\u5931\u8d25';
-                                        return '';
-                                    })()}
+                                    {getPromptFailureLabel(node)}
                                 </span>
                             </>
                         ) : node.isGenerating ? (

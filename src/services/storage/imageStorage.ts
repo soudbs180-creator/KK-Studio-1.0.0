@@ -152,6 +152,135 @@ async function toBlobFromAnyUrl(dataURL: string): Promise<Blob | null> {
     }
 }
 
+type StoredImageRecord = {
+    id: string;
+    blob?: Blob;
+    url?: string;
+    quality?: string;
+    protected?: boolean;
+    width?: number;
+    height?: number;
+    pixelCount?: number;
+    timestamp?: number;
+};
+
+type ImageMetrics = {
+    width: number;
+    height: number;
+    pixelCount: number;
+};
+
+async function measureImageBlob(blob: Blob): Promise<ImageMetrics | null> {
+    if (!(blob instanceof Blob) || blob.size <= 0) return null;
+    if (typeof blob.type === 'string' && blob.type && !blob.type.startsWith('image/')) {
+        return null;
+    }
+
+    if (typeof createImageBitmap === 'function') {
+        try {
+            const bitmap = await createImageBitmap(blob);
+            try {
+                if (bitmap.width > 0 && bitmap.height > 0) {
+                    return {
+                        width: bitmap.width,
+                        height: bitmap.height,
+                        pixelCount: bitmap.width * bitmap.height,
+                    };
+                }
+            } finally {
+                bitmap.close();
+            }
+        } catch {
+            // Fall back to HTMLImageElement below.
+        }
+    }
+
+    if (typeof Image === 'undefined') {
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const img = new Image();
+
+        const cleanup = () => {
+            URL.revokeObjectURL(objectUrl);
+            img.onload = null;
+            img.onerror = null;
+        };
+
+        img.onload = () => {
+            const width = img.naturalWidth || img.width;
+            const height = img.naturalHeight || img.height;
+            cleanup();
+
+            if (width > 0 && height > 0) {
+                resolve({ width, height, pixelCount: width * height });
+                return;
+            }
+
+            resolve(null);
+        };
+
+        img.onerror = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        img.src = objectUrl;
+    });
+}
+
+async function resolveStoredImageMetrics(record?: StoredImageRecord | null): Promise<ImageMetrics | null> {
+    if (!record) return null;
+
+    if (
+        typeof record.pixelCount === 'number'
+        && Number.isFinite(record.pixelCount)
+        && record.pixelCount > 0
+        && typeof record.width === 'number'
+        && Number.isFinite(record.width)
+        && record.width > 0
+        && typeof record.height === 'number'
+        && Number.isFinite(record.height)
+        && record.height > 0
+    ) {
+        return {
+            width: record.width,
+            height: record.height,
+            pixelCount: record.pixelCount,
+        };
+    }
+
+    if (record.blob) {
+        return measureImageBlob(record.blob);
+    }
+
+    if (typeof record.url === 'string' && record.url.trim().length > 0) {
+        try {
+            const blob = await toBlobFromAnyUrl(record.url);
+            if (!blob) return null;
+            return measureImageBlob(blob);
+        } catch {
+            return null;
+        }
+    }
+
+    return null;
+}
+
+async function getStoredImageRecord(id: string): Promise<StoredImageRecord | undefined> {
+    const db = await openDB();
+    const transaction = db.transaction(IMAGES_STORE, 'readonly');
+    const store = transaction.objectStore(IMAGES_STORE);
+
+    return new Promise((resolve, reject) => {
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result as StoredImageRecord | undefined);
+        request.onerror = () => reject(request.error);
+    });
+}
+
 function openDB(): Promise<IDBDatabase> {
     if (dbPromise) return dbPromise;
 
@@ -198,13 +327,12 @@ export function generateImageId(): string {
  */
 export async function saveImage(id: string, dataURL: string): Promise<void> {
     try {
-        let saveObject: any = {
+        let saveObject: StoredImageRecord = {
             id,
             timestamp: Date.now()
         };
 
         try {
-            // 🚀 尝试转换为Blob（兼容 data:/blob:/http）
             const blob = await toBlobFromAnyUrl(dataURL);
 
             if (blob) {
@@ -216,23 +344,23 @@ export async function saveImage(id: string, dataURL: string): Promise<void> {
             }
         } catch (err: any) {
             if (err.message === 'FETCH_FAILED') {
-                // 跨域导致 fetch 失败的外部 URL，直接保存字符串
-                console.log(`[ImageStorage] 🌐 Cannot convert ${id} to Blob due to CORS, saving raw URL instead`);
+                console.log(`[ImageStorage] Cannot convert ${id} to Blob due to CORS, saving raw URL instead`);
                 saveObject.url = dataURL;
             } else {
                 throw err;
             }
         }
 
-        // 1. 内存缓存：存储Blob URL或原始URL（轻量）
-        if (saveObject.blob) {
-            const blobURL = URL.createObjectURL(saveObject.blob);
-            memoryCache.set(id, blobURL);
-        } else if (saveObject.url) {
-            memoryCache.set(id, saveObject.url);
+        const existingRecord = await getStoredImageRecord(id);
+        const hasProtectedOriginal = !!existingRecord && (
+            existingRecord.protected === true || existingRecord.quality === 'original'
+        );
+
+        if (hasProtectedOriginal) {
+            console.debug(`[ImageStorage] Skip generic save for ${id} because a protected original already exists`);
+            return;
         }
 
-        // 2. IndexedDB：存储数据
         const db = await openDB();
         const transaction = db.transaction(IMAGES_STORE, 'readwrite');
         const store = transaction.objectStore(IMAGES_STORE);
@@ -243,10 +371,16 @@ export async function saveImage(id: string, dataURL: string): Promise<void> {
             request.onerror = () => reject(request.error);
         });
 
+        if (saveObject.blob) {
+            const blobURL = URL.createObjectURL(saveObject.blob);
+            memoryCache.set(id, blobURL);
+        } else if (saveObject.url) {
+            memoryCache.set(id, saveObject.url);
+        }
+
         console.debug(`[ImageStorage] Saved ${id} to IndexedDB`);
     } catch (error) {
         console.error('[ImageStorage] Failed to save image:', error);
-        // Fallback: 至少保存到内存缓存
         memoryCache.set(id, dataURL);
     }
 }
@@ -737,26 +871,34 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
 
     for (let i = 0; i < MAX_RETRIES; i++) {
         try {
-            let saveObject: any = {
+            let saveObject: StoredImageRecord = {
                 id,
                 quality: 'original',
                 timestamp: Date.now(),
                 protected: true // 🔒 受保护标记
             };
+            let candidateMetrics: ImageMetrics | null = null;
 
             try {
-                // 转换为Blob（兼容 data:/blob:/http）
                 const blob = await toBlobFromAnyUrl(dataURL);
 
                 if (blob) {
                     saveObject.blob = blob;
+                    if (!isVideo) {
+                        candidateMetrics = await measureImageBlob(blob);
+                        if (candidateMetrics) {
+                            saveObject.width = candidateMetrics.width;
+                            saveObject.height = candidateMetrics.height;
+                            saveObject.pixelCount = candidateMetrics.pixelCount;
+                        }
+                    }
                 } else {
                     console.warn(`[ImageStorage] Cannot save original ${id}: invalid or expired URL`);
                     return;
                 }
             } catch (err: any) {
                 if (err.message === 'FETCH_FAILED') {
-                    console.log(`[ImageStorage] 🌐 Cannot convert original ${id} to Blob due to CORS, saving raw URL instead`);
+                    console.log(`[ImageStorage] Cannot convert original ${id} to Blob due to CORS, saving raw URL instead`);
                     saveObject.url = dataURL;
                 } else {
                     throw err;
@@ -767,15 +909,28 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
             // 原因：为了支持项目独立文档夹架构，本地落盘由 CanvasContext.addImageNodes 等上层控制流
             // 精确地携带着画布项目名去写入对应的子文档夹，此处底层拦截保存会导致重复写入且落入错误层级。
 
-            // 2. 内存缓存：存储Blob URL或原始URL
-            if (saveObject.blob) {
-                const blobURL = URL.createObjectURL(saveObject.blob);
-                memoryCache.set(id, blobURL);
-            } else if (saveObject.url) {
-                memoryCache.set(id, saveObject.url);
+            const existingRecord = await getStoredImageRecord(id);
+            const hasProtectedOriginal = !!existingRecord && (
+                existingRecord.protected === true || existingRecord.quality === 'original'
+            );
+
+            if (!isVideo && hasProtectedOriginal) {
+                const existingMetrics = await resolveStoredImageMetrics(existingRecord);
+                const shouldKeepExisting = !!existingMetrics && (
+                    !candidateMetrics || candidateMetrics.pixelCount < existingMetrics.pixelCount
+                );
+
+                if (shouldKeepExisting) {
+                    const incomingLabel = candidateMetrics
+                        ? `${candidateMetrics.width}x${candidateMetrics.height}`
+                        : 'unknown-size';
+                    console.log(
+                        `[ImageStorage] Keep existing original ${id}: ${existingMetrics.width}x${existingMetrics.height} >= ${incomingLabel}`
+                    );
+                    return;
+                }
             }
 
-            // 3. IndexedDB：存储数据（带保护标记）
             const db = await openDB();
             const transaction = db.transaction(IMAGES_STORE, 'readwrite');
             const store = transaction.objectStore(IMAGES_STORE);
@@ -787,17 +942,22 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
                 request.onerror = () => reject(request.error);
             });
 
+            if (saveObject.blob) {
+                const blobURL = URL.createObjectURL(saveObject.blob);
+                memoryCache.set(id, blobURL);
+            } else if (saveObject.url) {
+                memoryCache.set(id, saveObject.url);
+            }
+
             console.log(`[ImageStorage] 🔒 Original image saved successfully to IDB (attempt ${i + 1}/${MAX_RETRIES})`);
             return; // 成功，退出
         } catch (error) {
             console.warn(`[ImageStorage] 🔒 Save retry ${i + 1}/${MAX_RETRIES}:`, error);
             if (i === MAX_RETRIES - 1) {
-                // 最后一次失败，至少保存到内存
                 console.error('[ImageStorage] 🔒 All retries failed, saving to memory only');
                 memoryCache.set(id, dataURL);
                 throw error;
             }
-            // 等待一小段时间再重试
             await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
         }
     }

@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, useLay
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import PromptBar from './components/layout/PromptBar';
 import ImageNode from './components/image/ImageCard';
+import { GlobalLightbox } from './components/image/GlobalLightbox';
 import PptStackPreviewModal from './components/image/PptStackPreviewModal';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
@@ -27,6 +28,11 @@ import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCen
 import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
+import {
+  getReferenceImageLookupIds,
+  normalizeReferenceImagesStorage,
+  toReferenceImageDataUrl,
+} from './utils/referenceImageStorage';
 
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
@@ -338,10 +344,6 @@ const MigrateModal = lazy(async () => {
   const module = await import('./components/modals/MigrateModal');
   return { default: module.MigrateModal };
 });
-const GlobalLightbox = lazy(async () => {
-  const module = await import('./components/image/GlobalLightbox');
-  return { default: module.GlobalLightbox };
-});
 const PptDeckEditorModal = lazy(() => import('./components/image/PptDeckEditorModal'));
 const RechargeModal = lazy(() => import('./components/modals/RechargeModal'));
 const CostEstimation = lazy(() => import('./pages/CostEstimation'));
@@ -574,6 +576,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       && node.creditSettlement === 'client'
       && node.isPaymentProcessed === true
       && refundableTransactionId.length > 0;
+    const shouldRefreshServerSideAttempt =
+      node.billingMode === 'credits'
+      && node.creditSettlement === 'server'
+      && (node.cost || 0) > 0;
 
     let refundStatus = node.refundStatus;
     let isPaymentProcessed = node.isPaymentProcessed;
@@ -588,12 +594,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
     }
 
-    if (
-      node.billingMode === 'credits'
-      && node.creditSettlement === 'server'
-      && (node.cost || 0) > 0
-    ) {
-      await refreshBilling();
+    if (shouldRefreshServerSideAttempt) {
+      try {
+        await refreshBilling();
+        refundStatus = 'success';
+      } catch (error) {
+        console.error('[resolveFailedCreditAttempt] Failed to refresh billing after server-side credit failure:', error);
+        refundStatus = 'failed';
+      }
     }
 
     return {
@@ -1014,10 +1022,10 @@ const AppContent: React.FC<AppContentProps> = () => {
           imageSize: ImageSize.SIZE_1K,
           parallelCount: parsed.parallelCount || 1,
           // Restore reference image metadata without base64; hydrate the binary data from IndexedDB later
-          referenceImages: (parsed.referenceImages || []).map((img: any) => ({
+          referenceImages: normalizeReferenceImagesStorage((parsed.referenceImages || []).map((img: any) => ({
             ...img,
             data: undefined // Binary data is hydrated from IndexedDB, not localStorage
-          })),
+          }))) || [],
           model: parsed.model || KnownModel.IMAGEN_4,
           enableGrounding: parsed.enableGrounding || false,
           enableImageSearch: parsed.enableImageSearch || false,
@@ -1081,18 +1089,19 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     const hydrate = async () => {
       // Only hydrate if we have images with storageId but missing data
-      const needsHydration = config.referenceImages.some(img => !img.data && img.storageId);
+      const needsHydration = config.referenceImages.some(img => !img.data && getReferenceImageLookupIds(img).length > 0);
       if (!needsHydration) return;
 
       const { getImage } = await import('./services/storage/imageStorage');
 
       const hydratedImages = await Promise.all(config.referenceImages.map(async (img) => {
-        if (!img.data && img.storageId) {
+        if (!img.data) {
           try {
-            // Try to find image by storageId
-            const dataUrl = await getImage(img.storageId);
+            for (const lookupId of getReferenceImageLookupIds(img)) {
+              const dataUrl = await getImage(lookupId);
 
-            if (dataUrl) {
+              if (!dataUrl) continue;
+
               // [FIX] Strip Data URL prefix to comply with PromptBar's raw Base64 expectation
               // The storage returns a full Data URL (e.g. "data:image/png;base64,...")
               // but PromptBar constructs the src by prepending "data:..." again.
@@ -1100,6 +1109,7 @@ const AppContent: React.FC<AppContentProps> = () => {
               if (matches && matches[2]) {
                 return {
                   ...img,
+                  storageId: img.storageId || lookupId,
                   data: matches[2],
                   mimeType: matches[1] || img.mimeType
                 };
@@ -1107,7 +1117,11 @@ const AppContent: React.FC<AppContentProps> = () => {
 
               // Fallback: If it doesn't match standard Data URL format, use as is.
               // This handles edge cases or if raw base64 was somehow saved.
-              return { ...img, data: dataUrl };
+              return {
+                ...img,
+                storageId: img.storageId || lookupId,
+                data: dataUrl
+              };
             }
           } catch (e) {
             console.error('Failed to hydrate image', img.id, e);
@@ -1181,7 +1195,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // Save metadata only (strip heavy data) appropriately? 
       // Actually PromptBar renders using `img.data`.
       // We must save the array structure, but we want `data` to be undefined or null in localStorage to save space.
-      referenceImages: config.referenceImages.map(img => ({
+      referenceImages: (normalizeReferenceImagesStorage(config.referenceImages) || []).map(img => ({
         ...img,
         data: undefined // Don't save base64 to localStorage
       }))
@@ -3128,9 +3142,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       finalReferenceImages.forEach(ref => {
         if (ref.data) {
           import('./services/storage/imageStorage').then(({ saveImage }) => {
-            const mime = (ref as any).mimeType || 'image/png';
-            const fullUrl = ref.data!.startsWith('data:') ? ref.data! : `data:${mime};base64,${ref.data!}`;
-            saveImage(ref.id, fullUrl).catch(e => console.warn('Ref save failed', e));
+            const fullUrl = toReferenceImageDataUrl(ref.data, (ref as any).mimeType || 'image/png');
+            const lookupIds = getReferenceImageLookupIds(ref);
+            Promise.allSettled(lookupIds.map((lookupId) => saveImage(lookupId, fullUrl)))
+              .catch(e => console.warn('Ref save failed', e));
           });
         }
       });
@@ -3654,6 +3669,11 @@ const AppContent: React.FC<AppContentProps> = () => {
           let actualProviderLabel = executionNode.providerLabel;
           let actualModelLabel = executionNode.modelLabel;
           let actualModel = executionNode.model;
+          let actualCost: number | undefined = undefined;
+          let actualCostSource: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none' | undefined = undefined;
+          let actualTokens: number | undefined = undefined;
+          let actualPromptTokens: number | undefined = undefined;
+          let actualCompletionTokens: number | undefined = undefined;
           const currentMode: GenerationMode = executionNode.mode || GenerationMode.IMAGE;
           const taskPrompt = currentMode === GenerationMode.PPT
             ? (() => {
@@ -3697,6 +3717,19 @@ const AppContent: React.FC<AppContentProps> = () => {
             actualProviderLabel = videoResult.providerName || actualProviderLabel;
             actualModelLabel = videoResult.modelName || actualModelLabel;
             actualModel = videoResult.model || actualModel;
+            actualCost = typeof (videoResult as any).usage?.cost === 'number' && Number.isFinite((videoResult as any).usage.cost)
+              ? (videoResult as any).usage.cost
+              : undefined;
+            actualTokens = typeof (videoResult as any).usage?.totalTokens === 'number' && Number.isFinite((videoResult as any).usage.totalTokens)
+              ? (videoResult as any).usage.totalTokens
+              : undefined;
+            actualPromptTokens = typeof (videoResult as any).usage?.promptTokens === 'number' && Number.isFinite((videoResult as any).usage.promptTokens)
+              ? (videoResult as any).usage.promptTokens
+              : undefined;
+            actualCompletionTokens = typeof (videoResult as any).usage?.completionTokens === 'number' && Number.isFinite((videoResult as any).usage.completionTokens)
+              ? (videoResult as any).usage.completionTokens
+              : undefined;
+            actualCostSource = actualCost !== undefined ? 'explicit' : 'none';
           } else {
             const result = await generateImage(
               taskPrompt,
@@ -3724,6 +3757,19 @@ const AppContent: React.FC<AppContentProps> = () => {
             actualProviderLabel = result.providerName || actualProviderLabel;
             actualModelLabel = result.modelName || actualModelLabel;
             actualModel = result.effectiveModel || actualModel;
+            actualCost = typeof result.cost === 'number' && Number.isFinite(result.cost)
+              ? result.cost
+              : undefined;
+            actualTokens = typeof result.tokens === 'number' && Number.isFinite(result.tokens)
+              ? result.tokens
+              : undefined;
+            actualPromptTokens = typeof result.promptTokens === 'number' && Number.isFinite(result.promptTokens)
+              ? result.promptTokens
+              : undefined;
+            actualCompletionTokens = typeof result.completionTokens === 'number' && Number.isFinite(result.completionTokens)
+              ? result.completionTokens
+              : undefined;
+            actualCostSource = actualCost !== undefined ? 'explicit' : 'none';
           }
 
           isFinished = true;
@@ -3829,6 +3875,11 @@ const AppContent: React.FC<AppContentProps> = () => {
             modelLabel: actualModelLabel,
             provider: actualProvider,
             providerLabel: actualProviderLabel,
+            tokens: actualTokens,
+            promptTokens: actualPromptTokens,
+            completionTokens: actualCompletionTokens,
+            cost: actualCost,
+            costSource: actualCostSource,
             billingMode: executionNode.billingMode,
             creditCost: executionNode.creditCost,
             keySlotId: actualKeySlotId,
@@ -4332,6 +4383,11 @@ const AppContent: React.FC<AppContentProps> = () => {
         modelTextColor: target.modelTextColor,
         billingMode: executionNode.billingMode,
         creditCost: executionNode.creditCost,
+        tokens: typeof result.tokens === 'number' && Number.isFinite(result.tokens) ? result.tokens : undefined,
+        promptTokens: typeof result.promptTokens === 'number' && Number.isFinite(result.promptTokens) ? result.promptTokens : undefined,
+        completionTokens: typeof result.completionTokens === 'number' && Number.isFinite(result.completionTokens) ? result.completionTokens : undefined,
+        cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
+        costSource: typeof result.cost === 'number' && Number.isFinite(result.cost) ? 'explicit' : 'none',
         keySlotId: result.keySlotId || executionNode.keySlotId,
         imageSize: result.imageSize || executionNode.imageSize,
         aspectRatio: result.aspectRatio || executionNode.aspectRatio,
@@ -5160,13 +5216,17 @@ ${slideLayerXml.join('\n')}
 
     // Pre-hydrate if needed to prevent flicker
     // We do this BEFORE setting config so the UI never sees the "loading" state
-    if (referenceImages.some(img => !img.data && img.storageId)) {
+    if (referenceImages.some(img => !img.data && getReferenceImageLookupIds(img).length > 0)) {
       try {
         const { getImage } = await import('./services/storage/imageStorage');
         const hydrated = await Promise.all(referenceImages.map(async (img) => {
-          if (!img.data && img.storageId) {
-            const data = await getImage(img.storageId);
-            if (data) return { ...img, data };
+          if (!img.data) {
+            for (const lookupId of getReferenceImageLookupIds(img)) {
+              const data = await getImage(lookupId);
+              if (data) {
+                return { ...img, storageId: img.storageId || lookupId, data };
+              }
+            }
           }
           return img;
         }));
@@ -5201,6 +5261,9 @@ ${slideLayerXml.join('\n')}
 
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换(鍚戝悗鍏煎), 鏃犱慨楗伴敭=替换
+    const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
+    // Keep the parent prompt group focused so the subcard frame stays visible after click.
+    setFocusedGroupId(sourceImage?.parentPromptId || null);
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
 
     // Set this image as source for continuing conversation
@@ -5215,7 +5278,6 @@ ${slideLayerXml.join('\n')}
     }
 
     // Compute the follow-up draft position below the parent group
-    const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
     if (sourceImage) {
       const parentPromptId = sourceImage.parentPromptId;
       const parentPrompt = activeCanvas?.promptNodes.find(p => p.id === parentPromptId);
@@ -7083,17 +7145,24 @@ ${slideLayerXml.join('\n')}
     const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
     const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
     const groupConnectorDash = `${groupConnectorDashLength} ${groupConnectorGapLength}`;
-    const groupConnectorDotRadius = Math.max(1.5, Math.min(3.5, 2 / groupConnectorZoom));
     const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping;
-    const connectorLayerZIndex = groupStackZIndex + 5;
+    const connectorLayerZIndex = Math.max(0, groupStackZIndex - 1);
     const promptCardZIndex = groupStackZIndex + 20;
     const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
-    // Keep the foreground overlay longer than the card shadow bloom so the dashed
-    // connector does not appear clipped before it reaches the sub-card.
-    const connectorCenterStub = Math.max(22, Math.min(36, 28 / groupConnectorZoom));
-    const groupConnectorSegments = groupView.childImages.map((childNode) => {
+    const promptCardHeight = node.height || getPromptHeight(node.prompt);
+    const promptCardWidth = isMobile
+      ? Math.min(320, Math.max(248, ((typeof window !== 'undefined' ? window.innerWidth : 320) - 24)))
+      : 320;
+    // Tuck both connector ends slightly underneath the cards so the card surfaces
+    // visually cover the dashed line instead of letting it float over the edges.
+    const promptConnectorDockInset = Math.max(2, Math.min(6, 4 / groupConnectorZoom));
+    const childConnectorDockInset = Math.max(2, Math.min(6, 4 / groupConnectorZoom));
+    const connectorOccluderInset = Math.max(4, Math.min(12, 8 / groupConnectorZoom));
+    const connectorOccluderRadius = Math.max(18, Math.min(26, 22 / groupConnectorZoom));
+    const connectorMaskId = `prompt-group-mask-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    const groupConnectorLayouts = groupView.childImages.map((childNode) => {
       const childConnectorPosition = resolveLiveImagePosition(childNode) ?? childNode.position;
-      const { totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
+      const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
       let imageHeight = theoreticalHeight;
 
       if (childNode.dimensions && typeof childNode.dimensions === 'string') {
@@ -7103,7 +7172,6 @@ ${slideLayerXml.join('\n')}
           const height = parseInt(match[2], 10);
           if (width > 0 && height > 0) {
             const aspect = width / height;
-            const { width: renderedWidth } = getCardDimensions(childNode.aspectRatio, false);
             imageHeight = (renderedWidth / aspect) + 40;
           }
         }
@@ -7111,34 +7179,38 @@ ${slideLayerXml.join('\n')}
 
       const resolvedImageHeight = imageCardHeightById[childNode.id] ?? imageHeight;
       const startX = promptConnectorPosition.x + 5000;
-      const startY = promptConnectorPosition.y + 5000;
+      const startY = promptConnectorPosition.y + 5000 - promptConnectorDockInset;
       const endX = childConnectorPosition.x + 5000;
-      const endY = (childConnectorPosition.y - resolvedImageHeight) + 5000;
-      const fullSegment = getSoftConnectorBezierSegment(startX, startY, endX, endY);
-      const verticalDistance = Math.max(1, endY - startY);
-      const overlayRatio = Math.min(0.24, connectorCenterStub / verticalDistance);
-      const splitT = Math.max(0.72, Math.min(0.9, 1 - overlayRatio));
-      const { left: backgroundSegment, right: foregroundSegment } = splitCubicBezierSegment(fullSegment, splitT);
-      const dashPeriod = groupConnectorDashLength + groupConnectorGapLength;
-      const foregroundDashOffset = dashPeriod > 0
-        ? -((estimateCubicBezierLength(backgroundSegment) % dashPeriod))
-        : 0;
+      const endY = (childConnectorPosition.y - resolvedImageHeight + childConnectorDockInset) + 5000;
 
       return {
         key: `${node.id}-${childNode.id}`,
-        startX,
-        startY,
-        endX,
-        endY,
-        backgroundPath: buildCubicBezierPath(backgroundSegment),
-        foregroundPath: buildCubicBezierPath(foregroundSegment),
-        foregroundDashOffset,
+        path: buildSoftConnectorPath(startX, startY, endX, endY),
+        occluder: {
+          key: `${node.id}-${childNode.id}-occluder`,
+          x: (childConnectorPosition.x - (renderedWidth / 2)) + 5000 - connectorOccluderInset,
+          y: (childConnectorPosition.y - resolvedImageHeight) + 5000 - connectorOccluderInset,
+          width: renderedWidth + (connectorOccluderInset * 2),
+          height: resolvedImageHeight + (connectorOccluderInset * 2),
+          radius: connectorOccluderRadius,
+        },
       };
     });
+    const groupConnectorOccluders = [
+      {
+        key: `${node.id}-prompt-occluder`,
+        x: (promptConnectorPosition.x - (promptCardWidth / 2)) + 5000 - connectorOccluderInset,
+        y: (promptConnectorPosition.y - promptCardHeight) + 5000 - connectorOccluderInset,
+        width: promptCardWidth + (connectorOccluderInset * 2),
+        height: promptCardHeight + (connectorOccluderInset * 2),
+        radius: connectorOccluderRadius,
+      },
+      ...groupConnectorLayouts.map((layout) => layout.occluder),
+    ];
 
     return (
       <>
-        {groupConnectorSegments.length > 0 && (
+        {groupConnectorLayouts.length > 0 && (
           <svg
             className="absolute top-0 left-0 pointer-events-none"
             shapeRendering="auto"
@@ -7151,61 +7223,46 @@ ${slideLayerXml.join('\n')}
               zIndex: connectorLayerZIndex,
             }}
           >
-            {groupConnectorSegments.map((segment) => {
-              return (
-                <g key={segment.key}>
-                  <circle cx={segment.startX} cy={segment.startY} r={groupConnectorDotRadius} fill="var(--connector-color, #6366f1)" opacity="0.55" />
-                  <path
-                    d={segment.backgroundPath}
-                    fill="none"
-                  stroke="var(--connector-color, #6366f1)"
-                  strokeWidth={groupConnectorStroke}
-                  strokeDasharray={groupConnectorDash}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={isGroupFocused ? 0.7 : 0.34}
+            <defs>
+              <mask
+                id={connectorMaskId}
+                maskUnits="userSpaceOnUse"
+                maskContentUnits="userSpaceOnUse"
+                x={0}
+                y={0}
+                width={10000}
+                height={10000}
+              >
+                <rect x={0} y={0} width={10000} height={10000} fill="white" />
+                {groupConnectorOccluders.map((occluder) => (
+                  <rect
+                    key={occluder.key}
+                    x={occluder.x}
+                    y={occluder.y}
+                    width={occluder.width}
+                    height={occluder.height}
+                    rx={occluder.radius}
+                    ry={occluder.radius}
+                    fill="black"
                   />
-                </g>
-              );
-            })}
-          </svg>
-        )}
-
-        {groupConnectorSegments.length > 0 && (
-          <svg
-            className="absolute top-0 left-0 pointer-events-none"
-            shapeRendering="auto"
-            style={{
-              width: '10000px',
-              height: '10000px',
-              left: '-5000px',
-              top: '-5000px',
-              overflow: 'visible',
-              zIndex: promptCardZIndex + 200,
-            }}
-          >
-            {groupConnectorSegments.map((segment) => (
-              <g key={`${segment.key}-stub`}>
+                ))}
+              </mask>
+            </defs>
+            <g mask={`url(#${connectorMaskId})`}>
+              {groupConnectorLayouts.map((segment) => (
                 <path
-                  d={segment.foregroundPath}
+                  key={segment.key}
+                  d={segment.path}
                   fill="none"
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
                   strokeDasharray={groupConnectorDash}
-                  strokeDashoffset={segment.foregroundDashOffset}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  opacity={isGroupFocused ? 0.74 : 0.54}
+                  opacity={isGroupFocused ? 0.68 : 0.4}
                 />
-                <circle
-                  cx={segment.endX}
-                  cy={segment.endY}
-                  r={groupConnectorDotRadius}
-                  fill="var(--connector-color, #6366f1)"
-                  opacity={0.68}
-                />
-              </g>
-            ))}
+              ))}
+            </g>
           </svg>
         )}
 
@@ -7370,6 +7427,7 @@ ${slideLayerXml.join('\n')}
     promptGroupStackZIndexById,
     resolveLiveImagePosition,
     resolveLivePromptPosition,
+    getPromptHeight,
     selectedNodeIds,
     updatePromptNode,
     updateImageNode,
@@ -9061,6 +9119,7 @@ ${slideLayerXml.join('\n')}
                 childImageIds: [],
                 referenceImages: [{
                   id: sourceImage.id,
+                  storageId: sourceImage.storageId || sourceImage.id,
                   data: sourceImage.originalUrl || sourceImage.url,
                   mimeType: 'image/png'
                 }],

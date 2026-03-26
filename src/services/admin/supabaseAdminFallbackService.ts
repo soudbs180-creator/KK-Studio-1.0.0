@@ -86,6 +86,8 @@ export interface SupabaseAdminCreditProviderRpcGroup {
   provider_name?: string | null;
   base_url?: string | null;
   api_key_count?: number | null;
+  api_key_entries?: Array<{ fingerprint?: string | null; preview?: string | null }> | null;
+  api_key_previews?: string[] | null;
   models?: SupabaseAdminCreditProviderRpcModel[] | null;
 }
 
@@ -121,6 +123,7 @@ export interface SupabaseAdminProviderInput {
   providerName: string;
   baseUrl: string;
   apiKeys: string[];
+  retainApiKeyFingerprints?: string[];
   models: SupabaseAdminProviderModelInput[];
 }
 
@@ -191,6 +194,10 @@ function normalizeErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function buildSyntheticApiKeyFingerprint(preview: string, index: number): string {
+  return `preview:${index}:${String(preview || '').trim()}`;
 }
 
 export async function resolveSupabaseAdminAccess(
@@ -331,6 +338,19 @@ export async function listAdminCreditProvidersViaSupabase(): Promise<SupabaseAdm
     api_key_count: Array.isArray(row.api_keys)
       ? row.api_keys.filter((item) => typeof item === 'string' && item.trim()).length
       : 0,
+    api_key_entries: Array.isArray(row.api_keys)
+      ? row.api_keys
+          .filter((item) => typeof item === 'string' && item.trim())
+          .map((item, index) => ({
+            fingerprint: buildSyntheticApiKeyFingerprint(String(item).trim(), index),
+            preview: String(item).trim(),
+          }))
+      : [],
+    api_key_previews: Array.isArray(row.api_keys)
+      ? row.api_keys
+          .filter((item) => typeof item === 'string' && item.trim())
+          .map((item) => String(item).trim())
+      : [],
     models: Array.isArray(row.models) ? row.models : [],
   }));
 }
@@ -353,6 +373,16 @@ export async function listActiveCreditModelsViaSupabase(): Promise<SupabaseActiv
 export async function saveAdminCreditProviderViaSupabase(
   input: SupabaseAdminProviderInput,
 ): Promise<void> {
+  if (Array.isArray(input.retainApiKeyFingerprints) && input.retainApiKeyFingerprints.length > 0) {
+    const syntheticFingerprintsOnly = input.retainApiKeyFingerprints.every((item) =>
+      String(item || '').startsWith('preview:'),
+    );
+
+    if (!syntheticFingerprintsOnly) {
+      throw new Error('当前已切换到 Supabase 直连回退模式，暂不支持逐条删除或替换已保存密钥。请启用 API 服务后重试。');
+    }
+  }
+
   const { error } = await supabase.rpc('save_credit_provider', {
     p_provider_id: input.providerId,
     p_provider_name: input.providerName,

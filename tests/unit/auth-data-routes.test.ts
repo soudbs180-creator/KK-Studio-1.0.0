@@ -166,8 +166,7 @@ describe("auth data routes", () => {
     }
     assert.equal(replace.body.data.slots.length, 1);
     assert.equal(replace.body.data.providers.length, 1);
-    assert.equal(replace.body.data.entries.length, 1);
-    assert.equal(replace.body.data.entries[0].id, "slot-1");
+    assert.equal(replace.body.data.entries.length, 0);
 
     const listed = await handleGetKeyManagerCloudState(service, {
       ...headers,
@@ -178,8 +177,112 @@ describe("auth data routes", () => {
     if (listed.body.success) {
       assert.equal(listed.body.data.slots.length, 1);
       assert.equal(listed.body.data.providers.length, 1);
-      assert.equal(listed.body.data.entries.length, 1);
+      assert.equal(listed.body.data.entries.length, 0);
       assert.equal(listed.body.data.providers[0].id, "provider-1");
+    }
+  });
+
+  test("preserves user api entries when key-manager state syncs", async () => {
+    const service = new AuthDataService(new InMemoryAuthDataRepository());
+    const headers = {
+      "x-request-id": "req-user-apis-preserved",
+      [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-3",
+      [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-3@example.com",
+    };
+
+    const replaceUserApis = await handleReplaceUserApiEntries(service, {
+      entries: [
+        {
+          id: "entry-1",
+          key: "sk-entry-1-secret",
+          name: "Google Key",
+          provider: "Google",
+          type: "official",
+          format: "gemini",
+          baseUrl: "https://generativelanguage.googleapis.com",
+          supportedModels: ["gemini-2.5-flash"],
+          disabled: false,
+          createdAt: 1700000000000,
+          updatedAt: 1700000000000,
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ],
+    }, {
+      ...headers,
+      "x-request-id": "req-user-apis-preserved-write-entries",
+    });
+
+    assert.equal(replaceUserApis.statusCode, 200);
+    assert.equal(replaceUserApis.body.success, true);
+
+    const replaceKeyManager = await handleReplaceKeyManagerCloudState(service, {
+      version: 2,
+      slots: [
+        {
+          id: "slot-1",
+          key: "sk-slot-1-secret",
+          name: "Primary Slot",
+          provider: "Google",
+          type: "official",
+          format: "gemini",
+          supportedModels: ["gemini-2.5-flash"],
+          disabled: false,
+          createdAt: 1700000000000,
+          updatedAt: 1700000000000,
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ],
+      providers: [
+        {
+          id: "provider-1",
+          name: "Custom Provider",
+          baseUrl: "https://provider.example.com/v1",
+          apiKey: "provider-secret",
+          models: ["gemini-2.5-flash"],
+          format: "openai",
+          isActive: true,
+        },
+      ],
+    }, {
+      ...headers,
+      "x-request-id": "req-user-apis-preserved-write-slots",
+    });
+
+    assert.equal(replaceKeyManager.statusCode, 200);
+    assert.equal(replaceKeyManager.body.success, true);
+    if (replaceKeyManager.body.success) {
+      assert.equal(replaceKeyManager.body.data.slots.length, 1);
+      assert.equal(replaceKeyManager.body.data.entries.length, 1);
+      assert.equal(replaceKeyManager.body.data.entries[0].id, "entry-1");
+    }
+
+    const listedUserApis = await handleGetUserApiEntries(service, {
+      ...headers,
+      "x-request-id": "req-user-apis-preserved-list",
+    });
+
+    assert.equal(listedUserApis.statusCode, 200);
+    assert.equal(listedUserApis.body.success, true);
+    if (listedUserApis.body.success) {
+      assert.equal(listedUserApis.body.data.entries.length, 1);
+      assert.equal(listedUserApis.body.data.entries[0].id, "entry-1");
+      assert.equal(listedUserApis.body.data.entries[0].key, "sk-entry-1-secret");
     }
   });
 

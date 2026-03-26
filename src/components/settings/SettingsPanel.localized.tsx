@@ -299,6 +299,17 @@ const SettingsNavList: React.FC<{
       <label className="settings-shell-nav__search">
         <Search size={15} />
         <input
+          type="search"
+          name="settings-navigation-search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          inputMode="search"
+          enterKeyHint="search"
+          data-form-type="other"
+          data-lpignore="true"
+          data-1p-ignore="true"
           value={navQuery}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={pick('搜索设置项', 'Search settings')}
@@ -606,6 +617,17 @@ const SettingsDesktopShell: React.FC<{
             >
               <Search size={15} />
               <input
+                type="search"
+                name="settings-toolbar-search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                inputMode="search"
+                enterKeyHint="search"
+                data-form-type="other"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 value={navQuery}
                 onChange={(event) => onQueryChange(event.target.value)}
                 placeholder={searchPlaceholder}

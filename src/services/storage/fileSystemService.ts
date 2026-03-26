@@ -71,6 +71,73 @@ function extensionFromMimeType(mimeType: string | undefined, fallback: string): 
     return fallback;
 }
 
+type BlobImageMetrics = {
+    width: number;
+    height: number;
+    pixelCount: number;
+};
+
+async function measureImageBlob(blob: Blob): Promise<BlobImageMetrics | null> {
+    if (!(blob instanceof Blob) || blob.size <= 0) return null;
+    if (typeof blob.type === 'string' && blob.type && !blob.type.startsWith('image/')) {
+        return null;
+    }
+
+    if (typeof createImageBitmap === 'function') {
+        try {
+            const bitmap = await createImageBitmap(blob);
+            try {
+                if (bitmap.width > 0 && bitmap.height > 0) {
+                    return {
+                        width: bitmap.width,
+                        height: bitmap.height,
+                        pixelCount: bitmap.width * bitmap.height,
+                    };
+                }
+            } finally {
+                bitmap.close();
+            }
+        } catch {
+            // Fall back to HTMLImageElement below.
+        }
+    }
+
+    if (typeof Image === 'undefined') {
+        return null;
+    }
+
+    return new Promise((resolve) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const img = new Image();
+
+        const cleanup = () => {
+            URL.revokeObjectURL(objectUrl);
+            img.onload = null;
+            img.onerror = null;
+        };
+
+        img.onload = () => {
+            const width = img.naturalWidth || img.width;
+            const height = img.naturalHeight || img.height;
+            cleanup();
+
+            if (width > 0 && height > 0) {
+                resolve({ width, height, pixelCount: width * height });
+                return;
+            }
+
+            resolve(null);
+        };
+
+        img.onerror = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        img.src = objectUrl;
+    });
+}
+
 function matchesStoredFileId(filename: string, id: string): boolean {
     const normalizedId = normalizeStoredFileId(filename);
     const baseName = filename.replace(/\.[^.]+$/, '');
@@ -969,15 +1036,31 @@ export const fileSystemService = {
             const originalsDir = await handle.getDirectoryHandle(DIRS.ORIGINALS, { create: true });
             const existingFileName = await findExistingFileNameByStoredId(originalsDir, id, MEDIA_EXTENSIONS);
             if (existingFileName) {
-                if (overwriteExisting) {
-                    // @ts-ignore
-                    const fileHandle = await originalsDir.getFileHandle(existingFileName, { create: true });
+                // @ts-ignore
+                const fileHandle = await originalsDir.getFileHandle(existingFileName, { create: true });
+                // @ts-ignore
+                const existingFile = await fileHandle.getFile();
+                const existingMetrics = !isVideo ? await measureImageBlob(existingFile) : null;
+                const incomingMetrics = !isVideo ? await measureImageBlob(blob) : null;
+                const shouldOverwriteExisting = overwriteExisting
+                    || (
+                        !isVideo
+                            ? (
+                                incomingMetrics
+                                    ? (!existingMetrics || incomingMetrics.pixelCount > existingMetrics.pixelCount)
+                                    : blob.size > existingFile.size
+                            )
+                            : blob.size > existingFile.size
+                    );
+
+                if (shouldOverwriteExisting) {
                     // @ts-ignore
                     const writable = await fileHandle.createWritable();
                     await writable.write(blob);
                     await writable.close();
                     return existingFileName;
                 }
+
                 return existingFileName;
             }
 

@@ -87,13 +87,7 @@ export function isUserApisEnvelope(value: unknown): value is JsonRecord {
 
 export function extractKeyManagerCloudSlots(raw: unknown): unknown[] {
   if (isUserApisEnvelope(raw)) {
-    const slots = toArray(raw.slots);
-    if (slots.length > 0) return slots;
-
-    const entries = toArray(raw.entries);
-    if (entries.length > 0) return entries;
-
-    return [];
+    return toArray(raw.slots);
   }
 
   return toArray(raw);
@@ -101,13 +95,7 @@ export function extractKeyManagerCloudSlots(raw: unknown): unknown[] {
 
 export function extractUserApiEntriesFromPayload(raw: unknown): unknown[] {
   if (isUserApisEnvelope(raw)) {
-    const entries = toArray(raw.entries);
-    if (entries.length > 0) return entries;
-
-    const slots = toArray(raw.slots);
-    if (slots.length > 0) return slots;
-
-    return [];
+    return toArray(raw.entries);
   }
 
   const legacy = toArray(raw);
@@ -132,26 +120,15 @@ export function mergeUserApisPayload(
   const existingProviders = extractUserApiProvidersFromPayload(existingRaw);
   const existingEntries = extractUserApiEntriesFromPayload(existingRaw);
 
-  const slotUpdates = updates.slots ?? updates.entries;
-  const entryUpdates = updates.entries ?? updates.slots;
-
   const nextSlots =
-    slotUpdates !== undefined
-      ? mergeArrayRecordsById(existingSlots, slotUpdates)
+    updates.slots !== undefined
+      ? mergeArrayRecordsById(existingSlots, updates.slots)
       : existingSlots;
   const nextProviders = updates.providers ?? existingProviders;
   const nextEntries =
-    entryUpdates !== undefined
-      ? mergeArrayRecordsById(existingEntries.length > 0 ? existingEntries : existingSlots, entryUpdates)
+    updates.entries !== undefined
+      ? mergeArrayRecordsById(existingEntries, updates.entries)
       : existingEntries;
-
-  const shouldUseEnvelope =
-    isUserApisEnvelope(existingRaw) ||
-    updates.slots !== undefined ||
-    updates.providers !== undefined ||
-    updates.entries !== undefined ||
-    existingProviders.length > 0 ||
-    existingEntries.length > 0;
 
   return {
     version: 2,

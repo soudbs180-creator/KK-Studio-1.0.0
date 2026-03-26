@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import type { CreditTransactionDto } from '../../packages/contracts/src/dto/billing.ts';
 import { supabase } from '../lib/supabase';
 import { legacyWebApiClient } from '../services/api/kkApiClient';
+import { isKkApiBillingPersistedViaSupabase } from '../services/api/kkApiServerHealth';
 import { useAuth } from './AuthContext';
 
 export interface CreditTransactionLog {
@@ -265,6 +266,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
+      const shouldUseApiBalance = await isKkApiBillingPersistedViaSupabase();
+      if (!shouldUseApiBalance) {
+        await fetchBalanceFromSupabase();
+        return;
+      }
+
       const response = await legacyWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
       if (!response.success) {
         console.error('[BillingContext] Failed to load credit balance from API, falling back to Supabase:', response.error);
@@ -283,17 +290,15 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       const apiBalance = toDisplayNumber(response.data.balance);
-      if (apiBalance === 0) {
-        const supabaseBalance = await readBalanceFromSupabase();
-        if (typeof supabaseBalance === 'number' && supabaseBalance !== apiBalance) {
-          console.warn('[BillingContext] Credit balance API returned 0 while Supabase reported a different balance, using Supabase balance.', {
-            expectedUserId: user.id,
-            apiBalance,
-            supabaseBalance,
-          });
-          setBalance(supabaseBalance);
-          return;
-        }
+      const supabaseBalance = await readBalanceFromSupabase();
+      if (typeof supabaseBalance === 'number' && supabaseBalance !== apiBalance) {
+        console.warn('[BillingContext] Credit balance API diverged from canonical Supabase balance, using Supabase balance.', {
+          expectedUserId: user.id,
+          apiBalance,
+          supabaseBalance,
+        });
+        setBalance(supabaseBalance);
+        return;
       }
 
       setBalance(apiBalance);
@@ -311,6 +316,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
+      const shouldUseApiLogs = await isKkApiBillingPersistedViaSupabase();
+      if (!shouldUseApiLogs) {
+        await fetchLogsFromSupabase();
+        return;
+      }
+
       const response = await legacyWebApiClient.listCreditTransactions(
         { limit: 500 },
         buildBillingRequestOptions(apiAccessToken),

@@ -71,11 +71,18 @@ export interface AdminCreditProviderModelDto {
   qualityPricing?: Record<string, { enabled: boolean; creditCost: number }>;
 }
 
+export interface AdminCreditProviderApiKeyEntryDto {
+  fingerprint: string;
+  preview: string;
+}
+
 export interface AdminCreditProviderDto {
   providerId: string;
   providerName: string;
   baseUrl: string;
   apiKeyCount: number;
+  apiKeyEntries?: AdminCreditProviderApiKeyEntryDto[];
+  apiKeyPreviews?: string[];
   models: AdminCreditProviderModelDto[];
 }
 
@@ -106,6 +113,7 @@ export interface SaveAdminCreditProviderRequestDto {
   providerName: string;
   baseUrl: string;
   apiKeys: string[];
+  retainApiKeyFingerprints?: string[];
   models: SaveAdminCreditProviderModelRequestDto[];
 }
 
