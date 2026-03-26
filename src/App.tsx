@@ -507,6 +507,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
   }, [resolveProviderDisplay, shouldPreferRouteProviderDisplay]);
 
+  const hasExplicitModelRoute = useCallback((modelId: string) => {
+    const rawModelId = String(modelId || '').trim();
+    const separatorIndex = rawModelId.indexOf('@');
+    return separatorIndex !== -1 && rawModelId.slice(separatorIndex + 1).trim().length > 0;
+  }, []);
+
   const ensureCreditAttemptCharged = useCallback(async (params: {
     modelId: string;
     modelLabel?: string;
@@ -3220,9 +3226,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
         : null;
       const previewModelLabel = previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview;
+      const previewPreferredKeyId = hasExplicitModelRoute(config.model)
+        ? undefined
+        : getPreferredKeyForMode(config.mode);
       const selectedKey = useServerSideCreditSettlement
         ? null
-        : keyManager.getNextKey(config.model, getPreferredKeyForMode(config.mode));
+        : keyManager.getNextKey(config.model, previewPreferredKeyId);
       const previewProvider = useServerSideCreditSettlement
         ? 'SystemProxy'
         : (selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google'));
@@ -3407,7 +3416,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by lastGenerateAtRef instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel, hasExplicitModelRoute]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

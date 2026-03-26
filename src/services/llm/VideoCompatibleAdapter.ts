@@ -1,6 +1,6 @@
 import { KeySlot } from '../auth/keyManager';
 import { formatAuthorizationHeaderValue } from '../api/apiConfig';
-import { resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy';
+import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy';
 import { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter';
 
 export class VideoCompatibleAdapter implements LLMAdapter {
@@ -37,6 +37,9 @@ export class VideoCompatibleAdapter implements LLMAdapter {
 
     async generateVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
         const rawBase = String(keySlot.baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        if (isLikelyDocumentationBaseUrl(rawBase)) {
+            throw new Error(`当前 Base URL 看起来是文档地址 (${rawBase})，不是供应商 API 地址。请改成供应商工作台里显示的真实 Base URL。`);
+        }
         const runtime = this.resolveRuntime(rawBase, keySlot, options.modelId);
         const cleanBase = this.normalizeBaseUrl(rawBase, runtime.videoApiStyle);
 

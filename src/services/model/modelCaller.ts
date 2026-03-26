@@ -63,6 +63,45 @@ class ModelCaller {
     return `${prefix}-${uuid || Date.now()}`;
   }
 
+  private parseModelRoute(modelId: string): {
+    rawModelId: string;
+    baseModelId: string;
+    hasExplicitRoute: boolean;
+    isSystemRoute: boolean;
+  } {
+    const rawModelId = String(modelId || '').trim();
+    const [baseModelId, rawSuffix = ''] = rawModelId.split('@');
+    const trimmedSuffix = rawSuffix.trim();
+    const decodedSuffix = (() => {
+      try {
+        return decodeURIComponent(trimmedSuffix).trim().toLowerCase();
+      } catch {
+        return trimmedSuffix.toLowerCase();
+      }
+    })();
+
+    return {
+      rawModelId,
+      baseModelId: String(baseModelId || rawModelId).trim(),
+      hasExplicitRoute: trimmedSuffix.length > 0,
+      isSystemRoute: decodedSuffix.startsWith('system')
+        || decodedSuffix === 'systemproxy'
+        || decodedSuffix === '12ai'
+        || decodedSuffix === 'builtin',
+    };
+  }
+
+  private withBaseModelId(options: CallModelOptions, baseModelId: string): CallModelOptions {
+    if (options.modelId === baseModelId) {
+      return options;
+    }
+
+    return {
+      ...options,
+      modelId: baseModelId,
+    };
+  }
+
   private buildBillingRequestOptions(requestId: string) {
     return {
       requestId,
@@ -107,26 +146,44 @@ class ModelCaller {
   }
 
   async call(options: CallModelOptions): Promise<CallResult> {
-    const { modelId } = options;
+    const route = this.parseModelRoute(options.modelId);
+    const directCallOptions = this.withBaseModelId(options, route.baseModelId);
 
-    const creditCost = await this.getCreditCost(modelId);
+    if (route.hasExplicitRoute && !route.isSystemRoute) {
+      const routedKey = keyManager.getNextKey(route.rawModelId);
+      if (!routedKey || routedKey.provider === 'SystemProxy' || !routedKey.key) {
+        return {
+          success: false,
+          error: `Selected route is unavailable for model: ${route.rawModelId}`,
+        };
+      }
+
+      return this.callWithUserKey(directCallOptions, {
+        key: routedKey.key,
+        baseUrl: routedKey.baseUrl,
+        provider: routedKey.provider,
+        format: routedKey.format,
+      });
+    }
+
+    const creditCost = await this.getCreditCost(route.rawModelId);
     if (creditCost > 0) {
       return this.callCreditModel(options, creditCost);
     }
 
-    const supplier = this.findSupplierForModel(modelId);
+    const supplier = this.findSupplierForModel(route.baseModelId);
     if (supplier) {
-      return this.callViaSupplier(options, supplier);
+      return this.callViaSupplier(directCallOptions, supplier);
     }
 
     const slots = keyManager.getSlots();
     const userSlot = slots.find(
       (slot) =>
-        slot.supportedModels?.includes(modelId)
-        || slot.supportedModels?.some((supportedModel) => modelId.includes(supportedModel)),
+        slot.supportedModels?.includes(route.baseModelId)
+        || slot.supportedModels?.some((supportedModel) => route.baseModelId.includes(supportedModel)),
     );
     if (userSlot) {
-      return this.callWithUserKey(options, {
+      return this.callWithUserKey(directCallOptions, {
         key: userSlot.key,
         baseUrl: userSlot.baseUrl,
         provider: userSlot.provider,
@@ -134,7 +191,7 @@ class ModelCaller {
       });
     }
 
-    return this.callWithSystemDefault(options);
+    return this.callWithSystemDefault(directCallOptions);
   }
 
   private async callCreditModel(options: CallModelOptions, creditCost: number): Promise<CallResult> {
@@ -206,11 +263,12 @@ class ModelCaller {
   }
 
   private async callWithProtocol(options: CallModelOptions, config: RoutedApiConfig): Promise<CallResult> {
+    const directModelId = this.parseModelRoute(options.modelId).baseModelId;
     const runtime = resolveProviderRuntime({
       provider: config.provider,
       baseUrl: config.baseUrl,
       format: config.format,
-      modelId: options.modelId,
+      modelId: directModelId,
     });
     if (runtime.geminiNative) {
       return this.callGeminiCompatible(options, config);
@@ -224,11 +282,12 @@ class ModelCaller {
     config: RoutedApiConfig,
   ): Promise<CallResult> {
     try {
+      const directModelId = this.parseModelRoute(options.modelId).baseModelId;
       const runtime = resolveProviderRuntime({
         provider: config.provider,
         baseUrl: config.baseUrl,
         format: config.format,
-        modelId: options.modelId,
+        modelId: directModelId,
       });
       const headers = buildProxyHeaders(
         runtime.authMethod as 'header' | 'query',
@@ -240,14 +299,14 @@ class ModelCaller {
       const chatUrl = buildOpenAIEndpoint(config.baseUrl, 'chat/completions');
       const responsesUrl = buildOpenAIEndpoint(config.baseUrl, 'responses');
       const chatBody = {
-        model: options.modelId,
+        model: directModelId,
         messages: options.messages,
         max_tokens: options.maxTokens || 2048,
         temperature: options.temperature ?? 0.7,
         stream: false,
       };
       const responsesBody = buildResponsesPayload({
-        model: options.modelId,
+        model: directModelId,
         messages: options.messages,
         maxOutputTokens: options.maxTokens || 2048,
         temperature: options.temperature ?? 0.7,
@@ -345,15 +404,16 @@ class ModelCaller {
     config: RoutedApiConfig,
   ): Promise<CallResult> {
     try {
+      const directModelId = this.parseModelRoute(options.modelId).baseModelId;
       const runtime = resolveProviderRuntime({
         provider: config.provider,
         baseUrl: config.baseUrl,
         format: 'gemini',
-        modelId: options.modelId,
+        modelId: directModelId,
       });
       const authMethod = runtime.authMethod as 'query' | 'header';
       const response = await fetch(
-        buildGeminiEndpoint(config.baseUrl, options.modelId, 'generateContent', config.apiKey, authMethod, config.provider),
+        buildGeminiEndpoint(config.baseUrl, directModelId, 'generateContent', config.apiKey, authMethod, config.provider),
         {
           method: 'POST',
           headers: buildGeminiHeaders(authMethod, config.apiKey, runtime.headerName, runtime.authorizationValueFormat),

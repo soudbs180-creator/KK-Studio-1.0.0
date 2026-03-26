@@ -16,7 +16,7 @@ import {
     modelPrefersResponsesApi,
     shouldRetryWithResponsesApi,
 } from '../api/openaiResponses';
-import { resolveProviderRuntime } from '../api/providerStrategy';
+import { isLikelyDocumentationBaseUrl, resolveProviderRuntime } from '../api/providerStrategy';
 import { ImageSize, AspectRatio, GenerationMode } from '../../types';
 import { logError, logWarning, addLog, LogLevel } from '../system/systemLogService';
 import { GoogleAdapter, convertImageToBase64, buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
@@ -2919,6 +2919,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const modelLower = options.modelId.toLowerCase();
         const rawBaseUrl = keySlot.baseUrl || '';
+        if (isLikelyDocumentationBaseUrl(rawBaseUrl)) {
+            throw new Error(`当前 Base URL 看起来是文档地址 (${rawBaseUrl})，不是供应商 API 地址。请改成供应商工作台里显示的真实 Base URL。`);
+        }
         const baseUrl = rawBaseUrl.toLowerCase();
 
         const isGeminiImage = modelLower.includes('gemini') && modelLower.includes('image') ||
@@ -3020,8 +3023,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (isGptBest) {
-            console.log(`[OpenAICompatibleAdapter] 使用 OpenAI_Strict API (GPT-Best) -> ${keySlot.name}`);
-            return this.generateImageStandard_OpenAI_Strict(options, keySlot);
+            console.log(`[OpenAICompatibleAdapter] 使用 GPT_Best_Extended API -> ${keySlot.name}`);
+            return this.generateImageStandard_GPT_Best_Extended(options, keySlot);
         }
 
         // 🚀 [Fix] 12AI 网关使用 OpenAI 格式 key (sk-开头) 时，不应使用 Gemini Native 格式

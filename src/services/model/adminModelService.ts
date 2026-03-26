@@ -336,43 +336,26 @@ class AdminModelService {
   }
 
   private async readFromRpc(): Promise<FlatModelRow[]> {
-    let legacyRows: FlatModelRow[] | null = null;
-    let legacyError: unknown = null;
-
     try {
+      const supabaseRows = this.mapActiveProviderRows(await listActiveCreditModelsViaSupabase());
+      if (supabaseRows.length > 0) {
+        return supabaseRows;
+      }
+    } catch (supabaseError) {
+      console.warn('[AdminModelService] Supabase active-model fetch failed, trying Web API fallback:', supabaseError);
+
       const response = await legacyWebApiClient.listActiveCreditModels();
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to load active credit models.');
+        throw new Error(
+          response.error?.message
+            || this.getErrorMessage(supabaseError, 'Failed to load active credit models.')
+        );
       }
 
-      legacyRows = this.mapLegacyProviderRows(response.data.items || []);
-      if (legacyRows.length > 0) {
-        return legacyRows;
-      }
-    } catch (error) {
-      legacyError = error;
-      console.warn('[AdminModelService] Web API active-model fetch failed, trying Supabase fallback:', error);
+      return this.mapLegacyProviderRows(response.data.items || []);
     }
 
-    try {
-      const fallbackRows = this.mapActiveProviderRows(await listActiveCreditModelsViaSupabase());
-      if (fallbackRows.length > 0 || !legacyRows) {
-        return fallbackRows;
-      }
-    } catch (fallbackError) {
-      if (legacyRows) {
-        return legacyRows;
-      }
-
-      throw new Error(
-        this.getErrorMessage(
-          fallbackError,
-          this.getErrorMessage(legacyError, 'Failed to load active credit models.')
-        )
-      );
-    }
-
-    return legacyRows || [];
+    return [];
   }
 
   private normalizeHexColor(input?: string | null, fallback = '#3B82F6'): string {

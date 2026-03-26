@@ -552,6 +552,30 @@ function normalizeHost(baseUrl?: string): string {
     return raw.toLowerCase();
 }
 
+export function isLikelyDocumentationBaseUrl(baseUrl?: string): boolean {
+    const raw = normalizeBaseUrl(baseUrl);
+    if (!raw) return false;
+
+    const host = normalizeHost(raw);
+    if (host === 'apifox.cn' || host.endsWith('.apifox.cn')) {
+        return true;
+    }
+
+    const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`, `http://${raw}`];
+    for (const candidate of candidates) {
+        try {
+            const pathname = new URL(candidate).pathname.toLowerCase();
+            if (/\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)$/.test(pathname)) {
+                return true;
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    return /\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)(?:$|[?#])/i.test(raw);
+}
+
 function matchesAny(patterns: RegExp[] | undefined, value: string): boolean {
     if (!patterns || !value) return false;
     return patterns.some((pattern) => pattern.test(value));

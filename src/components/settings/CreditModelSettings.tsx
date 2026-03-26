@@ -707,7 +707,7 @@ const CreditModelSettings: React.FC = () => {
       return;
     }
     if (hasSavedKeyEdits && !canSafelyEditSavedKeys) {
-      notify.error('无法修改已保存密钥', '当前只能看到预览，暂不支持逐条删除或替换，请切回 API 服务模式后重试。');
+      notify.error('无法修改已保存密钥', '当前云端模式只展示密钥掩码预览，暂不支持逐条删除或替换。你可以追加新密钥；如需整体换新，请删除供应商后重新创建。');
       return;
     }
     if (finalKeyCount === 0) {
@@ -971,7 +971,7 @@ const CreditModelSettings: React.FC = () => {
                     </div>
                     {form.savedApiKeyEntries.some((entry) => !isRealApiKeyFingerprint(entry.fingerprint)) && (
                       <div className="mt-2 text-[11px] leading-5 text-[var(--text-tertiary)]">
-                        当前处于回退模式，只能展示预览，暂不支持逐条删除或替换已保存密钥。
+                        当前处于云端掩码预览模式，只显示密钥前后缀，暂不支持逐条删除或替换已保存密钥。
                       </div>
                     )}
                   </div>
@@ -1019,7 +1019,7 @@ const CreditModelSettings: React.FC = () => {
 
                 <div className="text-[11px] leading-5 text-[var(--text-tertiary)]">
                   {isEditingSelectedProvider && selectedProviderKeyCount > 0
-                    ? `当前原有 ${selectedProviderKeyCount} 个上游密钥，保存后将保留 ${form.savedApiKeyEntries.length} 个已保存密钥。为了安全，只显示前后缀预览；你可以逐条删除、替换，或继续追加新的密钥。`
+                    ? `当前原有 ${selectedProviderKeyCount} 个上游密钥，保存后将继续保留 ${form.savedApiKeyEntries.length} 个已保存密钥。为了安全，只显示前后缀预览；你可以继续追加新的密钥。`
                     : '支持添加多个上游密钥。为了安全，保存后只显示前后缀预览，不回显完整值。'}
                 </div>
               </div>
