@@ -4,6 +4,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { tempUserService, type TempUserSession } from '../services/auth/tempUserService';
 import { setKkApiAccessToken } from '../services/api/kkApiClient';
 import { clearStoredAdminSession } from '../services/api/adminSession';
+import { emitAuthSessionChange } from '../services/auth/authSessionEvents';
 
 interface AuthContextType {
     session: Session | null;
@@ -38,9 +39,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cachedTempUser = tempUserService.getCachedTempUser();
         if (cachedTempUser) {
             console.log('[AuthContext] Restoring cached temp user session');
+            try {
+                supabase.auth.stopAutoRefresh();
+            } catch (error) {
+                console.warn('[AuthContext] Failed to stop Supabase auto refresh for temp user:', error);
+            }
             setKkApiAccessToken(undefined);
             setTempUserSession(cachedTempUser);
             setUser(cachedTempUser.user);
+            emitAuthSessionChange({
+                hasSession: false,
+                userId: cachedTempUser.user.id,
+                isTempUser: true,
+            });
             setLoading(false);
         }
     }, []);
@@ -52,29 +63,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (nextSession?.user) {
                 tempUserService.clearCachedTempUser();
+                try {
+                    supabase.auth.startAutoRefresh();
+                } catch (error) {
+                    console.warn('[AuthContext] Failed to start Supabase auto refresh:', error);
+                }
                 setKkApiAccessToken(nextSession.access_token || undefined);
                 setTempUserSession(null);
                 setSession(nextSession);
                 setUser(nextSession.user);
+                emitAuthSessionChange({
+                    hasSession: true,
+                    userId: nextSession.user.id,
+                    accessToken: nextSession.access_token || undefined,
+                    isTempUser: false,
+                });
                 setLoading(false);
                 return;
             }
 
             const cachedTempUser = tempUserService.getCachedTempUser();
             if (cachedTempUser) {
+                try {
+                    supabase.auth.stopAutoRefresh();
+                } catch (error) {
+                    console.warn('[AuthContext] Failed to stop Supabase auto refresh:', error);
+                }
                 setKkApiAccessToken(undefined);
                 setTempUserSession(cachedTempUser);
                 setSession(null);
                 setUser(cachedTempUser.user);
+                emitAuthSessionChange({
+                    hasSession: false,
+                    userId: cachedTempUser.user.id,
+                    isTempUser: true,
+                });
                 setLoading(false);
                 return;
             }
 
+            try {
+                supabase.auth.stopAutoRefresh();
+            } catch (error) {
+                console.warn('[AuthContext] Failed to stop Supabase auto refresh:', error);
+            }
             setTempUserSession(null);
             setSession(null);
             setUser(null);
             setKkApiAccessToken(undefined);
             clearStoredAdminSession();
+            emitAuthSessionChange({
+                hasSession: false,
+                userId: null,
+                isTempUser: false,
+            });
             setLoading(false);
         };
 
@@ -108,6 +150,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        try {
+            supabase.auth.stopAutoRefresh();
+        } catch (error) {
+            console.warn('[AuthContext] Failed to stop Supabase auto refresh on sign out:', error);
+        }
         setKkApiAccessToken(undefined);
         clearStoredAdminSession();
         // Clear temp user cache if exists
@@ -115,18 +162,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTempUserSession(null);
         setSession(null);
         setUser(null);
+        emitAuthSessionChange({
+            hasSession: false,
+            userId: null,
+            isTempUser: false,
+        });
     };
 
     const loginAsTempUser = async () => {
         setLoading(true);
         try {
             await supabase.auth.signOut();
+            try {
+                supabase.auth.stopAutoRefresh();
+            } catch (error) {
+                console.warn('[AuthContext] Failed to stop Supabase auto refresh for temp login:', error);
+            }
             setKkApiAccessToken(undefined);
             clearStoredAdminSession();
             const tempSession = await tempUserService.getOrCreateTempUser();
             setTempUserSession(tempSession);
             setSession(null);
             setUser(tempSession.user);
+            emitAuthSessionChange({
+                hasSession: false,
+                userId: tempSession.user.id,
+                isTempUser: true,
+            });
             setLoading(false);
             console.log('[AuthContext] Temp user login successful, expires at:', new Date(tempSession.expiresAt).toISOString());
         } catch (error: any) {

@@ -934,20 +934,31 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Sync user with KeyManager and handle Modal Logic (Storage -> API)
   useEffect(() => {
     if (authLoading) return;
+    let active = true;
 
     const init = async () => {
       // 0. Initialize Unified Model Service (loads admin configured models)
       await unifiedModelService.initialize();
+      if (!active) return;
 
       // 1. Sync User ID
       if (user) {
         import('./services/billing/costService').then(async ({ setUserId }) => {
+          if (!active) return;
           await setUserId(user.id);
         }).catch(err => console.error('[App] CostService sync failed:', err));
         await keyManager.setUserId(user.id);
+        if (!active) return;
 
         // [New] Mark user as logged in on this browser (for future skips)
         localStorage.setItem('kk_has_logged_in', 'true');
+      } else {
+        import('./services/billing/costService').then(async ({ setUserId }) => {
+          if (!active) return;
+          await setUserId(null);
+        }).catch(err => console.error('[App] CostService reset failed:', err));
+        await keyManager.setUserId(null);
+        if (!active) return;
       }
 
       // 2. Check for Returning User (Smart Skip)
@@ -1007,6 +1018,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
 
     init();
+
+    return () => {
+      active = false;
+    };
   }, [user, authLoading]);
 
   // Generation config state
@@ -7169,7 +7184,8 @@ ${slideLayerXml.join('\n')}
     const connectorOccluderInset = Math.max(4, Math.min(12, 8 / groupConnectorZoom));
     const connectorOccluderRadius = Math.max(18, Math.min(26, 22 / groupConnectorZoom));
     const connectorMaskId = `prompt-group-mask-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-    const groupConnectorLayouts = groupView.childImages.map((childNode) => {
+    const connectorCanvasPadding = 128;
+    const groupConnectorNodes = groupView.childImages.map((childNode) => {
       const childConnectorPosition = resolveLiveImagePosition(childNode) ?? childNode.position;
       const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
       let imageHeight = theoreticalHeight;
@@ -7187,20 +7203,55 @@ ${slideLayerXml.join('\n')}
       }
 
       const resolvedImageHeight = imageCardHeightById[childNode.id] ?? imageHeight;
-      const startX = promptConnectorPosition.x + 5000;
-      const startY = promptConnectorPosition.y + 5000 - promptConnectorDockInset;
-      const endX = childConnectorPosition.x + 5000;
-      const endY = (childConnectorPosition.y - resolvedImageHeight + childConnectorDockInset) + 5000;
 
       return {
         key: `${node.id}-${childNode.id}`,
+        childConnectorPosition,
+        renderedWidth,
+        resolvedImageHeight,
+      };
+    });
+    const promptCardLeft = promptConnectorPosition.x - (promptCardWidth / 2);
+    const promptCardRight = promptConnectorPosition.x + (promptCardWidth / 2);
+    const promptCardTop = promptConnectorPosition.y - promptCardHeight;
+    const promptCardBottom = promptConnectorPosition.y;
+    const connectorBounds = groupConnectorNodes.reduce((acc, childLayout) => {
+      const childLeft = childLayout.childConnectorPosition.x - (childLayout.renderedWidth / 2);
+      const childRight = childLayout.childConnectorPosition.x + (childLayout.renderedWidth / 2);
+      const childTop = childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight;
+      const childBottom = childLayout.childConnectorPosition.y;
+
+      return {
+        minX: Math.min(acc.minX, childLeft),
+        maxX: Math.max(acc.maxX, childRight),
+        minY: Math.min(acc.minY, childTop),
+        maxY: Math.max(acc.maxY, childBottom),
+      };
+    }, {
+      minX: promptCardLeft,
+      maxX: promptCardRight,
+      minY: promptCardTop,
+      maxY: promptCardBottom,
+    });
+    const connectorSvgLeft = connectorBounds.minX - connectorCanvasPadding;
+    const connectorSvgTop = connectorBounds.minY - connectorCanvasPadding;
+    const connectorSvgWidth = Math.max(1, (connectorBounds.maxX - connectorBounds.minX) + (connectorCanvasPadding * 2));
+    const connectorSvgHeight = Math.max(1, (connectorBounds.maxY - connectorBounds.minY) + (connectorCanvasPadding * 2));
+    const groupConnectorLayouts = groupConnectorNodes.map((childLayout) => {
+      const startX = promptConnectorPosition.x - connectorSvgLeft;
+      const startY = (promptConnectorPosition.y - promptConnectorDockInset) - connectorSvgTop;
+      const endX = childLayout.childConnectorPosition.x - connectorSvgLeft;
+      const endY = (childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight + childConnectorDockInset) - connectorSvgTop;
+
+      return {
+        key: childLayout.key,
         path: buildSoftConnectorPath(startX, startY, endX, endY),
         occluder: {
-          key: `${node.id}-${childNode.id}-occluder`,
-          x: (childConnectorPosition.x - (renderedWidth / 2)) + 5000 - connectorOccluderInset,
-          y: (childConnectorPosition.y - resolvedImageHeight) + 5000 - connectorOccluderInset,
-          width: renderedWidth + (connectorOccluderInset * 2),
-          height: resolvedImageHeight + (connectorOccluderInset * 2),
+          key: `${childLayout.key}-occluder`,
+          x: (childLayout.childConnectorPosition.x - (childLayout.renderedWidth / 2)) - connectorSvgLeft - connectorOccluderInset,
+          y: (childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight) - connectorSvgTop - connectorOccluderInset,
+          width: childLayout.renderedWidth + (connectorOccluderInset * 2),
+          height: childLayout.resolvedImageHeight + (connectorOccluderInset * 2),
           radius: connectorOccluderRadius,
         },
       };
@@ -7208,8 +7259,8 @@ ${slideLayerXml.join('\n')}
     const groupConnectorOccluders = [
       {
         key: `${node.id}-prompt-occluder`,
-        x: (promptConnectorPosition.x - (promptCardWidth / 2)) + 5000 - connectorOccluderInset,
-        y: (promptConnectorPosition.y - promptCardHeight) + 5000 - connectorOccluderInset,
+        x: promptCardLeft - connectorSvgLeft - connectorOccluderInset,
+        y: promptCardTop - connectorSvgTop - connectorOccluderInset,
         width: promptCardWidth + (connectorOccluderInset * 2),
         height: promptCardHeight + (connectorOccluderInset * 2),
         radius: connectorOccluderRadius,
@@ -7224,10 +7275,10 @@ ${slideLayerXml.join('\n')}
             className="absolute top-0 left-0 pointer-events-none"
             shapeRendering="auto"
             style={{
-              width: '10000px',
-              height: '10000px',
-              left: '-5000px',
-              top: '-5000px',
+              width: `${connectorSvgWidth}px`,
+              height: `${connectorSvgHeight}px`,
+              left: `${connectorSvgLeft}px`,
+              top: `${connectorSvgTop}px`,
               overflow: 'visible',
               zIndex: connectorLayerZIndex,
             }}
@@ -7239,10 +7290,10 @@ ${slideLayerXml.join('\n')}
                 maskContentUnits="userSpaceOnUse"
                 x={0}
                 y={0}
-                width={10000}
-                height={10000}
+                width={connectorSvgWidth}
+                height={connectorSvgHeight}
               >
-                <rect x={0} y={0} width={10000} height={10000} fill="white" />
+                <rect x={0} y={0} width={connectorSvgWidth} height={connectorSvgHeight} fill="white" />
                 {groupConnectorOccluders.map((occluder) => (
                   <rect
                     key={occluder.key}

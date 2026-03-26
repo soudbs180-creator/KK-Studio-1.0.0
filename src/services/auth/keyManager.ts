@@ -6,6 +6,7 @@
  * NOW SUPPORTS: Supabase Cloud Sync & Third-Party API Proxies
  */
 import { tempUserService } from './tempUserService';
+import { subscribeAuthSessionChange } from './authSessionEvents';
 import {
     type ApiProtocolFormat,
     AuthMethod,
@@ -34,6 +35,7 @@ import {
 } from '../api/supabaseUserApiCloudStorage';
 import { isKkApiPersistenceUnavailableError } from '../api/kkApiServerHealth';
 import { legacyWebApiClient } from '../api/kkApiClient';
+import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
 import { Provider } from '../../types';
@@ -937,7 +939,11 @@ export class KeyManager {
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
     private providerStorageScope: ProviderStorageScope = 'none';
+    private pendingStateCloudSync = false;
     private pendingProviderCloudSync = false;
+    private cloudSyncRevision = 0;
+    private pendingCloudSyncPromise: Promise<void> | null = null;
+    private pendingCloudRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Cached global model list snapshot
     private globalModelListCache: {
@@ -971,6 +977,34 @@ export class KeyManager {
             console.log('[KeyManager] Admin models updated, notifying listeners');
             this.notifyListeners();
         });
+
+        subscribeAuthSessionChange((detail) => {
+            if (detail.isTempUser || !detail.hasSession) {
+                return;
+            }
+
+            if (detail.userId && this.userId && detail.userId !== this.userId) {
+                return;
+            }
+
+            if (!this.hasPendingCloudSync()) {
+                return;
+            }
+
+            this.cloudSyncBackoffUntil = 0;
+            void this.flushPendingCloudSync();
+        });
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('online', () => {
+                if (!this.hasPendingCloudSync()) {
+                    return;
+                }
+
+                this.cloudSyncBackoffUntil = 0;
+                void this.flushPendingCloudSync();
+            });
+        }
     }
 
     private getStorageKey(): string {
@@ -1193,10 +1227,9 @@ export class KeyManager {
                 // Optional: Clear existing local storage just in case
                 localStorage.removeItem(key);
 
-                // Sync to cloud
-                if (!this.isSyncing) {
-                    await this.saveToCloud(toSave);
-                }
+                this.pendingStateCloudSync = true;
+                this.cloudSyncRevision += 1;
+                await this.flushPendingCloudSync(toSave);
             } else {
                 // Anonymous users persist only to local storage.
                 localStorage.setItem(key, JSON.stringify(toSave));
@@ -1220,9 +1253,13 @@ export class KeyManager {
      */
     async setUserId(userId: string | null) {
         this.unsubscribeRealtime();
+        this.clearPendingCloudRetry();
 
         this.userId = userId;
         this.hasHydratedCloudState = false;
+        this.pendingStateCloudSync = false;
+        this.pendingProviderCloudSync = false;
+        this.cloudSyncRevision = 0;
         this.loadProviders(true);
 
         if (userId) {
@@ -1423,12 +1460,13 @@ export class KeyManager {
         try {
             this.isSyncing = true;
             console.log('[KeyManager] Loading cloud state via API/Supabase...');
+            const accessToken = await getPreferredKkApiAccessToken();
 
             let apiPayload: unknown = null;
             let apiError: unknown = null;
 
             try {
-                const response = await legacyWebApiClient.getKeyManagerCloudState();
+                const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
                 if (response.success) {
                     apiPayload = response.data;
                 } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
@@ -1480,8 +1518,8 @@ export class KeyManager {
             console.error('[KeyManager] Error loading from cloud:', e);
         } finally {
             this.isSyncing = false;
-            if (this.userId === activeUserId && this.pendingProviderCloudSync) {
-                this.flushPendingProviderCloudSync();
+            if (this.userId === activeUserId && this.hasPendingCloudSync()) {
+                void this.flushPendingCloudSync();
             }
         }
     }
@@ -1524,7 +1562,8 @@ export class KeyManager {
             throwOnError?: boolean;
         }
     ) {
-        if (!this.userId || this.userId.startsWith('dev-user-')) {
+        const activeUserId = this.userId;
+        if (!activeUserId || activeUserId.startsWith('dev-user-')) {
             console.log('[KeyManager] Skip cloud upload (missing userId or dev user)');
             return;
         }
@@ -1539,8 +1578,9 @@ export class KeyManager {
         }
 
         try {
+            const accessToken = await getPreferredKkApiAccessToken();
             console.log('[KeyManager] Uploading key-manager cloud state via API...', {
-                userId: this.userId,
+                userId: activeUserId,
                 slotCount: state.slots.length
             });
 
@@ -1553,9 +1593,12 @@ export class KeyManager {
                 const savedPayload = await mergeUserApisPayloadViaSupabase({
                     slots: state.slots as unknown as Record<string, unknown>[],
                     providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
-                }, this.userId || undefined);
+                }, activeUserId);
 
-                this.pendingProviderCloudSync = false;
+                if (this.userId !== activeUserId) {
+                    return;
+                }
+
                 this.hasHydratedCloudState = true;
                 this.applyCloudPayload(savedPayload);
                 console.log('[KeyManager] Supabase cloud sync succeeded!');
@@ -1579,7 +1622,11 @@ export class KeyManager {
                 version: 2,
                 slots: state.slots as unknown as Record<string, unknown>[],
                 providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
-            });
+            }, { accessToken });
+
+            if (this.userId !== activeUserId) {
+                return;
+            }
 
             if (!response.success) {
                 const errorCode = response.error?.code || 'UNKNOWN_ERROR';
@@ -1614,7 +1661,6 @@ export class KeyManager {
                 throw new Error(errorMessage);
             }
 
-            this.pendingProviderCloudSync = false;
             this.hasHydratedCloudState = true;
             this.applyCloudPayload(response.data);
             console.log('[KeyManager] API cloud sync succeeded!');
@@ -1623,6 +1669,7 @@ export class KeyManager {
             requestCostSync().catch(console.error);
         } catch (e: any) {
             if (isKkApiPersistenceUnavailableError(e)) {
+                this.schedulePendingCloudRetry();
                 if (!options?.throwOnError) {
                     notify.warning('Cloud sync unavailable', e.message);
                 }
@@ -1633,10 +1680,74 @@ export class KeyManager {
             if (!isNetworkError) {
                 console.error('[KeyManager] saveToCloud failed:', e);
             }
+            this.schedulePendingCloudRetry();
             if (options?.throwOnError) {
                 throw e;
             }
         }
+    }
+
+    private hasPendingCloudSync(): boolean {
+        return this.pendingStateCloudSync || this.pendingProviderCloudSync;
+    }
+
+    private clearPendingCloudRetry(): void {
+        if (!this.pendingCloudRetryTimer) {
+            return;
+        }
+
+        clearTimeout(this.pendingCloudRetryTimer);
+        this.pendingCloudRetryTimer = null;
+    }
+
+    private schedulePendingCloudRetry(): void {
+        if (!this.userId || !this.hasPendingCloudSync()) {
+            return;
+        }
+
+        if (this.pendingCloudRetryTimer) {
+            return;
+        }
+
+        const waitMs = Math.max(1000, this.cloudSyncBackoffUntil - Date.now(), 3000);
+        this.pendingCloudRetryTimer = setTimeout(() => {
+            this.pendingCloudRetryTimer = null;
+            void this.flushPendingCloudSync();
+        }, waitMs);
+    }
+
+    private async flushPendingCloudSync(state: KeyManagerState = this.state): Promise<void> {
+        if (!this.userId || !this.hasPendingCloudSync()) {
+            return;
+        }
+
+        if (this.isSyncing) {
+            return;
+        }
+
+        if (this.pendingCloudSyncPromise) {
+            await this.pendingCloudSyncPromise;
+            return;
+        }
+
+        this.clearPendingCloudRetry();
+        const syncRevision = this.cloudSyncRevision;
+        this.pendingCloudSyncPromise = this.saveToCloud(state).then(() => {
+            if (this.cloudSyncRevision === syncRevision) {
+                this.pendingStateCloudSync = false;
+                this.pendingProviderCloudSync = false;
+            }
+        }).catch((error) => {
+            console.error('[KeyManager] Failed to sync key-manager state to cloud:', error);
+        }).finally(() => {
+            this.pendingCloudSyncPromise = null;
+
+            if (this.hasPendingCloudSync()) {
+                this.schedulePendingCloudRetry();
+            }
+        });
+
+        await this.pendingCloudSyncPromise;
     }
 
     async syncToCloudNow(): Promise<void> {
@@ -4112,16 +4223,17 @@ export class KeyManager {
 
         if (this.userId) {
             this.pendingProviderCloudSync = true;
-            this.flushPendingProviderCloudSync();
+            this.cloudSyncRevision += 1;
+            void this.flushPendingCloudSync();
         }
     }
 
     private flushPendingProviderCloudSync(): void {
-        if (!this.userId || !this.pendingProviderCloudSync || this.isSyncing) {
+        if (!this.userId || !this.pendingProviderCloudSync) {
             return;
         }
 
-        void this.saveToCloud(this.state).catch((error) => {
+        void this.flushPendingCloudSync().catch((error) => {
             console.error('[KeyManager] Failed to sync providers to cloud:', error);
         });
     }

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { ArrowRight, Loader2, Lock, Mail, Shield } from 'lucide-react';
 
-import type { LoginResponseDto } from '../../../packages/contracts/src/dto/auth.ts';
-import { legacyWebApiClient, setKkApiAccessToken } from '../../services/api/kkApiClient';
+import { supabase } from '../../lib/supabase';
 import { notify } from '../../services/system/notificationService';
 import { useLocale } from '../../context/LocaleContext';
 import { TurnstileWidget, useTurnstile } from './TurnstileWidget';
 
 interface LoginFormProps {
-  onSuccess?: (session: LoginResponseDto) => void;
+  onSuccess?: () => void;
   onRegisterClick?: () => void;
 }
 
@@ -59,18 +58,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await legacyWebApiClient.login({
+      const { error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
-        ...(turnstileToken ? { turnstileToken } : {}),
+        ...(turnstileToken ? { options: { captchaToken: turnstileToken } } : {}),
       });
 
-      if (response.success) {
-        setKkApiAccessToken(response.data.accessToken);
+      if (!error) {
         setFailedAttempts(0);
         setShowTurnstile(false);
         notify.success('登录成功', '欢迎回来。');
-        onSuccess?.(response.data);
+        onSuccess?.();
         return;
       }
 
@@ -78,7 +76,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       setFailedAttempts(nextAttempts);
       setShowTurnstile(nextAttempts >= 2);
       resetTurnstile();
-      notify.error('登录失败', response.error.message || '请检查账号和密码。');
+      notify.error('登录失败', error.message || '请检查账号和密码。');
     } catch (error: any) {
       notify.error('登录失败', error?.message || '网络异常，请稍后重试。');
     } finally {
@@ -137,7 +135,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             <div className="mb-2 flex items-center gap-2">
               <Shield className="h-4 w-4 text-amber-600" />
               <span className="text-sm text-amber-600">
-                检测到多次尝试，请先完成安全验证
+                检测到多次失败，请先完成安全验证
               </span>
             </div>
             <TurnstileWidget

@@ -1,5 +1,6 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
+import { waitForAuthSessionChange } from '../auth/authSessionEvents';
 import { clearStoredAdminSession } from '../api/adminSession';
 import { setKkApiAccessToken } from '../api/kkApiClient';
 
@@ -117,6 +118,7 @@ type SecureProxyBoundaryError = Error & {
 };
 
 let forcedReauthPromise: Promise<void> | null = null;
+let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = null;
 
 function getSecureProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
@@ -229,33 +231,81 @@ function buildCloudSessionError(feature: string): SecureProxyBoundaryError {
 }
 
 async function resolveCloudSession(feature: string): Promise<CloudSessionResolution> {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
+  const getStableSession = async (): Promise<CloudSessionResolution | null> => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
-  if (error) {
-    throw new Error(error.message || `Unable to verify login state for ${feature}.`);
-  }
-
-  let activeSession = session;
-  const expiresAtMs = typeof activeSession?.expires_at === 'number'
-    ? activeSession.expires_at * 1000
-    : 0;
-  const shouldRefresh = !activeSession?.access_token
-    || (expiresAtMs > 0 && expiresAtMs <= Date.now() + 60_000);
-
-  if (shouldRefresh) {
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError) {
-      console.warn('[secureModelProxy] refreshSession failed:', refreshError);
+    if (error) {
+      throw new Error(error.message || `Unable to verify login state for ${feature}.`);
     }
-    activeSession = !refreshError && refreshData.session?.access_token
-      ? refreshData.session
-      : null;
-  }
 
-  if (!activeSession?.access_token) {
+    const expiresAtMs = typeof session?.expires_at === 'number'
+      ? session.expires_at * 1000
+      : 0;
+    const hasUsableSession = Boolean(
+      session?.access_token
+      && (expiresAtMs <= 0 || expiresAtMs > Date.now() + 60_000),
+    );
+
+    if (hasUsableSession) {
+      return {
+        accessToken: session!.access_token,
+      };
+    }
+
+    if (refreshCloudSessionPromise) {
+      return refreshCloudSessionPromise;
+    }
+
+    refreshCloudSessionPromise = (async () => {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.warn('[secureModelProxy] refreshSession failed:', refreshError);
+      }
+
+      const refreshedSession = !refreshError && refreshData.session?.access_token
+        ? refreshData.session
+        : null;
+
+      if (refreshedSession?.access_token) {
+        return {
+          accessToken: refreshedSession.access_token,
+        };
+      }
+
+      const sessionEvent = await waitForAuthSessionChange(
+        (detail) => detail.hasSession && !detail.isTempUser,
+        1500,
+      );
+
+      if (sessionEvent?.accessToken) {
+        return {
+          accessToken: sessionEvent.accessToken,
+        };
+      }
+
+      const {
+        data: { session: recoveredSession },
+      } = await supabase.auth.getSession();
+
+      if (recoveredSession?.access_token) {
+        return {
+          accessToken: recoveredSession.access_token,
+        };
+      }
+
+      return null;
+    })().finally(() => {
+      refreshCloudSessionPromise = null;
+    });
+
+    return refreshCloudSessionPromise;
+  };
+
+  const resolvedSession = await getStableSession();
+  if (!resolvedSession?.accessToken) {
     // secure-model-proxy is backed by Supabase auth and must never use the
     // legacy compatibility token from the web API login flow.
     const sessionError = buildCloudSessionError(feature);
@@ -265,9 +315,7 @@ async function resolveCloudSession(feature: string): Promise<CloudSessionResolut
     throw sessionError;
   }
 
-  return {
-    accessToken: activeSession.access_token,
-  };
+  return resolvedSession;
 }
 
 async function buildInvocationError(
@@ -380,12 +428,13 @@ async function invokeSecureSystemProxy(
   let result = await invokeWithToken(session.accessToken);
 
   if (result.response?.status === 401) {
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError) {
-      console.warn('[secureModelProxy] retry refreshSession failed:', refreshError);
-    }
-    if (!refreshError && refreshData.session?.access_token) {
-      result = await invokeWithToken(refreshData.session.access_token);
+    try {
+      const recoveredSession = await resolveCloudSession(feature);
+      if (recoveredSession.accessToken) {
+        result = await invokeWithToken(recoveredSession.accessToken);
+      }
+    } catch (error) {
+      console.warn('[secureModelProxy] Cloud session recovery failed after proxy 401:', error);
     }
   }
 

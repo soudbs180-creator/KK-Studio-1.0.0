@@ -1,6 +1,7 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
-import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage, getImageCount } from '../services/storage/imageStorage';
+import { startTransition } from 'react';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
@@ -797,6 +798,7 @@ const persistCanvasStateToLocalStorage = (state: CanvasState, context: string = 
 
 export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [isShellReady, setIsShellReady] = useState(false);
     const [state, setState] = useState<CanvasState>(() => {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -894,6 +896,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
+    // Let the workspace shell paint first; heavier restoration continues in the background.
+    useEffect(() => {
+        const readyFrame = window.requestAnimationFrame(() => {
+            startTransition(() => {
+                setIsShellReady(true);
+            });
+        });
+
+        return () => {
+            window.cancelAnimationFrame(readyFrame);
+        };
+    }, []);
+
     // Load image URLs from IndexedDB AND Restore Folder Handle
     useEffect(() => {
         const init = async () => {
@@ -931,7 +946,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 }
 
                                 if (canvases.length > 0) {
-                                    setState(prev => {
+                                    startTransition(() => {
+                                        setState(prev => {
                                         // [Key fix] Merge disk project.json with the latest localStorage state.
                                         // A hard refresh usually leaves fresher state in localStorage via beforeunload.
                                         // project.json may lag behind due to async writes, so both sources must be merged carefully.
@@ -974,14 +990,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                             folderName: handle.name
                                         };
                                     });
+                                    });
                                 } else {
                                     // Empty project on disk? Just connect.
-                                    setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                    startTransition(() => {
+                                        setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                    });
                                 }
                             } catch (err) {
                                 console.error('Failed to load project from restored handle', err);
                                 // Fallback just connect
-                                setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                startTransition(() => {
+                                    setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                });
                             }
                         } else {
                             logInfo('CanvasContext', '等待本地文件夹权限', `permission: ${perm}`);
@@ -995,8 +1016,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 // 2. Load images from IndexedDB on demand.
                 console.log('[CanvasContext] Starting optimized image loading...');
-                const totalImages = await getImageCount();
-                console.log(`[CanvasContext] Total images in DB: ${totalImages}`);
 
                 // Collect the image IDs required by the current state.
                 const requiredImageIds = new Set<string>();
@@ -1144,7 +1163,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
                 // Update state with images from IndexedDB (or already in state)
                 if (imageMap.size > 0) {
-                    setState(prev => ({
+                    startTransition(() => {
+                        setState(prev => ({
                         ...prev,
                         canvases: prev.canvases.map(c => syncCanvasCompatibility({
                             ...c,
@@ -1207,6 +1227,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             }))
                         }))
                     }));
+                    });
                 }
             } catch (error) {
                 console.error('Failed to load images from IndexedDB:', error);
@@ -5472,7 +5493,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeGroup,
         updateGroup,
         setNodeTags,
-        isReady: !isLoading,
+        isReady: isShellReady,
         setViewportCenter,
         migrateNodes,
         mergeCanvasInto,

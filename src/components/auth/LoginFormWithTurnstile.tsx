@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { legacyWebApiClient, setKkApiAccessToken } from '../../services/api/kkApiClient';
+import { supabase } from '../../lib/supabase';
 import { notify } from '../../services/system/notificationService';
 import { TurnstileWidget, useTurnstile } from './TurnstileWidget';
 
@@ -39,20 +39,21 @@ export const LoginFormWithTurnstile: React.FC<LoginFormProps> = ({ onLogin }) =>
     setIsLoading(true);
 
     try {
-      const response = await legacyWebApiClient.login({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        turnstileToken,
+        options: {
+          captchaToken: turnstileToken,
+        },
       });
 
-      if (response.success) {
-        setKkApiAccessToken(response.data.accessToken);
+      if (!error) {
         notify.success('登录成功', '欢迎回来。');
         onLogin?.({ email, password });
         return;
       }
 
-      notify.error('登录失败', response.error.message || '请检查账号和密码。');
+      notify.error('登录失败', error.message || '请检查账号和密码。');
       resetTurnstile();
     } catch (error: any) {
       notify.error('登录失败', error?.message || '网络异常，请稍后重试。');
@@ -113,7 +114,7 @@ export const LoginFormWithTurnstile: React.FC<LoginFormProps> = ({ onLogin }) =>
       </button>
 
       <p className="text-center text-xs text-gray-500">
-        当前登录请求会通过 Cloudflare Turnstile 做风险校验。
+        当前登录请求会通过 Cloudflare Turnstile 做风控校验。
       </p>
     </form>
   );
