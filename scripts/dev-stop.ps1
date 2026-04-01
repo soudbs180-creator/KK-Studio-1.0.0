@@ -63,6 +63,14 @@ function Get-ProcessCommandLine {
     }
 }
 
+function Get-ListeningPortsForProcess {
+    param([int]$ProcessId)
+
+    return @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.OwningProcess -eq $ProcessId } |
+        Select-Object -ExpandProperty LocalPort -Unique)
+}
+
 function Is-KnownDevProcess {
     param(
         [int]$ProcessId,
@@ -79,6 +87,12 @@ function Is-KnownDevProcess {
     }
 
     $commandLine = [string](Get-ProcessCommandLine -ProcessId $ProcessId)
+    $listeningPorts = @(Get-ListeningPortsForProcess -ProcessId $ProcessId)
+
+    if ($process.ProcessName -eq 'node' -and 3000 -in $listeningPorts -and 3001 -in $listeningPorts) {
+        return $true
+    }
+
     if ([string]::IsNullOrWhiteSpace($commandLine)) {
         return $false
     }
@@ -99,9 +113,21 @@ function Is-KnownDevProcess {
 function Get-PortOwnerProcessId {
     param([int]$Port)
 
-    return @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique |
-        Select-Object -First 1)
+    $ownerPids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+
+    foreach ($ownerPid in $ownerPids) {
+        $resolvedOwnerPid = 0
+        if (-not [int]::TryParse([string]$ownerPid, [ref]$resolvedOwnerPid)) {
+            continue
+        }
+
+        if (Is-KnownDevProcess -ProcessId $resolvedOwnerPid -Port $Port) {
+            return $resolvedOwnerPid
+        }
+    }
+
+    return $null
 }
 
 foreach ($service in $services) {

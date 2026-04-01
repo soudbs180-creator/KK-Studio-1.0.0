@@ -93,9 +93,21 @@ function Get-ListeningPortsForProcess {
 function Get-ListeningProcessIdByPort {
     param([int]$Port)
 
-    return @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique |
-        Select-Object -First 1)
+    $ownerPids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+
+    foreach ($ownerPid in $ownerPids) {
+        $resolvedOwnerPid = 0
+        if (-not [int]::TryParse([string]$ownerPid, [ref]$resolvedOwnerPid)) {
+            continue
+        }
+
+        if (Is-KnownDevProcess -ProcessId $resolvedOwnerPid -Port $Port) {
+            return $resolvedOwnerPid
+        }
+    }
+
+    return $null
 }
 
 function Is-KnownDevProcess {

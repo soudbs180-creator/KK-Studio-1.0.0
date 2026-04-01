@@ -8,7 +8,7 @@ import { keyManager } from '../../services/auth/keyManager';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
-import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';
+import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '../../services/model/modelLibraryRefresh';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
@@ -694,24 +694,29 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }
 
         updateModelMenuLayout();
+        let nextAvailableModels = availableModels;
 
-        try {
-            await refreshModelLibraryData();
-        } catch (error) {
-            console.warn('[ChatSidebar] Model library refresh failed before open:', error);
+        if (nextAvailableModels.length > 0) {
+            refreshModelLibraryDataInBackground();
+        } else {
+            try {
+                await refreshModelLibraryData({ force: true });
+            } catch (error) {
+                console.warn('[ChatSidebar] Model library refresh failed before empty-state open:', error);
+            }
+
+            nextAvailableModels = buildAvailableChatModels(canBrowseSystemCreditModels);
+            setAvailableModels(nextAvailableModels);
         }
 
-        const models = buildAvailableChatModels(canBrowseSystemCreditModels);
-        setAvailableModels(models);
-
-        if (models.length === 0) {
+        if (nextAvailableModels.length === 0) {
             onOpenSettings?.('api-management');
             return;
         }
 
-        const matchedSelectedModel = models.find(model => model.id === selectedModel.id);
+        const matchedSelectedModel = nextAvailableModels.find(model => model.id === selectedModel.id);
         if (!matchedSelectedModel) {
-            setSelectedModel(models[0]);
+            setSelectedModel(nextAvailableModels[0]);
         } else if (
             matchedSelectedModel.name !== selectedModel.name
             || matchedSelectedModel.description !== selectedModel.description
@@ -721,6 +726,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
         setShowModelMenu(true);
     }, [
+        availableModels,
         canBrowseSystemCreditModels,
         onOpenSettings,
         registerActivity,

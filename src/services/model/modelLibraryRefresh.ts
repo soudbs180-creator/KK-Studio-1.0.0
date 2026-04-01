@@ -1,12 +1,22 @@
 import { keyManager } from '../auth/keyManager';
 import { adminModelService } from './adminModelService';
 
-let refreshPromise: Promise<void> | null = null;
+const MODEL_LIBRARY_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
-export async function refreshModelLibraryData(): Promise<void> {
+let refreshPromise: Promise<void> | null = null;
+let lastRefreshStartedAt = 0;
+
+export async function refreshModelLibraryData(options?: { force?: boolean }): Promise<void> {
     if (refreshPromise) {
         return refreshPromise;
     }
+
+    const now = Date.now();
+    if (!options?.force && now - lastRefreshStartedAt < MODEL_LIBRARY_REFRESH_INTERVAL_MS) {
+        return;
+    }
+
+    lastRefreshStartedAt = now;
 
     refreshPromise = (async () => {
         const results = await Promise.allSettled([
@@ -25,4 +35,10 @@ export async function refreshModelLibraryData(): Promise<void> {
     });
 
     return refreshPromise;
+}
+
+export function refreshModelLibraryDataInBackground(options?: { force?: boolean }): void {
+    void refreshModelLibraryData(options).catch((error) => {
+        console.warn('[ModelLibraryRefresh] Background refresh failed:', error);
+    });
 }

@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('runtime-sensitive services guard legacy Web API fallback behind local or explicit API configuration', () => {
+test('runtime-sensitive services keep legacy fallback guarded while routing guest and workspace flows through the API layer', () => {
   const supabaseUserApiSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
   const userApiProfileSource = readSource('src/services/api/userApiProfileStorage.ts');
   const keyManagerSource = readSource('src/services/auth/keyManager.ts');
@@ -34,15 +34,16 @@ test('runtime-sensitive services guard legacy Web API fallback behind local or e
     billingContextSource,
     /if \(shouldUseLegacyWebApiFallback\(\)\) \{\s*if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{\s*const rows = await loadCreditTransactionsDirectlyFromSupabase\(user\.id\);/,
   );
-  assert.match(syncServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
-  assert.match(syncServiceSource, /import \{ legacyWebApiClient, shouldUseLegacyWebApiFallback \} from '\.\.\/api\/kkApiClient';/);
-  assert.match(syncServiceSource, /if \(userId\) \{\s*await saveLayoutViaSupabase\(userId, canvases\);/);
-  assert.match(syncServiceSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{\s*return \[\];\s*\}/);
-  assert.match(syncServiceSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{\s*return \{ count: 0, success: true \};\s*\}/);
-  assert.match(tempUserServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
-  assert.match(tempUserServiceSource, /import \{ legacyWebApiClient, shouldUseLegacyWebApiFallback \} from '\.\.\/api\/kkApiClient';/);
-  assert.match(tempUserServiceSource, /\.from\('temp_users'\)\s*\.insert\(/);
-  assert.match(tempUserServiceSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{\s*console\.error\('\[TempUser\] Failed to create temp user session via Supabase:', error\);\s*throw new Error\('Failed to create guest session\.'\);\s*\}/);
+  assert.doesNotMatch(syncServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
+  assert.match(syncServiceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(syncServiceSource, /legacyWebApiClient\.saveWorkspaceLayout/);
+  assert.match(syncServiceSource, /legacyWebApiClient\.getWorkspaceLayout/);
+  assert.match(syncServiceSource, /legacyWebApiClient\.cleanupCloudImages/);
+  assert.doesNotMatch(syncServiceSource, /\.storage\s*\.\s*from\(/);
+  assert.doesNotMatch(tempUserServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
+  assert.match(tempUserServiceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(tempUserServiceSource, /legacyWebApiClient\.createTempUser/);
+  assert.doesNotMatch(tempUserServiceSource, /\.from\('temp_users'\)\s*\.insert\(/);
 });
 
 test('admin UI entrypoints skip legacy Web API probes when runtime fallback is disabled', () => {

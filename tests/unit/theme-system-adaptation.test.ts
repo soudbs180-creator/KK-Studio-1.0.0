@@ -42,8 +42,9 @@ test('theme-aware shells use resolved theme when preference is set to system', (
 
   assert.match(projectManagerSource, /const \{ resolvedTheme, toggleTheme \} = useTheme\(\);/);
   assert.match(projectManagerSource, /const isDarkMode = resolvedTheme === 'dark';/);
-  assert.match(projectManagerSource, /backgroundColor: isDarkMode \? '#27272a' : '#ffffff'/);
-  assert.match(projectManagerSource, /border: isDarkMode \? '1px solid rgba\(255,255,255,0.05\)' : '1px solid rgba\(0,0,0,0.05\)'/);
+  assert.match(projectManagerSource, /background: isDarkMode \? '#27272a' : 'var\(--floating-shell-bg\)'/);
+  assert.match(projectManagerSource, /border: isDarkMode \? '1px solid rgba\(255,255,255,0.05\)' : '1px solid var\(--floating-shell-border\)'/);
+  assert.match(projectManagerSource, /boxShadow: isDarkMode[\s\S]*'var\(--floating-shell-shadow\)'/);
   assert.match(projectManagerSource, /title=\{isDarkMode \? '切换到浅色模式' : '切换到深色模式'\}/);
   assert.match(projectManagerSource, /\{isDarkMode \? <Moon size=\{20\} \/> : <Sun size=\{20\} \/>}/);
 

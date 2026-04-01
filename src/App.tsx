@@ -54,6 +54,16 @@ function buildSoftConnectorPath(startX: number, startY: number, endX: number, en
   return `M${startX},${startY} C${control1X},${control1Y} ${control2X},${control2Y} ${endX},${endY}`;
 }
 
+function buildDockedVerticalConnectorPath(startX: number, startY: number, endX: number, endY: number) {
+  const deltaY = endY - startY;
+  const directionY = deltaY === 0 ? 1 : Math.sign(deltaY);
+  const distanceY = Math.abs(deltaY);
+  const startPullY = Math.max(28, Math.min(distanceY * 0.5, 140)) * directionY;
+  const endPullY = Math.max(24, Math.min(distanceY * 0.34, 112)) * directionY;
+
+  return `M${startX},${startY} C${startX},${startY + startPullY} ${endX},${endY - endPullY} ${endX},${endY}`;
+}
+
 function getSoftConnectorControlPoints(startX: number, startY: number, endX: number, endY: number) {
   const deltaX = endX - startX;
   const distanceX = Math.abs(deltaX);
@@ -6076,15 +6086,15 @@ ${slideLayerXml.join('\n')}
       }
     }
 
+    if (!position && hasLivePositionChanged) {
+      // Flush the last queued drag delta before we clear the live snapshot so
+      // cards and connectors do not briefly fall back to stale persisted coords.
+      moveSelectedNodesImmediate({ x: 0, y: 0 });
+    }
+
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
       syncLiveNodePositionState();
-
-      if (!position) {
-        // Flush the last queued drag delta so the persisted canvas position lands
-        // exactly where the live drag visual finished before we clear the live state.
-        moveSelectedNodesImmediate({ x: 0, y: 0 });
-      }
     }
 
     if (!groupId) {
@@ -7134,6 +7144,7 @@ ${slideLayerXml.join('\n')}
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
     const imageDetailLevel = node.parentPromptId ? 'full' : item.detailLevel;
+    const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
 
     return (
       <ImageNode
@@ -7143,7 +7154,7 @@ ${slideLayerXml.join('\n')}
         loadBand={item.loadBand}
         groupLayerZIndex={item.groupLayerZIndex}
         stackZIndexOverride={item.stackZIndexOverride}
-        position={node.position}
+        position={renderedImagePosition}
         onPositionChange={updateImageNodePosition}
         onLivePositionChange={handleLiveNodePositionChange}
         onHeightChange={handleImageCardHeightChange}
@@ -7199,6 +7210,7 @@ ${slideLayerXml.join('\n')}
     isMobile,
     applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodes,
+    resolveLiveImagePosition,
     moveSelectedNodes,
     nowTimestamp,
     selectedNodeIds,
@@ -7224,6 +7236,11 @@ ${slideLayerXml.join('\n')}
     const connectorLayerZIndex = Math.max(0, groupStackZIndex - 1);
     const promptCardZIndex = groupStackZIndex + 20;
     const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
+    const renderedPromptNode = (
+      promptConnectorPosition.x === node.position.x && promptConnectorPosition.y === node.position.y
+    )
+      ? node
+      : { ...node, position: promptConnectorPosition };
     const promptCardHeight = node.height || getPromptHeight(node.prompt);
     const promptCardWidth = isMobile
       ? Math.min(320, Math.max(248, ((typeof window !== 'undefined' ? window.innerWidth : 320) - 24)))
@@ -7296,7 +7313,7 @@ ${slideLayerXml.join('\n')}
 
       return {
         key: childLayout.key,
-        path: buildSoftConnectorPath(startX, startY, endX, endY),
+        path: buildDockedVerticalConnectorPath(startX, startY, endX, endY),
         occluder: {
           key: `${childLayout.key}-occluder`,
           x: (childLayout.childConnectorPosition.x - (childLayout.renderedWidth / 2)) - connectorSvgLeft - connectorOccluderInset,
@@ -7318,6 +7335,9 @@ ${slideLayerXml.join('\n')}
       },
       ...groupConnectorLayouts.map((layout) => layout.occluder),
     ];
+    // The card layers already sit above the connector layer via z-index, so the
+    // extra SVG mask only makes the line appear to "break" early on long drags.
+    const shouldMaskGroupConnectors = false;
 
     return (
       <>
@@ -7325,6 +7345,9 @@ ${slideLayerXml.join('\n')}
           <svg
             className="absolute top-0 left-0 pointer-events-none"
             shapeRendering="auto"
+            width={connectorSvgWidth}
+            height={connectorSvgHeight}
+            viewBox={`0 0 ${connectorSvgWidth} ${connectorSvgHeight}`}
             style={{
               width: `${connectorSvgWidth}px`,
               height: `${connectorSvgHeight}px`,
@@ -7334,32 +7357,34 @@ ${slideLayerXml.join('\n')}
               zIndex: connectorLayerZIndex,
             }}
           >
-            <defs>
-              <mask
-                id={connectorMaskId}
-                maskUnits="userSpaceOnUse"
-                maskContentUnits="userSpaceOnUse"
-                x={0}
-                y={0}
-                width={connectorSvgWidth}
-                height={connectorSvgHeight}
-              >
-                <rect x={0} y={0} width={connectorSvgWidth} height={connectorSvgHeight} fill="white" />
-                {groupConnectorOccluders.map((occluder) => (
-                  <rect
-                    key={occluder.key}
-                    x={occluder.x}
-                    y={occluder.y}
-                    width={occluder.width}
-                    height={occluder.height}
-                    rx={occluder.radius}
-                    ry={occluder.radius}
-                    fill="black"
-                  />
-                ))}
-              </mask>
-            </defs>
-            <g mask={`url(#${connectorMaskId})`}>
+            {shouldMaskGroupConnectors && (
+              <defs>
+                <mask
+                  id={connectorMaskId}
+                  maskUnits="userSpaceOnUse"
+                  maskContentUnits="userSpaceOnUse"
+                  x={0}
+                  y={0}
+                  width={connectorSvgWidth}
+                  height={connectorSvgHeight}
+                >
+                  <rect x={0} y={0} width={connectorSvgWidth} height={connectorSvgHeight} fill="white" />
+                  {groupConnectorOccluders.map((occluder) => (
+                    <rect
+                      key={occluder.key}
+                      x={occluder.x}
+                      y={occluder.y}
+                      width={occluder.width}
+                      height={occluder.height}
+                      rx={occluder.radius}
+                      ry={occluder.radius}
+                      fill="black"
+                    />
+                  ))}
+                </mask>
+              </defs>
+            )}
+            <g mask={shouldMaskGroupConnectors ? `url(#${connectorMaskId})` : undefined}>
               {groupConnectorLayouts.map((segment) => (
                 <path
                   key={segment.key}
@@ -7378,7 +7403,7 @@ ${slideLayerXml.join('\n')}
         )}
 
         <PromptNodeComponent
-          node={node}
+          node={renderedPromptNode}
           detailLevel={promptDetailLevel}
           groupLayerZIndex={promptGroupLayerById.get(node.id) ?? node.zIndex ?? 0}
           stackZIndexOverride={promptCardZIndex}
@@ -7398,7 +7423,8 @@ ${slideLayerXml.join('\n')}
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
           sourcePosition={node.sourceImageId
-            ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
+            ? (resolveLiveImagePosition(activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId) || null)
+              ?? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position)
             : undefined
           }
           onCancel={handleCancelGeneration}
@@ -7456,7 +7482,7 @@ ${slideLayerXml.join('\n')}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
               stackZIndexOverride={promptCardZIndex + 10 + childIndex}
               shadowBoost={shadowBoost}
-              position={childNode.position}
+              position={resolveLiveImagePosition(childNode) ?? childNode.position}
               onPositionChange={updateImageNodePosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}

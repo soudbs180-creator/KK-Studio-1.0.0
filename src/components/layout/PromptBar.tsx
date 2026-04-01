@@ -24,7 +24,7 @@ import { calculateCost } from '../../services/billing/costService';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { isCreditBasedModel, getModelCredits } from '../../services/model/modelPricing';
 import { adminModelService } from '../../services/model/adminModelService';
-import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';
+import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '../../services/model/modelLibraryRefresh';
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
 import PromptBarFooter from './prompt-bar/PromptBarFooter';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
@@ -932,6 +932,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         });
     }, [setConfig]);
 
+    const commitConfigUpdate = useCallback((updater: React.SetStateAction<GenerationConfig>) => {
+        setConfig(updater);
+    }, [setConfig]);
+
     const [promptDraft, setPromptDraft] = useState(config.prompt || '');
     const promptDraftRef = useRef(promptDraft);
     const deferredPromptDraft = useDeferredValue(promptDraft);
@@ -1187,16 +1191,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
 
     useEffect(() => {
-        const refreshModels = async () => {
-            try {
-                await refreshModelLibraryData();
-            } catch (err) {
-                console.error('[PromptBar] Failed to load models:', err);
-            } finally {
-                setGlobalModels(keyManager.getGlobalModelList());
-            }
-        };
-        refreshModels();
+        refreshModelLibraryDataInBackground();
 
         const unsubscribeKeyManager = keyManager.subscribe(() => {
             const newModels = keyManager.getGlobalModelList();
@@ -1649,23 +1644,30 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             return;
         }
 
-        try {
-            await refreshModelLibraryData();
-        } catch (error) {
-            console.warn('[PromptBar] Model library refresh failed before open:', error);
+        if (availableModels.length > 0) {
+            refreshModelLibraryDataInBackground();
+            setGlobalModels(keyManager.getGlobalModelList());
+            setActiveMenu('model');
+            return;
         }
 
-        const nextGlobalModels = keyManager.getGlobalModelList();
-        const nextAvailableModels = buildPromptBarAvailableModels(
-            nextGlobalModels,
+        try {
+            await refreshModelLibraryData({ force: true });
+        } catch (error) {
+            console.warn('[PromptBar] Model library refresh failed before empty-state open:', error);
+        }
+
+        const refreshedGlobalModels = keyManager.getGlobalModelList();
+        const refreshedAvailableModels = buildPromptBarAvailableModels(
+            refreshedGlobalModels,
             canBrowseSystemCreditModels,
             config.imageSize,
             config.mode,
         );
 
-        setGlobalModels(nextGlobalModels);
+        setGlobalModels(refreshedGlobalModels);
 
-        if (nextAvailableModels.length === 0) {
+        if (refreshedAvailableModels.length === 0) {
             onOpenSettings?.('api-management');
             return;
         }
@@ -1673,6 +1675,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         setActiveMenu('model');
     }, [
         activeMenu,
+        availableModels.length,
         canBrowseSystemCreditModels,
         config.imageSize,
         config.mode,
@@ -2051,35 +2054,39 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             mode: GenerationMode.IMAGE,
             label: '图片',
             icon: Camera,
-            color: 'var(--text-primary)',
-            activeBg: 'var(--prompt-bar-shell-hover)',
-            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.IMAGE, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            color: '#7dd3fc',
+            activeBg: 'rgba(14, 165, 233, 0.16)',
+            activeBorder: 'rgba(56, 189, 248, 0.4)',
+            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.IMAGE, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.VIDEO,
             label: '视频',
             icon: Video,
-            color: 'var(--text-primary)',
-            activeBg: 'var(--prompt-bar-shell-hover)',
-            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.VIDEO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            color: '#a78bfa',
+            activeBg: 'rgba(139, 92, 246, 0.16)',
+            activeBorder: 'rgba(167, 139, 250, 0.4)',
+            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.VIDEO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.AUDIO,
             label: '音乐',
             icon: Mic,
-            color: 'var(--text-primary)',
-            activeBg: 'var(--prompt-bar-shell-hover)',
-            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.AUDIO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
+            color: '#f9a8d4',
+            activeBg: 'rgba(236, 72, 153, 0.16)',
+            activeBorder: 'rgba(244, 114, 182, 0.4)',
+            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.AUDIO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
         },
         {
             mode: GenerationMode.PPT,
             label: 'PPT',
             icon: LayoutDashboard,
-            color: 'var(--text-primary)',
-            activeBg: 'var(--prompt-bar-shell-hover)',
-            onSelect: () => transitionConfigUpdate(prev => ({ ...prev, mode: GenerationMode.PPT, parallelCount: Math.min(20, Math.max(1, prev.parallelCount || 6)), pptStyleLocked: prev.pptStyleLocked !== false }))
+            color: '#fbbf24',
+            activeBg: 'rgba(245, 158, 11, 0.16)',
+            activeBorder: 'rgba(251, 191, 36, 0.4)',
+            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.PPT, parallelCount: Math.min(20, Math.max(1, prev.parallelCount || 6)), pptStyleLocked: prev.pptStyleLocked !== false }))
         }
-    ]), [transitionConfigUpdate]);
+    ]), [commitConfigUpdate]);
 
     const activeModeIndex = useMemo(() => {
         const idx = modeOptions.findIndex(item => item.mode === config.mode);
@@ -2569,12 +2576,12 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         }}
                                     >
                                         <div
-                                            className="absolute top-1 h-[calc(100%-8px)] rounded-lg transition-all duration-500"
+                                            className="pointer-events-none absolute top-1 h-[calc(100%-8px)] rounded-lg transition-all duration-500"
                                             style={{
                                                 width: `${sliderWidth}px`,
                                                 left: `${sliderLeft}px`,
                                                 backgroundColor: modeOptions[activeModeIndex]?.activeBg || 'rgba(99,102,241,0.16)',
-                                                border: '1px solid var(--prompt-bar-shell-border-strong)',
+                                                border: `1px solid ${modeOptions[activeModeIndex]?.activeBorder || 'var(--prompt-bar-shell-border-strong)'}`,
                                                 boxShadow: 'none',
                                                 transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
                                             }}
@@ -2610,6 +2617,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             return (
                                                 <div key={item.mode} className="relative z-10">
                                                     <button
+                                                        type="button"
                                                         className={`
                                                             px-2 py-1.5 rounded-lg font-medium
                                                             ${isMobile ? 'w-[72px] text-[12px]' : 'w-[82px] text-sm'}
@@ -2620,7 +2628,13 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                         style={{
                                                             color: isActive ? item.color : 'var(--text-secondary)',
                                                         }}
-                                                        onClick={item.onSelect}
+                                                        onMouseDown={(event) => {
+                                                            event.stopPropagation();
+                                                        }}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            item.onSelect();
+                                                        }}
                                                     >
                                                         <span className="inline-flex items-center gap-1.5">
                                                             <Icon
