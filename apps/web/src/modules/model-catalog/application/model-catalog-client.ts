@@ -1,14 +1,14 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
 import type {
   CreateAdminModelRequestDto,
   ModelCatalogItemDto,
   ModelCatalogListDto,
   ModelKind,
-} from "../../../../../../packages/contracts/src/dto/model-catalog.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class ModelCatalogClient {
   private readonly apiClient: KkApiClient;

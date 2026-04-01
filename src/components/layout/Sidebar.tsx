@@ -37,7 +37,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     }, [isOpen, onClose]);
 
     const [activeTab, setActiveTab] = useState<'home' | 'history'>('home');
-    const { theme, toggleTheme, setTheme } = useTheme();
+    const { theme, resolvedTheme, toggleTheme, setTheme } = useTheme();
+    const isDarkMode = resolvedTheme === 'dark';
+    const isLightMode = resolvedTheme === 'light';
     const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
 
     return (
@@ -59,12 +61,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                     left: '16px',
                     height: 'calc(100vh - 32px)',
                     width: '260px',
-                    backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.98)' : 'var(--toolbar-bg-dark)',
+                    backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.98)' : 'var(--toolbar-bg-dark)',
                     backdropFilter: 'blur(40px) saturate(180%)',
                     WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                    border: theme === 'light' ? '2px solid rgba(0, 0, 0, 0.15)' : '1px solid var(--border-light)',
+                    border: isLightMode ? '2px solid rgba(0, 0, 0, 0.15)' : '1px solid var(--border-light)',
                     borderRadius: '24px',
-                    boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.15)' : 'var(--shadow-xl)'
+                    boxShadow: isLightMode ? '0 8px 32px rgba(0, 0, 0, 0.15)' : 'var(--shadow-xl)'
                 }}
             >
                 {/* Header */}
@@ -211,7 +213,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                     </div>
                                 )}
                                 {/* Status indicator */}
-                                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#18181B] ${hasApiKey ? 'bg-emerald-500' : 'bg-red-500'
+                                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${isDarkMode ? 'border-[#18181B]' : 'border-white'} ${hasApiKey ? 'bg-emerald-500' : 'bg-red-500'
                                     }`} />
                             </div>
                             <div className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={onOpenProfile} role="button">
@@ -254,9 +256,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                             tabIndex={-1}
                             className="px-3 py-2 rounded-lg transition-all hover:bg-white/10 active:scale-95 outline-none focus:outline-none flex items-center justify-center"
                             style={{ backgroundColor: 'var(--toolbar-hover)', color: 'var(--text-secondary)' }}
-                            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+                            title={isDarkMode ? '切换到亮色模式' : '切换到暗色模式'}
                         >
-                            {theme === 'dark' ? (
+                            {isDarkMode ? (
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="12" r="5" />
                                     <line x1="12" y1="1" x2="12" y2="3" />

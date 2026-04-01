@@ -4,8 +4,12 @@ import type {
   ActiveCreditModelDto,
   ActiveCreditModelProviderDto,
   AdminCreditProviderDto,
+  ProviderPricingCacheDto,
+  ProviderPricingCacheItemDto,
   SaveAdminCreditProviderRequestDto,
+  UpsertProviderPricingCacheRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
+import { buildSharedPricingCacheProviderId } from "./provider-pricing-cache-key.ts";
 
 interface StoredCreditProviderModelRecord {
   recordId?: string;
@@ -35,6 +39,12 @@ interface StoredCreditProviderRecord {
   models: StoredCreditProviderModelRecord[];
 }
 
+interface StoredProviderPricingCacheRecord {
+  providerId: string;
+  pricing: ProviderPricingCacheItemDto[];
+  cachedAt?: string | null;
+}
+
 export interface SavedCreditProviderRecord {
   providerId: string;
   providerName: string;
@@ -49,6 +59,16 @@ export interface CreditProviderRepository {
     providerId: string,
     input: SaveAdminCreditProviderRequestDto,
   ): Promise<SavedCreditProviderRecord>;
+  getProviderPricingCache(providerId: string): Promise<ProviderPricingCacheDto | null>;
+  saveProviderPricingCache(
+    providerId: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto>;
+  getSharedProviderPricingCache(baseUrl: string): Promise<ProviderPricingCacheDto | null>;
+  saveSharedProviderPricingCache(
+    baseUrl: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto>;
   deleteAdminProvider(providerId: string): Promise<boolean>;
 }
 
@@ -105,6 +125,22 @@ function normalizeUniqueApiKeys(values: string[]): string[] {
   return result;
 }
 
+function clonePricingCacheItems(items: ProviderPricingCacheItemDto[]): ProviderPricingCacheItemDto[] {
+  return items.map((item) => ({
+    ...item,
+  }));
+}
+
+function cloneStoredPricingCache(
+  record: StoredProviderPricingCacheRecord,
+): StoredProviderPricingCacheRecord {
+  return {
+    providerId: record.providerId,
+    pricing: clonePricingCacheItems(record.pricing),
+    cachedAt: record.cachedAt ?? null,
+  };
+}
+
 function toAdminModelDto(
   model: StoredCreditProviderModelRecord,
 ): AdminCreditProviderDto["models"][number] {
@@ -156,6 +192,7 @@ function buildSeedProviders(): StoredCreditProviderRecord[] {
 
 export class InMemoryCreditProviderRepository implements CreditProviderRepository {
   private readonly providers = new Map<string, StoredCreditProviderRecord>();
+  private readonly pricingCache = new Map<string, StoredProviderPricingCacheRecord>();
 
   constructor(seedProviders = buildSeedProviders()) {
     seedProviders.forEach((provider) => {
@@ -247,7 +284,62 @@ export class InMemoryCreditProviderRepository implements CreditProviderRepositor
     };
   }
 
+  async getProviderPricingCache(providerId: string): Promise<ProviderPricingCacheDto | null> {
+    const cached = this.pricingCache.get(providerId);
+    if (!cached) {
+      return null;
+    }
+
+    const cloned = cloneStoredPricingCache(cached);
+    return {
+      providerId: cloned.providerId,
+      pricing: cloned.pricing,
+      cachedAt: cloned.cachedAt ?? null,
+    };
+  }
+
+  async saveProviderPricingCache(
+    providerId: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto> {
+    const nextRecord: StoredProviderPricingCacheRecord = {
+      providerId,
+      pricing: clonePricingCacheItems(input.pricing),
+      cachedAt: new Date().toISOString(),
+    };
+
+    this.pricingCache.set(providerId, cloneStoredPricingCache(nextRecord));
+
+    return {
+      providerId,
+      pricing: clonePricingCacheItems(nextRecord.pricing),
+      cachedAt: nextRecord.cachedAt ?? null,
+    };
+  }
+
+  async getSharedProviderPricingCache(baseUrl: string): Promise<ProviderPricingCacheDto | null> {
+    const providerId = buildSharedPricingCacheProviderId(baseUrl);
+    if (!providerId) {
+      return null;
+    }
+
+    return this.getProviderPricingCache(providerId);
+  }
+
+  async saveSharedProviderPricingCache(
+    baseUrl: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto> {
+    const providerId = buildSharedPricingCacheProviderId(baseUrl);
+    if (!providerId) {
+      throw new Error("baseUrl is required before saving shared pricing cache.");
+    }
+
+    return this.saveProviderPricingCache(providerId, input);
+  }
+
   async deleteAdminProvider(providerId: string): Promise<boolean> {
+    this.pricingCache.delete(providerId);
     return this.providers.delete(providerId);
   }
 

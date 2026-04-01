@@ -6,8 +6,10 @@ import {
   AUTHENTICATED_USER_ID_HEADER,
   AUTHENTICATED_USER_ROLE_HEADER,
 } from "../../packages/shared/src/index.ts";
+import { CreditExchangeRateService } from "../../apps/api/src/modules/billing/application/credit-exchange-rate-service.ts";
 import { CreditAccountService } from "../../apps/api/src/modules/billing/application/credit-account-service.ts";
 import { InMemoryCreditAccountRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-credit-account-repository.ts";
+import { InMemoryCreditExchangeRateRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-credit-exchange-rate-repository.ts";
 import {
   handleAdminRechargeCredits,
   handleDebitCredits,
@@ -15,6 +17,11 @@ import {
   handleListCreditTransactions,
   handleRefundCredits,
 } from "../../apps/api/src/modules/billing/presentation/http-billing-routes.ts";
+import {
+  handleListCreditExchangeRates,
+  handleUpsertCreditExchangeRate,
+  validateUpsertCreditExchangeRateRequest,
+} from "../../apps/api/src/modules/billing/presentation/http-credit-exchange-rate-routes.ts";
 
 describe("billing http routes", () => {
   test("requires an authenticated billing identity", async () => {
@@ -224,5 +231,94 @@ describe("billing http routes", () => {
     assert.equal(success.body.data.identity, "user-billing-admin-1");
     assert.equal(success.body.data.creditedAmount, 25);
     assert.equal(success.body.data.balanceAfter, 125);
+  });
+
+  test("lists recharge exchange rates and preserves decimal values", async () => {
+    const service = new CreditExchangeRateService(new InMemoryCreditExchangeRateRepository({
+      CNY: {
+        creditsPerUnit: 5.5,
+        minAmount: 6.5,
+        maxAmount: 520.25,
+        isActive: true,
+      },
+    }));
+
+    const result = await handleListCreditExchangeRates(service, {
+      "x-request-id": "req-billing-exchange-rates-list",
+    });
+
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.success, true);
+    if (!result.body.success) {
+      return;
+    }
+
+    assert.equal(result.body.data.items.length, 2);
+    assert.equal(result.body.data.items[0].currencyCode, "CNY");
+    assert.equal(result.body.data.items[0].creditsPerUnit, 5.5);
+    assert.equal(result.body.data.items[0].minAmount, 6.5);
+    assert.equal(result.body.data.items[0].maxAmount, 520.25);
+  });
+
+  test("exchange rate mutations require an elevated admin session and validate the payload", async () => {
+    const service = new CreditExchangeRateService(new InMemoryCreditExchangeRateRepository());
+    const input = {
+      currencyCode: "USD" as const,
+      creditsPerUnit: 22.75,
+      minAmount: 2,
+      maxAmount: 120,
+      isActive: true,
+    };
+
+    const unauthorized = await handleUpsertCreditExchangeRate(service, input, {
+      "x-request-id": "req-billing-exchange-rates-unauthorized",
+    });
+    assert.equal(unauthorized.statusCode, 401);
+
+    const forbidden = await handleUpsertCreditExchangeRate(service, input, {
+      "x-request-id": "req-billing-exchange-rates-forbidden",
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-rate-actor",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "user",
+    });
+    assert.equal(forbidden.statusCode, 403);
+
+    const elevationRequired = await handleUpsertCreditExchangeRate(service, input, {
+      "x-request-id": "req-billing-exchange-rates-elevation",
+      [AUTHENTICATED_USER_ID_HEADER]: "admin-rate-user",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+    });
+    assert.equal(elevationRequired.statusCode, 403);
+    assert.equal(elevationRequired.body.success, false);
+    if (!elevationRequired.body.success) {
+      assert.equal(elevationRequired.body.error.code, "ADMIN_ELEVATION_REQUIRED");
+    }
+
+    const invalidDetails = validateUpsertCreditExchangeRateRequest({
+      currencyCode: "USD",
+      creditsPerUnit: 0,
+      minAmount: 10,
+      maxAmount: 5,
+      isActive: "yes",
+    });
+    assert.ok(invalidDetails.length >= 2);
+
+    const success = await handleUpsertCreditExchangeRate(service, input, {
+      "x-request-id": "req-billing-exchange-rates-success",
+      [AUTHENTICATED_USER_ID_HEADER]: "admin-rate-user",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+      [AUTHENTICATED_ADMIN_SESSION_HEADER]: "true",
+    });
+
+    assert.equal(success.statusCode, 200);
+    assert.equal(success.body.success, true);
+    if (!success.body.success) {
+      return;
+    }
+
+    assert.equal(success.body.data.currencyCode, "USD");
+    assert.equal(success.body.data.creditsPerUnit, 22.75);
+    assert.equal(success.body.data.minAmount, 2);
+    assert.equal(success.body.data.maxAmount, 120);
+    assert.equal(success.body.data.isActive, true);
   });
 });

@@ -8,27 +8,16 @@
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
-import {
-  buildGeminiHeaders,
-  buildGeminiEndpoint,
-  buildOpenAIEndpoint,
-  buildProxyHeaders,
-  type ApiProtocolFormat,
-} from '../api/apiConfig';
-import {
-  buildResponsesPayload,
-  extractOpenAITextPayload,
-  extractOpenAIUsage,
-  modelPrefersResponsesApi,
-  shouldRetryWithResponsesApi,
-} from '../api/openaiResponses';
-import { resolveProviderRuntime } from '../api/providerStrategy';
-import { legacyWebApiClient } from '../api/kkApiClient';
 import { keyManager } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';
 import { supabase } from '../../lib/supabase';
 import { adminModelService } from './adminModelService';
-import { callSecureSystemProxyChat } from './secureModelProxy';
+import {
+  buildSecureProxyUserRouteFromSlotId,
+  callLocalUserRouteProxyChat,
+  callSecureSystemProxyChat,
+  type SecureProxyUserRoute,
+} from './secureModelProxy';
 
 export interface CallModelOptions {
   modelId: string;
@@ -50,19 +39,12 @@ export interface CallResult {
   };
 }
 
-type RoutedApiConfig = {
-  baseUrl: string;
-  apiKey: string;
+type SecureUserRouteConfig = {
+  route: SecureProxyUserRoute;
   provider?: string;
-  format?: ApiProtocolFormat;
 };
 
 class ModelCaller {
-  private buildBillingRequestId(prefix: string): string {
-    const uuid = globalThis.crypto?.randomUUID?.();
-    return `${prefix}-${uuid || Date.now()}`;
-  }
-
   private parseModelRoute(modelId: string): {
     rawModelId: string;
     baseModelId: string;
@@ -102,12 +84,6 @@ class ModelCaller {
     };
   }
 
-  private buildBillingRequestOptions(requestId: string) {
-    return {
-      requestId,
-    };
-  }
-
   private isModelMatch(modelId: string, candidate: string): boolean {
     const normalizedModelId = String(modelId || '').trim().toLowerCase();
     const normalizedCandidate = String(candidate || '').trim().toLowerCase();
@@ -125,7 +101,7 @@ class ModelCaller {
 
   private findConfiguredProviderForModel(
     modelId: string,
-  ): RoutedApiConfig | null {
+  ): SecureUserRouteConfig | null {
     const providers = keyManager
       .getProviders()
       .filter((provider) => provider.isActive && provider.baseUrl && provider.apiKey);
@@ -134,10 +110,8 @@ class ModelCaller {
       const hasModel = provider.models.some((candidate) => this.isModelMatch(modelId, candidate));
       if (hasModel) {
         return {
-          baseUrl: provider.baseUrl,
-          apiKey: provider.apiKey,
+          route: buildSecureProxyUserRouteFromSlotId(provider.id),
           provider: provider.name,
-          format: provider.format,
         };
       }
     }
@@ -158,11 +132,9 @@ class ModelCaller {
         };
       }
 
-      return this.callWithUserKey(directCallOptions, {
-        key: routedKey.key,
-        baseUrl: routedKey.baseUrl,
+      return this.callWithUserRoute(directCallOptions, {
+        route: buildSecureProxyUserRouteFromSlotId(routedKey.id),
         provider: routedKey.provider,
-        format: routedKey.format,
       });
     }
 
@@ -183,11 +155,9 @@ class ModelCaller {
         || slot.supportedModels?.some((supportedModel) => route.baseModelId.includes(supportedModel)),
     );
     if (userSlot) {
-      return this.callWithUserKey(directCallOptions, {
-        key: userSlot.key,
-        baseUrl: userSlot.baseUrl,
+      return this.callWithUserRoute(directCallOptions, {
+        route: buildSecureProxyUserRouteFromSlotId(userSlot.id),
         provider: userSlot.provider,
-        format: userSlot.format,
       });
     }
 
@@ -203,26 +173,6 @@ class ModelCaller {
       return { success: false, error: 'Please sign in with a full account before using credit-based models.' };
     }
 
-    const requiredCredits = Math.max(1, Math.ceil(Number(creditCost || 0)));
-    const billingRequestId = this.buildBillingRequestId('model-call');
-    const billingRequestOptions = this.buildBillingRequestOptions(billingRequestId);
-    const balanceResponse = await legacyWebApiClient.getCreditBalance(billingRequestOptions);
-
-    if (!balanceResponse.success) {
-      return {
-        success: false,
-        error: balanceResponse.error.message || 'Unable to load credit balance.',
-      };
-    }
-
-    const availableBalance = Number(balanceResponse.data.balance || 0);
-    if (availableBalance < requiredCredits) {
-      return {
-        success: false,
-        error: `Insufficient credits. Required: ${requiredCredits}.`,
-      };
-    }
-
     try {
       const response = await callSecureSystemProxyChat({
         modelId: options.modelId,
@@ -233,7 +183,19 @@ class ModelCaller {
       });
 
       if (!response.deducted) {
-        await this.deductCredits(requiredCredits, options.modelId, billingRequestId);
+        console.error(
+          '[ModelCaller] Secure system proxy returned success without confirming credit deduction.',
+          {
+            modelId: options.modelId,
+            expectedCredits: Math.max(1, Math.ceil(Number(creditCost || 0))),
+            userId: user.id,
+          },
+        );
+
+        return {
+          success: false,
+          error: 'Credit settlement could not be confirmed. Please retry the request.',
+        };
       }
 
       return {
@@ -246,209 +208,32 @@ class ModelCaller {
     }
   }
 
-  private async callViaSupplier(options: CallModelOptions, supplier: RoutedApiConfig): Promise<CallResult> {
-    return this.callWithProtocol(options, supplier);
+  private async callViaSupplier(options: CallModelOptions, supplier: SecureUserRouteConfig): Promise<CallResult> {
+    return this.callWithUserRoute(options, supplier);
   }
 
-  private async callWithUserKey(
+  private async callWithUserRoute(
     options: CallModelOptions,
-    userKey: { key: string; baseUrl?: string; format?: ApiProtocolFormat; provider?: string },
-  ): Promise<CallResult> {
-    return this.callWithProtocol(options, {
-      apiKey: userKey.key,
-      baseUrl: userKey.baseUrl || 'https://cdn.12ai.org',
-      provider: userKey.provider,
-      format: userKey.format,
-    });
-  }
-
-  private async callWithProtocol(options: CallModelOptions, config: RoutedApiConfig): Promise<CallResult> {
-    const directModelId = this.parseModelRoute(options.modelId).baseModelId;
-    const runtime = resolveProviderRuntime({
-      provider: config.provider,
-      baseUrl: config.baseUrl,
-      format: config.format,
-      modelId: directModelId,
-    });
-    if (runtime.geminiNative) {
-      return this.callGeminiCompatible(options, config);
-    }
-
-    return this.callOpenAICompatible(options, config);
-  }
-
-  private async callOpenAICompatible(
-    options: CallModelOptions,
-    config: RoutedApiConfig,
+    config: SecureUserRouteConfig,
   ): Promise<CallResult> {
     try {
       const directModelId = this.parseModelRoute(options.modelId).baseModelId;
-      const runtime = resolveProviderRuntime({
-        provider: config.provider,
-        baseUrl: config.baseUrl,
-        format: config.format,
+      const data = await callLocalUserRouteProxyChat({
+        routeId: config.route.id,
         modelId: directModelId,
-      });
-      const headers = buildProxyHeaders(
-        runtime.authMethod as 'header' | 'query',
-        config.apiKey,
-        runtime.headerName,
-        undefined,
-        runtime.authorizationValueFormat,
-      );
-      const chatUrl = buildOpenAIEndpoint(config.baseUrl, 'chat/completions');
-      const responsesUrl = buildOpenAIEndpoint(config.baseUrl, 'responses');
-      const chatBody = {
-        model: directModelId,
-        messages: options.messages,
-        max_tokens: options.maxTokens || 2048,
-        temperature: options.temperature ?? 0.7,
-        stream: false,
-      };
-      const responsesBody = buildResponsesPayload({
-        model: directModelId,
-        messages: options.messages,
-        maxOutputTokens: options.maxTokens || 2048,
-        temperature: options.temperature ?? 0.7,
+        messages: options.messages.map((message) => ({
+          role: message.role === 'assistant' || message.role === 'system' ? message.role : 'user',
+          content: typeof message.content === 'string' ? message.content : String(message.content ?? ''),
+        })),
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
         stream: false,
       });
 
-      let response: Response;
-      let responseText = '';
-      const preferResponses = modelPrefersResponsesApi(options.modelId);
-
-      if (preferResponses) {
-        response = await fetch(responsesUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(responsesBody),
-        });
-      } else {
-        response = await fetch(chatUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(chatBody),
-        });
-
-        if (!response.ok) {
-          responseText = await response.text();
-          if (shouldRetryWithResponsesApi(response.status, responseText)) {
-            response = await fetch(responsesUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(responsesBody),
-            });
-          }
-        }
-      }
-
-      if (!response.ok) {
-        if (!responseText) {
-          responseText = await response.text();
-        }
-        throw new Error(`API error: ${response.status} - ${responseText}`);
-      }
-
-      const data = await response.json();
-      const usage = extractOpenAIUsage(data);
       return {
         success: true,
-        content: extractOpenAITextPayload(data) || '',
-        usage,
-      };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  private buildGeminiPayload(options: CallModelOptions): Record<string, any> {
-    const systemInstruction = options.messages
-      .filter((message) => message.role === 'system')
-      .map((message) => String(message.content || '').trim())
-      .filter(Boolean)
-      .join('\n\n');
-
-    const contents = options.messages
-      .filter((message) => message.role !== 'system')
-      .map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: String(message.content || '') }],
-      }));
-
-    if (contents.length === 0) {
-      contents.push({
-        role: 'user',
-        parts: [{ text: systemInstruction || 'Hello' }],
-      });
-    }
-
-    const payload: Record<string, any> = {
-      contents,
-      generationConfig: {
-        maxOutputTokens: options.maxTokens || 2048,
-        temperature: options.temperature ?? 0.7,
-      },
-    };
-
-    if (systemInstruction) {
-      payload.systemInstruction = {
-        parts: [{ text: systemInstruction }],
-      };
-    }
-
-    return payload;
-  }
-
-  private async callGeminiCompatible(
-    options: CallModelOptions,
-    config: RoutedApiConfig,
-  ): Promise<CallResult> {
-    try {
-      const directModelId = this.parseModelRoute(options.modelId).baseModelId;
-      const runtime = resolveProviderRuntime({
-        provider: config.provider,
-        baseUrl: config.baseUrl,
-        format: 'gemini',
-        modelId: directModelId,
-      });
-      const authMethod = runtime.authMethod as 'query' | 'header';
-      const response = await fetch(
-        buildGeminiEndpoint(config.baseUrl, directModelId, 'generateContent', config.apiKey, authMethod, config.provider),
-        {
-          method: 'POST',
-          headers: buildGeminiHeaders(authMethod, config.apiKey, runtime.headerName, runtime.authorizationValueFormat),
-          body: JSON.stringify(this.buildGeminiPayload(options)),
-        },
-      );
-
-      if (!response.ok) {
-        const rawError = await response.text();
-        let message = rawError;
-
-        try {
-          const parsed = JSON.parse(rawError || '{}');
-          message = parsed.error?.message || parsed.message || rawError;
-        } catch {
-          message = rawError;
-        }
-
-        throw new Error(`API error: ${response.status} - ${message}`);
-      }
-
-      const data = await response.json();
-      const content = (data.candidates?.[0]?.content?.parts || [])
-        .map((part: any) => part?.text || '')
-        .filter(Boolean)
-        .join('\n');
-
-      return {
-        success: true,
-        content,
-        usage: {
-          promptTokens: data.usageMetadata?.promptTokenCount || 0,
-          completionTokens: data.usageMetadata?.candidatesTokenCount || 0,
-          totalTokens: data.usageMetadata?.totalTokenCount || 0,
-        },
+        content: data.content || '',
+        usage: data.usage,
       };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -476,19 +261,12 @@ class ModelCaller {
   }
 
   private findSupplierForModel(modelId: string): {
-    baseUrl: string;
-    apiKey: string;
+    route: SecureProxyUserRoute;
     provider?: string;
-    format: ApiProtocolFormat;
   } | null {
     const configuredProvider = this.findConfiguredProviderForModel(modelId);
     if (configuredProvider) {
-      return {
-        baseUrl: configuredProvider.baseUrl,
-        apiKey: configuredProvider.apiKey,
-        provider: undefined,
-        format: configuredProvider.format || 'auto',
-      };
+      return configuredProvider;
     }
 
     const suppliers = supplierService.getAll();
@@ -496,40 +274,12 @@ class ModelCaller {
     for (const supplier of suppliers) {
       const hasModel = supplier.models.some((model) => this.isModelMatch(modelId, model.id));
       if (hasModel) {
-        return {
-          baseUrl: supplier.baseUrl,
-          apiKey: supplier.apiKey,
-          provider: supplier.name,
-          format: supplier.format || 'auto',
-        };
+        console.warn('[ModelCaller] Blocking insecure supplier direct-call path for model:', modelId);
+        return null;
       }
     }
 
     return null;
-  }
-
-  private async deductCredits(
-    credits: number,
-    modelId: string,
-    billingRequestId?: string,
-  ): Promise<void> {
-    const roundedCredits = Math.max(1, Math.ceil(Number(credits || 0)));
-    const requestId = billingRequestId || this.buildBillingRequestId('model-call');
-    const debitResponse = await legacyWebApiClient.debitCredits(
-      {
-        businessRefType: 'model_call',
-        businessRefId: requestId,
-        creditAmount: roundedCredits,
-        modelCode: modelId,
-        idempotencyKey: requestId,
-      },
-      this.buildBillingRequestOptions(requestId),
-    );
-
-    if (!debitResponse.success) {
-      console.error('[ModelCaller] Credit deduction failed:', debitResponse.error);
-      throw new Error(debitResponse.error.message || 'Credit deduction failed.');
-    }
   }
 }
 

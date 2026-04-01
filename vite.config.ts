@@ -3,6 +3,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
+import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo';
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
 
@@ -115,11 +116,17 @@ async function normalizeSupplierBaseUrl(rawBaseUrl: string): Promise<string> {
 const ALWAYS_IGNORE_SEGMENTS = new Set([
     '.agents',
     '.git',
+    '.kk-local',
+    '.tmp-playwright',
     '.vite',
     '.vscode',
     'dist',
     'node_modules',
 ]);
+
+const ALWAYS_IGNORE_FILENAMES = [
+    /^tmp-.*\.(out|err|log)$/i,
+];
 
 const ROOT_WATCH_FILES = new Set([
     '.env',
@@ -143,6 +150,10 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
     const normalized = targetPath.replace(/\\/g, '/');
     const segments = normalized.split('/').filter(Boolean);
     const filename = segments[segments.length - 1]?.toLowerCase() || '';
+
+    if (ALWAYS_IGNORE_FILENAMES.some((pattern) => pattern.test(filename))) {
+        return true;
+    }
 
     if (
         segments.some((segment) =>
@@ -249,9 +260,11 @@ function buildVersionManifestPlugin(): Plugin {
                 || null;
 
             const manifest = {
-                appName: 'KK Studio',
+                appName: APP_NAME,
                 version: packageJson.version || '0.0.0',
                 buildTime: new Date().toISOString(),
+                releaseDate: APP_RELEASE_DATE,
+                releaseNotes: [...APP_RELEASE_NOTES],
                 channel: process.env.KK_STUDIO_RELEASE_CHANNEL || 'stable',
                 deploymentTarget: process.env.VERCEL_ENV
                     || process.env.CONTEXT

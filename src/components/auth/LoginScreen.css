@@ -1,10 +1,17 @@
-.auth-screen-active,
-.auth-screen-active body,
-body.auth-screen-active,
-html.auth-screen-active,
-html.auth-screen-active body,
-body.auth-screen-active #root {
+.auth-screen-active.auth-screen-active--dark,
+body.auth-screen-active.auth-screen-active--dark,
+html.auth-screen-active.auth-screen-active--dark,
+html.auth-screen-active.auth-screen-active--dark body,
+body.auth-screen-active.auth-screen-active--dark #root {
   background: #07111f !important;
+}
+
+.auth-screen-active.auth-screen-active--light,
+body.auth-screen-active.auth-screen-active--light,
+html.auth-screen-active.auth-screen-active--light,
+html.auth-screen-active.auth-screen-active--light body,
+body.auth-screen-active.auth-screen-active--light #root {
+  background: #eef4ff !important;
 }
 
 .auth-page {
@@ -631,6 +638,220 @@ body.auth-screen-active #root {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.auth-page--light {
+  background: #eef4ff;
+  color: #102447;
+}
+
+.auth-page--light::before {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(109, 170, 255, 0.2), transparent 34%),
+    radial-gradient(circle at 86% 84%, rgba(255, 182, 112, 0.2), transparent 36%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 46%, #e3edff 100%);
+}
+
+.auth-page--light::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(191, 210, 242, 0.24));
+}
+
+.auth-page--light .auth-shader-canvas {
+  opacity: 0.54;
+}
+
+.auth-page--light .auth-shader-background::after {
+  background:
+    radial-gradient(circle at 12% 16%, rgba(120, 187, 255, 0.12), transparent 42%),
+    radial-gradient(circle at 88% 84%, rgba(255, 192, 120, 0.12), transparent 44%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.18), rgba(217, 229, 252, 0.34));
+}
+
+.auth-page--light .auth-grid {
+  background-image:
+    linear-gradient(rgba(83, 116, 182, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(83, 116, 182, 0.06) 1px, transparent 1px);
+}
+
+.auth-page--light .auth-star-point {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98), rgba(168, 198, 245, 0.74) 45%, rgba(168, 198, 245, 0.08) 70%, transparent 100%);
+  box-shadow:
+    0 0 6px rgba(164, 194, 243, 0.46),
+    0 0 12px rgba(164, 194, 243, 0.18);
+}
+
+.auth-page--light .auth-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 248, 255, 0.92));
+  border: 1px solid rgba(120, 150, 200, 0.26);
+  box-shadow: 0 28px 80px rgba(77, 109, 163, 0.18);
+}
+
+.auth-page--light .auth-link-back {
+  color: #47638e;
+}
+
+.auth-page--light .auth-link-back:hover {
+  background: rgba(96, 126, 186, 0.1);
+  color: #102447;
+}
+
+.auth-page--light .auth-header p {
+  color: #5b6f92;
+}
+
+.auth-page--light .auth-field > span {
+  color: #425b84;
+}
+
+.auth-page--light .auth-field-help {
+  color: #6c82a7;
+}
+
+.auth-page--light .auth-field-error {
+  color: #bc4a4a;
+}
+
+.auth-page--light .auth-input-wrap {
+  border-color: rgba(110, 139, 192, 0.24);
+  background: rgba(255, 255, 255, 0.78);
+  color: #173052;
+}
+
+.auth-page--light .auth-input-wrap:focus-within {
+  border-color: rgba(84, 124, 208, 0.46);
+  box-shadow: 0 0 0 4px rgba(84, 124, 208, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.auth-page--light .auth-input-wrap input {
+  color: #102447;
+}
+
+.auth-page--light .auth-input-wrap input::placeholder {
+  color: #7a8fb1;
+}
+
+.auth-page--light .auth-eye-btn {
+  color: #6784b1;
+}
+
+.auth-page--light .auth-eye-btn:hover {
+  background: rgba(96, 126, 186, 0.12);
+  color: #173052;
+}
+
+.auth-page--light .auth-btn-ghost {
+  background: rgba(84, 124, 208, 0.1);
+  color: #244671;
+}
+
+.auth-page--light .auth-btn-ghost:hover {
+  background: rgba(84, 124, 208, 0.16);
+}
+
+.auth-page--light .auth-divider {
+  color: rgba(54, 79, 122, 0.7);
+}
+
+.auth-page--light .auth-divider::before,
+.auth-page--light .auth-divider::after {
+  border-bottom-color: rgba(110, 139, 192, 0.22);
+}
+
+.auth-page--light .auth-feedback-error {
+  background: rgba(255, 109, 109, 0.12);
+  border-color: rgba(220, 85, 85, 0.28);
+  color: #b24343;
+}
+
+.auth-page--light .auth-feedback-success {
+  background: rgba(80, 214, 160, 0.14);
+  border-color: rgba(80, 214, 160, 0.28);
+  color: #1f7a56;
+}
+
+.auth-page--light .auth-turnstile-block {
+  border-color: rgba(110, 139, 192, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.auth-page--light .auth-turnstile-head {
+  color: #36527a;
+}
+
+.auth-page--light .auth-turnstile-inline-error {
+  background: rgba(255, 109, 109, 0.12);
+  border-color: rgba(220, 85, 85, 0.26);
+  color: #b24343;
+}
+
+.auth-page--light .auth-turnstile-help {
+  color: #6f83a8;
+}
+
+.auth-page--light .auth-turnstile-debug {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(110, 139, 192, 0.22);
+  color: #36527a;
+}
+
+.auth-page--light .auth-text-btn {
+  color: #2d70d6;
+}
+
+.auth-page--light .auth-text-btn:hover {
+  color: #174d9d;
+}
+
+.auth-page--light .auth-btn-forgot {
+  background: rgba(84, 124, 208, 0.08);
+  color: #2d70d6;
+  border-color: rgba(84, 124, 208, 0.18);
+}
+
+.auth-page--light .auth-btn-forgot:hover {
+  background: rgba(84, 124, 208, 0.14);
+  border-color: rgba(84, 124, 208, 0.24);
+  color: #174d9d;
+}
+
+.auth-page--light .auth-version-badge {
+  border-color: rgba(110, 139, 192, 0.22);
+  background: rgba(255, 255, 255, 0.7);
+  color: #5b6f92;
+}
+
+.auth-page--light .auth-temp-entry {
+  background: rgba(255, 189, 87, 0.16);
+  color: #b77018;
+}
+
+.auth-page--light .auth-temp-entry:hover:not(:disabled) {
+  background: rgba(255, 189, 87, 0.22);
+}
+
+.auth-page--light .auth-modal-mask {
+  background: rgba(28, 44, 78, 0.24);
+}
+
+.auth-page--light .auth-modal-card {
+  border-color: rgba(110, 139, 192, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 247, 255, 0.94));
+  box-shadow: 0 24px 60px rgba(61, 86, 133, 0.22);
+}
+
+.auth-page--light .auth-modal-card p {
+  color: #4e6489;
+}
+
+.auth-page--light .auth-modal-icon {
+  background: rgba(255, 191, 67, 0.18);
+  color: #c47a14;
+}
+
+.auth-page--light .auth-brand p,
+.auth-page--light .auth-side-note {
+  color: #5b6f92;
 }
 
 @media (max-width: 767px) {

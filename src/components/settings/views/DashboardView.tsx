@@ -15,6 +15,10 @@ import {
 import { useBilling } from '../../../context/BillingContext';
 import keyManager from '../../../services/auth/keyManager';
 import { getTodayCosts } from '../../../services/billing/costService';
+import {
+  formatRemainingCredits,
+  selectRemainingBalanceSummary,
+} from '../../../services/billing/remainingBalance';
 import { getAllImageIds, getStorageUsage } from '../../../services/storage/imageStorage';
 import { getStorageMode, type StorageMode } from '../../../services/storage/storagePreference';
 import {
@@ -172,6 +176,11 @@ const DashboardStorageRow: React.FC<{ label: string; value: string; helper: stri
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { balance, billingLogs, usageLogs } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, 'en-US');
+  const { latestRecharge, todayRechargeCount } = useMemo(
+    () => selectRemainingBalanceSummary(billingLogs),
+    [billingLogs],
+  );
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
   const [todayTokens, setTodayTokens] = useState(() => getTodayCosts().totalTokens || 0);
@@ -235,11 +244,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     [usageLogs]
   );
 
-  const todayRechargeLogs = useMemo(
-    () => billingLogs.filter((log) => isSameLocalDay(log.created_at)),
-    [billingLogs]
-  );
-
   const importantLogs = useMemo(
     () =>
       logs.filter(
@@ -272,9 +276,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   }, [todayUsageLogs]);
 
   const todayUsageCount = todayUsageLogs.length;
-  const todayRechargeCount = todayRechargeLogs.length;
   const latestUsage = todayUsageLogs[0] || usageLogs[0] || null;
-  const latestRecharge = todayRechargeLogs[0] || billingLogs[0] || null;
   const latestLog = importantLogs[0] || logs[0] || null;
   const importantLogCount = importantLogs.length;
   const hasCriticalLogs = importantLogs.some(
@@ -313,12 +315,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       {
         key: 'billing',
         icon: <Coins size={18} />,
-        title: 'Recharge & Balance',
+        title: 'Credits & Recharge',
         summary: latestRecharge
           ? `Latest recharge settled at ${formatDateTime(latestRecharge.created_at)}`
-          : `Current balance ${formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}`,
+          : `Current balance ${remainingBalanceDisplay}`,
         meta: todayRechargeCount > 0 ? `${todayRechargeCount} recharges today` : 'No recharge activity today',
-        value: formatNumber(balance, Number.isInteger(balance) ? 0 : 2),
+        value: remainingBalanceDisplay,
         status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>Credits</SettingsBadge>,
         onClick: () => onNavigate('consumption-records'),
       },
@@ -352,7 +354,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     ],
     [
       activeProviderCount,
-      balance,
       channelCount,
       hasAvailableRoute,
       hasCriticalLogs,
@@ -362,6 +363,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       latestUsage,
       onNavigate,
       providerCount,
+      remainingBalanceDisplay,
       todayRechargeCount,
       todayUsageCount,
     ]
@@ -443,7 +445,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="mt-5 settings-reference-metric-grid">
               <DashboardStorageRow
                 label="Balance"
-                value={formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}
+                value={remainingBalanceDisplay}
                 helper="Remaining credits currently available to the workspace"
               />
               <DashboardStorageRow

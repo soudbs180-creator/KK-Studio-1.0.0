@@ -1,13 +1,13 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
 import type {
   CreatePaymentOrderRequestDto,
   PaymentOrderDto,
   PaymentOrderStatusViewDto,
-} from "../../../../../../packages/contracts/src/dto/payment.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class PaymentClient {
   private readonly apiClient: KkApiClient;

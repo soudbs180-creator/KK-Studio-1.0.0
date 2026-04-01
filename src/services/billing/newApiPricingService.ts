@@ -5,7 +5,7 @@
  * Reference: https://docs.newapi.pro/en/docs/api/management/auth
  */
 
-import { supabase } from '../../lib/supabase';
+import { legacyWebApiClient } from '../api/kkApiClient';
 import {
     buildGeminiHeaders,
     buildGeminiModelsEndpoint,
@@ -65,7 +65,7 @@ const MODEL_KEYWORDS = ['model', 'model_id', 'modelId', 'model_name', 'modelName
 const PRICE_KEYWORDS = ['price', 'input', 'output', 'ratio', 'quota', 'per_request', 'cost'];
 const JSON_ASSIGNMENT_MARKERS = ['window.__NUXT__', 'window.__NEXT_DATA__', 'window.__INITIAL_STATE__'];
 
-const normalizePricingBaseUrl = (baseUrl: string) => {
+export const normalizePricingBaseUrl = (baseUrl: string) => {
     const raw = String(baseUrl || '').trim();
     if (!raw) return '';
     const trimmed = raw.replace(/\/+$/, '');
@@ -973,29 +973,91 @@ export function calculateRequestCost(
     return (inputCost + outputCost) * ratio;
 }
 
+function toCachedPricingItemDto(pricing: ModelPricingInfo) {
+    return {
+        modelId: String(pricing.modelId || '').trim(),
+        modelName: String(pricing.modelName || pricing.modelId || '').trim(),
+        inputPrice: Math.max(0, toFiniteNumber(pricing.inputPrice) ?? 0),
+        outputPrice: Math.max(0, toFiniteNumber(pricing.outputPrice) ?? 0),
+        isPerToken: pricing.isPerToken !== false,
+        groupRatio: Math.max(0, toFiniteNumber(pricing.groupRatio) ?? 1),
+        currency: String(pricing.currency || 'USD').trim() || 'USD',
+        billingUnit: toTrimmedString(pricing.billingUnit),
+        displayPrice: toTrimmedString(pricing.displayPrice),
+        supportsGroups: pricing.supportsGroups === true,
+        endpointUrl: toTrimmedString(pricing.endpointUrl),
+        endpointPath: toTrimmedString(pricing.endpointPath),
+    };
+}
+
+function mapCachedPricingItem(item: Partial<ModelPricingInfo>): ModelPricingInfo {
+    return {
+        modelId: String(item.modelId || '').trim(),
+        modelName: String(item.modelName || item.modelId || '').trim(),
+        inputPrice: Math.max(0, toFiniteNumber(item.inputPrice) ?? 0),
+        outputPrice: Math.max(0, toFiniteNumber(item.outputPrice) ?? 0),
+        isPerToken: item.isPerToken !== false,
+        groupRatio: Math.max(0, toFiniteNumber(item.groupRatio) ?? 1),
+        currency: String(item.currency || 'USD').trim() || 'USD',
+        billingUnit: toTrimmedString(item.billingUnit),
+        displayPrice: toTrimmedString(item.displayPrice),
+        supportsGroups: item.supportsGroups === true,
+        endpointUrl: toTrimmedString(item.endpointUrl),
+        endpointPath: toTrimmedString(item.endpointPath),
+    };
+}
+
 /**
- * Save pricing info to Supabase (temporarily cached)
+ * Save pricing info to the typed admin API cache
  */
 export async function cacheProviderPricing(
     providerId: string,
     pricing: ModelPricingInfo[]
 ): Promise<void> {
     try {
-        const { error } = await supabase
-            .from('provider_pricing_cache')
-            .upsert({
-                provider_id: providerId,
-                pricing: pricing,
-                cached_at: new Date().toISOString()
-            }, {
-                onConflict: 'provider_id'
-            });
+        const response = await legacyWebApiClient.upsertAdminCreditProviderPricingCache(
+            providerId,
+            {
+                pricing: pricing.map((item) => toCachedPricingItemDto(item)),
+            },
+            {
+                requestId: `provider-pricing-cache-upsert-${providerId}-${Date.now()}`,
+            },
+        );
 
-        if (error) {
-            console.error('[NewApiPricing] Error caching pricing:', error);
+        if (!response.success) {
+            console.error('[NewApiPricing] Error caching pricing:', response.error?.message || 'Unknown error');
         }
     } catch (e) {
         console.error('[NewApiPricing] Error:', e);
+    }
+}
+
+export async function cacheProviderPricingByBaseUrl(
+    baseUrl: string,
+    pricing: ModelPricingInfo[]
+): Promise<void> {
+    const normalizedBaseUrl = normalizePricingBaseUrl(baseUrl);
+    if (!normalizedBaseUrl) {
+        return;
+    }
+
+    try {
+        const response = await legacyWebApiClient.upsertSharedProviderPricingCache(
+            normalizedBaseUrl,
+            {
+                pricing: pricing.map((item) => toCachedPricingItemDto(item)),
+            },
+            {
+                requestId: `shared-provider-pricing-cache-upsert-${Date.now()}`,
+            },
+        );
+
+        if (!response.success) {
+            console.error('[NewApiPricing] Error caching shared pricing by baseUrl:', response.error?.message || 'Unknown error');
+        }
+    } catch (e) {
+        console.error('[NewApiPricing] Error caching shared pricing by baseUrl:', e);
     }
 }
 
@@ -1006,14 +1068,42 @@ export async function getCachedPricing(
     providerId: string
 ): Promise<ModelPricingInfo[] | null> {
     try {
-        const { data, error } = await supabase
-            .from('provider_pricing_cache')
-            .select('pricing')
-            .eq('provider_id', providerId)
-            .single();
+        const response = await legacyWebApiClient.getAdminCreditProviderPricingCache(
+            providerId,
+            {
+                requestId: `provider-pricing-cache-get-${providerId}-${Date.now()}`,
+            },
+        );
 
-        if (error || !data) return null;
-        return data.pricing as ModelPricingInfo[];
+        if (!response.success) return null;
+        return Array.isArray(response.data.pricing)
+            ? response.data.pricing.map((item) => mapCachedPricingItem(item))
+            : [];
+    } catch (e) {
+        return null;
+    }
+}
+
+export async function getCachedPricingByBaseUrl(
+    baseUrl: string
+): Promise<ModelPricingInfo[] | null> {
+    const normalizedBaseUrl = normalizePricingBaseUrl(baseUrl);
+    if (!normalizedBaseUrl) {
+        return null;
+    }
+
+    try {
+        const response = await legacyWebApiClient.getSharedProviderPricingCache(
+            normalizedBaseUrl,
+            {
+                requestId: `shared-provider-pricing-cache-get-${Date.now()}`,
+            },
+        );
+
+        if (!response.success) return null;
+        return Array.isArray(response.data.pricing)
+            ? response.data.pricing.map((item) => mapCachedPricingItem(item))
+            : [];
     } catch (e) {
         return null;
     }

@@ -1,7 +1,7 @@
-# KK Studio v1.3.9
+# KK Studio v1.4.0
 A visual canvas workspace for multimodal creation, orchestration, and operations.
 
-![Version](https://img.shields.io/badge/version-1.3.9-indigo.svg)
+![Version](https://img.shields.io/badge/version-1.4.0-indigo.svg)
 ![React](https://img.shields.io/badge/React-19-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
 ![Vite](https://img.shields.io/badge/Vite-6-purple)
@@ -13,7 +13,7 @@ A visual canvas workspace for multimodal creation, orchestration, and operations
 
 KK Studio 是一款面向图像、多模态与提示词生产的可视化 AI 工作台。它不只是“填参数然后等待生成结果”的工具，而是把创作编排、模型接入、成本观察、日志排查和存储管理集中到同一个工作区里，让个人创作者和小团队都能在一套界面中完成从想法到结果的闭环。
 
-当前 `v1.3.9` 版本聚焦三条主线：
+当前 `v1.4.0` 版本聚焦三条主线：
 - 管理后台与鉴权链路稳态：服务端 Supabase 配置解析收口，管理员会话、认证仓储与回退路径更清晰
 - 设置中心体验升级：总览、存储、系统日志等页面结构重整，并补齐中英双语表达能力
 - 工作区细节打磨：默认头像、用户资料、供应商管理、成本估算和画布周边交互继续收口
@@ -167,7 +167,7 @@ npm run build
 
 ---
 
-## v1.3.9 更新说明
+## v1.4.0 更新说明
 
 ### 版本重点
 - 设置中心重构为更清晰的工作台式结构，总览、存储、日志与管理控制台的导航关系更统一
@@ -178,7 +178,7 @@ npm run build
 
 ### 对外建议描述
 - 强调“可视化创作 + 多模型接入 + 运维闭环”三位一体，而不是单纯的图片生成工具
-- 强调 `v1.3.9` 更适合长期使用和持续运营，尤其是设置中心、日志、存储与后台能力的补齐
+- 强调 `v1.4.0` 更适合长期使用和持续运营，尤其是设置中心、日志、存储与后台能力的补齐
 - 如果面向团队介绍，可突出本地优先、成本可见和后台可扩展这三点
 
 ---

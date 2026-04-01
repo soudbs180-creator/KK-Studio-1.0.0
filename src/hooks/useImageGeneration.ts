@@ -210,6 +210,7 @@ export const useImageGeneration = (options: {
     updatePromptNode, 
     urgentUpdatePromptNode, 
     addImageNodes, 
+    bringNodesToFront,
     deleteImageNode,
     updateImageNode,
     updateImageNodePosition
@@ -844,6 +845,8 @@ export const useImageGeneration = (options: {
         imageCount: uniqueRecoveredUrls.length || bridgeResult.urls.length,
         referenceImageCount: latestNode.referenceImages?.length || 0,
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
+        provider: latestNode.provider,
+        providerLabel: latestNode.providerLabel,
       });
       const recoveredGenerationTime = resolveSyncBridgeDurationMs(bridgeResult, pendingRequest.startedAt);
       const { completedTasks, preparedItems } = prepareCompletedTaskResults(nodeId, uniqueRecoveredUrls.map((url, index) => ({
@@ -969,6 +972,7 @@ export const useImageGeneration = (options: {
 
     const existingPendingRequests = getPendingSyncRequests(latestNode);
     if (existingPendingRequests.length > 0) {
+      bringNodesToFront([latestNode.id]);
       urgentUpdatePromptNode({
         ...latestNode,
         isGenerating: true,
@@ -1032,6 +1036,7 @@ export const useImageGeneration = (options: {
         nextNode = registerPendingSyncRequest(nextNode, candidate);
       });
 
+      bringNodesToFront([nextNode.id]);
       urgentUpdatePromptNode({
         ...nextNode,
         isGenerating: true,
@@ -1141,6 +1146,8 @@ export const useImageGeneration = (options: {
                   imageCount: uniqueImageUrls.length || imageUrls.length,
                   referenceImageCount: latestNode.referenceImages?.length || 0,
                   keySlotId: (result as any).keySlotId || latestNode.keySlotId,
+                  provider: (result as any).provider || latestNode.provider,
+                  providerLabel: (result as any).providerName || latestNode.providerLabel,
                   explicitCost: (result as any).usage?.cost,
                   explicitTokens: (result as any).usage?.totalTokens,
                   explicitPromptTokens: (result as any).usage?.promptTokens,
@@ -1339,7 +1346,7 @@ export const useImageGeneration = (options: {
     }
   }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
-  useTaskRecovery(pollTaskStatus);
+  useTaskRecovery(activeCanvas, pollTaskStatus);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1462,6 +1469,7 @@ export const useImageGeneration = (options: {
       const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
 
       const generationAttemptStartedAt = Date.now();
+      bringNodesToFront([promptNodeId]);
       urgentUpdatePromptNode({
         ...latestNode,
         ...executionNode,

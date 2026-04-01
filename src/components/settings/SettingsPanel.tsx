@@ -19,6 +19,10 @@ import { Suspense, lazy } from 'react';
 import keyManager from '../../services/auth/keyManager';
 import { getTodayCosts } from '../../services/billing/costService';
 import {
+  formatRemainingCredits,
+  selectRemainingBalanceSummary,
+} from '../../services/billing/remainingBalance';
+import {
   clearLogs,
   exportLogsForAI,
   getTodayLogs,
@@ -272,6 +276,11 @@ const DashboardCheckCard: React.FC<{
 
 const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({ onNavigate }) => {
   const { balance, billingLogs, usageLogs } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
+  const { latestRecharge, todayRechargeCount } = useMemo(
+    () => selectRemainingBalanceSummary(billingLogs),
+    [billingLogs],
+  );
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
   const [todayTokens, setTodayTokens] = useState(() => getTodayCosts().totalTokens || 0);
@@ -330,17 +339,14 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
     stats.total > 0 ? Math.max(0, Math.min(100, Math.round((stats.valid / stats.total) * 100))) : 0;
 
   const todayUsageLogs = useMemo(() => usageLogs.filter((log) => isSameLocalDay(log.created_at)), [usageLogs]);
-  const todayRechargeLogs = useMemo(() => billingLogs.filter((log) => isSameLocalDay(log.created_at)), [billingLogs]);
   const importantLogs = useMemo(
     () => logs.filter((item) => item.level === LogLevel.WARNING || item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL),
     [logs]
   );
 
   const todayUsageCount = todayUsageLogs.length;
-  const todayRechargeCount = todayRechargeLogs.length;
   const importantLogCount = importantLogs.length;
   const latestUsage = todayUsageLogs[0] || usageLogs[0] || null;
-  const latestRecharge = todayRechargeLogs[0] || billingLogs[0] || null;
   const latestImportantLogs = importantLogs.slice(-3).reverse();
   const latestLog = latestImportantLogs[0];
 
@@ -429,11 +435,11 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
     {
       key: 'recharge',
       icon: <DollarSign size={16} />,
-      title: '充值与余额',
-      value: todayRechargeCount > 0 ? `今天新增 ${todayRechargeCount} 条` : '今天没有新增充值',
+      title: '积分与充值',
+      value: `${remainingBalanceDisplay} 积分`,
       description: latestRecharge
-        ? `最近充值时间：${formatDateTime(latestRecharge.created_at)}`
-        : `当前余额 ${formatMetricNumber(balance, Number.isInteger(balance) ? 0 : 2)}`,
+        ? `积分 · 最近充值时间：${formatDateTime(latestRecharge.created_at)}`
+        : (todayRechargeCount > 0 ? `积分 · 今天新增 ${todayRechargeCount} 条充值记录` : '积分会在充值和消耗后自动更新'),
       tone: 'emerald' as DashboardTone,
     },
     {

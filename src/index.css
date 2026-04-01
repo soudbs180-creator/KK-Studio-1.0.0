@@ -7,13 +7,13 @@
    ============================================ */
 :root {
   /* ===== 背景层级 - 亮色模式 ===== */
-  --bg-base: #f5f1ea;
-  --bg-elevated: #faf5ee;
-  --bg-surface: #fffdfa;
-  --bg-overlay: #fffaf3;
-  --bg-input: #f4ede3;
-  --bg-hover: #ece3d8;
-  --bg-canvas: #f1ebe1;
+  --bg-base: #f5f7fb;
+  --bg-elevated: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #eef2f7;
+  --bg-canvas: #f6f8fc;
 
   /* 兼容旧变量*/
   --bg-primary: var(--bg-base);
@@ -23,27 +23,27 @@
   --menu-bg: var(--bg-elevated);
 
   /* ===== Toolbar & Glass ===== */
-  --toolbar-bg: rgba(255, 251, 245, 0.88);
-  --toolbar-bg-dark: rgba(255, 249, 241, 0.94);
-  --toolbar-hover: rgba(79, 70, 58, 0.06);
-  --toolbar-active: rgba(79, 70, 58, 0.1);
-  --toolbar-divider: rgba(79, 70, 58, 0.08);
+  --toolbar-bg: rgba(255, 255, 255, 0.9);
+  --toolbar-bg-dark: rgba(255, 255, 255, 0.96);
+  --toolbar-hover: rgba(15, 23, 42, 0.04);
+  --toolbar-active: rgba(59, 130, 246, 0.1);
+  --toolbar-divider: rgba(15, 23, 42, 0.08);
 
   /* ===== 边框 ===== */
-  --border-subtle: rgba(94, 82, 70, 0.08);
-  --border-default: rgba(94, 82, 70, 0.14);
-  --border-strong: rgba(94, 82, 70, 0.22);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-default: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.18);
   --border-focus: rgba(59, 130, 246, 0.5);
   /* 兼容旧变量*/
   --border-light: var(--border-subtle);
   --border-medium: var(--border-default);
 
   /* ===== 文字 ===== */
-  --text-primary: #221f1a;
-  --text-secondary: rgba(34, 31, 26, 0.76);
-  --text-tertiary: rgba(34, 31, 26, 0.56);
-  --text-muted: rgba(34, 31, 26, 0.38);
-  --text-disabled: rgba(34, 31, 26, 0.22);
+  --text-primary: #111827;
+  --text-secondary: rgba(17, 24, 39, 0.76);
+  --text-tertiary: rgba(55, 65, 81, 0.68);
+  --text-muted: rgba(107, 114, 128, 0.58);
+  --text-disabled: rgba(148, 163, 184, 0.56);
   --text-color: var(--text-primary);
 
   /* ===== 强调色 ===== */
@@ -91,13 +91,27 @@
 
   /* ===== 渐变 ===== */
   --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #4f46e5 100%);
-  --gradient-surface: linear-gradient(180deg, rgba(255, 253, 250, 0.96) 0%, rgba(244, 237, 227, 0.88) 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+  --floating-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+  --floating-shell-bg-supported: rgba(255, 255, 255, 0.84);
+  --floating-shell-border: rgba(15, 23, 42, 0.08);
+  --floating-shell-border-strong: rgba(15, 23, 42, 0.12);
+  --floating-shell-shadow: 0 16px 36px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+
+  /* ===== Prompt Bar 专用白色系表面 ===== */
+  --prompt-bar-glass-bg: rgba(255, 255, 255, 0.88);
+  --prompt-bar-glass-bg-supported: rgba(255, 255, 255, 0.74);
+  --prompt-bar-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+  --prompt-bar-shell-border: rgba(15, 23, 42, 0.08);
+  --prompt-bar-shell-border-strong: rgba(15, 23, 42, 0.12);
+  --prompt-bar-shell-hover: rgba(15, 23, 42, 0.05);
+  --prompt-bar-shell-shadow: 0 10px 24px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
 
   /* ===== 阴影 ===== */
-  --shadow-sm: 0 8px 20px rgba(113, 89, 60, 0.08);
-  --shadow-md: 0 16px 34px rgba(113, 89, 60, 0.1);
-  --shadow-lg: 0 24px 52px rgba(113, 89, 60, 0.12);
-  --shadow-xl: 0 34px 72px rgba(113, 89, 60, 0.16);
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 16px 34px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 24px 52px rgba(15, 23, 42, 0.1);
+  --shadow-xl: 0 34px 72px rgba(15, 23, 42, 0.12);
   --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --shadow-glow: var(--glow-blue);
 
@@ -130,7 +144,7 @@
   --transition-bounce: var(--duration-slow) var(--ease-spring);
 
   /* ===== 网格 ===== */
-  --grid-dot: rgba(99, 82, 61, 0.06);
+  --grid-dot: rgba(148, 163, 184, 0.18);
 
   /* ===== 字体系统 - 统一字体栈 ===== */
   --font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -498,6 +512,19 @@ body.dark-mode {
   --connector-color: #818cf8;
   --accent-pink: #ec4899;
   --accent-color: var(--accent-blue);
+
+  --prompt-bar-glass-bg: rgba(37, 37, 40, 0.9);
+  --prompt-bar-glass-bg-supported: rgba(24, 24, 27, 0.72);
+  --prompt-bar-shell-bg: linear-gradient(180deg, rgba(39, 39, 42, 0.98) 0%, rgba(24, 24, 27, 0.96) 100%);
+  --prompt-bar-shell-border: rgba(255, 255, 255, 0.08);
+  --prompt-bar-shell-border-strong: rgba(255, 255, 255, 0.14);
+  --prompt-bar-shell-hover: rgba(255, 255, 255, 0.08);
+  --prompt-bar-shell-shadow: 0 10px 24px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --floating-shell-bg: linear-gradient(180deg, rgba(38, 43, 47, 0.96) 0%, rgba(24, 27, 31, 0.92) 100%);
+  --floating-shell-bg-supported: rgba(31, 35, 39, 0.84);
+  --floating-shell-border: rgba(255, 255, 255, 0.08);
+  --floating-shell-border-strong: rgba(255, 255, 255, 0.14);
+  --floating-shell-shadow: 0 20px 46px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
   /* 状态语义色 */
   --state-success-bg: rgba(16, 185, 129, 0.14);
@@ -1384,19 +1411,95 @@ button:active {
    Glass Effect & Toolbar Styles
    ============================================ */
 .glass {
-  background: var(--toolbar-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  background: var(--floating-shell-bg-supported);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--floating-shell-border);
+  box-shadow: var(--floating-shell-shadow);
 }
 
 .glass-strong {
-  background: var(--toolbar-bg-dark);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid var(--border-medium);
-  box-shadow: var(--shadow-lg);
+  background: var(--floating-shell-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--floating-shell-border-strong);
+  box-shadow: var(--floating-shell-shadow);
+}
+
+.zoom-slider {
+  --zoom-slider-track: rgba(15, 23, 42, 0.14);
+  --zoom-slider-fill: rgba(71, 85, 105, 0.48);
+  --zoom-slider-thumb: #4b5563;
+  --zoom-slider-thumb-hover: #06b6d4;
+  width: 100%;
+  height: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  outline: none;
+}
+
+.dark .zoom-slider,
+body.dark-mode .zoom-slider {
+  --zoom-slider-track: rgba(255, 255, 255, 0.16);
+  --zoom-slider-fill: rgba(255, 255, 255, 0.52);
+  --zoom-slider-thumb: #f4f4f5;
+  --zoom-slider-thumb-hover: #67e8f9;
+}
+
+.zoom-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--zoom-slider-fill) 0%,
+    var(--zoom-slider-fill) var(--zoom-slider-progress, 0%),
+    var(--zoom-slider-track) var(--zoom-slider-progress, 0%),
+    var(--zoom-slider-track) 100%
+  );
+}
+
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -3px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--zoom-slider-thumb);
+  transition: background-color 0.2s ease;
+}
+
+.zoom-slider:hover::-webkit-slider-thumb {
+  background: var(--zoom-slider-thumb-hover);
+}
+
+.zoom-slider::-moz-range-track,
+.zoom-slider::-moz-range-progress {
+  height: 6px;
+  border: 0;
+  border-radius: 9999px;
+}
+
+.zoom-slider::-moz-range-track {
+  background: var(--zoom-slider-track);
+}
+
+.zoom-slider::-moz-range-progress {
+  background: var(--zoom-slider-fill);
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--zoom-slider-thumb);
+  transition: background-color 0.2s ease;
+}
+
+.zoom-slider:hover::-moz-range-thumb {
+  background: var(--zoom-slider-thumb-hover);
 }
 
 .glass-frost {
@@ -1414,16 +1517,16 @@ button:active {
 }
 
 .toolbar {
-  background: var(--toolbar-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-light);
+  background: var(--floating-shell-bg-supported);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--floating-shell-border);
   border-radius: var(--radius-lg);
   padding: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--floating-shell-shadow);
 }
 
 .toolbar-btn {
@@ -1452,9 +1555,9 @@ button:active {
 }
 
 .toolbar-btn.active {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-inner);
+  background: var(--selected-bg);
+  color: var(--accent-blue);
+  box-shadow: inset 0 0 0 1px var(--selected-border), var(--shadow-inner);
 }
 
 .toolbar-divider {
@@ -1776,7 +1879,7 @@ button:active {
   /* Width is controlled by PromptBar.tsx responsive utility classes.
      Keeping fixed width here causes build-order dependent overrides. */
   /* Fallback for browsers without backdrop-filter support */
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--prompt-bar-glass-bg);
   /* Modern browsers with backdrop-filter */
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
@@ -1791,16 +1894,12 @@ button:active {
 /* 支持 backdrop-filter 时使用更透明的背景*/
 @supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
   .input-bar {
-    background: rgba(255, 255, 255, 0.6);
-  }
-
-  body.dark-mode .input-bar {
-    background: rgba(24, 24, 27, 0.6);
+    background: var(--prompt-bar-glass-bg-supported);
   }
 }
 
 body.dark-mode .input-bar {
-  background: rgba(37, 37, 40, 0.9);
+  background: var(--prompt-bar-glass-bg);
 }
 
 .input-bar-inner {
@@ -1821,8 +1920,8 @@ body.dark-mode .input-bar {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-light);
+  background: var(--prompt-bar-shell-bg);
+  border: 1px solid var(--prompt-bar-shell-border);
   border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-size: 11px;
@@ -1832,8 +1931,8 @@ body.dark-mode .input-bar {
 }
 
 .input-bar-option:hover {
-  background: var(--toolbar-hover);
-  border-color: var(--border-medium);
+  background: var(--prompt-bar-shell-hover);
+  border-color: var(--prompt-bar-shell-border-strong);
   color: var(--text-primary);
 }
 
@@ -1875,8 +1974,8 @@ body.dark-mode .input-bar {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-light);
+  background: var(--prompt-bar-shell-bg);
+  border: 1px solid var(--prompt-bar-shell-border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 12px;
@@ -1885,7 +1984,7 @@ body.dark-mode .input-bar {
 }
 
 .input-bar-model:hover {
-  border-color: var(--border-medium);
+  border-color: var(--prompt-bar-shell-border-strong);
   color: var(--text-primary);
 }
 
@@ -4211,7 +4310,7 @@ iframe,
   background:
     radial-gradient(circle at top left, rgba(96, 165, 250, 0.14), transparent 24%),
     radial-gradient(circle at top right, rgba(99, 102, 241, 0.14), transparent 30%),
-    rgba(15, 23, 42, 0.42);
+    var(--settings-backdrop-bg);
   backdrop-filter: blur(18px);
 }
 
@@ -10763,4 +10862,268 @@ body.dark-mode .settings-panel {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+body:not(.dark-mode) {
+  --bg-base: #f5f7fb;
+  --bg-elevated: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #eef2f7;
+  --bg-canvas: #f6f8fc;
+  --toolbar-bg: rgba(255, 255, 255, 0.9);
+  --toolbar-bg-dark: rgba(255, 255, 255, 0.96);
+  --toolbar-hover: rgba(15, 23, 42, 0.04);
+  --toolbar-active: rgba(15, 23, 42, 0.08);
+  --toolbar-divider: rgba(15, 23, 42, 0.08);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-default: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --text-primary: #111827;
+  --text-secondary: rgba(17, 24, 39, 0.76);
+  --text-tertiary: rgba(55, 65, 81, 0.68);
+  --text-muted: rgba(107, 114, 128, 0.58);
+  --text-disabled: rgba(148, 163, 184, 0.56);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+  --floating-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+  --floating-shell-bg-supported: rgba(255, 255, 255, 0.84);
+  --floating-shell-border: rgba(15, 23, 42, 0.08);
+  --floating-shell-border-strong: rgba(15, 23, 42, 0.12);
+  --floating-shell-shadow: 0 16px 36px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 16px 34px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 24px 52px rgba(15, 23, 42, 0.1);
+  --shadow-xl: 0 34px 72px rgba(15, 23, 42, 0.12);
+  --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --grid-dot: rgba(148, 163, 184, 0.18);
+}
+
+.settings-panel {
+  --settings-accent-rgb: 88 122 255;
+  --settings-accent-soft-rgb: 48 191 170;
+  --settings-success-rgb: 22 163 74;
+  --settings-shell-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.08), transparent 26%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.96) 100%);
+  --settings-sidebar-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.99) 0%, rgb(247 249 252 / 0.98) 100%);
+  --settings-canvas-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.12), transparent 30%),
+    radial-gradient(circle at bottom left, rgb(var(--settings-accent-soft-rgb) / 0.06), transparent 26%),
+    linear-gradient(180deg, rgb(252 253 255 / 1) 0%, rgb(244 247 251 / 1) 100%);
+  --settings-section-bg: rgb(255 255 255 / 1);
+  --settings-surface-elevated: rgb(255 255 255 / 1);
+  --settings-surface-overlay: rgb(255 255 255 / 1);
+  --settings-shell-header-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.96) 0%, rgb(248 250 252 / 0.92) 100%),
+    rgb(255 255 255 / 0.92);
+  --settings-shell-border: rgba(15, 23, 42, 0.08);
+  --settings-sidebar-border: rgba(15, 23, 42, 0.06);
+  --settings-border-subtle: rgba(15, 23, 42, 0.08);
+  --settings-card-shadow: 0 26px 64px rgba(15, 23, 42, 0.12), 0 6px 18px rgba(15, 23, 42, 0.05);
+  --settings-shell-shadow: 0 40px 112px rgba(15, 23, 42, 0.2);
+  --settings-sidebar-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.04), 18px 0 40px rgba(15, 23, 42, 0.08);
+  --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.48);
+  --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.14);
+  --text-primary: #111827;
+  --text-secondary: rgba(17, 24, 39, 0.76);
+  --text-tertiary: rgba(55, 65, 81, 0.68);
+  --text-muted: rgba(107, 114, 128, 0.58);
+  --settings-input-bg: rgb(255 255 255 / 1);
+  --settings-input-border: rgba(15, 23, 42, 0.14);
+  --settings-input-shadow: 0 1px 0 rgb(255 255 255 / 0.98), 0 12px 24px rgba(15, 23, 42, 0.06);
+  --settings-search-bg: linear-gradient(180deg, rgb(255 255 255 / 0.96) 0%, rgb(248 250 252 / 0.92) 100%);
+  --settings-search-border: rgba(15, 23, 42, 0.1);
+  --settings-segment-shell-bg: linear-gradient(180deg, rgb(244 247 251 / 1) 0%, rgb(236 240 245 / 1) 100%);
+  --settings-segment-shell-border: rgba(15, 23, 42, 0.1);
+  --settings-segment-shell-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  --settings-segment-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(251 252 254 / 1) 100%);
+  --settings-segment-active-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(242 247 255 / 1) 100%);
+  --settings-segment-border: rgba(15, 23, 42, 0.12);
+  --settings-segment-active-border: rgb(var(--settings-accent-rgb) / 0.24);
+  --settings-segment-active-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
+  --settings-option-bg: #ffffff;
+  --settings-option-text: #111827;
+  --bg-secondary: var(--settings-section-bg);
+  --bg-tertiary: var(--settings-surface-elevated);
+  --border-light: var(--settings-border-subtle);
+  --settings-button-primary-bg: linear-gradient(135deg, #7aa8ff 0%, #5f7dff 100%);
+  --settings-button-primary-text: #ffffff;
+  --settings-button-primary-shadow: 0 18px 32px rgb(var(--settings-accent-rgb) / 0.22);
+  --settings-button-secondary-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(252 253 255 / 1) 100%);
+  --settings-button-secondary-border: rgba(15, 23, 42, 0.1);
+  --settings-button-secondary-text: var(--text-primary);
+  --settings-button-danger-bg: rgb(239 68 68 / 0.08);
+  --settings-button-danger-border: rgb(239 68 68 / 0.16);
+  --settings-button-danger-text: #c62828;
+  --settings-nav-hover-bg: rgb(var(--settings-accent-rgb) / 0.06);
+  --settings-nav-active-bg:
+    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.12) 0%, rgb(var(--settings-accent-soft-rgb) / 0.05) 100%),
+    rgb(255 255 255 / 0.98);
+  --settings-nav-active-border: rgb(var(--settings-accent-rgb) / 0.2);
+  --settings-status-bg: linear-gradient(180deg, rgb(22 163 74 / 0.14) 0%, rgb(22 163 74 / 0.08) 100%);
+  --settings-status-border: rgb(22 163 74 / 0.18);
+  --settings-status-text: #047857;
+  --settings-avatar-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.14) 0%, rgb(var(--settings-accent-soft-rgb) / 0.08) 100%);
+  --settings-avatar-border: rgb(var(--settings-accent-rgb) / 0.12);
+  --settings-avatar-text: #3159d8;
+  --settings-notification-dot-border: #ffffff;
+  --settings-backdrop-bg: rgb(244 247 251 / 0.76);
+  --settings-subcard-shadow: 0 16px 34px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(15, 23, 42, 0.05);
+  --settings-subcard-hover-shadow: 0 22px 44px rgba(15, 23, 42, 0.14), 0 6px 14px rgba(15, 23, 42, 0.06);
+  --settings-chart-bg: linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.96) 100%);
+  --settings-chart-border: rgba(15, 23, 42, 0.08);
+  --settings-chart-grid: rgba(148, 163, 184, 0.3);
+  --settings-log-details-bg: rgb(248 250 252 / 0.96);
+  --settings-log-details-border: rgba(15, 23, 42, 0.08);
+  --settings-track-bg: rgba(148, 163, 184, 0.22);
+  --settings-ring-track: rgba(148, 163, 184, 0.2);
+}
+
+body.dark-mode .settings-panel {
+  --settings-accent-rgb: 118 162 255;
+  --settings-accent-soft-rgb: 64 219 193;
+  --settings-success-rgb: 52 211 153;
+  --settings-shell-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.16), transparent 24%),
+    linear-gradient(180deg, rgb(8 13 22 / 0.98) 0%, rgb(5 9 15 / 1) 100%);
+  --settings-sidebar-bg:
+    linear-gradient(180deg, rgb(9 14 22 / 0.98) 0%, rgb(5 8 14 / 1) 100%);
+  --settings-canvas-bg:
+    radial-gradient(circle at top right, rgb(var(--settings-accent-rgb) / 0.08), transparent 30%),
+    radial-gradient(circle at bottom left, rgb(var(--settings-accent-soft-rgb) / 0.05), transparent 22%),
+    linear-gradient(180deg, rgb(10 11 13 / 0.995) 0%, rgb(7 8 10 / 1) 100%);
+  --settings-section-bg: rgb(16 18 20 / 0.96);
+  --settings-surface-elevated: rgb(24 26 29 / 0.99);
+  --settings-surface-overlay: rgb(20 22 25 / 0.97);
+  --settings-shell-header-bg:
+    linear-gradient(180deg, rgb(255 255 255 / 0.025) 0%, rgb(255 255 255 / 0.008) 100%),
+    rgb(11 12 15 / 0.94);
+  --settings-shell-border: rgb(255 255 255 / 0.16);
+  --settings-sidebar-border: rgb(255 255 255 / 0.12);
+  --settings-border-subtle: rgb(255 255 255 / 0.12);
+  --settings-card-shadow: 0 32px 80px rgb(0 0 0 / 0.28);
+  --settings-shell-shadow: 0 48px 144px rgb(0 0 0 / 0.62);
+  --settings-sidebar-shadow: inset -1px 0 0 rgb(255 255 255 / 0.045), 26px 0 52px rgb(0 0 0 / 0.26);
+  --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.74);
+  --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.2);
+  --text-primary: #fbfdff;
+  --text-secondary: rgb(226 232 240 / 0.8);
+  --text-tertiary: rgb(148 163 184 / 0.78);
+  --text-muted: rgb(148 163 184 / 0.6);
+  --settings-input-bg: rgb(18 20 23 / 0.98);
+  --settings-input-border: rgb(255 255 255 / 0.12);
+  --settings-input-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --settings-search-bg: linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, rgb(255 255 255 / 0.015) 100%);
+  --settings-search-border: rgb(255 255 255 / 0.11);
+  --settings-segment-shell-bg: linear-gradient(180deg, rgb(11 16 24 / 0.98) 0%, rgb(7 11 18 / 1) 100%);
+  --settings-segment-shell-border: rgb(255 255 255 / 0.08);
+  --settings-segment-shell-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
+  --settings-segment-bg: linear-gradient(180deg, rgb(22 27 35 / 0.96) 0%, rgb(17 21 28 / 0.98) 100%);
+  --settings-segment-active-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.24) 0%, rgb(var(--settings-accent-soft-rgb) / 0.1) 100%);
+  --settings-segment-border: rgb(255 255 255 / 0.1);
+  --settings-segment-active-border: rgb(var(--settings-accent-rgb) / 0.34);
+  --settings-segment-active-shadow: 0 14px 30px rgb(0 0 0 / 0.24);
+  --settings-option-bg: #12161d;
+  --settings-option-text: #f8fafc;
+  --bg-secondary: var(--settings-section-bg);
+  --bg-tertiary: var(--settings-surface-elevated);
+  --border-light: var(--settings-border-subtle);
+  --settings-button-primary-bg: linear-gradient(135deg, #8bbdff 0%, #6c90ff 100%);
+  --settings-button-primary-shadow: 0 22px 38px rgb(var(--settings-accent-rgb) / 0.3);
+  --settings-button-secondary-bg: linear-gradient(180deg, rgb(24 26 29 / 0.96) 0%, rgb(18 20 23 / 0.99) 100%);
+  --settings-button-secondary-border: rgb(255 255 255 / 0.12);
+  --settings-button-danger-bg: rgb(255 84 84 / 0.11);
+  --settings-button-danger-border: rgb(255 110 110 / 0.22);
+  --settings-button-danger-text: #ff9a9a;
+  --settings-nav-hover-bg: rgb(255 255 255 / 0.04);
+  --settings-nav-active-bg:
+    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.16) 0%, rgb(var(--settings-accent-soft-rgb) / 0.06) 100%),
+    rgb(24 26 30 / 0.99);
+  --settings-nav-active-border: rgb(var(--settings-accent-rgb) / 0.22);
+  --settings-status-bg: linear-gradient(180deg, rgb(16 185 129 / 0.18) 0%, rgb(16 185 129 / 0.1) 100%);
+  --settings-status-border: rgb(16 185 129 / 0.26);
+  --settings-status-text: #97f5d0;
+  --settings-avatar-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.26) 0%, rgb(var(--settings-accent-soft-rgb) / 0.12) 100%);
+  --settings-avatar-border: rgb(var(--settings-accent-rgb) / 0.18);
+  --settings-avatar-text: #e4eeff;
+  --settings-notification-dot-border: rgb(6 10 16);
+  --settings-backdrop-bg: rgb(2 3 5 / 0.84);
+  --settings-subcard-shadow: 0 16px 36px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.12);
+  --settings-subcard-hover-shadow: 0 22px 48px rgba(0, 0, 0, 0.24), 0 6px 14px rgba(0, 0, 0, 0.16);
+  --settings-chart-bg: linear-gradient(180deg, rgb(18 22 30 / 0.88) 0%, rgb(11 14 20 / 0.94) 100%);
+  --settings-chart-border: rgb(255 255 255 / 0.08);
+  --settings-chart-grid: rgb(255 255 255 / 0.08);
+  --settings-log-details-bg: rgb(9 12 18 / 0.6);
+  --settings-log-details-border: rgb(255 255 255 / 0.06);
+  --settings-track-bg: rgb(255 255 255 / 0.08);
+  --settings-ring-track: rgb(255 255 255 / 0.08);
+}
+
+.settings-panel .settings-shell-nav {
+  background: var(--settings-sidebar-bg);
+}
+
+.settings-panel .settings-shell-main,
+.settings-panel .settings-shell-mobile {
+  background: var(--settings-canvas-bg);
+}
+
+.settings-panel .settings-metric-card,
+.settings-panel .api-settings-provider-item,
+.settings-panel .api-settings-editor-card,
+.settings-panel .settings-dashboard-card,
+.settings-panel .settings-dashboard-priority,
+.settings-panel .settings-dashboard-log,
+.settings-panel .settings-dashboard-row,
+.settings-panel .settings-dashboard-quiet,
+.settings-panel .settings-exchange-card,
+.settings-panel .settings-reference-mini-metric,
+.settings-panel .settings-reference-ring-row,
+.settings-panel .settings-reference-list-item,
+.settings-panel .settings-provider-card__metric,
+.settings-panel .settings-log-entry {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02), var(--settings-subcard-shadow) !important;
+}
+
+.settings-panel .api-settings-provider-item:hover,
+.settings-panel .settings-dashboard-card:hover,
+.settings-panel .settings-dashboard-priority:hover,
+.settings-panel .settings-dashboard-log:hover,
+.settings-panel .settings-dashboard-row:hover {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025), var(--settings-subcard-hover-shadow) !important;
+}
+
+.settings-panel .settings-reference-card,
+.settings-panel .settings-provider-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.025),
+    0 0 0 1px rgb(255 255 255 / 0.015),
+    var(--settings-card-shadow);
+}
+
+.settings-panel .settings-reference-chart {
+  border-color: var(--settings-chart-border);
+  background: var(--settings-chart-bg);
+  box-shadow: var(--settings-subcard-shadow);
+}
+
+.settings-panel .settings-reference-chart__frame::before,
+.settings-panel .settings-reference-chart__frame::after {
+  border-top-color: var(--settings-chart-grid);
+}
+
+.settings-panel .settings-reference-ring {
+  background:
+    conic-gradient(var(--ring-color) calc(var(--value) * 1%), var(--settings-ring-track) 0);
+}
+
+.settings-panel .settings-reference-segment {
+  background: var(--settings-track-bg);
+}
+
+.settings-panel .settings-log-entry__details {
+  border-color: var(--settings-log-details-border);
+  background: var(--settings-log-details-bg);
 }

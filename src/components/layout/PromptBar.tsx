@@ -21,6 +21,7 @@ import { BUILTIN_PROMPT_LIBRARY, PromptLibraryItem } from '../../config/promptLi
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { calculateCost } from '../../services/billing/costService';
+import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { isCreditBasedModel, getModelCredits } from '../../services/model/modelPricing';
 import { adminModelService } from '../../services/model/adminModelService';
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
@@ -156,7 +157,7 @@ const ReferenceThumbnail = React.memo(({
     if (loading || !data) {
         return (
             <div className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--bg-tertiary)] flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                <div className="w-4 h-4 rounded-full border-2 border-white/85 border-t-transparent animate-spin" />
             </div>
         );
     }
@@ -169,7 +170,7 @@ const ReferenceThumbnail = React.memo(({
     return (
         <div
             onClick={(e) => onClick?.(e, src)}
-            className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all"
+            className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-white/80 transition-all"
             title="点击放大查看"
         >
             <img
@@ -262,6 +263,29 @@ function normalizeColor(color: string | undefined, fallback: string): string {
 
 function normalizeModelTextColor(textColor: string | undefined): string {
     return textColor === 'black' ? '#111827' : '#ffffff';
+}
+
+function isLightSeriesTextColor(textColor: string | undefined): boolean {
+    const normalized = (textColor || '').trim().toLowerCase();
+    return normalized === 'black'
+        || normalized === '#000'
+        || normalized === '#000000'
+        || normalized === '#111827';
+}
+
+function getLightSeriesSurfaceStyle(colorStart: string, emphasized = false): React.CSSProperties {
+    const tintStrength = emphasized ? 12 : 6;
+    const borderColor = emphasized
+        ? `color-mix(in srgb, ${colorStart} 18%, rgba(15, 23, 42, 0.12))`
+        : 'var(--prompt-bar-shell-border)';
+
+    return {
+        background: `linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, color-mix(in srgb, ${colorStart} ${tintStrength}%, white ${100 - tintStrength}%) 100%)`,
+        border: `1px solid ${borderColor}`,
+        boxShadow: emphasized
+            ? `0 14px 28px -22px color-mix(in srgb, ${colorStart} 42%, transparent), 0 0 0 1px rgba(255, 255, 255, 0.9) inset`
+            : '0 1px 0 rgba(255, 255, 255, 0.92) inset',
+    };
 }
 
 // 🚀 [添加] 积分专属发送按钮组件
@@ -364,7 +388,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <style>{arrowAnimStyle}</style>
                 <button
                     onClick={onClick}
-                    className="group relative h-10 pl-3.5 pr-1 rounded-full flex items-center gap-2 ml-auto transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:-translate-y-0.5"
+                    className="group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98]"
                     style={getGradientStyle()}
                 >
                     {/* 积分消耗显示 */}
@@ -408,7 +432,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 onClick={onClick}
                 disabled={isDisabled}
                 className={`
-                    group relative h-10 px-1 py-1 rounded-full flex flex-row items-center whitespace-nowrap shrink-0 ml-auto overflow-hidden
+                    group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
                     transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:outline-none
                     ${!isDisabled && !isInsufficient ? 'hover:translate-x-[1px] hover:scale-[1.025] active:translate-x-0 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-blue-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
                     ${defaultStyleProps.className || ''}
@@ -429,7 +453,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                         />
                     </>
                 )}
-                <div className="relative z-[1] flex items-center gap-2 px-3">
+                <div className="relative z-[1] flex min-w-0 items-center gap-2 px-3">
                     {isCreditModel && creditCost > 0 ? (
                         <div className="flex items-center gap-1.5">
                             <Sparkles size={14} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black' : 'text-white'} />
@@ -518,7 +542,149 @@ type PromptBarModelOption = ActiveModel & {
     advantage: string;
     isExclusive: boolean;
     isPinned: boolean;
+    displayName: string;
+    providerDisplayName: string;
+    providerDisplayShortName: string;
+    providerBadgeColorClass: string;
+    providerBadgeStyle?: React.CSSProperties;
+    resolvedDescription: string;
 };
+
+type PromptBarModelMenuButtonProps = {
+    model: PromptBarModelOption;
+    imageSize: ImageSize;
+    selected: boolean;
+    isLast: boolean;
+    description: string;
+    onSelect: (model: PromptBarModelOption) => void;
+    onOpenContextMenu: (event: React.MouseEvent<HTMLButtonElement>, model: PromptBarModelOption) => void;
+};
+
+const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
+    model,
+    imageSize,
+    selected,
+    isLast,
+    description,
+    onSelect,
+    onOpenContextMenu,
+}: PromptBarModelMenuButtonProps) {
+    const isExclusive = model.isExclusive;
+    const isPinned = model.isPinned;
+    const displayName = model.displayName;
+    const badgeInfo = getModelBadgeInfo({ id: model.id, label: model.label, provider: model.provider });
+    const colorStart = normalizeColor(model.colorStart, '#60a5fa');
+    const colorEnd = normalizeColor(model.colorEnd, '#2563eb');
+    const modelTextColor = model.textColor || 'white';
+    const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
+    const usesLightSurface = isLightSeriesTextColor(model.textColor);
+    const inactiveGradientStyle: React.CSSProperties = {
+        ...(usesLightSurface
+            ? getLightSeriesSurfaceStyle(colorStart)
+            : { background: 'linear-gradient(180deg, rgba(75, 85, 99, 0.4) 0%, rgba(55, 65, 81, 0.4) 100%)' }),
+    };
+    const activeGradientStyle: React.CSSProperties = {
+        ...(usesLightSurface
+            ? getLightSeriesSurfaceStyle(colorStart, true)
+            : {
+                background: `linear-gradient(180deg, ${colorEnd} 0%, ${colorEnd} 100%)`,
+                border: `1px solid ${colorStart}`,
+                boxShadow: `0 0 0 1px ${colorStart} inset`,
+            }),
+    };
+
+    return (
+        <button
+            className={`group w-full transition-all duration-300 mx-auto cursor-pointer
+            ${isExclusive
+                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} shadow-md active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${selected ? 'ring-2 ring-white/50 shadow-lg scale-[1.02]' : 'hover:scale-[1.02] hover:shadow-lg opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`
+                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-all border-2 ${selected ? 'bg-blue-50 dark:bg-white/10 ring-2 ring-blue-500 dark:ring-white/40 border-blue-500 dark:border-white/20 shadow-md' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
+            `}
+            style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
+            onMouseEnter={(event) => {
+                if (isExclusive && !selected) {
+                    event.currentTarget.style.background = String(activeGradientStyle.background || '');
+                    event.currentTarget.style.border = String(activeGradientStyle.border || '');
+                    event.currentTarget.style.boxShadow = String(activeGradientStyle.boxShadow || '');
+                }
+            }}
+            onMouseLeave={(event) => {
+                if (isExclusive && !selected) {
+                    event.currentTarget.style.background = String(inactiveGradientStyle.background || '');
+                    event.currentTarget.style.border = String(inactiveGradientStyle.border || '');
+                    event.currentTarget.style.boxShadow = String(inactiveGradientStyle.boxShadow || '');
+                }
+            }}
+            onClick={() => onSelect(model)}
+            onContextMenu={(event) => onOpenContextMenu(event, model)}
+        >
+            {isExclusive ? (
+                <div className="flex items-center justify-between w-full h-full">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                            <ModelLogo
+                                modelId={model.id}
+                                provider={model.provider}
+                                modelName={displayName}
+                                size={20}
+                                active={selected}
+                            />
+                        </div>
+                        <span className="text-sm font-semibold truncate text-left" style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}>
+                            {displayName}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+                        <span
+                            className={`text-xs px-2.5 py-1 rounded-full ${model.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
+                            style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
+                        >
+                            ✨{getModelCredits(model.id || '', imageSize)}
+                        </span>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
+                                <ModelLogo
+                                    modelId={model.id}
+                                    provider={model.provider}
+                                    modelName={displayName}
+                                    size={16}
+                                    active={selected}
+                                />
+                            </div>
+                            <span className={`text-sm font-medium ${badgeInfo.colorClass} break-all text-left`} title={displayName}>
+                                {displayName}
+                            </span>
+                        </div>
+                        {model.provider && (
+                            <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass}`}
+                                title={model.providerDisplayName}
+                                style={{ maxWidth: '40%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                            >
+                                {model.providerDisplayShortName}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex justify-between items-start mt-1 gap-2">
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            {description && (
+                                <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                                    {description}
+                                </span>
+                            )}
+                        </div>
+                        {isPinned && <span className="text-[12px] opacity-80 flex-shrink-0 mr-1 mt-0.5">📌</span>}
+                    </div>
+                </>
+            )}
+        </button>
+    );
+});
 
 const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, isGenerating, onFilesDrop, activeSourceImage, onClearSource, onCancel, isMobile = false, onOpenSettings, onInteract, onUiBusyChange, onFocus, onBlur, onOpenMore }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -529,7 +695,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
-    const [modelListScrollTop, setModelListScrollTop] = useState(0);
+    const [modelListWindowStart, setModelListWindowStart] = useState(0);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -624,6 +790,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const uploadingSkeletonCount = Math.max(0, uploadingCount - pendingReferenceUploads);
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
+    const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
     const canAccessSystemCreditModels = !!user && !isTempUser;
     const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
@@ -805,7 +972,11 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             if (modelListScrollRef.current && modelListScrollPos.current > 0) {
                 modelListScrollRef.current.scrollTop = modelListScrollPos.current;
             }
-            setModelListScrollTop(modelListScrollPos.current);
+            const restoredStartIndex = Math.max(
+                0,
+                Math.floor(modelListScrollPos.current / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+            );
+            setModelListWindowStart(restoredStartIndex);
         }, 100);
 
         return () => {
@@ -1080,11 +1251,20 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
         return uniqueModels.map((model) => {
             const custom = modelCustomizations[model.id] || {};
+            const displayInfo = getModelDisplayInfo(model);
+            const providerDisplayName = getCanonicalProviderDisplayName(model.provider);
+            const resolvedDescription = getModelDescription(model.id)?.description || custom.description || model.description || getFallbackDescription(model);
             return {
                 ...model,
                 advantage: custom.description || model.description || getFallbackDescription(model),
                 isExclusive: !!model.isSystemInternal,
                 isPinned: pinnedModels.includes(model.id),
+                displayName: displayInfo.displayName,
+                providerDisplayName,
+                providerDisplayShortName: providerDisplayName.length > 10 ? providerDisplayName.substring(0, 9) + '…' : providerDisplayName,
+                providerBadgeColorClass: getProviderBadgeColor(model.provider),
+                providerBadgeStyle: getProviderBadgeStyle(model.provider),
+                resolvedDescription,
             };
         });
     }, [availableModels, deferredModelSearch, modelCustomizations, pinnedModels]);
@@ -1101,7 +1281,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         }
 
         const baseVisibleCount = isMobile ? 8 : 9;
-        const startIndex = Math.max(0, Math.floor(modelListScrollTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN);
+        const startIndex = Math.max(0, modelListWindowStart);
         const endIndex = Math.min(
             filteredDisplayModels.length,
             startIndex + baseVisibleCount + MODEL_LIST_OVERSCAN * 2
@@ -1113,7 +1293,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             startIndex,
             totalHeight: filteredDisplayModels.length * MODEL_LIST_ITEM_HEIGHT,
         };
-    }, [filteredDisplayModels, isMobile, modelListScrollTop]);
+    }, [filteredDisplayModels, isMobile, modelListWindowStart]);
 
     const getDefaultImageSizeForModel = useCallback((modelId: string): ImageSize => {
         const caps = getModelCapabilities(modelId);
@@ -2098,45 +2278,88 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             || currentModel?.colorEnd,
         '#2563EB'
     );
+    const currentModelUsesLightSurface = isLightSeriesTextColor(
+        resolvedCurrentSystemDisplay?.textColor || currentModel?.textColor
+    );
     const currentModelTextColor = normalizeModelTextColor(
         resolvedCurrentSystemDisplay?.textColor || currentModel?.textColor
     );
 
-    // 🚀 [Fix] 模型名称显示：优先使用管理员配置的label，其次使用ID映射的友好名称
+    // 统一当前选中模型与下拉列表的展示名称，避免一个显示别名、一个显示原始 ID。
+    const modelDisplayInfo = currentModel
+        ? (() => {
+            const baseDisplayInfo = getModelDisplayInfo(currentModel);
+            return {
+                ...baseDisplayInfo,
+                displayName: resolvedCurrentSystemDisplay?.displayName || baseDisplayInfo.displayName,
+                providerName: resolvedCurrentSystemDisplay?.providerName || currentModel?.providerLabel || currentModel?.provider,
+                sourceScope: currentModel?.sourceScope,
+                sourceLabel: currentModel?.sourceLabel
+            };
+        })()
+        : null;
+
+    // 🚀 [Fix] 模型名称显示：与下拉列表共用同一套 displayName 解析逻辑
     let currentModelName = isModelListEmpty
         ? '无可用模型'
-        : (resolvedCurrentSystemDisplay?.displayName || currentModel?.label || getModelDisplayName(currentModel?.id || '') || currentModel?.id || '未选择模型');
+        : (modelDisplayInfo?.displayName || currentModel?.label || getModelDisplayName(currentModel?.id || '') || currentModel?.id || '未选择模型');
 
     // 隐藏模型名字中括号及括号内的内容，避免名称过长超出输入框
     if (typeof currentModelName === 'string') {
         currentModelName = currentModelName.replace(/\s*[（\(].*?[）\)]\s*/g, '');
     }
 
-    // 🚀 [NEW] 获取展示信息 (来源标签)
-    const modelDisplayInfo = currentModel
-        ? {
-            ...getModelDisplayInfo(currentModel),
-            providerName: resolvedCurrentSystemDisplay?.providerName || currentModel?.providerLabel || currentModel?.provider,
-            sourceScope: currentModel?.sourceScope,
-            sourceLabel: currentModel?.sourceLabel
+    const currentProviderDisplayName = currentModel?.provider
+        ? getCanonicalProviderDisplayName(currentModel.provider)
+        : '';
+    const currentProviderDisplayShortName = currentProviderDisplayName.length > 10
+        ? `${currentProviderDisplayName.substring(0, 9)}…`
+        : currentProviderDisplayName;
+
+    const truncateText = useCallback((text: string, max: number) => {
+        const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+        if (normalized.length <= max) return normalized;
+        return normalized.slice(0, Math.max(0, max - 1)) + '…';
+    }, []);
+
+    const truncateModelLabel = useCallback((label: string, max = 15) => {
+        return truncateText(label, max);
+    }, [truncateText]);
+
+    const truncateModelDescription = useCallback((description: string, max = 50) => {
+        return truncateText(description, max);
+    }, [truncateText]);
+
+    const handleSelectPromptBarModel = useCallback((model: PromptBarModelOption) => {
+        setModelManualLock(true);
+        transitionConfigUpdate(prev => {
+            const newModelCaps = getModelCapabilities(model.id);
+            const supportedSizes = newModelCaps?.supportedSizes?.length ? newModelCaps.supportedSizes : Object.values(ImageSize);
+            const supportedRatios = newModelCaps?.supportedRatios?.length ? newModelCaps.supportedRatios : Object.values(AspectRatio);
+            const newImageSize = supportedSizes.includes(prev.imageSize) ? prev.imageSize : getDefaultImageSizeForModel(model.id);
+            const newAspectRatio = supportedRatios.includes(prev.aspectRatio) ? prev.aspectRatio : getDefaultAspectForModel(model.id);
+
+            return { ...prev, model: model.id, imageSize: newImageSize, aspectRatio: newAspectRatio };
+        });
+        setActiveMenu(null);
+        setModelSearch('');
+        modelListScrollPos.current = 0;
+        setModelListWindowStart(0);
+    }, [getDefaultAspectForModel, getDefaultImageSizeForModel, transitionConfigUpdate]);
+
+    const handlePromptBarModelContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, model: PromptBarModelOption) => {
+        if (model.isExclusive) {
+            event.preventDefault();
+            return;
         }
-        : null;
-
-    const truncateModelLabel = useCallback((label: string, max = 25) => {
-        if (label.length <= max) return label;
-        return label.slice(0, max - 1) + '…';
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, modelId: model.id });
     }, []);
 
-    const truncateProviderLabel = useCallback((label: string) => {
-        const max = 5;
-        if (label.length <= max) return label;
-        return label.slice(0, max - 1) + '…';
-    }, []);
-
-    // 🚀 [NEW] 获取展示信息 (来源标签) - 限制25字符防止按钮过宽
+    // 桌面端模型按钮保持短名称，避免撑坏底部布局；移动端保留更多信息。
     const displayModelLabel = useMemo(() => {
-        return truncateModelLabel(currentModelName, 25);
-    }, [currentModelName, truncateModelLabel]);
+        return truncateModelLabel(currentModelName, isMobile ? 24 : 15);
+    }, [currentModelName, isMobile, truncateModelLabel]);
 
     // 🚀 [Mobile Layout] Dock to bottom on mobile
     const mobileStyle: React.CSSProperties = isMobile ? {
@@ -2193,7 +2416,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             <ModeSwitcherStyles />
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible w-[calc(100vw-32px)] max-w-[700px] ${isDragging ? 'ring-2 ring-indigo-500' : ''}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible w-[calc(100vw-32px)] max-w-[700px] ${isDragging ? 'ring-2 ring-white/80 shadow-[0_0_36px_rgba(255,255,255,0.22)]' : ''}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -2202,15 +2425,15 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             >
                 {/* Drag Overlay */}
                 {isDragging && (
-                    <div className="absolute inset-0 z-50 bg-indigo-500/20 backdrop-blur-md rounded-[inherit] flex items-center justify-center animate-fadeIn pointer-events-none">
-                        <span className="font-bold text-sm text-white drop-shadow-md">释放添加参考图</span>
+                    <div className="absolute inset-0 z-50 rounded-[inherit] border border-white/65 bg-white/55 backdrop-blur-md flex items-center justify-center animate-fadeIn pointer-events-none">
+                        <span className="font-bold text-sm text-slate-900 drop-shadow-[0_1px_8px_rgba(255,255,255,0.45)]">释放添加参考图</span>
                     </div>
                 )}
 
                 {/* [NEW] Flying Image Animation */}
                 {flyingImage && (
                     <div
-                        className="fixed z-[9999] w-12 h-12 rounded-lg border-2 border-indigo-500 shadow-xl overflow-hidden pointer-events-none transition-all ease-in-out duration-500"
+                        className="fixed z-[9999] w-12 h-12 rounded-lg border-2 border-white shadow-[0_10px_30px_rgba(255,255,255,0.35)] overflow-hidden pointer-events-none transition-all ease-in-out duration-500"
                         style={{
                             left: 0,
                             top: 0,
@@ -2298,12 +2521,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         backdrop-blur-sm
                                     `}
                                         style={{
-                                            backgroundColor: 'var(--bg-tertiary)',
-                                            borderColor: 'var(--border-light)',
-                                            boxShadow: `
-                                                0 1px 2px rgba(0,0,0,0.05),
-                                                0 0 0 1px rgba(255,255,255,0.02) inset
-                                            `,
+                                            background: 'var(--prompt-bar-shell-bg)',
+                                            borderColor: 'var(--prompt-bar-shell-border)',
+                                            boxShadow: 'var(--prompt-bar-shell-shadow)',
                                         }}
                                     >
                                         <div
@@ -2394,9 +2614,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             <button
                                 className="flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0"
                                 style={{
-                                    backgroundColor: showPromptLibrary ? 'rgba(59,130,246,0.14)' : 'var(--bg-tertiary)',
+                                    background: showPromptLibrary ? 'rgba(59,130,246,0.12)' : 'var(--prompt-bar-shell-bg)',
                                     color: showPromptLibrary ? '#60a5fa' : 'var(--text-secondary)',
-                                    borderColor: showPromptLibrary ? 'rgba(96,165,250,0.35)' : 'var(--border-light)'
+                                    borderColor: showPromptLibrary ? 'rgba(96,165,250,0.28)' : 'var(--prompt-bar-shell-border)'
                                 }}
                                 onMouseDown={(e) => e.stopPropagation()} onClick={(e) => {
                                     e.stopPropagation();
@@ -2413,9 +2633,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 <button
                                     className="flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0"
                                     style={{
-                                        backgroundColor: showPptOutlinePanel ? 'rgba(14,165,233,0.14)' : 'var(--bg-tertiary)',
+                                        background: showPptOutlinePanel ? 'rgba(14,165,233,0.12)' : 'var(--prompt-bar-shell-bg)',
                                         color: showPptOutlinePanel ? '#38bdf8' : 'var(--text-secondary)',
-                                        borderColor: showPptOutlinePanel ? 'rgba(56,189,248,0.35)' : 'var(--border-light)'
+                                        borderColor: showPptOutlinePanel ? 'rgba(56,189,248,0.28)' : 'var(--prompt-bar-shell-border)'
                                     }}
                                     onMouseDown={(e) => e.stopPropagation()} onClick={(e) => {
                                         e.stopPropagation();
@@ -2429,12 +2649,16 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 </button>
                             )}
 
-                            <button
-                                className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${config.enablePromptOptimization
+                                <button
+                                    className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${config.enablePromptOptimization
                                     ? 'bg-green-500/15 text-green-500 border-green-500/30'
-                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                                    : 'text-[var(--text-secondary)] hover:border-[var(--prompt-bar-shell-border-strong)]'
                                     }`}
                                 style={{
+                                    ...(!config.enablePromptOptimization ? {
+                                        background: 'var(--prompt-bar-shell-bg)',
+                                        borderColor: 'var(--prompt-bar-shell-border)',
+                                    } : {}),
                                     opacity: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? 1 : 0.45,
                                     pointerEvents: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? 'auto' : 'none'
                                 }}
@@ -2786,7 +3010,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                 className={`transition-all duration-300 ease-[cubic-bezier(0.25, 1, 0.5, 1)] rounded-lg overflow-hidden ${showSpacer ? 'w-12 opacity-100 mr-2' : 'w-0 opacity-0 mr-0'}`}
                                                 style={{ height: showSpacer ? '48px' : '0px' }}
                                             >
-                                                <div className="w-12 h-12 rounded-lg border-2 border-dashed border-indigo-500/30 bg-indigo-500/5"></div>
+                                                <div className="w-12 h-12 rounded-lg border-2 border-dashed border-white/60 bg-white/12"></div>
                                             </div>
 
                                             <div
@@ -2810,7 +3034,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                 />
                                                 {/* Mask Indicator - 当前已设置遮罩时显示高亮边框 */}
                                                 {config.maskUrl && config.editMode === 'inpaint' && (
-                                                    <div className="absolute inset-0 border-2 border-indigo-500 rounded-lg pointer-events-none" />
+                                                    <div className="absolute inset-0 border-2 border-white rounded-lg pointer-events-none" />
                                                 )}
                                                 <button
                                                     onClick={(e) => {
@@ -2843,7 +3067,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                     id="spacer"
                                     className={`transition-all duration-300 ease-[cubic-bezier(0.25, 1, 0.5, 1)] rounded-lg overflow-hidden ${dropTargetIndex === config.referenceImages.length ? 'w-12 opacity-100 h-12' : 'w-0 opacity-0 h-0'}`}
                                 >
-                                    <div className="w-12 h-12 rounded-lg border-2 border-dashed border-indigo-500/30 bg-indigo-500/5"></div>
+                                    <div className="w-12 h-12 rounded-lg border-2 border-dashed border-white/60 bg-white/12"></div>
                                 </div>
 
                                 {/* Upload Button - At the end of reference images row - 始终显示 */}
@@ -2918,22 +3142,36 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex min-w-0 items-center ${isMobile ? 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2' : 'flex-1 gap-1.5'}`}>
+                        <div className={`flex min-w-0 items-center ${isMobile ? 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2' : 'flex-1 gap-1.5 overflow-hidden'}`}>
                             {/* Model Button */}
                             <div className={`relative inline-flex min-w-0 ${isMobile ? 'col-span-2' : 'flex-shrink-0'}`}>
                                 <button
                                     id="models-dropdown-trigger"
-                                    className={`input-bar-model flex w-full max-w-full items-center flex-nowrap justify-center gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 min-w-0 overflow-hidden ${isModelListEmpty
+                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full max-w-full justify-center' : 'w-auto max-w-[calc(12ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed border-[var(--border-light)]'
                                         : (currentModel?.colorStart && currentModel?.colorEnd)
                                             ? 'border-white/20 !opacity-100 shadow-sm'
-                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-opacity-50'
+                                            : 'text-[var(--text-secondary)] hover:border-opacity-50'
                                         }`}
-                                    style={(!isModelListEmpty && currentModel?.colorStart && currentModel?.colorEnd) ? {
-                                        background: `linear-gradient(180deg, ${currentModelSecondaryColor} 0%, ${currentModelSecondaryColor} 100%)`,
-                                        border: `1px solid ${currentModelPrimaryColor}`,
-                                        boxShadow: `0 0 0 1px ${currentModelPrimaryColor} inset`
-                                    } : {}}
+                                    style={(() => {
+                                        if (isModelListEmpty) {
+                                            return {};
+                                        }
+                                        if (currentModel?.colorStart && currentModel?.colorEnd) {
+                                            if (currentModelUsesLightSurface) {
+                                                return getLightSeriesSurfaceStyle(currentModelPrimaryColor, true);
+                                            }
+                                            return {
+                                                background: `linear-gradient(180deg, ${currentModelSecondaryColor} 0%, ${currentModelSecondaryColor} 100%)`,
+                                                border: `1px solid ${currentModelPrimaryColor}`,
+                                                boxShadow: `0 0 0 1px ${currentModelPrimaryColor} inset`
+                                            };
+                                        }
+                                        return {
+                                            background: 'var(--prompt-bar-shell-bg)',
+                                            borderColor: 'var(--prompt-bar-shell-border)',
+                                        };
+                                    })()}
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
                                         e.stopPropagation(); // 🚀 阻止冒泡，防止被 handleClickOutside 误杀
@@ -2945,15 +3183,28 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                     }}
                                 >
                                     {(() => {
-                                        const badgeInfo = getModelBadgeInfo({ id: currentModel?.id ?? '', label: currentModel?.label ?? '', provider: currentModel?.provider });
+                                        const badgeInfo = getModelBadgeInfo({ id: currentModel?.id ?? '', label: currentModelName, provider: currentModel?.provider });
                                         return (
-                                            <span
-                                                className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'text-sm'} ${(!isModelListEmpty && currentModel?.colorStart && currentModel?.colorEnd) ? '' : badgeInfo.colorClass}`}
-                                                style={(!isModelListEmpty && currentModel?.colorStart && currentModel?.colorEnd) ? { color: currentModelTextColor } : undefined}
-                                                title={currentModelName}
-                                            >
-                                                {currentModelName}
-                                            </span>
+                                            <>
+                                                {!isModelListEmpty && currentModel ? (
+                                                    <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                                                        <ModelLogo
+                                                            modelId={currentModel.id}
+                                                            provider={currentModel.provider}
+                                                            modelName={currentModelName}
+                                                            size={isMobile ? 14 : 16}
+                                                            active
+                                                        />
+                                                    </span>
+                                                ) : null}
+                                                <span
+                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[12ch] text-sm'} ${(!isModelListEmpty && currentModel?.colorStart && currentModel?.colorEnd) ? '' : badgeInfo.colorClass}`}
+                                                    style={(!isModelListEmpty && currentModel?.colorStart && currentModel?.colorEnd) ? { color: currentModelTextColor } : undefined}
+                                                    title={currentModelName}
+                                                >
+                                                    {displayModelLabel}
+                                                </span>
+                                            </>
                                         );
                                     })()}
 
@@ -2979,9 +3230,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             <span
                                                 className={`text-[9px] px-1.5 py-0.5 rounded border flex-shrink-0 ${getProviderBadgeColor(currentModel.provider)}`}
                                                 style={{ marginLeft: '6px', ...getProviderBadgeStyle(currentModel.provider) }}
-                                                title={getCanonicalProviderDisplayName(currentModel.provider)}
+                                                title={currentProviderDisplayName}
                                             >
-                                                <span className="whitespace-nowrap">{truncateProviderLabel(getCanonicalProviderDisplayName(currentModel.provider))}</span>
+                                                <span className="whitespace-nowrap">{currentProviderDisplayShortName}</span>
                                             </span>
                                         ) : null
                                     )}
@@ -3033,7 +3284,11 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             onScroll={(e) => {
                                                 const nextTop = e.currentTarget.scrollTop;
                                                 modelListScrollPos.current = nextTop;
-                                                setModelListScrollTop(nextTop);
+                                                const nextStartIndex = Math.max(
+                                                    0,
+                                                    Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                                                );
+                                                setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
                                             }}
                                         >
                                             {(() => {
@@ -3049,190 +3304,21 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     <>
                                                         {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
                                                         {visibleModels.map((model: PromptBarModelOption, index: number) => {
-                                                            // 🚀 [Debug] 打印模型 textColor 和 id
-                                                            console.log(`[PromptBar Model Debug] id: ${model.id}, textColor: ${model.textColor}`);
-                                                            
                                                             const isLast = index === visibleModels.length - 1;
-                                                    const lowerId = model.id.toLowerCase();
-                                                    const baseName = model.label || model.id;
+                                                            const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
 
-                                                    // 🚀 [修正] 增强 Exclusive 判定逻辑
-                                                    const isExclusive = model.isExclusive;
-
-                                                    // 🚀 [添加] 区分标识：系统积分模型 vs 用户API模型
-                                                    const isSystemCreditModel = isExclusive;
-                                                    const isUserApiModel = !isExclusive && (model.provider === 'Google' || model.provider === 'Custom' || model.provider === 'OpenAI');
-
-
-                                                    const advantage = model.advantage;
-                                                    const isPinned = model.isPinned;
-
-                                                    const isActive = config.model === model.id;
-                                                    // 🚀 [Fix] 使用统一的 normalizeColor 函数处理颜色
-                                                    const colorStart = normalizeColor(model.colorStart, '#60a5fa');
-                                                    const colorEnd = normalizeColor(model.colorEnd, '#2563eb');
-
-                                                    // 🚀 [Fix] 积分模型：选中或悬停时显示彩色渐变，否则使用灰色调
-                                                    const isModelActive = config.model === model.id;
-
-                                                    // 获取模型文本颜色
-                                                    const modelTextColor = model.textColor || 'white';
-                                                    const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
-
-                                                    // 默认使用的统一灰色渐变底板
-                                                    const inactiveGradientStyle = {
-                                                        background: `linear-gradient(180deg, rgba(75, 85, 99, 0.4) 0%, rgba(55, 65, 81, 0.4) 100%)`,
-                                                    };
-
-                                                    // 悬停/激活时才展示的彩色底板
-                                                    const activeGradientStyle = {
-                                                        background: `linear-gradient(180deg, ${colorEnd} 0%, ${colorEnd} 100%)`,
-                                                        border: `1px solid ${colorStart}`,
-                                                        boxShadow: `0 0 0 1px ${colorStart} inset`,
-                                                    };
-
-                                                    return (
-                                                        <button
-                                                            key={model.id}
-                                                            className={`group w-full transition-all duration-300 mx-auto cursor-pointer
-                                                            ${isExclusive
-                                                                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} shadow-md active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${isModelActive ? 'ring-2 ring-white/50 shadow-lg scale-[1.02]' : 'hover:scale-[1.02] hover:shadow-lg opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`
-                                                                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-all border-2 ${isModelActive ? 'bg-blue-50 dark:bg-white/10 ring-2 ring-blue-500 dark:ring-white/40 border-blue-500 dark:border-white/20 shadow-md' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
-                                                            `}
-                                                            style={isExclusive ? (isModelActive ? activeGradientStyle : inactiveGradientStyle) : undefined}
-                                                            onMouseEnter={(e) => {
-                                                                if (isExclusive && !isModelActive) {
-                                                                    e.currentTarget.style.background = activeGradientStyle.background;
-                                                                    e.currentTarget.style.border = activeGradientStyle.border || '';
-                                                                    e.currentTarget.style.boxShadow = activeGradientStyle.boxShadow || '';
-                                                                }
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                if (isExclusive && !isModelActive) {
-                                                                    e.currentTarget.style.background = inactiveGradientStyle.background;
-                                                                    e.currentTarget.style.border = '';
-                                                                    e.currentTarget.style.boxShadow = '';
-                                                                }
-                                                            }}
-                                                            onClick={() => {
-                                                                setModelManualLock(true); // 🚀 用户手动点击，开启锁定
-                                                                transitionConfigUpdate(prev => {
-                                                                    // 🚀 [Fix] 智能参数保持：获取新模型支持的参数
-                                                                    const newModelCaps = getModelCapabilities(model.id);
-                                                                    const supportedSizes = newModelCaps?.supportedSizes?.length ? newModelCaps.supportedSizes : Object.values(ImageSize);
-                                                                    const supportedRatios = newModelCaps?.supportedRatios?.length ? newModelCaps.supportedRatios : Object.values(AspectRatio);
-
-                                                                    // 检查当前参数是否被新模型支持，支持则保持，不支持则回退到默认值
-                                                                    const newImageSize = supportedSizes.includes(prev.imageSize) ? prev.imageSize : getDefaultImageSizeForModel(model.id);
-                                                                    const newAspectRatio = supportedRatios.includes(prev.aspectRatio) ? prev.aspectRatio : getDefaultAspectForModel(model.id);
-
-                                                                    return { ...prev, model: model.id, imageSize: newImageSize, aspectRatio: newAspectRatio };
-                                                                });
-                                                                setActiveMenu(null);
-                                                                setModelSearch('');
-                                                                modelListScrollPos.current = 0;
-                                                                setModelListScrollTop(0);
-                                                            }}
-                                                            onContextMenu={(e) => {
-                                                                if (isExclusive) {
-                                                                    e.preventDefault();
-                                                                    return; // Disallow context menu for exclusive models
-                                                                }
-                                                                e.preventDefault();
-                                                                setContextMenu({ x: e.clientX, y: e.clientY, modelId: model.id });
-                                                            }}
-                                                        >
-                                                            {(() => {
-                                                                const displayInfo = getModelDisplayInfo(model);
-                                                                const badgeInfo = getModelBadgeInfo({ id: model.id, label: model.label, provider: model.provider });
-                                                                const displayName = displayInfo.displayName;
-
-                                                                if (isExclusive) {
-                                                                    // 🚀 [Fix] 积分模型：胶囊样式，图标+名称左对齐，积分标识右对齐
-                                                                    const textColorStyle = model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' };
-                                                                    const badgeBgStyle = model.textColor === 'black' ? 'bg-black/10' : 'bg-white/25';
-                                                                    const badgeBorderStyle = model.textColor === 'black' ? 'border-black/20' : 'border-white/30';
-                                                                    
-                                                                    return (
-                                                                        <div className="flex items-center justify-between w-full h-full">
-                                                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                                <div className="flex-shrink-0 flex items-center justify-center w-6 h-6">
-                                                                                    <ModelLogo
-                                                                                        modelId={model.id}
-                                                                                        provider={model.provider}
-                                                                                        modelName={displayName}
-                                                                                        size={20}
-                                                                                        active={isActive}
-                                                                                    />
-                                                                                </div>
-                                                                                <span className="text-sm font-semibold truncate text-left" style={textColorStyle}>
-                                                                                    {displayName}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-                                                                                <span className={`text-xs px-2.5 py-1 rounded-full ${badgeBgStyle} ${badgeBorderStyle} border font-semibold flex items-center gap-1`} style={textColorStyle}>
-                                                                                    ✨{getModelCredits(model.id || '', config.imageSize)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                }
-
-                                                                // 🚀 [Fix] API模型：图标居中对齐，文本左对齐
-                                                                return (
-                                                                    <div className="flex items-center justify-between w-full">
-                                                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                            <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
-                                                                                <ModelLogo
-                                                                                    modelId={model.id}
-                                                                                    provider={model.provider}
-                                                                                    modelName={displayName}
-                                                                                    size={16}
-                                                                                    active={isActive}
-                                                                                />
-                                                                            </div>
-                                                                            <span className={`text-sm font-medium ${badgeInfo.colorClass} break-all text-left`} title={displayInfo.displayName}>
-                                                                                {displayName}
-                                                                            </span>
-                                                                        </div>
-                                                                        {/* 供应商标签 - 右对齐带框（最多显示10个字符，单行） */}
-                                                                        {model.provider && (
-                                                                            <span
-                                                                                className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${getProviderBadgeColor(model.provider)}`}
-                                                                                title={getCanonicalProviderDisplayName(model.provider)}
-                                                                                style={{ maxWidth: '40%', textOverflow: 'ellipsis', ...getProviderBadgeStyle(model.provider) }}
-                                                                            >
-                                                                                {(() => {
-                                                                                    const displayProvider = getCanonicalProviderDisplayName(model.provider);
-                                                                                    return displayProvider.length > 10 ? displayProvider.substring(0, 9) + '…' : displayProvider;
-                                                                                })()}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-
-                                                            {/* Metadata Display - 三层简洁结构 - 专属模型不显示 */}
-                                                            {!isExclusive && (() => {
-                                                                const modelDesc = getModelDescription(model.id);
-                                                                const description = modelDesc?.description || advantage;
-
-                                                                return (
-                                                                    <div className="flex justify-between items-start mt-1 gap-2">
-                                                                        <div className="flex flex-col gap-1 flex-1 min-w-0">
-
-                                                                            {description && (
-                                                                                <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                                                                                    {description}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        {isPinned && <span className="text-[12px] opacity-80 flex-shrink-0 mr-1 mt-0.5">📌</span>}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </button >
-                                                    );
+                                                            return (
+                                                                <PromptBarModelMenuButton
+                                                                    key={model.id}
+                                                                    model={model}
+                                                                    imageSize={config.imageSize}
+                                                                    selected={config.model === model.id}
+                                                                    isLast={isLast}
+                                                                    description={description}
+                                                                    onSelect={handleSelectPromptBarModel}
+                                                                    onOpenContextMenu={handlePromptBarModelContextMenu}
+                                                                />
+                                                            );
                                                         })}
                                                         {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
                                                     </>
@@ -3244,14 +3330,14 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             </div >
 
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
-                            <div className={`relative inline-flex min-w-0 ${isMobile ? 'row-start-2 min-w-0' : 'flex-shrink-0'}`}>
+                            <div className={`relative inline-flex ${isMobile ? 'row-start-2 min-w-0' : 'min-w-fit flex-shrink-0'}`}>
                                 <button
                                     data-options-toggle
-                                    className={`flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap min-w-0 ${isMobile ? 'px-2.5 max-w-none' : 'px-3 flex-shrink-0'}`}
+                                    className={`flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? 'px-2.5 max-w-none' : 'px-3.5 flex-shrink-0'}`}
                                     style={{
-                                        backgroundColor: showOptionsPanel ? 'var(--bg-hover)' : 'var(--bg-tertiary)',
+                                        background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
                                         color: 'var(--text-secondary)',
-                                        borderColor: showOptionsPanel ? 'var(--border-medium)' : 'var(--border-light)'
+                                        borderColor: showOptionsPanel ? 'var(--prompt-bar-shell-border-strong)' : 'var(--prompt-bar-shell-border)'
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -3282,7 +3368,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             ) : (
                                                 getRatioIcon(config.aspectRatio)
                                             )}
-                                            <span className="min-w-0 truncate">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.imageSize}</span>
+                                            <span className="whitespace-nowrap">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.imageSize}</span>
                                         </>
                                     ) : (
                                         <>
@@ -3297,7 +3383,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             ) : (
                                                 getRatioIcon(config.aspectRatio)
                                             )}
-                                            <span className="min-w-0 truncate">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.videoResolution || '720p'}</span>
+                                            <span className="whitespace-nowrap">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.videoResolution || '720p'}</span>
                                         </>
                                     )}
                                     <svg className={`w-3 h-3 transition-transform ${showOptionsPanel ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3385,10 +3471,12 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             {/* Group 1: Network & Provider Settings - Hidden on mobile for compact layout */}
                             {/* Group 1: Network & Provider Settings - 只在支持时显示 */}
                             {!isMobile && (groundingSupported || imageSearchSupported) && (
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <div className="flex min-w-0 max-w-full items-center gap-1.5">
                                     <div
-                                        className="flex items-center gap-1.5 px-1 py-0.5 rounded-lg h-10 transition-all duration-200 border border-[var(--border-light)] bg-[var(--bg-tertiary)]"
+                                        className="flex min-w-0 max-w-full shrink items-center gap-1 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-1 py-0.5 h-10 transition-all duration-200"
                                         style={{
+                                            background: 'var(--prompt-bar-shell-bg)',
+                                            borderColor: 'var(--prompt-bar-shell-border)',
                                             opacity: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 0 : 1,
                                             visibility: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'hidden' : 'visible',
                                             pointerEvents: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'none' : 'auto'
@@ -3397,9 +3485,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         {/* Grounding Tool */}
                                         {groundingSupported && (
                                             <button
-                                                className={`flex items-center gap-1.5 px-2 h-full rounded-md transition-all text-[11px] font-medium whitespace-nowrap ${config.enableGrounding
+                                                className={`flex min-w-fit flex-shrink-0 items-center justify-center gap-1 px-2 h-full rounded-md transition-all text-[11px] font-medium whitespace-nowrap ${config.enableGrounding
                                                     ? 'bg-indigo-500/15 text-indigo-500 shadow-sm'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]'
+                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
                                                 title="Google 搜索 (实时信息)"
@@ -3410,7 +3498,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     <path d="M8.5 16.3a5 5 0 0 1 7 0" />
                                                     <line x1="12" y1="20" x2="12.01" y2="20" />
                                                 </svg>
-                                                <span>谷歌搜索</span>
+                                                <span className="whitespace-nowrap">谷歌搜索</span>
                                             </button>
                                         )}
 
@@ -3421,9 +3509,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                                         {imageSearchSupported && (
                                             <button
-                                                className={`flex items-center gap-1.5 px-2 h-full rounded-md transition-all text-[11px] font-medium whitespace-nowrap ${config.enableImageSearch
+                                                className={`flex min-w-fit flex-shrink-0 items-center justify-center gap-1 px-2 h-full rounded-md transition-all text-[11px] font-medium whitespace-nowrap ${config.enableImageSearch
                                                     ? 'bg-indigo-500/15 text-indigo-500 shadow-sm'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]'
+                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
                                                 title="图片搜索 (参考网络图片)"
@@ -3433,7 +3521,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     <circle cx="8.5" cy="8.5" r="1.5" />
                                                     <path d="M21 15l-5-5L5 21" />
                                                 </svg>
-                                                <span>图片搜索</span>
+                                                <span className="whitespace-nowrap">图片搜索</span>
                                             </button>
                                         )}
                                     </div>
@@ -3442,11 +3530,11 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                             {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
                             {!isMobile && (
-                                <div className="flex items-center gap-0.5 p-0.5 rounded-lg border h-10 shrink-0" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-light)' }}>
+                                <div className="ml-auto flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0" style={{ background: 'var(--prompt-bar-shell-bg)', borderColor: 'var(--prompt-bar-shell-border)', boxShadow: 'var(--prompt-bar-shell-shadow)' }}>
                                     {/* Parallel Count */}
-                                    <div className="relative h-full">
+                                    <div className="relative h-full w-[58px]">
                                         <button
-                                            className="flex items-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-white/5"
+                                            className="flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-white/5"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -3566,7 +3654,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         )}
                                     </div>
                                 </div>
-                            )}                            {/* 🚀 发送按钮 - 积分专属样式 */}
+                            )}
+                        </div>
+                        <div className={isMobile ? '' : 'ml-2 flex-shrink-0'}>
+                            {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}
                                 creditCost={totalCreditCost}
@@ -3585,7 +3676,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         return;
                                     }
                                     if (isSystemCreditModel && totalCreditCost > 0 && balance < totalCreditCost) {
-                                        notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额: ${balance}，请充值。`);
+                                        notify.error('积分不足', `使用当前配置需要 ${totalCreditCost} 积分，当前余额: ${remainingBalanceDisplay}，请充值。`);
                                         setShowRechargeModal(true);
                                         return;
                                     }

@@ -19,6 +19,7 @@ import { buildAuthRedirectUrl } from '../../config/authRedirect';
 import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import AnoAI from '@/components/ui/animated-shader-background';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
@@ -124,6 +125,7 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
+  const { resolvedTheme } = useTheme();
   const turnstileAvailable = canUseTurnstile();
   const turnstileMissingSiteKey = TURNSTILE_ENABLED && !TURNSTILE_HAS_SITE_KEY;
   const showTurnstileBlock = turnstileAvailable || turnstileMissingSiteKey;
@@ -179,24 +181,26 @@ const LoginScreen: React.FC = () => {
   useEffect(() => {
     const body = document.body;
     const root = document.documentElement;
+    const authThemeClass = `auth-screen-active--${resolvedTheme}`;
+    const backgroundColor = resolvedTheme === 'dark' ? '#07111f' : '#eef4ff';
     const previousBodyBackground = body.style.background;
     const previousRootBackground = root.style.background;
     const previousColorScheme = root.style.colorScheme;
 
-    body.classList.add('auth-screen-active');
-    root.classList.add('auth-screen-active');
-    body.style.background = '#07111f';
-    root.style.background = '#07111f';
-    root.style.colorScheme = 'dark';
+    body.classList.add('auth-screen-active', authThemeClass);
+    root.classList.add('auth-screen-active', authThemeClass);
+    body.style.background = backgroundColor;
+    root.style.background = backgroundColor;
+    root.style.colorScheme = resolvedTheme;
 
     return () => {
-      body.classList.remove('auth-screen-active');
-      root.classList.remove('auth-screen-active');
+      body.classList.remove('auth-screen-active', authThemeClass);
+      root.classList.remove('auth-screen-active', authThemeClass);
       body.style.background = previousBodyBackground;
       root.style.background = previousRootBackground;
       root.style.colorScheme = previousColorScheme;
     };
-  }, []);
+  }, [resolvedTheme]);
 
   useEffect(() => {
     if (!turnstileAvailable) {
@@ -497,7 +501,7 @@ const LoginScreen: React.FC = () => {
   }, [wechatAuthorizationUrl]);
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page auth-page--${resolvedTheme}`}>
       <WechatQrModal
         isOpen={wechatModalOpen}
         title="使用微信扫码登录"

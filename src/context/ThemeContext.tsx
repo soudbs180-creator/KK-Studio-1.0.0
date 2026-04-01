@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 
 export type Theme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
+const DEFAULT_THEME: Theme = 'system';
 
 interface ThemeContextType {
     theme: Theme;
@@ -15,24 +16,45 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const getSystemTheme = (): ResolvedTheme => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return 'light';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
 const getStoredTheme = (): Theme => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return DEFAULT_THEME;
 
     const stored = localStorage.getItem('theme') || localStorage.getItem('kk_theme');
     if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
-    return 'dark';
+    return DEFAULT_THEME;
+};
+
+const resolveThemeMode = (theme: Theme): ResolvedTheme => (
+    theme === 'system' ? getSystemTheme() : theme
+);
+
+const applyResolvedThemeToDocument = (mode: ResolvedTheme) => {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const body = document.body;
+    const root = document.documentElement;
+
+    body.classList.toggle('dark-mode', mode === 'dark');
+    root.classList.toggle('dark', mode === 'dark');
+    body.dataset.theme = mode;
+    root.dataset.theme = mode;
+    root.style.colorScheme = mode;
+};
+
+export const initializeThemeOnBoot = () => {
+    const initialTheme = getStoredTheme();
+    applyResolvedThemeToDocument(resolveThemeMode(initialTheme));
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
-        const initialTheme = getStoredTheme();
-        return initialTheme === 'system' ? getSystemTheme() : initialTheme;
-    });
+    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveThemeMode(getStoredTheme()));
     const hasMountedRef = useRef(false);
     const transitionTimeoutRef = useRef<number | null>(null);
 
@@ -66,20 +88,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const applyMode = (mode: ResolvedTheme) => {
             startThemeTransition();
             setResolvedTheme((currentMode) => (currentMode === mode ? currentMode : mode));
-            body.classList.toggle('dark-mode', mode === 'dark');
-            root.classList.toggle('dark', mode === 'dark');
-            body.dataset.theme = mode;
-            root.dataset.theme = mode;
-            root.style.colorScheme = mode;
+            applyResolvedThemeToDocument(mode);
         };
 
         if (theme === 'system') {
-            applyMode(getSystemTheme());
+            applyMode(resolveThemeMode(theme));
             localStorage.removeItem('theme');
             localStorage.removeItem('kk_theme');
 
             const handleChange = () => {
-                applyMode(getSystemTheme());
+                applyMode(resolveThemeMode('system'));
             };
 
             media.addEventListener('change', handleChange);

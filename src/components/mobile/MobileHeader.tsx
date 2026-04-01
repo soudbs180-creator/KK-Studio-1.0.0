@@ -1,5 +1,6 @@
 import React from 'react';
 import { Menu, Sparkles } from 'lucide-react';
+import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
 
 interface MobileHeaderProps {
@@ -30,7 +31,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const iconButtonClass = 'h-10 w-10 rounded-2xl flex items-center justify-center transition-all active:scale-95 hover:bg-white/10';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
-    const balanceDisplay = balanceLoading ? '...' : (typeof balance === 'number' ? balance : '--');
+    const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
     return (

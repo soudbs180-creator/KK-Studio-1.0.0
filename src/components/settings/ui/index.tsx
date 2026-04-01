@@ -31,7 +31,14 @@ export const SegmentedControl: React.FC<{
   onChange: (value: string) => void;
 }> = ({ options, value, onChange }) => {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div
+      className="grid grid-cols-2 gap-2 rounded-[22px] border p-2"
+      style={{
+        background: 'var(--settings-segment-shell-bg)',
+        borderColor: 'var(--settings-segment-shell-border)',
+        boxShadow: 'var(--settings-segment-shell-shadow)',
+      }}
+    >
       {options.map((option) => {
         const isActive = value === option.value;
         return (
@@ -42,11 +49,13 @@ export const SegmentedControl: React.FC<{
             className="min-w-0 overflow-hidden rounded-2xl border px-3 py-3 text-ellipsis whitespace-nowrap text-sm font-medium transition-all duration-200 active:scale-95"
             style={{
               background: isActive
-                ? 'linear-gradient(135deg, rgba(96, 165, 250, 0.26) 0%, rgba(59, 130, 246, 0.12) 100%)'
-                : 'rgba(15, 23, 42, 0.42)',
-              borderColor: isActive ? 'rgba(96, 165, 250, 0.34)' : 'rgba(148, 163, 184, 0.08)',
+                ? 'var(--settings-segment-active-bg)'
+                : 'var(--settings-segment-bg)',
+              borderColor: isActive
+                ? 'var(--settings-segment-active-border)'
+                : 'var(--settings-segment-border)',
               color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-              boxShadow: isActive ? '0 10px 24px rgba(37, 99, 235, 0.18)' : 'none',
+              boxShadow: isActive ? 'var(--settings-segment-active-shadow)' : 'none',
             }}
           >
             {option.label}
@@ -62,7 +71,8 @@ export const SegmentedControlMulti: React.FC<{
   options: string[];
   value: string;
   onChange: (value: string) => void;
-}> = ({ options, value, onChange }) => {
+  disabled?: boolean;
+}> = ({ options, value, onChange, disabled = false }) => {
   const activeIndex = options.indexOf(value);
   const slideWidth = `${100 / options.length}%`;
   const slideLeft = `${activeIndex * (100 / options.length)}%`;
@@ -71,20 +81,19 @@ export const SegmentedControlMulti: React.FC<{
     <div 
       className="relative flex overflow-hidden rounded-[20px] p-1"
       style={{
-        background:
-          'linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(9, 16, 28, 0.88) 100%)',
-        border: '1px solid rgba(148, 163, 184, 0.08)',
+        background: 'var(--settings-segment-shell-bg)',
+        border: '1px solid var(--settings-segment-shell-border)',
+        boxShadow: 'var(--settings-segment-shell-shadow)',
       }}
     >
       {/* 滑动背景 */}
       <div
         className="absolute bottom-1 top-1 rounded-[16px] transition-all duration-200 ease-out"
         style={{
-          background:
-            'linear-gradient(135deg, rgba(96, 165, 250, 0.28) 0%, rgba(16, 185, 129, 0.14) 100%)',
+          background: 'var(--settings-segment-active-bg)',
           left: slideLeft,
           width: slideWidth,
-          boxShadow: '0 12px 26px rgba(37, 99, 235, 0.18)',
+          boxShadow: 'var(--settings-segment-active-shadow)',
         }}
       />
       
@@ -92,8 +101,13 @@ export const SegmentedControlMulti: React.FC<{
         <button
           key={option}
           type="button"
-          onClick={() => onChange(option)}
-          className="relative z-10 min-w-0 flex-1 overflow-hidden rounded-[16px] px-2 py-2.5 text-ellipsis whitespace-nowrap text-sm font-medium transition-colors duration-200 active:scale-95"
+          onClick={() => {
+            if (!disabled) {
+              onChange(option);
+            }
+          }}
+          disabled={disabled}
+          className="relative z-10 min-w-0 flex-1 overflow-hidden rounded-[16px] px-2 py-2.5 text-ellipsis whitespace-nowrap text-sm font-medium transition-colors duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             color: value === option ? 'var(--text-primary)' : 'var(--text-secondary)',
           }}
@@ -116,9 +130,9 @@ export const IconGrid: React.FC<{
     <div 
       className="flex gap-1.5 overflow-hidden rounded-[22px] p-2"
       style={{
-        background:
-          'linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(9, 16, 28, 0.88) 100%)',
-        border: '1px solid rgba(148, 163, 184, 0.08)',
+        background: 'var(--settings-segment-shell-bg)',
+        border: '1px solid var(--settings-segment-shell-border)',
+        boxShadow: 'var(--settings-segment-shell-shadow)',
       }}
     >
       <div 
@@ -139,8 +153,9 @@ export const IconGrid: React.FC<{
                 height: '52px',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                 background: isActive
-                  ? 'linear-gradient(135deg, rgba(96, 165, 250, 0.24) 0%, rgba(59, 130, 246, 0.08) 100%)'
+                  ? 'var(--settings-segment-active-bg)'
                   : 'transparent',
+                boxShadow: isActive ? 'var(--settings-segment-active-shadow)' : 'none',
               }}
             >
               <div className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -165,7 +180,8 @@ export const SettingInput: React.FC<{
   placeholder?: string;
   type?: 'text' | 'password' | 'number';
   helper?: string;
-}> = ({ label, value, onChange, placeholder, type = 'text', helper }) => {
+  disabled?: boolean;
+}> = ({ label, value, onChange, placeholder, type = 'text', helper, disabled = false }) => {
   return (
     <label className="block">
       <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
@@ -176,12 +192,12 @@ export const SettingInput: React.FC<{
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
+        disabled={disabled}
+        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
-          borderColor: 'var(--settings-border-subtle)',
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, transparent 100%), var(--settings-surface-overlay)',
-          boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.03)',
+          borderColor: 'var(--settings-input-border)',
+          background: 'var(--settings-input-bg)',
+          boxShadow: 'var(--settings-input-shadow)',
         }}
       />
       {helper && (
@@ -199,7 +215,8 @@ export const SettingToggle: React.FC<{
   checked: boolean;
   onChange: (checked: boolean) => void;
   helper?: string;
-}> = ({ label, checked, onChange, helper }) => {
+  disabled?: boolean;
+}> = ({ label, checked, onChange, helper, disabled = false }) => {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
@@ -214,8 +231,13 @@ export const SettingToggle: React.FC<{
       </div>
       <button
         type="button"
-        onClick={() => onChange(!checked)}
-        className="relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200"
+        onClick={() => {
+          if (!disabled) {
+            onChange(!checked);
+          }
+        }}
+        disabled={disabled}
+        className="relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           background: checked
             ? 'linear-gradient(90deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%)'
@@ -241,7 +263,8 @@ export const SettingSelect: React.FC<{
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
   helper?: string;
-}> = ({ label, value, options, onChange, helper }) => {
+  disabled?: boolean;
+}> = ({ label, value, options, onChange, helper, disabled = false }) => {
   return (
     <label className="block">
       <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
@@ -250,16 +273,23 @@ export const SettingSelect: React.FC<{
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none"
+        disabled={disabled}
+        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
-          borderColor: 'var(--settings-border-subtle)',
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, transparent 100%), var(--settings-surface-overlay)',
-          boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.03)',
+          borderColor: 'var(--settings-input-border)',
+          background: 'var(--settings-input-bg)',
+          boxShadow: 'var(--settings-input-shadow)',
         }}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value} style={{ backgroundColor: '#0f172a' }}>
+          <option
+            key={option.value}
+            value={option.value}
+            style={{
+              backgroundColor: 'var(--settings-option-bg)',
+              color: 'var(--settings-option-text)',
+            }}
+          >
             {option.label}
           </option>
         ))}

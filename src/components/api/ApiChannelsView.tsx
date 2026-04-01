@@ -400,11 +400,15 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
             finalModels = [...DEFAULT_GOOGLE_MODELS];
         }
 
+        const trimmedKey = formKey.trim();
+        const normalizedBaseUrl = formBaseUrl.trim();
+        const hasFormKey = trimmedKey.length > 0;
+
         const keyData = {
             name: formName.trim() || defaultApiChannelName,
-            key: formKey.trim(),
+            key: trimmedKey,
             provider: formProvider as any, // Cast to any or Provider to fix type error
-            baseUrl: formBaseUrl.trim(),
+            baseUrl: normalizedBaseUrl,
             compatibilityMode: formCompatibility,
             supportedModels: finalModels,
             budgetLimit: formBudgetLimit,
@@ -418,17 +422,22 @@ export const ApiChannelsView = ({ mode = 'dispatch' }: { mode?: 'dispatch' | 'as
             formVideoModels,
             formChatModels,
             formOtherModels,
-            keyData
+            hasKey: hasFormKey,
+            provider: formProvider,
+            baseUrl: normalizedBaseUrl
         });
 
         let result;
         if (editingId) {
             await keyManager.updateKey(editingId, keyData);
         } else {
-            result = await keyManager.addKey(formKey.trim(), keyData);
+            result = await keyManager.addKey(trimmedKey, keyData);
         }
 
-        console.log('[ApiChannelsView] 保存结果:', result);
+        console.log('[ApiChannelsView] 保存结果:', {
+            editingId: editingId || null,
+            success: result ? result.success !== false : true
+        });
 
         if (result && !result.success) {
             console.error('[ApiChannelsView] 保存失败:', result.error);

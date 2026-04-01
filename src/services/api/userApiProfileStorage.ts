@@ -1,12 +1,12 @@
-import type { ApiResponse } from '../../../packages/contracts/src/index';
-import type { ApiProtocolFormat } from './apiConfig';
-import { legacyWebApiClient } from './kkApiClient';
-import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth';
-import { extractUserApiEntriesFromPayload } from './userApiPayload';
+import type { ApiResponse } from '../../../packages/contracts/src/index.ts';
+import type { ApiProtocolFormat } from './apiConfig.ts';
+import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
+import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth.ts';
+import { extractUserApiEntriesFromPayload } from './userApiPayload.ts';
 import {
   loadUserApisPayloadViaSupabase,
   mergeUserApisPayloadViaSupabase,
-} from './supabaseUserApiCloudStorage';
+} from './supabaseUserApiCloudStorage.ts';
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
@@ -157,34 +157,160 @@ function unwrapOrThrow<T>(response: ApiResponse<T>, fallback: string): T {
   throw new Error(response.error?.message || fallback);
 }
 
+function isUsableStoredSecret(value: unknown): boolean {
+  const normalized = String(value || '').trim();
+  return Boolean(
+    normalized
+    && normalized !== 'sk-readonly-0000'
+    && normalized !== '[object Object]'
+    && !normalized.startsWith('__kk_redacted__:')
+  );
+}
+
+function resolveEntryRevision(entry: StoredUserApiEntry): number {
+  return Math.max(
+    toTimestamp(entry.updatedAt, 0),
+    toTimestamp(entry.createdAt, 0),
+  );
+}
+
+function mergeUserApiEntrySets(
+  localEntries: StoredUserApiEntry[],
+  cloudEntries: StoredUserApiEntry[],
+): StoredUserApiEntry[] {
+  const mergedById = new Map<string, StoredUserApiEntry>();
+
+  const mergeCandidate = (candidate: StoredUserApiEntry, source: 'local' | 'cloud') => {
+    const id = String(candidate.id || '').trim();
+    if (!id) {
+      return;
+    }
+
+    const existing = mergedById.get(id);
+    if (!existing) {
+      mergedById.set(id, { ...candidate });
+      return;
+    }
+
+    const existingRevision = resolveEntryRevision(existing);
+    const candidateRevision = resolveEntryRevision(candidate);
+    const preferCandidate =
+      candidateRevision > existingRevision
+      || (candidateRevision === existingRevision && source === 'local');
+
+    const newer = preferCandidate ? candidate : existing;
+    const older = preferCandidate ? existing : candidate;
+
+    mergedById.set(id, {
+      ...older,
+      ...newer,
+      key: isUsableStoredSecret(newer.key)
+        ? newer.key
+        : isUsableStoredSecret(older.key)
+          ? older.key
+          : newer.key,
+    });
+  };
+
+  cloudEntries.forEach((entry) => mergeCandidate(entry, 'cloud'));
+  localEntries.forEach((entry) => mergeCandidate(entry, 'local'));
+
+  return Array.from(mergedById.values())
+    .sort((left, right) => resolveEntryRevision(right) - resolveEntryRevision(left));
+}
+
+function areEntrySetsEquivalent(
+  left: StoredUserApiEntry[],
+  right: StoredUserApiEntry[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
+  if (!shouldUseLegacyWebApiFallback()) {
+    return [];
+  }
+
+  const response = await legacyWebApiClient.getUserApiEntries();
+  const data = unwrapOrThrow(response, 'Failed to load local user API entries.');
+  return normalizeEntries(data.entries);
+}
+
+async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Promise<void> {
+  if (!shouldUseLegacyWebApiFallback()) {
+    return;
+  }
+
+  const response = await legacyWebApiClient.replaceUserApiEntries({
+    entries,
+  });
+
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to save local user API entries.');
+  }
+}
+
 export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
-  let supabaseEntries: StoredUserApiEntry[] = [];
-  let supabaseError: unknown = null;
+  const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
+  let localEntries: StoredUserApiEntry[] = [];
+  let localError: unknown = null;
+
+  if (canUseLegacyWebApi) {
+    try {
+      localEntries = await loadLocalUserApiEntriesViaApi();
+    } catch (error) {
+      localError = error;
+    }
+  }
+
+  let cloudEntries: StoredUserApiEntry[] = [];
+  let cloudError: unknown = null;
 
   try {
     const supabasePayload = await loadUserApisPayloadViaSupabase();
-    supabaseEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
+    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
   } catch (error) {
-    supabaseError = error;
+    cloudError = error;
   }
 
-  try {
-    const response = await legacyWebApiClient.getUserApiEntries();
-    const data = unwrapOrThrow(response, 'Failed to load user API entries.');
-    const apiEntries = normalizeEntries(data.entries);
-    return supabaseEntries.length > 0 ? supabaseEntries : apiEntries;
-  } catch (apiError) {
-    if (supabaseEntries.length > 0) {
-      return supabaseEntries;
+  const mergedEntries = mergeUserApiEntrySets(localEntries, cloudEntries);
+  if (mergedEntries.length > 0) {
+    if (
+      canUseLegacyWebApi
+      && (localEntries.length === 0 || !areEntrySetsEquivalent(localEntries, mergedEntries))
+    ) {
+      void saveLocalUserApiEntriesViaApi(mergedEntries).catch((error) => {
+        console.warn('[userApiProfileStorage] Failed to seed local user API store from merged payload:', error);
+      });
     }
 
-    const fallbackError = supabaseError || apiError;
+    if (cloudEntries.length === 0 || !areEntrySetsEquivalent(cloudEntries, mergedEntries)) {
+      void mergeUserApisPayloadViaSupabase({
+        entries: mergedEntries,
+      }).catch((error) => {
+        if (!isKkApiPersistenceUnavailableError(error)) {
+          console.warn('[userApiProfileStorage] Failed to sync merged user API payload to cloud:', error);
+        }
+      });
+    }
+
+    return mergedEntries;
+  }
+
+  const fallbackError = (canUseLegacyWebApi ? localError : null) || cloudError;
+  if (fallbackError) {
     throw new Error(
       typeof fallbackError === 'object' && fallbackError && 'message' in fallbackError
         ? String((fallbackError as { message?: unknown }).message || 'Failed to load user API entries.')
-        : 'Failed to load user API entries.'
+        : 'Failed to load user API entries.',
     );
   }
+
+  return [];
 }
 
 export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise<void> {
@@ -195,30 +321,43 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
     }),
   );
 
+  const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
+  let localError: unknown = null;
+  let localSaveSucceeded = false;
+
+  if (canUseLegacyWebApi) {
+    try {
+      await saveLocalUserApiEntriesViaApi(normalizedEntries);
+      localSaveSucceeded = true;
+    } catch (error) {
+      localError = error;
+    }
+  }
+
   try {
     await mergeUserApisPayloadViaSupabase({
       entries: normalizedEntries,
     });
     return;
   } catch (supabaseError) {
-    if (isKkApiPersistenceUnavailableError(supabaseError)) {
-      throw supabaseError;
-    }
-
-    const response = await legacyWebApiClient.replaceUserApiEntries({
-      entries: normalizedEntries,
-    });
-
-    if (response.success) {
+    if (localSaveSucceeded && isKkApiPersistenceUnavailableError(supabaseError)) {
       return;
     }
 
-    throw new Error(
-      response.error?.message
-      || (typeof supabaseError === 'object' && supabaseError && 'message' in supabaseError
-        ? String((supabaseError as { message?: unknown }).message || 'Failed to save user API entries.')
-        : 'Failed to save user API entries.')
-    );
+    if (localSaveSucceeded) {
+      console.warn('[userApiProfileStorage] Cloud sync failed after local save, keeping local copy as source of truth:', supabaseError);
+      return;
+    }
+
+    if (localError) {
+      throw new Error(
+        typeof localError === 'object' && localError && 'message' in localError
+          ? String((localError as { message?: unknown }).message || 'Failed to save user API entries.')
+          : 'Failed to save user API entries.',
+      );
+    }
+
+    throw supabaseError;
   }
 }
 

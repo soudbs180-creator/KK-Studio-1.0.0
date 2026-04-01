@@ -1,0 +1,228 @@
+[run-api-dev] SUPABASE_SERVICE_ROLE_KEY is missing or still using a placeholder. The local API will fall back to in-memory repositories until a real service role key is configured.
+{"level":"WARN","message":"Falling back to file-backed local auth data repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.142Z"}
+{"level":"WARN","message":"Falling back to in-memory admin console repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.143Z"}
+{"level":"WARN","message":"Falling back to in-memory credit account repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.143Z"}
+{"level":"WARN","message":"Falling back to in-memory credit exchange-rate repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.143Z"}
+{"level":"WARN","message":"Falling back to in-memory credit provider repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.143Z"}
+{"level":"WARN","message":"Falling back to in-memory workspace layout repository","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.143Z"}
+{"level":"WARN","message":"WeChat auth service is disabled because Supabase admin config is unavailable.","context":{"service":"apps/api","hasSupabaseUrl":true,"hasServiceRoleKey":false,"hasAuthKey":true,"hasUserApiEncryptionSecret":true,"usingPublicUrlFallback":false},"timestamp":"2026-03-31T06:02:29.145Z"}
+[2m15:37:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+[2m15:37:28[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:39:09[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:41:34[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:41:41[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:42:45[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:43:59[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:44:47[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:44:50[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+[2m15:44:59[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+C:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts:376:93: ERROR: Unterminated string literal[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Users/Administrator/Downloads/KK-Studio-1.0.0/src/services/admin/supabaseAdminFallbackService.ts[39m:376:93
+[33m  
+  [33mUnterminated string literal[33m
+  377|    }
+  378|  
+  379|    if (typeof data === 'string' && data.trim()) {
+     |                      ^
+  380|      return {
+  381|        subjectId: data.trim(),
+  [39m
+      at failureErrorWithLog (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:1467:15)
+      at C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:736:50
+      at responseCallbacks.<computed> (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:603:9)
+      at handleIncomingPacket (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:658:12)
+      at Socket.readFromStdout (C:\Users\Administrator\Downloads\KK-Studio-1.0.0\node_modules\esbuild\lib\main.js:581:7)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

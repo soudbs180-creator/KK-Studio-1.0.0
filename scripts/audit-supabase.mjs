@@ -46,7 +46,7 @@ export const RUNTIME_TABLE_CONTRACT = Object.freeze([
   {
     name: "provider_pricing_cache",
     role: "runtime",
-    rationale: "Current pricing cache queried by the legacy pricing/UI services.",
+    rationale: "Current provider pricing snapshot cache served through the typed model-catalog admin API.",
     target: "provider_pricing_snapshots",
   },
   {
@@ -100,7 +100,7 @@ export const TARGET_TABLE_CONTRACT = Object.freeze([
   },
   {
     name: "provider_pricing_snapshots",
-    bridge: "provider_pricing_cache remains the current runtime pricing cache.",
+    bridge: "provider_pricing_cache remains the current runtime pricing snapshot store behind the model-catalog admin API.",
   },
   {
     name: "workspaces",

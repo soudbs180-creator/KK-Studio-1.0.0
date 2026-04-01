@@ -3,19 +3,28 @@ import { randomUUID } from "node:crypto";
 import type {
   KeyManagerCloudStateDto,
   ReplaceKeyManagerCloudStateRequestDto,
+  SecureProxyUserRouteConfigDto,
   TempUserSessionDto,
   UserApiEntryDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import {
-  extractKeyManagerCloudState,
-  extractUserApiEntriesFromPayload,
   mergeUserApisPayload,
+  resolveSecureProxyUserRouteConfig,
+  sanitizeKeyManagerCloudStateForClient,
+  sanitizeUserApiEntriesForClient,
 } from "./user-api-payload.ts";
 
 export interface AuthDataRepository {
   listUserApiEntries(userId: string, email?: string): Promise<UserApiEntryDto[]>;
   replaceUserApiEntries(userId: string, email: string | undefined, entries: UserApiEntryDto[]): Promise<UserApiEntryDto[]>;
   getKeyManagerCloudState(userId: string, email?: string): Promise<KeyManagerCloudStateDto>;
+  getUserApisPayload(userId: string, email?: string): Promise<unknown>;
+  replaceUserApisPayload(userId: string, email: string | undefined, payload: unknown): Promise<void>;
+  resolveSecureProxyUserRouteConfig(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+  ): Promise<SecureProxyUserRouteConfigDto | null>;
   replaceKeyManagerCloudState(
     userId: string,
     email: string | undefined,
@@ -56,6 +65,30 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
   async getKeyManagerCloudState(userId: string, email?: string): Promise<KeyManagerCloudStateDto> {
     const profile = this.ensureProfile(userId, email);
     return this.extractKeyManagerState(profile.userApisPayload);
+  }
+
+  async getUserApisPayload(userId: string, email?: string): Promise<unknown> {
+    const profile = this.ensureProfile(userId, email);
+    return profile.userApisPayload;
+  }
+
+  async replaceUserApisPayload(
+    userId: string,
+    email: string | undefined,
+    payload: unknown,
+  ): Promise<void> {
+    const profile = this.ensureProfile(userId, email);
+    profile.userApisPayload = payload;
+    this.profiles.set(userId, profile);
+  }
+
+  async resolveSecureProxyUserRouteConfig(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+  ): Promise<SecureProxyUserRouteConfigDto | null> {
+    const profile = this.ensureProfile(userId, email);
+    return resolveSecureProxyUserRouteConfig(profile.userApisPayload, routeId);
   }
 
   async replaceKeyManagerCloudState(
@@ -107,16 +140,14 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
   }
 
   private extractEntries(raw: unknown): UserApiEntryDto[] {
-    const entries = extractUserApiEntriesFromPayload(raw);
+    const entries = sanitizeUserApiEntriesForClient(raw);
     return Array.isArray(entries)
-      ? entries
-          .filter((entry): entry is UserApiEntryDto => Boolean(entry) && typeof entry === "object")
-          .map((entry) => ({ ...entry }))
+      ? entries.map((entry) => entry as unknown as UserApiEntryDto)
       : [];
   }
 
   private extractKeyManagerState(raw: unknown): KeyManagerCloudStateDto {
-    const payload = extractKeyManagerCloudState(raw);
+    const payload = sanitizeKeyManagerCloudStateForClient(raw);
     return {
       version: payload.version,
       slots: payload.slots.map((slot) => ({ ...slot })),

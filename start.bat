@@ -3,7 +3,7 @@ chcp 65001 >nul
 cls
 
 echo ================================================
-echo    KK Studio - Dev Server
+echo    KK Studio - Stable Dev Server
 echo ================================================
 echo.
 
@@ -35,15 +35,15 @@ if not exist "node_modules" (
 
 REM Start server
 echo.
-echo [START] Starting dev server...
+echo [START] Starting stable dev server...
 echo.
 echo ----------------------------------------
 echo  URL: http://localhost:3000
-echo  Press Ctrl+C to stop
+echo  Stop: npm run dev:stop
 echo ----------------------------------------
 echo.
 
-npm run dev
+powershell -ExecutionPolicy Bypass -File scripts/dev-launch.ps1 -OpenBrowser
 
 REM Handle errors
 if %errorlevel% neq 0 (
@@ -51,7 +51,8 @@ if %errorlevel% neq 0 (
     echo [ERROR] Server failed
     echo Possible reasons:
     echo   1. Port 3000 is in use
-    echo   2. Config error
+    echo   2. Port 3001 is in use
+    echo   3. Config error
     echo.
     pause
 )

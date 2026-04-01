@@ -8,6 +8,40 @@
 import { tempUserService } from './tempUserService';
 import { subscribeAuthSessionChange } from './authSessionEvents';
 import {
+    clearCloudSyncPendingFlagsOnRevisionMatch,
+    clearPendingCloudRetry,
+    createKeyManagerCloudSyncState,
+    hasPendingCloudSync,
+    markPendingProviderCloudSync,
+    markPendingStateCloudSync,
+    resetCloudSyncState,
+    schedulePendingCloudRetry,
+} from './keyManagerCloudSync';
+import {
+    BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
+    createBrowserDirectProviderChecksDisabledError,
+    getKeyManagerStorageKey,
+    getProviderStorageKey,
+    isBrowserRuntime,
+    purgeAnonymousSensitiveLocalCaches,
+    type ProviderStorageScope,
+    USER_API_LOGIN_REQUIRED_MESSAGE,
+} from './keyManagerStorage';
+import {
+    loadProvidersFromLocal,
+    persistProvidersLocal,
+} from './keyManagerProviders';
+import {
+    findLinkedProviderForSlot,
+    normalizeProviderLinkValue,
+    normalizeStoredProviders,
+} from './keyManagerProviderLinks';
+import {
+    buildEffectiveSlotFromProvider,
+    resolveProviderBudgetLimit,
+    resolveProviderTokenLimit,
+} from './keyManagerEffectiveSlot';
+import {
     type ApiProtocolFormat,
     AuthMethod,
     buildGeminiHeaders,
@@ -34,7 +68,7 @@ import {
     mergeUserApisPayloadViaSupabase,
 } from '../api/supabaseUserApiCloudStorage';
 import { isKkApiPersistenceUnavailableError } from '../api/kkApiServerHealth';
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
@@ -43,7 +77,14 @@ import { MODEL_REGISTRY } from '../model/modelRegistry';
 import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
 import { requestCostSync } from '../billing/costSyncBridge';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot, type ProviderPricingSnapshot } from './providerPricingSnapshot';
-import { fetchRawPricingCatalog, fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
+import {
+    cacheProviderPricingByBaseUrl,
+    fetchRawPricingCatalog,
+    fetchWuyinPricingCatalog,
+    getCachedPricingByBaseUrl,
+    selectWuyinCatalogModels,
+    type ModelPricingInfo,
+} from '../billing/newApiPricingService';
 import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
 import { notify } from '../system/notificationService';
 
@@ -180,6 +221,145 @@ function matchesProviderRouteSuffix(
 }
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
+
+function toFiniteNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return undefined;
+}
+
+function resolveSharedPricingModelId(item: any): string {
+    const candidates = [
+        item?.model,
+        item?.modelId,
+        item?.id,
+        item?.model_name,
+        item?.modelName,
+        item?.name,
+    ];
+
+    return candidates
+        .map((value) => String(value || '').replace(/^models\//i, '').trim())
+        .find(Boolean) || '';
+}
+
+function buildSharedPricingItemsFromRawCatalog(
+    pricingData: any[],
+    groupRatioMap?: Record<string, number>,
+    fallbackEndpointUrl?: string,
+): ModelPricingInfo[] {
+    const seen = new Set<string>();
+    const rows: ModelPricingInfo[] = [];
+    const defaultGroupRatio =
+        (groupRatioMap && Object.values(groupRatioMap).find((value) => Number.isFinite(value)))
+        || 1;
+
+    for (const item of Array.isArray(pricingData) ? pricingData : []) {
+        const modelId = resolveSharedPricingModelId(item);
+        if (!modelId) {
+            continue;
+        }
+
+        const cacheKey = modelId.toLowerCase();
+        if (seen.has(cacheKey)) {
+            continue;
+        }
+        seen.add(cacheKey);
+
+        const perRequestPrice = toFiniteNumber(item?.per_request_price ?? item?.perRequestPrice ?? item?.price_per_image ?? item?.pricePerImage);
+        const explicitInputPrice = toFiniteNumber(item?.input_price ?? item?.inputPrice);
+        const modelPrice = toFiniteNumber(item?.model_price ?? item?.modelPrice);
+        const completionPrice = toFiniteNumber(item?.output_price ?? item?.outputPrice);
+        const completionRatio = toFiniteNumber(item?.completion_ratio ?? item?.completionRatio);
+        const quotaTypeRaw =
+            item?.quota_type ?? item?.quotaType ?? item?.billing_type ?? item?.billingType ?? '';
+        const quotaType = String(quotaTypeRaw).trim().toLowerCase();
+        const isPerToken = !(quotaType === 'per_request' || perRequestPrice !== undefined);
+        const inputPrice = perRequestPrice ?? explicitInputPrice ?? modelPrice ?? 0;
+        const outputPrice = completionPrice ?? (
+            isPerToken && inputPrice > 0 && completionRatio !== undefined
+                ? inputPrice * completionRatio
+                : 0
+        );
+        const groupRatio = toFiniteNumber(item?.group_ratio ?? item?.groupRatio) ?? defaultGroupRatio;
+
+        rows.push({
+            modelId,
+            modelName: (() => {
+                const rawName = item?.model_name ?? item?.modelName ?? modelId ?? '';
+                const trimmed = String(rawName).trim();
+                return trimmed || modelId;
+            })(),
+            inputPrice: Math.max(0, inputPrice),
+            outputPrice: Math.max(0, outputPrice),
+            isPerToken,
+            groupRatio,
+            currency: String(item?.currency || 'USD').trim() || 'USD',
+            billingUnit: (() => {
+                const rawUnit = item?.billing_unit ?? item?.pay_unit ?? '';
+                const trimmed = String(rawUnit).trim();
+                return trimmed || undefined;
+            })(),
+            displayPrice: (() => {
+                const trimmed = String(item?.display_price ?? '').trim();
+                return trimmed || undefined;
+            })(),
+            supportsGroups: item?.supports_groups === true || item?.supportsGroups === true,
+            endpointUrl: (() => {
+                const rawUrl = item?.endpoint_url ?? item?.endpointUrl ?? fallbackEndpointUrl ?? '';
+                const trimmed = String(rawUrl).trim();
+                return trimmed || undefined;
+            })(),
+            endpointPath: (() => {
+                const rawPath = item?.endpoint_path ?? item?.endpointPath ?? '';
+                const trimmed = String(rawPath).trim();
+                return trimmed || undefined;
+            })(),
+        });
+    }
+
+    return rows;
+}
+
+function buildPricingSnapshotFromSharedCache(pricing: ModelPricingInfo[]): ProviderPricingSnapshot | undefined {
+    if (!Array.isArray(pricing) || pricing.length === 0) {
+        return undefined;
+    }
+
+    return buildProviderPricingSnapshot(
+        pricing.map((item) => ({
+            model: item.modelId,
+            model_name: item.modelName,
+            quota_type: item.isPerToken ? 'tokens' : 'per_request',
+            per_request_price: item.isPerToken ? undefined : item.inputPrice,
+            model_price: item.isPerToken ? item.inputPrice : undefined,
+            completion_ratio:
+                item.isPerToken && item.inputPrice > 0 && item.outputPrice > 0
+                    ? item.outputPrice / item.inputPrice
+                    : undefined,
+            currency: item.currency,
+            billing_unit: item.billingUnit,
+            display_price: item.displayPrice,
+            endpoint_url: item.endpointUrl,
+            endpoint_path: item.endpointPath,
+            group_ratio: item.groupRatio,
+        })),
+        undefined,
+        {
+            fetchedAt: Date.now(),
+            note: 'Loaded from shared provider pricing cache',
+        },
+    );
+}
 
 export interface KeySlot {
     id: string;
@@ -320,10 +500,6 @@ export interface ThirdPartyProvider {
     updatedAt: number;
 }
 
-function normalizeProviderLinkValue(value: string | undefined | null): string {
-    return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
-}
-
 /**
  * Preset third-party API providers
  */
@@ -456,11 +632,8 @@ function get12AIBaseUrl(): string {
     return RegionService.get12AIBaseUrl();
 }
 
-const STORAGE_KEY = 'kk_studio_key_manager';
-const PROVIDERS_STORAGE_KEY = 'kk_studio_third_party_providers';
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
-type ProviderStorageScope = 'anonymous' | 'user' | 'cloud' | 'none';
 // Legacy Gemini model IDs kept for backward-compatible migrations
 const LEGACY_GOOGLE_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
 
@@ -939,11 +1112,8 @@ export class KeyManager {
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
     private providerStorageScope: ProviderStorageScope = 'none';
-    private pendingStateCloudSync = false;
-    private pendingProviderCloudSync = false;
-    private cloudSyncRevision = 0;
+    private cloudSyncState = createKeyManagerCloudSyncState();
     private pendingCloudSyncPromise: Promise<void> | null = null;
-    private pendingCloudRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Cached global model list snapshot
     private globalModelListCache: {
@@ -1008,13 +1178,27 @@ export class KeyManager {
     }
 
     private getStorageKey(): string {
-        if (!this.userId) return STORAGE_KEY; // Default global key for anon
-        return `${STORAGE_KEY}_${this.userId}`;
+        return getKeyManagerStorageKey(this.userId);
     }
 
     private getProviderStorageKey(targetUserId: string | null = this.userId): string {
-        if (!targetUserId) return PROVIDERS_STORAGE_KEY;
-        return `${PROVIDERS_STORAGE_KEY}_${targetUserId}`;
+        return getProviderStorageKey(targetUserId);
+    }
+
+    private purgeAnonymousSensitiveLocalCaches(): void {
+        purgeAnonymousSensitiveLocalCaches();
+    }
+
+    private ensureAuthenticatedUserApiMode(): string | null {
+        if (this.userId && !tempUserService.getCachedTempUser()) {
+            return null;
+        }
+
+        return USER_API_LOGIN_REQUIRED_MESSAGE;
+    }
+
+    private getBrowserDirectProviderChecksDisabledMessage(): string {
+        return BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE;
     }
 
     /**
@@ -1061,8 +1245,11 @@ export class KeyManager {
      * Load state from localStorage
      */
     private loadState(): KeyManagerState {
+        this.purgeAnonymousSensitiveLocalCaches();
+
         try {
             const key = this.getStorageKey();
+            localStorage.removeItem(key);
             const stored = localStorage.getItem(key);
 
             // If scoped key not found, DO NOT fallback to global key to prevent leakage.
@@ -1157,52 +1344,7 @@ export class KeyManager {
     }
 
     private migrateFromOldFormat(): KeyManagerState {
-        try {
-            const oldKeys = localStorage.getItem('kk-api-keys-local');
-            if (oldKeys) {
-                const keys = JSON.parse(oldKeys) as string[];
-                const slots: KeySlot[] = keys
-                    .filter(k => k && k.trim())
-                    .map((key, i) => ({
-                        id: `key_${Date.now()}_${i}`,
-                        key: key.trim(),
-                        name: `Migrated Key ${i + 1}`,
-                        provider: 'Google',
-                        status: 'unknown' as const,
-                        failCount: 0,
-                        successCount: 0,
-                        lastUsed: null,
-                        lastError: null,
-                        disabled: false,
-                        createdAt: Date.now(),
-                        totalCost: 0,
-                        budgetLimit: -1,
-                        tokenLimit: -1,
-                        supportedModels: [...DEFAULT_GOOGLE_MODELS],
-                        baseUrl: '',
-                        authMethod: 'query',
-                        headerName: 'x-goog-api-key',
-                        type: 'official', // Default old Google keys to the official runtime type
-                        format: 'gemini',
-                        updatedAt: Date.now() // Set initial timestamp
-                    }));
-
-                if (slots.length > 0) {
-                    console.log(`[KeyManager] Migrated ${slots.length} keys from old format`);
-                    const state: KeyManagerState = {
-                        slots,
-                        currentIndex: 0,
-                        maxFailures: DEFAULT_MAX_FAILURES,
-                        rotationStrategy: 'round-robin'
-                    };
-                    this.saveState(state);
-                    return state;
-                }
-            }
-        } catch (e) {
-            console.warn('[KeyManager] Migration failed:', e);
-        }
-
+        this.purgeAnonymousSensitiveLocalCaches();
         return {
             slots: [],
             currentIndex: 0,
@@ -1227,13 +1369,12 @@ export class KeyManager {
                 // Optional: Clear existing local storage just in case
                 localStorage.removeItem(key);
 
-                this.pendingStateCloudSync = true;
-                this.cloudSyncRevision += 1;
+                markPendingStateCloudSync(this.cloudSyncState);
                 await this.flushPendingCloudSync(toSave);
             } else {
-                // Anonymous users persist only to local storage.
-                localStorage.setItem(key, JSON.stringify(toSave));
-                console.log('[KeyManager] Anonymous local state saved:', key);
+                localStorage.removeItem(key);
+                this.purgeAnonymousSensitiveLocalCaches();
+                console.warn('[KeyManager] Anonymous local key storage is disabled.');
             }
 
         } catch (e) {
@@ -1257,9 +1398,7 @@ export class KeyManager {
 
         this.userId = userId;
         this.hasHydratedCloudState = false;
-        this.pendingStateCloudSync = false;
-        this.pendingProviderCloudSync = false;
-        this.cloudSyncRevision = 0;
+        resetCloudSyncState(this.cloudSyncState);
         this.loadProviders(true);
 
         if (userId) {
@@ -1342,7 +1481,7 @@ export class KeyManager {
             && cloudProviders.length === 0
             && this.providers.length > 0
             && (
-                this.pendingProviderCloudSync
+                this.cloudSyncState.pendingProviderCloudSync
                 || this.providerStorageScope === 'user'
                 || this.providerStorageScope === 'none'
             );
@@ -1460,22 +1599,27 @@ export class KeyManager {
         try {
             this.isSyncing = true;
             console.log('[KeyManager] Loading cloud state via API/Supabase...');
-            const accessToken = await getPreferredKkApiAccessToken();
+            const canUseLegacyApi = shouldUseLegacyWebApiFallback();
+            const accessToken = canUseLegacyApi
+                ? await getPreferredKkApiAccessToken()
+                : undefined;
 
             let apiPayload: unknown = null;
             let apiError: unknown = null;
 
-            try {
-                const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
-                if (response.success) {
-                    apiPayload = response.data;
-                } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
-                    apiError = new Error(response.error.message || 'Cloud fetch failed.');
-                    console.warn('[KeyManager] Cloud fetch via API failed:', response.error);
+            if (canUseLegacyApi) {
+                try {
+                    const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
+                    if (response.success) {
+                        apiPayload = response.data;
+                    } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
+                        apiError = new Error(response.error.message || 'Cloud fetch failed.');
+                        console.warn('[KeyManager] Cloud fetch via API failed:', response.error);
+                    }
+                } catch (error) {
+                    apiError = error;
+                    console.warn('[KeyManager] Cloud fetch via API threw:', error);
                 }
-            } catch (error) {
-                apiError = error;
-                console.warn('[KeyManager] Cloud fetch via API threw:', error);
             }
 
             let supabasePayload: unknown = null;
@@ -1494,16 +1638,38 @@ export class KeyManager {
             const apiDensity = getUserApisPayloadDensity(apiPayload);
             const supabaseDensity = getUserApisPayloadDensity(supabasePayload);
             const preferredPayload =
-                supabaseDensity > 0
-                    ? supabasePayload
-                    : apiDensity > 0
-                        ? apiPayload
-                        : supabasePayload ?? apiPayload;
+                apiDensity > 0
+                    ? apiPayload
+                    : supabaseDensity > 0
+                        ? supabasePayload
+                        : apiPayload ?? supabasePayload;
 
             const hasLocalState = this.state.slots.length > 0 || this.providers.length > 0;
             if ((preferredPayload == null || getUserApisPayloadDensity(preferredPayload) === 0) && hasLocalState && (apiError || supabaseError)) {
                 console.warn('[KeyManager] Cloud payload empty during degraded sync, preserving local state.');
                 return;
+            }
+
+            if (canUseLegacyApi && apiDensity === 0 && supabaseDensity > 0) {
+                const normalizedCloudPayload = isUserApisEnvelope(supabasePayload)
+                    ? supabasePayload as { version?: number; slots?: unknown[]; providers?: unknown[] }
+                    : {
+                        version: 2,
+                        slots: extractKeyManagerCloudSlots(supabasePayload),
+                        providers: extractUserApiProvidersFromPayload(supabasePayload),
+                    };
+
+                void legacyWebApiClient.replaceKeyManagerCloudState({
+                    version: Number(normalizedCloudPayload.version || 2),
+                    slots: Array.isArray(normalizedCloudPayload.slots)
+                        ? normalizedCloudPayload.slots as Record<string, unknown>[]
+                        : [],
+                    providers: Array.isArray(normalizedCloudPayload.providers)
+                        ? normalizedCloudPayload.providers as Record<string, unknown>[]
+                        : [],
+                }, { accessToken }).catch((error) => {
+                    console.warn('[KeyManager] Failed to seed local key-manager store from cloud payload:', error);
+                });
             }
 
             const shouldPreserveLocalProviders =
@@ -1578,8 +1744,8 @@ export class KeyManager {
         }
 
         try {
-            const accessToken = await getPreferredKkApiAccessToken();
-            console.log('[KeyManager] Uploading key-manager cloud state via API...', {
+            const canUseLegacyApi = shouldUseLegacyWebApiFallback();
+            console.log('[KeyManager] Uploading key-manager state via local API/cloud sync...', {
                 userId: activeUserId,
                 slotCount: state.slots.length
             });
@@ -1588,6 +1754,45 @@ export class KeyManager {
                 this.hasHydratedCloudState || this.providers.length > 0
                     ? this.providers
                     : undefined;
+
+            let localApiPayload: unknown = null;
+            let localApiError: Error | null = null;
+
+            if (canUseLegacyApi) {
+                const accessToken = await getPreferredKkApiAccessToken();
+                const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+                    version: 2,
+                    slots: state.slots as unknown as Record<string, unknown>[],
+                    providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                }, { accessToken });
+
+                if (response.success) {
+                    localApiPayload = response.data;
+                } else {
+                    const errorCode = response.error?.code || 'UNKNOWN_ERROR';
+                    const errorMessage = response.error?.message || 'Unknown local API sync failure.';
+                    const isNetworkError = errorCode === 'NETWORK_ERROR'
+                        || errorMessage.includes('fetch')
+                        || errorMessage.includes('Network');
+
+                    if (isNetworkError) {
+                        console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21\u672C\u5730 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
+                        this.cloudSyncBackoffUntil = Date.now() + 30_000;
+                        localApiError = new Error(errorMessage);
+                    } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
+                        console.error('[KeyManager] Local API session is missing or expired, postponing sync.');
+                        this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
+                        localApiError = new Error(errorMessage);
+                    } else {
+                        console.error('[KeyManager] Local API sync failed!', {
+                            code: errorCode,
+                            message: errorMessage,
+                            details: response.error?.details,
+                        });
+                        localApiError = new Error(errorMessage);
+                    }
+                }
+            }
 
             try {
                 const savedPayload = await mergeUserApisPayloadViaSupabase({
@@ -1607,66 +1812,47 @@ export class KeyManager {
                 requestCostSync().catch(console.error);
                 return;
             } catch (supabaseError) {
-                if (isKkApiPersistenceUnavailableError(supabaseError)) {
+                if (!localApiError && isKkApiPersistenceUnavailableError(supabaseError)) {
                     this.cloudSyncBackoffUntil = Date.now() + 60_000;
-                    if (options?.throwOnError) {
-                        throw supabaseError;
+                    if (this.userId === activeUserId && localApiPayload) {
+                        this.hasHydratedCloudState = true;
+                        this.applyCloudPayload(localApiPayload);
                     }
-                    return;
+                    throw supabaseError;
                 }
 
-                console.warn('[KeyManager] Supabase cloud sync failed, falling back to API route:', supabaseError);
-            }
+                if (!localApiError) {
+                    console.warn('[KeyManager] Cloud sync failed after local save, preserving local key-manager state:', supabaseError);
+                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
 
-            const response = await legacyWebApiClient.replaceKeyManagerCloudState({
-                version: 2,
-                slots: state.slots as unknown as Record<string, unknown>[],
-                providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
-            }, { accessToken });
+                    if (this.userId === activeUserId && localApiPayload) {
+                        this.hasHydratedCloudState = true;
+                        this.applyCloudPayload(localApiPayload);
+                    }
+
+                    throw supabaseError;
+                }
+
+                if (isKkApiPersistenceUnavailableError(supabaseError)) {
+                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
+                }
+            }
 
             if (this.userId !== activeUserId) {
                 return;
             }
 
-            if (!response.success) {
-                const errorCode = response.error?.code || 'UNKNOWN_ERROR';
-                const errorMessage = response.error?.message || 'Unknown cloud sync failure.';
-                const isNetworkError = errorCode === 'NETWORK_ERROR'
-                    || errorMessage.includes('fetch')
-                    || errorMessage.includes('Network');
-                if (isNetworkError) {
-                    console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
-                    this.cloudSyncBackoffUntil = Date.now() + 30_000;
-                    if (options?.throwOnError) {
-                        throw new Error(errorMessage);
-                    }
-                    return;
-                }
-
-                console.error('[KeyManager] API cloud sync failed!', {
-                    code: errorCode,
-                    message: errorMessage,
-                    details: response.error?.details,
-                });
-
-                if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
-                    console.error('[KeyManager] Session is missing or expired, postponing cloud sync.');
-                    this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
-                    if (options?.throwOnError) {
-                        throw new Error(errorMessage);
-                    }
-                    return;
-                }
-
-                throw new Error(errorMessage);
+            if (localApiPayload) {
+                this.hasHydratedCloudState = true;
+                this.applyCloudPayload(localApiPayload);
+                this.cloudSyncBackoffUntil = 0;
+                requestCostSync().catch(console.error);
+                return;
             }
 
-            this.hasHydratedCloudState = true;
-            this.applyCloudPayload(response.data);
-            console.log('[KeyManager] API cloud sync succeeded!');
-            this.cloudSyncBackoffUntil = 0;
-
-            requestCostSync().catch(console.error);
+            if (localApiError) {
+                throw localApiError;
+            }
         } catch (e: any) {
             if (isKkApiPersistenceUnavailableError(e)) {
                 this.schedulePendingCloudRetry();
@@ -1688,32 +1874,21 @@ export class KeyManager {
     }
 
     private hasPendingCloudSync(): boolean {
-        return this.pendingStateCloudSync || this.pendingProviderCloudSync;
+        return hasPendingCloudSync(this.cloudSyncState);
     }
 
     private clearPendingCloudRetry(): void {
-        if (!this.pendingCloudRetryTimer) {
-            return;
-        }
-
-        clearTimeout(this.pendingCloudRetryTimer);
-        this.pendingCloudRetryTimer = null;
+        clearPendingCloudRetry(this.cloudSyncState);
     }
 
     private schedulePendingCloudRetry(): void {
-        if (!this.userId || !this.hasPendingCloudSync()) {
-            return;
-        }
-
-        if (this.pendingCloudRetryTimer) {
-            return;
-        }
-
-        const waitMs = Math.max(1000, this.cloudSyncBackoffUntil - Date.now(), 3000);
-        this.pendingCloudRetryTimer = setTimeout(() => {
-            this.pendingCloudRetryTimer = null;
-            void this.flushPendingCloudSync();
-        }, waitMs);
+        schedulePendingCloudRetry(this.cloudSyncState, {
+            userId: this.userId,
+            cloudSyncBackoffUntil: this.cloudSyncBackoffUntil,
+            onRetry: () => {
+                void this.flushPendingCloudSync();
+            },
+        });
     }
 
     private async flushPendingCloudSync(state: KeyManagerState = this.state): Promise<void> {
@@ -1731,12 +1906,9 @@ export class KeyManager {
         }
 
         this.clearPendingCloudRetry();
-        const syncRevision = this.cloudSyncRevision;
+        const syncRevision = this.cloudSyncState.cloudSyncRevision;
         this.pendingCloudSyncPromise = this.saveToCloud(state).then(() => {
-            if (this.cloudSyncRevision === syncRevision) {
-                this.pendingStateCloudSync = false;
-                this.pendingProviderCloudSync = false;
-            }
+            clearCloudSyncPendingFlagsOnRevisionMatch(this.cloudSyncState, syncRevision);
         }).catch((error) => {
             console.error('[KeyManager] Failed to sync key-manager state to cloud:', error);
         }).finally(() => {
@@ -1823,6 +1995,13 @@ export class KeyManager {
         headerName?: string,
         format?: ApiProtocolFormat
     ): Promise<{ success: boolean, message?: string }> {
+        if (isBrowserRuntime()) {
+            return {
+                success: false,
+                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+            };
+        }
+
         try {
             // Sanitize input key before connectivity test
             const cleanKey = key.replace(/[^\x00-\x7F]/g, "").trim();
@@ -1927,6 +2106,11 @@ export class KeyManager {
         provider?: Provider | string,
         format?: ApiProtocolFormat
     ): Promise<string[]> {
+        if (isBrowserRuntime()) {
+            console.warn('[KeyManager] Browser-side remote model discovery is disabled.');
+            return [];
+        }
+
         try {
             const cleanUrl = baseUrl.replace(/\/chat\/completions$/, '').replace(/\/$/, '');
             const runtime = resolveProviderRuntime({
@@ -2104,27 +2288,11 @@ export class KeyManager {
     }
 
     private resolveProviderBudgetLimit(provider: ThirdPartyProvider): number {
-        if (typeof provider.budgetLimit === 'number' && Number.isFinite(provider.budgetLimit)) {
-            return provider.budgetLimit;
-        }
-
-        if (provider.customCostMode === 'amount' && typeof provider.customCostValue === 'number' && Number.isFinite(provider.customCostValue)) {
-            return provider.customCostValue;
-        }
-
-        return -1;
+        return resolveProviderBudgetLimit(provider);
     }
 
     private resolveProviderTokenLimit(provider: ThirdPartyProvider): number {
-        if (typeof provider.tokenLimit === 'number' && Number.isFinite(provider.tokenLimit)) {
-            return provider.tokenLimit;
-        }
-
-        if (provider.customCostMode === 'tokens' && typeof provider.customCostValue === 'number' && Number.isFinite(provider.customCostValue)) {
-            return provider.customCostValue;
-        }
-
-        return -1;
+        return resolveProviderTokenLimit(provider);
     }
 
     private isUsageLimitExceeded(target: {
@@ -2816,6 +2984,11 @@ export class KeyManager {
         customHeaders?: Record<string, string>;
         customBody?: Record<string, any>;
     }): Promise<{ success: boolean; error?: string; id?: string }> {
+        const secureModeError = this.ensureAuthenticatedUserApiMode();
+        if (secureModeError) {
+            return { success: false, error: secureModeError };
+        }
+
         // Sanitize the input key before validation: trim whitespace and remove non-ASCII noise
         const trimmedKey = key.replace(/[^\x00-\x7F]/g, "").trim();
 
@@ -2915,6 +3088,11 @@ export class KeyManager {
  * Update an existing API key
  */
     async updateKey(id: string, updates: Partial<KeySlot>): Promise<void> {
+        const secureModeError = this.ensureAuthenticatedUserApiMode();
+        if (secureModeError) {
+            throw new Error(secureModeError);
+        }
+
         console.log('[KeyManager] updateKey invoked:', {
             id,
             updates,
@@ -2968,6 +3146,13 @@ export class KeyManager {
      * @param syncModels If true, also fetches and returns the latest model list from the API.
      */
     async validateKey(key: string, provider: string = 'Gemini', syncModels: boolean = false): Promise<{ valid: boolean; error?: string; models?: string[] }> {
+        if (isBrowserRuntime()) {
+            return {
+                valid: false,
+                error: this.getBrowserDirectProviderChecksDisabledMessage(),
+            };
+        }
+
         if (provider !== 'Gemini' && provider !== 'Google' && provider !== 'Custom' && provider !== 'OpenAI') {
             // Other OpenAI-compatible providers are validated in refreshKey with baseUrl context.
             return { valid: true };
@@ -3059,6 +3244,11 @@ export class KeyManager {
      * Also re-sync the derived model list after refreshing.
      */
     async refreshKey(id: string): Promise<void> {
+        if (isBrowserRuntime()) {
+            console.warn('[KeyManager] Browser-side key refresh is disabled.');
+            return;
+        }
+
         const slot = this.state.slots.find(s => s.id === id);
         if (slot) {
             console.log(`[KeyManager] Refreshing key ${id} (Syncing models: YES)`);
@@ -3124,6 +3314,11 @@ export class KeyManager {
      * Re-validate all keys
      */
     async revalidateAll(): Promise<void> {
+        if (isBrowserRuntime()) {
+            console.warn('[KeyManager] Browser-side key revalidation is disabled.');
+            return;
+        }
+
         for (const slot of this.state.slots) {
             // We do NOT sync models during background revalidateAll to save bandwidth/latency,
             // unless we want to? Users requested "Reflects API capabilities", usually implies explicit action.
@@ -3546,7 +3741,7 @@ export class KeyManager {
             id: slot.id,
             name: slot.name || slot.provider || 'Unnamed Channel',
             baseUrl: slot.baseUrl || GOOGLE_API_BASE,
-            apiKey: slot.key,
+            apiKey: '',
             provider: slot.provider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(slot.format, runtime.resolvedFormat),
@@ -3578,7 +3773,7 @@ export class KeyManager {
             id: provider.id,
             name: provider.name,
             baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
+            apiKey: '',
             provider: runtime.uiProvider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(provider.format, runtime.resolvedFormat),
@@ -3762,6 +3957,11 @@ export class KeyManager {
      * 添加新的第三方供应商配置。
      */
     addProvider(config: Omit<ThirdPartyProvider, 'id' | 'usage' | 'status' | 'createdAt' | 'updatedAt'>): ThirdPartyProvider {
+        const secureModeError = this.ensureAuthenticatedUserApiMode();
+        if (secureModeError) {
+            throw new Error(secureModeError);
+        }
+
         this.loadProviders();
 
         const now = Date.now();
@@ -3798,6 +3998,11 @@ export class KeyManager {
      * Update an existing third-party provider.
      */
     updateProvider(id: string, updates: Partial<Omit<ThirdPartyProvider, 'id' | 'createdAt'>>): boolean {
+        const secureModeError = this.ensureAuthenticatedUserApiMode();
+        if (secureModeError) {
+            throw new Error(secureModeError);
+        }
+
         this.loadProviders();
 
         const index = this.providers.findIndex(p => p.id === id);
@@ -3926,58 +4131,16 @@ export class KeyManager {
     }
 
     private findLinkedProviderForSlot(slot: KeySlot): ThirdPartyProvider | null {
-        const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
-        if (!slotBaseUrl) return null;
-
-        const sameBaseProviders = this.providers.filter((provider) => {
-            if (!provider.isActive) return false;
-            return normalizeProviderLinkValue(provider.baseUrl) === slotBaseUrl;
-        });
-
-        if (sameBaseProviders.length === 0) return null;
-        if (sameBaseProviders.length === 1) return sameBaseProviders[0];
-
-        const slotName = normalizeProviderLinkValue(slot.name);
-        const slotKey = String(slot.key || '').trim();
-
-        return sameBaseProviders.find((provider) => {
-            const providerName = normalizeProviderLinkValue(provider.name);
-            const providerKey = String(provider.apiKey || '').trim();
-            return (slotName && slotName === providerName) || (slotKey && slotKey === providerKey);
-        }) || null;
+        return findLinkedProviderForSlot(slot, this.providers);
     }
 
     private buildEffectiveSlotFromProvider(slot: KeySlot, provider: ThirdPartyProvider): KeySlot {
-        const format = normalizeApiProtocolFormat(provider.format, slot.format || 'auto');
-        const runtime = resolveProviderRuntime({
-            provider: slot.provider,
-            baseUrl: provider.baseUrl,
-            format,
-            authMethod: slot.authMethod,
-            headerName: slot.headerName,
-            compatibilityMode: slot.compatibilityMode,
-        });
-
-        return {
-            ...slot,
-            key: String(provider.apiKey || '').trim(),
-            name: provider.name || slot.name,
-            baseUrl: provider.baseUrl || slot.baseUrl,
-            group: provider.group,
-            disabled: !provider.isActive,
-            budgetLimit: this.resolveProviderBudgetLimit(provider),
-            tokenLimit: this.resolveProviderTokenLimit(provider),
-            usedTokens: provider.usage?.totalTokens || 0,
-            totalCost: provider.usage?.totalCost || 0,
-            format,
-            supportedModels: provider.models?.length
-                ? normalizeModelList(provider.models, slot.provider)
-                : slot.supportedModels,
-            type: determineKeyType(slot.provider, provider.baseUrl || slot.baseUrl),
-            authMethod: runtime.authMethod as AuthMethod,
-            headerName: runtime.headerName,
-            compatibilityMode: runtime.compatibilityMode,
-        };
+        return buildEffectiveSlotFromProvider(
+            slot,
+            provider,
+            (models, providerName) => normalizeModelList(models, providerName),
+            resolveProviderRuntime,
+        );
     }
 
     /**
@@ -4058,6 +4221,13 @@ export class KeyManager {
         attemptedUrls?: string[];
         count?: number;
     }> {
+        if (isBrowserRuntime()) {
+            return {
+                ok: false,
+                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+            };
+        }
+
         this.loadProviders();
         const provider = this.providers.find(p => p.id === providerId);
         if (!provider) {
@@ -4075,6 +4245,21 @@ export class KeyManager {
             const message = `供应商 ${provider.name} 当前未暴露可抓取的价格端点，需要手动录入价格。`;
             console.info(`[KeyManager] ${message}`);
             return { ok: false, message };
+        }
+
+        if (!provider.pricingSnapshot) {
+            const sharedPricing = await getCachedPricingByBaseUrl(provider.baseUrl);
+            const cachedSnapshot = buildPricingSnapshotFromSharedCache(sharedPricing || []);
+            if (cachedSnapshot) {
+                provider.pricingSnapshot = mergeProviderPricingSnapshot(cachedSnapshot, provider.pricingSnapshot);
+                this.saveProviders();
+                this.notifyListeners();
+                return {
+                    ok: true,
+                    message: `已从共享价格缓存载入 ${sharedPricing?.length || 0} 条价格数据。`,
+                    count: sharedPricing?.length || 0,
+                };
+            }
         }
 
         try {
@@ -4109,6 +4294,16 @@ export class KeyManager {
 
             this.saveProviders();
             this.notifyListeners();
+
+            const sharedPricing = buildSharedPricingItemsFromRawCatalog(
+                result.pricingData,
+                result.groupRatio,
+                result.endpointUrl,
+            );
+            if (sharedPricing.length > 0) {
+                void cacheProviderPricingByBaseUrl(provider.baseUrl, sharedPricing);
+            }
+
             console.log(`[KeyManager] Successfully synced pricing for ${provider.name}. Models found: ${result.pricingData.length}`);
             return {
                 ok: true,
@@ -4133,81 +4328,29 @@ export class KeyManager {
      * 閿风姾娴囬摼宥呭閸熷棗鍨悰?
      */
     private normalizeStoredProviders(rawProviders: unknown): ThirdPartyProvider[] {
-        if (!Array.isArray(rawProviders)) return [];
-
-        return rawProviders.map((provider, index) => {
-            const now = Date.now();
-            const raw = ((provider && typeof provider === 'object') ? provider : {}) as Partial<ThirdPartyProvider>;
-            const usage = raw.usage || {
-                totalTokens: 0,
-                totalCost: 0,
-                dailyTokens: 0,
-                dailyCost: 0,
-                lastReset: now,
-            };
-
-            return {
-                ...raw,
-                id: String(raw.id || `provider_${now}_${index}`),
-                name: String(raw.name || 'Custom Provider'),
-                baseUrl: String(raw.baseUrl || '').trim(),
-                apiKey: String(raw.apiKey || '').trim(),
-                models: normalizeModelList(Array.isArray(raw.models) ? raw.models : [], String(raw.name || 'Custom')),
-                format: normalizeApiProtocolFormat(raw.format, 'auto'),
-                isActive: raw.isActive !== false,
-                usage: {
-                    totalTokens: Number(usage.totalTokens || 0),
-                    totalCost: Number(usage.totalCost || 0),
-                    dailyTokens: Number(usage.dailyTokens || 0),
-                    dailyCost: Number(usage.dailyCost || 0),
-                    lastReset: Number(usage.lastReset || now),
-                },
-                status: raw.status === 'active' || raw.status === 'error' || raw.status === 'checking'
-                    ? raw.status
-                    : 'checking',
-                createdAt: Number(raw.createdAt || now),
-                updatedAt: Number(raw.updatedAt || now),
-                budgetLimit: raw.budgetLimit !== undefined ? Number(raw.budgetLimit) : raw.budgetLimit,
-                tokenLimit: raw.tokenLimit !== undefined ? Number(raw.tokenLimit) : raw.tokenLimit,
-                customCostValue: raw.customCostValue !== undefined ? Number(raw.customCostValue) : raw.customCostValue,
-                lastChecked: raw.lastChecked !== undefined ? Number(raw.lastChecked) : raw.lastChecked,
-                activitySummary: raw.activitySummary ? {
-                    lastLatencyMs: raw.activitySummary.lastLatencyMs !== undefined ? Number(raw.activitySummary.lastLatencyMs) : raw.activitySummary.lastLatencyMs,
-                    lastTokens: raw.activitySummary.lastTokens !== undefined ? Number(raw.activitySummary.lastTokens) : raw.activitySummary.lastTokens,
-                    lastAmount: raw.activitySummary.lastAmount !== undefined ? Number(raw.activitySummary.lastAmount) : raw.activitySummary.lastAmount,
-                    updatedAt: raw.activitySummary.updatedAt !== undefined ? Number(raw.activitySummary.updatedAt) : raw.activitySummary.updatedAt,
-                } : undefined,
-            };
-        });
+        return normalizeStoredProviders<ThirdPartyProvider>(
+            rawProviders,
+            (models, providerName) => normalizeModelList(models, providerName),
+        );
     }
 
     private persistProvidersLocal(): void {
         try {
-            const storageKey = this.getProviderStorageKey();
-            if (this.userId) {
-                localStorage.removeItem(storageKey);
-                return;
-            }
-
-            localStorage.setItem(storageKey, JSON.stringify(this.providers));
-            this.providerStorageScope = 'anonymous';
+            this.providerStorageScope = persistProvidersLocal(this.userId);
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
         }
     }
 
     private loadProviders(force = false): void {
-        if (!force && this.providers.length > 0) return; // Already loaded
-
         try {
-            const stored = localStorage.getItem(this.getProviderStorageKey());
-            if (stored) {
-                this.providers = this.normalizeStoredProviders(JSON.parse(stored));
-                this.providerStorageScope = this.userId ? 'user' : 'anonymous';
+            const loaded = loadProvidersFromLocal(this.userId, this.providers, force);
+            if (!loaded) {
                 return;
             }
-            this.providers = [];
-            this.providerStorageScope = 'none';
+
+            this.providers = loaded.providers;
+            this.providerStorageScope = loaded.scope;
         } catch (e) {
             console.error('[KeyManager] Failed to load providers:', e);
             this.providers = [];
@@ -4222,14 +4365,13 @@ export class KeyManager {
         this.persistProvidersLocal();
 
         if (this.userId) {
-            this.pendingProviderCloudSync = true;
-            this.cloudSyncRevision += 1;
+            markPendingProviderCloudSync(this.cloudSyncState);
             void this.flushPendingCloudSync();
         }
     }
 
     private flushPendingProviderCloudSync(): void {
-        if (!this.userId || !this.pendingProviderCloudSync) {
+        if (!this.userId || !this.cloudSyncState.pendingProviderCloudSync) {
             return;
         }
 
@@ -4280,6 +4422,10 @@ export function detectApiType(apiKey: string, baseUrl?: string): 'google-officia
  * Fetch available Google models using the official models endpoint.
  */
 export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
+    if (isBrowserRuntime()) {
+        throw createBrowserDirectProviderChecksDisabledError();
+    }
+
     try {
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
@@ -4351,6 +4497,10 @@ function getDefaultGoogleModels(): string[] {
 }
 
 export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string): Promise<string[]> {
+    if (isBrowserRuntime()) {
+        throw createBrowserDirectProviderChecksDisabledError();
+    }
+
     const lowerBase = String(baseUrl || '').toLowerCase();
     if (!baseUrl || lowerBase.includes('googleapis.com') || lowerBase.includes('generativelanguage.googleapis.com')) {
         return fetchGoogleModels(apiKey);
@@ -4402,6 +4552,10 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
  * Fetch models from an OpenAI-compatible endpoint and normalize the response.
  */
 export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): Promise<string[]> {
+    if (isBrowserRuntime()) {
+        throw createBrowserDirectProviderChecksDisabledError();
+    }
+
     try {
         const runtime = resolveProviderRuntime({
             baseUrl,
@@ -4578,6 +4732,15 @@ export async function autoDetectAndConfigureModels(
     categories: ReturnType<typeof categorizeModels>;
     apiType: string;
 }> {
+    if (isBrowserRuntime()) {
+        return {
+            success: false,
+            models: [],
+            categories: categorizeModels([]),
+            apiType: 'browser-direct-disabled',
+        };
+    }
+
     const apiType = detectApiType(apiKey, baseUrl);
     const resolvedFormat = resolveApiProtocolFormat(
         preferredFormat,

@@ -5,14 +5,16 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   KeyManagerCloudStateDto,
   ReplaceKeyManagerCloudStateRequestDto,
+  SecureProxyUserRouteConfigDto,
   TempUserSessionDto,
   UserApiEntryDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import type { AuthDataRepository } from "./in-memory-auth-data-repository.ts";
 import {
-  extractKeyManagerCloudState,
-  extractUserApiEntriesFromPayload,
   mergeUserApisPayload,
+  resolveSecureProxyUserRouteConfig,
+  sanitizeKeyManagerCloudStateForClient,
+  sanitizeUserApiEntriesForClient,
 } from "./user-api-payload.ts";
 import {
   decryptUserApisPayload,
@@ -35,7 +37,7 @@ const tempUserExpiryMs = 24 * 60 * 60 * 1000;
 
 export class SupabaseAuthDataRepository implements AuthDataRepository {
   private readonly client: SupabaseClient;
-  private readonly storageEncryptionKey: string;
+  private readonly storageEncryptionKey?: string;
 
   constructor(options: SupabaseAuthDataRepositoryOptions) {
     this.client = createClient(options.supabaseUrl, options.serviceRoleKey, {
@@ -44,7 +46,7 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
         persistSession: false,
       },
     });
-    this.storageEncryptionKey = options.storageEncryptionKey || options.serviceRoleKey;
+    this.storageEncryptionKey = options.storageEncryptionKey?.trim() || undefined;
   }
 
   async listUserApiEntries(userId: string, email?: string): Promise<UserApiEntryDto[]> {
@@ -57,6 +59,7 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     email: string | undefined,
     entries: UserApiEntryDto[],
   ): Promise<UserApiEntryDto[]> {
+    this.assertWritableEncryptionConfigured();
     const existing = await this.getOrCreateProfile(userId, email);
     const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), {
       entries,
@@ -87,11 +90,52 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     return this.extractKeyManagerState(this.decryptPayload(profile?.user_apis));
   }
 
+  async getUserApisPayload(userId: string, email?: string): Promise<unknown> {
+    const profile = await this.getOrCreateProfile(userId, email);
+    return this.decryptPayload(profile?.user_apis);
+  }
+
+  async replaceUserApisPayload(
+    userId: string,
+    email: string | undefined,
+    payload: unknown,
+  ): Promise<void> {
+    this.assertWritableEncryptionConfigured();
+    const existing = await this.getOrCreateProfile(userId, email);
+    const encryptedPayload = this.encryptPayload(payload);
+
+    const { error } = await this.client
+      .from("profiles")
+      .upsert({
+        id: userId,
+        email: email || existing?.email || null,
+        user_apis: encryptedPayload,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: "id",
+        ignoreDuplicates: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async resolveSecureProxyUserRouteConfig(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+  ): Promise<SecureProxyUserRouteConfigDto | null> {
+    const profile = await this.getOrCreateProfile(userId, email);
+    return resolveSecureProxyUserRouteConfig(this.decryptPayload(profile?.user_apis), routeId);
+  }
+
   async replaceKeyManagerCloudState(
     userId: string,
     email: string | undefined,
     state: ReplaceKeyManagerCloudStateRequestDto,
   ): Promise<KeyManagerCloudStateDto> {
+    this.assertWritableEncryptionConfigured();
     const existing = await this.getOrCreateProfile(userId, email);
     const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), {
       slots: state.slots,
@@ -196,16 +240,14 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
   }
 
   private extractEntries(raw: unknown): UserApiEntryDto[] {
-    const entries = extractUserApiEntriesFromPayload(raw);
+    const entries = sanitizeUserApiEntriesForClient(raw);
     return Array.isArray(entries)
-      ? entries
-          .filter((entry): entry is UserApiEntryDto => Boolean(entry) && typeof entry === "object")
-          .map((entry) => ({ ...entry }))
+      ? entries.map((entry) => entry as unknown as UserApiEntryDto)
       : [];
   }
 
   private extractKeyManagerState(raw: unknown): KeyManagerCloudStateDto {
-    const payload = extractKeyManagerCloudState(raw);
+    const payload = sanitizeKeyManagerCloudStateForClient(raw);
     return {
       version: payload.version,
       slots: payload.slots.map((slot) => ({ ...slot })),
@@ -215,10 +257,22 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
   }
 
   private encryptPayload(raw: unknown): unknown {
+    if (!this.storageEncryptionKey) {
+      throw new Error("USER_API_ENCRYPTION_SECRET is required before writing user API data.");
+    }
     return encryptUserApisPayload(raw, this.storageEncryptionKey);
   }
 
   private decryptPayload(raw: unknown): unknown {
+    if (!this.storageEncryptionKey) {
+      return raw;
+    }
     return decryptUserApisPayload(raw, this.storageEncryptionKey);
+  }
+
+  private assertWritableEncryptionConfigured(): void {
+    if (!this.storageEncryptionKey) {
+      throw new Error("USER_API_ENCRYPTION_SECRET is required before updating user API data.");
+    }
   }
 }

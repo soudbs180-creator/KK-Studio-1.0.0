@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { createKkApiClient } from "../../packages/contracts/src/client/kk-api-client.ts";
+import { createKkApiClient } from "../../packages/contracts/src/index.ts";
 
 describe("payment sidecar client", () => {
   test("creates payment orders with typed headers and body", async () => {

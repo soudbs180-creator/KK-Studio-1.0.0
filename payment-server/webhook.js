@@ -2,9 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const { AlipaySdk } = require('alipay-sdk');
 const {
-    handleLegacySettlementFailure,
-    handleLegacySuccessfulPaymentCallback,
-} = require('./runtime_payment_bridge');
+    handleLegacyPaymentCallbackThroughSidecar,
+} = require('./sidecar_compat_bridge');
 
 const router = express.Router();
 
@@ -57,7 +56,7 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
     };
 
     try {
-        const result = await handleLegacySuccessfulPaymentCallback({
+        const result = await handleLegacyPaymentCallbackThroughSidecar({
             userId,
             callbackId: transactionId,
             transactionId,
@@ -83,14 +82,14 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
             return true;
         }
 
-        console.log('[payment-webhook] Payment settlement applied:', result.settlement?.result || result.runtimeStatus || {});
+        console.log('[payment-webhook] Payment settlement applied:', {
+            source: result.source || 'sidecar',
+            settlement: result.settlement?.result || undefined,
+            runtimeStatus: result.runtimeStatus || undefined,
+            paymentOrderStatus: result.paymentOrderStatus || undefined,
+        });
         return true;
     } catch (error) {
-        await handleLegacySettlementFailure({
-            merchantOrderNo: billNo || transactionId,
-            callbackId: transactionId,
-            errorMessage: error?.message || 'Payment settlement request failed.',
-        }, bridgeOptions);
         console.error('[payment-webhook] Payment settlement request failed:', error);
         return false;
     }
@@ -101,8 +100,6 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
 // ============================================
 router.post('/alipay', async (req, res) => {
     const postData = req.body;
-
-    console.log('[payment-webhook] Received Alipay notify:', postData);
 
     try {
         const isValid = alipaySdk.checkNotifySign(postData);
@@ -117,6 +114,13 @@ router.post('/alipay', async (req, res) => {
         const totalAmount = postData.total_amount;
         const alipayTradeNo = postData.trade_no;
         const userId = decodeURIComponent(postData.passback_params || '');
+
+        console.log('[payment-webhook] Received Alipay notify:', {
+            outTradeNo,
+            tradeStatus,
+            totalAmount,
+            alipayTradeNo
+        });
 
         if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
             if (!userId) {

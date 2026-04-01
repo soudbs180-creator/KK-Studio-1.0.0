@@ -37,14 +37,21 @@ import {
   handleListAssets,
 } from "./modules/asset-library/index.ts";
 import {
+  LocalUserRouteProxyService,
+  handleInvokeLocalUserRouteProxy,
+} from "./modules/model-proxy/index.ts";
+import {
   AuthDataService,
   AuthService,
+  FileBackedAuthDataRepository,
   InMemoryAuthDataRepository,
+  SupabaseUserScopedAuthDataMirror,
   SupabaseAuthDataRepository,
   SupabaseWechatAuthRepository,
   type TurnstileVerifier,
   WechatAuthService,
   handleCreateTempUser,
+  handleCheckUserRouteConnectivity,
   handleGetKeyManagerCloudState,
   handleGetProfile,
   handleGetUserApiEntries,
@@ -53,17 +60,25 @@ import {
   handleWechatCallback,
   handleReplaceKeyManagerCloudState,
   handleReplaceUserApiEntries,
+  handleSyncUserRoutePricing,
   handleUpdateProfile,
+  UserRouteDiagnosticsService,
   handleVersionedLogin,
   handleVersionedRegister,
 } from "./modules/auth/index.ts";
 import {
   handleApplyPaymentSettlement,
+  CreditExchangeRateService,
   CreditAccountService,
   type CreditAccountRepository,
+  type CreditExchangeRateRepository,
   InMemoryCreditAccountRepository,
+  InMemoryCreditExchangeRateRepository,
   handleAdminRechargeCredits,
+  handleListCreditExchangeRates,
+  handleUpsertCreditExchangeRate,
   SupabaseCreditAccountRepository,
+  SupabaseCreditExchangeRateRepository,
   handleDebitCredits,
   handleGetCreditBalance,
   handleListCreditTransactions,
@@ -82,11 +97,15 @@ import {
   ModelCatalogService,
   SupabaseCreditProviderRepository,
   handleDeleteAdminCreditProvider,
+  handleGetAdminCreditProviderPricingCache,
+  handleGetSharedProviderPricingCache,
   handleListActiveCreditModels,
   handleListAdminCreditProviders,
   handleCreateAdminModel,
   handleListModels,
   handleSaveAdminCreditProvider,
+  handleUpsertAdminCreditProviderPricingCache,
+  handleUpsertSharedProviderPricingCache,
 } from "./modules/model-catalog/index.ts";
 import {
   WorkflowService,
@@ -184,12 +203,13 @@ export interface ApiServerOptions {
   verifyTurnstileToken?: TurnstileVerifier;
 }
 
-type RepositoryBackend = "memory" | "supabase" | "custom";
+type RepositoryBackend = "memory" | "supabase" | "local-file" | "custom";
 
 function resolveRepositoryBackend(
   repository: unknown,
   inMemoryCtor: abstract new (...args: any[]) => unknown,
   supabaseCtor: abstract new (...args: any[]) => unknown,
+  localFileCtor?: abstract new (...args: any[]) => unknown,
 ): RepositoryBackend {
   if (repository instanceof inMemoryCtor) {
     return "memory";
@@ -197,6 +217,10 @@ function resolveRepositoryBackend(
 
   if (repository instanceof supabaseCtor) {
     return "supabase";
+  }
+
+  if (localFileCtor && repository instanceof localFileCtor) {
+    return "local-file";
   }
 
   return "custom";
@@ -236,6 +260,25 @@ function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfi
   return new InMemoryCreditAccountRepository();
 }
 
+function createCreditExchangeRateRepository(
+  serverSupabaseConfig: ServerSupabaseConfig,
+): CreditExchangeRateRepository {
+  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
+    apiLogger.info("Using Supabase credit exchange-rate repository", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new SupabaseCreditExchangeRateRepository({
+      supabaseUrl: serverSupabaseConfig.supabaseUrl,
+      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
+    });
+  }
+
+  apiLogger.warn("Falling back to in-memory credit exchange-rate repository", {
+    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+  });
+  return new InMemoryCreditExchangeRateRepository();
+}
+
 function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConfig) {
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     apiLogger.info("Using Supabase credit provider repository", {
@@ -265,10 +308,12 @@ function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
     });
   }
 
-  apiLogger.warn("Falling back to in-memory auth data repository", {
+  apiLogger.warn("Falling back to file-backed local auth data repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
-  return new InMemoryAuthDataRepository();
+  return new FileBackedAuthDataRepository({
+    storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
+  });
 }
 
 function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseConfig) {
@@ -338,15 +383,32 @@ export function createApiServer(
     options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
   const creditAccountRepository =
     options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig);
+  const creditExchangeRateRepository = createCreditExchangeRateRepository(serverSupabaseConfig);
   const creditProviderRepository = createCreditProviderRepository(serverSupabaseConfig);
   const workspaceLayoutRepository = createWorkspaceLayoutRepository(serverSupabaseConfig);
   const authService = new AuthService({
     verifyTurnstileToken: options.verifyTurnstileToken || defaultTurnstileVerifier,
   });
-  const authDataService = new AuthDataService(authDataRepository);
+  const authDataCloudMirror =
+    !serverSupabaseConfig.serviceRoleKey
+    && serverSupabaseConfig.supabaseUrl
+    && serverSupabaseConfig.authKey
+    && serverSupabaseConfig.userApiEncryptionSecret
+      ? new SupabaseUserScopedAuthDataMirror({
+          supabaseUrl: serverSupabaseConfig.supabaseUrl,
+          authKey: serverSupabaseConfig.authKey,
+          storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
+        })
+      : undefined;
+  const authDataService = new AuthDataService(authDataRepository, {
+    cloudMirror: authDataCloudMirror,
+  });
+  const userRouteDiagnosticsService = new UserRouteDiagnosticsService(authDataService);
+  const localUserRouteProxyService = new LocalUserRouteProxyService(authDataService, serverSupabaseConfig);
   const adminConsoleService = new AdminConsoleService(adminConsoleRepository);
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
   const creditAccountService = new CreditAccountService(creditAccountRepository);
+  const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: (accessToken) => {
       const resolvedOverride = options.resolveAccessToken?.(accessToken);
@@ -388,11 +450,17 @@ export function createApiServer(
       authDataRepository,
       InMemoryAuthDataRepository,
       SupabaseAuthDataRepository,
+      FileBackedAuthDataRepository,
     ),
     creditAccounts: resolveRepositoryBackend(
       creditAccountRepository,
       InMemoryCreditAccountRepository,
       SupabaseCreditAccountRepository,
+    ),
+    creditExchangeRates: resolveRepositoryBackend(
+      creditExchangeRateRepository,
+      InMemoryCreditExchangeRateRepository,
+      SupabaseCreditExchangeRateRepository,
     ),
     creditProviders: resolveRepositoryBackend(
       creditProviderRepository,
@@ -415,6 +483,8 @@ export function createApiServer(
       const clientVersion = getClientVersion(req);
       const url = new URL(req.url || "/", "http://localhost");
       const pathname = url.pathname;
+      const userRouteConnectivityMatch = pathname.match(/^\/api\/v1\/profile\/user-routes\/([^/]+)\/connectivity$/);
+      const userRoutePricingMatch = pathname.match(/^\/api\/v1\/profile\/user-routes\/([^/]+)\/pricing-sync$/);
 
       try {
         const authenticatedUser = await requestAuthenticator.authenticate(headers);
@@ -453,11 +523,13 @@ export function createApiServer(
               repositories: repositoryModes,
               persistence: {
                 userApiKeys:
-                  repositoryModes.authData === "supabase"
-                  && configSummary.hasUserApiEncryptionSecret,
+                  (repositoryModes.authData === "supabase"
+                    && configSummary.hasUserApiEncryptionSecret)
+                  || repositoryModes.authData === "local-file",
                 keyManager:
-                  repositoryModes.authData === "supabase"
-                  && configSummary.hasUserApiEncryptionSecret,
+                  (repositoryModes.authData === "supabase"
+                    && configSummary.hasUserApiEncryptionSecret)
+                  || repositoryModes.authData === "local-file",
                 credits: repositoryModes.creditAccounts === "supabase",
                 creditProviders: repositoryModes.creditProviders === "supabase",
                 workspaceLayout: repositoryModes.workspaceLayout === "supabase",
@@ -595,6 +667,37 @@ export function createApiServer(
           return;
         }
 
+        if (req.method === "POST" && userRouteConnectivityMatch) {
+          const result = await handleCheckUserRouteConnectivity(
+            userRouteDiagnosticsService,
+            decodeURIComponent(userRouteConnectivityMatch[1] || ""),
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "POST" && userRoutePricingMatch) {
+          const result = await handleSyncUserRoutePricing(
+            userRouteDiagnosticsService,
+            decodeURIComponent(userRoutePricingMatch[1] || ""),
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/model-proxy/user") {
+          const body = await readJsonBody(req);
+          const result = await handleInvokeLocalUserRouteProxy(
+            localUserRouteProxyService,
+            body,
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/api/v1/admin/access") {
           const result = await handleGetAdminAccess(adminConsoleService, requestHeaders);
           writeJson(res, result.statusCode, result.body);
@@ -638,6 +741,12 @@ export function createApiServer(
           return;
         }
 
+        if (req.method === "GET" && pathname === "/api/v1/billing/exchange-rates") {
+          const result = await handleListCreditExchangeRates(creditExchangeRateService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/api/v1/assets") {
           const result = await handleListAssets(assetLibraryService, {
               kind: url.searchParams.get("kind") || undefined,
@@ -658,6 +767,13 @@ export function createApiServer(
         if (req.method === "POST" && pathname === "/api/v1/billing/credits/refunds") {
           const body = await readJsonBody(req);
           const result = await handleRefundCredits(creditAccountService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "PUT" && pathname === "/api/v1/admin/billing/exchange-rates") {
+          const body = await readJsonBody(req);
+          const result = await handleUpsertCreditExchangeRate(creditExchangeRateService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
         }
@@ -688,6 +804,28 @@ export function createApiServer(
 
         if (req.method === "GET" && pathname === "/api/v1/model-catalog/active-credit-models") {
           const result = await handleListActiveCreditModels(creditProviderService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (pathname === "/api/v1/provider-pricing-cache" && req.method === "GET") {
+          const result = await handleGetSharedProviderPricingCache(
+            creditProviderService,
+            url.searchParams.get("baseUrl") || "",
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (pathname === "/api/v1/provider-pricing-cache" && req.method === "PUT") {
+          const body = await readJsonBody(req);
+          const result = await handleUpsertSharedProviderPricingCache(
+            creditProviderService,
+            url.searchParams.get("baseUrl") || "",
+            body,
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }
@@ -728,6 +866,31 @@ export function createApiServer(
 
         if (req.method === "GET" && pathname === "/api/v1/admin/credit-providers") {
           const result = await handleListAdminCreditProviders(creditProviderService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const adminCreditProviderPricingCacheMatch = pathname.match(
+          /^\/api\/v1\/admin\/credit-providers\/([^/]+)\/pricing-cache$/,
+        );
+        if (adminCreditProviderPricingCacheMatch && req.method === "GET") {
+          const result = await handleGetAdminCreditProviderPricingCache(
+            creditProviderService,
+            decodeURIComponent(adminCreditProviderPricingCacheMatch[1]),
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (adminCreditProviderPricingCacheMatch && req.method === "PUT") {
+          const body = await readJsonBody(req);
+          const result = await handleUpsertAdminCreditProviderPricingCache(
+            creditProviderService,
+            decodeURIComponent(adminCreditProviderPricingCacheMatch[1]),
+            body,
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }

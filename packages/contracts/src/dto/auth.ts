@@ -71,6 +71,27 @@ export interface KeyManagerCloudRecordDto {
   [key: string]: unknown;
 }
 
+export interface UserRouteConnectivityCheckDto {
+  routeId: string;
+  ok: boolean;
+  message?: string;
+  endpointUrl: string;
+  latencyMs?: number | null;
+  resolvedFormat: UserApiProtocolFormat;
+  models: string[];
+}
+
+export interface UserRoutePricingSyncDto {
+  routeId: string;
+  ok: boolean;
+  message?: string;
+  endpointUrl?: string;
+  attemptedUrls?: string[];
+  count: number;
+  pricingData: KeyManagerCloudRecordDto[];
+  groupRatio: Record<string, number>;
+}
+
 export interface KeyManagerCloudStateDto {
   version: number;
   slots: KeyManagerCloudRecordDto[];

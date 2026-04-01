@@ -8,15 +8,51 @@ export interface ServerSupabaseConfig {
   usingPublicUrlFallback: boolean;
 }
 
+const obviousPlaceholderPatterns = [
+  /^replace-with-/i,
+  /^your[-_]/i,
+  /^changeme$/i,
+  /^todo$/i,
+  /^你的/i,
+  /^请填写/i,
+];
+
+function normalizeOptionalEnvValue(value: unknown): string | undefined {
+  const normalized = String(value || "").trim();
+  return normalized ? normalized : undefined;
+}
+
+function isObviousPlaceholder(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return obviousPlaceholderPatterns.some((pattern) => pattern.test(value));
+}
+
+function resolveServiceRoleKey(): string | undefined {
+  const serviceRoleKey =
+    normalizeOptionalEnvValue(env.get("SUPABASE_SERVICE_ROLE_KEY"))
+    || normalizeOptionalEnvValue(env.get("SUPABASE_SECRET_KEY"));
+
+  if (!serviceRoleKey || isObviousPlaceholder(serviceRoleKey)) {
+    return undefined;
+  }
+
+  return serviceRoleKey;
+}
+
 export function resolveServerSupabaseConfig(): ServerSupabaseConfig {
-  const explicitSupabaseUrl = env.get("SUPABASE_URL");
-  const fallbackSupabaseUrl = env.get("VITE_SUPABASE_URL");
-  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-  const authKey = serviceRoleKey || env.get("SUPABASE_ANON_KEY") || env.get("VITE_SUPABASE_ANON_KEY");
+  const explicitSupabaseUrl = normalizeOptionalEnvValue(env.get("SUPABASE_URL"));
+  const fallbackSupabaseUrl = normalizeOptionalEnvValue(env.get("VITE_SUPABASE_URL"));
+  const serviceRoleKey = resolveServiceRoleKey();
+  const authKey =
+    serviceRoleKey
+    || normalizeOptionalEnvValue(env.get("SUPABASE_ANON_KEY"))
+    || normalizeOptionalEnvValue(env.get("VITE_SUPABASE_ANON_KEY"));
   const userApiEncryptionSecret =
-    env.get("USER_API_ENCRYPTION_SECRET")
-    || env.get("PROFILE_USER_APIS_ENCRYPTION_SECRET")
-    || serviceRoleKey;
+    normalizeOptionalEnvValue(env.get("USER_API_ENCRYPTION_SECRET"))
+    || normalizeOptionalEnvValue(env.get("PROFILE_USER_APIS_ENCRYPTION_SECRET"));
 
   return {
     supabaseUrl: explicitSupabaseUrl || fallbackSupabaseUrl,

@@ -1,13 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyRound, Shield, ShieldAlert, Wallet } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import { clearStoredAdminSession } from '../../services/api/adminSession';
-import { legacyWebApiClient } from '../../services/api/kkApiClient';
+import {
+  ADMIN_CONSOLE_DRAFT_SCOPE,
+  loadScopedAdminConsoleState,
+  saveScopedAdminConsoleState,
+} from '../../services/admin/adminConsoleState';
+import {
+  legacyWebApiClient,
+  shouldUseLegacyWebApiFallback,
+} from '../../services/api/kkApiClient';
 import {
   adminRechargeCreditsViaSupabase,
   changeAdminPasswordViaSupabase,
+  setUserRoleViaSupabase,
 } from '../../services/admin/supabaseAdminFallbackService';
 import { notify } from '../../services/system/notificationService';
 import {
@@ -19,6 +28,13 @@ import {
 
 const DEFAULT_RECHARGE_REMARK_ZH = '管理员手动充值';
 const DEFAULT_RECHARGE_REMARK_EN = 'Manual admin recharge';
+
+type AdminConsoleDraft = {
+  identity: string;
+  rechargeAmount: number;
+  rechargeRemark: string;
+  newAdminIdentity: string;
+};
 
 function buildRequestId(prefix: string, suffix?: string): string {
   const uuid = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
@@ -46,7 +62,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const AdminConsoleSettings: React.FC = () => {
   const { user } = useAuth();
   const { pick } = useLocale();
+  const canUseLegacyAdminApi = shouldUseLegacyWebApiFallback();
   const defaultRechargeRemark = pick(DEFAULT_RECHARGE_REMARK_ZH, DEFAULT_RECHARGE_REMARK_EN);
+  const lastDraftUserIdRef = useRef<string | null>(null);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -68,6 +86,56 @@ const AdminConsoleSettings: React.FC = () => {
         : current
     );
   }, [defaultRechargeRemark]);
+
+  useEffect(() => {
+    const nextUserId = String(user?.id || '').trim() || null;
+    if (lastDraftUserIdRef.current === nextUserId) {
+      return;
+    }
+
+    lastDraftUserIdRef.current = nextUserId;
+    const draft = loadScopedAdminConsoleState<Partial<AdminConsoleDraft>>(
+      ADMIN_CONSOLE_DRAFT_SCOPE,
+      nextUserId || undefined,
+    );
+
+    if (!draft) {
+      setIdentity('');
+      setRechargeAmount(100);
+      setRechargeRemark(defaultRechargeRemark);
+      setNewAdminIdentity('');
+      return;
+    }
+
+    const nextRechargeAmount = Number(draft.rechargeAmount);
+    setIdentity(typeof draft.identity === 'string' ? draft.identity : '');
+    setRechargeAmount(
+      Number.isFinite(nextRechargeAmount) && nextRechargeAmount > 0
+        ? Math.max(1, Math.round(nextRechargeAmount))
+        : 100,
+    );
+    setRechargeRemark(
+      typeof draft.rechargeRemark === 'string' && draft.rechargeRemark.trim()
+        ? draft.rechargeRemark
+        : defaultRechargeRemark,
+    );
+    setNewAdminIdentity(
+      typeof draft.newAdminIdentity === 'string' ? draft.newAdminIdentity : '',
+    );
+  }, [defaultRechargeRemark, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    saveScopedAdminConsoleState<AdminConsoleDraft>(ADMIN_CONSOLE_DRAFT_SCOPE, user.id, {
+      identity,
+      rechargeAmount,
+      rechargeRemark,
+      newAdminIdentity,
+    });
+  }, [identity, newAdminIdentity, rechargeAmount, rechargeRemark, user?.id]);
 
   const amountLabel = useMemo(
     () => `${rechargeAmount} ${pick('积分', 'credits')}`,
@@ -119,8 +187,9 @@ const AdminConsoleSettings: React.FC = () => {
 
     setChangingPassword(true);
     try {
-      try {
-        const response = await legacyWebApiClient.changeAdminPassword(
+      if (canUseLegacyAdminApi) {
+        try {
+          const response = await legacyWebApiClient.changeAdminPassword(
           {
             oldPassword,
             newPassword,
@@ -131,7 +200,10 @@ const AdminConsoleSettings: React.FC = () => {
         if (!response.success) {
           throw new Error(response.error?.message || pick('管理员密码修改失败。', 'Failed to change the admin password.'));
         }
-      } catch {
+        } catch {
+          await changeAdminPasswordViaSupabase(user, oldPassword, newPassword);
+        }
+      } else {
         await changeAdminPasswordViaSupabase(user, oldPassword, newPassword);
       }
 
@@ -182,8 +254,9 @@ const AdminConsoleSettings: React.FC = () => {
     try {
       let balanceAfter = 0;
 
-      try {
-        const response = await legacyWebApiClient.adminRechargeCredits(
+      if (canUseLegacyAdminApi) {
+        try {
+          const response = await legacyWebApiClient.adminRechargeCredits(
           {
             identity: identity.trim(),
             creditAmount: rechargeAmount,
@@ -196,8 +269,16 @@ const AdminConsoleSettings: React.FC = () => {
           throw new Error(response.error?.message || pick('充值失败。', 'Recharge failed.'));
         }
 
-        balanceAfter = Number(response.data.balanceAfter || 0);
-      } catch {
+          balanceAfter = Number(response.data.balanceAfter || 0);
+        } catch {
+          const result = await adminRechargeCreditsViaSupabase(
+            identity.trim(),
+            rechargeAmount,
+            rechargeRemark.trim() || defaultRechargeRemark
+          );
+          balanceAfter = result.balanceAfter;
+        }
+      } else {
         const result = await adminRechargeCreditsViaSupabase(
           identity.trim(),
           rechargeAmount,
@@ -221,7 +302,7 @@ const AdminConsoleSettings: React.FC = () => {
     }
   };
 
-  const handleSetAdmin = async () => {
+const handleSetAdmin = async () => {
     const userId = requireAdminUserId();
     if (!userId) {
       return;
@@ -237,33 +318,40 @@ const AdminConsoleSettings: React.FC = () => {
 
     setSettingAdmin(true);
     try {
-      const response = await legacyWebApiClient.setUserRole(
-        {
-          identity: newAdminIdentity.trim(),
-          role: 'admin',
-        },
-        buildAdminRequestOptions(buildRequestId('admin-role', newAdminIdentity))
-      );
+      const normalizedIdentity = newAdminIdentity.trim();
 
-      if (!response.success) {
-        throw new Error(response.error?.message || pick('授予管理员权限失败。', 'Failed to grant admin access.'));
+      if (canUseLegacyAdminApi) {
+        try {
+          const response = await legacyWebApiClient.setUserRole(
+          {
+            identity: normalizedIdentity,
+            role: 'admin',
+          },
+          buildAdminRequestOptions(buildRequestId('admin-role', normalizedIdentity))
+        );
+
+        if (!response.success) {
+          throw new Error(response.error?.message || pick('授予管理员权限失败。', 'Failed to grant admin access.'));
+        }
+        } catch {
+          await setUserRoleViaSupabase(normalizedIdentity, 'admin');
+        }
+      } else {
+        await setUserRoleViaSupabase(normalizedIdentity, 'admin');
       }
 
       notify.success(
         pick('设置成功', 'Role updated'),
         pick(
-          `已将 ${newAdminIdentity.trim()} 设置为管理员。`,
-          `${newAdminIdentity.trim()} has been granted admin access.`
+          `已将 ${normalizedIdentity} 设置为管理员。`,
+          `${normalizedIdentity} has been granted admin access.`
         )
       );
       setNewAdminIdentity('');
     } catch (error) {
       notify.error(
         pick('设置失败', 'Update failed'),
-        pick(
-          `${getErrorMessage(error, '授予管理员权限失败。')} 当前“授予管理员”仍依赖本地 API 的 Supabase service role 配置。`,
-          `${getErrorMessage(error, 'Failed to grant admin access.')} The grant-admin action still depends on the local API service-role configuration.`
-        )
+        getErrorMessage(error, pick('授予管理员权限失败。', 'Failed to grant admin access.'))
       );
     } finally {
       setSettingAdmin(false);
@@ -308,8 +396,8 @@ const AdminConsoleSettings: React.FC = () => {
         }}
       >
         {pick(
-          '管理员改密和手动充值现在支持 Supabase 直连兜底；如果本地 API 没有正确加载 service role，也可以继续使用这两项能力。授予管理员权限目前仍通过本地 API 执行。',
-          'Changing the admin password and manual recharges now support a direct Supabase fallback. If the local API does not load the service role correctly, these two actions still work. Granting admin access still runs through the local API.'
+          '管理员改密、手动充值和角色授予现在都支持 Supabase 直连兜底；如果本地 API 没有正确加载 service role，这些后台操作也仍可继续使用。',
+          'Changing the admin password, manual recharges, and role grants now support a direct Supabase fallback. These admin actions still work even when the local API has not loaded the service role correctly.'
         )}
       </div>
 
@@ -448,13 +536,13 @@ const AdminConsoleSettings: React.FC = () => {
             </div>
             <div className="mt-3 text-[13px] leading-6 text-[var(--text-secondary)]">
               {pick(
-                '如果这一步失败，请先确认本地 API 已通过',
-                'If this action fails, first confirm that the local API loaded'
+                '如果这一步失败，请先确认当前账号仍然是 admin，并且本地 API 与',
+                'If this action fails, first confirm the current account still has the admin role and that the local API matches'
               )}
               <code className="mx-1 rounded bg-black/10 px-1 py-0.5">apps/api/.env.local</code>
               {pick(
-                '加载了正确的 Supabase service role。',
-                'with the correct Supabase service-role credentials.'
+                '中的配置保持一致。即使本地 service role 缺失，已登录的 admin 也可以通过 Supabase 直连兜底完成授予。',
+                'configuration in apps/api/.env.local. Even if the local service role is missing, a signed-in admin can still complete the grant through the direct Supabase fallback.'
               )}
             </div>
           </div>

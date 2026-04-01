@@ -17,6 +17,11 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
+import { useAdminRole } from '../../hooks/useAdminRole';
+import {
+  formatRemainingCredits,
+  selectRemainingBalanceSummary,
+} from '../../services/billing/remainingBalance';
 import WechatQrModal from '../auth/WechatQrModal';
 import {
   collectLinkedAuthProviders,
@@ -91,14 +96,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isMobile = false,
 }) => {
   const { isTempUser, tempUserExpiry } = useAuth();
+  const { accountRole, checkingAdmin } = useAdminRole();
   const {
     balance,
     billingLogs,
     usageLogs,
     loading: billingLoading,
-    fetchLogs,
+    refreshBilling,
     setShowRechargeModal,
   } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
+  const { latestRecharge } = useMemo(
+    () => selectRemainingBalanceSummary(billingLogs),
+    [billingLogs],
+  );
+  const remainingBalanceHint = latestRecharge
+    ? `最近充值：${formatDateTime(latestRecharge.created_at)}`
+    : '仅管理员积分模型会消耗这里的积分，个人 API 不扣积分';
 
   const [view, setView] = useState<UserProfileView>('main');
   const [loading, setLoading] = useState(false);
@@ -132,12 +146,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const avatarInputValue = selectedPresetAvatar ? '' : avatarUrl;
 
   const roleLabel = useMemo(() => {
-    const role =
-      (user?.user_metadata?.role as string | undefined) ||
-      (user?.app_metadata?.role as string | undefined) ||
-      'user';
-    return role === 'admin' ? '管理员' : '普通用户';
-  }, [user]);
+    if (checkingAdmin && user) {
+      return '识别中';
+    }
+
+    if (accountRole === 'admin') {
+      return '管理员';
+    }
+
+    if (String(accountRole || '').startsWith('member')) {
+      return '会员账号';
+    }
+
+    return '普通用户';
+  }, [accountRole, checkingAdmin, user]);
 
   const sessionLinkedProviders = useMemo(
     () => collectLinkedAuthProviders(user),
@@ -191,13 +213,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
     if (safeView === 'billing') {
-      void fetchLogs();
+      void refreshBilling();
     }
 
     if (safeView === 'security') {
       void loadSecurityState();
     }
-  }, [canChangePassword, fetchLogs, initialView, isOpen, isShadowWechatEmail, sessionLinkedProviders, user]);
+  }, [canChangePassword, initialView, isOpen, isShadowWechatEmail, refreshBilling, sessionLinkedProviders, user]);
 
   useEffect(() => {
     if (!isOpen || !user?.id || isTempUser) {
@@ -276,7 +298,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const openBilling = () => {
     setView('billing');
-    void fetchLogs();
+    void refreshBilling();
   };
 
   const loadSecurityState = async () => {
@@ -626,11 +648,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      可用余额
+                      积分
                     </div>
-                    <div className="mt-1 text-2xl font-bold text-amber-300">{balance}</div>
+                    <div className="mt-1 text-2xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      仅管理员积分模型会消耗余额，个人 API 不扣积分
+                      {remainingBalanceHint}
                     </div>
                   </div>
                   <button
@@ -908,9 +930,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                   <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border-light)' }}>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      当前积分
+                      积分
                     </div>
-                    <div className="text-xl font-bold text-amber-300">{balance}</div>
+                    <div className="text-xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
+                    {latestRecharge ? (
+                      <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                        最近充值：{formatDateTime(latestRecharge.created_at)}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -919,7 +946,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   className="mt-3 inline-flex h-9 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-amber-500 px-4 text-sm text-white"
                 >
                   <CreditCard size={14} className="shrink-0" />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">充值余额</span>
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">充值积分</span>
                 </button>
               </div>
 

@@ -30,6 +30,13 @@ type RpcRechargeRow = {
   message?: string | null;
 };
 
+type RpcSetUserRoleRow = {
+  id?: string | null;
+  email?: string | null;
+  success?: boolean | null;
+  message?: string | null;
+};
+
 type RpcAdminCreditProviderModelRow = {
   model_id?: string | null;
   display_name?: string | null;
@@ -127,11 +134,35 @@ export interface SupabaseAdminProviderInput {
   models: SupabaseAdminProviderModelInput[];
 }
 
+interface ProfileRoleRow {
+  role?: string | null;
+}
+
+export type AppAccountRole = 'user' | 'admin' | `member${string}`;
+
 export interface SupabaseAdminAccessState {
+  role: AppAccountRole;
   isAdmin: boolean;
   adminSessionActive: boolean;
   adminSessionExpiresAt?: string;
   requiresPasswordChange: boolean;
+}
+
+export function normalizeAppAccountRole(rawRole: unknown): AppAccountRole {
+  const normalized = String(rawRole || '').trim().toLowerCase();
+  if (normalized === 'admin') {
+    return 'admin';
+  }
+
+  if (normalized.startsWith('member')) {
+    return normalized as AppAccountRole;
+  }
+
+  return 'user';
+}
+
+export function isAdminAccountRole(role: unknown): boolean {
+  return normalizeAppAccountRole(role) === 'admin';
 }
 
 function buildFallbackAdminSessionToken(userId: string): string {
@@ -200,33 +231,42 @@ function buildSyntheticApiKeyFingerprint(preview: string, index: number): string
   return `preview:${index}:${String(preview || '').trim()}`;
 }
 
+async function resolveSupabaseProfileRole(userId: string): Promise<AppAccountRole> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle<ProfileRoleRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeAppAccountRole(data?.role);
+}
+
 export async function resolveSupabaseAdminAccess(
   user: User | null | undefined,
 ): Promise<SupabaseAdminAccessState> {
   const userId = String(user?.id || '').trim();
   if (!userId) {
     return {
+      role: 'user',
       isAdmin: false,
       adminSessionActive: false,
       requiresPasswordChange: false,
     };
   }
 
+  const role = await resolveSupabaseProfileRole(userId);
+  const isAdmin = isAdminAccountRole(role);
   const sessionState = resolveFallbackAdminSessionState(userId);
-  const { data, error } = await supabase.rpc('is_admin');
-
-  if (error || data !== true) {
-    return {
-      isAdmin: false,
-      adminSessionActive: false,
-      requiresPasswordChange: false,
-    };
-  }
 
   return {
-    isAdmin: true,
-    adminSessionActive: sessionState.adminSessionActive,
-    adminSessionExpiresAt: sessionState.adminSessionExpiresAt,
+    role,
+    isAdmin,
+    adminSessionActive: isAdmin ? sessionState.adminSessionActive : false,
+    adminSessionExpiresAt: isAdmin ? sessionState.adminSessionExpiresAt : undefined,
     requiresPasswordChange: false,
   };
 }
@@ -320,6 +360,42 @@ export async function adminRechargeCreditsViaSupabase(
   return {
     balanceAfter: Math.max(0, Number(row.new_balance || 0)),
     message: String(row.message || '充值成功。'),
+  };
+}
+
+export async function setUserRoleViaSupabase(
+  identity: string,
+  role: 'admin' | 'user',
+) {
+  const { data, error } = await supabase.rpc('admin_set_user_role_by_identity', {
+    p_identity: identity,
+    p_role: role,
+  });
+
+  if (error) {
+    throw new Error(normalizeErrorMessage(error, '\u8bbe\u7f6e\u7528\u6237\u89d2\u8272\u5931\u8d25\u3002'));
+  }
+
+  if (typeof data === 'string' && data.trim()) {
+    return {
+      subjectId: data.trim(),
+      identity: identity.trim(),
+      role,
+    };
+  }
+
+  const row = Array.isArray(data)
+    ? (data[0] as RpcSetUserRoleRow | undefined)
+    : (data as RpcSetUserRoleRow | undefined);
+
+  if (row?.success === false) {
+    throw new Error(String(row.message || '\u8bbe\u7f6e\u7528\u6237\u89d2\u8272\u5931\u8d25\u3002'));
+  }
+
+  return {
+    subjectId: String(row?.id || '').trim(),
+    identity: String(row?.email || identity).trim() || identity.trim(),
+    role,
   };
 }
 

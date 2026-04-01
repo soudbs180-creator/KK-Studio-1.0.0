@@ -1,0 +1,191 @@
+{
+  "generatedFromPlan": "KK Studio 1.4.0 module isolation and linkage safety plan",
+  "entries": [
+    {
+      "path": "src/services/admin/supabaseAdminFallbackService.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Fallback bridge for legacy admin flows while migrated admin-console routes remain incomplete.",
+      "upstreamCanonicalSource": "apps/api/src/modules/admin-console",
+      "downstreamDependents": [
+        "src/components/settings/AdminSystem.tsx",
+        "src/components/settings/ApiSettingsView.tsx"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/admin-console-routes.test.ts"
+      ],
+      "removalCondition": "Delete once all admin settings flows use typed admin-console API contracts without Supabase fallback reads."
+    },
+    {
+      "path": "src/services/billing/costSyncBridge.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Translates legacy frontend billing refresh triggers into the migrated billing/runtime model.",
+      "upstreamCanonicalSource": "apps/api/src/modules/billing",
+      "downstreamDependents": [
+        "src/services/auth/keyManager.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/integration/billing_physical_separation.test.ts"
+      ],
+      "removalCondition": "Delete when billing refresh and pricing sync are requested only through typed billing clients."
+    },
+    {
+      "path": "src/services/llm/syncImageBridge.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Bridges legacy image-generation responses into the synchronized workspace/update pipeline.",
+      "upstreamCanonicalSource": "apps/api/src/modules/generation",
+      "downstreamDependents": [
+        "src/services/llm/LLMService.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/generation-service.test.ts"
+      ],
+      "removalCondition": "Delete when image sync events are emitted natively from the generation module end-to-end."
+    },
+    {
+      "path": "src/services/model/modelPricingOverrideBridge.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Applies pricing overrides while old provider pricing snapshots coexist with migrated model catalog data.",
+      "upstreamCanonicalSource": "apps/api/src/modules/model-catalog",
+      "downstreamDependents": [
+        "src/services/auth/keyManager.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/provider-strategy.test.ts"
+      ],
+      "removalCondition": "Delete when pricing overrides live entirely in typed model-catalog responses."
+    },
+    {
+      "path": "src/workflow/adapters/workflowToLegacy.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Maps migrated workflow structures back into legacy canvas consumers during transition.",
+      "upstreamCanonicalSource": "apps/api/src/modules/workflow",
+      "downstreamDependents": [
+        "src/workflow/adapters/canvasToWorkflow.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/workflow-service.test.ts"
+      ],
+      "removalCondition": "Delete when all workflow-aware UI surfaces consume the migrated workflow shape directly."
+    },
+    {
+      "path": "src/components/settings/SettingsPanel.v2.tsx",
+      "role": "compatibility-layer",
+      "currentPurpose": "UI migration surface for settings redesign while the legacy settings panel remains in circulation.",
+      "upstreamCanonicalSource": "src/components/settings/SettingsPanel.tsx",
+      "downstreamDependents": [
+        "src/routes/settingsRoutes.tsx"
+      ],
+      "riskLevel": "low",
+      "regressionTests": [
+        "tests/unit/frontend-key-boundary-hardening.test.ts"
+      ],
+      "removalCondition": "Delete after settings routes use one production panel implementation."
+    },
+    {
+      "path": "src/components/settings/SettingsScaffold.tsx",
+      "role": "compatibility-layer",
+      "currentPurpose": "Scaffold shell kept during the settings-area migration to avoid breaking route composition while final views stabilize.",
+      "upstreamCanonicalSource": "src/components/settings/SettingsPanel.tsx",
+      "downstreamDependents": [
+        "src/routes/settingsRoutes.tsx"
+      ],
+      "riskLevel": "low",
+      "regressionTests": [
+        "tests/unit/frontend-key-boundary-hardening.test.ts"
+      ],
+      "removalCondition": "Delete once the production settings routes no longer depend on scaffold composition."
+    },
+    {
+      "path": "apps/api/src/modules/auth/presentation/mount-legacy-auth-routes.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Mounts migration-era auth routes that forward into the typed auth module.",
+      "upstreamCanonicalSource": "apps/api/src/modules/auth",
+      "downstreamDependents": [
+        "apps/api/src/app.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/auth-http-routes.test.ts",
+        "tests/unit/auth-data-routes.test.ts"
+      ],
+      "removalCondition": "Delete once all callers use the typed /api/v1/auth and /api/v1/profile surfaces."
+    },
+    {
+      "path": "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Mounts migration-era billing routes that forward into the typed billing module.",
+      "upstreamCanonicalSource": "apps/api/src/modules/billing",
+      "downstreamDependents": [
+        "apps/api/src/app.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-http-routes.test.ts"
+      ],
+      "removalCondition": "Delete once all billing consumers use the typed /api/v1/billing surface."
+    },
+    {
+      "path": "apps/api/src/modules/billing/infrastructure/legacy-billing-router-adapter.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Infrastructure adapter that maps legacy billing router behavior onto the migrated billing module.",
+      "upstreamCanonicalSource": "apps/api/src/modules/billing",
+      "downstreamDependents": [
+        "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-http-routes.test.ts",
+        "tests/integration/billing_physical_separation.test.ts"
+      ],
+      "removalCondition": "Delete once the migrated billing module no longer needs legacy router behavior translation."
+    },
+    {
+      "path": "payment-server/runtime_payment_bridge.js",
+      "role": "compatibility-layer",
+      "currentPurpose": "Legacy runtime bridge for payment server flows during sidecar migration.",
+      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
+      "downstreamDependents": [
+        "payment-server/index.js"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/payment-server-runtime-payment-bridge.test.ts"
+      ],
+      "removalCondition": "Delete once the legacy payment server no longer serves production checkout requests."
+    },
+    {
+      "path": "payment-server/sidecar_compat_bridge.js",
+      "role": "compatibility-layer",
+      "currentPurpose": "Routes legacy payment-server create/status/redirect flows into the sidecar payment module while Express and Alipay SDK runtime remain in place.",
+      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
+      "downstreamDependents": [
+        "payment-server/index.js"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/payment-sidecar-service.test.ts",
+        "tests/unit/governance-contract.test.ts"
+      ],
+      "removalCondition": "Delete once payment-server/index.js no longer serves checkout/status requests and the legacy shell is reduced to a thin runtime wrapper or removed."
+    },
+    {
+      "path": "payment-server/settlement_bridge.js",
+      "role": "compatibility-layer",
+      "currentPurpose": "Legacy settlement write-back bridge for the payment server during sidecar migration.",
+      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
+      "downstreamDependents": [
+        "payment-server/index.js"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/payment-server-settlement-bridge.test.ts"
+      ],
+      "removalCondition": "Delete once settlement write-back only occurs through the typed internal payment-settlement contract."
+    }
+  ]
+}

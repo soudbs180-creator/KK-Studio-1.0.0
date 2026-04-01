@@ -71,7 +71,7 @@ describe("payment sidecar service", () => {
     }, {
       requestId: "req-sidecar-create-1",
       userId: "user-sidecar-1",
-      paymentUrlFactory: (merchantOrderNo) => `https://payment.kkai.plus/payment/v1/orders/${merchantOrderNo}/checkout`,
+      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
     });
 
     const second = await service.createOrder({
@@ -85,7 +85,7 @@ describe("payment sidecar service", () => {
     }, {
       requestId: "req-sidecar-create-2",
       userId: "user-sidecar-1",
-      paymentUrlFactory: (merchantOrderNo) => `https://payment.kkai.plus/payment/v1/orders/${merchantOrderNo}/checkout`,
+      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
     });
 
     assert.equal(first.success, true);
@@ -116,7 +116,7 @@ describe("payment sidecar service", () => {
     }, {
       requestId: "req-sidecar-credit-resolve-1",
       userId: "user-sidecar-credit-1",
-      paymentUrlFactory: (merchantOrderNo) => `https://payment.kkai.plus/payment/v1/orders/${merchantOrderNo}/checkout`,
+      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
     });
 
     assert.equal(created.success, true);
@@ -144,7 +144,7 @@ describe("payment sidecar service", () => {
     }, {
       requestId: "req-sidecar-credit-omitted-1",
       userId: "user-sidecar-credit-omitted-1",
-      paymentUrlFactory: (merchantOrderNo) => `https://payment.kkai.plus/payment/v1/orders/${merchantOrderNo}/checkout`,
+      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
     });
 
     assert.equal(created.success, true);
@@ -173,7 +173,7 @@ describe("payment sidecar service", () => {
     }, {
       requestId: "req-sidecar-paid-create",
       userId: "user-sidecar-2",
-      paymentUrlFactory: (merchantOrderNo) => `https://payment.kkai.plus/payment/v1/orders/${merchantOrderNo}/checkout`,
+      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
     });
 
     assert.equal(created.success, true);
@@ -284,4 +284,38 @@ describe("payment sidecar legacy routes", () => {
     const statusPayload = status.body as { tradeStatus: string };
     assert.equal(statusPayload.tradeStatus, "WAITING");
   });
+
+  test("allows legacy payment routes to inject an external payment url factory", async () => {
+    const service = new PaymentService(
+      new InMemoryPaymentOrderRepository(),
+      new StubSettlementWriter(),
+      new StubCreditAmountResolver(),
+    );
+
+    const created = await handleLegacyCreateQrCode(
+      service,
+      new URLSearchParams({
+        method: "alipay",
+        userId: "legacy-user-bridge-1",
+        amount: "12",
+        returnUrl: "https://kkai.plus/pay/success",
+        notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      }),
+      {
+        [AUTHENTICATED_USER_ID_HEADER]: "legacy-user-bridge-1",
+        "x-request-id": "req-sidecar-legacy-external-link",
+      },
+      "https://payment.kkai.plus",
+      {
+        paymentUrlFactory: async (input) =>
+          `https://openapi.alipay.com/gateway.do?merchantOrderNo=${encodeURIComponent(input.merchantOrderNo)}`,
+      },
+    );
+
+    assert.equal(created.statusCode, 200);
+    const payload = created.body as { qrCode: string; outTradeNo: string };
+    assert.match(payload.qrCode, /^https:\/\/openapi\.alipay\.com\/gateway\.do\?/);
+    assert.match(payload.qrCode, new RegExp(encodeURIComponent(payload.outTradeNo)));
+  });
 });
+

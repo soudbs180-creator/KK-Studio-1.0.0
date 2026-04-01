@@ -15,6 +15,10 @@ import { useBilling } from '../../../context/BillingContext';
 import { useLocale } from '../../../context/LocaleContext';
 import keyManager from '../../../services/auth/keyManager';
 import { getTodayCosts } from '../../../services/billing/costService';
+import {
+  formatRemainingCredits,
+  selectRemainingBalanceSummary,
+} from '../../../services/billing/remainingBalance';
 import { getAllImageIds, getStorageUsage } from '../../../services/storage/imageStorage';
 import { getStorageMode, type StorageMode } from '../../../services/storage/storagePreference';
 import {
@@ -138,6 +142,11 @@ const RingRow: React.FC<{
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
   const { balance, billingLogs, usageLogs } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
+  const { latestRecharge, todayRechargeCount } = useMemo(
+    () => selectRemainingBalanceSummary(billingLogs),
+    [billingLogs],
+  );
   const [stats, setStats] = useState(() => keyManager.getStats());
   const [todayCostUsd, setTodayCostUsd] = useState(() => getTodayCosts().totalCostUsd || 0);
   const [todayTokens, setTodayTokens] = useState(() => getTodayCosts().totalTokens || 0);
@@ -236,11 +245,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     [usageLogs]
   );
 
-  const todayRechargeLogs = useMemo(
-    () => billingLogs.filter((log) => isSameLocalDay(log.created_at)),
-    [billingLogs]
-  );
-
   const importantLogs = useMemo(
     () =>
       logs.filter(
@@ -273,9 +277,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   }, [todayUsageLogs]);
 
   const todayUsageCount = todayUsageLogs.length;
-  const todayRechargeCount = todayRechargeLogs.length;
   const latestUsage = todayUsageLogs[0] || usageLogs[0] || null;
-  const latestRecharge = todayRechargeLogs[0] || billingLogs[0] || null;
   const latestLog = importantLogs[0] || logs[0] || null;
   const importantLogCount = importantLogs.length;
   const hasCriticalLogs = importantLogs.some(
@@ -314,12 +316,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       {
         key: 'billing',
         icon: <Wallet size={18} />,
-        title: pick('余额与充值', 'Recharge & Balance'),
+        title: pick('积分与充值', 'Credits & Recharge'),
         summary: latestRecharge
           ? pick(`最近一次充值时间：${formatDateTime(latestRecharge.created_at)}`, `Latest recharge settled at ${formatDateTime(latestRecharge.created_at)}`)
-          : pick(`当前余额 ${formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}`, `Current balance ${formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}`),
+          : pick(`当前余额 ${remainingBalanceDisplay}`, `Current balance ${remainingBalanceDisplay}`),
         meta: todayRechargeCount > 0 ? pick(`今天新增 ${todayRechargeCount} 条充值记录`, `${todayRechargeCount} recharges today`) : pick('今天还没有充值记录', 'No recharge activity today'),
-        value: formatNumber(balance, Number.isInteger(balance) ? 0 : 2),
+        value: remainingBalanceDisplay,
         status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('积分', 'Credits')}</SettingsBadge>,
         onClick: () => onNavigate('consumption-records'),
       },
@@ -355,7 +357,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     ],
     [
       activeProviderCount,
-      balance,
       channelCount,
       formatDateTime,
       formatNumber,
@@ -368,6 +369,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       onNavigate,
       pick,
       providerCount,
+      remainingBalanceDisplay,
       todayRechargeCount,
       todayUsageCount,
     ]
@@ -453,8 +455,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <div className="mt-5 settings-reference-metric-grid">
               <MetricTile
                 label={pick('余额', 'Balance')}
-                value={formatNumber(balance, Number.isInteger(balance) ? 0 : 2)}
-                helper={pick('当前工作区可用积分余额', 'Remaining credits currently available to the workspace')}
+                value={remainingBalanceDisplay}
+                helper={pick('当前工作区可用积分', 'Remaining credits currently available to the workspace')}
               />
               <MetricTile
                 label={pick('最近充值', 'Latest Recharge')}

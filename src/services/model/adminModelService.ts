@@ -1,5 +1,6 @@
-﻿import { legacyWebApiClient } from '../api/kkApiClient';
+﻿import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 
+import { listActiveCreditModelsViaEdgeFunction } from '../admin/adminCreditModelsEdgeService';
 import { listActiveCreditModelsViaSupabase } from '../admin/supabaseAdminFallbackService';
 import { supabase } from '../../lib/supabase';
 
@@ -337,11 +338,28 @@ class AdminModelService {
 
   private async readFromRpc(): Promise<FlatModelRow[]> {
     try {
+      const edgeRows = this.mapActiveProviderRows(await listActiveCreditModelsViaEdgeFunction());
+      if (edgeRows.length > 0) {
+        return edgeRows;
+      }
+    } catch (edgeError) {
+      console.warn('[AdminModelService] Edge function active-model fetch failed, trying Supabase RPC:', edgeError);
+    }
+
+    try {
       const supabaseRows = this.mapActiveProviderRows(await listActiveCreditModelsViaSupabase());
       if (supabaseRows.length > 0) {
         return supabaseRows;
       }
     } catch (supabaseError) {
+      if (!shouldUseLegacyWebApiFallback()) {
+        console.warn(
+          '[AdminModelService] Supabase active-model fetch failed and Web API fallback is disabled for this runtime:',
+          supabaseError,
+        );
+        throw supabaseError;
+      }
+
       console.warn('[AdminModelService] Supabase active-model fetch failed, trying Web API fallback:', supabaseError);
 
       const response = await legacyWebApiClient.listActiveCreditModels();

@@ -8,7 +8,8 @@
         "moduleResolution": "node",
         "allowImportingTsExtensions": true,
         "types": [
-            "node"
+            "node",
+            "vite/client"
         ],
         "strict": true,
         "skipLibCheck": true,
@@ -17,7 +18,9 @@
         "noEmit": true
     },
     "include": [
+        "src/**/*.d.ts",
         "apps/**/*.ts",
+        "apps/**/*.tsx",
         "packages/**/*.ts"
     ],
     "exclude": [

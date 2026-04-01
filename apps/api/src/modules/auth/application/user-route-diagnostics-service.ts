@@ -1,0 +1,581 @@
+import type {
+  SecureProxyUserRouteConfigDto,
+  UserApiProtocolFormat,
+  UserRouteConnectivityCheckDto,
+  UserRoutePricingSyncDto,
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { AuthDataService } from "./auth-data-service.ts";
+
+type JsonRecord = Record<string, unknown>;
+type ResolvedRouteFormat = Exclude<UserApiProtocolFormat, "auto">;
+type ResolvedAuthMethod = "query" | "header";
+type AuthorizationValueFormat = "bearer" | "raw";
+
+const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com";
+const GOOGLE_DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
+const CLAUDE_DEFAULT_BASE_URL = "https://api.anthropic.com";
+
+export class UserRouteDiagnosticsError extends Error {
+  readonly code: string;
+  readonly statusCode: number;
+
+  constructor(message: string, options?: { code?: string; statusCode?: number }) {
+    super(message);
+    this.name = "UserRouteDiagnosticsError";
+    this.code = options?.code || "USER_ROUTE_DIAGNOSTICS_ERROR";
+    this.statusCode = options?.statusCode || 500;
+  }
+}
+
+function normalizeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getApiKeyToken(apiKey: string): string {
+  return String(apiKey || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\r?\n|\r|\t/g, "")
+    .trim()
+    .replace(/^Bearer\s+/i, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function formatAuthorizationHeaderValue(
+  apiKey: string,
+  valueFormat: AuthorizationValueFormat,
+): string {
+  const token = getApiKeyToken(apiKey);
+  if (valueFormat === "raw") {
+    return token;
+  }
+
+  return /^Bearer\s+/i.test(apiKey) ? apiKey : `Bearer ${token}`;
+}
+
+function inferRouteFormat(routeConfig: SecureProxyUserRouteConfigDto): ResolvedRouteFormat {
+  const explicitFormat = routeConfig.format;
+  if (explicitFormat === "openai" || explicitFormat === "gemini" || explicitFormat === "claude") {
+    return explicitFormat;
+  }
+
+  const provider = normalizeString(routeConfig.provider).toLowerCase();
+  const baseUrl = normalizeString(routeConfig.baseUrl).toLowerCase();
+  if (provider === "google" || provider === "gemini" || baseUrl.includes("googleapis.com")) {
+    return "gemini";
+  }
+  if (provider.includes("anthropic") || baseUrl.includes("anthropic.com")) {
+    return "claude";
+  }
+
+  return "openai";
+}
+
+function inferAuthMethod(
+  routeConfig: SecureProxyUserRouteConfigDto,
+  format: ResolvedRouteFormat,
+): ResolvedAuthMethod {
+  if (routeConfig.authMethod === "query" || routeConfig.authMethod === "header") {
+    return routeConfig.authMethod;
+  }
+
+  return format === "gemini" && normalizeString(routeConfig.baseUrl).includes("googleapis.com")
+    ? "query"
+    : "header";
+}
+
+function inferHeaderName(
+  routeConfig: SecureProxyUserRouteConfigDto,
+  format: ResolvedRouteFormat,
+): string {
+  const configured = normalizeString(routeConfig.headerName);
+  if (configured) {
+    return configured;
+  }
+
+  if (format === "gemini") {
+    return "x-goog-api-key";
+  }
+  if (format === "claude") {
+    return "x-api-key";
+  }
+
+  return "Authorization";
+}
+
+function inferAuthorizationValueFormat(
+  routeConfig: SecureProxyUserRouteConfigDto,
+  format: ResolvedRouteFormat,
+  headerName: string,
+): AuthorizationValueFormat {
+  const baseUrl = normalizeString(routeConfig.baseUrl).toLowerCase();
+  const provider = normalizeString(routeConfig.provider).toLowerCase();
+  const normalizedHeader = headerName.toLowerCase();
+
+  if (format === "gemini" || format === "claude") {
+    return "raw";
+  }
+
+  if (normalizedHeader !== "authorization") {
+    return "raw";
+  }
+
+  if (baseUrl.includes("wuyinkeji") || provider.includes("wuyin")) {
+    return "raw";
+  }
+
+  return "bearer";
+}
+
+function normalizeOpenAIBaseUrl(url: string | undefined): string {
+  let clean = normalizeString(url) || OPENAI_DEFAULT_BASE_URL;
+  clean = clean.replace(/\/+$/, "");
+  clean = clean.replace(/\/(?:chat\/completions|images\/generations|images\/edits|responses|models)$/i, "");
+  if (!/\/v\d[\w.-]*$/i.test(clean)) {
+    clean = `${clean}/v1`;
+  }
+  return clean.replace(/\/+$/, "");
+}
+
+function buildOpenAIEndpoint(baseUrl: string | undefined, endpoint: string): string {
+  return `${normalizeOpenAIBaseUrl(baseUrl)}/${endpoint.replace(/^\/+/, "")}`;
+}
+
+function normalizeClaudeBaseUrl(url: string | undefined): string {
+  let clean = normalizeString(url) || CLAUDE_DEFAULT_BASE_URL;
+  clean = clean.replace(/\/+$/, "");
+  clean = clean.replace(/\/(?:messages|models)$/i, "");
+  if (!/\/v\d[\w.-]*$/i.test(clean)) {
+    clean = `${clean}/v1`;
+  }
+  return clean.replace(/\/+$/, "");
+}
+
+function buildClaudeEndpoint(baseUrl: string | undefined, endpoint: string): string {
+  return `${normalizeClaudeBaseUrl(baseUrl)}/${endpoint.replace(/^\/+/, "")}`;
+}
+
+function normalizeGeminiBaseUrl(url: string | undefined): string {
+  let clean = normalizeString(url) || GOOGLE_DEFAULT_BASE_URL;
+  clean = clean
+    .replace(/\/v1beta\/models\/[^/?]+:(?:generateContent|streamGenerateContent)$/i, "")
+    .replace(/\/v1\/models\/[^/?]+:(?:generateContent|streamGenerateContent)$/i, "")
+    .replace(/\/+$/, "");
+
+  const suffixes = ["/v1beta/models", "/v1/models", "/models", "/v1beta", "/v1"];
+  let stripped = true;
+  while (stripped) {
+    stripped = false;
+    const lower = clean.toLowerCase();
+    for (const suffix of suffixes) {
+      if (lower.endsWith(suffix)) {
+        clean = clean.slice(0, -suffix.length).replace(/\/+$/, "");
+        stripped = true;
+        break;
+      }
+    }
+  }
+
+  return clean || GOOGLE_DEFAULT_BASE_URL;
+}
+
+function buildGeminiModelsEndpoint(
+  baseUrl: string | undefined,
+  apiKey: string,
+  authMethod: ResolvedAuthMethod,
+): string {
+  const endpoint = `${normalizeGeminiBaseUrl(baseUrl)}/v1beta/models`;
+  if (authMethod === "query") {
+    return `${endpoint}?key=${encodeURIComponent(getApiKeyToken(apiKey))}`;
+  }
+  return endpoint;
+}
+
+function buildHeaders(
+  routeConfig: SecureProxyUserRouteConfigDto,
+  format: ResolvedRouteFormat,
+  authMethod: ResolvedAuthMethod,
+  headerName: string,
+  authorizationValueFormat: AuthorizationValueFormat,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+
+  if (format === "claude") {
+    headers["anthropic-version"] = "2023-06-01";
+  }
+
+  if (authMethod !== "header") {
+    return headers;
+  }
+
+  headers[headerName] = headerName.toLowerCase() === "authorization"
+    ? formatAuthorizationHeaderValue(routeConfig.apiKey, authorizationValueFormat)
+    : getApiKeyToken(routeConfig.apiKey);
+
+  return headers;
+}
+
+function normalizeModels(payload: unknown): string[] {
+  const record = payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload as JsonRecord
+    : null;
+  const models = Array.isArray(record?.data)
+    ? record.data
+    : Array.isArray(record?.models)
+      ? record.models
+      : [];
+
+  return models
+    .map((item: any) => String(item?.id || item?.name || item?.model || "").replace(/^models\//i, ""))
+    .filter(Boolean);
+}
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload) {
+    return fallback;
+  }
+
+  if (typeof payload === "string") {
+    return payload.trim() || fallback;
+  }
+
+  if (typeof payload === "object" && !Array.isArray(payload)) {
+    const record = payload as JsonRecord;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message.trim();
+    }
+    if (record.error && typeof record.error === "object" && !Array.isArray(record.error)) {
+      const nested = record.error as JsonRecord;
+      if (typeof nested.message === "string" && nested.message.trim()) {
+        return nested.message.trim();
+      }
+      if (typeof nested.error === "string" && nested.error.trim()) {
+        return nested.error.trim();
+      }
+    }
+  }
+
+  return fallback;
+}
+
+async function parseResponsePayload(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizePricingBaseUrl(baseUrl: string): string {
+  const raw = normalizeString(baseUrl);
+  if (!raw) return "";
+  const trimmed = raw.replace(/\/+$/, "");
+  return trimmed.replace(/(\/(pricing|models))(\/.*)?$/i, "") || trimmed;
+}
+
+function buildPricingEndpointCandidates(baseUrl: string): string[] {
+  const cleanUrl = normalizePricingBaseUrl(baseUrl);
+  if (!cleanUrl) return [];
+
+  const rootUrl = cleanUrl.replace(/\/v1$/i, "");
+  let originUrl = cleanUrl;
+
+  try {
+    const parsed = new URL(cleanUrl);
+    originUrl = `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    originUrl = rootUrl;
+  }
+
+  const baseCandidates = Array.from(new Set([cleanUrl, rootUrl, originUrl].filter(Boolean)));
+  const suffixes = ["/pricing", "/pricing.html", "/models", "/api/pricing", "/price", "/api/price"];
+  return Array.from(
+    new Set(
+      baseCandidates.flatMap((candidate) => suffixes.map((suffix) => `${candidate}${suffix}`)),
+    ),
+  );
+}
+
+function isPricingLikeObject(item: unknown): item is JsonRecord {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return false;
+  }
+
+  const keys = Object.keys(item).map((key) => key.toLowerCase());
+  const hasModel = keys.some((key) => key.includes("model") || key === "id" || key.includes("name"));
+  const hasPrice = keys.some((key) => key.includes("price") || key.includes("ratio") || key.includes("quota") || key.includes("cost"));
+  return hasModel && hasPrice;
+}
+
+function extractPricingPayloadRows(payload: unknown): JsonRecord[] {
+  if (Array.isArray(payload)) {
+    return payload.filter(isPricingLikeObject);
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as JsonRecord;
+  if (Array.isArray(record.data)) {
+    return record.data.filter(isPricingLikeObject);
+  }
+  if (Array.isArray(record.prices)) {
+    return record.prices.filter(isPricingLikeObject);
+  }
+  if (Array.isArray(record.models)) {
+    return record.models.filter(isPricingLikeObject);
+  }
+
+  for (const value of Object.values(record)) {
+    const nested = extractPricingPayloadRows(value);
+    if (nested.length > 0) {
+      return nested;
+    }
+  }
+
+  return [];
+}
+
+function extractGroupRatioMap(payload: unknown): Record<string, number> {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {};
+  }
+
+  const record = payload as JsonRecord;
+  const source = record.group_ratio ?? record.groupRatio ?? record.groups ?? null;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return {};
+  }
+
+  return Object.entries(source as JsonRecord).reduce<Record<string, number>>((acc, [key, value]) => {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      acc[key] = numeric;
+    }
+    return acc;
+  }, {});
+}
+
+function supportsPricingSync(routeConfig: SecureProxyUserRouteConfigDto, format: ResolvedRouteFormat): boolean {
+  const baseUrl = normalizeString(routeConfig.baseUrl).toLowerCase();
+  if (format === "gemini" && baseUrl.includes("googleapis.com")) {
+    return false;
+  }
+  if (format === "claude" && baseUrl.includes("anthropic.com")) {
+    return false;
+  }
+  return true;
+}
+
+export class UserRouteDiagnosticsService {
+  private readonly authDataService: AuthDataService;
+
+  constructor(authDataService: AuthDataService) {
+    this.authDataService = authDataService;
+  }
+
+  async checkConnectivity(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+    accessToken?: string,
+  ): Promise<UserRouteConnectivityCheckDto> {
+    const routeConfig = await this.resolveRouteConfig(userId, email, routeId, accessToken);
+    const format = inferRouteFormat(routeConfig);
+    const authMethod = inferAuthMethod(routeConfig, format);
+    const headerName = inferHeaderName(routeConfig, format);
+    const authorizationValueFormat = inferAuthorizationValueFormat(routeConfig, format, headerName);
+    const endpointUrl =
+      format === "gemini"
+        ? buildGeminiModelsEndpoint(routeConfig.baseUrl, routeConfig.apiKey, authMethod)
+        : format === "claude"
+          ? buildClaudeEndpoint(routeConfig.baseUrl, "models")
+          : buildOpenAIEndpoint(routeConfig.baseUrl, "models");
+    const headers = buildHeaders(
+      routeConfig,
+      format,
+      authMethod,
+      headerName,
+      authorizationValueFormat,
+    );
+
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort("Connectivity check timed out."), 15000);
+
+    try {
+      const response = await fetch(endpointUrl, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+      const latencyMs = Date.now() - startedAt;
+      const payload = await parseResponsePayload(response);
+
+      if (!response.ok) {
+        return {
+          routeId,
+          ok: false,
+          message: extractErrorMessage(
+            payload,
+            `HTTP ${response.status}: ${response.statusText || "Connectivity check failed."}`,
+          ),
+          endpointUrl,
+          latencyMs,
+          resolvedFormat: format,
+          models: [],
+        };
+      }
+
+      return {
+        routeId,
+        ok: true,
+        message: undefined,
+        endpointUrl,
+        latencyMs,
+        resolvedFormat: format,
+        models: normalizeModels(payload),
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error && error.name === "AbortError"
+          ? "Request timed out while checking connectivity."
+          : error instanceof Error
+            ? error.message
+            : "Connectivity check failed.";
+
+      return {
+        routeId,
+        ok: false,
+        message,
+        endpointUrl,
+        latencyMs: Date.now() - startedAt,
+        resolvedFormat: format,
+        models: [],
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async syncPricing(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+    accessToken?: string,
+  ): Promise<UserRoutePricingSyncDto> {
+    const routeConfig = await this.resolveRouteConfig(userId, email, routeId, accessToken);
+    const format = inferRouteFormat(routeConfig);
+    const authMethod = inferAuthMethod(routeConfig, format);
+    const headerName = inferHeaderName(routeConfig, format);
+    const authorizationValueFormat = inferAuthorizationValueFormat(routeConfig, format, headerName);
+
+    if (!supportsPricingSync(routeConfig, format)) {
+      return {
+        routeId,
+        ok: false,
+        message: `供应商 ${routeConfig.provider} 当前没有可抓取的价格端点。`,
+        count: 0,
+        pricingData: [],
+        groupRatio: {},
+      };
+    }
+
+    const headers = buildHeaders(
+      routeConfig,
+      format,
+      authMethod,
+      headerName,
+      authorizationValueFormat,
+    );
+    const attemptedUrls: string[] = [];
+    let lastMessage = "No pricing data is available right now.";
+
+    for (const endpointUrl of buildPricingEndpointCandidates(routeConfig.baseUrl)) {
+      attemptedUrls.push(endpointUrl);
+      try {
+        const response = await fetch(endpointUrl, {
+          method: "GET",
+          headers,
+        });
+        const payload = await parseResponsePayload(response);
+        if (!response.ok) {
+          lastMessage = extractErrorMessage(
+            payload,
+            `HTTP ${response.status}: ${response.statusText || "Pricing sync failed."}`,
+          );
+          continue;
+        }
+
+        const pricingData = extractPricingPayloadRows(payload);
+        if (pricingData.length === 0) {
+          lastMessage = "Pricing endpoint returned no usable pricing rows.";
+          continue;
+        }
+
+        return {
+          routeId,
+          ok: true,
+          message: `已同步 ${pricingData.length} 条价格数据。`,
+          endpointUrl,
+          attemptedUrls,
+          count: pricingData.length,
+          pricingData,
+          groupRatio: extractGroupRatioMap(payload),
+        };
+      } catch (error) {
+        lastMessage = error instanceof Error ? error.message : "Pricing sync failed.";
+      }
+    }
+
+    return {
+      routeId,
+      ok: false,
+      message: lastMessage,
+      endpointUrl: attemptedUrls[attemptedUrls.length - 1],
+      attemptedUrls,
+      count: 0,
+      pricingData: [],
+      groupRatio: {},
+    };
+  }
+
+  private async resolveRouteConfig(
+    userId: string,
+    email: string | undefined,
+    routeId: string,
+    accessToken?: string,
+  ): Promise<SecureProxyUserRouteConfigDto> {
+    const normalizedRouteId = String(routeId || "").trim();
+    if (!normalizedRouteId) {
+      throw new UserRouteDiagnosticsError("routeId is required.", {
+        code: "INVALID_REQUEST",
+        statusCode: 400,
+      });
+    }
+
+    const routeConfig = await this.authDataService.resolveSecureProxyUserRouteConfig(
+      userId,
+      email,
+      normalizedRouteId,
+      accessToken,
+    );
+    if (!routeConfig) {
+      throw new UserRouteDiagnosticsError("The selected user route could not be resolved.", {
+        code: "USER_ROUTE_NOT_FOUND",
+        statusCode: 404,
+      });
+    }
+
+    return routeConfig;
+  }
+}

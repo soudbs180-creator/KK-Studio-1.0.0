@@ -1,3 +1,4 @@
+import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { supabase } from '../../lib/supabase';
 
 export type SupportedRechargeCurrency = 'CNY' | 'USD';
@@ -10,15 +11,6 @@ export interface CreditExchangeRate {
   isActive: boolean;
   updatedAt?: string | null;
 }
-
-type CreditExchangeRateRow = {
-  currency_code: SupportedRechargeCurrency;
-  credits_per_unit: number;
-  min_amount: number | null;
-  max_amount: number | null;
-  is_active: boolean;
-  updated_at?: string | null;
-};
 
 export const DEFAULT_CREDIT_EXCHANGE_RATES: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
   CNY: {
@@ -37,6 +29,15 @@ export const DEFAULT_CREDIT_EXCHANGE_RATES: Record<SupportedRechargeCurrency, Cr
   },
 };
 
+interface CreditExchangeRateRow {
+  currency_code?: SupportedRechargeCurrency | null;
+  credits_per_unit?: number | null;
+  min_amount?: number | null;
+  max_amount?: number | null;
+  is_active?: boolean | null;
+  updated_at?: string | null;
+}
+
 const toNumber = (value: unknown, fallback: number | null = null): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -46,11 +47,26 @@ const toNumber = (value: unknown, fallback: number | null = null): number | null
   return fallback;
 };
 
-const mapRow = (row: CreditExchangeRateRow): CreditExchangeRate => ({
-  currencyCode: row.currency_code,
-  creditsPerUnit: Math.max(1, toNumber(row.credits_per_unit, DEFAULT_CREDIT_EXCHANGE_RATES[row.currency_code].creditsPerUnit) || 1),
-  minAmount: toNumber(row.min_amount, null),
-  maxAmount: toNumber(row.max_amount, null),
+const mapApiRate = (row: Partial<CreditExchangeRate> & { currencyCode?: SupportedRechargeCurrency | null }): CreditExchangeRate => ({
+  currencyCode: row.currencyCode || 'CNY',
+  creditsPerUnit: Math.max(
+    0.000001,
+    toNumber(
+      row.creditsPerUnit,
+      DEFAULT_CREDIT_EXCHANGE_RATES[(row.currencyCode || 'CNY') as SupportedRechargeCurrency].creditsPerUnit,
+    ) || 0,
+  ),
+  minAmount: toNumber(row.minAmount, null),
+  maxAmount: toNumber(row.maxAmount, null),
+  isActive: row.isActive !== false,
+  updatedAt: row.updatedAt || null,
+});
+
+const mapSupabaseRate = (row: CreditExchangeRateRow): CreditExchangeRate => mapApiRate({
+  currencyCode: row.currency_code || 'CNY',
+  creditsPerUnit: row.credits_per_unit ?? undefined,
+  minAmount: row.min_amount ?? null,
+  maxAmount: row.max_amount ?? null,
   isActive: row.is_active !== false,
   updatedAt: row.updated_at || null,
 });
@@ -92,59 +108,131 @@ const mergeWithInactiveFallback = (rows: CreditExchangeRate[]): Record<Supported
   return merged;
 };
 
-export async function listCreditExchangeRates(): Promise<CreditExchangeRate[]> {
+async function readCreditExchangeRatesViaSupabase(): Promise<CreditExchangeRate[]> {
   const { data, error } = await supabase
     .from('credit_exchange_rates')
     .select('currency_code, credits_per_unit, min_amount, max_amount, is_active, updated_at')
-    .in('currency_code', ['CNY', 'USD'])
-    .order('currency_code', { ascending: true });
+    .order('currency_code', { ascending: true })
+    .returns<CreditExchangeRateRow[]>();
 
   if (error) {
-    console.warn('[creditExchangeRateService] Failed to list exchange rates:', error.message);
-    return Object.values(DEFAULT_CREDIT_EXCHANGE_RATES);
+    throw new Error(error.message || 'Failed to load exchange rates from Supabase.');
   }
 
-  const mapped = (data || []).map((row) => mapRow(row as CreditExchangeRateRow));
-  return Object.values(mergeWithDefaults(mapped));
+  return (data || []).map((row) => mapSupabaseRate(row));
+}
+
+async function upsertCreditExchangeRateViaSupabase(rate: CreditExchangeRate): Promise<CreditExchangeRate> {
+  const { data, error } = await supabase
+    .from('credit_exchange_rates')
+    .upsert(
+      {
+        currency_code: rate.currencyCode,
+        credits_per_unit: Math.max(0.000001, Number(rate.creditsPerUnit) || 0),
+        min_amount: rate.minAmount,
+        max_amount: rate.maxAmount,
+        is_active: rate.isActive !== false,
+      },
+      { onConflict: 'currency_code' },
+    )
+    .select('currency_code, credits_per_unit, min_amount, max_amount, is_active, updated_at')
+    .single<CreditExchangeRateRow>();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update exchange rate in Supabase.');
+  }
+
+  return mapSupabaseRate(data as CreditExchangeRateRow);
+}
+
+export async function listCreditExchangeRates(): Promise<CreditExchangeRate[]> {
+  if (shouldUseLegacyWebApiFallback()) {
+    try {
+      const response = await legacyWebApiClient.listCreditExchangeRates({
+        requestId: `exchange-rates-list-${Date.now()}`,
+      });
+
+      if (response.success) {
+        const mapped = (response.data.items || []).map((row) => mapApiRate(row as CreditExchangeRate));
+        return Object.values(mergeWithDefaults(mapped));
+      }
+
+      console.warn(
+        '[creditExchangeRateService] Failed to list exchange rates via local API, falling back to Supabase:',
+        response.error?.message || 'Unknown error',
+      );
+    } catch (error) {
+      console.warn('[creditExchangeRateService] Local API exchange-rate read failed, falling back to Supabase:', error);
+    }
+  }
+
+  try {
+    return Object.values(mergeWithDefaults(await readCreditExchangeRatesViaSupabase()));
+  } catch (fallbackError) {
+    console.warn('[creditExchangeRateService] Supabase exchange-rate fallback failed:', fallbackError);
+    return Object.values(DEFAULT_CREDIT_EXCHANGE_RATES);
+  }
 }
 
 export async function getCreditExchangeRateMap(): Promise<Record<SupportedRechargeCurrency, CreditExchangeRate>> {
-  const { data, error } = await supabase
-    .from('credit_exchange_rates')
-    .select('currency_code, credits_per_unit, min_amount, max_amount, is_active, updated_at')
-    .in('currency_code', ['CNY', 'USD'])
-    .order('currency_code', { ascending: true });
+  if (shouldUseLegacyWebApiFallback()) {
+    try {
+      const response = await legacyWebApiClient.listCreditExchangeRates({
+        requestId: `exchange-rates-map-${Date.now()}`,
+      });
 
-  if (error) {
-    console.warn('[creditExchangeRateService] Failed to read exchange rate map:', error.message);
-    return mergeWithDefaults([]);
+      if (response.success) {
+        const mapped = (response.data.items || []).map((row) => mapApiRate(row as CreditExchangeRate));
+        return mergeWithInactiveFallback(mapped);
+      }
+
+      console.warn(
+        '[creditExchangeRateService] Failed to read exchange rate map via local API, falling back to Supabase:',
+        response.error?.message || 'Unknown error',
+      );
+    } catch (error) {
+      console.warn('[creditExchangeRateService] Local API exchange-rate map failed, falling back to Supabase:', error);
+    }
   }
 
-  const mapped = (data || []).map((row) => mapRow(row as CreditExchangeRateRow));
-  return mergeWithInactiveFallback(mapped);
+  try {
+    return mergeWithInactiveFallback(await readCreditExchangeRatesViaSupabase());
+  } catch (fallbackError) {
+    console.warn('[creditExchangeRateService] Supabase exchange-rate map fallback failed:', fallbackError);
+    return mergeWithDefaults([]);
+  }
 }
 
 export async function upsertCreditExchangeRate(rate: CreditExchangeRate): Promise<CreditExchangeRate> {
-  const payload: CreditExchangeRateRow = {
-    currency_code: rate.currencyCode,
-    credits_per_unit: Math.max(1, rate.creditsPerUnit),
-    min_amount: rate.minAmount,
-    max_amount: rate.maxAmount,
-    is_active: rate.isActive !== false,
-    updated_at: new Date().toISOString(),
-  };
+  if (shouldUseLegacyWebApiFallback()) {
+    try {
+      const response = await legacyWebApiClient.upsertCreditExchangeRate(
+        {
+          currencyCode: rate.currencyCode,
+          creditsPerUnit: Math.max(0.000001, Number(rate.creditsPerUnit) || 0),
+          minAmount: rate.minAmount,
+          maxAmount: rate.maxAmount,
+          isActive: rate.isActive !== false,
+        },
+        {
+          requestId: `exchange-rates-upsert-${rate.currencyCode}-${Date.now()}`,
+        },
+      );
 
-  const { data, error } = await supabase
-    .from('credit_exchange_rates')
-    .upsert(payload, { onConflict: 'currency_code' })
-    .select('currency_code, credits_per_unit, min_amount, max_amount, is_active, updated_at')
-    .single();
+      if (response.success) {
+        return mapApiRate(response.data as CreditExchangeRate);
+      }
 
-  if (error) {
-    throw error;
+      console.warn(
+        '[creditExchangeRateService] Failed to update exchange rate via local API, falling back to Supabase:',
+        response.error?.message || 'Unknown error',
+      );
+    } catch (error) {
+      console.warn('[creditExchangeRateService] Local API exchange-rate update failed, falling back to Supabase:', error);
+    }
   }
 
-  return mapRow(data as CreditExchangeRateRow);
+  return await upsertCreditExchangeRateViaSupabase(rate);
 }
 
 export function calculateCreditsByRate(

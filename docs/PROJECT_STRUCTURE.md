@@ -1,80 +1,58 @@
-# 项目结构与命名规范
+# Project Structure
 
-本文档用于约束 `KK-Studio` 的目录职责、命名方式和后续整理方向，目标是让项目在继续迭代时保持可维护、可定位、可扩展。
+This document defines ownership rules for the KK Studio repository during the migration to the final `apps/* + packages/*` layout.
 
-## 目录职责
+## Target top-level layout
 
-- `src/components`：界面组件，按业务域拆分。
-- `src/context`：全局状态与 Provider。
-- `src/services`：外部接口、业务逻辑、存储与计费服务。
-- `src/pages`：完整页面级视图。
-- `src/utils`：纯函数工具，不放副作用逻辑。
-- `src/workers`：缩略图、图像处理等异步工作线程。
-- `payment-server`：积分充值与支付回调服务端逻辑。
-- `supabase/functions`：安全代理、鉴权与积分相关边缘函数。
-- `docs`：架构、接入、迁移和运维文档。
-- `scripts`：工程巡检、编码检查等辅助脚本。
+```text
+apps/
+  web/
+  api/
+  payment-sidecar/
+packages/
+  ui/
+  contracts/
+  shared/
+  domain/
+docs/
+scripts/
+workspace/
+```
 
-## 组件命名规范
+## Ownership summary
 
-- React 组件文件统一使用 `PascalCase`。
-- 组件对外入口优先使用语义化名称，例如 `ImageCard.tsx`。
-- 历史兼容文件先保留，再通过包装入口逐步收敛，避免一次性大规模重命名带来回归。
-- 同一目录中：
-  - 展示组件放在 `components`
-  - 弹窗放在 `modals`
-  - 画布交互放在 `canvas`
-  - 设置相关放在 `settings`
+- `apps/web`: browser app shell, routes, modules, and typed API clients
+- `apps/api`: main API and privileged business logic
+- `apps/payment-sidecar`: payment providers, callbacks, order persistence, and settlement write-back
+- `packages/ui`: reusable UI primitives only
+- `packages/contracts`: DTOs, envelopes, and generated/manual API clients
+- `packages/shared`: cross-runtime utilities such as env access, auth headers, and logging
+- `packages/domain`: pure rules, policies, state machines, and repository interfaces
 
-## 服务命名规范
+## Legacy status
 
-- service 文件统一使用 `camelCase`，如 `secureModelProxy.ts`、`imageStorage.ts`。
-- 一类能力只保留一个主入口，避免出现多个并行“近似实现”。
-- 供应商适配、模型路由、计费逻辑分开存放，避免在单个 service 中混写 UI 逻辑。
+The repository still contains frozen legacy roots:
 
-## 当前主入口约定
+- `src/`
+- `server/`
+- `api/`
+- `billing/`
+- `payment-server/`
 
-- 画布图片卡片统一从 `src/components/image/ImageCard.tsx` 引入。
-- `src/components/image/ImageCard2.tsx` 当前保留为兼容实现文件，后续重构时再安全迁移。
-- 设置面板、API 管理、成本页属于“管理域”，构建时会被归并到独立 chunk。
+These paths are transitional. Do not introduce new primary logic there.
 
-## 存储与本地文件约定
+## Web boundary
 
-- 浏览器缓存仍是默认存储模式。
-- 本地存储作为双层保护，用于浏览器缓存丢失后的恢复。
-- 存储相关逻辑统一收口到：
-  - `src/services/storage`
-  - `src/services/image`
-  - `src/workers`
-- 本地数据目录属于运行产物，不应触发前端热更新监听。
+- Web code must call backend behavior through typed contracts.
+- Web code must not directly access Supabase business tables or RPCs.
+- Web code must not import API or payment implementation files.
 
-## 编码与文案要求
+## Service boundary
 
-- 所有源码、文档、配置统一使用 UTF-8。
-- 编码巡检脚本：`npm run check:encoding`
-- 用户可见文案优先中文，避免混入乱码或历史占位文本。
+- `apps/api` and `apps/payment-sidecar` must not import web implementation files.
+- Cross-module service imports must flow through module indexes, not deep implementation paths.
+- Shared behavior used by both services belongs in `packages/shared` or `packages/domain`.
 
-## 构建与拆包约定
+## Local artifact policy
 
-- 框架依赖、图标、Supabase、模型服务、存储服务、管理域组件应尽量拆分为独立 chunk。
-- 仅做低风险拆包，不做会改变交互表现的大规模路由改造。
-- 若出现白屏或首屏阻塞，优先检查：
-  - 主包体积
-  - 动态导入与静态导入混用
-  - 是否把管理域模块错误放入首页入口
-
-## Legacy 文件处理原则
-
-- 先识别“主入口”和“历史遗留文件”，再决定是否迁移。
-- 没有确认引用关系前，不直接删除旧文件。
-- 优先采用以下方式整理：
-  - 新增语义化入口文件
-  - 增加结构文档
-  - 收敛导入路径
-  - 最后再做物理重命名
-
-## 后续建议
-
-- 继续把少量仍存在的历史动态导入/静态导入混用问题逐步收敛。
-- 为 `src/services` 增加更明确的分层说明文档。
-- 在不改变 UI 的前提下，逐步把低频管理面板改为按需加载。
+Temporary scripts, screenshots, diagnostics, and scratch files do not belong at the repo root. Move them into `workspace/diagnostics`, `workspace/local-artifacts`, or `workspace/quarantine`.

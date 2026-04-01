@@ -11,7 +11,22 @@ import * as costService from '../billing/costService';
 import { logWarning } from '../system/systemLogService';
 import { ImageSize, Provider } from '../../types';
 import { getProviderCapability, modelSupportedByProvider, ProviderCapabilityProfile } from './providerCapabilities';
-import { callSecureSystemProxyChat, callSecureSystemProxyImage, callSecureSystemProxyVideo, callSecureSystemProxyAudio, checkSecureSystemProxyTaskStatus } from '../model/secureModelProxy';
+import {
+    buildSecureProxyUserRouteFromSlotId,
+    callLocalUserRouteProxyAudio,
+    callLocalUserRouteProxyChat,
+    callLocalUserRouteProxyImage,
+    callLocalUserRouteProxyVideo,
+    callSecureSystemProxyChat,
+    callSecureSystemProxyImage,
+    callSecureSystemProxyVideo,
+    callSecureSystemProxyAudio,
+    checkLocalUserRouteProxyTaskStatus,
+    checkSecureSystemProxyTaskStatus,
+    isSecureProxyGuestModeError,
+    isSecureProxySessionReauthError,
+} from '../model/secureModelProxy';
+import { resolveKkApiBaseUrl } from '../api/kkApiClient';
 import { resolveProviderRuntime } from '../api/providerStrategy';
 import { resolveProviderIdentity } from '../../utils/providerDisplay';
 import { getModelPricing } from '../model/modelPricing';
@@ -88,21 +103,175 @@ export class LLMService {
         return baseModelId.trim();
     }
 
-    private isSystemKeySelection(preferredKeyId?: string): boolean {
-        const normalized = String(preferredKeyId || '').trim().toLowerCase();
-        if (!normalized) {
+    private shouldUseSecureProxyUserRoute(keySlot: KeySlot): boolean {
+        if (!keySlot || keySlot.provider === 'SystemProxy') {
             return false;
         }
 
-        if (normalized === 'system_proxy_slot' || normalized.startsWith('backend_proxy_')) {
-            return true;
+        return Boolean(keyManager.getUserId());
+    }
+
+    private buildUserRouteForKeySlot(keySlot: KeySlot): string {
+        return buildSecureProxyUserRouteFromSlotId(keySlot.id).id;
+    }
+
+    private shouldFallbackToCloudUserRouteAfterLocalProxy(
+        error: unknown,
+    ): boolean {
+        void error;
+        return false;
+    }
+
+    private createCloudFallbackNotice(action: string, keySlot: Pick<KeySlot, 'name' | 'provider'>): string {
+        const providerLabel = String(keySlot.name || keySlot.provider || 'provider').trim();
+        return `[LLMService] Local user-route proxy unavailable for ${providerLabel}, falling back to cloud ${action}.`;
+    }
+
+    private buildUserRouteFallbackFailureError(
+        keySlot: Pick<KeySlot, 'name' | 'provider'>,
+        localError: unknown,
+        cloudError: unknown,
+    ): Error {
+        const providerLabel = String(keySlot.name || keySlot.provider || '当前渠道').trim();
+        const localApiBaseUrl = resolveKkApiBaseUrl();
+        let message = `用户 API 路由失败：${providerLabel} 的本地代理不可用，云端兜底也失败了。`;
+
+        if (isSecureProxySessionReauthError(cloudError)) {
+            message = `用户 API 路由失败：本地 KK API 服务不可用（${localApiBaseUrl}），且当前登录态已过期。请先确认 KK API 已启动，再重新登录后重试。`;
+        } else if (isSecureProxyGuestModeError(cloudError)) {
+            message = `用户 API 路由失败：本地 KK API 服务不可用（${localApiBaseUrl}），游客模式也不支持云端用户 API 代理。请先登录正式账号后重试。`;
         }
 
-        return normalized === 'system'
-            || normalized === 'systemproxy'
-            || normalized === 'slot_systemproxy'
-            || normalized === 'slot_system_proxy_slot'
-            || normalized === 'provider_systemproxy';
+        const error = new Error(message) as Error & {
+            code?: string;
+            cause?: unknown;
+            localCause?: unknown;
+            cloudCause?: unknown;
+        };
+        error.code = 'USER_ROUTE_FALLBACK_FAILED';
+        error.cause = cloudError;
+        error.localCause = localError;
+        error.cloudCause = cloudError;
+        return error;
+    }
+
+    private decorateTaskStatusResult(
+        result: object,
+        normalizedPreferredKeyId?: string,
+        preferredKeySlot?: KeySlot | null,
+        fallbackIdentity?: { provider: string; providerName: string; keySlotId: string },
+    ): Record<string, unknown> {
+        if (preferredKeySlot) {
+            return this.applyProviderIdentity({
+                ...result,
+                keySlotId: preferredKeySlot.id,
+            }, preferredKeySlot);
+        }
+
+        const preferredProvider = normalizedPreferredKeyId
+            ? keyManager.getProvider(normalizedPreferredKeyId)
+            : undefined;
+        if (preferredProvider) {
+            return {
+                ...result,
+                provider: preferredProvider.name,
+                providerName: preferredProvider.name,
+                keySlotId: preferredProvider.id,
+            };
+        }
+
+        if (fallbackIdentity) {
+            return {
+                ...result,
+                ...fallbackIdentity,
+            };
+        }
+
+        return result as Record<string, unknown>;
+    }
+
+    private async runDirectChat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
+        if (options.stream && adapter.chatStream) {
+            await adapter.chatStream(options, keySlot);
+            return '';
+        }
+
+        const content = await adapter.chat(options, keySlot);
+        if (options.stream && typeof options.onStream === 'function' && content) {
+            options.onStream(content);
+        }
+
+        return content;
+    }
+
+    private async runDirectImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
+        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
+        return adapter.generateImage(options, keySlot);
+    }
+
+    private async runDirectVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
+        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
+        if (!adapter.generateVideo) {
+            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct video generation.`);
+        }
+
+        return adapter.generateVideo(options, keySlot);
+    }
+
+    private async runDirectAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
+        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
+        if (!adapter.generateAudio) {
+            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct audio generation.`);
+        }
+
+        return adapter.generateAudio(options, keySlot);
+    }
+
+    private async runDirectTaskStatus(
+        taskId: string,
+        mode: GenerationMode,
+        keySlot: KeySlot,
+        modelId?: string,
+    ): Promise<any> {
+        const adapter = this.getAdapterForSlot(keySlot, modelId);
+        if (!adapter.checkTaskStatus) {
+            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct task status checks.`);
+        }
+
+        return adapter.checkTaskStatus(taskId, mode, keySlot, modelId);
+    }
+
+    private async runDirectTaskStatuses(
+        taskIds: string[],
+        mode: GenerationMode,
+        keySlot: KeySlot,
+        modelId?: string,
+    ): Promise<any[]> {
+        const adapter = this.getAdapterForSlot(keySlot, modelId);
+        if (adapter.checkTaskStatuses) {
+            return adapter.checkTaskStatuses(taskIds, mode, keySlot, modelId);
+        }
+
+        if (!adapter.checkTaskStatus) {
+            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct task status checks.`);
+        }
+
+        return Promise.all(taskIds.map((taskId) => adapter.checkTaskStatus!(taskId, mode, keySlot, modelId)));
+    }
+
+    private createBrowserDirectProviderCallBlockedError(action: string, keySlot?: Pick<KeySlot, 'name' | 'provider'>): Error {
+        const providerLabel = String(keySlot?.name || keySlot?.provider || 'this provider').trim();
+        const guidance = keyManager.getUserId()
+            ? `Secure proxy routing is required for ${providerLabel}.`
+            : `Sign in and save ${providerLabel} to your account before using the secure proxy.`;
+        const error = new Error(`Browser-side ${action} is disabled. ${guidance}`) as Error & { code?: string };
+        error.code = 'BROWSER_DIRECT_PROVIDER_CALLS_DISABLED';
+        return error;
+    }
+
+    private throwBrowserDirectProviderCallBlocked(action: string, keySlot?: Pick<KeySlot, 'name' | 'provider'>): never {
+        throw this.createBrowserDirectProviderCallBlockedError(action, keySlot);
     }
 
     public getProviderProfile(provider: Provider): ProviderCapabilityProfile | null {
@@ -148,44 +317,61 @@ export class LLMService {
                     return response.content;
                 }
 
-                const adapter = this.getAdapterForSlot(keySlot, options.modelId);
+                if (this.shouldUseSecureProxyUserRoute(keySlot)) {
+                    const routeId = this.buildUserRouteForKeySlot(keySlot);
+                    const normalizedMessages = options.messages.map((message) => ({
+                        role: message.role as 'system' | 'user' | 'assistant',
+                        content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
+                    }));
 
-                if (!adapter.supports(options.modelId)) {
-                    throw new Error(`Channel ${keySlot.name} cannot handle model ${options.modelId} under its configured protocol.`);
-                }
+                    let response;
+                    try {
+                        response = await callLocalUserRouteProxyChat({
+                            routeId,
+                            modelId: options.modelId,
+                            messages: normalizedMessages,
+                            temperature: options.temperature,
+                            maxTokens: options.maxTokens,
+                            stream: false,
+                        });
+                    } catch (error) {
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
+                            throw error;
+                        }
 
-                const baseModelId = options.modelId.split('@')[0];
-                const cleanOptions = { ...options, modelId: baseModelId };
-
-                const callerOnStream = options.onStream;
-                let streamedText = '';
-                const streamOptions = {
-                    ...cleanOptions,
-                    onStream: (chunk: string) => {
-                        streamedText += chunk;
-                        callerOnStream?.(chunk);
+                        console.warn(this.createCloudFallbackNotice('chat routing', keySlot), error);
+                        try {
+                            response = await callSecureSystemProxyChat({
+                                modelId: options.modelId,
+                                userRoute: buildSecureProxyUserRouteFromSlotId(routeId),
+                                messages: normalizedMessages,
+                                temperature: options.temperature,
+                                maxTokens: options.maxTokens,
+                                stream: false,
+                            });
+                        } catch (cloudError) {
+                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                        }
                     }
-                };
 
-                let result: string;
-                if (options.stream && adapter.chatStream) {
-                    await adapter.chatStream(streamOptions, keySlot);
-                    result = streamedText;
-                } else {
-                    result = await adapter.chat(cleanOptions, keySlot);
-                }
-                keyManager.reportSuccess(keySlot.id);
+                    keyManager.reportSuccess(keySlot.id);
+                    const inputLen = options.messages.reduce((acc, m) => acc + m.content.length, 0);
+                    const outputLen = response.content.length;
+                    const tokens = response.usage?.totalTokens || Math.ceil((inputLen + outputLen) * 0.3);
 
-                const inputLen = options.messages.reduce((acc, m) => acc + m.content.length, 0);
-                const outputLen = result.length;
-                const tokens = Math.ceil((inputLen + outputLen) * 0.3);
+                    keyManager.addUsage(keySlot.id, tokens);
+                    if (keySlot.creditCost !== undefined) {
+                        keyManager.addCost(keySlot.id, keySlot.creditCost);
+                    }
 
-                keyManager.addUsage(keySlot.id, tokens);
-                if (keySlot.creditCost !== undefined) {
-                    keyManager.addCost(keySlot.id, keySlot.creditCost);
+                    if (options.stream && typeof options.onStream === 'function' && response.content) {
+                        options.onStream(response.content);
+                    }
+
+                    return response.content;
                 }
 
-                return result;
+                this.throwBrowserDirectProviderCallBlocked('chat routing', keySlot);
             } catch (error: any) {
                 lastError = error;
                 console.warn(`[LLMService] Chat attempt ${i + 1} failed: `, error);
@@ -232,20 +418,56 @@ export class LLMService {
                     };
                 }
 
-                const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-
-                if (!adapter.supports(options.modelId)) {
-                    throw new Error(`Channel ${keySlot.name} cannot handle model ${options.modelId} under its configured protocol.`);
-                }
-
-                // 𨱅?Suffix Stripping for API Call
                 const fullBaseId = options.modelId.split('@')[0];
                 const cleanModelId = fullBaseId.split('|')[0]; // Strip Provider/Name metadata
 
-                // Note: We might want to pass mapped options here if needed, but Adapter handles it now
-                const cleanOptions: any = { ...options, modelId: cleanModelId, onTaskId };
+                let result: ImageGenerationResult | null = null;
+                if (this.shouldUseSecureProxyUserRoute(keySlot)) {
+                    const routeId = this.buildUserRouteForKeySlot(keySlot);
+                    let proxyResponse;
+                    try {
+                        proxyResponse = await callLocalUserRouteProxyImage({
+                            routeId,
+                            modelId: options.modelId,
+                            prompt: options.prompt,
+                            aspectRatio: options.aspectRatio,
+                            imageSize: options.imageSize,
+                            imageCount: options.imageCount,
+                            referenceImages: options.referenceImages,
+                        });
+                    } catch (error) {
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
+                            throw error;
+                        }
 
-                const result = await adapter.generateImage(cleanOptions, keySlot);
+                        console.warn(this.createCloudFallbackNotice('image routing', keySlot), error);
+                        try {
+                            proxyResponse = await callSecureSystemProxyImage({
+                                modelId: options.modelId,
+                                userRoute: buildSecureProxyUserRouteFromSlotId(routeId),
+                                prompt: options.prompt,
+                                aspectRatio: options.aspectRatio,
+                                imageSize: options.imageSize,
+                                imageCount: options.imageCount,
+                                referenceImages: options.referenceImages,
+                            });
+                        } catch (cloudError) {
+                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                        }
+                    }
+
+                    result = {
+                        urls: proxyResponse.urls,
+                        usage: proxyResponse.usage,
+                        provider: keySlot.provider,
+                        providerName: keySlot.name,
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
+                } else {
+                    this.throwBrowserDirectProviderCallBlocked('image routing', keySlot);
+                }
                 keyManager.reportSuccess(keySlot.id);
 
                 this.applyProviderIdentity(result, keySlot);
@@ -281,7 +503,7 @@ export class LLMService {
                 if (tokensForStats === 0 || costForStats === 0) {
                     // Get estimate fallback using costService
                     try {
-                        const est = costService.calculateCost(options.modelId, sizeRaw as ImageSize, count, options.prompt.length, refCount, keySlot.id);
+                        const est = costService.calculateCost(result.model || options.modelId, sizeRaw as ImageSize, count, options.prompt.length, refCount, keySlot.id);
                         if (tokensForStats === 0) tokensForStats = est.tokens;
                         if (costForStats === 0) costForStats = keySlot.creditCost !== undefined ? keySlot.creditCost : est.cost;
                     } catch (e) {
@@ -293,9 +515,9 @@ export class LLMService {
                     costForStats = keySlot.creditCost;
                 }
 
-                // 系统积分模型不计入用户渠道 token/cost 统计，避免“积分 + 用户API”双重消耗感知
-                keyManager.addUsage(keySlot.id, tokensForStats);
-                keyManager.addCost(keySlot.id, costForStats);
+                const settledKeyId = result.keySlotId || keySlot.id;
+                keyManager.addUsage(settledKeyId, tokensForStats);
+                keyManager.addCost(settledKeyId, costForStats);
 
                 // Ensure result has usage populated for caller
                 if (!result.usage) {
@@ -407,28 +629,70 @@ export class LLMService {
                     };
                 }
 
-                const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-                const targetAdapter = adapter.generateVideo ? adapter : this.videoAdapter;
+                if (this.shouldUseSecureProxyUserRoute(keySlot)) {
+                    const cleanModelId = options.modelId.split('@')[0];
+                    const routeId = this.buildUserRouteForKeySlot(keySlot);
+                    let response;
+                    try {
+                        response = await callLocalUserRouteProxyVideo({
+                            routeId,
+                            modelId: options.modelId,
+                            prompt: options.prompt,
+                            aspectRatio: options.aspectRatio,
+                            resolution: options.resolution,
+                            duration: options.duration,
+                            videoDuration: options.videoDuration,
+                            imageUrl: options.imageUrl,
+                            imageTailUrl: options.imageTailUrl,
+                        });
+                    } catch (error) {
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
+                            throw error;
+                        }
 
-                // 𨱅?Suffix Stripping for API Call
-                const fullBaseId = options.modelId.split('@')[0];
-                const cleanModelId = fullBaseId.split('|')[0]; // Strip Provider/Name metadata
-                const cleanOptions: any = { ...options, modelId: cleanModelId, onTaskId };
+                        console.warn(this.createCloudFallbackNotice('video routing', keySlot), error);
+                        try {
+                            response = await callSecureSystemProxyVideo({
+                                modelId: options.modelId,
+                                userRoute: buildSecureProxyUserRouteFromSlotId(routeId),
+                                prompt: options.prompt,
+                                aspectRatio: options.aspectRatio,
+                                resolution: options.resolution,
+                                duration: options.duration,
+                                videoDuration: options.videoDuration,
+                                imageUrl: options.imageUrl,
+                                imageTailUrl: options.imageTailUrl,
+                            });
+                        } catch (cloudError) {
+                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                        }
+                    }
 
-                const result = await targetAdapter.generateVideo!(cleanOptions, keySlot);
-                keyManager.reportSuccess(keySlot.id);
+                    if (response.taskId) {
+                        onTaskId?.(response.taskId);
+                    }
 
-                this.applyProviderIdentity(result, keySlot);
-                if (!result.modelName) {
-                    const metadata = getModelMetadata(result.model || options.modelId);
-                    result.modelName = metadata?.name || cleanModelId;
+                    const proxyResult: VideoGenerationResult = {
+                        url: response.url || '',
+                        taskId: response.taskId,
+                        status: response.status,
+                        provider: keySlot.provider,
+                        providerName: keySlot.name,
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
+                    this.applyProviderIdentity(proxyResult, keySlot);
+                    keyManager.reportSuccess(keySlot.id);
+
+                    if (keySlot.creditCost !== undefined) {
+                        keyManager.addCost(keySlot.id, keySlot.creditCost);
+                    }
+
+                    return proxyResult;
                 }
 
-                if (keySlot.creditCost !== undefined) {
-                    keyManager.addCost(keySlot.id, keySlot.creditCost);
-                }
-
-                return result;
+                this.throwBrowserDirectProviderCallBlocked('video routing', keySlot);
             } catch (error: any) {
                 lastError = error;
                 console.warn(`[LLMService] Video attempt ${i + 1} failed: `, error);
@@ -474,27 +738,54 @@ export class LLMService {
                     };
                 }
 
-                const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-                const targetAdapter = adapter.generateAudio ? adapter : this.audioAdapter;
+                if (this.shouldUseSecureProxyUserRoute(keySlot)) {
+                    const cleanModelId = options.modelId.split('@')[0];
+                    const routeId = this.buildUserRouteForKeySlot(keySlot);
+                    let response;
+                    try {
+                        response = await callLocalUserRouteProxyAudio({
+                            routeId,
+                            modelId: options.modelId,
+                            prompt: options.prompt,
+                        });
+                    } catch (error) {
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
+                            throw error;
+                        }
 
-                // 𨱅?Suffix Stripping for API Call
-                const cleanModelId = options.modelId.split('@')[0];
-                const cleanOptions: any = { ...options, modelId: cleanModelId, onTaskId };
+                        console.warn(this.createCloudFallbackNotice('audio routing', keySlot), error);
+                        try {
+                            response = await callSecureSystemProxyAudio({
+                                modelId: options.modelId,
+                                userRoute: buildSecureProxyUserRouteFromSlotId(routeId),
+                                prompt: options.prompt,
+                            });
+                        } catch (cloudError) {
+                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                        }
+                    }
 
-                const result = await targetAdapter.generateAudio!(cleanOptions, keySlot);
-                keyManager.reportSuccess(keySlot.id);
+                    const proxyResult: AudioGenerationResult = {
+                        url: response.url,
+                        status: 'success',
+                        usage: response.usage,
+                        provider: keySlot.provider,
+                        providerName: keySlot.name,
+                        modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
+                        model: options.modelId,
+                        keySlotId: keySlot.id,
+                    };
+                    this.applyProviderIdentity(proxyResult, keySlot);
+                    keyManager.reportSuccess(keySlot.id);
 
-                this.applyProviderIdentity(result, keySlot);
-                if (!result.modelName) {
-                    const metadata = getModelMetadata(result.model || options.modelId);
-                    result.modelName = metadata?.name || cleanModelId;
+                    if (keySlot.creditCost !== undefined) {
+                        keyManager.addCost(keySlot.id, keySlot.creditCost);
+                    }
+
+                    return proxyResult;
                 }
 
-                if (keySlot.creditCost !== undefined) {
-                    keyManager.addCost(keySlot.id, keySlot.creditCost);
-                }
-
-                return result;
+                this.throwBrowserDirectProviderCallBlocked('audio routing', keySlot);
             } catch (error: any) {
                 lastError = error;
                 console.warn(`[LLMService] Audio attempt ${i + 1} failed: `, error);
@@ -521,35 +812,32 @@ export class LLMService {
         const normalizedPreferredKeyId = typeof preferredKeyId === 'string'
             ? preferredKeyId
             : preferredKeyId?.id;
+        const preferredKeySlot = normalizedPreferredKeyId && normalizedPreferredKeyId !== 'system_proxy_slot'
+            ? keyManager.getEffectiveKey(normalizedPreferredKeyId) || keyManager.getKey(normalizedPreferredKeyId)
+            : null;
+        const shouldUseLocalUserRouteTaskStatus = taskId.startsWith('local_proxy:');
 
-        if (normalizedPreferredKeyId === 'system_proxy_slot' || taskId.startsWith('system_proxy:')) {
+        const shouldUseSecureProxyTaskStatus = (
+            normalizedPreferredKeyId === 'system_proxy_slot'
+            || taskId.startsWith('system_proxy:')
+            || preferredKeySlot?.provider === 'SystemProxy'
+        );
+
+        if (shouldUseLocalUserRouteTaskStatus) {
+            const result = await checkLocalUserRouteProxyTaskStatus(taskId);
+            return this.decorateTaskStatusResult(result, normalizedPreferredKeyId, preferredKeySlot);
+        }
+
+        if (shouldUseSecureProxyTaskStatus) {
             const result = await checkSecureSystemProxyTaskStatus(taskId);
-            return {
-                ...result,
+            return this.decorateTaskStatusResult(result, normalizedPreferredKeyId, preferredKeySlot, {
                 provider: 'SystemProxy',
                 providerName: '系统积分模型',
                 keySlotId: 'system_proxy_slot',
-            };
+            });
         }
 
-        // Try to get the key first to identify the provider
-        const nextKey = keyManager.getNextKey(mode === GenerationMode.VIDEO ? 'veo-3.1-generate-preview' : 'gemini-1.5-flash', normalizedPreferredKeyId);
-        if (!nextKey) throw new Error("No API key available to check task status");
-
-        const keySlot = keyManager.getKey(nextKey.id);
-        if (!keySlot) throw new Error("No API key available to check task status");
-
-        const adapter = this.getAdapterForSlot(keySlot);
-        if (!adapter.checkTaskStatus) {
-            throw new Error(`Adapter for ${keySlot.provider} does not support task polling`);
-        }
-
-        const result = await adapter.checkTaskStatus(taskId, mode, keySlot, modelId);
-
-        // Enrich result with provider info (consistent with generate methods)
-        this.applyProviderIdentity(result, keySlot);
-
-        return result;
+        this.throwBrowserDirectProviderCallBlocked('task status checks', preferredKeySlot || undefined);
     }
 
     public async checkTaskStatuses(
@@ -568,35 +856,25 @@ export class LLMService {
         const normalizedPreferredKeyId = typeof preferredKeyId === 'string'
             ? preferredKeyId
             : preferredKeyId?.id;
-
-        if (normalizedPreferredKeyId === 'system_proxy_slot' || normalizedTaskIds.every((taskId) => taskId.startsWith('system_proxy:'))) {
-            return Promise.all(
-                normalizedTaskIds.map((taskId) => this.checkTaskStatus(taskId, mode, preferredKeyId, modelId))
-            );
-        }
-
-        const nextKey = keyManager.getNextKey(
-            mode === GenerationMode.VIDEO ? 'veo-3.1-generate-preview' : 'gemini-1.5-flash',
-            normalizedPreferredKeyId
+        const preferredKeySlot = normalizedPreferredKeyId && normalizedPreferredKeyId !== 'system_proxy_slot'
+            ? keyManager.getEffectiveKey(normalizedPreferredKeyId) || keyManager.getKey(normalizedPreferredKeyId)
+            : null;
+        const containsLocalProxyTasks = normalizedTaskIds.some((taskId) => taskId.startsWith('local_proxy:'));
+        const containsSecureProxyTasks = normalizedTaskIds.some((taskId) => taskId.startsWith('system_proxy:'));
+        const shouldUsePerTaskRouting = (
+            normalizedPreferredKeyId === 'system_proxy_slot'
+            || containsLocalProxyTasks
+            || containsSecureProxyTasks
+            || preferredKeySlot?.provider === 'SystemProxy'
         );
-        if (!nextKey) throw new Error('No API key available to check task status');
 
-        const keySlot = keyManager.getKey(nextKey.id);
-        if (!keySlot) throw new Error('No API key available to check task status');
-
-        const adapter = this.getAdapterForSlot(keySlot);
-        if (!adapter.checkTaskStatuses) {
+        if (shouldUsePerTaskRouting) {
             return Promise.all(
                 normalizedTaskIds.map((taskId) => this.checkTaskStatus(taskId, mode, preferredKeyId, modelId))
             );
         }
 
-        const results = await adapter.checkTaskStatuses(normalizedTaskIds, mode, keySlot, modelId);
-        return results.map((result, index) => {
-            const enriched = this.applyProviderIdentity({ ...result }, keySlot);
-            if (!enriched.taskId) enriched.taskId = normalizedTaskIds[index];
-            return enriched;
-        });
+        this.throwBrowserDirectProviderCallBlocked('task status checks', preferredKeySlot || undefined);
     }
 }
 

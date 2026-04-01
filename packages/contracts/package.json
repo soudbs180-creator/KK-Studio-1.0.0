@@ -1,0 +1,9 @@
+{
+  "name": "@kk/contracts",
+  "private": true,
+  "version": "1.4.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

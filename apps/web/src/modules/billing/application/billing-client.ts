@@ -1,7 +1,7 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
 import type {
   AdminRechargeCreditsRequestDto,
   AdminRechargeCreditsResponseDto,
@@ -12,8 +12,8 @@ import type {
   ListCreditTransactionsQueryDto,
   RefundCreditsRequestDto,
   RefundCreditsResponseDto,
-} from "../../../../../../packages/contracts/src/dto/billing.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class BillingClient {
   private readonly apiClient: KkApiClient;

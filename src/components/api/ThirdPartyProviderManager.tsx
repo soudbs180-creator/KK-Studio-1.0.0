@@ -213,38 +213,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
 
     const loadProviders = () => {
         try {
-            const saved = localStorage.getItem('third_party_providers');
-            if (!saved) {
-                console.log('[ThirdPartyProviderManager] No saved providers found');
-                setProviders([]);
-                return;
-            }
-            
-            const parsed = JSON.parse(saved);
-            
-            // 🚀 [Fix] Validate and migrate old data format
-            if (!Array.isArray(parsed)) {
-                console.error('[ThirdPartyProviderManager] Saved data is not an array');
-                setProviders([]);
-                return;
-            }
-            
-            // Migrate old providers to new format
-            const migratedProviders = parsed.map((provider: any) => ({
-                ...provider,
-                // Ensure new fields have defaults
-                apiFormat: provider.apiFormat || 'auto',
-                streamingMode: provider.streamingMode ?? false,
-                // Ensure managementConfig exists
-                managementConfig: provider.managementConfig || {
-                    enabled: false,
-                    accessToken: '',
-                },
-            }));
-            
-            console.log('[ThirdPartyProviderManager] Loaded', migratedProviders.length, 'providers');
-            setProviders(migratedProviders);
-            onProvidersChange?.(migratedProviders);
+            localStorage.removeItem('third_party_providers');
+            console.warn('[ThirdPartyProviderManager] Secure mode enabled: browser-side provider persistence is disabled.');
+            setProviders([]);
+            onProvidersChange?.([]);
         } catch (e) {
             console.error('[ThirdPartyProviderManager] Failed to load providers:', e);
             setProviders([]);
@@ -252,7 +224,6 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
     };
 
     const saveProviders = (newProviders: ThirdPartyProvider[]) => {
-        localStorage.setItem('third_party_providers', JSON.stringify(newProviders));
         setProviders(newProviders);
         onProvidersChange?.(newProviders);
     };

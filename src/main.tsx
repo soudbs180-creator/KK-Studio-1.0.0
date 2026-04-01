@@ -5,6 +5,7 @@ import './index.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
+import { initializeThemeOnBoot } from './context/ThemeContext';
 import { disableVercelToolbar } from './utils/disableVercelToolbar';
 
 type FatalError = {
@@ -22,6 +23,7 @@ const root = createRoot(rootElement);
 let hasMountedApp = false;
 
 disableVercelToolbar();
+initializeThemeOnBoot();
 
 function normalizeError(error: unknown): FatalError {
   if (error instanceof Error) {

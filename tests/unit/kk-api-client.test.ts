@@ -1,9 +1,101 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { createKkApiClient } from "../../packages/contracts/src/client/kk-api-client.ts";
+import { createKkApiClient } from "../../packages/contracts/src/index.ts";
+import {
+  isLoopbackHostname,
+  shouldUseLegacyWebApiFallback,
+} from "../../src/services/api/kkApiClient.ts";
 
 describe("kk api client", () => {
+  test("detects loopback hosts for local-only Web API fallbacks", () => {
+    assert.equal(isLoopbackHostname("localhost"), true);
+    assert.equal(isLoopbackHostname("127.0.0.1"), true);
+    assert.equal(isLoopbackHostname("::1"), true);
+    assert.equal(isLoopbackHostname("kkai.plus"), false);
+  });
+
+  test("keeps legacy Web API fallback disabled on hosted origins when only the API base URL is configured", () => {
+    const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+    const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    const locationLike = globalThis as { location?: { origin?: string } };
+    const originalLocation = locationLike.location;
+
+    process.env.VITE_KK_API_BASE_URL = "https://api.example.com";
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    locationLike.location = { origin: "https://kk-studio.vercel.app" };
+
+    try {
+      assert.equal(shouldUseLegacyWebApiFallback(), false);
+    } finally {
+      if (typeof originalBaseUrl === "string") {
+        process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
+      } else {
+        delete process.env.VITE_KK_API_BASE_URL;
+      }
+      if (typeof originalLegacyFallback === "string") {
+        process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+      } else {
+        delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+      }
+      locationLike.location = originalLocation;
+    }
+  });
+
+  test("requires an explicit opt-in to enable legacy Web API fallback on hosted origins", () => {
+    const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+    const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    const locationLike = globalThis as { location?: { origin?: string } };
+    const originalLocation = locationLike.location;
+
+    process.env.VITE_KK_API_BASE_URL = "https://api.example.com";
+    process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = "true";
+    locationLike.location = { origin: "https://kk-studio.vercel.app" };
+
+    try {
+      assert.equal(shouldUseLegacyWebApiFallback(), true);
+    } finally {
+      if (typeof originalBaseUrl === "string") {
+        process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
+      } else {
+        delete process.env.VITE_KK_API_BASE_URL;
+      }
+      if (typeof originalLegacyFallback === "string") {
+        process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+      } else {
+        delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+      }
+      locationLike.location = originalLocation;
+    }
+  });
+
+  test("keeps legacy Web API fallback enabled on local loopback origins", () => {
+    const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+    const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    const locationLike = globalThis as { location?: { origin?: string } };
+    const originalLocation = locationLike.location;
+
+    delete process.env.VITE_KK_API_BASE_URL;
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    locationLike.location = { origin: "http://127.0.0.1:3000" };
+
+    try {
+      assert.equal(shouldUseLegacyWebApiFallback(), true);
+    } finally {
+      if (typeof originalBaseUrl === "string") {
+        process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
+      } else {
+        delete process.env.VITE_KK_API_BASE_URL;
+      }
+      if (typeof originalLegacyFallback === "string") {
+        process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+      } else {
+        delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+      }
+      locationLike.location = originalLocation;
+    }
+  });
+
   test("sends generation task requests with the spec headers", async () => {
     const requests: Array<{
       body?: string;
@@ -153,7 +245,7 @@ describe("kk api client", () => {
     }
   });
 
-  test("builds billing transaction, refund, and admin recharge requests with the expected paths", async () => {
+  test("builds billing transaction, refund, recharge config, and admin recharge requests with the expected paths", async () => {
     const requests: Array<{ method?: string; url: string; body?: string }> = [];
     const client = createKkApiClient({
       baseUrl: "http://127.0.0.1:3001",
@@ -189,13 +281,21 @@ describe("kk api client", () => {
       transactionId: "8f702f95-2b10-4c4d-b839-5163ae09a50c",
       reason: "client refund",
     });
+    await client.listCreditExchangeRates();
+    await client.upsertCreditExchangeRate({
+      currencyCode: "CNY",
+      creditsPerUnit: 5.5,
+      minAmount: 6,
+      maxAmount: 300,
+      isActive: true,
+    });
     await client.adminRechargeCredits({
       identity: "admin-target@example.com",
       creditAmount: 25,
       description: "client admin recharge",
     });
 
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 5);
     assert.equal(
       requests[0].url,
       "http://127.0.0.1:3001/api/v1/billing/credits/transactions?transactionType=consumption&status=completed&limit=20",
@@ -207,9 +307,20 @@ describe("kk api client", () => {
       transactionId: "8f702f95-2b10-4c4d-b839-5163ae09a50c",
       reason: "client refund",
     });
-    assert.equal(requests[2].url, "http://127.0.0.1:3001/api/v1/admin/billing/recharges");
-    assert.equal(requests[2].method, "POST");
-    assert.deepEqual(JSON.parse(requests[2].body || "{}"), {
+    assert.equal(requests[2].url, "http://127.0.0.1:3001/api/v1/billing/exchange-rates");
+    assert.equal(requests[2].method, "GET");
+    assert.equal(requests[3].url, "http://127.0.0.1:3001/api/v1/admin/billing/exchange-rates");
+    assert.equal(requests[3].method, "PUT");
+    assert.deepEqual(JSON.parse(requests[3].body || "{}"), {
+      currencyCode: "CNY",
+      creditsPerUnit: 5.5,
+      minAmount: 6,
+      maxAmount: 300,
+      isActive: true,
+    });
+    assert.equal(requests[4].url, "http://127.0.0.1:3001/api/v1/admin/billing/recharges");
+    assert.equal(requests[4].method, "POST");
+    assert.deepEqual(JSON.parse(requests[4].body || "{}"), {
       identity: "admin-target@example.com",
       creditAmount: 25,
       description: "client admin recharge",
@@ -275,6 +386,188 @@ describe("kk api client", () => {
     assert.deepEqual(JSON.parse(requests[3].body || "{}"), {
       identity: "user-1@example.com",
       role: "admin",
+    });
+  });
+
+  test("builds admin credit provider pricing cache requests with the expected paths", async () => {
+    const requests: Array<{ method?: string; url: string; body?: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            providerId: "provider-1",
+            pricing: [],
+            cachedAt: "2026-03-31T00:00:00.000Z",
+          },
+          meta: {
+            requestId: "req-provider-pricing-client",
+            timestamp: "2026-03-31T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.getAdminCreditProviderPricingCache("provider-1");
+    await client.upsertAdminCreditProviderPricingCache("provider-1", {
+      pricing: [
+        {
+          modelId: "gpt-4.1",
+          modelName: "GPT-4.1",
+          inputPrice: 1.2,
+          outputPrice: 3.4,
+          isPerToken: true,
+          currency: "USD",
+        },
+      ],
+    });
+
+    assert.equal(requests.length, 2);
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/admin/credit-providers/provider-1/pricing-cache",
+    );
+    assert.equal(requests[0].method, "GET");
+    assert.equal(
+      requests[1].url,
+      "http://127.0.0.1:3001/api/v1/admin/credit-providers/provider-1/pricing-cache",
+    );
+    assert.equal(requests[1].method, "PUT");
+    assert.deepEqual(JSON.parse(requests[1].body || "{}"), {
+      pricing: [
+        {
+          modelId: "gpt-4.1",
+          modelName: "GPT-4.1",
+          inputPrice: 1.2,
+          outputPrice: 3.4,
+          isPerToken: true,
+          currency: "USD",
+        },
+      ],
+    });
+  });
+
+  test("builds user route diagnostics requests with the expected paths", async () => {
+    const requests: Array<{ method?: string; url: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {},
+          meta: {
+            requestId: "req-user-route-diagnostics",
+            timestamp: "2026-03-31T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.checkUserRouteConnectivity("provider-1");
+    await client.syncUserRoutePricing("provider-1");
+
+    assert.equal(requests.length, 2);
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/profile/user-routes/provider-1/connectivity",
+    );
+    assert.equal(requests[0].method, "POST");
+    assert.equal(
+      requests[1].url,
+      "http://127.0.0.1:3001/api/v1/profile/user-routes/provider-1/pricing-sync",
+    );
+    assert.equal(requests[1].method, "POST");
+  });
+
+  test("builds shared provider pricing cache requests with the expected paths", async () => {
+    const requests: Array<{ method?: string; url: string; body?: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            providerId: "shared:abc123",
+            pricing: [],
+            cachedAt: "2026-03-31T00:00:00.000Z",
+          },
+          meta: {
+            requestId: "req-shared-provider-pricing-client",
+            timestamp: "2026-03-31T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.getSharedProviderPricingCache("https://api.example.com/v1");
+    await client.upsertSharedProviderPricingCache("https://api.example.com/v1", {
+      pricing: [
+        {
+          modelId: "gpt-4.1",
+          modelName: "GPT-4.1",
+          inputPrice: 1.2,
+          outputPrice: 3.4,
+          isPerToken: true,
+          currency: "USD",
+        },
+      ],
+    });
+
+    assert.equal(requests.length, 2);
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/provider-pricing-cache?baseUrl=https%3A%2F%2Fapi.example.com%2Fv1",
+    );
+    assert.equal(requests[0].method, "GET");
+    assert.equal(
+      requests[1].url,
+      "http://127.0.0.1:3001/api/v1/provider-pricing-cache?baseUrl=https%3A%2F%2Fapi.example.com%2Fv1",
+    );
+    assert.equal(requests[1].method, "PUT");
+    assert.deepEqual(JSON.parse(requests[1].body || "{}"), {
+      pricing: [
+        {
+          modelId: "gpt-4.1",
+          modelName: "GPT-4.1",
+          inputPrice: 1.2,
+          outputPrice: 3.4,
+          isPerToken: true,
+          currency: "USD",
+        },
+      ],
     });
   });
 

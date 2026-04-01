@@ -254,8 +254,8 @@ type ScheduledImageLoadState = {
 
 const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   base: 1,
-  generating: 2,
-  focused: 3,
+  focused: 2,
+  generating: 3,
 };
 
 // Lucide icons replaced with SVGs
@@ -268,6 +268,7 @@ import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
+import { formatRemainingCredits } from './services/billing/remainingBalance';
 
 
 import { saveAs } from 'file-saver';
@@ -422,6 +423,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     refreshBilling,
     adjustBalanceOptimistically
   } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
 
   // Canvas Ref for Zoom/Pan Controls
   const canvasRef = useRef<InfiniteCanvasHandle>(null);
@@ -2937,7 +2939,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     lastGenerateSignatureRef.current = { value: submitSignature, at: now };
 
     // Real billing guard and deduction flow
-    // First determine whether this is a credit-billed system model; explicit user-channel routes should not use the credit flow
+    // Route-aware billing: when the request resolves to a user-owned key/channel,
+    // it must never enter the system-credit deduction flow.
     const provider = config.model.includes('@') ? config.model.split('@')[1] : undefined;
     const customLocal = (() => {
       try {
@@ -2946,16 +2949,22 @@ const AppContent: React.FC<AppContentProps> = () => {
     })();
 
     const hasCustomUserKey = keyManager.hasCustomKeyForModel(config.model);
+    const preferredKeyIdForBilling = hasExplicitModelRoute(config.model)
+      ? undefined
+      : getPreferredKeyForMode(config.mode);
+    const selectedKeyForBilling = keyManager.getNextKey(config.model, preferredKeyIdForBilling);
     const isCreditModel = isCreditBasedModel(
       config.model,
       provider,
       customLocal.alias,
-      hasCustomUserKey
+      hasCustomUserKey,
+      selectedKeyForBilling?.id || preferredKeyIdForBilling,
     );
 
     console.log('[handleGenerate] 计费检查', {
       model: config.model,
       provider,
+      selectedKeyId: selectedKeyForBilling?.id,
       hasCustomUserKey,
       isCreditModel,
       mode: config.mode
@@ -3241,12 +3250,9 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
         : null;
       const previewModelLabel = previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview;
-      const previewPreferredKeyId = hasExplicitModelRoute(config.model)
-        ? undefined
-        : getPreferredKeyForMode(config.mode);
       const selectedKey = useServerSideCreditSettlement
         ? null
-        : keyManager.getNextKey(config.model, previewPreferredKeyId);
+        : selectedKeyForBilling;
       const previewProvider = useServerSideCreditSettlement
         ? 'SystemProxy'
         : (selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google'));
@@ -3602,7 +3608,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       executionNode.model,
       retryProvider,
       undefined,
-      hasRetryCustomUserKey
+      hasRetryCustomUserKey,
+      executionNode.keySlotId,
     );
     const retryUseServerSideCreditSettlement = retryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
     const retryPerImageCreditCost = retryIsCreditModel
@@ -4290,7 +4297,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       executionNode.model,
       pageRetryProvider,
       undefined,
-      hasPageRetryCustomUserKey
+      hasPageRetryCustomUserKey,
+      executionNode.keySlotId,
     );
     const pageRetryUseServerSideCreditSettlement = pageRetryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
     const pageRetryPerImageCreditCost = pageRetryIsCreditModel
@@ -5581,6 +5589,38 @@ ${slideLayerXml.join('\n')}
     setGroupOverlapMap(computedGroupOverlapMap);
   }, [computedGroupOverlapMap]);
 
+  const maxPersistedCanvasLayer = React.useMemo(() => {
+    if (!activeCanvas) return 0;
+
+    let maxLayer = 0;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      maxLayer = Math.max(maxLayer, promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0);
+    });
+
+    activeCanvas.imageNodes.forEach((imageNode) => {
+      const baseLayer = imageNode.parentPromptId
+        ? (promptGroupLayerById.get(imageNode.parentPromptId) ?? imageNode.zIndex ?? 0)
+        : (imageNode.zIndex ?? 0);
+      maxLayer = Math.max(maxLayer, baseLayer);
+    });
+
+    (activeCanvas.workflow?.nodes || []).forEach((workflowNode) => {
+      maxLayer = Math.max(maxLayer, workflowNode.zIndex ?? 0);
+    });
+
+    activeCanvas.groups.forEach((group) => {
+      maxLayer = Math.max(maxLayer, group.zIndex ?? 0);
+    });
+
+    return maxLayer;
+  }, [activeCanvas, promptGroupLayerById]);
+
+  const floatingStackBandSize = React.useMemo(
+    () => (maxPersistedCanvasLayer + 1) * 100,
+    [maxPersistedCanvasLayer]
+  );
+
   const promptGroupStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
     if (!activeCanvas) return stackMap;
@@ -5594,13 +5634,18 @@ ${slideLayerXml.join('\n')}
         : generatingGroupIdSet.has(promptNode.id)
           ? 'generating'
           : 'base';
-      const stackZIndex = (baseLayer * 100) + (PROMPT_GROUP_TIER_WEIGHT[tier] * 10);
+      const floatingBonus = tier === 'generating'
+        ? floatingStackBandSize * 2
+        : tier === 'focused'
+          ? floatingStackBandSize
+          : 0;
+      const stackZIndex = (baseLayer * 100) + (PROMPT_GROUP_TIER_WEIGHT[tier] * 10) + floatingBonus;
 
       stackMap.set(promptNode.id, stackZIndex);
     });
 
     return stackMap;
-  }, [activeCanvas, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupLayerById]);
+  }, [activeCanvas, floatingStackBandSize, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupLayerById]);
 
   const standaloneImageStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
@@ -5617,6 +5662,7 @@ ${slideLayerXml.join('\n')}
 
       let stackZIndex = baseLayer * 100;
       if (imageNode.isGenerating) {
+        stackZIndex += floatingStackBandSize * 2;
         stackZIndex += 40;
       } else if (isNewImage) {
         stackZIndex += 30;
@@ -5632,7 +5678,7 @@ ${slideLayerXml.join('\n')}
     });
 
     return stackMap;
-  }, [activeCanvas, activeSourceImage, selectedNodeIds]);
+  }, [activeCanvas, activeSourceImage, floatingStackBandSize, selectedNodeIds]);
 
   const workflowUtilityStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
@@ -7912,7 +7958,13 @@ ${slideLayerXml.join('\n')}
         <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
           <div
             className="flex items-center gap-3 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-md transition-all hover:border-[var(--border-medium)] group"
-            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
+            style={{
+              background: 'var(--floating-shell-bg)',
+              borderColor: 'var(--floating-shell-border)',
+              boxShadow: 'var(--floating-shell-shadow)',
+              backdropFilter: 'blur(18px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+            }}
           >
             <div className="flex items-center gap-1.5">
               <Sparkles size={18} fill="currentColor" className="text-blue-500" />
@@ -7920,12 +7972,12 @@ ${slideLayerXml.join('\n')}
                 <span className="text-[18px] font-mono font-bold leading-none min-w-[20px] drop-shadow-sm" style={{ color: 'var(--text-primary)' }}>
                   {balanceLoading ? (
                     <Loader2 size={16} className="animate-spin opacity-40 text-blue-400" />
-                  ) : balance}
+                  ) : remainingBalanceDisplay}
                 </span>
                 <span className="text-[14px] font-bold leading-none text-blue-400">积分</span>
               </div>
             </div>
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--border-light)' }} />
+            <div className="w-px h-6" style={{ backgroundColor: 'var(--floating-shell-border)' }} />
             <button
               onClick={() => setShowRechargeModal(true)}
               className="inline-flex items-center justify-center px-3 py-1 bg-indigo-500 hover:bg-indigo-400 text-white text-[11px] font-bold leading-none rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-500/20"

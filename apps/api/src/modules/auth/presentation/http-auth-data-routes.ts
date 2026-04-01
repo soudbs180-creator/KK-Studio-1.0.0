@@ -20,6 +20,19 @@ function resolveUserEmail(headers: Record<string, string>): string | undefined {
   return resolveAuthenticatedUserEmail(headers);
 }
 
+function resolveBearerAccessToken(headers: Record<string, string>): string | undefined {
+  const authorization = String(headers.authorization || "").trim();
+  if (!authorization) {
+    return undefined;
+  }
+
+  if (authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice(7).trim() || undefined;
+  }
+
+  return authorization;
+}
+
 function buildUnauthorizedResult<T>(requestId: string, clientVersion?: string) {
   return {
     statusCode: 401,
@@ -133,6 +146,7 @@ export async function handleGetUserApiEntries(
       resolveUserEmail(headers),
       requestId,
       clientVersion,
+      resolveBearerAccessToken(headers),
     ),
   };
 }
@@ -174,6 +188,7 @@ export async function handleReplaceUserApiEntries(
       body,
       requestId,
       clientVersion,
+      resolveBearerAccessToken(headers),
     ),
   };
 }
@@ -197,6 +212,7 @@ export async function handleGetKeyManagerCloudState(
       resolveUserEmail(headers),
       requestId,
       clientVersion,
+      resolveBearerAccessToken(headers),
     ),
   };
 }
@@ -238,6 +254,7 @@ export async function handleReplaceKeyManagerCloudState(
       body,
       requestId,
       clientVersion,
+      resolveBearerAccessToken(headers),
     ),
   };
 }

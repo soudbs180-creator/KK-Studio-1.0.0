@@ -7,7 +7,6 @@ import {
   updateTaskStatus,
   modeToTaskType
 } from '../services/persistence/taskPersistence';
-import { useCanvas } from '../context/CanvasContext';
 import { llmService } from '../services/llm/LLMService';
 import { keyManager } from '../services/auth/keyManager';
 import { resolveProviderRuntime } from '../services/api/providerStrategy';
@@ -22,6 +21,10 @@ interface TaskRecoveryState {
 type RecoveryReason = 'initial' | 'visibility' | 'online' | 'manual';
 
 const RECOVERY_THROTTLE_MS = 30_000;
+
+type TaskRecoveryCanvasSnapshot = {
+  promptNodes?: PromptNode[];
+} | null | undefined;
 
 const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): TaskProviderType => {
   const normalizedModel = String(model || '').trim().toLowerCase();
@@ -46,6 +49,7 @@ const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): Tas
  * 在页面加载、回到前台和网络恢复后自动恢复进行中的任务
  */
 export function useTaskRecovery(
+  activeCanvas: TaskRecoveryCanvasSnapshot,
   pollTaskFn: (node: PromptNode, taskId: string) => Promise<void>
 ) {
   const [state, setState] = useState<TaskRecoveryState>({
@@ -53,8 +57,6 @@ export function useTaskRecovery(
     recoveredCount: 0,
     pendingCount: 0,
   });
-
-  const { activeCanvas } = useCanvas();
   const isRecoveringRef = useRef(false);
   const lastRecoveredAtRef = useRef(new Map<string, number>());
 
@@ -77,7 +79,7 @@ export function useTaskRecovery(
       let recovered = 0;
 
       for (const task of recoverableTasks) {
-        const node = activeCanvas?.promptNodes.find(
+        const node = activeCanvas?.promptNodes?.find(
           n => n.jobId === task.taskId || n.id === task.promptNodeId
         );
 

@@ -17,8 +17,15 @@ import {
   clearStoredAdminSession,
   setStoredAdminSession,
 } from '../../services/api/adminSession';
+import {
+  loadStoredAdminSystemTab,
+  saveStoredAdminSystemTab,
+} from '../../services/admin/adminConsoleState';
 import { verifyAdminPasswordViaSupabase } from '../../services/admin/supabaseAdminFallbackService';
-import { legacyWebApiClient } from '../../services/api/kkApiClient';
+import {
+  legacyWebApiClient,
+  shouldUseLegacyWebApiFallback,
+} from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
 import { SettingsActionButton, SettingsBadge, SettingsViewShell } from './SettingsScaffold';
 import AdminConsoleSettings from './AdminConsoleSettings';
@@ -145,6 +152,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const canUseLegacyAdminApi = shouldUseLegacyWebApiFallback();
 
   const tabOptions = useMemo(() => getTabOptions(pick), [pick]);
   const userLabel = user?.email || user?.phone || user?.id || pick('未登录', 'Not signed in');
@@ -155,8 +163,13 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   );
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+    const restoredTab = loadStoredAdminSystemTab(user?.id, initialTab);
+    setActiveTab((current) => (current === restoredTab ? current : restoredTab));
+  }, [initialTab, user?.id]);
+
+  useEffect(() => {
+    saveStoredAdminSystemTab(user?.id, activeTab);
+  }, [activeTab, user?.id]);
 
   useEffect(() => {
     if (authLoading || checkingAdmin) {
@@ -212,8 +225,9 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
         adminSessionExpiresAt: string;
       };
 
-      try {
-        const response = await legacyWebApiClient.verifyAdminPassword(
+      if (canUseLegacyAdminApi) {
+        try {
+          const response = await legacyWebApiClient.verifyAdminPassword(
           { password },
           buildAdminRequestOptions(buildAdminRequestId('admin-unlock', user.id))
         );
@@ -224,11 +238,14 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
           );
         }
 
-        verifiedSession = {
-          adminSessionToken: response.data.adminSessionToken,
-          adminSessionExpiresAt: response.data.adminSessionExpiresAt,
-        };
-      } catch {
+          verifiedSession = {
+            adminSessionToken: response.data.adminSessionToken,
+            adminSessionExpiresAt: response.data.adminSessionExpiresAt,
+          };
+        } catch {
+          verifiedSession = await verifyAdminPasswordViaSupabase(user, password);
+        }
+      } else {
         verifiedSession = await verifyAdminPasswordViaSupabase(user, password);
       }
 
@@ -387,8 +404,8 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
               <h2>{pick('管理员后台解锁', 'Unlock admin console')}</h2>
               <p>
                 {pick(
-                  '输入管理员密码后才能查看积分模型、汇率规则和高权限操作模块。',
-                  'Enter the admin password to access credit models, exchange rules, and privileged tools.'
+                  '输入管理员密码后才能编辑积分模型规则、汇率规则和高权限操作；普通账号的积分模型显示与使用不会受这 30 分钟会话影响。',
+                  'Enter the admin password to edit credit model rules, exchange rules, and privileged tools. End-user model access is not affected by this 30-minute session.'
                 )}
               </p>
             </div>
@@ -412,8 +429,8 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
                   </div>
                   <div className="settings-reference-card__meta">
                     {pick(
-                      '解锁后将开放全部后台模块，会话默认保持 30 分钟，到期后需要重新验证。',
-                      'Unlocking opens the full admin workspace for 30 minutes, then verification is required again.'
+                      '解锁后只开放后台编辑能力，会话默认保持 30 分钟；到期后需要重新验证，但不会影响普通账号继续使用积分模型。',
+                      'Unlocking enables admin editing for 30 minutes. When it expires, verify again, but normal users can still use credit models.'
                     )}
                   </div>
                 </div>
@@ -473,12 +490,12 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
                     {pick('模块预览', 'Modules')}
                   </div>
                   <div className="settings-reference-card__title">
-                    {pick('将要开放的后台模块', 'Modules that unlock next')}
+                    {pick('解锁后可编辑的后台模块', 'Admin editing modules')}
                   </div>
                   <div className="settings-reference-card__meta">
                     {pick(
-                      '解锁后会保持统一的深色控制台布局，所有高权限页面都从这里进入。',
-                      'After unlocking, every privileged page opens inside the same console shell.'
+                      '解锁后会进入统一的后台编辑控制台，只影响管理员维护操作，不影响普通用户前台使用。',
+                      'After unlocking, every admin editing page opens inside the same console shell without affecting the end-user experience.'
                     )}
                   </div>
                 </div>
@@ -488,8 +505,8 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
               <div className="mt-5 settings-reference-list">
                 <ModulePreviewRow
                   title={pick('积分模型', 'Credit models')}
-                  meta={pick('供应商、模型路由、出图画质和积分定价。', 'Providers, model routes, quality tiers, and credit pricing.')}
-                  value={pick('积分', 'Credit')}
+                  meta={pick('供应商、模型路由、画质档位和积分定价编辑。', 'Edit providers, model routes, quality tiers, and credit pricing.')}
+                  value={pick('编辑', 'Edit')}
                 />
                 <ModulePreviewRow
                   title={pick('汇率规则', 'Exchange rules')}

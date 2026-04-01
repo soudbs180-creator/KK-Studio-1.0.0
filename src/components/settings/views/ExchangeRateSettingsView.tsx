@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Coins, RefreshCw } from 'lucide-react';
 import {
   DEFAULT_CREDIT_EXCHANGE_RATES,
@@ -7,7 +7,13 @@ import {
   type SupportedRechargeCurrency,
   upsertCreditExchangeRate,
 } from '../../../services/billing/creditExchangeRateService';
+import { useAuth } from '../../../context/AuthContext';
 import { useLocale } from '../../../context/LocaleContext';
+import {
+  EXCHANGE_RATE_DRAFT_SCOPE,
+  loadScopedAdminConsoleState,
+  saveScopedAdminConsoleState,
+} from '../../../services/admin/adminConsoleState';
 import { notify } from '../../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
@@ -24,12 +30,55 @@ const createEmptyRateState = (): Record<SupportedRechargeCurrency, CreditExchang
   CNY: { ...DEFAULT_CREDIT_EXCHANGE_RATES.CNY },
   USD: { ...DEFAULT_CREDIT_EXCHANGE_RATES.USD },
 });
+const normalizeExchangeRateState = (
+  candidate: Partial<Record<SupportedRechargeCurrency, Partial<CreditExchangeRate>>> | undefined,
+): Record<SupportedRechargeCurrency, CreditExchangeRate> => {
+  const nextState = createEmptyRateState();
+
+  currencies.forEach((currency) => {
+    const nextRate = candidate?.[currency];
+    if (!nextRate) {
+      return;
+    }
+
+    const creditsPerUnit = Number(nextRate.creditsPerUnit);
+    const minAmount =
+      nextRate.minAmount === null || nextRate.minAmount === undefined
+        ? null
+        : Number(nextRate.minAmount);
+    const maxAmount =
+      nextRate.maxAmount === null || nextRate.maxAmount === undefined
+        ? null
+        : Number(nextRate.maxAmount);
+
+    nextState[currency] = {
+      currencyCode: currency,
+      creditsPerUnit:
+        Number.isFinite(creditsPerUnit) && creditsPerUnit > 0
+          ? creditsPerUnit
+          : nextState[currency].creditsPerUnit,
+      minAmount:
+        minAmount === null || (Number.isFinite(minAmount) && minAmount >= 0)
+          ? minAmount
+          : nextState[currency].minAmount,
+      maxAmount:
+        maxAmount === null || (Number.isFinite(maxAmount) && maxAmount >= 0)
+          ? maxAmount
+          : nextState[currency].maxAmount,
+      isActive: nextRate.isActive !== false,
+    };
+  });
+
+  return nextState;
+};
 
 const formatAmountPreview = (amount: number, currency: SupportedRechargeCurrency) =>
   currency === 'CNY' ? `¥${amount}` : `$${amount}`;
 
 export const ExchangeRateSettingsView: React.FC = () => {
+  const { user } = useAuth();
   const { pick } = useLocale();
+  const restoredDraftRef = useRef<Record<SupportedRechargeCurrency, CreditExchangeRate> | null>(null);
   const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(createEmptyRateState);
   const [loadingRates, setLoadingRates] = useState(false);
   const [savingCurrency, setSavingCurrency] = useState<SupportedRechargeCurrency | null>(null);
@@ -66,7 +115,9 @@ export const ExchangeRateSettingsView: React.FC = () => {
       rates.forEach((rate) => {
         nextState[rate.currencyCode] = rate;
       });
-      setExchangeRates(nextState);
+      setExchangeRates(
+        restoredDraftRef.current ? { ...nextState, ...restoredDraftRef.current } : nextState,
+      );
     } catch (error: any) {
       notify.error(
         pick('加载汇率失败', 'Failed to load rates'),
@@ -80,6 +131,31 @@ export const ExchangeRateSettingsView: React.FC = () => {
   useEffect(() => {
     void loadRates();
   }, []);
+
+  useEffect(() => {
+    const draft = loadScopedAdminConsoleState<
+      Partial<Record<SupportedRechargeCurrency, Partial<CreditExchangeRate>>>
+    >(EXCHANGE_RATE_DRAFT_SCOPE, user?.id);
+    restoredDraftRef.current = draft ? normalizeExchangeRateState(draft) : null;
+
+    if (restoredDraftRef.current) {
+      setExchangeRates(restoredDraftRef.current);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveScopedAdminConsoleState(EXCHANGE_RATE_DRAFT_SCOPE, user.id, exchangeRates);
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [exchangeRates, user?.id]);
 
   const handleRateFieldChange = (
     currency: SupportedRechargeCurrency,
@@ -169,7 +245,7 @@ export const ExchangeRateSettingsView: React.FC = () => {
         <SettingsMetricCard
           label={pick('启用币种', 'Active currencies')}
           value={`${activeCurrencies} / ${currencies.length}`}
-          helper={pick('前台充值页会读取这里的开关', 'The recharge page reads these switches directly.')}
+          helper={pick('充值页会通过计费 API 同步这里的开关', 'The recharge page syncs these switches through the billing API.')}
           icon={Coins}
           tone={activeCurrencies === currencies.length ? 'emerald' : 'amber'}
         />

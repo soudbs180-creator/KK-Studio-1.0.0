@@ -1,5 +1,5 @@
-import type { RequestMeta } from "../../../packages/contracts/src/http/envelope.ts";
-import { consoleLogger } from "../../../packages/shared/src/logging/logger.ts";
+import type { RequestMeta } from "../../../packages/contracts/src/index.ts";
+import { consoleLogger } from "../../../packages/shared/src/index.ts";
 
 export type ModuleLayer = "presentation" | "application" | "domain" | "infrastructure";
 

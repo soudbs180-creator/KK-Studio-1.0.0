@@ -21,6 +21,8 @@ import type {
   RegisterResponseDto,
   ReplaceUserApiEntriesRequestDto,
   TempUserSessionDto,
+  UserRouteConnectivityCheckDto,
+  UserRoutePricingSyncDto,
   UpdateProfileRequestDto,
   UserApiEntryListDto,
   WechatAuthStartResponseDto,
@@ -30,11 +32,14 @@ import type {
   AdminRechargeCreditsResponseDto,
   CreditTransactionListDto,
   CreditBalanceDto,
+  CreditExchangeRateDto,
+  CreditExchangeRateListDto,
   DebitCreditsRequestDto,
   DebitCreditsResponseDto,
   ListCreditTransactionsQueryDto,
   RefundCreditsRequestDto,
   RefundCreditsResponseDto,
+  UpsertCreditExchangeRateRequestDto,
 } from "../dto/billing.ts";
 import type {
   CreateGenerationTaskRequestDto,
@@ -48,8 +53,10 @@ import type {
   ModelCatalogItemDto,
   ModelCatalogListDto,
   ModelKind,
+  ProviderPricingCacheDto,
   SaveAdminCreditProviderRequestDto,
   SaveAdminCreditProviderResponseDto,
+  UpsertProviderPricingCacheRequestDto,
 } from "../dto/model-catalog.ts";
 import type {
   CreatePaymentOrderRequestDto,
@@ -76,6 +83,7 @@ export interface ApiClientConfig {
   baseUrl: string;
   fetchImpl?: typeof fetch;
   getAccessToken?: () => string | undefined | Promise<string | undefined>;
+  refreshAccessToken?: () => string | undefined | Promise<string | undefined>;
   getClientVersion?: () => string | undefined;
   getDefaultHeaders?: () => Record<string, string | undefined>;
 }
@@ -126,6 +134,14 @@ export interface KkApiClient {
     input: ReplaceKeyManagerCloudStateRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
+  checkUserRouteConnectivity(
+    routeId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<UserRouteConnectivityCheckDto>>;
+  syncUserRoutePricing(
+    routeId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<UserRoutePricingSyncDto>>;
   createTempUser(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<TempUserSessionDto>>;
@@ -177,6 +193,13 @@ export interface KkApiClient {
     input: AdminRechargeCreditsRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminRechargeCreditsResponseDto>>;
+  listCreditExchangeRates(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<CreditExchangeRateListDto>>;
+  upsertCreditExchangeRate(
+    input: UpsertCreditExchangeRateRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<CreditExchangeRateDto>>;
   listModels(
     kind?: ModelKind,
     options?: ApiClientRequestOptions,
@@ -196,6 +219,24 @@ export interface KkApiClient {
     input: SaveAdminCreditProviderRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<SaveAdminCreditProviderResponseDto>>;
+  getAdminCreditProviderPricingCache(
+    providerId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>>;
+  upsertAdminCreditProviderPricingCache(
+    providerId: string,
+    input: UpsertProviderPricingCacheRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>>;
+  getSharedProviderPricingCache(
+    baseUrl: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>>;
+  upsertSharedProviderPricingCache(
+    baseUrl: string,
+    input: UpsertProviderPricingCacheRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>>;
   deleteAdminCreditProvider(
     providerId: string,
     options?: ApiClientRequestOptions,
@@ -355,6 +396,19 @@ async function resolveAccessToken(
   return config.getAccessToken ? config.getAccessToken() : undefined;
 }
 
+function normalizeTransportSafeAccessToken(token?: string): string | undefined {
+  const normalized = String(token || "").trim();
+  return normalized.length > 0 && /^[\x21-\x7E]+$/.test(normalized)
+    ? normalized
+    : undefined;
+}
+
+async function resolveRefreshedAccessToken(
+  config: ApiClientConfig,
+): Promise<string | undefined> {
+  return config.refreshAccessToken ? config.refreshAccessToken() : undefined;
+}
+
 async function requestJson<TResponse>(
   config: ApiClientConfig,
   path: string,
@@ -374,25 +428,44 @@ async function requestJson<TResponse>(
   }
 
   try {
-    const accessToken = await resolveAccessToken(config, options);
     const defaultHeaders = config.getDefaultHeaders ? config.getDefaultHeaders() : {};
+    const executeRequest = async (accessToken?: string) => {
+      const headers = normalizeHeaders({
+        ...defaultHeaders,
+        ...options?.headers,
+        ...(init.body ? { "content-type": "application/json; charset=utf-8" } : {}),
+        authorization: accessToken ? `Bearer ${accessToken}` : undefined,
+        "x-client-version": clientVersion,
+        "x-request-id": requestId,
+      });
 
-    const headers = normalizeHeaders({
-      ...defaultHeaders,
-      ...options?.headers,
-      ...(init.body ? { "content-type": "application/json; charset=utf-8" } : {}),
-      authorization: accessToken ? `Bearer ${accessToken}` : undefined,
-      "x-client-version": clientVersion,
-      "x-request-id": requestId,
-    });
+      const response = await fetchImpl(new URL(path, normalizeBaseUrl(config.baseUrl)), {
+        ...init,
+        headers,
+        signal: options?.signal,
+      });
 
-    const response = await fetchImpl(new URL(path, normalizeBaseUrl(config.baseUrl)), {
-      ...init,
-      headers,
-      signal: options?.signal,
-    });
+      const payload = await parseResponseBody(response);
+      return { response, payload };
+    };
 
-    const payload = await parseResponseBody(response);
+    const initialAccessToken = normalizeTransportSafeAccessToken(
+      await resolveAccessToken(config, options),
+    );
+    let { response, payload } = await executeRequest(initialAccessToken);
+
+    if (response.status === 401 && typeof options?.accessToken !== "string") {
+      try {
+        const refreshedAccessToken = normalizeTransportSafeAccessToken(
+          await resolveRefreshedAccessToken(config),
+        );
+        if (refreshedAccessToken && refreshedAccessToken !== initialAccessToken) {
+          ({ response, payload } = await executeRequest(refreshedAccessToken));
+        }
+      } catch {
+        // Fall through and surface the original 401 response below.
+      }
+    }
 
     if (isEnvelope<TResponse>(payload)) {
       return payload;
@@ -558,6 +631,28 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         {
           method: "PUT",
           body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    checkUserRouteConnectivity(routeId, options) {
+      return requestJson<UserRouteConnectivityCheckDto>(
+        config,
+        `api/v1/profile/user-routes/${encodeURIComponent(routeId)}/connectivity`,
+        {
+          method: "POST",
+        },
+        options,
+      );
+    },
+
+    syncUserRoutePricing(routeId, options) {
+      return requestJson<UserRoutePricingSyncDto>(
+        config,
+        `api/v1/profile/user-routes/${encodeURIComponent(routeId)}/pricing-sync`,
+        {
+          method: "POST",
         },
         options,
       );
@@ -739,6 +834,29 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
+    listCreditExchangeRates(options) {
+      return requestJson<CreditExchangeRateListDto>(
+        config,
+        "api/v1/billing/exchange-rates",
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    upsertCreditExchangeRate(input, options) {
+      return requestJson<CreditExchangeRateDto>(
+        config,
+        "api/v1/admin/billing/exchange-rates",
+        {
+          method: "PUT",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
     listModels(kind, options) {
       const path = kind
         ? `api/v1/model-catalog/models?kind=${encodeURIComponent(kind)}`
@@ -792,6 +910,60 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<SaveAdminCreditProviderResponseDto>(
         config,
         `api/v1/admin/credit-providers/${encodeURIComponent(providerId)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    getAdminCreditProviderPricingCache(providerId, options) {
+      return requestJson<ProviderPricingCacheDto>(
+        config,
+        `api/v1/admin/credit-providers/${encodeURIComponent(providerId)}/pricing-cache`,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    upsertAdminCreditProviderPricingCache(providerId, input, options) {
+      return requestJson<ProviderPricingCacheDto>(
+        config,
+        `api/v1/admin/credit-providers/${encodeURIComponent(providerId)}/pricing-cache`,
+        {
+          method: "PUT",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    getSharedProviderPricingCache(baseUrl, options) {
+      const query = new URLSearchParams({
+        baseUrl,
+      });
+
+      return requestJson<ProviderPricingCacheDto>(
+        config,
+        `api/v1/provider-pricing-cache?${query.toString()}`,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    upsertSharedProviderPricingCache(baseUrl, input, options) {
+      const query = new URLSearchParams({
+        baseUrl,
+      });
+
+      return requestJson<ProviderPricingCacheDto>(
+        config,
+        `api/v1/provider-pricing-cache?${query.toString()}`,
         {
           method: "PUT",
           body: JSON.stringify(input),

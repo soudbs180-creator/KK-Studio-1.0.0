@@ -1,7 +1,7 @@
 import {
   createKkApiClient,
   type KkApiClient,
-} from "../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../packages/contracts/src/index.ts";
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 import { getPreferredKkApiAccessToken } from "./authAccessToken.ts";
 

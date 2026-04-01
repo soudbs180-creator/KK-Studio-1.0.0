@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { tempUserService, type TempUserSession } from '../services/auth/tempUserService';
 import { setKkApiAccessToken } from '../services/api/kkApiClient';
+import { startKkApiAccessTokenSessionSync } from '../services/api/authAccessToken';
 import { clearStoredAdminSession } from '../services/api/adminSession';
 import { emitAuthSessionChange } from '../services/auth/authSessionEvents';
 
@@ -50,6 +51,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         latestTempUserSessionRef.current = tempUserSession;
     }, [tempUserSession]);
+
+    useEffect(() => {
+        const stopSessionSync = startKkApiAccessTokenSessionSync();
+        return () => {
+            stopSessionSync();
+        };
+    }, []);
 
     // Check for cached temp user on mount
     useEffect(() => {

@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { test } from "node:test";
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
+}
+
+test("hosted preflight checks verify auth prerequisites and keep local API fallback out of Vercel", () => {
+  const source = readSource("scripts/diagnose-hosted-release.mjs");
+
+  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_KK_API_BASE_URL",\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*\];/);
+  assert.match(source, /label: "vercel whoami"/);
+  assert.match(source, /label: "npx vercel whoami"/);
+  assert.match(source, /label: "supabase projects list"/);
+  assert.match(source, /label: "npx supabase projects list"/);
+  assert.match(source, /Vercel authentication is unavailable\./);
+  assert.match(source, /Supabase authentication is unavailable\./);
+  assert.match(source, /It does not read remote Vercel or Supabase dashboard state\./);
+});
+
+test("hosted release workflow pushes migrations before deploying edge functions and frontend", () => {
+  const source = readSource("scripts/release-hosted.mjs");
+
+  assert.match(source, /const skipMigrations = args\.has\("--skip-migrations"\);/);
+  assert.match(source, /runStep\("Link Supabase project", `npx supabase link --project-ref \$\{projectRef\}`\);/);
+  assert.match(source, /runStep\("Push Supabase migrations", "npx supabase db push"\);/);
+  assert.match(source, /runStep\("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy"\);/);
+  assert.match(source, /runStep\("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy"\);/);
+  assert.match(source, /runStep\("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models"\);/);
+  assert.match(source, /runStep\("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth"\);/);
+  assert.match(source, /npx vercel deploy --prod -y/);
+});
+
+test("cloud auto deploy waits for Supabase functions before Vercel and includes user-route-proxy", () => {
+  const source = readSource(".github/workflows/cloud-auto-deploy.yml");
+
+  assert.match(source, /deploy-vercel:\s+[\s\S]*needs:\s+[\s\S]*- verify\s+[\s\S]*- deploy-supabase-functions/);
+  assert.match(source, /needs\.deploy-supabase-functions\.result == 'success'/);
+  assert.match(source, /Deploy user-route-proxy Edge Function/);
+  assert.match(source, /supabase functions deploy user-route-proxy/);
+});
+
+test("hosted release runbook keeps routing and billing smoke tests explicit", () => {
+  const source = readSource("docs/development/hosted-release-runbook.md");
+
+  assert.match(source, /User-owned API routes must use `userRoute` and must not consume credits\./);
+  assert.match(source, /1\. Supabase database migrations/);
+  assert.match(source, /2\. Supabase Edge Functions/);
+  assert.match(source, /3\. Vercel frontend/);
+  assert.match(source, /4\. Smoke tests/);
+  assert.match(source, /Confirm the request succeeds and the user credit balance does not decrease\./);
+  assert.match(source, /Hosted `secure-model-proxy` is still on an older version without `userRoute`/);
+});

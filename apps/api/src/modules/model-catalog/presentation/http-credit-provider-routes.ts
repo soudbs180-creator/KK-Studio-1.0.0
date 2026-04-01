@@ -4,6 +4,7 @@ import {
   buildRequestMeta,
   type ApiErrorDetail,
   type SaveAdminCreditProviderRequestDto,
+  type UpsertProviderPricingCacheRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import {
   resolveAuthenticatedAdminSession,
@@ -192,6 +193,93 @@ export function validateSaveAdminCreditProviderRequest(body: unknown): ApiErrorD
   return details;
 }
 
+export function validateUpsertProviderPricingCacheRequest(body: unknown): ApiErrorDetail[] {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return [{ field: "body", reason: "Request body must be an object." }];
+  }
+
+  const candidate = body as Partial<UpsertProviderPricingCacheRequestDto>;
+  const details: ApiErrorDetail[] = [];
+
+  if (!Array.isArray(candidate.pricing)) {
+    details.push({ field: "pricing", reason: "pricing must be an array." });
+    return details;
+  }
+
+  candidate.pricing.forEach((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      details.push({ field: `pricing[${index}]`, reason: "Each pricing item must be an object." });
+      return;
+    }
+
+    if (!item.modelId || typeof item.modelId !== "string") {
+      details.push({ field: `pricing[${index}].modelId`, reason: "modelId is required." });
+    }
+
+    if (!item.modelName || typeof item.modelName !== "string") {
+      details.push({ field: `pricing[${index}].modelName`, reason: "modelName is required." });
+    }
+
+    if (typeof item.inputPrice !== "number" || !Number.isFinite(item.inputPrice) || item.inputPrice < 0) {
+      details.push({
+        field: `pricing[${index}].inputPrice`,
+        reason: "inputPrice must be a non-negative finite number.",
+      });
+    }
+
+    if (typeof item.outputPrice !== "number" || !Number.isFinite(item.outputPrice) || item.outputPrice < 0) {
+      details.push({
+        field: `pricing[${index}].outputPrice`,
+        reason: "outputPrice must be a non-negative finite number.",
+      });
+    }
+
+    if (typeof item.isPerToken !== "boolean") {
+      details.push({
+        field: `pricing[${index}].isPerToken`,
+        reason: "isPerToken must be a boolean.",
+      });
+    }
+
+    if (!item.currency || typeof item.currency !== "string") {
+      details.push({ field: `pricing[${index}].currency`, reason: "currency is required." });
+    }
+
+    if (typeof item.groupRatio !== "undefined" && (
+      typeof item.groupRatio !== "number"
+      || !Number.isFinite(item.groupRatio)
+      || item.groupRatio < 0
+    )) {
+      details.push({
+        field: `pricing[${index}].groupRatio`,
+        reason: "groupRatio must be a non-negative finite number when provided.",
+      });
+    }
+  });
+
+  return details;
+}
+
+function validateSharedPricingBaseUrl(baseUrl: string, requestId: string, clientVersion?: string) {
+  const normalizedBaseUrl = String(baseUrl || "").trim();
+  if (normalizedBaseUrl) {
+    return null;
+  }
+
+  return {
+    statusCode: 400,
+    body: {
+      success: false as const,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "Shared pricing cache request validation failed.",
+        details: [{ field: "baseUrl", reason: "baseUrl query parameter is required." }],
+      },
+      meta: buildRequestMeta(requestId, clientVersion),
+    },
+  };
+}
+
 export async function handleListActiveCreditModels(
   service: CreditProviderService,
   headers: Record<string, string>,
@@ -282,6 +370,198 @@ export async function handleSaveAdminCreditProvider(
 
   const result = await service.saveAdminProvider(
     normalizedProviderId,
+    body,
+    userId,
+    requestId,
+    clientVersion,
+  );
+
+  return {
+    statusCode: 200,
+    body: result,
+  };
+}
+
+export async function handleGetAdminCreditProviderPricingCache(
+  service: CreditProviderService,
+  providerId: string,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  if (!isAdminRequest(headers)) {
+    return buildAdminForbiddenResult(requestId, clientVersion);
+  }
+
+  const normalizedProviderId = String(providerId || "").trim();
+  if (!normalizedProviderId) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false as const,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "Credit provider pricing cache request validation failed.",
+          details: [{ field: "providerId", reason: "providerId path parameter is required." }],
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      },
+    };
+  }
+
+  const result = await service.getProviderPricingCache(
+    normalizedProviderId,
+    requestId,
+    clientVersion,
+  );
+
+  return {
+    statusCode: result.success ? 200 : 404,
+    body: result,
+  };
+}
+
+export async function handleGetSharedProviderPricingCache(
+  service: CreditProviderService,
+  baseUrl: string,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  const validationResult = validateSharedPricingBaseUrl(baseUrl, requestId, clientVersion);
+  if (validationResult) {
+    return validationResult;
+  }
+
+  const result = await service.getSharedProviderPricingCache(
+    baseUrl,
+    requestId,
+    clientVersion,
+  );
+
+  return {
+    statusCode: result.success ? 200 : 404,
+    body: result,
+  };
+}
+
+export async function handleUpsertAdminCreditProviderPricingCache(
+  service: CreditProviderService,
+  providerId: string,
+  body: UpsertProviderPricingCacheRequestDto,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  if (!isAdminRequest(headers)) {
+    return buildAdminForbiddenResult(requestId, clientVersion);
+  }
+
+  if (!hasElevatedAdminSession(headers)) {
+    return buildAdminElevationRequiredResult(requestId, clientVersion);
+  }
+
+  const normalizedProviderId = String(providerId || "").trim();
+  if (!normalizedProviderId) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false as const,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "Credit provider pricing cache request validation failed.",
+          details: [{ field: "providerId", reason: "providerId path parameter is required." }],
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      },
+    };
+  }
+
+  const validationErrors = validateUpsertProviderPricingCacheRequest(body);
+  if (validationErrors.length > 0) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false as const,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "Credit provider pricing cache request validation failed.",
+          details: validationErrors,
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      },
+    };
+  }
+
+  const result = await service.saveProviderPricingCache(
+    normalizedProviderId,
+    body,
+    userId,
+    requestId,
+    clientVersion,
+  );
+
+  return {
+    statusCode: 200,
+    body: result,
+  };
+}
+
+export async function handleUpsertSharedProviderPricingCache(
+  service: CreditProviderService,
+  baseUrl: string,
+  body: UpsertProviderPricingCacheRequestDto,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  const validationResult = validateSharedPricingBaseUrl(baseUrl, requestId, clientVersion);
+  if (validationResult) {
+    return validationResult;
+  }
+
+  const validationErrors = validateUpsertProviderPricingCacheRequest(body);
+  if (validationErrors.length > 0) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false as const,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "Shared pricing cache request validation failed.",
+          details: validationErrors,
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      },
+    };
+  }
+
+  const result = await service.saveSharedProviderPricingCache(
+    baseUrl,
     body,
     userId,
     requestId,

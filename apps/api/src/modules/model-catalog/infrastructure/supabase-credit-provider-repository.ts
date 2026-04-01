@@ -5,12 +5,16 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   ActiveCreditModelProviderDto,
   AdminCreditProviderDto,
+  ProviderPricingCacheDto,
+  ProviderPricingCacheItemDto,
   SaveAdminCreditProviderRequestDto,
+  UpsertProviderPricingCacheRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import type {
   CreditProviderRepository,
   SavedCreditProviderRecord,
 } from "./in-memory-credit-provider-repository.ts";
+import { buildSharedPricingCacheProviderId } from "./provider-pricing-cache-key.ts";
 
 interface RpcAdminCreditProviderModelRow {
   model_id?: string | null;
@@ -87,6 +91,12 @@ interface CreditProviderTableRow {
   mix_with_same_model?: boolean | null;
   quality_pricing?: Record<string, { enabled: boolean; creditCost: number }> | null;
   visibility?: string | null;
+}
+
+interface ProviderPricingCacheRow {
+  provider_id?: string | null;
+  pricing?: ProviderPricingCacheItemDto[] | null;
+  cached_at?: string | null;
 }
 
 export interface SupabaseCreditProviderRepositoryOptions {
@@ -213,6 +223,20 @@ function normalizeUniqueApiKeys(values: string[]): string[] {
 function filterApiKeysByFingerprints(apiKeys: string[], fingerprints: string[]): string[] {
   const allowed = new Set(fingerprints);
   return apiKeys.filter((value) => allowed.has(buildApiKeyFingerprint(value)));
+}
+
+function clonePricingCacheItems(items: ProviderPricingCacheItemDto[]): ProviderPricingCacheItemDto[] {
+  return items.map((item) => ({
+    ...item,
+  }));
+}
+
+function toProviderPricingCacheDto(row: ProviderPricingCacheRow): ProviderPricingCacheDto {
+  return {
+    providerId: String(row.provider_id || "").trim(),
+    pricing: Array.isArray(row.pricing) ? clonePricingCacheItems(row.pricing) : [],
+    cachedAt: row.cached_at || null,
+  };
 }
 
 function compareProviderTableRows(left: CreditProviderTableRow, right: CreditProviderTableRow): number {
@@ -459,6 +483,73 @@ export class SupabaseCreditProviderRepository implements CreditProviderRepositor
       apiKeyCount: effectiveApiKeys.length,
       modelCount: input.models.length,
     };
+  }
+
+  async getProviderPricingCache(providerId: string): Promise<ProviderPricingCacheDto | null> {
+    const { data, error } = await this.client
+      .from("provider_pricing_cache")
+      .select("provider_id, pricing, cached_at")
+      .eq("provider_id", providerId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return toProviderPricingCacheDto(data as ProviderPricingCacheRow);
+  }
+
+  async saveProviderPricingCache(
+    providerId: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto> {
+    const cachedAt = new Date().toISOString();
+    const { data, error } = await this.client
+      .from("provider_pricing_cache")
+      .upsert({
+        provider_id: providerId,
+        pricing: clonePricingCacheItems(input.pricing),
+        cached_at: cachedAt,
+      }, {
+        onConflict: "provider_id",
+      })
+      .select("provider_id, pricing, cached_at")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return toProviderPricingCacheDto((data || {
+      provider_id: providerId,
+      pricing: input.pricing,
+      cached_at: cachedAt,
+    }) as ProviderPricingCacheRow);
+  }
+
+  async getSharedProviderPricingCache(baseUrl: string): Promise<ProviderPricingCacheDto | null> {
+    const providerId = buildSharedPricingCacheProviderId(baseUrl);
+    if (!providerId) {
+      return null;
+    }
+
+    return this.getProviderPricingCache(providerId);
+  }
+
+  async saveSharedProviderPricingCache(
+    baseUrl: string,
+    input: UpsertProviderPricingCacheRequestDto,
+  ): Promise<ProviderPricingCacheDto> {
+    const providerId = buildSharedPricingCacheProviderId(baseUrl);
+    if (!providerId) {
+      throw new Error("baseUrl is required before saving shared pricing cache.");
+    }
+
+    return this.saveProviderPricingCache(providerId, input);
   }
 
   async deleteAdminProvider(providerId: string): Promise<boolean> {

@@ -12,6 +12,14 @@ import {
   handleCreateAdminModel,
   handleListModels,
 } from "../../apps/api/src/modules/model-catalog/presentation/http-model-catalog-routes.ts";
+import { CreditProviderService } from "../../apps/api/src/modules/model-catalog/application/credit-provider-service.ts";
+import { InMemoryCreditProviderRepository } from "../../apps/api/src/modules/model-catalog/infrastructure/in-memory-credit-provider-repository.ts";
+import {
+  handleGetAdminCreditProviderPricingCache,
+  handleGetSharedProviderPricingCache,
+  handleUpsertAdminCreditProviderPricingCache,
+  handleUpsertSharedProviderPricingCache,
+} from "../../apps/api/src/modules/model-catalog/presentation/http-credit-provider-routes.ts";
 
 describe("model catalog routes", () => {
   test("lists seeded public models", async () => {
@@ -108,4 +116,147 @@ describe("model catalog routes", () => {
     assert.equal(second.body.success, false);
   });
 
+  test("requires an authenticated admin to read provider pricing cache", async () => {
+    const service = new CreditProviderService(new InMemoryCreditProviderRepository());
+
+    const unauthorized = await handleGetAdminCreditProviderPricingCache(
+      service,
+      "provider-1",
+      {
+        "x-request-id": "req-provider-pricing-unauthorized",
+      },
+    );
+
+    assert.equal(unauthorized.statusCode, 401);
+    assert.equal(unauthorized.body.success, false);
+
+    const forbidden = await handleGetAdminCreditProviderPricingCache(
+      service,
+      "provider-1",
+      {
+        "x-request-id": "req-provider-pricing-forbidden",
+        [AUTHENTICATED_USER_ID_HEADER]: "user-provider-1",
+        [AUTHENTICATED_USER_ROLE_HEADER]: "user",
+      },
+    );
+
+    assert.equal(forbidden.statusCode, 403);
+    assert.equal(forbidden.body.success, false);
+  });
+
+  test("saves and returns provider pricing cache through the migrated model-catalog service", async () => {
+    const service = new CreditProviderService(new InMemoryCreditProviderRepository());
+    const headers = {
+      "x-request-id": "req-provider-pricing-upsert",
+      [AUTHENTICATED_USER_ID_HEADER]: "admin-user-1",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+      [AUTHENTICATED_ADMIN_SESSION_HEADER]: "true",
+    };
+
+    const upsertResult = await handleUpsertAdminCreditProviderPricingCache(
+      service,
+      "provider-1",
+      {
+        pricing: [
+          {
+            modelId: "gpt-4.1",
+            modelName: "GPT-4.1",
+            inputPrice: 1.2,
+            outputPrice: 3.4,
+            isPerToken: true,
+            groupRatio: 1,
+            currency: "USD",
+            billingUnit: "1M tokens",
+            supportsGroups: true,
+          },
+        ],
+      },
+      headers,
+    );
+
+    assert.equal(upsertResult.statusCode, 200);
+    assert.equal(upsertResult.body.success, true);
+    if (upsertResult.body.success) {
+      assert.equal(upsertResult.body.data.providerId, "provider-1");
+      assert.equal(upsertResult.body.data.pricing.length, 1);
+    }
+
+    const readResult = await handleGetAdminCreditProviderPricingCache(
+      service,
+      "provider-1",
+      {
+        "x-request-id": "req-provider-pricing-read",
+        [AUTHENTICATED_USER_ID_HEADER]: "admin-user-1",
+        [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+      },
+    );
+
+    assert.equal(readResult.statusCode, 200);
+    assert.equal(readResult.body.success, true);
+    if (readResult.body.success) {
+      assert.equal(readResult.body.data.providerId, "provider-1");
+      assert.equal(readResult.body.data.pricing.length, 1);
+      assert.equal(readResult.body.data.pricing[0].modelId, "gpt-4.1");
+      assert.equal(readResult.body.data.pricing[0].inputPrice, 1.2);
+    }
+  });
+
+  test("allows authenticated users to share pricing cache by baseUrl without admin elevation", async () => {
+    const service = new CreditProviderService(new InMemoryCreditProviderRepository());
+    const baseUrl = "https://api.example.com/v1";
+
+    const unauthorized = await handleGetSharedProviderPricingCache(
+      service,
+      baseUrl,
+      {
+        "x-request-id": "req-shared-pricing-unauthorized",
+      },
+    );
+
+    assert.equal(unauthorized.statusCode, 401);
+    assert.equal(unauthorized.body.success, false);
+
+    const upsertResult = await handleUpsertSharedProviderPricingCache(
+      service,
+      baseUrl,
+      {
+        pricing: [
+          {
+            modelId: "gpt-4.1",
+            modelName: "GPT-4.1",
+            inputPrice: 1.2,
+            outputPrice: 3.4,
+            isPerToken: true,
+            currency: "USD",
+          },
+        ],
+      },
+      {
+        "x-request-id": "req-shared-pricing-upsert",
+        [AUTHENTICATED_USER_ID_HEADER]: "user-shared-pricing-1",
+        [AUTHENTICATED_USER_ROLE_HEADER]: "user",
+      },
+    );
+
+    assert.equal(upsertResult.statusCode, 200);
+    assert.equal(upsertResult.body.success, true);
+
+    const readResult = await handleGetSharedProviderPricingCache(
+      service,
+      baseUrl,
+      {
+        "x-request-id": "req-shared-pricing-read",
+        [AUTHENTICATED_USER_ID_HEADER]: "user-shared-pricing-1",
+        [AUTHENTICATED_USER_ROLE_HEADER]: "user",
+      },
+    );
+
+    assert.equal(readResult.statusCode, 200);
+    assert.equal(readResult.body.success, true);
+    if (readResult.body.success) {
+      assert.equal(readResult.body.data.pricing.length, 1);
+      assert.equal(readResult.body.data.pricing[0].modelId, "gpt-4.1");
+      assert.match(readResult.body.data.providerId, /^shared:/);
+    }
+  });
 });

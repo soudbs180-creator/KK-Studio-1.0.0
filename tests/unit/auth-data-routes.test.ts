@@ -7,6 +7,7 @@ import {
 } from "../../packages/shared/src/index.ts";
 import { AuthDataService } from "../../apps/api/src/modules/auth/application/auth-data-service.ts";
 import { InMemoryAuthDataRepository } from "../../apps/api/src/modules/auth/infrastructure/in-memory-auth-data-repository.ts";
+import type { UserScopedAuthDataMirror } from "../../apps/api/src/modules/auth/infrastructure/supabase-user-scoped-auth-data-mirror.ts";
 import {
   handleCreateTempUser,
   handleGetKeyManagerCloudState,
@@ -14,6 +15,40 @@ import {
   handleReplaceKeyManagerCloudState,
   handleReplaceUserApiEntries,
 } from "../../apps/api/src/modules/auth/presentation/http-auth-data-routes.ts";
+
+const REDACTED_KEY_PREFIX = "__kk_redacted__:key:";
+const REDACTED_API_KEY_PREFIX = "__kk_redacted__:apiKey:";
+
+class FakeUserScopedAuthDataMirror implements UserScopedAuthDataMirror {
+  public payload: unknown | null = null;
+  public lastSaved:
+    | {
+        accessToken: string;
+        userId: string;
+        email?: string;
+        payload: unknown;
+      }
+    | null = null;
+
+  async loadUserApisPayload(_accessToken: string, _userId: string): Promise<unknown | null> {
+    return this.payload;
+  }
+
+  async saveUserApisPayload(
+    accessToken: string,
+    userId: string,
+    email: string | undefined,
+    payload: unknown,
+  ): Promise<void> {
+    this.lastSaved = {
+      accessToken,
+      userId,
+      email,
+      payload,
+    };
+    this.payload = payload;
+  }
+}
 
 describe("auth data routes", () => {
   test("requires authentication to read and replace user api entries", async () => {
@@ -86,6 +121,7 @@ describe("auth data routes", () => {
     }
     assert.equal(replace.body.data.entries.length, 1);
     assert.equal(replace.body.data.entries[0].provider, "Google");
+    assert.equal(replace.body.data.entries[0].key, `${REDACTED_KEY_PREFIX}entry-1`);
 
     const listed = await handleGetUserApiEntries(service, {
       ...headers,
@@ -96,7 +132,7 @@ describe("auth data routes", () => {
     if (listed.body.success) {
       assert.equal(listed.body.data.entries.length, 1);
       assert.equal(listed.body.data.entries[0].id, "entry-1");
-      assert.equal(listed.body.data.entries[0].key, "sk-entry-1-secret");
+      assert.equal(listed.body.data.entries[0].key, "__kk_redacted__:key:entry-1");
     }
   });
 
@@ -167,6 +203,8 @@ describe("auth data routes", () => {
     assert.equal(replace.body.data.slots.length, 1);
     assert.equal(replace.body.data.providers.length, 1);
     assert.equal(replace.body.data.entries.length, 0);
+    assert.equal(replace.body.data.slots[0].key, `${REDACTED_KEY_PREFIX}slot-1`);
+    assert.equal(replace.body.data.providers[0].apiKey, `${REDACTED_API_KEY_PREFIX}provider-1`);
 
     const listed = await handleGetKeyManagerCloudState(service, {
       ...headers,
@@ -179,6 +217,8 @@ describe("auth data routes", () => {
       assert.equal(listed.body.data.providers.length, 1);
       assert.equal(listed.body.data.entries.length, 0);
       assert.equal(listed.body.data.providers[0].id, "provider-1");
+      assert.equal(listed.body.data.slots[0].key, `${REDACTED_KEY_PREFIX}slot-1`);
+      assert.equal(listed.body.data.providers[0].apiKey, `${REDACTED_API_KEY_PREFIX}provider-1`);
     }
   });
 
@@ -270,6 +310,7 @@ describe("auth data routes", () => {
       assert.equal(replaceKeyManager.body.data.slots.length, 1);
       assert.equal(replaceKeyManager.body.data.entries.length, 1);
       assert.equal(replaceKeyManager.body.data.entries[0].id, "entry-1");
+      assert.equal(replaceKeyManager.body.data.entries[0].key, `${REDACTED_KEY_PREFIX}entry-1`);
     }
 
     const listedUserApis = await handleGetUserApiEntries(service, {
@@ -282,8 +323,119 @@ describe("auth data routes", () => {
     if (listedUserApis.body.success) {
       assert.equal(listedUserApis.body.data.entries.length, 1);
       assert.equal(listedUserApis.body.data.entries[0].id, "entry-1");
-      assert.equal(listedUserApis.body.data.entries[0].key, "sk-entry-1-secret");
+      assert.equal(listedUserApis.body.data.entries[0].key, "__kk_redacted__:key:entry-1");
     }
+  });
+
+  test("mirrors local auth data to the user-scoped cloud profile when a bearer token is present", async () => {
+    const mirror = new FakeUserScopedAuthDataMirror();
+    const service = new AuthDataService(new InMemoryAuthDataRepository(), {
+      cloudMirror: mirror,
+    });
+    const headers = {
+      authorization: "Bearer supabase-user-token-1",
+      "x-request-id": "req-user-apis-mirror-write",
+      [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-mirror-1",
+      [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-mirror-1@example.com",
+    };
+
+    const replace = await handleReplaceUserApiEntries(service, {
+      entries: [
+        {
+          id: "entry-1",
+          key: "sk-entry-1-secret",
+          name: "Google Key",
+          provider: "Google",
+          type: "official",
+          format: "gemini",
+          baseUrl: "https://generativelanguage.googleapis.com",
+          supportedModels: ["gemini-2.5-flash"],
+          disabled: false,
+          createdAt: 1700000000000,
+          updatedAt: 1700000000000,
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ],
+    }, headers);
+
+    assert.equal(replace.statusCode, 200);
+    assert.ok(mirror.lastSaved);
+    assert.equal(mirror.lastSaved?.accessToken, "supabase-user-token-1");
+    assert.equal(mirror.lastSaved?.userId, "user-auth-data-mirror-1");
+    assert.equal(mirror.lastSaved?.email, "user-auth-data-mirror-1@example.com");
+    assert.equal(
+      (mirror.lastSaved?.payload as { entries?: Array<{ key?: string }> }).entries?.[0]?.key,
+      "sk-entry-1-secret",
+    );
+  });
+
+  test("hydrates local auth data from the user-scoped cloud profile on read", async () => {
+    const mirror = new FakeUserScopedAuthDataMirror();
+    mirror.payload = {
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [
+        {
+          id: "entry-cloud-1",
+          key: "sk-cloud-secret",
+          name: "Cloud Key",
+          provider: "Google",
+          type: "official",
+          format: "gemini",
+          baseUrl: "https://generativelanguage.googleapis.com",
+          supportedModels: ["gemini-2.5-flash"],
+          disabled: false,
+          createdAt: 1700000000000,
+          updatedAt: 1700000000000,
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ],
+    };
+
+    const repository = new InMemoryAuthDataRepository();
+    const service = new AuthDataService(repository, {
+      cloudMirror: mirror,
+    });
+    const headers = {
+      authorization: "Bearer supabase-user-token-2",
+      "x-request-id": "req-user-apis-mirror-read",
+      [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-mirror-2",
+      [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-mirror-2@example.com",
+    };
+
+    const listed = await handleGetUserApiEntries(service, headers);
+    assert.equal(listed.statusCode, 200);
+    assert.equal(listed.body.success, true);
+    if (!listed.body.success) {
+      return;
+    }
+
+    assert.equal(listed.body.data.entries.length, 1);
+    assert.equal(listed.body.data.entries[0].id, "entry-cloud-1");
+    assert.equal(listed.body.data.entries[0].key, `${REDACTED_KEY_PREFIX}entry-cloud-1`);
+
+    const localPayload = await repository.getUserApisPayload("user-auth-data-mirror-2", "user-auth-data-mirror-2@example.com");
+    assert.equal(
+      (localPayload as { entries?: Array<{ key?: string }> }).entries?.[0]?.key,
+      "sk-cloud-secret",
+    );
   });
 
   test("creates guest temp users through the auth module", async () => {

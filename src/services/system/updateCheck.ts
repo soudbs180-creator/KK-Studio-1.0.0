@@ -16,6 +16,8 @@ let intervalId: number | null = null;
 type BuildManifest = {
     version?: string;
     buildTime?: string;
+    releaseDate?: string;
+    releaseNotes?: readonly string[];
     channel?: string;
     commitSha?: string | null;
     deploymentTarget?: string | null;

@@ -115,6 +115,24 @@ export interface PaymentSidecarServerOptions {
   settlementWriterOptions?: Partial<HttpMainApiSettlementWriterOptions>;
 }
 
+type RuntimeMode = "memory" | "supabase" | "http" | "custom";
+
+function resolveRepositoryBackend(
+  repository: unknown,
+  inMemoryCtor: abstract new (...args: any[]) => unknown,
+  supabaseCtor: abstract new (...args: any[]) => unknown,
+): RuntimeMode {
+  if (repository instanceof inMemoryCtor) {
+    return "memory";
+  }
+
+  if (repository instanceof supabaseCtor) {
+    return "supabase";
+  }
+
+  return "custom";
+}
+
 function createPaymentOrderRepository(): PaymentOrderRepository {
   const supabaseUrl = env.get("SUPABASE_URL");
   const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
@@ -148,22 +166,49 @@ export function createPaymentSidecarServer(
   port = Number(process.env.PAYMENT_SIDECAR_PORT || process.env.PORT || 8080),
   options: PaymentSidecarServerOptions = {},
 ) {
+  const supabaseUrl = env.get("SUPABASE_URL");
+  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
+  const configuredKkApiBaseUrl =
+    options.settlementWriterOptions?.baseUrl
+    || process.env.KK_API_BASE_URL
+    || "http://127.0.0.1:3001";
+  const configuredInternalToken =
+    options.settlementWriterOptions?.internalToken
+    || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+    || "";
   const repository = options.paymentOrderRepository || createPaymentOrderRepository();
   const creditAmountResolver = options.creditAmountResolver || createPaymentCreditAmountResolver();
   const settlementWriter = new HttpMainApiSettlementWriter({
-    baseUrl: options.settlementWriterOptions?.baseUrl
-      || process.env.KK_API_BASE_URL
-      || "http://127.0.0.1:3001",
-    internalToken: options.settlementWriterOptions?.internalToken
-      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN,
+    baseUrl: configuredKkApiBaseUrl,
+    internalToken: configuredInternalToken,
     fetchImpl: options.settlementWriterOptions?.fetchImpl,
   });
   const service = new PaymentService(repository, settlementWriter, creditAmountResolver);
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: options.resolveAccessToken,
-    supabaseUrl: env.get("SUPABASE_URL"),
+    supabaseUrl,
     supabaseAuthKey: resolveSupabaseAuthKey(),
   });
+  const repositoryModes = {
+    paymentOrders: resolveRepositoryBackend(
+      repository,
+      InMemoryPaymentOrderRepository,
+      SupabasePaymentOrderRepository,
+    ),
+    creditAmountResolver:
+      options.creditAmountResolver
+        ? "custom"
+        : (supabaseUrl && serviceRoleKey ? "supabase" : "memory"),
+    settlementWriter:
+      options.settlementWriterOptions?.fetchImpl
+        ? "custom"
+        : configuredInternalToken
+          ? "http"
+          : "memory",
+  } as const;
+  const hasPersistentPaymentRepository = repositoryModes.paymentOrders === "supabase";
+  const hasSupabaseCreditAmountResolver = Boolean(!options.creditAmountResolver && supabaseUrl && serviceRoleKey);
+  const hasSettlementWriteback = Boolean(configuredKkApiBaseUrl && configuredInternalToken);
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -186,6 +231,20 @@ export function createPaymentSidecarServer(
             data: {
               service: "kk-studio-payment-sidecar",
               status: "ok",
+              config: {
+                hasSupabaseUrl: Boolean(supabaseUrl),
+                hasServiceRoleKey: Boolean(serviceRoleKey),
+                hasKkApiBaseUrl: Boolean(configuredKkApiBaseUrl),
+                hasInternalToken: Boolean(configuredInternalToken),
+                kkApiBaseUrl: configuredKkApiBaseUrl,
+              },
+              repositories: repositoryModes,
+              persistence: {
+                paymentOrders: hasPersistentPaymentRepository,
+                paymentCallbacks: hasPersistentPaymentRepository,
+                settlementWriteback: hasSettlementWriteback,
+                creditExchangeRates: hasSupabaseCreditAmountResolver,
+              },
             },
             meta: buildErrorMeta(requestId, clientVersion),
           });
@@ -209,7 +268,13 @@ export function createPaymentSidecarServer(
           return;
         }
 
-        if (req.method === "POST" && pathname === "/payment/v1/callbacks/alipay") {
+        if (
+          req.method === "POST"
+          && (
+            pathname === "/payment/v1/callbacks/alipay"
+            || pathname === "/api/pay/notify/alipay"
+          )
+        ) {
           const body = await readJsonBody(req);
           const result = await handleAlipayCallback(service, body, requestHeaders);
           if (result.redirectTo) {

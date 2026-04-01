@@ -1,5 +1,6 @@
 import { User } from '@supabase/supabase-js';
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { supabase } from '../../lib/supabase';
+import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
@@ -81,21 +82,70 @@ class TempUserService {
   }
 
   async createTempUser(): Promise<TempUserSession> {
-    const response = await legacyWebApiClient.createTempUser();
-    if (!response.success) {
-      console.error('[TempUser] Failed to create temp user session via API:', response.error);
-      throw new Error(response.error.message || 'Failed to create guest session.');
-    }
+    const userId = crypto.randomUUID();
+    const createdAt = Date.now();
+    const createdAtIso = new Date(createdAt).toISOString();
+    const expiresAt = createdAt + TEMP_USER_EXPIRY_MS;
+    const expiresAtIso = new Date(expiresAt).toISOString();
+    const email = buildTempEmail(userId);
+    const nickname = buildTempNickname(userId);
 
-    const createdAt = Date.parse(response.data.createdAt) || Date.now();
-    const expiresAt = Date.parse(response.data.expiresAt) || createdAt + TEMP_USER_EXPIRY_MS;
-    const email = response.data.email || buildTempEmail(response.data.userId);
-    const nickname = response.data.nickname || buildTempNickname(response.data.userId);
-    const createdAtIso = response.data.createdAt || new Date(createdAt).toISOString();
+    try {
+      const { error } = await supabase
+        .from('temp_users')
+        .insert({
+          id: userId,
+          created_at: createdAtIso,
+          expires_at: expiresAtIso,
+          is_active: true,
+          metadata: {
+            email,
+            nickname,
+            lastSeenAt: createdAtIso,
+            source: 'web-client',
+          },
+        });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      if (!shouldUseLegacyWebApiFallback()) {
+        console.error('[TempUser] Failed to create temp user session via Supabase:', error);
+        throw new Error('Failed to create guest session.');
+      }
+
+      const response = await legacyWebApiClient.createTempUser();
+      if (!response.success) {
+        console.error('[TempUser] Failed to create temp user session via API:', response.error);
+        throw new Error(response.error.message || 'Failed to create guest session.');
+      }
+
+      const legacyCreatedAt = Date.parse(response.data.createdAt) || createdAt;
+      const legacyExpiresAt = Date.parse(response.data.expiresAt) || legacyCreatedAt + TEMP_USER_EXPIRY_MS;
+      const legacyEmail = response.data.email || buildTempEmail(response.data.userId);
+      const legacyNickname = response.data.nickname || buildTempNickname(response.data.userId);
+      const legacyCreatedAtIso = response.data.createdAt || new Date(legacyCreatedAt).toISOString();
+
+      const session: TempUserSession = {
+        user: buildTempUser({
+          userId: response.data.userId,
+          email: legacyEmail,
+          nickname: legacyNickname,
+          createdAtIso: legacyCreatedAtIso,
+        }),
+        createdAt: legacyCreatedAt,
+        expiresAt: legacyExpiresAt,
+        isTempUser: true,
+      };
+
+      this.cacheTempUser(session);
+      return session;
+    }
 
     const session: TempUserSession = {
       user: buildTempUser({
-        userId: response.data.userId,
+        userId,
         email,
         nickname,
         createdAtIso,

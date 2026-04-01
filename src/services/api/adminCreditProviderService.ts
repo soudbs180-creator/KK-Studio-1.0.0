@@ -1,4 +1,9 @@
 import {
+  deleteAdminCreditProviderViaEdgeFunction,
+  listAdminCreditProvidersViaEdgeFunction,
+  saveAdminCreditProviderViaEdgeFunction,
+} from '../admin/adminCreditModelsEdgeService';
+import {
   deleteAdminCreditProviderViaSupabase,
   listAdminCreditProvidersViaSupabase,
   saveAdminCreditProviderViaSupabase,
@@ -75,18 +80,35 @@ function normalizeAdminCreditProviderGroup(
 }
 
 export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpcGroup[]> {
+  try {
+    const edgeRows = await listAdminCreditProvidersViaEdgeFunction();
+    return edgeRows.map((row) => normalizeAdminCreditProviderGroup(row));
+  } catch (edgeError) {
+    console.warn('[adminCreditProviderService] Edge function list failed, falling back to Supabase RPC:', edgeError);
+  }
+
   const rows = await listAdminCreditProvidersViaSupabase();
   return rows.map((row) => normalizeAdminCreditProviderGroup(row));
 }
 
 export async function saveAdminCreditProvider(input: SaveAdminCreditProviderInput): Promise<void> {
-  await saveAdminCreditProviderViaSupabase(input);
+  try {
+    await saveAdminCreditProviderViaEdgeFunction(input);
+  } catch (edgeError) {
+    console.warn('[adminCreditProviderService] Edge function save failed, falling back to Supabase RPC:', edgeError);
+    await saveAdminCreditProviderViaSupabase(input);
+  }
 
   await adminModelService.broadcastCatalogUpdate('save');
 }
 
 export async function deleteAdminCreditProvider(providerId: string): Promise<void> {
-  await deleteAdminCreditProviderViaSupabase(providerId);
+  try {
+    await deleteAdminCreditProviderViaEdgeFunction(providerId);
+  } catch (edgeError) {
+    console.warn('[adminCreditProviderService] Edge function delete failed, falling back to Supabase RPC:', edgeError);
+    await deleteAdminCreditProviderViaSupabase(providerId);
+  }
 
   await adminModelService.broadcastCatalogUpdate('delete');
 }

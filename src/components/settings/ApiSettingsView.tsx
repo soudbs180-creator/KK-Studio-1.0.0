@@ -19,18 +19,26 @@ import {
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
+import { legacyWebApiClient } from '../../services/api/kkApiClient';
 import { getKkApiServerHealth, type KkApiServerHealth } from '../../services/api/kkApiServerHealth';
-import { loadUserApisPayloadMetadataViaSupabase } from '../../services/api/supabaseUserApiCloudStorage';
+import {
+  loadUserApisPayloadMetadataViaSupabase,
+  removeUserApiProviderViaSupabase,
+  removeUserApiSlotViaSupabase,
+  upsertUserApiProviderViaSupabase,
+  upsertUserApiSlotViaSupabase,
+} from '../../services/api/supabaseUserApiCloudStorage';
 import {
   extractKeyManagerCloudSlots,
   extractUserApiProvidersFromPayload,
 } from '../../services/api/userApiPayload';
+import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import keyManager, {
-  autoDetectAndConfigureModels,
   type KeySlot,
   type ThirdPartyProvider,
 } from '../../services/auth/keyManager';
+import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
 import { notify } from '../../services/system/notificationService';
 import {
@@ -190,6 +198,8 @@ function normalizeStringArray(value: unknown): string[] {
     ? value.map((item) => normalizeString(item)).filter(Boolean)
     : [];
 }
+
+const isReadonlySecretPlaceholder = (value?: string | null) => String(value || '').trim() === READONLY_SECRET_PLACEHOLDER;
 
 function hasStoredSecret(value: unknown): boolean {
   if (typeof value === 'string') {
@@ -629,6 +639,7 @@ const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
 const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isTempUser } = useAuth();
   const { pick } = useLocale();
   const getOfficialDisplayName = useCallback(
     (provider: OfficialProvider) => (provider === 'Google' ? pick('谷歌', 'Google') : 'OpenAI'),
@@ -687,15 +698,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const routeValue = normalizeRouteMatchValue(routeProviderId);
     if (!routeValue) return null;
 
-    return (
-      thirdPartyProviders.find((provider) =>
-        [
-          provider.id,
-          provider.name,
-          provider.baseUrl,
-        ].some((candidate) => normalizeRouteMatchValue(candidate) === routeValue)
-      ) || null
-    );
+    return thirdPartyProviders.find((provider) => normalizeRouteMatchValue(provider.id) === routeValue) || null;
   }, [routeProviderId, thirdPartyProviders]);
   const isOfficialEditorRoute = Boolean(routeOfficialId);
   const isProviderEditorRoute = Boolean(routeProviderId);
@@ -718,15 +721,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     if (!apiHealth.reachable) {
       return pick(
-        '当前本地 API 服务不可用，设置页无法安全读取或保存完整的加密密钥状态。Supabase 中已有的数据不会丢失，但现在只能依赖只读兜底显示。',
-        'The local API server is unavailable, so this page cannot safely read or save the full encrypted key state. Existing Supabase data is still preserved, but only read-only fallbacks are available right now.',
+        '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在 Supabase，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
+        'The local API server is unavailable. Signed-in BYOK settings still live in Supabase, and this page will keep using the cloud-backed view until the local service recovers.',
       );
     }
 
     if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
       return pick(
-        '当前本地 API 正在使用内存仓库，而不是 Supabase 持久化仓库。Supabase 里的 user_apis 数据仍然存在，但完整密钥状态需要服务端解密，所以现在不应继续写入。',
-        'The local API server is using in-memory repositories instead of Supabase-backed persistence. The user_apis data in Supabase still exists, but the full key state needs server-side decryption, so writes should stay blocked for now.',
+        '当前本地 API 仍在内存模式，但已登录用户的 BYOK 修改会直接写入 Supabase，并在本地服务恢复后继续同步。',
+        'The local API server is still running in memory mode, but signed-in BYOK changes now write straight to Supabase and will sync back once the local service recovers.',
       );
     }
 
@@ -739,27 +742,91 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     if (!apiHealth.reachable) {
       return pick(
-        '先确认本地 API 进程已启动，然后再重试刷新。',
-        'Start the local API server first, then try refreshing again.',
+        '本地 API 恢复后会重新接管服务端仓库；在这之前，当前页面会继续优先使用云端同步结果。',
+        'Once the local API is back it can resume the server-side repositories. Until then, this page keeps using the cloud-backed sync path.',
       );
     }
 
     if (!apiHealth.config.hasServiceRoleKey) {
       return pick(
-        '需要为 API 进程补上 SUPABASE_SERVICE_ROLE_KEY，并建议同时配置 USER_API_ENCRYPTION_SECRET，随后重启 3001 端口上的服务。',
-        'Add SUPABASE_SERVICE_ROLE_KEY to the API process, and preferably USER_API_ENCRYPTION_SECRET as well, then restart the service running on port 3001.',
+        '如果你想让本地 API 也恢复完整的服务端持久化能力，再补上 SUPABASE_SERVICE_ROLE_KEY 并重启本地服务；普通用户 BYOK 云端同步本身不依赖它。',
+        'If you want the local API to regain full server-side persistence, add SUPABASE_SERVICE_ROLE_KEY and restart it. Basic BYOK cloud sync for signed-in users does not depend on that key.',
       );
     }
 
-    return null;
+    return pick(
+      '本地与云端会在服务恢复后继续对齐；当前页面已经优先保证云端记录不丢失。',
+      'Local and cloud state will realign once the service recovers. The page now prioritizes keeping the cloud record intact.',
+    );
   }, [apiHealth, pick]);
-  const userApiActionsDisabled = isUserApiPersistenceDegraded;
-  const userApiReadOnlyHelper = isUsingReadonlyProfileFallback
+  const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
+  const isAuthenticated = Boolean(authenticatedUserId);
+  const userApiActionsDisabled = !isAuthenticated;
+  const providerActionsDisabled = !isAuthenticated;
+  const userApiEditorDisabled = !isAuthenticated;
+  const userApiEditorReadOnly = userApiEditorDisabled;
+  const providerEditorReadOnly = providerActionsDisabled;
+  const userApiActionHelper = pick(
+    '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
+    'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
+  );
+  const providerActionHelper = userApiActionHelper;
+  const userApiEditorReadOnlyHelper = userApiEditorReadOnly
+    ? userApiActionHelper
+    : isUserApiPersistenceDegraded
+      ? pick(
+          '当前处于云端直写模式。你保存的官方接口会直接进入 Supabase，并在本地服务恢复后继续同步。',
+          'Cloud-backed write mode is active. Saved official endpoints will go straight to Supabase and sync back once the local service recovers.',
+        )
+      : null;
+  const providerEditorReadOnlyHelper = providerEditorReadOnly
+    ? providerActionHelper
+    : isUserApiPersistenceDegraded
+      ? pick(
+          '当前处于云端直写模式。你保存的供应商会直接进入 Supabase，并在本地服务恢复后继续同步。',
+          'Cloud-backed write mode is active. Saved providers will go straight to Supabase and sync back once the local service recovers.',
+        )
+      : null;
+  const browserDirectChecksDisabled = true;
+  const browserDirectChecksHelper = pick(
+    '浏览器直连检测已关闭。请先保存到账号，再通过本地后端或云端安全代理链路使用。',
+    'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
+  );
+  const headerPrimaryActionDisabled = activeTab === 'official' ? userApiActionsDisabled : providerActionsDisabled;
+  const useSupabaseDirectUserApiWrites = isAuthenticated && isUserApiPersistenceDegraded;
+  const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
+  const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
+  const diagnosticsActionDisabled = !isAuthenticated || apiHealth?.reachable === false;
+  const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
-        '当前展示的是 Supabase 中的只读元数据，等本地 API 恢复到 Supabase 持久化模式后才能继续编辑、测试或切换。',
-        'The current cards are read-only metadata from Supabase. Editing, testing, and toggling can resume after the local API is back on Supabase-backed persistence.',
+        '当前页面会优先保住 Supabase 里的云端配置，并在本地服务恢复后重新和本地状态对齐。',
+        'This page now prioritizes preserving the Supabase-backed cloud record and will realign local state after the local service recovers.',
       )
     : null;
+  const ensureUserApiActionsAllowed = (): boolean => {
+    if (!isAuthenticated) {
+      notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper);
+      return false;
+    }
+
+    return true;
+  };
+  const ensureProviderActionsAllowed = (): boolean => {
+    if (!isAuthenticated) {
+      notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper);
+      return false;
+    }
+
+    return true;
+  };
+  const ensureBrowserDirectDiagnosticsAllowed = (): boolean => {
+    if (browserDirectChecksDisabled) {
+      notify.warning(pick('浏览器直连已禁用', 'Browser direct calls disabled'), browserDirectChecksHelper);
+      return false;
+    }
+
+    return true;
+  };
   const showInlineOfficialCreate = editorMode === null && activeTab === 'official';
   const showInlineProviderCreate = editorMode === null && activeTab === 'third-party';
   const showOfficialEditor = editorMode === 'official' || showInlineOfficialCreate;
@@ -845,6 +912,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     refresh();
   }, [pick, refresh, refreshApiHealth]);
+  const refreshAfterSupabaseDirectUserApiMutation = useCallback(async () => {
+    await refreshCloudData(true);
+  }, [refreshCloudData]);
 
   useEffect(() => {
     refresh();
@@ -949,6 +1019,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const beginCreateOfficial = () => {
+    if (!ensureUserApiActionsAllowed()) {
+      return;
+    }
+
     setActiveTab('official');
     setEditorMode('official');
     setEditingOfficialId(null);
@@ -959,6 +1033,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const beginCreateProvider = () => {
+    if (!ensureProviderActionsAllowed()) {
+      return;
+    }
+
     setActiveTab('third-party');
     setEditorMode('third-party');
     setEditingOfficialId(null);
@@ -969,6 +1047,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const startEditOfficial = (slot: KeySlot) => {
+    if (!ensureUserApiActionsAllowed()) {
+      return;
+    }
+
     setActiveTab('official');
     setEditorMode('official');
     setEditingOfficialId(slot.id);
@@ -979,6 +1061,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const startEditProvider = (provider: ThirdPartyProvider) => {
+    if (!ensureProviderActionsAllowed()) {
+      return;
+    }
+
     setActiveTab('third-party');
     setEditorMode('third-party');
     setEditingOfficialId(null);
@@ -999,18 +1085,40 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
 
   const saveOfficial = async () => {
+    if (!ensureUserApiActionsAllowed()) {
+      return;
+    }
+
     const value = officialForm.mode === 'unlimited' ? null : positive(officialForm.value);
-    if (!officialForm.key.trim()) {
+    const normalizedKey = officialForm.key.trim();
+    const nextSlotId = officialForm.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const nextKeyValue = normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : '');
+
+    if (!nextKeyValue) {
       notify.error(
         pick('保存失败', 'Save failed'),
-        pick('请填写有效的 API Key。', 'Enter a valid API key.')
+        pick('请填写有效的 API Key。', 'Enter a valid API key.'),
       );
       return;
     }
+
+    if (isReadonlySecretPlaceholder(officialForm.key)) {
+      if (!canReusePersistedOfficialSecret) {
+        notify.error(
+          pick('保存失败', 'Save failed'),
+          pick(
+            '请重新输入真实 API Key，当前只读占位符不能直接保存回账号。',
+            'Re-enter the real API key before saving. Read-only placeholder secrets cannot be saved back to the account.',
+          ),
+        );
+        return;
+      }
+    }
+
     if (officialForm.mode !== 'unlimited' && !value) {
       notify.error(
         pick('保存失败', 'Save failed'),
-        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.')
+        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.'),
       );
       return;
     }
@@ -1021,23 +1129,45 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     };
 
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
-      if (officialForm.id) {
+      if (useSupabaseDirectUserApiWrites) {
+        const existingSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
+        await upsertUserApiSlotViaSupabase({
+          id: nextSlotId,
+          name: officialForm.provider,
+          provider: officialForm.provider as Provider,
+          type: 'official',
+          format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
+          baseUrl: officialForm.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL,
+          key: nextKeyValue,
+          supportedModels: existingSlot?.supportedModels || [],
+          disabled: existingSlot?.disabled || false,
+          status: existingSlot?.status || 'unknown',
+          failCount: existingSlot?.failCount || 0,
+          successCount: existingSlot?.successCount || 0,
+          lastUsed: existingSlot?.lastUsed || null,
+          lastError: existingSlot?.lastError || null,
+          createdAt: existingSlot?.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          avgResponseTime: existingSlot?.avgResponseTime,
+          lastResponseTime: existingSlot?.lastResponseTime,
+          usedTokens: existingSlot?.usedTokens || 0,
+          totalCost: existingSlot?.totalCost || 0,
+          ...payload,
+        });
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else if (officialForm.id) {
         await keyManager.updateKey(officialForm.id, {
           name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
           baseUrl: '',
-          key: officialForm.key.trim(),
+          key: normalizedKey,
           ...payload,
         });
         await keyManager.syncToCloudNow();
-        notify.success(
-          pick('保存成功', 'Saved'),
-          pick('官方接口配置已更新。', 'Official endpoint settings have been updated.')
-        );
       } else {
-        const result = await keyManager.addKey(officialForm.key.trim(), {
+        const result = await keyManager.addKey(normalizedKey, {
           name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
@@ -1048,33 +1178,56 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         if (!result.success) {
           notify.error(
             pick('新增失败', 'Creation failed'),
-            result.error || pick('无法创建官方接口。', 'Unable to create the official endpoint.')
+            result.error || pick('无法创建官方接口。', 'Unable to create the official endpoint.'),
           );
           return;
         }
         await keyManager.syncToCloudNow();
-        notify.success(
-          pick('新增成功', 'Created'),
-          pick('官方接口已加入当前链路。', 'The official endpoint has been added to the current routing chain.')
-        );
       }
+
+      notify.success(
+        officialForm.id ? pick('保存成功', 'Saved') : pick('新增成功', 'Created'),
+        officialForm.id
+          ? pick('官方接口配置已更新。', 'Official endpoint settings have been updated.')
+          : pick('官方接口已加入当前链路。', 'The official endpoint has been added to the current routing chain.'),
+      );
       cancelEdit();
     });
   };
 
   const saveProvider = async () => {
+    if (!ensureProviderActionsAllowed()) {
+      return;
+    }
+
     const value = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
-    if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !providerForm.apiKey.trim()) {
+    const normalizedApiKey = providerForm.apiKey.trim();
+    const nextProviderId = providerForm.id || `provider_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const nextApiKeyValue = normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : '');
+
+    if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !nextApiKeyValue) {
       notify.error(
         pick('保存失败', 'Save failed'),
-        pick('请完整填写供应商名称、基础地址和 API Key。', 'Enter the provider name, base URL, and API key.')
+        pick('请完整填写供应商名称、基础地址和 API Key。', 'Enter the provider name, base URL, and API key.'),
       );
       return;
     }
+
+    if (isReadonlySecretPlaceholder(providerForm.apiKey) && !canReusePersistedProviderSecret) {
+      notify.error(
+        pick('保存失败', 'Save failed'),
+        pick(
+          '请重新输入真实 API Key，当前只读占位符不能直接保存回账号。',
+          'Re-enter the real API key before saving. Read-only placeholder secrets cannot be saved back to the account.',
+        ),
+      );
+      return;
+    }
+
     if (providerForm.mode !== 'unlimited' && !value) {
       notify.error(
         pick('保存失败', 'Save failed'),
-        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.')
+        pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.'),
       );
       return;
     }
@@ -1087,11 +1240,39 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     };
 
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
-      if (providerForm.id) {
+      if (useSupabaseDirectUserApiWrites) {
+        const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
+        await upsertUserApiProviderViaSupabase({
+          id: nextProviderId,
+          name: providerForm.name.trim(),
+          baseUrl: providerForm.baseUrl.trim(),
+          apiKey: nextApiKeyValue,
+          models: existingProvider?.models || [],
+          format: providerForm.format,
+          group: providerForm.group.trim() || undefined,
+          providerColor: providerForm.color,
+          isActive: providerForm.isActive,
+          usage: existingProvider?.usage || {
+            totalTokens: 0,
+            totalCost: 0,
+            dailyTokens: 0,
+            dailyCost: 0,
+            lastReset: Date.now(),
+          },
+          status: existingProvider?.status || 'checking',
+          lastError: existingProvider?.lastError,
+          lastChecked: existingProvider?.lastChecked,
+          createdAt: existingProvider?.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          activitySummary: existingProvider?.activitySummary,
+          ...payload,
+        });
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else if (providerForm.id) {
         keyManager.updateProvider(providerForm.id, {
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
-          apiKey: providerForm.apiKey.trim(),
+          apiKey: normalizedApiKey,
           format: providerForm.format,
           group: providerForm.group.trim() || undefined,
           providerColor: providerForm.color,
@@ -1099,15 +1280,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           ...payload,
         });
         await keyManager.syncToCloudNow();
-        notify.success(
-          pick('保存成功', 'Saved'),
-          pick('供应商配置已更新。', 'Provider settings have been updated.')
-        );
       } else {
         keyManager.addProvider({
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
-          apiKey: providerForm.apiKey.trim(),
+          apiKey: normalizedApiKey,
           models: [],
           format: providerForm.format,
           group: providerForm.group.trim() || undefined,
@@ -1116,131 +1293,270 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           ...payload,
         });
         await keyManager.syncToCloudNow();
-        notify.success(
-          pick('新增成功', 'Created'),
-          pick('供应商已加入当前调度池。', 'The provider has been added to the routing pool.')
-        );
       }
+
+      notify.success(
+        providerForm.id ? pick('保存成功', 'Saved') : pick('新增成功', 'Created'),
+        providerForm.id
+          ? pick('供应商配置已更新。', 'Provider settings have been updated.')
+          : pick('供应商已加入当前调度池。', 'The provider has been added to the routing pool.'),
+      );
       cancelEdit();
     });
   };
 
   const deleteOfficial = async (id: string) => {
+    if (!ensureUserApiActionsAllowed()) {
+      return;
+    }
+
     await run(`official-delete:${id}`, async () => {
-      keyManager.removeKey(id);
-      await keyManager.syncToCloudNow();
+      if (useSupabaseDirectUserApiWrites) {
+        await removeUserApiSlotViaSupabase(id);
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else {
+        keyManager.removeKey(id);
+        await keyManager.syncToCloudNow();
+      }
+
       notify.success(
         pick('删除成功', 'Deleted'),
-        pick('官方接口已移除。', 'The official endpoint has been removed.')
+        pick('官方接口已移除。', 'The official endpoint has been removed.'),
       );
       if (editingOfficialId === id) cancelEdit();
     });
   };
 
   const deleteProvider = async (id: string) => {
+    if (!ensureProviderActionsAllowed()) {
+      return;
+    }
+
     await run(`provider-delete:${id}`, async () => {
-      keyManager.removeProvider(id);
-      await keyManager.syncToCloudNow();
+      if (useSupabaseDirectUserApiWrites) {
+        await removeUserApiProviderViaSupabase(id);
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else {
+        keyManager.removeProvider(id);
+        await keyManager.syncToCloudNow();
+      }
+
       notify.success(
         pick('删除成功', 'Deleted'),
-        pick('供应商配置已移除。', 'The provider configuration has been removed.')
+        pick('供应商配置已移除。', 'The provider configuration has been removed.'),
       );
       if (editingProviderId === id) cancelEdit();
     });
   };
 
   const toggleOfficial = async (slot: KeySlot) => {
+    if (!ensureUserApiActionsAllowed()) {
+      return;
+    }
+
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
-      await keyManager.updateKey(slot.id, { disabled: nextDisabled });
-      await keyManager.syncToCloudNow();
+      if (useSupabaseDirectUserApiWrites) {
+        await upsertUserApiSlotViaSupabase({
+          id: slot.id,
+          name: slot.name,
+          provider: slot.provider,
+          type: slot.type,
+          format: slot.format,
+          baseUrl: slot.baseUrl || (slot.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL),
+          key: READONLY_SECRET_PLACEHOLDER,
+          supportedModels: slot.supportedModels,
+          disabled: nextDisabled,
+          status: slot.status,
+          failCount: slot.failCount,
+          successCount: slot.successCount,
+          lastUsed: slot.lastUsed,
+          lastError: slot.lastError,
+          createdAt: slot.createdAt,
+          updatedAt: Date.now(),
+          avgResponseTime: slot.avgResponseTime,
+          lastResponseTime: slot.lastResponseTime,
+          usedTokens: slot.usedTokens,
+          totalCost: slot.totalCost,
+          budgetLimit: slot.budgetLimit,
+          tokenLimit: slot.tokenLimit,
+        });
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else {
+        await keyManager.updateKey(slot.id, { disabled: nextDisabled });
+        await keyManager.syncToCloudNow();
+      }
+
       notify.success(
         nextDisabled ? pick('已暂停', 'Paused') : pick('已启用', 'Enabled'),
-        pick(`${slot.name} 的调度状态已更新。`, `${slot.name} scheduling status has been updated.`)
+        pick(`${slot.name} 的调度状态已更新。`, `${slot.name} scheduling status has been updated.`),
       );
     });
   };
 
   const toggleProvider = async (provider: ThirdPartyProvider) => {
+    if (!ensureProviderActionsAllowed()) {
+      return;
+    }
+
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
-      keyManager.updateProvider(provider.id, { isActive: nextActive });
-      await keyManager.syncToCloudNow();
+      if (useSupabaseDirectUserApiWrites) {
+        await upsertUserApiProviderViaSupabase({
+          id: provider.id,
+          name: provider.name,
+          baseUrl: provider.baseUrl,
+          apiKey: READONLY_SECRET_PLACEHOLDER,
+          models: provider.models,
+          format: provider.format,
+          group: provider.group,
+          providerColor: provider.providerColor,
+          isActive: nextActive,
+          usage: provider.usage,
+          status: provider.status,
+          lastError: provider.lastError,
+          lastChecked: provider.lastChecked,
+          createdAt: provider.createdAt,
+          updatedAt: Date.now(),
+          activitySummary: provider.activitySummary,
+          budgetLimit: provider.budgetLimit,
+          tokenLimit: provider.tokenLimit,
+          customCostMode: provider.customCostMode,
+          customCostValue: provider.customCostValue,
+        });
+        await refreshAfterSupabaseDirectUserApiMutation();
+      } else {
+        keyManager.updateProvider(provider.id, { isActive: nextActive });
+        await keyManager.syncToCloudNow();
+      }
+
       notify.success(
         nextActive ? pick('已启用', 'Enabled') : pick('已暂停', 'Paused'),
-        pick(`${provider.name} 的调度状态已更新。`, `${provider.name} scheduling status has been updated.`)
+        pick(`${provider.name} 的调度状态已更新。`, `${provider.name} scheduling status has been updated.`),
       );
     });
   };
 
   const refreshOfficial = async (slot: KeySlot) => {
+    if (!ensureBrowserDirectDiagnosticsAllowed()) {
+      return;
+    }
+
     await run(`official-check:${slot.id}`, async () => {
-      const provider = slot.provider === 'OpenAI' ? 'OpenAI' : 'Google';
-      const baseUrl = provider === 'Google' ? 'https://generativelanguage.googleapis.com' : 'https://api.openai.com';
-      const check = await keyManager.testChannel(
-        baseUrl,
-        slot.key,
-        provider,
-        slot.authMethod,
-        slot.headerName,
-        provider === 'Google' ? 'gemini' : 'openai'
-      );
-      const models = check.success ? await autoDetectAndConfigureModels(slot.key, baseUrl, provider === 'Google' ? 'gemini' : 'openai') : null;
+      const response = await legacyWebApiClient.checkUserRouteConnectivity(slot.id);
+      if (!response.success) {
+        notify.warning(
+          pick('检测失败', 'Check failed'),
+          response.error.message || pick('本地 API 安全代理暂时不可用。', 'The local API secure proxy is unavailable right now.'),
+        );
+        return;
+      }
+
+      const check = response.data;
       await keyManager.updateKey(slot.id, {
-        status: check.success ? 'valid' : 'invalid',
-        lastError: check.success ? null : check.message || '连接失败',
-        supportedModels: models?.success ? models.models : slot.supportedModels,
+        status: check.ok ? 'valid' : 'invalid',
+        lastError: check.ok ? null : check.message || '连接失败',
+        supportedModels: check.ok && check.models.length > 0 ? check.models : slot.supportedModels,
+        lastResponseTime: check.ok ? check.latencyMs ?? slot.lastResponseTime : slot.lastResponseTime,
+        avgResponseTime: check.ok ? check.latencyMs ?? slot.avgResponseTime : slot.avgResponseTime,
       });
-      if (check.success) {
+      if (check.ok) {
         notify.success(
           pick('刷新成功', 'Refreshed'),
-          pick(`${slot.name} 已完成连通检测。`, `${slot.name} connectivity check is complete.`)
+          pick(`${slot.name} 已完成连通检测。`, `${slot.name} connectivity check is complete.`),
         );
       } else {
         notify.warning(
           pick('检测失败', 'Check failed'),
-          check.message || pick('请检查密钥和网络连通性。', 'Check the key and network connectivity.')
+          check.message || pick('请检查密钥和网络连通性。', 'Check the key and network connectivity.'),
         );
       }
     });
   };
 
   const refreshProvider = async (provider: ThirdPartyProvider) => {
+    if (!ensureBrowserDirectDiagnosticsAllowed()) {
+      return;
+    }
+
     await run(`provider-check:${provider.id}`, async () => {
-      const check = await keyManager.testChannel(provider.baseUrl, provider.apiKey, provider.name, undefined, undefined, provider.format);
-      const models = check.success ? await autoDetectAndConfigureModels(provider.apiKey, provider.baseUrl, provider.format) : null;
+      const response = await legacyWebApiClient.checkUserRouteConnectivity(provider.id);
+      if (!response.success) {
+        notify.warning(
+          pick('检测失败', 'Check failed'),
+          response.error.message || pick('本地 API 安全代理暂时不可用。', 'The local API secure proxy is unavailable right now.'),
+        );
+        return;
+      }
+
+      const check = response.data;
+      const checkedAt = Date.now();
       keyManager.updateProvider(provider.id, {
-        status: check.success ? 'active' : 'error',
-        lastChecked: Date.now(),
-        lastError: check.success ? undefined : check.message || '连接失败',
-        models: models?.success ? models.models : provider.models,
+        status: check.ok ? 'active' : 'error',
+        lastChecked: checkedAt,
+        lastError: check.ok ? undefined : check.message || '连接失败',
+        models: check.ok && check.models.length > 0 ? check.models : provider.models,
+        activitySummary: {
+          ...provider.activitySummary,
+          lastLatencyMs: check.ok
+            ? check.latencyMs ?? provider.activitySummary?.lastLatencyMs ?? null
+            : provider.activitySummary?.lastLatencyMs ?? null,
+          updatedAt: checkedAt,
+        },
       });
-      if (check.success) {
+      if (check.ok) {
         notify.success(
           pick('刷新成功', 'Refreshed'),
-          pick(`${provider.name} 已完成连通检测。`, `${provider.name} connectivity check is complete.`)
+          pick(`${provider.name} 已完成连通检测。`, `${provider.name} connectivity check is complete.`),
         );
       } else {
         notify.warning(
           pick('检测失败', 'Check failed'),
-          check.message || pick('请检查基础地址和密钥。', 'Check the base URL and key.')
+          check.message || pick('请检查基础地址和密钥。', 'Check the base URL and key.'),
         );
       }
     });
   };
 
   const syncPricing = async (provider: ThirdPartyProvider) => {
+    if (!ensureBrowserDirectDiagnosticsAllowed()) {
+      return;
+    }
+
     await run(`provider-price:${provider.id}`, async () => {
-      const result = await keyManager.syncProviderPricingDetailed(provider.id);
+      const response = await legacyWebApiClient.syncUserRoutePricing(provider.id);
+      if (!response.success) {
+        notify.warning(
+          pick('同步失败', 'Sync failed'),
+          response.error.message || pick('本地 API 安全代理暂时不可用。', 'The local API secure proxy is unavailable right now.'),
+        );
+        return;
+      }
+
+      const result = response.data;
       if (result.ok) {
+        const fetchedSnapshot = buildProviderPricingSnapshot(result.pricingData, result.groupRatio, {
+          fetchedAt: Date.now(),
+          note: result.endpointUrl ? `Synced from ${result.endpointUrl}` : 'Synced from secure proxy',
+        });
+        const mergedSnapshot = mergeProviderPricingSnapshot(fetchedSnapshot, provider.pricingSnapshot);
+        const pricingModels = (fetchedSnapshot.rows || [])
+          .map((row) => String(row?.model || '').trim())
+          .filter(Boolean);
+
+        keyManager.updateProvider(provider.id, {
+          pricingSnapshot: mergedSnapshot,
+          models: pricingModels.length > 0 ? Array.from(new Set([...provider.models, ...pricingModels])) : provider.models,
+        });
+
         notify.success(
           pick('同步成功', 'Synced'),
-          result.message || pick('价格信息已更新。', 'Pricing information has been updated.')
+          result.message || pick('价格信息已更新。', 'Pricing information has been updated.'),
         );
       } else {
         notify.warning(
           pick('同步失败', 'Sync failed'),
-          result.message || pick('当前没有可用的价格数据返回。', 'No pricing data is available right now.')
+          result.message || pick('当前没有可用的价格数据返回。', 'No pricing data is available right now.'),
         );
       }
     });
@@ -1346,7 +1662,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               {selectedOfficialSlot ? (
                 <SettingsActionButton
                   icon={RefreshCw}
-                  disabled={userApiActionsDisabled}
+                  disabled={diagnosticsActionDisabled}
                   loading={busy === `official-check:${selectedOfficialSlot.id}`}
                   onClick={() => void refreshOfficial(selectedOfficialSlot)}
                 >
@@ -1415,7 +1731,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 <>
                   <SettingsActionButton
                     icon={RefreshCw}
-                    disabled={userApiActionsDisabled}
+                    disabled={diagnosticsActionDisabled}
                     loading={busy === `provider-check:${selectedProvider.id}`}
                     onClick={() => void refreshProvider(selectedProvider)}
                   >
@@ -1423,7 +1739,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                   </SettingsActionButton>
                   <SettingsActionButton
                     icon={Wand2}
-                    disabled={userApiActionsDisabled}
+                    disabled={diagnosticsActionDisabled}
                     loading={busy === `provider-price:${selectedProvider.id}`}
                     onClick={() => void syncPricing(selectedProvider)}
                   >
@@ -1499,7 +1815,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             >
               {pick('刷新数据', 'Refresh data')}
             </SettingsActionButton>
-            <SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
+            <SettingsActionButton icon={Plus} tone="primary" disabled={headerPrimaryActionDisabled} onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
               {activeTab === 'official' ? pick('新增官方接口', 'New official endpoint') : pick('新增供应商', 'New provider')}
             </SettingsActionButton>
           </>
@@ -1510,7 +1826,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               <SettingsMetricCard
                 label={pick('持久化状态', 'Persistence status')}
                 value={isUsingReadonlyProfileFallback ? pick('正在展示 Supabase 只读数据', 'Showing read-only Supabase data') : pick('本地 API 仍在内存模式', 'Local API still uses memory mode')}
-                helper={userApiReadOnlyHelper || userApiPersistenceHelper || pick('Supabase 中的数据仍在，但完整密钥状态需要服务端解密后才能安全使用。', 'Supabase data is still there, but the full key state must be decrypted server-side before it can be used safely.')}
+                helper={userApiReadOnlyHelper || userApiPersistenceHelper || pick('云端配置仍会继续保留，等本地服务恢复后会重新和本地状态对齐。', 'Cloud-backed settings remain preserved and will realign with local state once the service recovers.')}
                 icon={RefreshCw}
                 tone="rose"
               />
@@ -1675,7 +1991,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     actions={
                       <>
                         <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={userApiActionsDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
                         <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleOfficial(slot)}>
                           {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
                         </SettingsActionButton>
@@ -1695,7 +2011,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
             'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
           )}
-          action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
+          action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
@@ -1704,7 +2020,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 '先添加一个供应商，再配置协议、预算和自动价格同步。',
                 'Add a provider first, then configure its protocol, budget, and pricing sync.'
               )}
-              action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
+              action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
@@ -1764,16 +2080,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     footer={activityLine ? <div className="text-[13px] text-[var(--text-secondary)]">{activityLine}</div> : null}
                     actions={
                       <>
-                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditProvider(provider)}>
+                        <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
                           {pick('编辑', 'Edit')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={userApiActionsDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
                           {pick('刷新', 'Refresh')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={Wand2} size="sm" disabled={userApiActionsDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
+                        <SettingsActionButton icon={Wand2} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
                           {pick('自动获取价格', 'Sync pricing')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleProvider(provider)}>
+                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
                           {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
                         </SettingsActionButton>
                       </>
@@ -1834,12 +2150,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
+              {userApiEditorReadOnlyHelper ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
+                  {userApiEditorReadOnlyHelper}
+                </div>
+              ) : null}
+              {browserDirectChecksDisabled ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
+                  {browserDirectChecksHelper}
+                </div>
+              ) : null}
               <SettingInput
                 label={pick('接口名称', 'Endpoint name')}
                 value={getOfficialDisplayName(officialForm.provider)}
                 onChange={() => setOfficialForm((current) => ({ ...current, name: current.provider }))}
                 placeholder={pick('会根据提供商自动固定', 'Automatically fixed by provider')}
                 helper={pick('官方接口名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Official endpoint names are fixed by provider; Google follows the current language.')}
+                disabled={userApiEditorReadOnly}
               />
               <SettingSelect
                 label={pick('服务商', 'Provider')}
@@ -1849,6 +2176,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                   { value: 'OpenAI', label: 'OpenAI' },
                 ]}
                 onChange={(value) => setOfficialForm((current) => ({ ...current, provider: value as OfficialProvider, name: value as OfficialProvider }))}
+                disabled={userApiEditorReadOnly}
               />
             </div>
 
@@ -1859,11 +2187,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               placeholder={pick('输入官方接口的 API Key', 'Enter the official endpoint API key')}
               type="password"
               helper={pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
+              disabled={userApiEditorReadOnly}
             />
 
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
-              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} />
+              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
               {officialForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput
@@ -1873,6 +2202,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     type="number"
                     placeholder={officialForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
                     helper={officialForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
+                    disabled={userApiEditorReadOnly}
                   />
                 </div>
               ) : null}
@@ -1936,12 +2266,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
+              {providerEditorReadOnlyHelper ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
+                  {providerEditorReadOnlyHelper}
+                </div>
+              ) : null}
+              {browserDirectChecksDisabled ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
+                  {browserDirectChecksHelper}
+                </div>
+              ) : null}
               <SettingInput
                 label={pick('供应商名称', 'Provider name')}
                 value={providerForm.name}
                 onChange={(value) => setProviderForm((current) => ({ ...current, name: value }))}
                 placeholder={pick('例如：SiliconFlow', 'For example: SiliconFlow')}
                 helper={pick('建议写成你在团队里常用的供应商名称。', 'Use the provider name your team already recognizes.')}
+                disabled={providerEditorReadOnly}
               />
               <SettingInput
                 label={pick('主题颜色', 'Theme color')}
@@ -1949,6 +2290,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 onChange={(value) => setProviderForm((current) => ({ ...current, color: value }))}
                 placeholder="#60A5FA"
                 helper={pick('用于列表卡片的识别色，不影响真实请求。', 'Used as the list accent color and does not affect real requests.')}
+                disabled={providerEditorReadOnly}
               />
             </div>
 
@@ -1958,6 +2300,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
               placeholder="https://api.example.com/v1"
               helper={pick('通信检测、模型拉取和价格同步都会基于这里的地址。', 'Connectivity checks, model sync, and pricing sync all use this URL.')}
+              disabled={providerEditorReadOnly}
             />
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -1967,6 +2310,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
                 placeholder={pick('输入供应商 API Key', 'Enter the provider API key')}
                 type="password"
+                disabled={providerEditorReadOnly}
               />
               <SettingSelect
                 label={pick('通信协议', 'Protocol')}
@@ -1979,6 +2323,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 ]}
                 onChange={(value) => setProviderForm((current) => ({ ...current, format: value as ApiProtocolFormat }))}
                 helper={pick('默认推荐自动识别，必要时再手动固定协议。', 'Auto detect is recommended unless you need to lock the protocol manually.')}
+                disabled={providerEditorReadOnly}
               />
             </div>
 
@@ -1989,6 +2334,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 onChange={(value) => setProviderForm((current) => ({ ...current, group: value }))}
                 placeholder={pick('例如：国内通道', 'For example: CN route')}
                 helper={pick('用于组织和筛选供应商，不影响请求协议。', 'Used for organization and filtering, without affecting request behavior.')}
+                disabled={providerEditorReadOnly}
               />
               <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
                 <SettingToggle
@@ -1996,6 +2342,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                   helper={pick('关闭后，供应商会保留配置，但不会再参与自动调度。', 'When disabled, the provider stays configured but is removed from automatic routing.')}
                   checked={providerForm.isActive}
                   onChange={(checked) => setProviderForm((current) => ({ ...current, isActive: checked }))}
+                  disabled={providerEditorReadOnly}
                 />
               </div>
             </div>
@@ -2014,7 +2361,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingProviderId ? (
                   <SettingsActionButton
                     icon={Wand2}
-                    disabled={userApiActionsDisabled}
+                    disabled={diagnosticsActionDisabled}
                     loading={busy === `provider-price:${editingProviderId}`}
                     onClick={() => {
                       const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
@@ -2031,7 +2378,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
-              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} />
+              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
               {providerForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput
@@ -2041,13 +2388,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     type="number"
                     placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
                     helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
+                    disabled={providerEditorReadOnly}
                   />
                 </div>
               ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton disabled={userApiActionsDisabled} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
+              <PrimaryButton disabled={providerActionsDisabled} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
                 {editingProviderId ? pick('保存变更', 'Save changes') : pick('新增供应商', 'Create provider')}
               </PrimaryButton>
@@ -2055,7 +2403,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingProviderId ? (
-                <DangerButton disabled={userApiActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
+                <DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)} className="ml-auto">
                   <Trash2 size={16} className="mr-1" />
                   {pick('删除供应商', 'Delete provider')}
                 </DangerButton>
@@ -2069,3 +2417,5 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 };
 
 export default ApiSettingsView;
+
+

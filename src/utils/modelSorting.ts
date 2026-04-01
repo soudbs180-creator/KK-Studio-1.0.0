@@ -1,5 +1,3 @@
-import { getModelDisplayInfo } from '../services/model/modelCapabilities';
-
 const PINNED_MODELS_KEY = 'kk_pinned_models';
 const NANO_BANANA_KEYWORDS = ['nano', 'banana'];
 
@@ -41,6 +39,14 @@ export const toggleModelPin = (modelId: string) => {
     window.dispatchEvent(new Event('model-pinned-change'));
 };
 
+const normalizeSearchValue = (value: unknown): string => {
+    return String(value || '').trim().toLowerCase();
+};
+
+const tokenizeSearch = (value: string): string[] => {
+    return value.split(/\s+/).filter(token => token.length > 0);
+};
+
 const getModelWeight = (model: any, pinned: string[]): number => {
     let weight = 0;
     const modelId = typeof model === 'string' ? model : (model.id || '');
@@ -76,23 +82,23 @@ const getSuffixWeight = (id: string): number => {
 // Priority: ID Match > Alias Match > Description Match
 // Supports: "word matching" (all words present = higher score)
 export const filterAndSortModels = (models: any[], searchText: string, customizations: Record<string, { alias?: string; description?: string }>): any[] => {
-    if (!searchText) {
+    const normalizedSearch = normalizeSearchValue(searchText);
+    if (!normalizedSearch) {
         return sortModels(models); // Fallback to standard sort
     }
 
-    const lowerSearch = searchText.toLowerCase();
-    const searchTokens = lowerSearch.split(/\s+/).filter(t => t.length > 0); // Split by space
+    const searchTokens = tokenizeSearch(normalizedSearch);
 
     if (searchTokens.length === 0) return sortModels(models);
 
     // Map to store scores
     const scoredModels = models.map(model => {
         const custom = customizations[model.id] || {};
-        const id = model.id.toLowerCase();
-        const alias = (custom.alias || model.name || model.label || '').toLowerCase();
+        const id = normalizeSearchValue(model.id);
+        const alias = normalizeSearchValue(custom.alias || model.name || model.label);
         // Provider is often useful to search by (e.g. "openai")
-        const provider = (model.provider || '').toLowerCase();
-        const desc = (custom.description || model.description || '').toLowerCase();
+        const provider = normalizeSearchValue(model.provider);
+        const desc = normalizeSearchValue(custom.description || model.description);
 
         let score = 0;
         let matchedTokensCount = 0;
@@ -102,9 +108,9 @@ export const filterAndSortModels = (models: any[], searchText: string, customiza
         const scoreField = (text: string, weight: number) => {
             let fieldScore = 0;
             // Full phrase match (highest priority)
-            if (text === lowerSearch) fieldScore += 1000 * weight;
-            else if (text.startsWith(lowerSearch)) fieldScore += 500 * weight;
-            else if (text.includes(lowerSearch)) fieldScore += 200 * weight;
+            if (text === normalizedSearch) fieldScore += 1000 * weight;
+            else if (text.startsWith(normalizedSearch)) fieldScore += 500 * weight;
+            else if (text.includes(normalizedSearch)) fieldScore += 200 * weight;
 
             return fieldScore;
         };

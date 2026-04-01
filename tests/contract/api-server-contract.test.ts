@@ -516,7 +516,8 @@ describe("api server contract", () => {
     assert.equal(savePayload.data.slots.length, 1);
     assert.equal(savePayload.data.providers.length, 1);
     assert.equal(savePayload.data.entries.length, 1);
-    assert.equal(savePayload.data.entries[0].id, "contract-slot-1");
+    assert.equal(savePayload.data.slots[0].id, "contract-slot-1");
+    assert.equal(savePayload.data.entries[0].id, "contract-entry-1");
 
     const getResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
       headers: {
@@ -532,7 +533,9 @@ describe("api server contract", () => {
     assert.equal(getPayload.data.slots.length, 1);
     assert.equal(getPayload.data.providers.length, 1);
     assert.equal(getPayload.data.entries.length, 1);
+    assert.equal(getPayload.data.slots[0].id, "contract-slot-1");
     assert.equal(getPayload.data.providers[0].id, "contract-provider-1");
+    assert.equal(getPayload.data.entries[0].id, "contract-entry-1");
   });
 
   test("model catalog and admin model endpoints honor the contract shape", async () => {

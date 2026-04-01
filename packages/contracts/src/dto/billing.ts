@@ -29,6 +29,55 @@ export interface CreditBalanceDto extends AuditFieldsDto {
   frozenBalance: number;
 }
 
+export type BillingSummaryWindow = "today" | "30d";
+
+export interface GetBillingSummaryQueryDto {
+  window?: BillingSummaryWindow;
+}
+
+export interface BillingSummaryActivityDto {
+  transactionId: EntityId;
+  transactionType: string;
+  amount: number;
+  credits?: number;
+  costUsd?: number;
+  tokens?: number;
+  providerCode?: string | null;
+  modelCode?: string | null;
+  description?: string | null;
+  status?: string | null;
+  createdAt: string;
+}
+
+export interface BillingProfileSnapshotDto {
+  dailyCostUsd?: number;
+  dailyTokens?: number;
+  totalBudget?: number;
+  totalUsed?: number;
+}
+
+export interface BillingSummaryDto {
+  window: BillingSummaryWindow;
+  generatedAt: string;
+  periodStart: string;
+  periodEnd: string;
+  source: "credit_transactions";
+  activityCount: number;
+  totals: {
+    spendCredits: number;
+    spendUsd: number;
+    creditsConsumed: number;
+    refunds: number;
+    recharges: number;
+    tokens: number;
+    tokenTotals: number;
+    transactionCount: number;
+    netCredits: number;
+  };
+  latestActivity: BillingSummaryActivityDto | null;
+  profileSnapshot?: BillingProfileSnapshotDto;
+}
+
 export interface DebitCreditsRequestDto extends IdempotentRequestDto {
   businessRefType: string;
   businessRefId: EntityId;
@@ -94,4 +143,27 @@ export interface AdminRechargeCreditsResponseDto {
   balanceAfter: number;
   creditedAmount: number;
   subjectEmail?: string;
+}
+
+export type SupportedRechargeCurrencyDto = "CNY" | "USD";
+
+export interface CreditExchangeRateDto {
+  currencyCode: SupportedRechargeCurrencyDto;
+  creditsPerUnit: number;
+  minAmount: number | null;
+  maxAmount: number | null;
+  isActive: boolean;
+  updatedAt?: string | null;
+}
+
+export interface CreditExchangeRateListDto {
+  items: CreditExchangeRateDto[];
+}
+
+export interface UpsertCreditExchangeRateRequestDto {
+  currencyCode: SupportedRechargeCurrencyDto;
+  creditsPerUnit: number;
+  minAmount: number | null;
+  maxAmount: number | null;
+  isActive: boolean;
 }

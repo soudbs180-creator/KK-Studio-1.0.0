@@ -58,6 +58,12 @@ const createDefaultFormData = (): SupplierDraftFormData => ({
   budgetLimit: '',
 });
 
+const sanitizeDraftFormData = (formData: SupplierDraftFormData): SupplierDraftFormData => ({
+  ...formData,
+  apiKey: '',
+  systemToken: '',
+});
+
 const loadSupplierDraft = (): SupplierDraftPayload | null => {
   if (typeof window === 'undefined') return null;
 
@@ -71,7 +77,7 @@ const loadSupplierDraft = (): SupplierDraftPayload | null => {
     return {
       formData: {
         ...createDefaultFormData(),
-        ...parsed.formData,
+        ...sanitizeDraftFormData(parsed.formData as SupplierDraftFormData),
         format: parsed.formData.format ?? 'auto',
       },
       fetchedModels: Array.isArray(parsed.fetchedModels) ? parsed.fetchedModels : null,
@@ -94,7 +100,7 @@ const saveSupplierDraft = (
 
   try {
     const payload: SupplierDraftPayload = {
-      formData,
+      formData: sanitizeDraftFormData(formData),
       fetchedModels,
       tokenValid,
       savedAt: new Date().toISOString(),
@@ -300,7 +306,18 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
       return;
     }
 
-    console.log('[SupplierModal] Submitting form:', formData);
+    const hasPrimaryCredential = Boolean(formData.apiKey.trim());
+    const hasCatalogAccess = Boolean(formData.systemToken.trim());
+
+    console.log('[SupplierModal] Submitting form:', {
+      name: formData.name.trim(),
+      baseUrl: formData.baseUrl.trim(),
+      format: formData.format,
+      budgetLimit: formData.budgetLimit || null,
+      hasPrimaryCredential,
+      hasCatalogAccess,
+      fetchedModelCount: fetchedModels?.length ?? 0,
+    });
     
     setIsLoading(true);
     try {

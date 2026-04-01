@@ -1,9 +1,9 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
-import type { CanvasSummaryDto } from "../../../../../../packages/contracts/src/dto/workspace-canvas.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { CanvasSummaryDto } from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class WorkspaceCanvasClient {
   private readonly apiClient: KkApiClient;

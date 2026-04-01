@@ -4,8 +4,10 @@ import {
   type AdminCreditProviderListDto,
   type ApiResponse,
   type DeleteAdminCreditProviderResponseDto,
+  type ProviderPricingCacheDto,
   type SaveAdminCreditProviderRequestDto,
   type SaveAdminCreditProviderResponseDto,
+  type UpsertProviderPricingCacheRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import type {
@@ -68,6 +70,101 @@ export class CreditProviderService {
         modelCount: result.modelCount,
         saved: true,
       },
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async getProviderPricingCache(
+    providerId: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>> {
+    const cached = await this.repository.getProviderPricingCache(providerId);
+    if (!cached) {
+      return {
+        success: false,
+        error: {
+          code: "CREDIT_PROVIDER_PRICING_CACHE_NOT_FOUND",
+          message: "No cached provider pricing was found for this provider.",
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      };
+    }
+
+    return {
+      success: true,
+      data: cached,
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async saveProviderPricingCache(
+    providerId: string,
+    input: UpsertProviderPricingCacheRequestDto,
+    actorUserId: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>> {
+    const result = await this.repository.saveProviderPricingCache(providerId, input);
+
+    this.logger.info("Admin credit provider pricing cache saved via migrated API module", {
+      actorUserId,
+      providerId,
+      itemCount: result.pricing.length,
+      cachedAt: result.cachedAt,
+    });
+
+    return {
+      success: true,
+      data: result,
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async getSharedProviderPricingCache(
+    baseUrl: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>> {
+    const cached = await this.repository.getSharedProviderPricingCache(baseUrl);
+    if (!cached) {
+      return {
+        success: false,
+        error: {
+          code: "CREDIT_PROVIDER_PRICING_CACHE_NOT_FOUND",
+          message: "No cached provider pricing was found for this baseUrl.",
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      };
+    }
+
+    return {
+      success: true,
+      data: cached,
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async saveSharedProviderPricingCache(
+    baseUrl: string,
+    input: UpsertProviderPricingCacheRequestDto,
+    actorUserId: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<ProviderPricingCacheDto>> {
+    const result = await this.repository.saveSharedProviderPricingCache(baseUrl, input);
+
+    this.logger.info("Shared provider pricing cache saved via API module", {
+      actorUserId,
+      baseUrl,
+      cacheId: result.providerId,
+      itemCount: result.pricing.length,
+      cachedAt: result.cachedAt,
+    });
+
+    return {
+      success: true,
+      data: result,
       meta: buildRequestMeta(requestId, clientVersion),
     };
   }

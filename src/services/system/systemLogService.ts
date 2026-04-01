@@ -27,6 +27,7 @@ interface DailyLogs {
 
 const STORAGE_KEY = 'kk_studio_system_logs';
 const MAX_ENTRIES = 200;
+const REDACTED_VALUE = '[REDACTED]';
 
 let listeners: Array<(logs: SystemLogEntry[]) => void> = [];
 
@@ -34,13 +35,52 @@ function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function getStorage(): Storage | null {
+  if (typeof localStorage === 'undefined') {
+    return null;
+  }
+
+  return localStorage;
+}
+
+function sanitizeLogText(value?: string | null): string {
+  if (!value) {
+    return '';
+  }
+
+  return String(value)
+    .replace(/\b(Authorization\s*:\s*Bearer)\s+[^\s,;]+/gi, `$1 ${REDACTED_VALUE}`)
+    .replace(/\b(Bearer)\s+[^\s,;]+/gi, `$1 ${REDACTED_VALUE}`)
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|system[_-]?token|service[_-]?role[_-]?key|x-api-key|authorization|secret|password)["']?\s*[:=]\s*)(".*?"|'.*?'|[^\s,\n\r;]+)/gi,
+      `$1"${REDACTED_VALUE}"`,
+    )
+    .replace(
+      /([?&](?:key|api[_-]?key|access_token|refresh_token|system_token|authorization)=)[^&\s]+/gi,
+      `$1${REDACTED_VALUE}`,
+    );
+}
+
+function sanitizeLogEntry(entry: SystemLogEntry): SystemLogEntry {
+  return {
+    ...entry,
+    message: sanitizeLogText(entry.message),
+    details: sanitizeLogText(entry.details),
+    stack: entry.stack ? sanitizeLogText(entry.stack) : undefined,
+  };
+}
+
 function loadLogs(): DailyLogs {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const storage = getStorage();
+    const stored = storage?.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as DailyLogs;
       if (parsed.date === getTodayString() && Array.isArray(parsed.entries)) {
-        return parsed;
+        return {
+          date: parsed.date,
+          entries: parsed.entries.map((entry) => sanitizeLogEntry(entry)).slice(-MAX_ENTRIES),
+        };
       }
     }
   } catch (error) {
@@ -52,11 +92,16 @@ function loadLogs(): DailyLogs {
 
 function saveLogs(data: DailyLogs): void {
   try {
+    const storage = getStorage();
+    if (!storage) {
+      return;
+    }
+
     const safeData: DailyLogs = {
       date: data.date,
-      entries: data.entries.slice(-MAX_ENTRIES),
+      entries: data.entries.map((entry) => sanitizeLogEntry(entry)).slice(-MAX_ENTRIES),
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeData));
+    storage.setItem(STORAGE_KEY, JSON.stringify(safeData));
   } catch (error) {
     console.warn('[SystemLog] 保存日志失败:', error);
   }
@@ -74,14 +119,17 @@ export function addLog(
   stack?: string
 ): void {
   const data = loadLogs();
+  const sanitizedMessage = sanitizeLogText(message);
+  const sanitizedDetails = sanitizeLogText(details);
+  const sanitizedStack = stack ? sanitizeLogText(stack) : undefined;
   const entry: SystemLogEntry = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     level,
     source,
-    message,
-    details,
+    message: sanitizedMessage,
+    details: sanitizedDetails,
     timestamp: Date.now(),
-    stack,
+    stack: sanitizedStack,
   };
 
   data.entries.push(entry);
@@ -89,16 +137,16 @@ export function addLog(
   notifyListeners(data.entries);
 
   if (level === LogLevel.ERROR || level === LogLevel.CRITICAL) {
-    console.error(`[${source}] ${message}`, details);
+    console.error(`[${source}] ${sanitizedMessage}`, sanitizedDetails);
     return;
   }
 
   if (level === LogLevel.WARNING) {
-    console.warn(`[${source}] ${message}`, details);
+    console.warn(`[${source}] ${sanitizedMessage}`, sanitizedDetails);
     return;
   }
 
-  console.log(`[${source}] ${message}`, details);
+  console.log(`[${source}] ${sanitizedMessage}`, sanitizedDetails);
 }
 
 export function logError(source: string, error: Error | unknown, context?: string): void {
@@ -139,7 +187,8 @@ export function subscribeToLogs(callback: (logs: SystemLogEntry[]) => void): () 
 }
 
 export function clearLogs(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  const storage = getStorage();
+  storage?.removeItem(STORAGE_KEY);
   notifyListeners([]);
 }
 

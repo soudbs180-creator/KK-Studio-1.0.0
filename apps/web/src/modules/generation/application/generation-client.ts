@@ -1,12 +1,12 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
 import type {
   CreateGenerationTaskRequestDto,
   GenerationTaskDto,
-} from "../../../../../../packages/contracts/src/dto/generation.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class GenerationClient {
   private readonly apiClient: KkApiClient;

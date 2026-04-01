@@ -2,6 +2,14 @@ import type { EntityId } from "./common.ts";
 import type { ModelAvailability } from "../enums/status.ts";
 
 export type ModelKind = "chat" | "image" | "video" | "audio" | "embedding";
+export type ProviderProtocolFamily =
+  | "openai-compatible"
+  | "newapi-compatible"
+  | "gemini-native"
+  | "claude-native"
+  | "openrouter-openai"
+  | "wuyin-async-image"
+  | "12ai-flow";
 
 export interface ModelCatalogItemDto {
   id: EntityId;
@@ -128,4 +136,29 @@ export interface SaveAdminCreditProviderResponseDto {
 export interface DeleteAdminCreditProviderResponseDto {
   providerId: string;
   deleted: boolean;
+}
+
+export interface ProviderPricingCacheItemDto {
+  modelId: string;
+  modelName: string;
+  inputPrice: number;
+  outputPrice: number;
+  isPerToken: boolean;
+  groupRatio?: number;
+  currency: string;
+  billingUnit?: string;
+  displayPrice?: string;
+  supportsGroups?: boolean;
+  endpointUrl?: string;
+  endpointPath?: string;
+}
+
+export interface ProviderPricingCacheDto {
+  providerId: string;
+  pricing: ProviderPricingCacheItemDto[];
+  cachedAt?: string | null;
+}
+
+export interface UpsertProviderPricingCacheRequestDto {
+  pricing: ProviderPricingCacheItemDto[];
 }

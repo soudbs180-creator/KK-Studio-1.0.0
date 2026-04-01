@@ -3,9 +3,11 @@ import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check } from 'l
 import { notificationService, Notification, NotificationType } from '../../services/system/notificationService';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { useLocale } from '../../context/LocaleContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const NotificationToast: React.FC = () => {
     const { pick } = useLocale();
+    const { isDarkMode } = useTheme();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -72,23 +74,6 @@ const NotificationToast: React.FC = () => {
         const score = (t: string) => t === 'error' ? 3 : t === 'warning' ? 2 : 1;
         return score(a.type) - score(b.type) || a.timestamp - b.timestamp;
     });
-
-    // Force explicit theme detection for inline styles
-    const [isDarkMode, setIsDarkMode] = useState(false);
-
-    useEffect(() => {
-        const checkTheme = () => {
-            const isDark = document.body.classList.contains('dark-mode') || document.documentElement.className.includes('dark');
-            setIsDarkMode(isDark);
-        };
-
-        checkTheme();
-        const observer = new MutationObserver(checkTheme);
-        observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
-        return () => observer.disconnect();
-    }, []);
 
     return (
         <>

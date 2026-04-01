@@ -56,7 +56,10 @@ describe("credit provider routes", () => {
     if (result.body.success) {
       assert.ok(result.body.data.items.length >= 1);
       assert.equal(typeof result.body.data.items[0].providerId, "string");
+      assert.equal("baseUrl" in result.body.data.items[0], false);
       assert.equal("apiKeyCount" in result.body.data.items[0], false);
+      assert.equal("apiKeyEntries" in result.body.data.items[0], false);
+      assert.equal("apiKeyPreviews" in result.body.data.items[0], false);
     }
   });
 

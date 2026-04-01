@@ -67,7 +67,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         mergeCanvasInto,
         cleanupInvalidCards,
     } = useCanvas();
-    const { theme, toggleTheme } = useTheme();
+    const { resolvedTheme, toggleTheme } = useTheme();
+    const isDarkMode = resolvedTheme === 'dark';
 
     const [showDropdown, setShowDropdown] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -712,17 +713,17 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <div
                     className={`flex cursor-grab flex-col items-center gap-2 rounded-2xl p-1.5 transition-all duration-300 active:cursor-grabbing ${isDragging ? 'scale-[0.98]' : ''}`}
                     style={{
-                        backgroundColor: theme === 'dark' ? '#27272a' : '#ffffff',
-                        border: theme === 'dark' ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.05)',
-                        boxShadow: theme === 'dark'
+                        background: isDarkMode ? '#27272a' : 'var(--floating-shell-bg)',
+                        border: isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid var(--floating-shell-border)',
+                        boxShadow: isDarkMode
                             ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
-                            : '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.05)',
+                            : 'var(--floating-shell-shadow)',
                     }}
                     onMouseDown={handleDragStart}
                     onTouchStart={handleDragStart}
                 >
                     <div className="flex w-full justify-center py-0.5 opacity-20 hover:opacity-50">
-                        <div className="h-0.5 w-4 rounded-full" style={{ backgroundColor: theme === 'dark' ? '#ffffff' : '#000000' }} />
+                        <div className="h-0.5 w-4 rounded-full" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--text-muted)' }} />
                     </div>
 
                     <div className="relative">
@@ -737,7 +738,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             tabIndex={-1}
                         >
                             <Layers size={20} />
-                            <div className={`absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-indigo-500 border ${theme === 'dark' ? 'border-[#27272a]' : 'border-white'}`} />
+                            <div className={`absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-indigo-500 border ${isDarkMode ? 'border-[#27272a]' : 'border-white'}`} />
                         </button>
                         {projectDropdown}
                     </div>
@@ -754,7 +755,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <Search size={20} />
                     </button>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} />
+                    <div className="my-1 h-px w-full" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'var(--floating-shell-border)' }} />
 
                     <button
                         onClick={(event) => {
@@ -804,7 +805,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <LayoutDashboard size={20} />
                     </button>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} />
+                    <div className="my-1 h-px w-full" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'var(--floating-shell-border)' }} />
 
                     <button
                         onClick={(event) => {
@@ -812,10 +813,10 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             toggleTheme();
                         }}
                         className={desktopIconButtonClass}
-                        title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+                        title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
                         tabIndex={-1}
                     >
-                        {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+                        {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
                     </button>
                 </div>
             </div>

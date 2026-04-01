@@ -18,6 +18,18 @@ export interface HttpRouteResult {
   redirectTo?: string;
 }
 
+export interface PaymentRouteOptions {
+  paymentUrlFactory?: (input: {
+    merchantOrderNo: string;
+    userId: string;
+    providerCode: string;
+    amount: string;
+    currency: string;
+    returnUrl: string;
+    notifyUrl: string;
+  }) => string | Promise<string>;
+}
+
 function getAuthenticatedUserId(headers: Record<string, string>): string | undefined {
   return resolveAuthenticatedUserId(headers);
 }
@@ -184,6 +196,7 @@ export async function handleCreatePaymentOrder(
   body: CreatePaymentOrderRequestDto,
   headers: Record<string, string>,
   origin: string,
+  options: PaymentRouteOptions = {},
 ): Promise<HttpRouteResult> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
@@ -225,7 +238,7 @@ export async function handleCreatePaymentOrder(
     requestId,
     clientVersion,
     userId,
-    paymentUrlFactory: (merchantOrderNo) => buildCheckoutUrl(origin, merchantOrderNo),
+    paymentUrlFactory: options.paymentUrlFactory || ((input) => buildCheckoutUrl(origin, input.merchantOrderNo)),
   });
 
   return {
@@ -280,6 +293,7 @@ export async function handleLegacyCreateQrCode(
   query: URLSearchParams,
   headers: Record<string, string>,
   origin: string,
+  options: PaymentRouteOptions = {},
 ): Promise<HttpRouteResult> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
@@ -345,7 +359,7 @@ export async function handleLegacyCreateQrCode(
     requestId,
     clientVersion,
     userId,
-    paymentUrlFactory: (merchantOrderNo) => buildCheckoutUrl(origin, merchantOrderNo),
+    paymentUrlFactory: options.paymentUrlFactory || ((input) => buildCheckoutUrl(origin, input.merchantOrderNo)),
   });
 
   if (!result.success) {
@@ -469,8 +483,9 @@ export async function handleLegacyRedirect(
   query: URLSearchParams,
   headers: Record<string, string>,
   origin: string,
+  options: PaymentRouteOptions = {},
 ): Promise<HttpRouteResult> {
-  const created = await handleLegacyCreateQrCode(service, query, headers, origin);
+  const created = await handleLegacyCreateQrCode(service, query, headers, origin, options);
   if (created.statusCode !== 200 || !created.body || typeof created.body !== "object") {
     return created;
   }

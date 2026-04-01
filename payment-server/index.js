@@ -8,10 +8,10 @@ const { AlipaySdk } = require('alipay-sdk');
 
 const webhookRouter = require('./webhook');
 const {
-  buildRuntimePaymentStatusView,
-  findLegacyPaymentOrder,
-  persistLegacyPaymentOrder,
-} = require('./runtime_payment_bridge');
+  handleLegacyCreateQrCodeThroughSidecar,
+  handleLegacyGetStatusThroughSidecar,
+  handleLegacyRedirectThroughSidecar,
+} = require('./sidecar_compat_bridge');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -80,36 +80,75 @@ const mainApiBaseUrl = String(process.env.KK_API_BASE_URL || 'http://127.0.0.1:3
 const settlementInternalToken = String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || '').trim();
 const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
 
-function buildRuntimeBridgeOptions(requestId) {
-  return {
-    supabaseUrl,
-    serviceRoleKey: supabaseServiceRoleKey,
-    requestId,
-    onWarning(message, error) {
-      console.warn('[payment-server]', message, error || '');
-    },
-  };
+function buildLegacyOrigin(req) {
+  const protocol = String(req.headers['x-forwarded-proto'] || req.protocol || 'http')
+    .split(',')[0]
+    .trim();
+  const host = String(req.headers['x-forwarded-host'] || req.get('host') || '')
+    .split(',')[0]
+    .trim();
+
+  return host ? `${protocol}://${host}` : 'http://127.0.0.1:8080';
 }
 
-async function persistLegacyOrderSnapshot(input) {
-  try {
-    const result = await persistLegacyPaymentOrder({
-      merchantOrderNo: input.outTradeNo,
-      userId: input.userId,
-      providerCode: input.providerCode || 'alipay',
-      amount: input.amount,
-      currency: input.currency || 'CNY',
-      paymentUrl: input.paymentUrl,
-      returnUrl: input.returnUrl,
-      notifyUrl: input.notifyUrl,
-      idempotencyKey: `legacy-${input.outTradeNo}`,
-    }, buildRuntimeBridgeOptions(`payment-order-${input.outTradeNo}`));
+function toUrlSearchParams(query = {}) {
+  const params = new URLSearchParams();
 
-    return result.persisted ? result.order : undefined;
-  } catch (error) {
-    console.warn('[payment-server] Failed to persist runtime payment order:', input.outTradeNo, error);
-    return undefined;
+  for (const [key, value] of Object.entries(query)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item !== 'undefined' && item !== null) {
+          params.append(key, String(item));
+        }
+      }
+      continue;
+    }
+
+    if (typeof value !== 'undefined' && value !== null) {
+      params.set(key, String(value));
+    }
   }
+
+  return params;
+}
+
+function applyLegacyPaymentDefaults(params) {
+  if (!params.get('returnUrl')) {
+    params.set(
+      'returnUrl',
+      process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success',
+    );
+  }
+
+  if (!params.get('notifyUrl')) {
+    params.set(
+      'notifyUrl',
+      process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay',
+    );
+  }
+
+  if (!params.get('currency')) {
+    params.set('currency', 'CNY');
+  }
+
+  return params;
+}
+
+function sendRouteResult(res, result) {
+  if (result.redirectTo) {
+    res.redirect(result.statusCode || 302, result.redirectTo);
+    return;
+  }
+
+  const contentType = result.contentType || 'application/json; charset=utf-8';
+  res.status(result.statusCode || 200);
+
+  if (typeof result.body === 'string') {
+    res.type(contentType).send(result.body);
+    return;
+  }
+
+  res.type(contentType).send(result.body);
 }
 
 const app = express();
@@ -159,7 +198,7 @@ if (!supabaseUrl) {
 }
 
 if (!supabaseServiceRoleKey) {
-  console.warn('[payment-server] SUPABASE_SERVICE_ROLE_KEY is missing, so payment order and callback persistence will be skipped.');
+  console.warn('[payment-server] SUPABASE_SERVICE_ROLE_KEY is missing, so the legacy shell will fall back to non-persistent sidecar payment storage.');
 }
 
 app.use('/api/pay/notify', webhookRouter);
@@ -219,45 +258,20 @@ app.get('/api/v1/user/nickname', async (req, res) => {
 
 app.get('/api/pay/qrcode', async (req, res) => {
   try {
-    const { method, userId, amount } = req.query;
-    const currency = String(req.query.currency || 'CNY').trim().toUpperCase();
-
-    if (!userId || !amount) {
-      return res.status(400).json({ error: 'Missing required params: userId, amount' });
-    }
-
-    if (method !== 'alipay') {
-      return res.status(400).json({ error: 'Only alipay is supported on this legacy route.' });
-    }
-
-    const outTradeNo = `ORDER_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    const returnUrl = process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success';
-    const notifyUrl = process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay';
-
-    const payLink = await createAlipayPageLink({
-      outTradeNo,
-      amount,
-      userId,
-      returnUrl,
-      notifyUrl,
+    const origin = buildLegacyOrigin(req);
+    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
+    const result = await handleLegacyCreateQrCodeThroughSidecar(query, req.headers, origin, {
+      paymentUrlFactory: async (input) => createAlipayPageLink({
+        outTradeNo: input.merchantOrderNo,
+        amount: input.amount,
+        userId: input.userId,
+        returnUrl: input.returnUrl,
+        notifyUrl: input.notifyUrl,
+      }),
     });
 
-    if (!/^https?:\/\//i.test(payLink)) {
-      return res.status(500).json({ error: 'Failed to generate a payment URL.' });
-    }
-
-    await persistLegacyOrderSnapshot({
-      outTradeNo,
-      userId,
-      amount,
-      currency,
-      providerCode: 'alipay',
-      paymentUrl: payLink,
-      returnUrl,
-      notifyUrl,
-    });
-
-    return res.json({ qrCode: payLink, outTradeNo, isWebLink: true });
+    sendRouteResult(res, result);
+    return;
   } catch (error) {
     console.error('[payment-server] create qrcode failed:', error);
     return res.status(500).json({ error: error?.message || String(error) });
@@ -266,45 +280,20 @@ app.get('/api/pay/qrcode', async (req, res) => {
 
 app.get('/api/pay', async (req, res) => {
   try {
-    const { method, userId, amount } = req.query;
-    const currency = String(req.query.currency || 'CNY').trim().toUpperCase();
-
-    if (!userId || !amount) {
-      return res.status(400).send('Missing required params: userId, amount');
-    }
-
-    if (method !== 'alipay') {
-      return res.status(400).send('Only alipay is supported on this legacy route.');
-    }
-
-    const outTradeNo = `ORDER_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-    const returnUrl = process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success';
-    const notifyUrl = process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay';
-
-    const payLink = await createAlipayPageLink({
-      outTradeNo,
-      amount,
-      userId,
-      returnUrl,
-      notifyUrl,
+    const origin = buildLegacyOrigin(req);
+    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
+    const result = await handleLegacyRedirectThroughSidecar(query, req.headers, origin, {
+      paymentUrlFactory: async (input) => createAlipayPageLink({
+        outTradeNo: input.merchantOrderNo,
+        amount: input.amount,
+        userId: input.userId,
+        returnUrl: input.returnUrl,
+        notifyUrl: input.notifyUrl,
+      }),
     });
 
-    if (!/^https?:\/\//i.test(payLink)) {
-      return res.status(500).send('Failed to generate a payment URL.');
-    }
-
-    await persistLegacyOrderSnapshot({
-      outTradeNo,
-      userId,
-      amount,
-      currency,
-      providerCode: 'alipay',
-      paymentUrl: payLink,
-      returnUrl,
-      notifyUrl,
-    });
-
-    return res.redirect(302, payLink);
+    sendRouteResult(res, result);
+    return;
   } catch (error) {
     console.error('[payment-server] create pay redirect failed:', error);
     return res.status(500).send(error?.message || String(error));
@@ -313,37 +302,32 @@ app.get('/api/pay', async (req, res) => {
 
 app.get('/api/pay/status', async (req, res) => {
   try {
+    const query = toUrlSearchParams(req.query);
     const { outTradeNo } = req.query;
     if (!outTradeNo) {
       return res.status(400).json({ error: 'Missing outTradeNo.' });
     }
 
-    let runtimeStatus;
+    let sidecarStatus;
     try {
-      const runtimeOrder = await findLegacyPaymentOrder(
-        String(outTradeNo),
-        buildRuntimeBridgeOptions(`payment-status-${outTradeNo}`),
-      );
-      runtimeStatus = buildRuntimePaymentStatusView(runtimeOrder);
-
+      const sidecarResult = await handleLegacyGetStatusThroughSidecar(query, req.headers);
       if (
-        runtimeStatus
-        && (
-          runtimeStatus.settlementApplied
-          || runtimeStatus.paymentOrderStatus === 'failed'
-          || runtimeStatus.paymentOrderStatus === 'cancelled'
-          || runtimeStatus.paymentOrderStatus === 'refunded'
-        )
+        sidecarResult.statusCode === 200
+        && sidecarResult.body
+        && typeof sidecarResult.body === 'object'
       ) {
-        return res.json({ tradeStatus: runtimeStatus.tradeStatus, details: runtimeStatus, source: 'runtime' });
+        sidecarStatus = sidecarResult.body;
+        if (sidecarStatus.tradeStatus && sidecarStatus.tradeStatus !== 'WAITING') {
+          return res.json({ ...sidecarStatus, source: 'sidecar-runtime' });
+        }
       }
-    } catch (runtimeError) {
-      console.warn('[payment-server] Failed to read runtime payment status:', outTradeNo, runtimeError);
+    } catch (sidecarError) {
+      console.warn('[payment-server] Failed to read sidecar payment status:', outTradeNo, sidecarError);
     }
 
     if (!alipaySdk) {
-      if (runtimeStatus) {
-        return res.json({ tradeStatus: runtimeStatus.tradeStatus, details: runtimeStatus, source: 'runtime' });
+      if (sidecarStatus) {
+        return res.json({ ...sidecarStatus, source: 'sidecar-runtime' });
       }
 
       return res.status(500).json({ error: 'No payment status provider is configured.' });

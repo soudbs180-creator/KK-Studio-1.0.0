@@ -314,6 +314,10 @@ const OPENAI_OFFICIAL_PROVIDER_ALIASES = new Set([
     'openai \u5b98\u65b9\u63a5\u53e3',
 ]);
 
+function matchesKnownOfficialProviderAlias(value: string): boolean {
+    return GOOGLE_OFFICIAL_PROVIDER_ALIASES.has(value) || OPENAI_OFFICIAL_PROVIDER_ALIASES.has(value);
+}
+
 function hasOfficialAliasMatch(
     provider: string,
     providerLabel: string,
@@ -326,12 +330,14 @@ function hasOfficialAliasMatch(
         return false;
     }
 
-    // If one side explicitly points to another provider, do not infer "official".
-    if (provider !== '' && !providerMatches) {
+    // If one side explicitly points to another known official provider family,
+    // do not infer "official". Arbitrary user-defined labels should not block
+    // official fallback pricing for Google/OpenAI routes.
+    if (provider !== '' && !providerMatches && matchesKnownOfficialProviderAlias(provider)) {
         return false;
     }
 
-    if (providerLabel !== '' && !labelMatches) {
+    if (providerLabel !== '' && !labelMatches && matchesKnownOfficialProviderAlias(providerLabel)) {
         return false;
     }
 

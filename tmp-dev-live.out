@@ -1,0 +1,66 @@
+
+> kk-studio@1.4.0 dev
+> vite
+
+{"level":"INFO","message":"API skeleton server started","context":{"service":"apps/api","port":3001},"timestamp":"2026-03-31T09:29:31.956Z"}
+
+  [32m[1mVITE[22m v6.4.1[39m  [2mready in [0m[1m203[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://198.18.0.1:[1m3000[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.244:[1m3000[22m/[39m
+[2m17:34:14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:34:42.411Z"}
+[2m17:35:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:36:26.437Z"}
+[2m17:37:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:38:22.459Z"}
+[2m17:41:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:41:59.451Z"}
+[2m17:42:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:42:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:43:26.824Z"}
+[2m17:45:14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:45:47.457Z"}
+[2m17:47:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:47:54.434Z"}
+[2m17:47:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:48:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:48:58.441Z"}
+[2m17:49:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:49:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:49:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:49:55.466Z"}
+[2m17:50:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:50:49.440Z"}
+[2m17:51:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:51:36.811Z"}
+[2m17:52:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:53:13.472Z"}
+[2m17:53:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:53:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:54:06.545Z"}
+[2m17:54:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:55:36.652Z"}
+[2m17:55:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m17:56:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:56:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ui/index.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:57:22.507Z"}
+[2m17:58:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m17:58:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/modals/RechargeModal.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T09:59:01.472Z"}
+[2m18:00:11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/modals/RechargeModal.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:00:49.895Z"}
+[2m18:01:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:01:41.453Z"}
+[2m18:02:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/modals/RechargeModal.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:03:01.486Z"}
+[2m18:03:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m18:03:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+[2m18:04:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:04:54.437Z"}
+[2m18:04:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/modals/RechargeModal.tsx[22m
+[2m18:05:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/modals/RechargeModal.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:06:09.440Z"}
+[2m18:06:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/components/settings/ApiSettingsView.tsx[22m
+{"level":"INFO","message":"Workspace layout saved via migrated API module","context":{"module":"workspace-canvas","userId":"359fe235-b407-4f53-ac8e-0960d354ddd7","canvasCount":4},"timestamp":"2026-03-31T10:07:09.529Z"}

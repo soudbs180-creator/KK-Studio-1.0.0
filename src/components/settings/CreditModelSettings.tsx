@@ -1,11 +1,17 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, Info, Plus, ShieldAlert, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import {
   deleteAdminCreditProvider,
   listAdminCreditProviders,
   saveAdminCreditProvider,
   type AdminCreditProviderRpcGroup,
 } from '../../services/api/adminCreditProviderService';
+import {
+  CREDIT_MODEL_DRAFT_SCOPE,
+  loadScopedAdminConsoleState,
+  saveScopedAdminConsoleState,
+} from '../../services/admin/adminConsoleState';
 import { notify } from '../../services/system/notificationService';
 import { getCachedPricing, type ModelPricingInfo } from '../../services/billing/newApiPricingService';
 import {
@@ -218,6 +224,71 @@ const emptyProvider = (): EditableProvider => ({
   models: [newModel()],
 });
 
+type CreditModelDraft = {
+  selectedProviderId: string;
+  pricingMultiplier: number;
+  form: EditableProvider;
+};
+
+const normalizeEditableModelDraft = (
+  candidate?: Partial<EditableModel> | null,
+): EditableModel => {
+  const fallback = newModel();
+  const creditCost = Math.max(1, Number(candidate?.creditCost || fallback.creditCost));
+  const maxCallsLimit = Number(candidate?.maxCallsLimit);
+
+  return {
+    modelId: String(candidate?.modelId || '').trim(),
+    displayName: String(candidate?.displayName || '').trim(),
+    endpointType:
+      candidate?.endpointType === 'openai' || candidate?.endpointType === 'gemini'
+        ? candidate.endpointType
+        : 'auto',
+    creditCost,
+    description: String(candidate?.description || ''),
+    isActive: candidate?.isActive !== false,
+    maxCallsLimit:
+      Number.isFinite(maxCallsLimit) && maxCallsLimit > 0 ? Math.round(maxCallsLimit) : null,
+    color: normalizeHexColor(candidate?.color, fallback.color),
+    colorSecondary: String(candidate?.colorSecondary || ''),
+    textColor: candidate?.textColor === 'black' ? 'black' : 'white',
+    advancedEnabled: candidate?.advancedEnabled === true,
+    mixWithSameModel: candidate?.mixWithSameModel === true,
+    qualityPricing: normalizeAdminQualityPricing(
+      (candidate?.qualityPricing as Record<string, unknown> | null | undefined) ?? null,
+      creditCost,
+    ),
+  };
+};
+
+const normalizeEditableProviderDraft = (
+  candidate?: Partial<EditableProvider> | null,
+): EditableProvider => {
+  const savedApiKeyEntries = Array.isArray(candidate?.savedApiKeyEntries)
+    ? candidate.savedApiKeyEntries
+        .map((entry) => ({
+          fingerprint: String(entry?.fingerprint || '').trim() || null,
+          preview: String(entry?.preview || '').trim(),
+        }))
+        .filter((entry) => entry.preview)
+    : [];
+  const apiKeys = Array.isArray(candidate?.apiKeys)
+    ? candidate.apiKeys.map((item) => String(item || ''))
+    : [''];
+  const models = Array.isArray(candidate?.models)
+    ? candidate.models.map((model) => normalizeEditableModelDraft(model))
+    : [newModel()];
+
+  return {
+    providerId: String(candidate?.providerId || '').trim(),
+    providerName: String(candidate?.providerName || ''),
+    baseUrl: String(candidate?.baseUrl || ''),
+    savedApiKeyEntries,
+    apiKeys: apiKeys.length > 0 ? apiKeys : [''],
+    models: models.length > 0 ? models : [newModel()],
+  };
+};
+
 const SIZE_TO_QUALITY: Record<string, AdminModelQualityKey> = {
   [ImageSize.SIZE_05K]: '0.5K',
   [ImageSize.SIZE_1K]: '1K',
@@ -328,6 +399,9 @@ const AdvancedToggle: React.FC<AdvancedToggleProps> = ({
 const ADD_MODEL_BUTTON_CLASSNAME = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap';
 
 const CreditModelSettings: React.FC = () => {
+  const { user } = useAuth();
+  const restoredSelectedProviderIdRef = React.useRef<string | null>(null);
+  const lastDraftUserIdRef = React.useRef<string | null>(null);
   const [rows, setRows] = useState<CreditModelRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -369,6 +443,55 @@ const CreditModelSettings: React.FC = () => {
     () => rows.filter((row) => row.advanced_enabled).length,
     [rows]
   );
+
+  useEffect(() => {
+    const nextUserId = String(user?.id || '').trim() || null;
+    if (lastDraftUserIdRef.current === nextUserId) {
+      return;
+    }
+
+    lastDraftUserIdRef.current = nextUserId;
+    const draft = loadScopedAdminConsoleState<Partial<CreditModelDraft>>(
+      CREDIT_MODEL_DRAFT_SCOPE,
+      nextUserId || undefined,
+    );
+
+    if (!draft) {
+      return;
+    }
+
+    const nextSelectedProviderId = String(draft.selectedProviderId || '').trim();
+    const nextPricingMultiplier = Number(draft.pricingMultiplier);
+    const nextForm = normalizeEditableProviderDraft(draft.form);
+
+    restoredSelectedProviderIdRef.current =
+      nextSelectedProviderId || nextForm.providerId.trim() || null;
+    setSelectedProviderId(nextSelectedProviderId);
+    setForm(nextForm);
+    setPricingMultiplier(
+      Number.isFinite(nextPricingMultiplier) && nextPricingMultiplier > 0
+        ? nextPricingMultiplier
+        : 1,
+    );
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveScopedAdminConsoleState<CreditModelDraft>(CREDIT_MODEL_DRAFT_SCOPE, user.id, {
+        selectedProviderId,
+        pricingMultiplier,
+        form,
+      });
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [form, pricingMultiplier, selectedProviderId, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -516,6 +639,13 @@ const CreditModelSettings: React.FC = () => {
 
   useEffect(() => {
     if (!selectedProviderId) return;
+    if (
+      restoredSelectedProviderIdRef.current
+      && restoredSelectedProviderIdRef.current === selectedProviderId
+    ) {
+      restoredSelectedProviderIdRef.current = null;
+      return;
+    }
     const entry = providers.find((item) => item.providerId === selectedProviderId);
     if (!entry) return;
     const first = entry.items[0];

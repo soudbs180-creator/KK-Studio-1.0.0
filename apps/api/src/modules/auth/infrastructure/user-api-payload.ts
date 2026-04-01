@@ -1,6 +1,15 @@
+import type { SecureProxyUserRouteConfigDto } from "../../../../../../packages/contracts/src/index.ts";
+
 type JsonRecord = Record<string, unknown>;
 
 type LegacyArrayKind = "slots" | "entries" | "unknown";
+
+const REDACTED_SECRET_PREFIX = "__kk_redacted__:";
+const SECRET_ARRAY_FIELDS = {
+  slots: ["key"],
+  providers: ["apiKey"],
+  entries: ["key"],
+} as const;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -59,7 +68,51 @@ function getRecordId(value: unknown): string {
   return String(value.id || "").trim();
 }
 
-function mergeArrayRecordsById(existing: unknown[], next: unknown[]): unknown[] {
+function isRedactedSecretPlaceholder(value: unknown): boolean {
+  return typeof value === "string" && value.startsWith(REDACTED_SECRET_PREFIX);
+}
+
+function shouldPreservePersistedSecret(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = value.trim();
+  return normalized.length === 0 || isRedactedSecretPlaceholder(normalized);
+}
+
+function buildRedactedSecretPlaceholder(recordId: string, field: string): string {
+  const normalizedId = String(recordId || "configured").trim() || "configured";
+  const normalizedField = String(field || "secret").trim() || "secret";
+  return `${REDACTED_SECRET_PREFIX}${normalizedField}:${normalizedId}`;
+}
+
+function redactArrayRecordSecrets(
+  items: unknown[],
+  fields: readonly string[],
+): JsonRecord[] {
+  return items
+    .filter(isRecord)
+    .map((item) => {
+      const id = getRecordId(item);
+      const nextItem: JsonRecord = { ...item };
+
+      fields.forEach((field) => {
+        const rawValue = nextItem[field];
+        if (typeof rawValue === "string" && rawValue.trim().length > 0) {
+          nextItem[field] = buildRedactedSecretPlaceholder(id, field);
+        }
+      });
+
+      return nextItem;
+    });
+}
+
+function mergeArrayRecordsById(
+  existing: unknown[],
+  next: unknown[],
+  secretFields: readonly string[] = [],
+): unknown[] {
   const existingById = new Map<string, JsonRecord>();
 
   existing.forEach((item) => {
@@ -76,7 +129,23 @@ function mergeArrayRecordsById(existing: unknown[], next: unknown[]): unknown[] 
     if (!id) return item;
 
     const persisted = existingById.get(id);
-    return persisted ? { ...persisted, ...item } : item;
+    if (!persisted) {
+      return item;
+    }
+
+    const merged: JsonRecord = { ...persisted, ...item };
+    secretFields.forEach((field) => {
+      if (!(field in persisted)) {
+        return;
+      }
+
+      const nextValue = item[field];
+      if (shouldPreservePersistedSecret(nextValue)) {
+        merged[field] = persisted[field];
+      }
+    });
+
+    return merged;
   });
 }
 
@@ -133,6 +202,33 @@ export function extractKeyManagerCloudState(raw: unknown): {
   };
 }
 
+export function sanitizeUserApiEntriesForClient(raw: unknown): JsonRecord[] {
+  return redactArrayRecordSecrets(
+    extractUserApiEntriesFromPayload(raw),
+    SECRET_ARRAY_FIELDS.entries,
+  );
+}
+
+export function sanitizeKeyManagerCloudStateForClient(raw: unknown): {
+  version: number;
+  slots: JsonRecord[];
+  providers: JsonRecord[];
+  entries: JsonRecord[];
+} {
+  return {
+    version: extractUserApisPayloadVersion(raw),
+    slots: redactArrayRecordSecrets(
+      extractKeyManagerCloudSlots(raw),
+      SECRET_ARRAY_FIELDS.slots,
+    ),
+    providers: redactArrayRecordSecrets(
+      extractUserApiProvidersFromPayload(raw),
+      SECRET_ARRAY_FIELDS.providers,
+    ),
+    entries: sanitizeUserApiEntriesForClient(raw),
+  };
+}
+
 export function mergeUserApisPayload(
   existingRaw: unknown,
   updates: {
@@ -147,12 +243,15 @@ export function mergeUserApisPayload(
 
   const nextSlots =
     updates.slots !== undefined
-      ? mergeArrayRecordsById(existingSlots, updates.slots)
+      ? mergeArrayRecordsById(existingSlots, updates.slots, SECRET_ARRAY_FIELDS.slots)
       : existingSlots;
-  const nextProviders = updates.providers ?? existingProviders;
+  const nextProviders =
+    updates.providers !== undefined
+      ? mergeArrayRecordsById(existingProviders, updates.providers, SECRET_ARRAY_FIELDS.providers)
+      : existingProviders;
   const nextEntries =
     updates.entries !== undefined
-      ? mergeArrayRecordsById(existingEntries, updates.entries)
+      ? mergeArrayRecordsById(existingEntries, updates.entries, SECRET_ARRAY_FIELDS.entries)
       : existingEntries;
 
   return {
@@ -161,4 +260,101 @@ export function mergeUserApisPayload(
     providers: nextProviders,
     entries: nextEntries,
   };
+}
+
+function resolveDefaultRouteBaseUrl(
+  provider: string,
+  baseUrl: string,
+  format: "openai" | "gemini" | "claude" | "auto",
+): string {
+  const normalizedBaseUrl = String(baseUrl || "").trim();
+  if (normalizedBaseUrl) {
+    return normalizedBaseUrl.replace(/\/+$/, "");
+  }
+
+  const normalizedProvider = String(provider || "").trim().toLowerCase();
+  if (format === "claude" || normalizedProvider.includes("anthropic")) {
+    return "https://api.anthropic.com";
+  }
+
+  if (format === "gemini" || normalizedProvider === "google" || normalizedProvider === "gemini") {
+    return "https://generativelanguage.googleapis.com";
+  }
+
+  if (normalizedProvider === "openai") {
+    return "https://api.openai.com";
+  }
+
+  return normalizedBaseUrl;
+}
+
+function resolveRouteConfigFromRecord(
+  routeId: string,
+  rawRecord: unknown,
+): SecureProxyUserRouteConfigDto | null {
+  if (!isRecord(rawRecord)) {
+    return null;
+  }
+
+  const apiKey = String(rawRecord.apiKey ?? rawRecord.key ?? "").trim();
+  if (!apiKey) {
+    return null;
+  }
+
+  const formatValue = String(rawRecord.format || "").trim().toLowerCase();
+  const format: SecureProxyUserRouteConfigDto["format"] =
+    formatValue === "gemini"
+      ? "gemini"
+      : formatValue === "claude"
+        ? "claude"
+        : formatValue === "openai"
+          ? "openai"
+          : "auto";
+
+  const provider = String(rawRecord.provider || rawRecord.name || "Custom").trim() || "Custom";
+  const baseUrl = resolveDefaultRouteBaseUrl(
+    provider,
+    String(rawRecord.baseUrl || rawRecord.base_url || "").trim(),
+    format,
+  );
+
+  return {
+    routeId,
+    provider,
+    baseUrl,
+    apiKey,
+    format,
+    authMethod: rawRecord.authMethod === "query" ? "query" : "header",
+    headerName: typeof rawRecord.headerName === "string" ? rawRecord.headerName.trim() : undefined,
+    compatibilityMode:
+      rawRecord.compatibilityMode === "chat"
+        ? "chat"
+        : rawRecord.compatibilityMode === "standard"
+          ? "standard"
+          : undefined,
+  };
+}
+
+export function resolveSecureProxyUserRouteConfig(
+  raw: unknown,
+  routeId: string,
+): SecureProxyUserRouteConfigDto | null {
+  const normalizedRouteId = String(routeId || "").trim();
+  if (!normalizedRouteId) {
+    return null;
+  }
+
+  const slots = extractKeyManagerCloudSlots(raw).filter(isRecord);
+  const providers = extractUserApiProvidersFromPayload(raw).filter(isRecord);
+  const entries = extractUserApiEntriesFromPayload(raw).filter(isRecord);
+  const matchedRecord =
+    slots.find((item) => String(item.id || "").trim() === normalizedRouteId)
+    || providers.find((item) => String(item.id || "").trim() === normalizedRouteId)
+    || entries.find((item) => String(item.id || "").trim() === normalizedRouteId);
+
+  if (!matchedRecord) {
+    return null;
+  }
+
+  return resolveRouteConfigFromRecord(normalizedRouteId, matchedRecord);
 }

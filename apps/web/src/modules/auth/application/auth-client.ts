@@ -1,7 +1,7 @@
 import type {
   ApiClientRequestOptions,
   KkApiClient,
-} from "../../../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
 import type {
   LoginRequestDto,
   LoginResponseDto,
@@ -9,8 +9,8 @@ import type {
   RegisterRequestDto,
   RegisterResponseDto,
   UpdateProfileRequestDto,
-} from "../../../../../../packages/contracts/src/dto/auth.ts";
-import type { ApiResponse } from "../../../../../../packages/contracts/src/http/envelope.ts";
+} from "../../../../../../packages/contracts/src/index.ts";
+import type { ApiResponse } from "../../../../../../packages/contracts/src/index.ts";
 
 export class AuthClient {
   private readonly apiClient: KkApiClient;

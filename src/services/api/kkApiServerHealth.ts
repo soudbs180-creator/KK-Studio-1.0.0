@@ -1,6 +1,6 @@
 import { resolveKkApiBaseUrl } from './kkApiClient.ts';
 
-export type KkApiRepositoryBackend = 'supabase' | 'memory' | 'custom' | 'unknown';
+export type KkApiRepositoryBackend = 'supabase' | 'memory' | 'local-file' | 'custom' | 'unknown';
 
 interface RawHealthEnvelope {
   success?: boolean;
@@ -54,7 +54,7 @@ function normalizeBoolean(value: unknown): boolean {
 }
 
 function normalizeBackend(value: unknown): KkApiRepositoryBackend {
-  return value === 'supabase' || value === 'memory' || value === 'custom'
+  return value === 'supabase' || value === 'memory' || value === 'local-file' || value === 'custom'
     ? value
     : 'unknown';
 }
@@ -225,9 +225,14 @@ export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> 
     );
   }
 
-  if (health.repositories.authData !== 'supabase' || !health.persistence.userApiKeys) {
+  const userDataPersisted =
+    (health.repositories.authData === 'supabase' || health.repositories.authData === 'local-file')
+    && health.persistence.userApiKeys
+    && health.persistence.keyManager;
+
+  if (!userDataPersisted) {
     throw new KkApiPersistenceUnavailableError(
-      'Local API server is running in-memory mode. Configure SUPABASE_SERVICE_ROLE_KEY and restart the API server before saving user API settings.',
+      'Local API server is not persisting user API data yet. Restart the API server with local-file or Supabase-backed auth storage enabled before saving user API settings.',
       health,
     );
   }

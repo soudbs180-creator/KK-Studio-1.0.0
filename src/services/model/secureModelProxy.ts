@@ -7,12 +7,25 @@ export interface SecureProxyChatMessage {
   content: string;
 }
 
+export interface SecureProxyUserRoute {
+  kind: 'key-slot';
+  id: string;
+}
+
+export function buildSecureProxyUserRouteFromSlotId(slotId: string): SecureProxyUserRoute {
+  return {
+    kind: 'key-slot',
+    id: String(slotId || '').trim(),
+  };
+}
+
 export interface SecureProxyChatRequest {
   modelId: string;
   messages: SecureProxyChatMessage[];
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  userRoute?: SecureProxyUserRoute;
 }
 
 export interface SecureProxyChatResponse {
@@ -23,7 +36,7 @@ export interface SecureProxyChatResponse {
     completionTokens: number;
     totalTokens: number;
   };
-  endpointType?: 'openai' | 'gemini';
+  endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
 export interface SecureProxyImageRequest {
@@ -33,6 +46,7 @@ export interface SecureProxyImageRequest {
   imageSize?: string;
   imageCount?: number;
   referenceImages?: Array<string | { data: string; mimeType: string }>;
+  userRoute?: SecureProxyUserRoute;
 }
 
 export interface SecureProxyImageResponse {
@@ -44,7 +58,7 @@ export interface SecureProxyImageResponse {
     totalTokens?: number;
     cost?: number;
   };
-  endpointType?: 'openai' | 'gemini';
+  endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
 export interface SecureProxyVideoRequest {
@@ -56,6 +70,7 @@ export interface SecureProxyVideoRequest {
   videoDuration?: string;
   imageUrl?: string;
   imageTailUrl?: string;
+  userRoute?: SecureProxyUserRoute;
 }
 
 export interface SecureProxyVideoResponse {
@@ -63,12 +78,13 @@ export interface SecureProxyVideoResponse {
   status: 'pending' | 'success' | 'failed';
   url?: string;
   deducted?: boolean;
-  endpointType?: 'openai' | 'gemini';
+  endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
 export interface SecureProxyAudioRequest {
   modelId: string;
   prompt: string;
+  userRoute?: SecureProxyUserRoute;
 }
 
 export interface SecureProxyAudioResponse {
@@ -80,7 +96,7 @@ export interface SecureProxyAudioResponse {
     totalTokens?: number;
     cost?: number;
   };
-  endpointType?: 'openai' | 'gemini';
+  endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
 export interface SecureProxyTaskStatusResponse {
@@ -91,6 +107,8 @@ export interface SecureProxyTaskStatusResponse {
 
 export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
 export const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
+export const LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE = 'LOCAL_USER_ROUTE_PROXY_UNAVAILABLE';
+export const LOCAL_USER_ROUTE_NOT_FOUND_CODE = 'USER_ROUTE_NOT_FOUND';
 export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '登录已过期，请重新登录后继续使用系统积分模型。';
 export const SECURE_PROXY_GUEST_MODE_MESSAGE = '游客模式不支持云同步和系统积分模型，请先登录正式账号。';
 
@@ -110,7 +128,9 @@ type ResolveCloudSessionOptions = {
 
 type SecureProxyBoundaryErrorCode =
   | typeof SECURE_PROXY_SESSION_REAUTH_CODE
-  | typeof SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE;
+  | typeof SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE
+  | typeof LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE
+  | typeof LOCAL_USER_ROUTE_NOT_FOUND_CODE;
 
 type SecureProxyBoundaryError = Error & {
   code?: SecureProxyBoundaryErrorCode;
@@ -123,6 +143,10 @@ let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = 
 
 function getSecureProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
+}
+
+function getLocalUserRouteProxyEndpoint(): string {
+  return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/user-route-proxy`;
 }
 
 function buildSecureProxyBoundaryError(
@@ -163,6 +187,18 @@ export function isSecureProxyGuestModeError(error: unknown): error is SecureProx
     error &&
     typeof error === 'object' &&
     (error as SecureProxyBoundaryError).code === SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE
+  );
+}
+
+export function isLocalUserRouteProxyFallbackError(error: unknown): error is SecureProxyBoundaryError {
+  return Boolean(
+    error
+    && typeof error === 'object'
+    && (
+      (error as SecureProxyBoundaryError).code === LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE
+      || (error as SecureProxyBoundaryError).code === LOCAL_USER_ROUTE_NOT_FOUND_CODE
+      || (((error as SecureProxyBoundaryError).status || 0) >= 500)
+    )
   );
 }
 
@@ -432,7 +468,72 @@ async function invokeSecureSystemProxy(
   return result.data;
 }
 
+async function invokeLocalUserRouteProxy(
+  feature: string,
+  body: Record<string, unknown>,
+): Promise<any> {
+  const session = await resolveCloudSession(feature);
+
+  let response: Response;
+  try {
+    response = await fetch(getLocalUserRouteProxyEndpoint(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error: any) {
+    throw buildSecureProxyBoundaryError(
+      error?.message || 'Failed to reach the user-route proxy.',
+      {
+        code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+        status: 502,
+        feature,
+      },
+    );
+  }
+
+  let payload: any = null;
+  let responseBody = '';
+  try {
+    responseBody = await response.clone().text();
+    payload = responseBody ? JSON.parse(responseBody) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.success) {
+    const errorCode = String(payload?.error?.code || '').trim();
+    const errorMessage =
+      payload?.error?.message
+      || responseBody
+      || `User-route proxy failed with status ${response.status}`;
+    throw buildSecureProxyBoundaryError(errorMessage, {
+      code: errorCode === LOCAL_USER_ROUTE_NOT_FOUND_CODE
+        ? LOCAL_USER_ROUTE_NOT_FOUND_CODE
+        : LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+      status: response.status,
+      responseBody,
+      feature,
+    });
+  }
+
+  return payload.data;
+}
+
 export async function cancelSecureSystemProxyTask(taskId: string): Promise<boolean> {
+  if (String(taskId || '').startsWith('local_proxy:')) {
+    await invokeLocalUserRouteProxy('task cancel', {
+      mode: 'cancel_task',
+      localTaskId: taskId,
+    });
+
+    return true;
+  }
+
   await invokeSecureSystemProxy('task cancel', {
     mode: 'cancel_task',
     taskId,
@@ -442,6 +543,15 @@ export async function cancelSecureSystemProxyTask(taskId: string): Promise<boole
 }
 
 export async function deleteSecureSystemProxyTask(taskId: string): Promise<boolean> {
+  if (String(taskId || '').startsWith('local_proxy:')) {
+    await invokeLocalUserRouteProxy('task delete', {
+      mode: 'delete_task',
+      localTaskId: taskId,
+    });
+
+    return true;
+  }
+
   await invokeSecureSystemProxy('task delete', {
     mode: 'delete_task',
     taskId,
@@ -451,6 +561,15 @@ export async function deleteSecureSystemProxyTask(taskId: string): Promise<boole
 }
 
 export async function downloadSecureSystemProxyTaskContent(taskId: string): Promise<string> {
+  if (String(taskId || '').startsWith('local_proxy:')) {
+    const data = await invokeLocalUserRouteProxy('task download', {
+      mode: 'download_task',
+      localTaskId: taskId,
+    });
+
+    return String(data.url || '');
+  }
+
   const data = await invokeSecureSystemProxy('task download', {
     mode: 'download_task',
     taskId,
@@ -473,6 +592,13 @@ function normalizeMessageContent(content: unknown): string {
 export async function callSecureSystemProxyChat(
   payload: SecureProxyChatRequest
 ): Promise<SecureProxyChatResponse> {
+  if (payload.userRoute?.kind === 'key-slot' && payload.userRoute.id) {
+    return callLocalUserRouteProxyChat({
+      ...payload,
+      routeId: payload.userRoute.id,
+    });
+  }
+
   const normalizedMessages = payload.messages.map((message) => ({
     role: message.role,
     content: normalizeMessageContent(message.content),
@@ -480,6 +606,33 @@ export async function callSecureSystemProxyChat(
 
   const data = await invokeSecureSystemProxy('chat generation', {
     mode: 'chat',
+    modelId: payload.modelId,
+    userRoute: payload.userRoute,
+    messages: normalizedMessages,
+    temperature: payload.temperature,
+    maxTokens: payload.maxTokens,
+    stream: payload.stream ?? false,
+  });
+
+  return {
+    content: data.content || '',
+    deducted: Boolean(data.deducted),
+    usage: data.usage,
+    endpointType: data.endpointType,
+  };
+}
+
+export async function callLocalUserRouteProxyChat(
+  payload: SecureProxyChatRequest & { routeId: string },
+): Promise<SecureProxyChatResponse> {
+  const normalizedMessages = payload.messages.map((message) => ({
+    role: message.role,
+    content: normalizeMessageContent(message.content),
+  }));
+
+  const data = await invokeLocalUserRouteProxy('local chat generation', {
+    mode: 'chat',
+    routeId: payload.routeId,
     modelId: payload.modelId,
     messages: normalizedMessages,
     temperature: payload.temperature,
@@ -498,8 +651,38 @@ export async function callSecureSystemProxyChat(
 export async function callSecureSystemProxyImage(
   payload: SecureProxyImageRequest
 ): Promise<SecureProxyImageResponse> {
+  if (payload.userRoute?.kind === 'key-slot' && payload.userRoute.id) {
+    return callLocalUserRouteProxyImage({
+      ...payload,
+      routeId: payload.userRoute.id,
+    });
+  }
+
   const data = await invokeSecureSystemProxy('image generation', {
     mode: 'image',
+    modelId: payload.modelId,
+    userRoute: payload.userRoute,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    imageSize: payload.imageSize,
+    imageCount: payload.imageCount ?? 1,
+    referenceImages: payload.referenceImages ?? [],
+  });
+
+  return {
+    urls: Array.isArray(data.urls) ? data.urls : [],
+    deducted: Boolean(data.deducted),
+    usage: data.usage,
+    endpointType: data.endpointType,
+  };
+}
+
+export async function callLocalUserRouteProxyImage(
+  payload: SecureProxyImageRequest & { routeId: string },
+): Promise<SecureProxyImageResponse> {
+  const data = await invokeLocalUserRouteProxy('local image generation', {
+    mode: 'image',
+    routeId: payload.routeId,
     modelId: payload.modelId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
@@ -519,8 +702,41 @@ export async function callSecureSystemProxyImage(
 export async function callSecureSystemProxyVideo(
   payload: SecureProxyVideoRequest
 ): Promise<SecureProxyVideoResponse> {
+  if (payload.userRoute?.kind === 'key-slot' && payload.userRoute.id) {
+    return callLocalUserRouteProxyVideo({
+      ...payload,
+      routeId: payload.userRoute.id,
+    });
+  }
+
   const data = await invokeSecureSystemProxy('video generation', {
     mode: 'video',
+    modelId: payload.modelId,
+    userRoute: payload.userRoute,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    resolution: payload.resolution,
+    duration: payload.duration,
+    videoDuration: payload.videoDuration,
+    imageUrl: payload.imageUrl,
+    imageTailUrl: payload.imageTailUrl,
+  });
+
+  return {
+    taskId: data.taskId || '',
+    status: data.status || 'pending',
+    url: data.url,
+    deducted: Boolean(data.deducted),
+    endpointType: data.endpointType,
+  };
+}
+
+export async function callLocalUserRouteProxyVideo(
+  payload: SecureProxyVideoRequest & { routeId: string },
+): Promise<SecureProxyVideoResponse> {
+  const data = await invokeLocalUserRouteProxy('local video generation', {
+    mode: 'video',
+    routeId: payload.routeId,
     modelId: payload.modelId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
@@ -543,8 +759,34 @@ export async function callSecureSystemProxyVideo(
 export async function callSecureSystemProxyAudio(
   payload: SecureProxyAudioRequest
 ): Promise<SecureProxyAudioResponse> {
+  if (payload.userRoute?.kind === 'key-slot' && payload.userRoute.id) {
+    return callLocalUserRouteProxyAudio({
+      ...payload,
+      routeId: payload.userRoute.id,
+    });
+  }
+
   const data = await invokeSecureSystemProxy('audio generation', {
     mode: 'audio',
+    modelId: payload.modelId,
+    userRoute: payload.userRoute,
+    prompt: payload.prompt,
+  });
+
+  return {
+    url: data.url || '',
+    deducted: Boolean(data.deducted),
+    usage: data.usage,
+    endpointType: data.endpointType,
+  };
+}
+
+export async function callLocalUserRouteProxyAudio(
+  payload: SecureProxyAudioRequest & { routeId: string },
+): Promise<SecureProxyAudioResponse> {
+  const data = await invokeLocalUserRouteProxy('local audio generation', {
+    mode: 'audio',
+    routeId: payload.routeId,
     modelId: payload.modelId,
     prompt: payload.prompt,
   });
@@ -561,6 +803,21 @@ export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<
   const data = await invokeSecureSystemProxy('task status', {
     mode: 'task_status',
     taskId,
+  });
+
+  return {
+    status: data.status || 'pending',
+    url: data.url,
+    deducted: Boolean(data.deducted),
+  };
+}
+
+export async function checkLocalUserRouteProxyTaskStatus(
+  localTaskId: string,
+): Promise<SecureProxyTaskStatusResponse> {
+  const data = await invokeLocalUserRouteProxy('local task status', {
+    mode: 'task_status',
+    localTaskId,
   });
 
   return {

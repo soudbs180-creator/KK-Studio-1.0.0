@@ -3,7 +3,7 @@ import {
   type ApiClientConfig,
   type ApiClientRequestOptions,
   type KkApiClient,
-} from "../../../../packages/contracts/src/client/kk-api-client.ts";
+} from "../../../../packages/contracts/src/index.ts";
 
 export interface WebApiClientConfig {
   accessToken?: string;

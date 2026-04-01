@@ -494,13 +494,25 @@ export const isCreditBasedModel = (
   modelId: string,
   _provider?: string,
   _customAlias?: string,
-  hasCustomUserKey?: boolean
+  hasCustomUserKey?: boolean,
+  preferredKeyId?: string,
 ): boolean => {
   const normalizedModelId = String(modelId || '').trim();
   const lowerId = normalizedModelId.toLowerCase();
 
   if (hasCustomUserKey) {
     return false;
+  }
+
+  if (preferredKeyId) {
+    try {
+      const resolvedRoute = keyManager.getEffectiveKey(preferredKeyId) || keyManager.getKey(preferredKeyId);
+      if (resolvedRoute && resolvedRoute.provider !== 'SystemProxy') {
+        return false;
+      }
+    } catch {
+      // Ignore key lookup failures and fall back to the catalog-level check below.
+    }
   }
 
   const suffix = lowerId.includes('@') ? lowerId.split('@')[1] : '';

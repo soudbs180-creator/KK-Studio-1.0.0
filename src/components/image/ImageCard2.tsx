@@ -1226,6 +1226,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             ? 1.016
             : (showHighlightedAccent || showActiveAccent ? 1.01 : 1);
     const cardSurfaceTransform = `scale(${cardSurfaceScale})`;
+    const imageNodeContainerStyle = {
+        background: 'transparent',
+        border: 'none',
+        boxShadow: 'none',
+        overflow: 'visible',
+    } as const;
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
         const shellTitle = image.alias || image.fileName || image.prompt || 'Image';
@@ -1245,10 +1251,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 ref={containerRef}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
+                    ...imageNodeContainerStyle,
                     zIndex: stackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
+                    ...imageNodeContainerStyle,
                     left: renderLeft - originX,
                     top: renderTop - originY,
                     zIndex: stackZIndex,
@@ -1360,10 +1368,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 ref={containerRef}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
+                    ...imageNodeContainerStyle,
                     zIndex: stackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
+                    ...imageNodeContainerStyle,
                     left: renderLeft - originX,
                     top: renderTop - originY,
                     zIndex: stackZIndex,

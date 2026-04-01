@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, test } from "node:test";
 
 import {
   parseWechatAuthorizationUrl,
   resolveWechatStartErrorMessage,
 } from "../../src/services/auth/wechatAuthUtils.ts";
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
+}
 
 describe("wechat auth client helpers", () => {
   test("extracts widget params from the official WeChat qrconnect url", () => {
@@ -32,19 +40,36 @@ describe("wechat auth client helpers", () => {
     assert.match(
       resolveWechatStartErrorMessage(
         "WECHAT_AUTH_UNAVAILABLE",
-        "WeChat login is not configured on the API server.",
+        "WeChat auth function secrets are missing.",
       ),
-      /微信扫码登录尚未在 API 服务端完成配置/u,
+      /Supabase Edge Function/,
     );
   });
 
-  test("maps invalid html payloads to a localized proxy hint", () => {
+  test("maps missing edge function connectivity to a localized hint", () => {
     assert.match(
       resolveWechatStartErrorMessage(
-        "INVALID_RESPONSE_PAYLOAD",
-        "KK API returned an HTML page instead of the expected JSON payload.",
+        "EDGE_FUNCTION_UNAVAILABLE",
+        "Failed to invoke the wechat-auth Edge Function.",
       ),
-      /返回了网页而不是 JSON/u,
+      /wechat-auth/i,
     );
+  });
+
+  test("prefers Supabase Edge Functions and only falls back to legacy API behind the local runtime guard", () => {
+    const serviceSource = readSource("src/services/auth/wechatAuth.ts");
+    const functionSource = readSource("supabase/functions/wechat-auth/index.ts");
+    const packageSource = readSource("package.json");
+    const workflowSource = readSource(".github/workflows/cloud-auto-deploy.yml");
+
+    assert.match(serviceSource, /supabase\.functions\.invoke\("wechat-auth"/);
+    assert.match(serviceSource, /shouldUseLegacyWebApiFallback\(\) && shouldFallbackToLegacyWechat\(resolvedEdgeError\)/);
+    assert.match(functionSource, /Deno\.serve/);
+    assert.match(functionSource, /WECHAT_OPEN_REDIRECT_URI/);
+    assert.match(functionSource, /auth\.admin\.generateLink/);
+    assert.match(functionSource, /appendQueryParams\(state\.redirectTo, \{\s*wechat_bind: 'success'/);
+    assert.match(packageSource, /"supabase:functions:deploy:wechat-auth"\s*:\s*"npx supabase functions deploy wechat-auth --no-verify-jwt"/);
+    assert.match(workflowSource, /Deploy wechat-auth Edge Function/);
+    assert.match(workflowSource, /supabase functions deploy wechat-auth --no-verify-jwt/);
   });
 });

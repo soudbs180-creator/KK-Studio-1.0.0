@@ -47,6 +47,7 @@ class SupplierService {
   private listeners: (() => void)[] = [];
 
   constructor() {
+    this.clearLegacyStorage();
     this.loadFromStorage();
   }
 
@@ -255,28 +256,12 @@ class SupplierService {
   }
 
   private loadFromStorage() {
-    try {
-      const data = localStorage.getItem(SUPPLIERS_STORAGE_KEY);
-      if (data) {
-        this.suppliers = JSON.parse(data).map((supplier: Supplier) => ({
-          ...supplier,
-          format: normalizeApiProtocolFormat((supplier as any).format, 'auto'),
-        }));
-        console.log('[SupplierService] Loaded from storage:', this.suppliers.length);
-      }
-    } catch (error) {
-      console.error('[SupplierService] Failed to load from storage:', error);
-      this.suppliers = [];
-    }
+    this.suppliers = [];
+    console.warn('[SupplierService] Secure mode enabled: supplier secrets are not loaded from browser storage.');
   }
 
   private saveToStorage() {
-    try {
-      localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(this.suppliers));
-      console.log('[SupplierService] Saved to storage:', this.suppliers.length);
-    } catch (error) {
-      console.error('[SupplierService] Failed to save to storage:', error);
-    }
+    console.warn('[SupplierService] Secure mode enabled: supplier secrets are kept in memory only.');
   }
 
   subscribe(callback: () => void): () => void {

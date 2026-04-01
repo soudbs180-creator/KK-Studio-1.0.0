@@ -760,6 +760,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         };
     }, []);
 
+    const zoomSliderProgress = Math.max(0, Math.min(100, ((transform.scale * 100) - 10) / 290 * 100));
+
     return (
         <div className="relative w-full h-full">
             {/* Canvas Container */}
@@ -841,21 +843,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                             setTransform(newTransform);
                             onTransformChange?.(newTransform);
                         }}
-                        className="w-32 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer
-                            [&::-webkit-slider-thumb]:appearance-none
-                            [&::-webkit-slider-thumb]:w-3
-                            [&::-webkit-slider-thumb]:h-3
-                            [&::-webkit-slider-thumb]:rounded-full
-                            [&::-webkit-slider-thumb]:bg-gray-500 dark:bg-zinc-400
-                            [&::-webkit-slider-thumb]:hover:bg-gray-700 dark:hover:bg-white
-                            [&::-webkit-slider-thumb]:transition-colors
-                            [&::-moz-range-thumb]:w-3
-                            [&::-moz-range-thumb]:h-3
-                            [&::-moz-range-thumb]:rounded-full
-                            [&::-moz-range-thumb]:bg-gray-500 dark:bg-zinc-400
-                            [&::-moz-range-thumb]:hover:bg-gray-700 dark:hover:bg-white
-                            [&::-moz-range-thumb]:border-0
-                            [&::-moz-range-thumb]:transition-colors"
+                        className="zoom-slider w-32 cursor-pointer"
+                        style={{ '--zoom-slider-progress': `${zoomSliderProgress}%` } as React.CSSProperties}
                     />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 font-semibold min-w-[3ch] text-right">
                         {Math.round(transform.scale * 100)}%

@@ -1,0 +1,137 @@
+{
+  "serviceAppImports": [
+    {
+      "source": "apps/payment-sidecar/src/server.ts",
+      "targets": [
+        "apps/api/src/lib/request-authenticator.ts"
+      ],
+      "reason": "The payment sidecar still reuses the internal request authenticator until that contract is extracted into a shared runtime surface.",
+      "canonicalSource": "packages/shared/src",
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/contract/payment-sidecar.contract.test.ts",
+        "tests/unit/payment-sidecar-service.test.ts"
+      ],
+      "removalCondition": "Delete once internal service-to-service authentication is provided through packages/shared or a dedicated internal contract package."
+    }
+  ],
+  "legacyZoneModuleImports": [
+    {
+      "source": "server/auth_routes.ts",
+      "targets": [
+        "apps/api/src/modules/auth/index.ts"
+      ],
+      "reason": "The legacy server shell still mounts migrated auth routes while the old route bootstrap is being retired.",
+      "canonicalSource": "apps/api/src/modules/auth",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/auth-http-routes.test.ts",
+        "tests/unit/auth-data-routes.test.ts"
+      ],
+      "removalCondition": "Delete once the legacy server bootstrap no longer mounts auth routes directly."
+    },
+    {
+      "source": "server/billing_routes.ts",
+      "targets": [
+        "apps/api/src/modules/billing/index.ts"
+      ],
+      "reason": "The legacy server shell still mounts migrated billing routes while the old billing bootstrap is being retired.",
+      "canonicalSource": "apps/api/src/modules/billing",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-http-routes.test.ts"
+      ],
+      "removalCondition": "Delete once the legacy server bootstrap no longer mounts billing routes directly."
+    }
+  ],
+  "frontendSupabaseAccess": [
+    {
+      "path": "src/services/admin/supabaseAdminFallbackService.ts",
+      "tables": [
+        "profiles"
+      ],
+      "procedures": [
+        "authenticate_admin",
+        "admin_change_password",
+        "admin_recharge_credits_by_identity",
+        "admin_set_user_role_by_identity",
+        "get_admin_credit_models_full",
+        "get_active_credit_models",
+        "save_credit_provider",
+        "delete_credit_provider"
+      ],
+      "buckets": [],
+      "reason": "Admin settings still depend on the Supabase fallback bridge while admin-console routes finish migrating.",
+      "canonicalSource": "apps/api/src/modules/admin-console",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/admin-console-routes.test.ts"
+      ],
+      "removalCondition": "Delete once admin settings flows use only typed admin-console routes."
+    },
+    {
+      "path": "src/context/BillingContext.tsx",
+      "tables": [
+        "user_credits",
+        "credit_transactions"
+      ],
+      "procedures": [
+        "consume_credits",
+        "refund_credits"
+      ],
+      "buckets": [],
+      "reason": "Billing surfaces temporarily read canonical Supabase balance and ledger rows when the local API health check reports memory-mode persistence.",
+      "canonicalSource": "apps/api/src/modules/billing",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-remaining-balance-contract.test.ts"
+      ],
+      "removalCondition": "Delete once the typed billing API remains available with Supabase persistence in all supported runtimes."
+    },
+    {
+      "path": "src/services/billing/creditExchangeRateService.ts",
+      "tables": [
+        "credit_exchange_rates"
+      ],
+      "procedures": [],
+      "buckets": [],
+      "reason": "Recharge exchange-rate settings still fall back to the canonical Supabase table when the typed billing API is unavailable.",
+      "canonicalSource": "apps/api/src/modules/billing",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-http-routes.test.ts"
+      ],
+      "removalCondition": "Delete once exchange-rate settings use only the typed billing API in every supported runtime."
+    },
+    {
+      "path": "src/services/api/supabaseUserApiCloudStorage.ts",
+      "tables": [
+        "profiles"
+      ],
+      "procedures": [],
+      "buckets": [],
+      "reason": "User API payload migration still requires one direct profile read while the typed cloud-storage facade is being completed.",
+      "canonicalSource": "apps/api/src/modules/auth",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/user-api-cloud-storage.test.ts"
+      ],
+      "removalCondition": "Delete once user API profile hydration is served only through typed API contracts."
+    },
+    {
+      "path": "src/services/security/apiKeySecureStorage.ts",
+      "tables": [
+        "profiles"
+      ],
+      "procedures": [],
+      "buckets": [],
+      "reason": "Secure key storage still reads the profile runtime directly during the auth and secret-storage migration.",
+      "canonicalSource": "apps/api/src/modules/auth",
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/frontend-key-boundary-hardening.test.ts"
+      ],
+      "removalCondition": "Delete once secure key storage is accessed exclusively through typed auth/security APIs."
+    }
+  ]
+}

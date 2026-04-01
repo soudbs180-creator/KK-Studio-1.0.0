@@ -1,0 +1,19 @@
+{
+  "appName": "KK Studio",
+  "version": "1.4.0",
+  "displayVersion": "v1.4.0",
+  "releaseDate": "2026-03-28",
+  "releaseNotes": [
+    "Main app, payment sidecar, and documentation are aligned to version 1.4.0.",
+    "Release metadata is centralized for packaging, publishing, and update validation.",
+    "Architecture and governance baselines are enforced to reduce version drift and unsafe compatibility changes."
+  ],
+  "versionTargets": {
+    "rootPackage": "package.json",
+    "paymentServerPackage": "payment-server/package.json",
+    "webAppInfo": "src/config/appInfo.ts",
+    "readme": "README.md",
+    "sessionHandoff": "docs/development/session-handoff.md",
+    "progressReport": "docs/development/progress.md"
+  }
+}

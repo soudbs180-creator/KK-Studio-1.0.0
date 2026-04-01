@@ -30,7 +30,15 @@ export interface CreatePaymentOrderContext {
   requestId: string;
   clientVersion?: string;
   userId: string;
-  paymentUrlFactory: (merchantOrderNo: string) => string;
+  paymentUrlFactory: (input: {
+    merchantOrderNo: string;
+    userId: string;
+    providerCode: string;
+    amount: string;
+    currency: string;
+    returnUrl: string;
+    notifyUrl: string;
+  }) => string | Promise<string>;
 }
 
 export class PaymentService {
@@ -68,6 +76,15 @@ export class PaymentService {
       amount: input.amount,
       currency: input.currency,
     });
+    const paymentUrl = await context.paymentUrlFactory({
+      merchantOrderNo,
+      userId: context.userId,
+      providerCode: input.providerCode,
+      amount: input.amount,
+      currency: input.currency,
+      returnUrl: input.returnUrl,
+      notifyUrl: input.notifyUrl,
+    });
 
     if (
       typeof input.creditAmount === "number"
@@ -88,7 +105,7 @@ export class PaymentService {
       creditAmount: resolvedCreditAmount,
       userId: context.userId,
       merchantOrderNo,
-      paymentUrl: context.paymentUrlFactory(merchantOrderNo),
+      paymentUrl,
     }, createdAt);
 
     await this.repository.save(order);

@@ -1,5 +1,5 @@
 ﻿
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
@@ -8,7 +8,8 @@ import { keyManager } from '../../services/auth/keyManager';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
-import { sortModels, toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
+import { formatRemainingCredits } from '../../services/billing/remainingBalance';
+import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import ReactDOM from 'react-dom';
 import { AspectRatio, ImageSize } from '../../types';
@@ -25,6 +26,62 @@ interface ChatSidebarProps {
     onHoverChange?: (isHovered: boolean) => void; // 通知父组件hover状态变化
     onWidthChange?: (width: number) => void;
 }
+
+type ChatSidebarModelMenuItem = ChatModel & {
+    displayName: string;
+    displayInfo: ReturnType<typeof getModelDisplayInfo>;
+    advantage: string;
+    isPinned: boolean;
+};
+
+type ChatSidebarModelMenuButtonProps = {
+    model: ChatSidebarModelMenuItem;
+    selected: boolean;
+    onSelect: (model: ChatSidebarModelMenuItem) => void;
+    onOpenContextMenu: (event: React.MouseEvent<HTMLButtonElement>, modelId: string) => void;
+};
+
+const ChatSidebarModelMenuButton = React.memo(function ChatSidebarModelMenuButton({
+    model,
+    selected,
+    onSelect,
+    onOpenContextMenu,
+}: ChatSidebarModelMenuButtonProps) {
+    return (
+        <button
+            onClick={() => onSelect(model)}
+            onContextMenu={(event) => onOpenContextMenu(event, model.id)}
+            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selected ? 'bg-white/10 ring-1 ring-white/20' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] border border-transparent'}`}
+        >
+            <span className="mt-0.5 relative shrink-0 inline-flex h-5 w-5 items-center justify-center">
+                <ModelLogo
+                    modelId={model.id}
+                    provider={model.provider}
+                    modelName={model.displayInfo.displayName}
+                    size={18}
+                    active={selected}
+                />
+                {model.isPinned && <span className="absolute -top-1 -right-1 text-[8px]">📌</span>}
+            </span>
+            <div className="flex flex-col gap-0.5 w-full min-w-0">
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span className={`font-medium truncate min-w-0 ${getModelThemeColor(model.id)}`}>
+                        {model.displayInfo.displayName}
+                    </span>
+                    {model.displayInfo.badgeText && (
+                        <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded border opacity-80 shrink-0 ${model.displayInfo.badgeColor}`}
+                            style={{ whiteSpace: 'nowrap', ...(model.displayInfo.badgeStyle || {}) }}
+                        >
+                            {model.displayInfo.badgeText}
+                        </span>
+                    )}
+                </div>
+                <span className="text-[10px] opacity-70 leading-tight truncate min-w-0">{model.advantage}</span>
+            </div>
+        </button>
+    );
+});
 
 // 附件类型
 interface Attachment {
@@ -344,6 +401,7 @@ Return STRICT JSON only:
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, setShowRechargeModal } = useBilling();
+    const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
     const canAccessSystemCreditModels = !!user && !isTempUser;
     const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
@@ -353,6 +411,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
+    const deferredModelSearch = useDeferredValue(modelSearch);
     const modelMenuButtonRef = useRef<HTMLButtonElement>(null);
     const [modelMenuLayout, setModelMenuLayout] = useState<{ left: number; bottom: number; width: number } | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
@@ -483,7 +542,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
         const requiredCredits = getRequiredCredits(model);
         if (requiredCredits > 0 && balance < requiredCredits) {
-            notify.error('积分不足', `使用当前管理员模型${feature}需要 ${requiredCredits} 积分，当前余额: ${balance}，请充值。`);
+            notify.error('积分不足', `使用当前管理员模型${feature}需要 ${requiredCredits} 积分，当前余额: ${remainingBalanceDisplay}，请充值。`);
             setShowRechargeModal(true);
             return false;
         }
@@ -685,6 +744,32 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             return session.messages.some(m => (m.content || '').toLowerCase().includes(q));
         });
     }, [sessionSearch, sessions, showArchived]);
+
+    const pinnedModels = useMemo(() => getPinnedModels(), [pinnedUpdate]);
+
+    const filteredModelMenuItems = useMemo<ChatSidebarModelMenuItem[]>(() => {
+        return filterAndSortModels(availableModels, deferredModelSearch, modelCustomizations).map((model: ChatModel) => {
+            const custom = modelCustomizations[model.id] || {};
+            return {
+                ...model,
+                displayName: custom.alias || model.name || model.id,
+                displayInfo: getModelDisplayInfo(model),
+                advantage: custom.description || model.description || (model.provider ? `${model.provider} 模型` : '自定义模型'),
+                isPinned: pinnedModels.includes(model.id),
+            };
+        });
+    }, [availableModels, deferredModelSearch, modelCustomizations, pinnedModels]);
+
+    const handleSelectModelFromMenu = useCallback((model: ChatSidebarModelMenuItem) => {
+        setSelectedModel(model);
+        setShowModelMenu(false);
+        setModelSearch('');
+    }, []);
+
+    const handleModelContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, modelId: string) => {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, modelId });
+    }, []);
 
     const sessionMap = useMemo(() => {
         const map = new Map<string, ChatSessionItem>();
@@ -2155,66 +2240,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                     <span>选择模型 (右键可顶置)</span>
                                                                 </div>
 
-                                                                {filterAndSortModels(availableModels, modelSearch, modelCustomizations)
-                                                                    .map((model: any) => {
-                                                                        const custom = modelCustomizations[model.id] || {};
-                                                                        const displayInfo = getModelDisplayInfo(model);
-                                                                        const displayName = custom.alias || model.name || model.id;
-                                                                        const advantage = custom.description || model.description || (model.provider ? `${model.provider} 模型` : '自定义模型');
-                                                                        const isPinned = getPinnedModels().includes(model.id);
-
+                                                                {filteredModelMenuItems
+                                                                    .map((model) => {
                                                                         return (
-                                                                            <button
+                                                                            <ChatSidebarModelMenuButton
                                                                                 key={model.id}
-                                                                                onClick={() => { setSelectedModel(model); setShowModelMenu(false); setModelSearch(''); }}
-                                                                                onContextMenu={(e) => {
-                                                                                    e.preventDefault();
-                                                                                    setContextMenu({ x: e.clientX, y: e.clientY, modelId: model.id });
-                                                                                }}
-                                                                                className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selectedModel.id === model.id ? 'bg-white/10 ring-1 ring-white/20' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] border border-transparent'}`}
-                                                                            >
-                                                                                <span className="mt-0.5 relative shrink-0 inline-flex h-5 w-5 items-center justify-center">
-                                                                                    <ModelLogo
-                                                                                        modelId={model.id}
-                                                                                        provider={model.provider}
-                                                                                        modelName={displayInfo.displayName}
-                                                                                        size={18}
-                                                                                        active={selectedModel.id === model.id}
-                                                                                    />
-                                                                                    {isPinned && <span className="absolute -top-1 -right-1 text-[8px]">📌</span>}
-                                                                                </span>
-                                                                                <div className="flex flex-col gap-0.5 w-full min-w-0">
-                                                                                    <div className="flex items-center justify-between gap-2 min-w-0">
-                                                                                        <span
-                                                                                            className={`font-medium truncate min-w-0 ${getModelThemeColor(model.id)}`}
-                                                                                        >
-                                                                                            {displayInfo.displayName}
-                                                                                        </span>
-                                                                                        {displayInfo.badgeText && (
-                                                                                            <span
-                                                                                                className={`text-[10px] px-1.5 py-0.5 rounded border opacity-80 shrink-0 ${displayInfo.badgeColor}`}
-                                                                                                style={{ whiteSpace: 'nowrap', ...(displayInfo.badgeStyle || {}) }}
-                                                                                            >
-                                                                                                {displayInfo.badgeText}
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <span className="text-[10px] opacity-70 leading-tight truncate min-w-0">{advantage}</span>
-                                                                                </div>
-                                                                            </button>
+                                                                                model={model}
+                                                                                selected={selectedModel.id === model.id}
+                                                                                onSelect={handleSelectModelFromMenu}
+                                                                                onOpenContextMenu={handleModelContextMenu}
+                                                                            />
                                                                         );
                                                                     })}
-                                                                {sortModels(availableModels).filter(m => {
-                                                                    if (!modelSearch) return true;
-                                                                    const custom = modelCustomizations[m.id] || {};
-                                                                    const searchLower = modelSearch.toLowerCase();
-                                                                    return (
-                                                                        m.id.toLowerCase().includes(searchLower) ||
-                                                                        (m.name && m.name.toLowerCase().includes(searchLower)) ||
-                                                                        (custom.alias && custom.alias.toLowerCase().includes(searchLower)) ||
-                                                                        (m.provider && m.provider.toLowerCase().includes(searchLower))
-                                                                    );
-                                                                }).length === 0 && (
+                                                                {filteredModelMenuItems.length === 0 && (
                                                                         <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
                                                                             未找到匹配的模型
                                                                         </div>

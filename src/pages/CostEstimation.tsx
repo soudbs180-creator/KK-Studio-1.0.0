@@ -25,6 +25,7 @@ import {
   type CostBreakdownItem,
   type CostEntry,
 } from '../services/billing/costService';
+import { formatRemainingCredits } from '../services/billing/remainingBalance';
 import { adminModelService } from '../services/model/adminModelService';
 
 interface CostEstimationProps {
@@ -226,7 +227,8 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   embedded = false,
 }) => {
   const { pick, locale } = useLocale();
-  const { balance, usageLogs, fetchLogs } = useBilling();
+  const { balance, usageLogs, refreshBilling } = useBilling();
+  const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
 
   const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
   const [summaryRows, setSummaryRows] = useState<CostBreakdownItem[]>([]);
@@ -259,7 +261,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
     setRefreshing(true);
     try {
       setRefreshTick((value) => value + 1);
-      await fetchLogs();
+      await refreshBilling();
     } finally {
       setRefreshing(false);
     }
@@ -703,7 +705,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
             <div className="settings-reference-grid-4">
               <ConsumptionMetricCard
                 label={pick('当前余额', 'Current Balance')}
-                value={formatNumber(balance, Number.isInteger(balance) ? 0 : 2, locale)}
+                value={remainingBalanceDisplay}
                 helper={pick('当前工作区可立即使用的积分。', 'Credits immediately available to the current workspace.')}
                 badge={<Coins size={18} className="text-[var(--text-primary)]" />}
               />
