@@ -10,8 +10,9 @@ import {
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
-const SESSION_POLL_INTERVAL_MS = 350;
-const SESSION_POLL_ATTEMPTS = 18;
+const SESSION_FALLBACK_POLL_INTERVAL_MS = 1200;
+const SESSION_FALLBACK_POLL_ATTEMPTS = 4;
+const SESSION_WAIT_TIMEOUT_MS = 6500;
 
 function parseHashParams(): URLSearchParams {
   const hash = window.location.hash.startsWith('#')
@@ -34,24 +35,78 @@ function hasSessionHints(searchParams: URLSearchParams, hashParams: URLSearchPar
 }
 
 async function waitForSession(): Promise<boolean> {
-  for (let attempt = 0; attempt < SESSION_POLL_ATTEMPTS; attempt += 1) {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
+  return await new Promise<boolean>((resolve, reject) => {
+    let settled = false;
+    let fallbackAttempts = 0;
+    let fallbackTimer: number | undefined;
+    let timeoutTimer: number | undefined;
 
-    if (error) {
-      throw error;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        finish(true);
+      }
+    });
+
+    function cleanup() {
+      subscription.unsubscribe();
+      if (typeof fallbackTimer === 'number') {
+        window.clearTimeout(fallbackTimer);
+      }
+      if (typeof timeoutTimer === 'number') {
+        window.clearTimeout(timeoutTimer);
+      }
     }
 
-    if (session) {
-      return true;
+    function finish(result: boolean) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, SESSION_POLL_INTERVAL_MS));
-  }
+    function fail(error: unknown) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    }
 
-  return false;
+    const pollForSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          fail(error);
+          return;
+        }
+
+        if (session) {
+          finish(true);
+          return;
+        }
+
+        fallbackAttempts += 1;
+        if (fallbackAttempts < SESSION_FALLBACK_POLL_ATTEMPTS) {
+          fallbackTimer = window.setTimeout(() => {
+            void pollForSession();
+          }, SESSION_FALLBACK_POLL_INTERVAL_MS);
+        }
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    timeoutTimer = window.setTimeout(() => {
+      finish(false);
+    }, SESSION_WAIT_TIMEOUT_MS);
+
+    fallbackTimer = window.setTimeout(() => {
+      void pollForSession();
+    }, SESSION_FALLBACK_POLL_INTERVAL_MS);
+  });
 }
 
 export default function AuthCallback() {
