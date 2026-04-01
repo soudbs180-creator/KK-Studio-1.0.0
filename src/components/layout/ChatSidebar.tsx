@@ -8,6 +8,7 @@ import { keyManager } from '../../services/auth/keyManager';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
+import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
@@ -683,6 +684,52 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         lastActivityRef.current = Date.now();
         scheduleAutoClose();
     }, [scheduleAutoClose]);
+
+    const handleToggleModelMenu = useCallback(async () => {
+        registerActivity();
+
+        if (showModelMenu) {
+            setShowModelMenu(false);
+            return;
+        }
+
+        updateModelMenuLayout();
+
+        try {
+            await refreshModelLibraryData();
+        } catch (error) {
+            console.warn('[ChatSidebar] Model library refresh failed before open:', error);
+        }
+
+        const models = buildAvailableChatModels(canBrowseSystemCreditModels);
+        setAvailableModels(models);
+
+        if (models.length === 0) {
+            onOpenSettings?.('api-management');
+            return;
+        }
+
+        const matchedSelectedModel = models.find(model => model.id === selectedModel.id);
+        if (!matchedSelectedModel) {
+            setSelectedModel(models[0]);
+        } else if (
+            matchedSelectedModel.name !== selectedModel.name
+            || matchedSelectedModel.description !== selectedModel.description
+        ) {
+            setSelectedModel(matchedSelectedModel);
+        }
+
+        setShowModelMenu(true);
+    }, [
+        canBrowseSystemCreditModels,
+        onOpenSettings,
+        registerActivity,
+        selectedModel.description,
+        selectedModel.id,
+        selectedModel.name,
+        showModelMenu,
+        updateModelMenuLayout,
+    ]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -2136,17 +2183,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             <div className={`relative min-w-0 ${isMobile ? 'col-start-1 row-start-1' : 'flex-1'}`}>
                                 <button
                                     ref={modelMenuButtonRef}
-                                    onClick={() => {
-                                        registerActivity();
-                                        if (availableModels.length === 0) {
-                                            onOpenSettings?.('api-management');
-                                        } else {
-                                            if (!showModelMenu) {
-                                                updateModelMenuLayout();
-                                            }
-                                            setShowModelMenu(!showModelMenu);
-                                        }
-                                    }}
+                                    onClick={() => { void handleToggleModelMenu(); }}
                                     className="w-full py-1.5 px-3 min-h-[44px] gap-2 transition-all flex items-center justify-center rounded-lg hover:bg-[var(--toolbar-hover)] active:bg-[var(--bg-tertiary)] text-sm"
                                 >
                                     {availableModels.length === 0 ? (

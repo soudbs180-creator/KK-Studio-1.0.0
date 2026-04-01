@@ -5808,6 +5808,9 @@ ${slideLayerXml.join('\n')}
           ?? ((imageNode.zIndex ?? 0) * 100 + 10)
         )
     );
+    const resolveViewportNodePosition = <TNode extends { id: string; position: { x: number; y: number } }>(node: TNode) => (
+      liveNodePositionById[node.id] ?? node.position
+    );
 
     // 1. Filter Groups
     const visibleGroups = activeCanvas.groups
@@ -5833,8 +5836,9 @@ ${slideLayerXml.join('\n')}
         // Estimate Bounds (Center X, Bottom Y)
         const w = 800;
         const h = 800;
-        const x = n.position.x - w / 2;
-        const y = n.position.y - h;
+        const position = resolveViewportNodePosition(n);
+        const x = position.x - w / 2;
+        const y = position.y - h;
 
         return !(x > vRight || x + w < vLeft || y > vBottom || y + h < vTop);
       })
@@ -5849,8 +5853,9 @@ ${slideLayerXml.join('\n')}
       .filter(n => {
         const w = 800;
         const h = 1200;
-        const x = n.position.x - w / 2;
-        const y = n.position.y - h;
+        const position = resolveViewportNodePosition(n);
+        const x = position.x - w / 2;
+        const y = position.y - h;
         return !(x > vRight || x + w < vLeft || y > vBottom || y + h < vTop);
       })
       .sort((a, b) => {
@@ -5878,7 +5883,7 @@ ${slideLayerXml.join('\n')}
     const nowTimestamp = Date.now();
 
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, liveNodePositionById, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
 
   const actualChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -8512,7 +8517,7 @@ ${slideLayerXml.join('\n')}
           {connectorRenderPromptNodes.map(pn => {
             if (pn.isDraft) return null; // Draft/pending connection is rendered by pending-connection block below
             if (!pn.sourceImageId) return null;
-            const sourceNode = connectorVisibleImageNodesById.get(pn.sourceImageId);
+            const sourceNode = imageNodesById.get(pn.sourceImageId);
             if (!sourceNode) return null;
             const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
             const promptPosition = resolveLivePromptPosition(pn) ?? pn.position;
@@ -8598,8 +8603,7 @@ ${slideLayerXml.join('\n')}
           {activeSourceImage && (() => {
             const hasDraftFollowup = !!activeCanvas?.promptNodes.some(p => p.isDraft && p.sourceImageId === activeSourceImage);
             if (hasDraftFollowup) return null;
-            if (!connectorVisibleImageNodeIds.has(activeSourceImage)) return null;
-            const sourceNode = connectorVisibleImageNodesById.get(activeSourceImage);
+            const sourceNode = imageNodesById.get(activeSourceImage);
             if (!sourceNode) return null;
             const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
 
@@ -8672,9 +8676,9 @@ ${slideLayerXml.join('\n')}
             const targetNode = visibleWorkflowUtilityNodesById.get(edge.to);
             if (!targetNode) return null;
 
-            const sourcePrompt = connectorPromptNodesById.get(edge.from);
-            const sourceImage = connectorVisibleImageNodesById.get(edge.from);
-            const sourceUtility = visibleWorkflowUtilityNodesById.get(edge.from);
+            const sourcePrompt = promptNodesById.get(edge.from);
+            const sourceImage = imageNodesById.get(edge.from);
+            const sourceUtility = workflowUtilityNodesById.get(edge.from);
             if (!sourcePrompt && !sourceImage && !sourceUtility) return null;
             const sourcePromptPosition = resolveLivePromptPosition(sourcePrompt);
             const sourceImagePosition = resolveLiveImagePosition(sourceImage);

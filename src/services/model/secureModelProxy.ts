@@ -140,6 +140,7 @@ type SecureProxyBoundaryError = Error & {
 };
 
 let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = null;
+let invalidateCloudSessionPromise: Promise<void> | null = null;
 
 function getSecureProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
@@ -327,13 +328,33 @@ async function resolveCloudSession(
 
   if (!resolvedSession?.accessToken) {
     // secure-model-proxy is backed by Supabase auth and must never use the
-    // legacy compatibility token from the web API login flow. Surface the
-    // reauth requirement to the caller, but do not force a sign-out here:
-    // transient 401s should not eject an otherwise logged-in user.
+    // legacy compatibility token from the web API login flow. If we fail to
+    // recover a valid cloud session here, clear the stale local auth cache so
+    // the UI can stop presenting a phantom logged-in state.
+    await invalidateCloudSession(`Unable to recover Supabase session for ${feature}`);
     throw buildCloudSessionError(feature);
   }
 
   return resolvedSession;
+}
+
+async function invalidateCloudSession(reason: string): Promise<void> {
+  if (invalidateCloudSessionPromise) {
+    return invalidateCloudSessionPromise;
+  }
+
+  invalidateCloudSessionPromise = (async () => {
+    try {
+      console.warn('[secureModelProxy] Clearing invalid Supabase auth session:', reason);
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.warn('[secureModelProxy] Failed to clear invalid Supabase auth session:', error);
+    }
+  })().finally(() => {
+    invalidateCloudSessionPromise = null;
+  });
+
+  return invalidateCloudSessionPromise;
 }
 
 async function buildInvocationError(
@@ -358,6 +379,7 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
+    await invalidateCloudSession(`secure-model-proxy returned 401 during ${feature}`);
     return buildSessionReauthError(feature, responseBody);
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;
@@ -468,23 +490,64 @@ async function invokeSecureSystemProxy(
   return result.data;
 }
 
+type LocalUserRouteProxyHttpResult = {
+  response?: Response;
+  payload: any;
+  responseBody: string;
+};
+
+function isInvalidJwtResponse(responseBody: string, payload: any): boolean {
+  const joinedMessage = [
+    payload?.error?.message,
+    payload?.message,
+    responseBody,
+  ]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join('\n');
+
+  return joinedMessage.includes('invalid jwt');
+}
+
+async function invokeLocalUserRouteProxyHttp(
+  accessToken: string,
+  body: Record<string, unknown>,
+): Promise<LocalUserRouteProxyHttpResult> {
+  const response = await fetch(getLocalUserRouteProxyEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  let payload: any = null;
+  let responseBody = '';
+  try {
+    responseBody = await response.clone().text();
+    payload = responseBody ? JSON.parse(responseBody) : null;
+  } catch {
+    payload = null;
+  }
+
+  return {
+    response,
+    payload,
+    responseBody,
+  };
+}
+
 async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
   const session = await resolveCloudSession(feature);
 
-  let response: Response;
+  let result: LocalUserRouteProxyHttpResult;
   try {
-    response = await fetch(getLocalUserRouteProxyEndpoint(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-      body: JSON.stringify(body),
-    });
+    result = await invokeLocalUserRouteProxyHttp(session.accessToken, body);
   } catch (error: any) {
     throw buildSecureProxyBoundaryError(
       error?.message || 'Failed to reach the user-route proxy.',
@@ -496,32 +559,52 @@ async function invokeLocalUserRouteProxy(
     );
   }
 
-  let payload: any = null;
-  let responseBody = '';
-  try {
-    responseBody = await response.clone().text();
-    payload = responseBody ? JSON.parse(responseBody) : null;
-  } catch {
-    payload = null;
+  const shouldRetryWithFreshSession = (
+    result.response?.status === 401
+    || isInvalidJwtResponse(result.responseBody, result.payload)
+  );
+
+  if (shouldRetryWithFreshSession) {
+    try {
+      console.warn('[secureModelProxy] User-route proxy returned 401/Invalid JWT, forcing session refresh before retry');
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
+      if (recoveredSession.accessToken) {
+        result = await invokeLocalUserRouteProxyHttp(recoveredSession.accessToken, body);
+      }
+    } catch (error) {
+      console.warn('[secureModelProxy] Cloud session recovery failed after user-route proxy 401:', error);
+      if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
+        throw error;
+      }
+    }
   }
 
-  if (!response.ok || !payload?.success) {
-    const errorCode = String(payload?.error?.code || '').trim();
+  if (!result.response?.ok || !result.payload?.success) {
+    const errorCode = String(result.payload?.error?.code || '').trim();
     const errorMessage =
-      payload?.error?.message
-      || responseBody
-      || `User-route proxy failed with status ${response.status}`;
+      result.payload?.error?.message
+      || result.responseBody
+      || `User-route proxy failed with status ${result.response?.status ?? 500}`;
+
+    if (
+      result.response?.status === 401
+      || isInvalidJwtResponse(result.responseBody, result.payload)
+    ) {
+      await invalidateCloudSession(`user-route-proxy returned 401 during ${feature}`);
+      throw buildSessionReauthError(feature, result.responseBody);
+    }
+
     throw buildSecureProxyBoundaryError(errorMessage, {
       code: errorCode === LOCAL_USER_ROUTE_NOT_FOUND_CODE
         ? LOCAL_USER_ROUTE_NOT_FOUND_CODE
         : LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
-      status: response.status,
-      responseBody,
+      status: result.response?.status,
+      responseBody: result.responseBody,
       feature,
     });
   }
 
-  return payload.data;
+  return result.payload.data;
 }
 
 export async function cancelSecureSystemProxyTask(taskId: string): Promise<boolean> {

@@ -99,13 +99,13 @@
   --floating-shell-shadow: 0 16px 36px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.92);
 
   /* ===== Prompt Bar 专用白色系表面 ===== */
-  --prompt-bar-glass-bg: rgba(255, 255, 255, 0.88);
-  --prompt-bar-glass-bg-supported: rgba(255, 255, 255, 0.74);
-  --prompt-bar-shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.96) 100%);
+  --prompt-bar-glass-bg: rgba(248, 250, 252, 0.98);
+  --prompt-bar-glass-bg-supported: rgba(248, 250, 252, 0.98);
+  --prompt-bar-shell-bg: rgba(248, 250, 252, 0.98);
   --prompt-bar-shell-border: rgba(15, 23, 42, 0.08);
   --prompt-bar-shell-border-strong: rgba(15, 23, 42, 0.12);
   --prompt-bar-shell-hover: rgba(15, 23, 42, 0.05);
-  --prompt-bar-shell-shadow: 0 10px 24px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --prompt-bar-shell-shadow: none;
 
   /* ===== 阴影 ===== */
   --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
@@ -513,19 +513,18 @@ body.dark-mode {
   --accent-pink: #ec4899;
   --accent-color: var(--accent-blue);
 
-  --prompt-bar-glass-bg: rgba(37, 37, 40, 0.9);
-  --prompt-bar-glass-bg-supported: rgba(24, 24, 27, 0.72);
-  --prompt-bar-shell-bg: linear-gradient(180deg, rgba(39, 39, 42, 0.98) 0%, rgba(24, 24, 27, 0.96) 100%);
-  --prompt-bar-shell-border: rgba(255, 255, 255, 0.08);
-  --prompt-bar-shell-border-strong: rgba(255, 255, 255, 0.14);
-  --prompt-bar-shell-hover: rgba(255, 255, 255, 0.08);
-  --prompt-bar-shell-shadow: 0 10px 24px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --prompt-bar-glass-bg: rgba(29, 29, 31, 0.98);
+  --prompt-bar-glass-bg-supported: rgba(29, 29, 31, 0.98);
+  --prompt-bar-shell-bg: rgba(29, 29, 31, 0.98);
+  --prompt-bar-shell-border: rgba(255, 255, 255, 0.09);
+  --prompt-bar-shell-border-strong: rgba(255, 255, 255, 0.16);
+  --prompt-bar-shell-hover: rgba(255, 255, 255, 0.06);
+  --prompt-bar-shell-shadow: none;
   --floating-shell-bg: linear-gradient(180deg, rgba(38, 43, 47, 0.96) 0%, rgba(24, 27, 31, 0.92) 100%);
   --floating-shell-bg-supported: rgba(31, 35, 39, 0.84);
   --floating-shell-border: rgba(255, 255, 255, 0.08);
   --floating-shell-border-strong: rgba(255, 255, 255, 0.14);
   --floating-shell-shadow: 0 20px 46px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-
   /* 状态语义色 */
   --state-success-bg: rgba(16, 185, 129, 0.14);
   --state-success-border: rgba(16, 185, 129, 0.24);
@@ -1880,12 +1879,11 @@ body.dark-mode .zoom-slider {
      Keeping fixed width here causes build-order dependent overrides. */
   /* Fallback for browsers without backdrop-filter support */
   background: var(--prompt-bar-glass-bg);
-  /* Modern browsers with backdrop-filter */
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-medium);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--prompt-bar-shell-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  box-shadow: none;
   z-index: 100;
   overflow: visible;
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;

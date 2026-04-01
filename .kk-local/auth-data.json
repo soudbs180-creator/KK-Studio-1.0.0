@@ -13,23 +13,23 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "qjYs3EGFi4PZKvz6",
-              "tag": "e+heSM+Wnl1yZw5cUhXUfg==",
-              "data": "dEID/LZa7aYCQwFQNQLy7dwmNQ+G6nglegsUdQ1A00I0LGS7akjE"
+              "iv": "5gpgKf5fSAbTYwzZ",
+              "tag": "bZHkzJu6StMy1wqXtHwhEw==",
+              "data": "0v1zlccxx0SYIyCedlesmYPz0MTjZWaFO3Hbp579O/7ZyfWBhti3"
             },
             "name": "Google API",
             "type": "official",
             "format": "gemini",
-            "status": "valid",
+            "status": "invalid",
             "weight": 50,
             "baseUrl": "",
             "timeout": 30000,
             "disabled": false,
-            "lastUsed": 1774688345194,
+            "lastUsed": 1775026267526,
             "provider": "Google",
             "createdAt": 1770042112311,
-            "failCount": 0,
-            "lastError": null,
+            "failCount": 1,
+            "lastError": "{\"code\":401,\"message\":\"Invalid JWT\"}",
             "totalCost": 5.450389799999999,
             "updatedAt": 1774690348456,
             "authMethod": "query",
@@ -64,9 +64,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "R9ewmj0T3aqKEOFj",
-              "tag": "6l3aUUVMFBqPyCkYeq+NEA==",
-              "data": "3rBFLVWB+So4/HblFsu+7CuZb5ZLAJ3yp0D4te2u2NItMq8="
+              "iv": "3thJez6vSpcNjfzY",
+              "tag": "L0q4mbLAWp0Niu101r3gzA==",
+              "data": "ASsfPW4hcNivtDCuFChlRj7kVd249gJRxPNLpQ1zm2QRyQg="
             },
             "name": "反代",
             "type": "third-party",
@@ -153,9 +153,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "j8EkkGpQlHBqrBmn",
-              "tag": "QkxS868bnIZRkjPt/EmAwQ==",
-              "data": "8624XslsJNQhlAfOmdRD47bMrw796cgMQjSBKUCM84wISBEF88WVG9i2cy0xb2t6nYQU"
+              "iv": "otw9r4NOoY/HgKmu",
+              "tag": "ApYkqwiWXVr7KMo/lCMFTg==",
+              "data": "WgvqpfVJWZFwh6wrCUW2sHlWVE+wCDv9xediHbyAfHSgZtikNQ89U+xX2Sl+UKfILWEz"
             },
             "name": "suxi",
             "type": "third-party",
@@ -303,9 +303,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "Endgz+1vHncK54zh",
-              "tag": "Ic1kBQlLHoEojRx0XG4ZGg==",
-              "data": "faPozVuukaebJ2/z+zkypl4riVXngR2LngFbTdtmQSgEFm6rQAnMcfLetJWYGDMLzRk7"
+              "iv": "xobpzY3MLQb5mxll",
+              "tag": "1zAWiNEI0TDwILtQaO9fmw==",
+              "data": "7sj7BGB3fOzFQsRmQRcsLTWn9blmW3peH16h/IUKcGXjiNhGc4CO/OhmdDzQtXpXW8by"
             },
             "name": "gemini中转商",
             "type": "third-party",
@@ -356,9 +356,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "p61/51dlHm/f1a5k",
-              "tag": "lbsW580Shva372IZ0O12mQ==",
-              "data": "aWqirNQO6BBS/xxgyUMqjyjW2igeJjbEqm1MexcQEI7Fo5Zbw06UYPyVbR3PU6J8goRl"
+              "iv": "vrl1kGKAslkuAmGX",
+              "tag": "m8NOGn/eKWnV0YihwaJ1mg==",
+              "data": "9DQy2vBKXqPe8IrtLWv/eOp6nU7GxQBV3UeHMAz90Cny688djf5BWlORk2WXtu/hGyzG"
             },
             "name": "12ai",
             "type": "third-party",
@@ -442,9 +442,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "/ACCVxpqrrTkXB14",
-              "tag": "KOnI9eWlQLyUBCLZI87SWw==",
-              "data": "msM9B8W2YLRu11qKkE/ikvJ1IsdwuOv/hKHUY3upa3VafhknsTqIS4+zyUYBC1TlfMmV"
+              "iv": "zGETJOPtZpMNSVK5",
+              "tag": "o/t0hDvOM68wlMXthr1F1Q==",
+              "data": "gLSG/X1SskOa5fRb7IQvSJu3lIp/GDNjGK9TCAQyOb8kd5s5mSj1BejSDzZJ84S3sJMt"
             },
             "name": "贞贞",
             "type": "third-party",
@@ -1348,9 +1348,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "iqLoxpT+pLXZaf08",
-              "tag": "DmJOXobOV+Ps43UYKDbUcg==",
-              "data": "cXHDyvg8kvEnnj2/2VHHku2YoUzq1vmvu7uMamdRs2whQTUWNAbWxOSm+hShk1iraYkb"
+              "iv": "Bs5bEEVd87OStC+v",
+              "tag": "WpZmJjUJEFNDdoyjd5xkCA==",
+              "data": "JJusKRS1ocOEbu4B8Pc2DniVAj04AYSiHER4a8/yo3MOclghx2R4veG65gGJcE6OROJ8"
             },
             "name": "comfly",
             "type": "third-party",
@@ -2261,19 +2261,19 @@
             "id": "provider_1773648981862_kx2ow0rt7",
             "name": "Google API",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981862,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981862
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "0lqK1bSCYzNnlIsN",
-              "tag": "n2L8M3MDszry5wDl6Uzchw==",
-              "data": "w3oM7keO7xIuYZG1NGgSOG3bOQ0A/6RZL2aoQpp1kQOz2mAyOqFu"
+              "iv": "yRLHiAprnEJjzhDL",
+              "tag": "lgDIEj4ehaUSlsHL6fUbnQ==",
+              "data": "wXrXvaNYF0+LTIaw95og"
             },
             "format": "gemini",
             "models": [
@@ -2305,19 +2305,19 @@
             "id": "provider_1773648981864_nxqd7vam1",
             "name": "反代",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981864,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981864
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "eRsfclzpC7YKFSt7",
-              "tag": "mLEzm4XgWlBvP+DIEY6bVg==",
-              "data": "5k1ReXI7f71U+zQM/XBEe7+/gBozYIsQKwyVXCZmFaGSPek="
+              "iv": "cWC12FxmSRUkGUk7",
+              "tag": "jnKApBu9+rz0xkKSamUL/w==",
+              "data": "nRYxBdjgudBXG/X8lv87"
             },
             "format": "auto",
             "models": [
@@ -2384,19 +2384,19 @@
             "id": "provider_1773648981866_nkdln61dl",
             "name": "suxi",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981866,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981866
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "fgiUeghDI3MVGHZB",
-              "tag": "DOykYJAisf+nKGduKT+JiA==",
-              "data": "tWe6460VWaMgG/TTa2ERNRF7n2SqpHo7/eOyE1lkjyoZhcCQHgDD4hEn66DxMsUnc32M"
+              "iv": "2gXejZHqg9xJeJ/v",
+              "tag": "KxX024UDWHAuFxY9Qjr4ug==",
+              "data": "ivW1HXxHpEBBioWCcy97"
             },
             "format": "auto",
             "models": [
@@ -2524,10 +2524,10 @@
             "providerColor": "#3B82F6",
             "customCostMode": "unlimited",
             "activitySummary": {
-              "updatedAt": 1773839325735,
-              "lastAmount": 0,
+              "lastLatencyMs": 1913,
               "lastTokens": 0,
-              "lastLatencyMs": 1913
+              "lastAmount": 0,
+              "updatedAt": 1773839325735
             },
             "customCostValue": 0,
             "pricingSnapshot": {
@@ -7008,19 +7008,19 @@
             "id": "provider_1773648981867_v9nhklscg",
             "name": "gemini中转商",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981867,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981867
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "cNyhdEIVvum6YLiq",
-              "tag": "yjhLVgmRpGoXiUf8EKx5tA==",
-              "data": "PrDoYMR9bT8mWR56Lc1iuoasjBNbW2uZkTGkL46TNloHF+lYBCRSBeWHUy+plwiiQClt"
+              "iv": "VL1icBIiiqx2NIOy",
+              "tag": "8lbvDKYYwwYqhs1mSGkfYA==",
+              "data": "MV3p611+sUoi/s4nMeTa"
             },
             "format": "auto",
             "models": [
@@ -7052,19 +7052,19 @@
             "name": "12ai",
             "group": "default",
             "usage": {
-              "dailyCost": 1.4299999999999997,
-              "lastReset": 1773849715239,
+              "totalTokens": 0,
               "totalCost": 1.8199999999999994,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 1.4299999999999997,
+              "lastReset": 1773849715239
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "Xoa1f97Rcvc2V/wM",
-              "tag": "D0zdhzwbEMq7Zkv69kkWvw==",
-              "data": "4cGXJaoEt+nbgag3g5zMLvM3tZajil80LCAWakRvR6Jo3q/zP5vnEp0H55aRYuVQWOUH"
+              "iv": "Yi8YRFrc62tPEot5",
+              "tag": "gyxIYWvMArBncZ8s73UJgw==",
+              "data": "wpaNQccQAq95sp1SxOF1"
             },
             "format": "auto",
             "models": [
@@ -7126,10 +7126,10 @@
             "providerColor": "#3B82F6",
             "customCostMode": "unlimited",
             "activitySummary": {
-              "updatedAt": 1773839328908,
-              "lastAmount": 0.39,
+              "lastLatencyMs": 1375,
               "lastTokens": 0,
-              "lastLatencyMs": 1375
+              "lastAmount": 0.39,
+              "updatedAt": 1773839328908
             },
             "customCostValue": 0,
             "pricingSnapshot": {
@@ -10329,19 +10329,19 @@
             "id": "provider_1773648981870_dv5c0sauo",
             "name": "贞贞",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981870,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981870
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "WmFawx9b1ghpk/kD",
-              "tag": "5UXg2fWJdWgvo/MQvuwgFw==",
-              "data": "eYlBzG3A5M+v3PTN6RlBkdMuiZ8AVQojBJp0CEUBGQ3Y6oAAyTM/9R9xgvTE/ZyV50qR"
+              "iv": "MleMf1rb3QAJOea0",
+              "tag": "Dv7spm0uTrPR949DHRoBFg==",
+              "data": "/ILwS05ga9D/y6hmzBep"
             },
             "format": "auto",
             "models": [
@@ -11224,10 +11224,10 @@
             "providerColor": "#3B82F6",
             "customCostMode": "unlimited",
             "activitySummary": {
-              "updatedAt": 1773839571569,
-              "lastAmount": 0,
+              "lastLatencyMs": 553,
               "lastTokens": 0,
-              "lastLatencyMs": 553
+              "lastAmount": 0,
+              "updatedAt": 1773839571569
             },
             "customCostValue": 0,
             "compatibilityMode": "standard"
@@ -11236,19 +11236,19 @@
             "id": "provider_1773648981871_n2kbrbsfl",
             "name": "comfly",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1773648981871,
+              "totalTokens": 0,
               "totalCost": 0,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1773648981871
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "6IwZw93UQp+Nz1m7",
-              "tag": "SVWC7mbwM8ZpkAMXd75Hng==",
-              "data": "NuT3j4aa+ai0bRBSnXm+JVi8F9fFhiV1bZGGDlUKcmgZ5AvTC/XmyeQRX2vRGP9tsL5i"
+              "iv": "GPOZGX0uK0VMgne6",
+              "tag": "RB+YfuaHI8Mm25k9Pc1rZg==",
+              "data": "748CRsCtaqS119heFEFb"
             },
             "format": "auto",
             "models": [
@@ -12139,19 +12139,19 @@
             "id": "provider_1773804818010_d394tx381",
             "name": "柏拉图",
             "usage": {
-              "dailyCost": 0,
-              "lastReset": 1774357005922,
+              "totalTokens": 0,
               "totalCost": 0.5333360000000001,
               "dailyTokens": 0,
-              "totalTokens": 0
+              "dailyCost": 0,
+              "lastReset": 1774357005922
             },
             "apiKey": {
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "oq1fr/IfeILe7FZt",
-              "tag": "Xgl8r5gGY9DG7HCnU4UIiw==",
-              "data": "iNf48ZRDzLWI0J+a78ATvlO4JSkeyjN59c3clmwE5qEpAtjf/LKKr3MIrhSWzkiVfzvc"
+              "iv": "SDpnJ5ZNtdhNhFZm",
+              "tag": "6e7i9b/35B/6JyPLe5FTBA==",
+              "data": "qNp9xIARx42MLM8W4Arm"
             },
             "format": "auto",
             "models": [
@@ -13285,10 +13285,10 @@
             "providerColor": "#F59E0B",
             "customCostMode": "amount",
             "activitySummary": {
-              "updatedAt": 1773839300038,
-              "lastAmount": 0,
+              "lastLatencyMs": 538,
               "lastTokens": 0,
-              "lastLatencyMs": 538
+              "lastAmount": 0,
+              "updatedAt": 1773839300038
             },
             "customCostValue": 1,
             "pricingSnapshot": {
@@ -96468,9 +96468,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "bq3Yyzh5+EuREk3o",
-              "tag": "yvtcopC7V7IcTlI+g6gaQQ==",
-              "data": "GOF6nF4Jf71B0D4ixe8XVcGPobhUvGIHkvIeRpFICy4lZdBoQRpX"
+              "iv": "qjDarFxC0T249H4G",
+              "tag": "2hVtQuMwVBQtp5P16JD1qw==",
+              "data": "yhqhwAWVvgqLQbR59bZipydEQ3TuJqB7dB3bJuPhH/xhg40Ju2zP"
             },
             "name": "Google API",
             "type": "official",
@@ -96519,9 +96519,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "Mjv9FwWDt4PDOjql",
-              "tag": "4v4oqhVc7GyOn1/oiVoJBA==",
-              "data": "6fMIjtP8ZtX57KYQhAlcs1hBYFSMB/3FCnkKNL63e4yXjA8="
+              "iv": "B4G21UQspuOiI71G",
+              "tag": "0zbzWtcukqF/8h0aQqi2jQ==",
+              "data": "Vs/t+4roBFxYj8s7CDckZB9UAzkVMU6TpM0z4m6CGd3XyOI="
             },
             "name": "反代",
             "type": "third-party",
@@ -96608,9 +96608,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "cry78njSy7jNyWcC",
-              "tag": "wv5ZFm+eaP2ihKlG6zXc4A==",
-              "data": "ISdSn1b4KqghnKn3t62x/6GtgBjNL4E0J278ibngeNtJKXeKhsQ8dnUnqSCuzA9viApi"
+              "iv": "AwTg58WOY9Wl2y09",
+              "tag": "JsyHGS5m9zSSIdop5Kde9Q==",
+              "data": "Y/uYoaBWlAJmAT2cPSoKR+T9elPwgI73GhsofnR1yhYIx5dntCNf/23ZHHHaqNP8wxna"
             },
             "name": "suxi",
             "type": "third-party",
@@ -96758,9 +96758,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "yp+2GTHWdYc6KOep",
-              "tag": "KM4kUVm0MA4RgOKI+MLShw==",
-              "data": "XrEEYLZrddvKmGNWJY/i2UcVOk3Vg/Ry+tn4IYhMNu4qv8trWR83TxwWb4pwB42f+YVJ"
+              "iv": "cfmnB2s9kw5hPMfK",
+              "tag": "VtgaxU+/euOGe3DcaKVhug==",
+              "data": "6S5Y7RX48U0q5rjf83gur0qBpSvPWQuZfsNREdW3UoeCJeNhKQA513qxNJ6hsuOLhGPh"
             },
             "name": "gemini中转商",
             "type": "third-party",
@@ -96811,9 +96811,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "EW+qTwNdp4YLhQDG",
-              "tag": "gK/qTDbe1EOTOekIc/cwQg==",
-              "data": "U+hmqgx/VPq5z2WezRYm7EAhw804obYJMQRNmnDkdOMtpR6+VfpwNLYw3Qo4DWNzQ3v6"
+              "iv": "TTu6jJJVPlC7UP2U",
+              "tag": "gh7NkqOh1qwVTuThw6+v6g==",
+              "data": "qigV8amtZB1rQ4r7Ouh1o+69jxWwgBzeSpDv1WkqXQdmbwFoeetL1+R3SPX+8f94vsTz"
             },
             "name": "12ai",
             "type": "third-party",
@@ -96897,9 +96897,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "EtTRZNFDSCvUo+K5",
-              "tag": "G33f6ZJaZ/2EczmQr4zf8g==",
-              "data": "g0c4kBN5SOVGsBIKo1VptrFgLJuqGYSUcBYBrw3Pdo9dncNxGDy4QrCROURwk63Gybjo"
+              "iv": "sPjUtIEo7QlquxsP",
+              "tag": "5jlyh7/YUMcGZfc35PvhLQ==",
+              "data": "Jr2voa4CWJiIVZusmCDMhTjVkd8Yr1/Uc2qOafGzeI2N7j8y+pvh1DJqrZMBgpQHr9ub"
             },
             "name": "贞贞",
             "type": "third-party",
@@ -97803,9 +97803,9 @@
               "__kkUserApiSecret": true,
               "alg": "aes-256-gcm",
               "v": 1,
-              "iv": "OSBoSC6UHCCdK3bl",
-              "tag": "cyAr0fy98Sz0F5nEXNNPKg==",
-              "data": "ZtOAfTjY4clqdyGk1sNco5e+ShP+QtU9EBSnVWmFOI9ZFiSeppqD+JlMCe29b7YY+fNV"
+              "iv": "pU2+wO8c+dFBp3xO",
+              "tag": "0/1VgUhBNFT6UxixTzv5Iw==",
+              "data": "hU1dlNQ7po0NxPL8QHSWefjg7EnQv+PZ43uBLqtDAfBu9mIwBVpv1hknjoA24e5JUZsY"
             },
             "name": "comfly",
             "type": "third-party",

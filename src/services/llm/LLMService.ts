@@ -23,6 +23,7 @@ import {
     callSecureSystemProxyAudio,
     checkLocalUserRouteProxyTaskStatus,
     checkSecureSystemProxyTaskStatus,
+    isLocalUserRouteProxyFallbackError,
     isSecureProxyGuestModeError,
     isSecureProxySessionReauthError,
 } from '../model/secureModelProxy';

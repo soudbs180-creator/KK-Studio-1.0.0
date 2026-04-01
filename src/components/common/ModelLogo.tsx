@@ -5,6 +5,7 @@ import higgsfieldIcon from '../../assets/model-logos/higgsfield.png';
 import imagineArtIcon from '../../assets/model-logos/imagineart.png';
 import reveIcon from '../../assets/model-logos/reve.svg';
 import riffusionProducerIcon from '../../assets/model-logos/riffusion-producer.png';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ModelLogoProps {
     modelId: string;
@@ -178,6 +179,7 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
     active = true,
     className = '',
 }) => {
+    const { isDarkMode } = useTheme();
     const [variant, setVariant] = useState<IconVariant>('color');
     const [hasError, setHasError] = useState(false);
     const isNanoBanana = useMemo(() => isNanoBananaSeries(modelId, provider, modelName), [modelId, modelName, provider]);
@@ -193,7 +195,8 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
     const iconUrl = iconId
         ? getLobeIconCDN(iconId, {
             cdn: 'aliyun',
-            format: 'svg',
+            format: variant === 'mono' ? 'png' : 'svg',
+            isDarkMode,
             type: variant,
         })
         : null;

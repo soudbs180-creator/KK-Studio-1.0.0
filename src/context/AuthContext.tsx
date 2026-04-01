@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const latestSessionRef = useRef<Session | null>(null);
     const latestUserRef = useRef<User | null>(null);
     const latestTempUserSessionRef = useRef<TempUserSession | null>(null);
-    const expectedSessionClearReasonRef = useRef<'user-signout' | 'temp-login' | null>(null);
+    const expectedSessionClearReasonRef = useRef<'user-signout' | 'temp-login' | 'session-invalid' | null>(null);
     const authRecoveryPromiseRef = useRef<Promise<void> | null>(null);
 
     useEffect(() => {
@@ -104,6 +104,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
         };
 
+        const invalidateStaleAuthState = async (reason: string) => {
+            if (!active) return;
+
+            console.warn('[AuthContext] Clearing stale auth state:', reason);
+            expectedSessionClearReasonRef.current = 'session-invalid';
+
+            try {
+                await supabase.auth.signOut({ scope: 'local' });
+            } catch (error) {
+                console.warn('[AuthContext] Failed to clear local Supabase session while invalidating auth state:', error);
+            }
+
+            settleAuthState(null);
+            expectedSessionClearReasonRef.current = null;
+        };
+
         const recoverUnexpectedSessionLoss = (reason: string) => {
             if (!active || authRecoveryPromiseRef.current) {
                 return;
@@ -143,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     authRecoveryPromiseRef.current = null;
                 }
 
-                preserveCurrentAuthState(`${reason} (recovery unavailable)`);
+                await invalidateStaleAuthState(`${reason} (recovery unavailable)`);
             })();
         };
 
