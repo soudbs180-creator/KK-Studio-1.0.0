@@ -41,7 +41,7 @@ test('admin credit model edge function uses service-role auth and keeps active-l
   assert.doesNotMatch(source, /return\s+\{[^}]*api_keys[^}]*\}\s*;/s);
 });
 
-test('frontend services route admin credit providers through the shared API client', () => {
+test('frontend services route admin credit providers and active models through typed API clients', () => {
   const providerServiceSource = readSource('src/services/api/adminCreditProviderService.ts');
   const adminModelServiceSource = readSource('src/services/model/adminModelService.ts');
 
@@ -52,8 +52,10 @@ test('frontend services route admin credit providers through the shared API clie
   assert.doesNotMatch(providerServiceSource, /listAdminCreditProvidersViaEdgeFunction/);
   assert.doesNotMatch(providerServiceSource, /saveAdminCreditProviderViaEdgeFunction/);
   assert.doesNotMatch(providerServiceSource, /deleteAdminCreditProviderViaEdgeFunction/);
-  assert.match(adminModelServiceSource, /listActiveCreditModelsViaEdgeFunction/);
-  assert.match(adminModelServiceSource, /listActiveCreditModelsViaSupabase/);
+  assert.match(adminModelServiceSource, /legacyWebApiClient\.listActiveCreditModels\(\)/);
+  assert.doesNotMatch(adminModelServiceSource, /listActiveCreditModelsViaEdgeFunction/);
+  assert.doesNotMatch(adminModelServiceSource, /listActiveCreditModelsViaSupabase/);
+  assert.doesNotMatch(adminModelServiceSource, /shouldUseLegacyWebApiFallback/);
 });
 
 test('latest public active-model migration keeps base_url and api_keys sanitized', () => {

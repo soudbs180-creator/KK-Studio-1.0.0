@@ -2,20 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_SESSION_CHANGE_EVENT } from '../services/api/adminSession';
-import {
-  legacyWebApiClient,
-  shouldUseLegacyWebApiFallback,
-} from '../services/api/kkApiClient';
-import {
-  getKkApiServerHealth,
-  type KkApiServerHealth,
-} from '../services/api/kkApiServerHealth';
+import { legacyWebApiClient } from '../services/api/kkApiClient';
 import {
   type AppAccountRole,
   isAdminAccountRole,
   normalizeAppAccountRole,
-  resolveSupabaseAdminAccess,
-  type SupabaseAdminAccessState,
 } from '../services/admin/supabaseAdminFallbackService';
 
 type UseAdminRoleResult = {
@@ -47,28 +38,6 @@ const DEFAULT_ADMIN_ROLE_STATE: ResolvedAdminRoleState = {
 
 function buildAdminRequestOptions() {
   return {};
-}
-
-function shouldBypassLocalAdminAccess(health: KkApiServerHealth | null | undefined): boolean {
-  if (!health || !health.reachable || !health.verified) {
-    return true;
-  }
-
-  if (!health.config.hasServiceRoleKey) {
-    return true;
-  }
-
-  return health.repositories.authData !== 'supabase' || health.repositories.adminConsole !== 'supabase';
-}
-
-function toAdminRoleStateFromSupabase(access: SupabaseAdminAccessState): ResolvedAdminRoleState {
-  return {
-    accountRole: access.role,
-    isAdmin: access.isAdmin,
-    adminSessionActive: access.adminSessionActive,
-    adminSessionExpiresAt: access.adminSessionExpiresAt,
-    requiresAdminPasswordChange: access.requiresPasswordChange,
-  };
 }
 
 function toAdminRoleStateFromApi(response: {
@@ -154,86 +123,51 @@ export const useAdminRole = (): UseAdminRoleResult => {
       setCheckingAdmin(true);
 
       try {
-        const canUseLegacyAdminAccess = shouldUseLegacyWebApiFallback();
-        const [health, fallbackAccess] = await Promise.all([
-          canUseLegacyAdminAccess
-            ? getKkApiServerHealth().catch(() => null)
-            : Promise.resolve(null),
-          resolveSupabaseAdminAccess(user).catch(() => null),
-        ]);
+        const response = await legacyWebApiClient
+          .getAdminAccess(buildAdminRequestOptions())
+          .catch(() => undefined);
 
         if (!alive) {
           return;
         }
 
-        const bypassLocalAdminAccess = !canUseLegacyAdminAccess || shouldBypassLocalAdminAccess(health);
+        if (response?.success) {
+          const resolvedState = toAdminRoleStateFromApi(response.data);
+          applyResolvedState(resolvedState);
+          lastResolvedStateRef.current = {
+            userId: user.id,
+            state: resolvedState,
+          };
+          return;
+        }
+
         const previousState =
           lastResolvedStateRef.current?.userId === user.id
             ? lastResolvedStateRef.current.state
             : null;
 
-        let apiState: ResolvedAdminRoleState | null = null;
-        let apiResponseSucceeded = false;
-
-        if (!bypassLocalAdminAccess) {
-          const response = await legacyWebApiClient.getAdminAccess(
-            buildAdminRequestOptions(),
-          ).catch(() => undefined);
-
-          if (response?.success) {
-            apiResponseSucceeded = true;
-            apiState = toAdminRoleStateFromApi(response.data);
-          }
-        }
-
-        const resolvedState = fallbackAccess
-          ? toAdminRoleStateFromSupabase(fallbackAccess)
-          : apiState;
-
-        if (resolvedState) {
-          const mergedState =
-            resolvedState.isAdmin && apiState && !bypassLocalAdminAccess
-              ? {
-                  accountRole: resolvedState.accountRole,
-                  isAdmin: resolvedState.isAdmin,
-                  adminSessionActive:
-                    apiState.adminSessionActive || resolvedState.adminSessionActive,
-                  adminSessionExpiresAt:
-                    apiState.adminSessionActive
-                      ? apiState.adminSessionExpiresAt
-                      : resolvedState.adminSessionExpiresAt,
-                  requiresAdminPasswordChange:
-                    apiState.requiresAdminPasswordChange || resolvedState.requiresAdminPasswordChange,
-                }
-              : resolvedState;
-
-          applyResolvedState(mergedState);
-          lastResolvedStateRef.current = {
-            userId: user.id,
-            state: mergedState,
-          };
-          return;
-        }
-
-        if (previousState && previousState.isAdmin && (!health || bypassLocalAdminAccess || !apiResponseSucceeded)) {
+        if (previousState?.isAdmin) {
           applyResolvedState(previousState);
           return;
         }
 
         applyResolvedState(DEFAULT_ADMIN_ROLE_STATE);
       } catch {
-        if (alive) {
-          const previousState =
-            lastResolvedStateRef.current?.userId === user.id
-              ? lastResolvedStateRef.current.state
-              : null;
-
-          if (previousState?.isAdmin) {
-            applyResolvedState(previousState);
-          } else {
-            applyResolvedState(DEFAULT_ADMIN_ROLE_STATE);
-          }
+        if (!alive) {
+          return;
         }
+
+        const previousState =
+          lastResolvedStateRef.current?.userId === user.id
+            ? lastResolvedStateRef.current.state
+            : null;
+
+        if (previousState?.isAdmin) {
+          applyResolvedState(previousState);
+          return;
+        }
+
+        applyResolvedState(DEFAULT_ADMIN_ROLE_STATE);
       } finally {
         if (alive) {
           setCheckingAdmin(false);

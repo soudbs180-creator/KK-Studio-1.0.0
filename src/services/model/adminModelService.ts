@@ -1,8 +1,5 @@
-﻿import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
+﻿import { legacyWebApiClient } from '../api/kkApiClient';
 
-import { listActiveCreditModelsViaEdgeFunction } from '../admin/adminCreditModelsEdgeService';
-import { listActiveCreditModelsViaSupabase } from '../admin/supabaseAdminFallbackService';
-import { supabase } from '../../lib/supabase';
 
 import {
   type AdminModelQualityPricing,
@@ -123,7 +120,7 @@ type ResolvedAdminModelRoute = {
 };
 
 class AdminModelService {
-  private static readonly BROADCAST_CHANNEL = 'public:admin-model-catalog';
+  private static readonly BROADCAST_CHANNEL = 'kk-admin-model-catalog';
   private static readonly BROADCAST_EVENT = 'credit-models-updated';
   private providers: AdminProvider[] = [];
   private models: AdminModelConfig[] = [];
@@ -133,7 +130,7 @@ class AdminModelService {
   private modelRefreshHandler: (() => void) | null = null;
   private autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private autoRefreshInitialized = false;
-  private broadcastChannel: ReturnType<typeof supabase.channel> | null = null;
+  private broadcastChannel: BroadcastChannel | null = null;
 
   private static readonly LOAD_RETRY_INTERVAL_MS = 15000;
   private static readonly AUTO_REFRESH_INTERVAL_MS = 10000;
@@ -145,24 +142,27 @@ class AdminModelService {
   }
 
   private initializeBroadcastRefresh(): void {
-    if (this.broadcastChannel || typeof window === 'undefined') {
+    if (
+      this.broadcastChannel
+      || typeof window === 'undefined'
+      || typeof window.BroadcastChannel === 'undefined'
+    ) {
       return;
     }
 
-    this.broadcastChannel = supabase
-      .channel(AdminModelService.BROADCAST_CHANNEL, {
-        config: {
-          broadcast: {
-            self: false,
-          },
-        },
-      })
-      .on('broadcast', { event: AdminModelService.BROADCAST_EVENT }, () => {
-        void this.forceLoadAdminModels().catch((error) => {
-          console.warn('[AdminModelService] Broadcast refresh failed:', error);
-        });
-      })
-      .subscribe();
+    const channel = new window.BroadcastChannel(AdminModelService.BROADCAST_CHANNEL);
+    channel.addEventListener('message', (event) => {
+      const payload = event.data as { event?: string } | null;
+      if (payload?.event !== AdminModelService.BROADCAST_EVENT) {
+        return;
+      }
+
+      void this.forceLoadAdminModels().catch((error) => {
+        console.warn('[AdminModelService] Broadcast refresh failed:', error);
+      });
+    });
+
+    this.broadcastChannel = channel;
   }
 
   private initializeSafeAutoRefresh(): void {
@@ -210,64 +210,6 @@ class AdminModelService {
     });
 
     reschedule(AdminModelService.AUTO_REFRESH_INTERVAL_MS);
-  }
-
-  private getErrorMessage(error: unknown, fallback: string): string {
-    if (typeof error === 'object' && error && 'message' in error) {
-      const message = String((error as { message?: unknown }).message || '').trim();
-      if (message) {
-        return message;
-      }
-    }
-
-    return fallback;
-  }
-
-  private mapActiveProviderRows(
-    grouped: Array<{
-      provider_id?: string | null;
-      provider_name?: string | null;
-      models?: Array<{
-        id?: string | null;
-        model_id?: string | null;
-        display_name?: string | null;
-        description?: string | null;
-        endpoint_type?: string | null;
-        credit_cost?: number | null;
-        priority?: number | null;
-        weight?: number | null;
-        call_count?: number | null;
-        color?: string | null;
-        color_secondary?: string | null;
-        text_color?: string | null;
-        advanced_enabled?: boolean | null;
-        mix_with_same_model?: boolean | null;
-        quality_pricing?: Record<string, any> | null;
-      }> | null;
-    }>
-  ): FlatModelRow[] {
-    return grouped.flatMap((provider) =>
-      (provider.models || []).map((model) => ({
-        id: model.id ?? undefined,
-        provider_id: provider.provider_id ?? undefined,
-        provider_name: provider.provider_name ?? undefined,
-        model_id: model.model_id ?? undefined,
-        display_name: model.display_name ?? undefined,
-        description: model.description ?? undefined,
-        color: model.color ?? undefined,
-        color_secondary: model.color_secondary ?? undefined,
-        text_color: model.text_color ?? undefined,
-        endpoint_type: model.endpoint_type ?? undefined,
-        credit_cost: model.credit_cost ?? undefined,
-        priority: model.priority ?? undefined,
-        weight: model.weight ?? undefined,
-        call_count: model.call_count ?? undefined,
-        is_active: true,
-        advanced_enabled: model.advanced_enabled ?? undefined,
-        mix_with_same_model: model.mix_with_same_model ?? undefined,
-        quality_pricing: model.quality_pricing ?? undefined,
-      }))
-    );
   }
 
   private mapLegacyProviderRows(
@@ -336,44 +278,13 @@ class AdminModelService {
     return this.loadAdminModels(true);
   }
 
-  private async readFromRpc(): Promise<FlatModelRow[]> {
-    try {
-      const edgeRows = this.mapActiveProviderRows(await listActiveCreditModelsViaEdgeFunction());
-      if (edgeRows.length > 0) {
-        return edgeRows;
-      }
-    } catch (edgeError) {
-      console.warn('[AdminModelService] Edge function active-model fetch failed, trying Supabase RPC:', edgeError);
+  private async readFromApi(): Promise<FlatModelRow[]> {
+    const response = await legacyWebApiClient.listActiveCreditModels();
+    if (!response.success) {
+      throw new Error(response.error?.message || 'Failed to load active credit models.');
     }
 
-    try {
-      const supabaseRows = this.mapActiveProviderRows(await listActiveCreditModelsViaSupabase());
-      if (supabaseRows.length > 0) {
-        return supabaseRows;
-      }
-    } catch (supabaseError) {
-      if (!shouldUseLegacyWebApiFallback()) {
-        console.warn(
-          '[AdminModelService] Supabase active-model fetch failed and Web API fallback is disabled for this runtime:',
-          supabaseError,
-        );
-        throw supabaseError;
-      }
-
-      console.warn('[AdminModelService] Supabase active-model fetch failed, trying Web API fallback:', supabaseError);
-
-      const response = await legacyWebApiClient.listActiveCreditModels();
-      if (!response.success) {
-        throw new Error(
-          response.error?.message
-            || this.getErrorMessage(supabaseError, 'Failed to load active credit models.')
-        );
-      }
-
-      return this.mapLegacyProviderRows(response.data.items || []);
-    }
-
-    return [];
+    return this.mapLegacyProviderRows(response.data.items || []);
   }
 
   private normalizeHexColor(input?: string | null, fallback = '#3B82F6'): string {
@@ -404,7 +315,7 @@ class AdminModelService {
   private async doLoad(): Promise<void> {
     this.loadingPromise = (async () => {
       try {
-        const rows: FlatModelRow[] = await this.readFromRpc();
+        const rows: FlatModelRow[] = await this.readFromApi();
 
         const grouped = new Map<string, AdminProvider>();
 
@@ -790,19 +701,20 @@ class AdminModelService {
       return;
     }
 
+    await this.forceLoadAdminModels().catch((error) => {
+      console.warn('[AdminModelService] Failed to refresh model catalog before broadcasting update:', error);
+    });
+
     this.initializeBroadcastRefresh();
     if (!this.broadcastChannel) {
       return;
     }
 
     try {
-      await this.broadcastChannel.send({
-        type: 'broadcast',
+      this.broadcastChannel.postMessage({
         event: AdminModelService.BROADCAST_EVENT,
-        payload: {
-          reason,
-          ts: Date.now(),
-        },
+        reason,
+        ts: Date.now(),
       });
     } catch (error) {
       console.warn('[AdminModelService] Failed to broadcast model catalog update:', error);

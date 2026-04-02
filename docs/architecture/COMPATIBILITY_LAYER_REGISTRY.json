@@ -2,21 +2,6 @@
   "generatedFromPlan": "KK Studio 1.4.0 module isolation and linkage safety plan",
   "entries": [
     {
-      "path": "src/services/admin/supabaseAdminFallbackService.ts",
-      "role": "compatibility-layer",
-      "currentPurpose": "Fallback bridge for legacy admin flows while migrated admin-console routes remain incomplete.",
-      "upstreamCanonicalSource": "apps/api/src/modules/admin-console",
-      "downstreamDependents": [
-        "src/components/settings/AdminSystem.tsx",
-        "src/components/settings/ApiSettingsView.tsx"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/admin-console-routes.test.ts"
-      ],
-      "removalCondition": "Delete once all admin settings flows use typed admin-console API contracts without Supabase fallback reads."
-    },
-    {
       "path": "src/services/billing/costSyncBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Translates legacy frontend billing refresh triggers into the migrated billing/runtime model.",

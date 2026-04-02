@@ -46,30 +46,6 @@
   ],
   "frontendSupabaseAccess": [
     {
-      "path": "src/services/admin/supabaseAdminFallbackService.ts",
-      "tables": [
-        "profiles"
-      ],
-      "procedures": [
-        "authenticate_admin",
-        "admin_change_password",
-        "admin_recharge_credits_by_identity",
-        "admin_set_user_role_by_identity",
-        "get_admin_credit_models_full",
-        "get_active_credit_models",
-        "save_credit_provider",
-        "delete_credit_provider"
-      ],
-      "buckets": [],
-      "reason": "Admin settings still depend on the Supabase fallback bridge while admin-console routes finish migrating.",
-      "canonicalSource": "apps/api/src/modules/admin-console",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/admin-console-routes.test.ts"
-      ],
-      "removalCondition": "Delete once admin settings flows use only typed admin-console routes."
-    },
-    {
       "path": "src/services/api/supabaseUserApiCloudStorage.ts",
       "tables": [
         "profiles"

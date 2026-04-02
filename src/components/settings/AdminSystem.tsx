@@ -21,11 +21,7 @@ import {
   loadStoredAdminSystemTab,
   saveStoredAdminSystemTab,
 } from '../../services/admin/adminConsoleState';
-import { verifyAdminPasswordViaSupabase } from '../../services/admin/supabaseAdminFallbackService';
-import {
-  legacyWebApiClient,
-  shouldUseLegacyWebApiFallback,
-} from '../../services/api/kkApiClient';
+import { legacyWebApiClient } from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
 import { SettingsActionButton, SettingsBadge, SettingsViewShell } from './SettingsScaffold';
 import AdminConsoleSettings from './AdminConsoleSettings';
@@ -152,7 +148,6 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
-  const canUseLegacyAdminApi = shouldUseLegacyWebApiFallback();
 
   const tabOptions = useMemo(() => getTabOptions(pick), [pick]);
   const userLabel = user?.email || user?.phone || user?.id || pick('未登录', 'Not signed in');
@@ -220,35 +215,21 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
 
     setVerifying(true);
     try {
-      let verifiedSession: {
-        adminSessionToken: string;
-        adminSessionExpiresAt: string;
-      };
+      const response = await legacyWebApiClient.verifyAdminPassword(
+        { password },
+        buildAdminRequestOptions(buildAdminRequestId('admin-unlock', user.id))
+      );
 
-      if (canUseLegacyAdminApi) {
-        try {
-          const response = await legacyWebApiClient.verifyAdminPassword(
-          { password },
-          buildAdminRequestOptions(buildAdminRequestId('admin-unlock', user.id))
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || pick('管理员密码错误。', 'The admin password is incorrect.')
         );
-
-        if (!response.success) {
-          throw new Error(
-            response.error.message || pick('管理员密码错误。', 'The admin password is incorrect.')
-          );
-        }
-
-          verifiedSession = {
-            adminSessionToken: response.data.adminSessionToken,
-            adminSessionExpiresAt: response.data.adminSessionExpiresAt,
-          };
-        } catch {
-          verifiedSession = await verifyAdminPasswordViaSupabase(user, password);
-        }
-      } else {
-        verifiedSession = await verifyAdminPasswordViaSupabase(user, password);
       }
 
+      const verifiedSession = {
+        adminSessionToken: response.data.adminSessionToken,
+        adminSessionExpiresAt: response.data.adminSessionExpiresAt,
+      };
       setStoredAdminSession(
         verifiedSession.adminSessionToken,
         verifiedSession.adminSessionExpiresAt,

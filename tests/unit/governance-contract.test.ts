@@ -61,7 +61,6 @@ test("compatibility layer registry tracks the required migration files", () => {
   };
 
   const requiredEntries = [
-    "src/services/admin/supabaseAdminFallbackService.ts",
     "src/services/billing/costSyncBridge.ts",
     "src/services/llm/syncImageBridge.ts",
     "src/services/model/modelPricingOverrideBridge.ts",
@@ -132,7 +131,6 @@ test("migration allowlist registry tracks every approved architecture exception 
   }
 
   const requiredFrontendEntries = [
-    "src/services/admin/supabaseAdminFallbackService.ts",
     "src/services/api/supabaseUserApiCloudStorage.ts",
     "src/services/security/apiKeySecureStorage.ts",
   ];

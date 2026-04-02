@@ -9,16 +9,13 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('admin console actions include a Supabase fallback for role grants', () => {
+test('admin console actions use the typed API path for role grants without Supabase fallback', () => {
   const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
   const fallbackSource = readSource('src/services/admin/supabaseAdminFallbackService.ts');
 
-  assert.match(fallbackSource, /export async function setUserRoleViaSupabase\(/);
-  assert.match(fallbackSource, /supabase\.rpc\('admin_set_user_role_by_identity'/);
-  assert.match(adminConsoleSource, /setUserRoleViaSupabase/);
-  assert.match(adminConsoleSource, /await setUserRoleViaSupabase\(normalizedIdentity, 'admin'\);/);
-  assert.doesNotMatch(
-    adminConsoleSource,
-    /The grant-admin action still depends on the local API service-role configuration\./,
-  );
+  assert.match(adminConsoleSource, /legacyWebApiClient\.setUserRole/);
+  assert.doesNotMatch(adminConsoleSource, /setUserRoleViaSupabase/);
+  assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
+  assert.doesNotMatch(fallbackSource, /supabase\.rpc\(/);
+  assert.doesNotMatch(fallbackSource, /setUserRoleViaSupabase/);
 });

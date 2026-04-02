@@ -46,26 +46,28 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.doesNotMatch(tempUserServiceSource, /\.from\('temp_users'\)\s*\.insert\(/);
 });
 
-test('admin UI entrypoints skip legacy Web API probes when runtime fallback is disabled', () => {
+test('admin UI entrypoints use the typed API path directly without Supabase fallback bridges', () => {
   const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
   const adminSystemSource = readSource('src/components/settings/AdminSystem.tsx');
   const adminRoleSource = readSource('src/hooks/useAdminRole.ts');
 
-  assert.match(adminConsoleSource, /const canUseLegacyAdminApi = shouldUseLegacyWebApiFallback\(\);/);
-  assert.match(adminConsoleSource, /if \(canUseLegacyAdminApi\) \{[\s\S]*legacyWebApiClient\.changeAdminPassword/);
-  assert.match(adminConsoleSource, /if \(canUseLegacyAdminApi\) \{[\s\S]*legacyWebApiClient\.adminRechargeCredits/);
-  assert.match(adminConsoleSource, /if \(canUseLegacyAdminApi\) \{[\s\S]*legacyWebApiClient\.setUserRole/);
-  assert.match(adminSystemSource, /const canUseLegacyAdminApi = shouldUseLegacyWebApiFallback\(\);/);
-  assert.match(adminSystemSource, /if \(canUseLegacyAdminApi\) \{[\s\S]*legacyWebApiClient\.verifyAdminPassword/);
-  assert.match(adminRoleSource, /const canUseLegacyAdminAccess = shouldUseLegacyWebApiFallback\(\);/);
-  assert.match(
-    adminRoleSource,
-    /canUseLegacyAdminAccess\s*\?\s*getKkApiServerHealth\(\)\.catch\(\(\) => null\)\s*:\s*Promise\.resolve\(null\)/,
-  );
-  assert.match(
-    adminRoleSource,
-    /const bypassLocalAdminAccess = !canUseLegacyAdminAccess \|\| shouldBypassLocalAdminAccess\(health\);/,
-  );
+  assert.match(adminConsoleSource, /legacyWebApiClient\.changeAdminPassword/);
+  assert.match(adminConsoleSource, /legacyWebApiClient\.adminRechargeCredits/);
+  assert.match(adminConsoleSource, /legacyWebApiClient\.setUserRole/);
+  assert.doesNotMatch(adminConsoleSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(adminConsoleSource, /ViaSupabase/);
+  assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
+
+  assert.match(adminSystemSource, /legacyWebApiClient\.verifyAdminPassword/);
+  assert.doesNotMatch(adminSystemSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(adminSystemSource, /ViaSupabase/);
+  assert.doesNotMatch(adminSystemSource, /supabaseAdminFallbackService/);
+
+  assert.match(adminRoleSource, /legacyWebApiClient/);
+  assert.match(adminRoleSource, /\.getAdminAccess\(buildAdminRequestOptions\(\)\)/);
+  assert.doesNotMatch(adminRoleSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(adminRoleSource, /getKkApiServerHealth/);
+  assert.doesNotMatch(adminRoleSource, /resolveSupabaseAdminAccess/);
 });
 
 test('register form follows the Supabase-hosted auth path instead of the legacy register API', () => {

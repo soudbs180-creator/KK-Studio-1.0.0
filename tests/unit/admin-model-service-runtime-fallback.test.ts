@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('admin model loading only uses the legacy Web API fallback for local or explicitly configured runtimes', () => {
+test('admin model loading uses the typed API directly while exchange rates remain API-only', () => {
   const clientSource = readSource('src/services/api/kkApiClient.ts');
   const serviceSource = readSource('src/services/model/adminModelService.ts');
   const exchangeRateSource = readSource('src/services/billing/creditExchangeRateService.ts');
@@ -19,9 +19,11 @@ test('admin model loading only uses the legacy Web API fallback for local or exp
   assert.match(clientSource, /function isExplicitLegacyWebApiFallbackEnabled\(\): boolean \{/);
   assert.match(clientSource, /if \(runtimeHostname && isLoopbackHostname\(runtimeHostname\)\) \{/);
   assert.match(clientSource, /return Boolean\(configuredBaseUrl\) && isExplicitLegacyWebApiFallbackEnabled\(\);/);
-  assert.match(serviceSource, /shouldUseLegacyWebApiFallback/);
-  assert.match(serviceSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
-  assert.match(serviceSource, /Web API fallback is disabled for this runtime/);
+  assert.match(serviceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(serviceSource, /legacyWebApiClient\.listActiveCreditModels\(\)/);
+  assert.doesNotMatch(serviceSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(serviceSource, /listActiveCreditModelsViaEdgeFunction/);
+  assert.doesNotMatch(serviceSource, /listActiveCreditModelsViaSupabase/);
   assert.match(exchangeRateSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
   assert.match(exchangeRateSource, /legacyWebApiClient\.listCreditExchangeRates\(/);
   assert.match(exchangeRateSource, /legacyWebApiClient\.upsertCreditExchangeRate\(/);
