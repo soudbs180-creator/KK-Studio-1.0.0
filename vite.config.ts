@@ -220,14 +220,6 @@ function resolveManualChunk(id: string): string | undefined {
             return 'lucide-vendor';
         }
 
-        if (normalizedId.includes('/@lobehub/icons/') || normalizedId.includes('/@lobehub/fluent-emoji/')) {
-            return 'lobehub-icons-vendor';
-        }
-
-        if (normalizedId.includes('/@lobehub/ui/')) {
-            return 'lobehub-ui-vendor';
-        }
-
         if (normalizedId.includes('/three/')) {
             return 'three-vendor';
         }

@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getLobeIconCDN } from '@lobehub/icons/es/features/getLobeIconCDN';
 import eigenAiIcon from '../../assets/model-logos/eigen-ai.svg';
 import higgsfieldIcon from '../../assets/model-logos/higgsfield.png';
 import imagineArtIcon from '../../assets/model-logos/imagineart.png';
 import reveIcon from '../../assets/model-logos/reve.svg';
 import riffusionProducerIcon from '../../assets/model-logos/riffusion-producer.png';
 import { useTheme } from '../../context/ThemeContext';
+import { getLobeIconCdnUrl } from '../../utils/lobeIconCdn';
 
 interface ModelLogoProps {
     modelId: string;
@@ -193,7 +193,7 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
     }, [customIconUrl, iconId]);
 
     const iconUrl = iconId
-        ? getLobeIconCDN(iconId, {
+        ? getLobeIconCdnUrl(iconId, {
             cdn: 'aliyun',
             format: variant === 'mono' ? 'png' : 'svg',
             isDarkMode,
