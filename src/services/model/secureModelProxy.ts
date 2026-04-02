@@ -460,7 +460,10 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
-    await invalidateCloudSession(`secure-model-proxy returned 401 during ${feature}`);
+    // A proxy-side 401 does not always mean the local Supabase session is gone.
+    // It can also happen when the Edge Function deployment/config drifts from the
+    // frontend auth project. Keep the local session intact here so users see a
+    // recoverable auth error instead of being force-signed-out mid-generation.
     return buildSessionReauthError(feature, responseBody);
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;
@@ -719,7 +722,9 @@ async function invokeLocalUserRouteProxy(
       result.response?.status === 401
       || isInvalidJwtResponse(result.responseBody, result.payload)
     ) {
-      await invalidateCloudSession(`user-route-proxy returned 401 during ${feature}`);
+      // Preserve the current local session for the same reason as the secure
+      // system proxy path above: a backend-side auth mismatch should not kick
+      // the user back to the login screen while their browser session still exists.
       throw buildSessionReauthError(feature, result.responseBody);
     }
 
