@@ -24,6 +24,7 @@
   },
   "overrides": {
     "hono": "^4.12.7",
+    "path-to-regexp": "8.4.2",
     "undici": "^7.24.0"
   }
 }
