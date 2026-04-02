@@ -20,22 +20,20 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(supabaseUserApiSource, /shouldUseLegacyWebApiFallback/);
   assert.match(supabaseUserApiSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
   assert.match(userApiProfileSource, /const canUseLegacyWebApi = shouldUseLegacyWebApiFallback\(\);/);
-  assert.match(userApiProfileSource, /canUseLegacyWebApi\s*&&\s*\(localEntries.length === 0 \|\| !areEntrySetsEquivalent\(localEntries, cloudEntries\)\)/);
+  assert.match(userApiProfileSource, /if \(canUseLegacyWebApi\) \{\s*try \{\s*localEntries = await loadLocalUserApiEntriesViaApi\(\);/);
   assert.match(userApiProfileSource, /const mergedEntries = mergeUserApiEntrySets\(localEntries, cloudEntries\);/);
   assert.match(userApiProfileSource, /entries: mergedEntries,/);
   assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
-  assert.match(keyManagerSource, /if \(canUseLegacyApi\) \{[\s\S]*legacyWebApiClient\.getKeyManagerCloudState/);
-  assert.match(keyManagerSource, /if \(canUseLegacyApi && apiDensity === 0 && supabaseDensity > 0\) \{/);
-  assert.match(keyManagerSource, /if \(canUseLegacyApi\) \{[\s\S]*legacyWebApiClient\.replaceKeyManagerCloudState/);
-  assert.match(billingContextSource, /import \{ legacyWebApiClient, shouldUseLegacyWebApiFallback \} from '\.\.\/services\/api\/kkApiClient';/);
-  assert.match(
-    billingContextSource,
-    /if \(shouldUseLegacyWebApiFallback\(\)\) \{\s*if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{\s*return fetchBalanceDirectlyFromSupabase\(user\.id\);\s*\}/,
-  );
-  assert.match(
-    billingContextSource,
-    /if \(shouldUseLegacyWebApiFallback\(\)\) \{\s*if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{\s*const rows = await loadCreditTransactionsDirectlyFromSupabase\(user\.id\);/,
-  );
+  assert.match(keyManagerSource, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
+  assert.match(keyManagerSource, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
+  assert.match(billingContextSource, /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
+  assert.match(billingContextSource, /legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /legacyWebApiClient\.listCreditTransactions\(/);
+  assert.match(billingContextSource, /legacyWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /legacyWebApiClient\.refundCredits\(\{/);
+  assert.doesNotMatch(billingContextSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
+  assert.doesNotMatch(billingContextSource, /\.channel\(/);
   assert.doesNotMatch(syncServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
   assert.match(syncServiceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
   assert.match(syncServiceSource, /legacyWebApiClient\.saveWorkspaceLayout/);

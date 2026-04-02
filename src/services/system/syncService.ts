@@ -40,18 +40,29 @@ function normalizeCanvasArray(raw: unknown): Canvas[] {
     .map((item) => ({ ...item }));
 }
 
+function hasLocalOnlyCanvasMedia(canvases: Canvas[]): boolean {
+  return canvases.some((canvas) =>
+    canvas.imageNodes.length > 0
+    || canvas.promptNodes.some((promptNode) => Array.isArray(promptNode.referenceImages) && promptNode.referenceImages.length > 0)
+  );
+}
+
 /**
  * Service to handle cloud sync via the typed KK API layer.
  */
 export const syncService = {
   async saveLayout(canvases: Canvas[]) {
     try {
+      if (hasLocalOnlyCanvasMedia(canvases)) {
+        throw new Error('Cloud workspace sync is disabled for canvases that still depend on local-only media.');
+      }
+
       const response = await legacyWebApiClient.saveWorkspaceLayout({
         canvases: canvases as unknown as Record<string, unknown>[],
       });
 
       if (isUnauthorizedResponse(response)) {
-        return;
+        throw new Error('Authenticated KK API session is required to save workspace layout.');
       }
 
       unwrapOrThrow(response, 'Failed to save workspace layout.');
@@ -79,17 +90,15 @@ export const syncService = {
 
   async uploadImagePair(id: string, blob: Blob): Promise<{ original: string, thumbnail: string }> {
     void id;
-
-    // Cloud image upload stays disabled; keep returning local object URLs for callers.
-    const localUrl = URL.createObjectURL(blob);
-    return { original: localUrl, thumbnail: localUrl };
+    void blob;
+    throw new Error('Cloud image sync is disabled until server-backed asset upload is implemented.');
   },
 
   async cleanupAllCloudImages(): Promise<{ count: number; success: boolean }> {
     try {
       const response = await legacyWebApiClient.cleanupCloudImages();
       if (isUnauthorizedResponse(response)) {
-        return { count: 0, success: true };
+        throw new Error('Authenticated KK API session is required to clean up cloud images.');
       }
 
       const data = unwrapOrThrow(response, 'Failed to cleanup cloud images.');

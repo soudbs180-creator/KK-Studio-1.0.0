@@ -14,10 +14,11 @@ test('keyManager only uses legacy key-manager cloud routes when runtime fallback
 
   assert.match(source, /shouldUseLegacyWebApiFallback/);
   assert.match(source, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
-  assert.match(source, /if \(canUseLegacyApi\) \{/);
-  assert.match(source, /const accessToken = await getPreferredKkApiAccessToken\(\);/);
-  assert.match(source, /legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\)/);
-  assert.match(source, /if \(canUseLegacyApi && apiDensity === 0 && supabaseDensity > 0\) \{/);
-  assert.match(source, /void legacyWebApiClient\.replaceKeyManagerCloudState\(/);
+  assert.match(source, /if \(this\.authIsTempUser\) \{\s*const accessToken = await getPreferredKkApiAccessToken\(\);/);
+  assert.match(source, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
+  assert.match(source, /preferredPayload = await loadUserApisPayloadViaSupabase\(activeUserId\);/);
+  assert.match(source, /if \(!this\.authIsTempUser && shouldUseLegacyWebApiFallback\(\) && !this\.hasHydratedCloudState && preferredDensity > 0\) \{/);
+  assert.match(source, /void getPreferredKkApiAccessToken\(\)\.then\(\(accessToken\) => \(/);
+  assert.match(source, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
   assert.match(source, /const response = await legacyWebApiClient\.replaceKeyManagerCloudState\(/);
 });

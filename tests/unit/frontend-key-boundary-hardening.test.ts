@@ -108,9 +108,10 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
   assert.match(source, /const authenticatedUserId = !isTempUser \? \(user\?\.id \|\| keyManager\.getUserId\(\)\) : null;/);
   assert.match(source, /const isAuthenticated = Boolean\(authenticatedUserId\);/);
-  assert.match(source, /const userApiActionsDisabled = !isAuthenticated;/);
-  assert.match(source, /const providerActionsDisabled = !isAuthenticated;/);
-  assert.match(source, /const userApiEditorDisabled = !isAuthenticated;/);
+  assert.match(source, /const isHydratingRuntimeUserApis = shouldUseReadonlyProfileFallback && !isUserApiPersistenceDegraded;/);
+  assert.match(source, /const userApiActionsDisabled = !isAuthenticated \|\| isHydratingRuntimeUserApis;/);
+  assert.match(source, /const providerActionsDisabled = !isAuthenticated \|\| isHydratingRuntimeUserApis;/);
+  assert.match(source, /const userApiEditorDisabled = !isAuthenticated \|\| isHydratingRuntimeUserApis;/);
   assert.match(source, /const userApiEditorReadOnly = userApiEditorDisabled;/);
   assert.match(source, /const providerEditorReadOnly = providerActionsDisabled;/);
   assert.match(source, /const userApiEditorReadOnlyHelper = userApiEditorReadOnly/);
@@ -121,6 +122,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const ensureUserApiActionsAllowed = \(\): boolean => \{/);
   assert.match(source, /const ensureProviderActionsAllowed = \(\): boolean => \{/);
   assert.match(source, /if \(!isAuthenticated\) \{/);
+  assert.match(source, /if \(isHydratingRuntimeUserApis\) \{/);
   assert.match(source, /const beginCreateOfficial = \(\) => \{\s*if \(!ensureUserApiActionsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /const beginCreateProvider = \(\) => \{\s*if \(!ensureProviderActionsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /const startEditOfficial = \(slot: KeySlot\) => \{\s*if \(!ensureUserApiActionsAllowed\(\)\) \{\s*return;\s*\}/);

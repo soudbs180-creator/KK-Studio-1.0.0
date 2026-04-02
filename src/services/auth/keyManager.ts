@@ -1751,43 +1751,43 @@ export class KeyManager {
             let localApiPayload: unknown = null;
             let localApiError: Error | null = null;
 
-            if (canUseLegacyApi) {
-                const accessToken = await getPreferredKkApiAccessToken();
-                const response = await legacyWebApiClient.replaceKeyManagerCloudState({
-                    version: 2,
-                    slots: state.slots as unknown as Record<string, unknown>[],
-                    providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
-                }, { accessToken });
+            if (this.authIsTempUser) {
+                if (canUseLegacyApi) {
+                    const accessToken = await getPreferredKkApiAccessToken();
+                    const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+                        version: 2,
+                        slots: state.slots as unknown as Record<string, unknown>[],
+                        providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                    }, { accessToken });
 
-                if (response.success) {
-                    localApiPayload = response.data;
-                } else {
-                    const errorCode = response.error?.code || 'UNKNOWN_ERROR';
-                    const errorMessage = response.error?.message || 'Unknown local API sync failure.';
-                    const isNetworkError = errorCode === 'NETWORK_ERROR'
-                        || errorMessage.includes('fetch')
-                        || errorMessage.includes('Network');
-
-                    if (isNetworkError) {
-                        console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21\u672C\u5730 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
-                        this.cloudSyncBackoffUntil = Date.now() + 30_000;
-                        localApiError = new Error(errorMessage);
-                    } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
-                        console.error('[KeyManager] Local API session is missing or expired, postponing sync.');
-                        this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
-                        localApiError = new Error(errorMessage);
+                    if (response.success) {
+                        localApiPayload = response.data;
                     } else {
-                        console.error('[KeyManager] Local API sync failed!', {
-                            code: errorCode,
-                            message: errorMessage,
-                            details: response.error?.details,
-                        });
-                        localApiError = new Error(errorMessage);
+                        const errorCode = response.error?.code || 'UNKNOWN_ERROR';
+                        const errorMessage = response.error?.message || 'Unknown local API sync failure.';
+                        const isNetworkError = errorCode === 'NETWORK_ERROR'
+                            || errorMessage.includes('fetch')
+                            || errorMessage.includes('Network');
+
+                        if (isNetworkError) {
+                            console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21\u672C\u5730 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
+                            this.cloudSyncBackoffUntil = Date.now() + 30_000;
+                            localApiError = new Error(errorMessage);
+                        } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
+                            console.error('[KeyManager] Local API session is missing or expired, postponing sync.');
+                            this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
+                            localApiError = new Error(errorMessage);
+                        } else {
+                            console.error('[KeyManager] Local API sync failed!', {
+                                code: errorCode,
+                                message: errorMessage,
+                                details: response.error?.details,
+                            });
+                            localApiError = new Error(errorMessage);
+                        }
                     }
                 }
-            }
 
-            if (this.authIsTempUser) {
                 if (this.userId !== activeUserId) {
                     return;
                 }
@@ -1807,65 +1807,67 @@ export class KeyManager {
                 return;
             }
 
-            try {
-                const savedPayload = await mergeUserApisPayloadViaSupabase({
-                    slots: state.slots as unknown as Record<string, unknown>[],
-                    providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
-                }, activeUserId);
-
-                if (this.userId !== activeUserId) {
-                    return;
-                }
-
-                this.hasHydratedCloudState = true;
-                this.applyCloudPayload(savedPayload);
-                console.log('[KeyManager] Supabase cloud sync succeeded!');
-                this.cloudSyncBackoffUntil = 0;
-
-                requestCostSync().catch(console.error);
-                return;
-            } catch (supabaseError) {
-                if (!localApiError && isKkApiPersistenceUnavailableError(supabaseError)) {
-                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
-                    if (this.userId === activeUserId && localApiPayload) {
-                        this.hasHydratedCloudState = true;
-                        this.applyCloudPayload(localApiPayload);
-                    }
-                    throw supabaseError;
-                }
-
-                if (!localApiError) {
-                    console.warn('[KeyManager] Cloud sync failed after local save, preserving local key-manager state:', supabaseError);
-                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
-
-                    if (this.userId === activeUserId && localApiPayload) {
-                        this.hasHydratedCloudState = true;
-                        this.applyCloudPayload(localApiPayload);
-                    }
-
-                    throw supabaseError;
-                }
-
-                if (isKkApiPersistenceUnavailableError(supabaseError)) {
-                    this.cloudSyncBackoffUntil = Date.now() + 60_000;
-                }
-            }
+            const savedPayload = await mergeUserApisPayloadViaSupabase({
+                slots: state.slots as unknown as Record<string, unknown>[],
+                providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+            }, activeUserId);
 
             if (this.userId !== activeUserId) {
                 return;
             }
 
-            if (localApiPayload) {
+            this.hasHydratedCloudState = true;
+            this.applyCloudPayload(savedPayload);
+            console.log('[KeyManager] Supabase cloud sync succeeded!');
+            this.cloudSyncBackoffUntil = 0;
+
+            if (canUseLegacyApi) {
+                const accessToken = await getPreferredKkApiAccessToken();
+                const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+                    version: Number((savedPayload as { version?: number } | null | undefined)?.version || 2),
+                    slots: extractKeyManagerCloudSlots(savedPayload) as Record<string, unknown>[],
+                    providers: extractUserApiProvidersFromPayload(savedPayload) as Record<string, unknown>[],
+                }, { accessToken });
+
+                if (response.success) {
+                    localApiPayload = response.data;
+                } else {
+                    const errorCode = response.error?.code || 'UNKNOWN_ERROR';
+                    const errorMessage = response.error?.message || 'Unknown local API sync failure.';
+                    const isNetworkError = errorCode === 'NETWORK_ERROR'
+                        || errorMessage.includes('fetch')
+                        || errorMessage.includes('Network');
+
+                    if (isNetworkError) {
+                        console.warn('[KeyManager] Cloud save succeeded, but local API seed will retry after network recovery.');
+                        this.cloudSyncBackoffUntil = Date.now() + 30_000;
+                        localApiError = new Error(errorMessage);
+                    } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
+                        console.error('[KeyManager] Cloud save succeeded, but local API session is missing or expired.');
+                        this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
+                        localApiError = new Error(errorMessage);
+                    } else {
+                        console.error('[KeyManager] Cloud save succeeded, but local API seed failed!', {
+                            code: errorCode,
+                            message: errorMessage,
+                            details: response.error?.details,
+                        });
+                        localApiError = new Error(errorMessage);
+                    }
+                }
+            }
+
+            if (this.userId === activeUserId && localApiPayload) {
                 this.hasHydratedCloudState = true;
                 this.applyCloudPayload(localApiPayload);
-                this.cloudSyncBackoffUntil = 0;
-                requestCostSync().catch(console.error);
-                return;
             }
 
             if (localApiError) {
-                throw localApiError;
+                console.warn('[KeyManager] Canonical cloud save succeeded, but local key-manager bridge is out of sync:', localApiError);
             }
+
+            requestCostSync().catch(console.error);
+            return;
         } catch (e: any) {
             if (isKkApiPersistenceUnavailableError(e)) {
                 this.schedulePendingCloudRetry();

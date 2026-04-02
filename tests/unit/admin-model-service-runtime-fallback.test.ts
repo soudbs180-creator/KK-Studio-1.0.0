@@ -22,6 +22,9 @@ test('admin model loading only uses the legacy Web API fallback for local or exp
   assert.match(serviceSource, /shouldUseLegacyWebApiFallback/);
   assert.match(serviceSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
   assert.match(serviceSource, /Web API fallback is disabled for this runtime/);
-  assert.match(exchangeRateSource, /shouldUseLegacyWebApiFallback/);
-  assert.match(exchangeRateSource, /if \(shouldUseLegacyWebApiFallback\(\)\) \{/);
+  assert.match(exchangeRateSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(exchangeRateSource, /legacyWebApiClient\.listCreditExchangeRates\(/);
+  assert.match(exchangeRateSource, /legacyWebApiClient\.upsertCreditExchangeRate\(/);
+  assert.doesNotMatch(exchangeRateSource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(exchangeRateSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
 });

@@ -14,6 +14,10 @@ test('billing balance refresh still resolves remaining balance from canonical so
 
   assert.match(
     billingContextSource,
+    /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/,
+  );
+  assert.match(
+    billingContextSource,
     /function sortCreditLogs\(rows: CreditTransactionLog\[\]\): CreditTransactionLog\[\] \{\s*return \[\.\.\.rows\]\.sort\(\(left, right\) => Date\.parse\(right\.created_at\) - Date\.parse\(left\.created_at\)\);\s*\}/,
   );
   assert.match(
@@ -31,36 +35,35 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /const refreshPromise = Promise\.all\(\[fetchBalance\(\), loadCreditTransactions\(false\)\]\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
+    /const refreshPromise = Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
   );
   assert.match(
     billingContextSource,
-    /const response = await consumeCreditsDirectlyViaSupabase\(\{[\s\S]*?if \(typeof response\.newBalance === 'number'\) \{\s*setBalance\(toDisplayNumber\(response\.newBalance\)\);\s*\}\s*await loadCreditTransactions\(false\);/,
-  );
-  assert.match(billingContextSource, /import \{ isKkApiBillingPersistedViaSupabase \} from '\.\.\/services\/api\/kkApiServerHealth';/);
-  assert.match(billingContextSource, /async function fetchBalanceDirectlyFromSupabase\(userId: string\): Promise<number \| undefined> \{/);
-  assert.match(billingContextSource, /async function loadCreditTransactionsDirectlyFromSupabase\(\s*userId: string,\s*\): Promise<CreditTransactionLog\[]> \{/);
-  assert.match(
-    billingContextSource,
-    /if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{\s*return fetchBalanceDirectlyFromSupabase\(user\.id\);\s*\}/,
+    /const response = await legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\);/,
   );
   assert.match(
     billingContextSource,
-    /if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{\s*const rows = await loadCreditTransactionsDirectlyFromSupabase\(user\.id\);\s*applyTransactionRows\(rows\);/,
+    /const response = await legacyWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*buildBillingRequestOptions\(apiAccessToken\),\s*\);/,
   );
+  assert.match(
+    billingContextSource,
+    /const intervalId = window\.setInterval\(\(\) => \{\s*triggerRefresh\(\);\s*\},\s*BILLING_SYNC_POLL_MS\);/,
+  );
+  assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
+  assert.doesNotMatch(billingContextSource, /\.from\('user_credits'\)/);
+  assert.doesNotMatch(billingContextSource, /\.from\('credit_transactions'\)/);
   assert.doesNotMatch(billingContextSource, /total_earned/i);
   assert.doesNotMatch(billingContextSource, /total_spent/i);
 });
 
-test('billing credit mutations stay on Supabase RPCs instead of the legacy local API surface', () => {
+test('billing credit mutations stay on the typed billing API surface', () => {
   const billingContextSource = readSource('src/context/BillingContext.tsx');
 
-  assert.match(billingContextSource, /async function consumeCreditsDirectlyViaSupabase\(/);
-  assert.match(billingContextSource, /supabase\.rpc\('consume_credits', \{/);
-  assert.match(billingContextSource, /async function refundCreditsDirectlyViaSupabase\(/);
-  assert.match(billingContextSource, /supabase\.rpc\('refund_credits', \{/);
-  assert.doesNotMatch(billingContextSource, /legacyWebApiClient\.debitCredits\(/);
-  assert.doesNotMatch(billingContextSource, /legacyWebApiClient\.refundCredits\(/);
+  assert.match(billingContextSource, /const response = await legacyWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /transactionId: response\.data\.ledgerId,/);
+  assert.match(billingContextSource, /const response = await legacyWebApiClient\.refundCredits\(\{/);
+  assert.doesNotMatch(billingContextSource, /supabase\.rpc\('consume_credits', \{/);
+  assert.doesNotMatch(billingContextSource, /supabase\.rpc\('refund_credits', \{/);
 });
 
 test('remaining balance display helper is shared across billing surfaces', () => {
@@ -99,7 +102,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.ok(profileModalSource.includes('仅管理员积分模型会消耗这里的积分，个人 API 不扣积分'));
   assert.ok(profileModalSource.includes('void refreshBilling();'));
 
-  assert.ok(costEstimationSource.includes('const { balance, usageLogs, refreshBilling } = useBilling();'));
+  assert.ok(costEstimationSource.includes('const { balance, usageLogs, refreshBilling, fetchLogs } = useBilling();'));
   assert.ok(costEstimationSource.includes('const remainingBalanceDisplay = formatRemainingCredits(balance, locale);'));
   assert.ok(costEstimationSource.includes('value={remainingBalanceDisplay}'));
   assert.ok(costEstimationSource.includes('await refreshBilling();'));
@@ -113,7 +116,7 @@ test('user api settings keep working when local API persistence degrades to memo
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const supabaseUserApiStorageSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
 
-  assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = !isAuthenticated;'));
+  assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('const headerPrimaryActionDisabled = activeTab === \'official\' ? userApiActionsDisabled : providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('disabled={headerPrimaryActionDisabled} onClick={activeTab === \'official\' ? beginCreateOfficial : beginCreateProvider}'));

@@ -207,6 +207,13 @@ const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas
     }));
 };
 
+const hasLocalOnlyCanvasMedia = (canvases: Canvas[]): boolean => (
+    canvases.some((canvas) =>
+        canvas.imageNodes.length > 0
+        || canvas.promptNodes.some((promptNode) => Array.isArray(promptNode.referenceImages) && promptNode.referenceImages.length > 0)
+    )
+);
+
 type LocalMediaCacheEntry = {
     url?: string;
     originalUrl?: string;
@@ -1433,8 +1440,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [isLoading]);
 
     // Cloud sync: auto-save.
+    const cloudMediaSyncWarningShownRef = useRef(false);
     useEffect(() => {
         if (isLoading || state.canvases.length === 0) return;
+
+        if (hasLocalOnlyCanvasMedia(state.canvases)) {
+            if (!cloudMediaSyncWarningShownRef.current) {
+                console.warn('[CanvasContext] Cloud layout sync skipped because the canvas still depends on local-only media assets.');
+                cloudMediaSyncWarningShownRef.current = true;
+            }
+            return;
+        }
+
+        cloudMediaSyncWarningShownRef.current = false;
 
         const timer = setTimeout(() => {
             const stripped = stripImageUrls(state.canvases);

@@ -1,32 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 import { readRuntimeEnv } from '../utils/runtimeEnv.ts';
 
-const BUILTIN_SUPABASE_URL = 'https://ovdjhdofjysanamgkfng.supabase.co';
-const BUILTIN_SUPABASE_ANON_KEY = 'sb_publishable_UvP5c6ShzuoYDtnZppd1yA_3L_m13l0';
+const DISABLED_SUPABASE_URL = 'https://disabled.invalid';
+const DISABLED_SUPABASE_ANON_KEY = 'sb_publishable_disabled';
 
 const envSupabaseUrl = readRuntimeEnv('VITE_SUPABASE_URL') || '';
 const envSupabaseAnonKey = readRuntimeEnv('VITE_SUPABASE_ANON_KEY') || '';
+const hasExplicitSupabaseConfig = Boolean(envSupabaseUrl && envSupabaseAnonKey);
 
-const supabaseUrl = envSupabaseUrl || BUILTIN_SUPABASE_URL;
-const supabaseAnonKey = envSupabaseAnonKey || BUILTIN_SUPABASE_ANON_KEY;
 const missingEnvKeys = [
   !envSupabaseUrl ? 'VITE_SUPABASE_URL' : null,
   !envSupabaseAnonKey ? 'VITE_SUPABASE_ANON_KEY' : null,
 ].filter(Boolean) as string[];
 
-export const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
-export const hasExplicitSupabaseConfig = Boolean(envSupabaseUrl && envSupabaseAnonKey);
-export const isUsingBuiltinSupabaseConfig = hasSupabaseConfig && missingEnvKeys.length > 0;
+const supabaseUrl = hasExplicitSupabaseConfig ? envSupabaseUrl : DISABLED_SUPABASE_URL;
+const supabaseAnonKey = hasExplicitSupabaseConfig ? envSupabaseAnonKey : DISABLED_SUPABASE_ANON_KEY;
+
+export const hasSupabaseConfig = hasExplicitSupabaseConfig;
+export const isUsingBuiltinSupabaseConfig = false;
 export const supabaseConfigIssue = hasSupabaseConfig
   ? null
-  : 'Missing Supabase public config. Auth and sync are disabled.';
+  : `Missing Supabase public config (${missingEnvKeys.join(', ')}). Auth and cloud sync are disabled.`;
 export { supabaseUrl, supabaseAnonKey };
-
-if (isUsingBuiltinSupabaseConfig) {
-  console.warn(
-    `[Supabase] Missing ${missingEnvKeys.join(', ')} in deployment env. Falling back to built-in public client config.`
-  );
-}
 
 if (!hasSupabaseConfig) {
   console.error('[Supabase] Public client config is unavailable.');

@@ -133,7 +133,6 @@ test("migration allowlist registry tracks every approved architecture exception 
 
   const requiredFrontendEntries = [
     "src/services/admin/supabaseAdminFallbackService.ts",
-    "src/context/BillingContext.tsx",
     "src/services/api/supabaseUserApiCloudStorage.ts",
     "src/services/security/apiKeySecureStorage.ts",
   ];
@@ -236,9 +235,11 @@ test("payment-server legacy shell delegates order creation through the sidecar c
   assert.match(paymentWebhookSource, /require\('\.\/sidecar_compat_bridge'\)/);
   assert.match(paymentWebhookSource, /handleLegacyPaymentCallbackThroughSidecar/);
   assert.doesNotMatch(paymentWebhookSource, /require\('\.\/runtime_payment_bridge'\)/);
-  assert.match(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
-  assert.match(billingContextSource, /import \{ isKkApiBillingPersistedViaSupabase \} from '\.\.\/services\/api\/kkApiServerHealth';/);
-  assert.match(billingContextSource, /\.from\('user_credits'\)/);
-  assert.match(billingContextSource, /\.from\('credit_transactions'\)/);
-  assert.match(billingContextSource, /if \(!\(await isKkApiBillingPersistedViaSupabase\(\)\)\) \{/);
+  assert.match(billingContextSource, /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
+  assert.match(billingContextSource, /legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /legacyWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /legacyWebApiClient\.refundCredits\(\{/);
+  assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
+  assert.doesNotMatch(billingContextSource, /\.from\('user_credits'\)/);
+  assert.doesNotMatch(billingContextSource, /\.from\('credit_transactions'\)/);
 });

@@ -3833,7 +3833,7 @@ const AppContent: React.FC<AppContentProps> = () => {
                   const id = `${Date.now()}_${index}`;
                   await syncService.uploadImagePair(id, blob);
                 } catch (e) {
-                  console.warn('Cloud upload failed (retry flow, non-blocking)', e);
+                  console.warn('Cloud image sync skipped because no real upload backend is configured yet.', e);
                 }
               }).catch(() => { });
             }

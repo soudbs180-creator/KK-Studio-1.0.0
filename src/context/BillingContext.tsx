@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { CreditTransactionDto } from '../../packages/contracts/src/index.ts';
-import { supabase } from '../lib/supabase';
-import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../services/api/kkApiClient';
+import { legacyWebApiClient } from '../services/api/kkApiClient';
 import { useAuth } from './AuthContext';
 
 export interface CreditTransactionLog {
@@ -34,40 +33,6 @@ export interface CreditRefundResult {
   message: string;
 }
 
-interface UserCreditsBalanceRow {
-  user_id: string;
-  balance: string | number | null;
-}
-
-interface SupabaseCreditTransactionRow {
-  id: string;
-  user_id: string;
-  amount: string | number | null;
-  type: string;
-  balance_after: string | number | null;
-  model_id?: string | null;
-  model_name?: string | null;
-  provider_id?: string | null;
-  description?: string | null;
-  status?: string | null;
-  metadata?: Record<string, unknown> | null;
-  created_at: string;
-  completed_at?: string | null;
-}
-
-interface SupabaseConsumeCreditsRpcRow {
-  success?: boolean | null;
-  new_balance?: string | number | null;
-  transaction_id?: string | null;
-  message?: string | null;
-}
-
-interface SupabaseRefundCreditsRpcRow {
-  success?: boolean | null;
-  new_balance?: string | number | null;
-  message?: string | null;
-}
-
 interface BillingSnapshot {
   balance: number;
   billingLogs: CreditTransactionLog[];
@@ -79,6 +44,7 @@ interface BillingSnapshot {
 const BILLING_SNAPSHOT_PREFIX = 'kk_billing_snapshot:';
 const BILLING_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 const CREDIT_TRANSACTIONS_FETCH_LIMIT = 120;
+const BILLING_SYNC_POLL_MS = 30_000;
 
 interface BillingContextType {
   balance: number;
@@ -121,6 +87,11 @@ function buildBillingRequestOptions(accessToken?: string) {
 function buildClientRequestId(prefix: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   return `${prefix}-${uuid || Date.now()}`;
+}
+
+function getResponseErrorMessage(response: { error?: { message?: string | null } } | null | undefined, fallback: string): string {
+  const message = String(response?.error?.message || '').trim();
+  return message || fallback;
 }
 
 function toDisplayNumber(value: unknown): number {
@@ -245,158 +216,6 @@ function extractLatestBalanceAfter(rows: CreditTransactionLog[]): number | undef
   return undefined;
 }
 
-function mapSupabaseCreditTransactionRow(row: SupabaseCreditTransactionRow): CreditTransactionLog {
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    type: row.type,
-    amount: toDisplayNumber(row.amount),
-    balance_after: toDisplayNumber(row.balance_after),
-    model_id: row.model_id ?? null,
-    model_name: row.model_name ?? null,
-    provider_id: row.provider_id ?? null,
-    description: row.description ?? null,
-    status: row.status ?? null,
-    metadata: row.metadata ?? null,
-    created_at: row.created_at,
-    completed_at: row.completed_at ?? null,
-  };
-}
-
-function getSupabaseRpcRow<T>(value: T | T[] | null | undefined): T | undefined {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value ?? undefined;
-}
-
-async function fetchBalanceDirectlyFromSupabase(userId: string): Promise<number | undefined> {
-  const { data, error } = await supabase
-    .from('user_credits')
-    .select('user_id, balance')
-    .eq('user_id', userId)
-    .maybeSingle<UserCreditsBalanceRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    return 0;
-  }
-
-  return toDisplayNumber(data.balance);
-}
-
-async function loadCreditTransactionsDirectlyFromSupabase(
-  userId: string,
-): Promise<CreditTransactionLog[]> {
-  const { data, error } = await supabase
-    .from('credit_transactions')
-    .select([
-      'id',
-      'user_id',
-      'amount',
-      'type',
-      'balance_after',
-      'model_id',
-      'model_name',
-      'provider_id',
-      'description',
-      'status',
-      'metadata',
-      'created_at',
-      'completed_at',
-    ].join(', '))
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(CREDIT_TRANSACTIONS_FETCH_LIMIT)
-    .returns<SupabaseCreditTransactionRow[]>();
-
-  if (error) {
-    throw error;
-  }
-
-  return sortCreditLogs((data || []).map((row) => mapSupabaseCreditTransactionRow(row)));
-}
-
-async function consumeCreditsDirectlyViaSupabase(params: {
-  userId: string;
-  amount: number;
-  modelId?: string;
-  modelName?: string;
-  providerId?: string;
-  description?: string;
-}): Promise<CreditConsumeResult> {
-  const { data, error } = await supabase.rpc('consume_credits', {
-    p_user_id: params.userId,
-    p_amount: params.amount,
-    p_model_id: params.modelId || null,
-    p_model_name: params.modelName || params.modelId || null,
-    p_provider_id: params.providerId || 'managed',
-    p_description: params.description || '',
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const row = getSupabaseRpcRow<SupabaseConsumeCreditsRpcRow>(data as SupabaseConsumeCreditsRpcRow[] | SupabaseConsumeCreditsRpcRow | null);
-  if (!row || row.success !== true) {
-    return {
-      success: false,
-      newBalance: typeof row?.new_balance !== 'undefined' ? toDisplayNumber(row.new_balance) : undefined,
-      message: String(row?.message || 'Credit debit failed'),
-    };
-  }
-
-  const transactionId = String(row.transaction_id || '').trim();
-  if (!transactionId) {
-    return {
-      success: false,
-      newBalance: typeof row.new_balance !== 'undefined' ? toDisplayNumber(row.new_balance) : undefined,
-      message: 'Credit debit did not return a transaction id',
-    };
-  }
-
-  return {
-    success: true,
-    transactionId,
-    newBalance: toDisplayNumber(row.new_balance),
-    message: String(row.message || 'Credit debit applied'),
-  };
-}
-
-async function refundCreditsDirectlyViaSupabase(
-  transactionId: string,
-  reason: string,
-): Promise<CreditRefundResult> {
-  const { data, error } = await supabase.rpc('refund_credits', {
-    p_transaction_id: transactionId,
-    p_reason: reason,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const row = getSupabaseRpcRow<SupabaseRefundCreditsRpcRow>(data as SupabaseRefundCreditsRpcRow[] | SupabaseRefundCreditsRpcRow | null);
-  if (!row || row.success !== true) {
-    return {
-      success: false,
-      newBalance: typeof row?.new_balance !== 'undefined' ? toDisplayNumber(row.new_balance) : undefined,
-      message: String(row?.message || 'Credit refund failed'),
-    };
-  }
-
-  return {
-    success: true,
-    newBalance: toDisplayNumber(row.new_balance),
-    message: String(row.message || 'Credit refund applied'),
-  };
-}
-
 export const useBilling = () => useContext(BillingContext);
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -433,35 +252,25 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      return await fetchBalanceDirectlyFromSupabase(user.id);
-    } catch (directError) {
-      console.warn('[BillingContext] Direct Supabase balance fetch failed, trying canonical API fallback:', directError);
-      if (!shouldUseLegacyWebApiFallback()) {
-        console.error('[BillingContext] Failed to load credit balance:', directError);
+      const response = await legacyWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
+      if (!response.success) {
+        console.error('[BillingContext] Failed to load credit balance from canonical API:', response.error);
         return undefined;
       }
 
-      try {
-        const response = await legacyWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
-        if (!response.success) {
-          console.error('[BillingContext] Failed to load credit balance from canonical API:', response.error);
-          return undefined;
-        }
-
-        const resolvedUserId = String(response.data.userId || '').trim();
-        if (resolvedUserId && resolvedUserId !== user.id) {
-          console.warn('[BillingContext] Credit balance API resolved a different user id, ignoring mismatched payload.', {
-            expectedUserId: user.id,
-            resolvedUserId,
-          });
-          return undefined;
-        }
-
-        return toDisplayNumber(response.data.balance);
-      } catch (error) {
-        console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
+      const resolvedUserId = String(response.data.userId || '').trim();
+      if (resolvedUserId && resolvedUserId !== user.id) {
+        console.warn('[BillingContext] Credit balance API resolved a different user id, ignoring mismatched payload.', {
+          expectedUserId: user.id,
+          resolvedUserId,
+        });
         return undefined;
       }
+
+      return toDisplayNumber(response.data.balance);
+    } catch (error) {
+      console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
+      return undefined;
     }
   }, [user, isTempUser, apiAccessToken]);
 
@@ -474,51 +283,35 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      const rows = await loadCreditTransactionsDirectlyFromSupabase(user.id);
+      const response = await legacyWebApiClient.listCreditTransactions(
+        { limit: CREDIT_TRANSACTIONS_FETCH_LIMIT },
+        buildBillingRequestOptions(apiAccessToken),
+      );
+
+      if (!response.success) {
+        console.error('[BillingContext] Failed to load credit transactions from canonical API:', response.error);
+        return undefined;
+      }
+
+      const rows = sortCreditLogs((response.data.items || []).map((item) => mapCreditTransaction(item)));
+      const hasForeignRows = rows.some((row) => row.user_id && row.user_id !== user.id);
+      if (hasForeignRows) {
+        console.warn('[BillingContext] Credit transaction API returned rows for a different user, ignoring mismatched payload.', {
+          expectedUserId: user.id,
+          returnedUserIds: Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean))),
+        });
+        return undefined;
+      }
+
       applyTransactionRows(rows);
       const latestBalanceAfter = extractLatestBalanceAfter(rows);
       if (updateBalance && typeof latestBalanceAfter === 'number') {
         setBalance(latestBalanceAfter);
       }
       return latestBalanceAfter;
-    } catch (directError) {
-      console.warn('[BillingContext] Direct Supabase transaction fetch failed, trying canonical API fallback:', directError);
-      if (!shouldUseLegacyWebApiFallback()) {
-        console.error('[BillingContext] Failed to load credit transactions:', directError);
-        return undefined;
-      }
-
-      try {
-        const response = await legacyWebApiClient.listCreditTransactions(
-          { limit: CREDIT_TRANSACTIONS_FETCH_LIMIT },
-          buildBillingRequestOptions(apiAccessToken),
-        );
-
-        if (!response.success) {
-          console.error('[BillingContext] Failed to load credit transactions from canonical API:', response.error);
-          return undefined;
-        }
-
-        const rows = sortCreditLogs((response.data.items || []).map((item) => mapCreditTransaction(item)));
-        const hasForeignRows = rows.some((row) => row.user_id && row.user_id !== user.id);
-        if (hasForeignRows) {
-          console.warn('[BillingContext] Credit transaction API returned rows for a different user, ignoring mismatched payload.', {
-            expectedUserId: user.id,
-            returnedUserIds: Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean))),
-          });
-          return undefined;
-        }
-
-        applyTransactionRows(rows);
-        const latestBalanceAfter = extractLatestBalanceAfter(rows);
-        if (updateBalance && typeof latestBalanceAfter === 'number') {
-          setBalance(latestBalanceAfter);
-        }
-        return latestBalanceAfter;
-      } catch (error) {
-        console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
-        return undefined;
-      }
+    } catch (error) {
+      console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
+      return undefined;
     }
   }, [user, isTempUser, apiAccessToken, applyTransactionRows]);
 
@@ -701,40 +494,36 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     const userId = String(user?.id || '').trim();
-    if (!userId || isTempUser) {
+    if (!userId || isTempUser || typeof window === 'undefined') {
       return;
     }
 
-    const channel = supabase
-      .channel(`billing-sync:${userId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_credits',
-        filter: `user_id=eq.${userId}`,
-      }, () => {
-        scheduleRealtimeRefresh(0, 'balance');
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'credit_transactions',
-        filter: `user_id=eq.${userId}`,
-      }, () => {
-        scheduleRealtimeRefresh(80, logsLoadedRef.current ? 'full' : 'balance');
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          scheduleRealtimeRefresh(0, 'balance');
-        }
-      });
+    const triggerRefresh = () => {
+      scheduleRealtimeRefresh(0, logsLoadedRef.current ? 'full' : 'balance');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        triggerRefresh();
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      triggerRefresh();
+    }, BILLING_SYNC_POLL_MS);
+
+    window.addEventListener('focus', triggerRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    triggerRefresh();
 
     return () => {
-      if (realtimeRefreshTimerRef.current !== null && typeof window !== 'undefined') {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', triggerRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (realtimeRefreshTimerRef.current !== null) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
       }
-      void supabase.removeChannel(channel);
     };
   }, [user?.id, isTempUser, scheduleRealtimeRefresh]);
 
@@ -768,24 +557,22 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const idempotencyKey = String(details?.idempotencyKey || buildClientRequestId('credit-debit')).trim();
 
       try {
-        const response = await consumeCreditsDirectlyViaSupabase({
-          userId: user.id,
-          amount: needAmount,
-          modelId: modelCode,
-          modelName: String(details?.modelName || details?.feature || modelCode || modelId || '').trim() || modelCode,
-          providerId: String(details?.providerId || details?.provider || 'managed').trim() || 'managed',
-          description: String(
-            details?.description
-              || `${businessRefType}:${businessRefId}#${idempotencyKey}`,
-          ).trim(),
-        });
-
+        const response = await legacyWebApiClient.debitCredits({
+          businessRefType,
+          businessRefId,
+          creditAmount: needAmount,
+          modelCode,
+          idempotencyKey,
+        }, buildBillingRequestOptions(apiAccessToken));
         if (!response.success) {
-          return response;
+          return {
+            success: false,
+            message: getResponseErrorMessage(response, 'Credit debit failed'),
+          };
         }
 
-        if (typeof response.newBalance === 'number') {
-          setBalance(toDisplayNumber(response.newBalance));
+        if (typeof response.data.balanceAfter === 'number') {
+          setBalance(toDisplayNumber(response.data.balanceAfter));
         }
         if (logsLoadedRef.current) {
           await loadCreditTransactions(false);
@@ -793,16 +580,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         return {
           success: true,
-          transactionId: response.transactionId,
-          newBalance: response.newBalance,
-          message: response.message,
+          transactionId: response.data.ledgerId,
+          newBalance: response.data.balanceAfter,
+          message: 'Credit debit applied',
         };
       } catch (error) {
         console.error('[BillingContext] Failed to debit credits:', error);
         return { success: false, message: 'Credit debit failed' };
       }
     },
-    [user, isTempUser, loadCreditTransactions],
+    [user, isTempUser, apiAccessToken, loadCreditTransactions],
   );
 
   const consumeCredits = useCallback(
@@ -830,13 +617,19 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       try {
-        const response = await refundCreditsDirectlyViaSupabase(safeTransactionId, reason);
+        const response = await legacyWebApiClient.refundCredits({
+          transactionId: safeTransactionId,
+          reason,
+        }, buildBillingRequestOptions(apiAccessToken));
         if (!response.success) {
-          return response;
+          return {
+            success: false,
+            message: getResponseErrorMessage(response, 'Credit refund failed'),
+          };
         }
 
-        if (typeof response.newBalance === 'number') {
-          setBalance(toDisplayNumber(response.newBalance));
+        if (typeof response.data.balanceAfter === 'number') {
+          setBalance(toDisplayNumber(response.data.balanceAfter));
         }
         if (logsLoadedRef.current) {
           await loadCreditTransactions(false);
@@ -844,15 +637,15 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         return {
           success: true,
-          newBalance: response.newBalance,
-          message: response.message,
+          newBalance: response.data.balanceAfter,
+          message: 'Credit refund applied',
         };
       } catch (error) {
         console.error('[BillingContext] Failed to refund credits:', reason, error);
         return { success: false, message: 'Credit refund failed' };
       }
     },
-    [user, isTempUser, loadCreditTransactions],
+    [user, isTempUser, apiAccessToken, loadCreditTransactions],
   );
 
   const recharge = useCallback(

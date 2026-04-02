@@ -70,40 +70,6 @@
       "removalCondition": "Delete once admin settings flows use only typed admin-console routes."
     },
     {
-      "path": "src/context/BillingContext.tsx",
-      "tables": [
-        "user_credits",
-        "credit_transactions"
-      ],
-      "procedures": [
-        "consume_credits",
-        "refund_credits"
-      ],
-      "buckets": [],
-      "reason": "Billing surfaces temporarily read canonical Supabase balance and ledger rows when the local API health check reports memory-mode persistence.",
-      "canonicalSource": "apps/api/src/modules/billing",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-remaining-balance-contract.test.ts"
-      ],
-      "removalCondition": "Delete once the typed billing API remains available with Supabase persistence in all supported runtimes."
-    },
-    {
-      "path": "src/services/billing/creditExchangeRateService.ts",
-      "tables": [
-        "credit_exchange_rates"
-      ],
-      "procedures": [],
-      "buckets": [],
-      "reason": "Recharge exchange-rate settings still fall back to the canonical Supabase table when the typed billing API is unavailable.",
-      "canonicalSource": "apps/api/src/modules/billing",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-http-routes.test.ts"
-      ],
-      "removalCondition": "Delete once exchange-rate settings use only the typed billing API in every supported runtime."
-    },
-    {
       "path": "src/services/api/supabaseUserApiCloudStorage.ts",
       "tables": [
         "profiles"

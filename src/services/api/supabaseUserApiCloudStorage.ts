@@ -137,6 +137,10 @@ function payloadHasEncryptedSecrets(rawPayload: unknown): boolean {
 }
 
 function getCachedUserApisPayload(userId: string): UserApisEnvelope | null | undefined {
+  if (!shouldUseLegacyWebApiFallback()) {
+    return undefined;
+  }
+
   const cached = userApisPayloadCache.get(userId);
   if (!cached) {
     return undefined;
@@ -152,6 +156,10 @@ function getCachedUserApisPayload(userId: string): UserApisEnvelope | null | und
 
 function setCachedUserApisPayload(userId: string, payload: unknown | null): UserApisEnvelope | null {
   const normalizedPayload = payload == null ? null : normalizeEnvelope(payload);
+  if (!shouldUseLegacyWebApiFallback()) {
+    return cloneEnvelope(normalizedPayload);
+  }
+
   userApisPayloadCache.set(userId, {
     payload: cloneEnvelope(normalizedPayload),
     expiresAt: Date.now() + USER_APIS_PAYLOAD_CACHE_TTL_MS,
@@ -350,13 +358,26 @@ async function saveNormalizedUserApisPayloadDirectlyToProfile(
 async function getAuthenticatedProfileContext(
   expectedUserId?: string,
 ): Promise<AuthenticatedProfileContext | null> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    throw new Error(getErrorMessage(error, 'Failed to resolve Supabase user session.'));
+  const sessionResult = await supabase.auth.getSession();
+  if (sessionResult.error) {
+    throw new Error(getErrorMessage(sessionResult.error, 'Failed to resolve Supabase user session.'));
   }
 
-  const sessionUser = data.session?.user;
-  const userId = String(sessionUser?.id || '').trim();
+  const sessionUser = sessionResult.data.session?.user;
+  const resolvedUser = sessionUser || await (async () => {
+    const userResult = await supabase.auth.getUser();
+    if (userResult.error) {
+      const message = getErrorMessage(userResult.error, '').toLowerCase();
+      if (message.includes('auth session missing') || message.includes('session') && message.includes('missing')) {
+        return null;
+      }
+
+      throw new Error(getErrorMessage(userResult.error, 'Failed to resolve Supabase user profile.'));
+    }
+
+    return userResult.data.user ?? null;
+  })();
+  const userId = String(resolvedUser?.id || '').trim();
   if (!userId) {
     return null;
   }
@@ -367,7 +388,7 @@ async function getAuthenticatedProfileContext(
 
   return {
     userId,
-    email: sessionUser?.email ?? null,
+    email: resolvedUser?.email ?? null,
   };
 }
 
