@@ -30,6 +30,7 @@ export interface AuthDataRepository {
     email: string | undefined,
     state: ReplaceKeyManagerCloudStateRequestDto,
   ): Promise<KeyManagerCloudStateDto>;
+  getTempUserSession(userId: string): Promise<TempUserSessionDto | null>;
   createTempUser(userAgent?: string): Promise<TempUserSessionDto>;
 }
 
@@ -43,6 +44,7 @@ interface StoredProfileRecord {
 
 export class InMemoryAuthDataRepository implements AuthDataRepository {
   private readonly profiles = new Map<string, StoredProfileRecord>();
+  private readonly tempUsers = new Map<string, TempUserSessionDto>();
 
   async listUserApiEntries(userId: string, email?: string): Promise<UserApiEntryDto[]> {
     const profile = this.ensureProfile(userId, email);
@@ -105,13 +107,28 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
     return this.extractKeyManagerState(profile.userApisPayload);
   }
 
+  async getTempUserSession(userId: string): Promise<TempUserSessionDto | null> {
+    const tempUser = this.tempUsers.get(userId);
+    if (!tempUser) {
+      return null;
+    }
+
+    const expiresAtMs = Date.parse(String(tempUser.expiresAt || ""));
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      this.tempUsers.delete(userId);
+      return null;
+    }
+
+    return { ...tempUser };
+  }
+
   async createTempUser(userAgent?: string): Promise<TempUserSessionDto> {
     const userId = randomUUID();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + tempUserExpiryMs);
     void userAgent;
 
-    return {
+    const tempUser: TempUserSessionDto = {
       userId,
       email: `${userId}@temp.local`,
       nickname: `Guest_${userId.replace(/-/g, "").slice(0, 8)}`,
@@ -119,6 +136,10 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
       expiresAt: expiresAt.toISOString(),
       isTempUser: true,
     };
+
+    this.tempUsers.set(userId, tempUser);
+
+    return tempUser;
   }
 
   private ensureProfile(userId: string, email?: string): StoredProfileRecord {

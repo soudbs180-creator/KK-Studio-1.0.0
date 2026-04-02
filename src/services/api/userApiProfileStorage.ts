@@ -230,6 +230,31 @@ function areEntrySetsEquivalent(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+let lastSeededLegacyEntries: StoredUserApiEntry[] | null = null;
+
+function cloneEntries(entries: StoredUserApiEntry[]): StoredUserApiEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    supportedModels: [...entry.supportedModels],
+  }));
+}
+
+function scheduleLegacyEntrySeed(entries: StoredUserApiEntry[]): void {
+  if (!shouldUseLegacyWebApiFallback()) {
+    return;
+  }
+
+  if (lastSeededLegacyEntries && areEntrySetsEquivalent(lastSeededLegacyEntries, entries)) {
+    return;
+  }
+
+  void saveLocalUserApiEntriesViaApi(entries).then(() => {
+    lastSeededLegacyEntries = cloneEntries(entries);
+  }).catch((error) => {
+    console.warn('[userApiProfileStorage] Failed to seed local user API store from merged payload:', error);
+  });
+}
+
 async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
   if (!shouldUseLegacyWebApiFallback()) {
     return [];
@@ -256,6 +281,21 @@ async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Pro
 
 export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
   const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
+  let cloudEntries: StoredUserApiEntry[] = [];
+  let cloudError: unknown = null;
+
+  try {
+    const supabasePayload = await loadUserApisPayloadViaSupabase();
+    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
+  } catch (error) {
+    cloudError = error;
+  }
+
+  if (cloudEntries.length > 0) {
+    scheduleLegacyEntrySeed(cloudEntries);
+    return cloudEntries;
+  }
+
   let localEntries: StoredUserApiEntry[] = [];
   let localError: unknown = null;
 
@@ -267,28 +307,9 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     }
   }
 
-  let cloudEntries: StoredUserApiEntry[] = [];
-  let cloudError: unknown = null;
-
-  try {
-    const supabasePayload = await loadUserApisPayloadViaSupabase();
-    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
-  } catch (error) {
-    cloudError = error;
-  }
-
-  const mergedEntries = mergeUserApiEntrySets(localEntries, cloudEntries);
-  if (mergedEntries.length > 0) {
-    if (
-      canUseLegacyWebApi
-      && (localEntries.length === 0 || !areEntrySetsEquivalent(localEntries, mergedEntries))
-    ) {
-      void saveLocalUserApiEntriesViaApi(mergedEntries).catch((error) => {
-        console.warn('[userApiProfileStorage] Failed to seed local user API store from merged payload:', error);
-      });
-    }
-
-    if (cloudEntries.length === 0 || !areEntrySetsEquivalent(cloudEntries, mergedEntries)) {
+  if (localEntries.length > 0) {
+    const mergedEntries = mergeUserApiEntrySets(localEntries, cloudEntries);
+    if (mergedEntries.length > 0) {
       void mergeUserApisPayloadViaSupabase({
         entries: mergedEntries,
       }).catch((error) => {
@@ -298,7 +319,7 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
       });
     }
 
-    return mergedEntries;
+    return localEntries;
   }
 
   const fallbackError = (canUseLegacyWebApi ? localError : null) || cloudError;

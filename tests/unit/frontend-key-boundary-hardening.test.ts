@@ -99,7 +99,7 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
   assert.match(source, /if \(options\.stream && typeof options\.onStream === 'function' && response\.content\) \{\s*options\.onStream\(response\.content\);\s*\}/);
 });
 
-test('ApiSettingsView keeps browser-direct diagnostics disabled and gates BYOK actions behind auth', () => {
+test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking server-side diagnostics', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
 
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
@@ -115,7 +115,7 @@ test('ApiSettingsView keeps browser-direct diagnostics disabled and gates BYOK a
   assert.match(source, /const providerEditorReadOnly = providerActionsDisabled;/);
   assert.match(source, /const userApiEditorReadOnlyHelper = userApiEditorReadOnly/);
   assert.match(source, /const providerEditorReadOnlyHelper = providerEditorReadOnly/);
-  assert.match(source, /const browserDirectChecksDisabled = true;/);
+  assert.match(source, /const browserDirectChecksDisabled = false;/);
   assert.match(source, /Sign in before managing BYOK routes\. Anonymous key storage and direct provider calls are disabled in the frontend\./);
   assert.match(source, /const browserDirectChecksHelper = pick\(/);
   assert.match(source, /const ensureUserApiActionsAllowed = \(\): boolean => \{/);
@@ -152,6 +152,44 @@ test('ApiSettingsView keeps browser-direct diagnostics disabled and gates BYOK a
   assert.match(source, /<SettingToggle[\s\S]*?checked=\{providerForm\.isActive\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SegmentedControlMulti[\s\S]*?value=\{getModeOption\(officialForm\.mode\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SegmentedControlMulti[\s\S]*?value=\{getModeOption\(providerForm\.mode\)\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
+});
+
+test('AuthContext keeps KeyManager scoped to authenticated Supabase users only', () => {
+  const source = readSource('src/context/AuthContext.tsx');
+
+  assert.match(source, /import \{ keyManager \} from '\.\.\/services\/auth\/keyManager';/);
+  assert.match(source, /useLayoutEffect/);
+  assert.match(source, /const nextUserId = tempUserSession \? null : \(user\?\.id \|\| null\);/);
+  assert.match(source, /void keyManager\.setUserId\(nextUserId\)\.catch\(\(error\) => \{/);
+  assert.match(source, /emitAuthSessionChange\(\{\s*hasSession: false,\s*userId: cachedTempUser\.user\.id,\s*isTempUser: true,\s*\}\);/);
+});
+
+test('KeyManager clears prior in-memory user state before hydrating the next account scope', () => {
+  const source = readSource('src/services/auth/keyManager.ts');
+
+  assert.match(source, /async setUserId\(userId: string \| null\) \{/);
+  assert.match(source, /this\.loadProviders\(true\);\s*this\.state = this\.loadState\(\);\s*this\.globalModelListCache = null;\s*this\.notifyListeners\(\);/);
+  assert.match(source, /if \(this\.state\.slots\.length > 0\) \{\s*console\.log\('\[KeyManager\] Local cache loaded:', this\.state\.slots\.length, 'slots'\);/);
+});
+
+test('BillingContext clears balance and transaction state immediately when the user scope changes', () => {
+  const source = readSource('src/context/BillingContext.tsx');
+
+  assert.match(source, /const \[hydratedUserId, setHydratedUserId\] = useState<string \| null>\(null\);/);
+  assert.match(source, /const activeBillingUserId = !user \|\| isTempUser \? null : user\.id;/);
+  assert.match(source, /useEffect\(\(\) => \{\s*refreshPromiseRef\.current = null;/);
+  assert.match(source, /window\.clearTimeout\(realtimeRefreshTimerRef\.current\);/);
+  assert.match(source, /setHydratedUserId\(null\);/);
+  assert.match(source, /setBalance\(0\);/);
+  assert.match(source, /setBillingLogs\(\[\]\);/);
+  assert.match(source, /setUsageLogs\(\[\]\);/);
+  assert.match(source, /setShowRechargeModal\(false\);/);
+  assert.match(source, /setHydratedUserId\(activeBillingUserId\);/);
+  assert.match(source, /const hasHydratedCurrentBillingScope = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
+  assert.match(source, /const visibleBalance = hasHydratedCurrentBillingScope \? balance : 0;/);
+  assert.match(source, /const visibleBillingLogs = hasHydratedCurrentBillingScope \? billingLogs : \[\];/);
+  assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope \? usageLogs : \[\];/);
+  assert.match(source, /const visibleLoading = activeBillingUserId \? \(loading \|\| !hasHydratedCurrentBillingScope\) : false;/);
 });
 
 test('OpenAIVideoService fails closed instead of calling third-party providers from the browser', () => {

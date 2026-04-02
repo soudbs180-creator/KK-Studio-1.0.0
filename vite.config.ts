@@ -354,6 +354,14 @@ async function canReachLocalApi(targetOrigin: string): Promise<boolean> {
     }
 }
 
+function isAddressInUseError(error: unknown): boolean {
+    const message = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error || '');
+
+    return message.includes('EADDRINUSE') || message.includes('address already in use');
+}
+
 async function ensureLocalApiServer(targetOrigin: string): Promise<void> {
     if (await canReachLocalApi(targetOrigin)) {
         return;
@@ -361,7 +369,18 @@ async function ensureLocalApiServer(targetOrigin: string): Promise<void> {
 
     if (!localApiServerPromise) {
         localApiServerPromise = (async () => {
-            await import('./scripts/run-api-dev.mjs');
+            const { startLocalApiServer } = await import('./scripts/lib/local-api-bootstrap.mjs');
+
+            try {
+                await startLocalApiServer();
+            } catch (error) {
+                // `npm run dev:start` manages the API separately. If that server already owns
+                // port 3001, treat the address-in-use failure as a signal to re-check health
+                // instead of crashing the Vite process.
+                if (!isAddressInUseError(error)) {
+                    throw error;
+                }
+            }
 
             for (let attempt = 0; attempt < 40; attempt += 1) {
                 if (await canReachLocalApi(targetOrigin)) {
@@ -372,9 +391,8 @@ async function ensureLocalApiServer(targetOrigin: string): Promise<void> {
             }
 
             throw new Error(`Timed out waiting for local API at ${targetOrigin}`);
-        })().catch((error) => {
+        })().finally(() => {
             localApiServerPromise = null;
-            throw error;
         });
     }
 
@@ -385,10 +403,6 @@ function kkApiProxyPlugin(targetOrigin = 'http://127.0.0.1:3001'): Plugin {
     return {
         name: 'kk-api-proxy',
         configureServer(server) {
-            void ensureLocalApiServer(targetOrigin).catch((error) => {
-                console.error('[kk-api-proxy] Failed to start local API server:', error);
-            });
-
             server.middlewares.use(async (req, res, next) => {
                 const requestPath = getRequestPath(req.url);
                 if (!shouldProxyToLocalApi(requestPath)) {

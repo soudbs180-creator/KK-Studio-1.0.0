@@ -49,6 +49,7 @@ scripts/alipay-mcp.env
 *~
 
 # Local diagnostics / comparison artifacts
+.kk-local/
 .npm-cache/
 .codex-backups/
 .codex-temp*/

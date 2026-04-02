@@ -110,7 +110,10 @@ class TempUserService {
       return session;
     } catch (error) {
       console.error('[TempUser] Failed to create temp user session via API:', error);
-      throw new Error('Failed to create guest session.');
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Failed to create guest session.';
+      throw new Error(message);
     }
   }
 

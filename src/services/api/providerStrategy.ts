@@ -404,9 +404,9 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         basePatterns: [/gpt-best/i, /gptbest/i],
         defaultFormat: 'openai',
         supportedFormats: ['openai', 'gemini', 'claude'],
-        defaultAuthMethod: 'header',
-        geminiAuthMethod: 'header',
-        claudeAuthMethod: 'header',
+        defaultAuthMethod: 'query',
+        geminiAuthMethod: 'query',
+        claudeAuthMethod: 'query',
         defaultHeaderName: AUTHORIZATION_HEADER,
         geminiHeaderName: AUTHORIZATION_HEADER,
         claudeHeaderName: AUTHORIZATION_HEADER,
@@ -642,6 +642,78 @@ export function isGeminiFamilyModel(modelId?: string): boolean {
     return lower.startsWith('gemini-') || lower.startsWith('imagen-') || lower.startsWith('veo-');
 }
 
+const PROVIDER_IMAGE_MODEL_ALIASES: Record<string, string> = {
+    'nano-banana': 'gemini-2.5-flash-image',
+    'nano banana': 'gemini-2.5-flash-image',
+    'nano-banana-pro': 'gemini-3-pro-image-preview',
+    'nano banana pro': 'gemini-3-pro-image-preview',
+    'nano-banana-2': 'gemini-3.1-flash-image-preview',
+    'nano banana 2': 'gemini-3.1-flash-image-preview',
+};
+
+const TWELVE_AI_SUPPORTED_IMAGE_MODELS = new Set([
+    'gemini-2.5-flash-image',
+    'gemini-2.5-flash-image-c',
+    'gemini-3-pro-image-preview',
+    'gemini-3-pro-image-preview-c',
+]);
+
+function normalizeProviderCompatibilityModelId(modelId?: string): string {
+    const [rawBaseModelId] = String(modelId || '').trim().split('@');
+    const cleaned = rawBaseModelId.replace(/^models\//i, '').trim().toLowerCase();
+    if (!cleaned) return '';
+
+    const normalizedWhitespace = cleaned.replace(/\s+/g, ' ');
+    if (PROVIDER_IMAGE_MODEL_ALIASES[normalizedWhitespace]) {
+        return PROVIDER_IMAGE_MODEL_ALIASES[normalizedWhitespace];
+    }
+
+    const dashed = normalizedWhitespace.replace(/\s+/g, '-');
+    return PROVIDER_IMAGE_MODEL_ALIASES[dashed] || dashed;
+}
+
+function looksLikeImageModel(modelId: string): boolean {
+    return modelId.includes('image')
+        || modelId.includes('nano')
+        || modelId.includes('banana')
+        || modelId.startsWith('imagen-');
+}
+
+export function resolveProviderModelCompatibilityIssue(input: {
+    provider?: string | Provider;
+    baseUrl?: string;
+    modelId?: string;
+}): string | null {
+    const normalizedModelId = normalizeProviderCompatibilityModelId(input.modelId);
+    if (!normalizedModelId) {
+        return null;
+    }
+
+    const runtime = resolveProviderRuntime({
+        provider: input.provider,
+        baseUrl: input.baseUrl,
+        modelId: normalizedModelId,
+    });
+
+    if (
+        runtime.strategyId === '12ai'
+        && looksLikeImageModel(normalizedModelId)
+        && !TWELVE_AI_SUPPORTED_IMAGE_MODELS.has(normalizedModelId)
+    ) {
+        return `12AI 图片路由当前只支持 gemini-2.5-flash-image 和 gemini-3-pro-image-preview，当前模型 ${normalizedModelId} 不在 12AI 文档支持列表中。`;
+    }
+
+    return null;
+}
+
+export function isProviderModelCompatible(input: {
+    provider?: string | Provider;
+    baseUrl?: string;
+    modelId?: string;
+}): boolean {
+    return !resolveProviderModelCompatibilityIssue(input);
+}
+
 export function resolveProviderStrategy(provider?: string | Provider, baseUrl?: string): ProviderStrategy {
     const baseMatch = findStrategyByBase(baseUrl);
     if (baseMatch) {
@@ -684,7 +756,7 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
     const protocolFamily = toProtocolFamily(resolvedFormat);
     const providerFamily = toProviderFamily(strategy, protocolFamily);
 
-    const authMethod = normalizeAuthMethod(input.authMethod)
+    let authMethod = normalizeAuthMethod(input.authMethod)
         || (
             protocolFamily === 'gemini-native'
                 ? (strategy.geminiAuthMethod || strategy.defaultAuthMethod || 'header')
@@ -692,6 +764,12 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
                     ? (strategy.claudeAuthMethod || strategy.defaultAuthMethod || 'header')
                     : (strategy.defaultAuthMethod || 'header')
         );
+
+    // GPT Best live docs currently advertise query-string auth (`?key=`).
+    // Force old header-based saved configs onto the documented path.
+    if (strategy.id === 'gpt-best') {
+        authMethod = 'query';
+    }
 
     const defaultHeaderName = protocolFamily === 'gemini-native'
         ? (strategy.geminiHeaderName || (providerFamily === 'google-official' ? GOOGLE_API_HEADER : strategy.defaultHeaderName || AUTHORIZATION_HEADER))

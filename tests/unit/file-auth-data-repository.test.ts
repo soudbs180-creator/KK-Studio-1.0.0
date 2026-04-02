@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, test } from "node:test";
@@ -91,6 +91,52 @@ describe("file-backed auth data repository", () => {
 
       const fileContents = await readFile(filePath, "utf8");
       assert.doesNotMatch(fileContents, /sk-live-secret-123456/);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("cleans stale temp files before writing the next auth-data snapshot", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "kk-auth-data-stale-"));
+    const filePath = path.join(tempDir, "auth-data.json");
+    const staleTempPath = `${filePath}.stale-write.tmp`;
+
+    try {
+      await writeFile(staleTempPath, '{"stale":true}', "utf8");
+
+      const repository = new FileBackedAuthDataRepository({
+        filePath,
+        storageEncryptionKey: "local-auth-data-secret-seed",
+      });
+
+      await repository.replaceUserApiEntries("user-2", "user-2@example.com", [
+        {
+          id: "entry-2",
+          name: "Example Provider",
+          provider: "Custom",
+          type: "proxy",
+          format: "openai",
+          key: "sk-live-secret-654321",
+          baseUrl: "https://api.example.com/v1",
+          supportedModels: ["gpt-4.1"],
+          disabled: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ]);
+
+      const files = await readdir(tempDir);
+      assert.equal(files.includes(path.basename(staleTempPath)), false);
+      assert.equal(files.some((fileName) => fileName.endsWith(".tmp")), false);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

@@ -275,7 +275,7 @@ const DashboardCheckCard: React.FC<{
 };
 
 const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({ onNavigate }) => {
-  const { balance, billingLogs, usageLogs } = useBilling();
+  const { balance, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
@@ -289,6 +289,10 @@ const DashboardView: React.FC<{ onNavigate: (view: SettingsView) => void }> = ({
   const [activeProviderCount, setActiveProviderCount] = useState(0);
   const [storageMode, setStorageMode] = useState<StorageMode | null>(null);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   useEffect(() => {
     let isMounted = true;

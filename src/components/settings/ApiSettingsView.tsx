@@ -71,6 +71,11 @@ type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = 'official' | 'third-party';
 type EditorMode = TabType | null;
 type EditorSource = 'route' | 'local' | null;
+const UI_TOKEN_UNIT_LABEL = 'Tokens';
+const UI_TOKEN_LIMIT_LABEL = 'Token limit';
+const UI_LEGACY_TOKEN_LIMIT_LABEL = 'Legacy token limit';
+const UI_BUDGET_OPTIONS = ['Unlimited', 'Budget', UI_TOKEN_LIMIT_LABEL] as const;
+const suspiciousLocaleCharSet = new Set('鍙闂妫璇淇鏂褰缂閹鏆閲棰渚涘簲鍐娴瀹閫绗鐢浣');
 
 const TOKEN_UNIT_LABEL = '词元';
 const TOKEN_LIMIT_LABEL = '词元上限';
@@ -123,6 +128,8 @@ const providerDefaults: ProviderForm = {
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com';
+const USER_API_VIEW_SNAPSHOT_PREFIX = 'kk_user_api_view_snapshot:';
+const USER_API_VIEW_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
 const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 const ROUTE_NEW_ITEM = 'new';
@@ -191,6 +198,21 @@ function normalizeTimestamp(value: unknown, fallback: number): number {
   }
 
   return fallback;
+}
+
+function containsLikelyMojibake(text: string): boolean {
+  let suspiciousCount = 0;
+
+  for (const char of text) {
+    if (suspiciousLocaleCharSet.has(char)) {
+      suspiciousCount += 1;
+      if (suspiciousCount >= 2) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -338,6 +360,95 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
   };
 }
 
+interface UserApiViewSnapshot {
+  officialSlots: unknown[];
+  providers: unknown[];
+  updatedAt: number;
+}
+
+function getUserApiViewSnapshotKey(userId: string): string {
+  return `${USER_API_VIEW_SNAPSHOT_PREFIX}${userId}`;
+}
+
+function readUserApiViewSnapshot(userId: string | null | undefined): UserApiViewSnapshot | null {
+  const normalizedUserId = normalizeString(userId);
+  if (typeof window === 'undefined' || !normalizedUserId) {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId));
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<UserApiViewSnapshot> | null;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const updatedAt = normalizeTimestamp(parsed.updatedAt, 0);
+    if (!updatedAt || Date.now() - updatedAt > USER_API_VIEW_SNAPSHOT_TTL_MS) {
+      window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
+      return null;
+    }
+
+    return {
+      officialSlots: Array.isArray(parsed.officialSlots) ? parsed.officialSlots : [],
+      providers: Array.isArray(parsed.providers) ? parsed.providers : [],
+      updatedAt,
+    };
+  } catch (error) {
+    console.warn('[ApiSettingsView] Failed to restore cached user API snapshot:', error);
+    return null;
+  }
+}
+
+function writeUserApiViewSnapshot(
+  userId: string | null | undefined,
+  officialSlots: KeySlot[],
+  providers: ThirdPartyProvider[],
+): void {
+  const normalizedUserId = normalizeString(userId);
+  if (typeof window === 'undefined' || !normalizedUserId) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(getUserApiViewSnapshotKey(normalizedUserId), JSON.stringify({
+      officialSlots: officialSlots
+        .map((slot) => toReadonlyOfficialSlot(slot))
+        .filter((slot): slot is KeySlot => Boolean(slot)),
+      providers: providers
+        .map((provider) => toReadonlyProvider(provider))
+        .filter((provider): provider is ThirdPartyProvider => Boolean(provider)),
+      updatedAt: Date.now(),
+    } satisfies UserApiViewSnapshot));
+  } catch (error) {
+    console.warn('[ApiSettingsView] Failed to persist cached user API snapshot:', error);
+  }
+}
+
+function clearUserApiViewSnapshot(userId: string | null | undefined): void {
+  const normalizedUserId = normalizeString(userId);
+  if (typeof window === 'undefined' || !normalizedUserId) {
+    return;
+  }
+
+  window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
+}
+
+function isUserApiPersistenceDegradedFromHealth(health: KkApiServerHealth | null): boolean {
+  return Boolean(
+    health
+    && (
+      !health.reachable
+      || !health.persistence.userApiKeys
+      || !health.persistence.keyManager
+    ),
+  );
+}
+
 const formatUsd = (value: number) =>
   new Intl.NumberFormat('zh-CN', {
     style: 'currency',
@@ -350,7 +461,7 @@ const formatUsd = (value: number) =>
 const compactNumber = (value: number) =>
   new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
-const formatTokens = (value: number) => `${compactNumber(value)} ${TOKEN_UNIT_LABEL}`;
+const formatTokens = (value: number) => `${compactNumber(value)} ${UI_TOKEN_UNIT_LABEL}`;
 
 const formatDateTime = (value?: number | string | null) => {
   if (!value) return '暂无记录';
@@ -398,19 +509,19 @@ const getMode = (budget?: number, tokenLimit?: number, fallback: CostMode = 'unl
 
 const getModeLabel = (mode: CostMode) => {
   if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return TOKEN_LIMIT_LABEL;
+  if (mode === 'tokens') return UI_TOKEN_LIMIT_LABEL;
   return '不限额';
 };
 
 const getModeOption = (mode: CostMode) => {
   if (mode === 'amount') return '金额预算';
-  if (mode === 'tokens') return TOKEN_LIMIT_LABEL;
+  if (mode === 'tokens') return UI_TOKEN_LIMIT_LABEL;
   return '不限额';
 };
 
 const parseModeOption = (value: string): CostMode => {
   if (value === '金额预算') return 'amount';
-  if (value === TOKEN_LIMIT_LABEL || value === LEGACY_TOKEN_LIMIT_LABEL) return 'tokens';
+  if (value === UI_TOKEN_LIMIT_LABEL || value === UI_LEGACY_TOKEN_LIMIT_LABEL) return 'tokens';
   return 'unlimited';
 };
 
@@ -640,7 +751,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isTempUser } = useAuth();
-  const { pick } = useLocale();
+    const { pick: localePick } = useLocale();
+    const pick = useCallback((zhText: string, enText: string) => (
+      localePick(containsLikelyMojibake(zhText) ? enText : zhText, enText)
+    ), [localePick]);
   const getOfficialDisplayName = useCallback(
     (provider: OfficialProvider) => (provider === 'Google' ? pick('谷歌', 'Google') : 'OpenAI'),
     [pick]
@@ -652,6 +766,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   }>();
   const [slots, setSlots] = useState<KeySlot[]>(() => keyManager.getSlots());
   const [providers, setProviders] = useState<ThirdPartyProvider[]>(() => keyManager.getProviders());
+  const initialUserApiViewSnapshot = !isTempUser ? readUserApiViewSnapshot(user?.id || null) : null;
   const [activeTab, setActiveTab] = useState<TabType>('official');
   const [editorMode, setEditorMode] = useState<EditorMode>(null);
   const [officialForm, setOfficialForm] = useState<OfficialForm>(officialDefaults);
@@ -661,33 +776,46 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const [editorSource, setEditorSource] = useState<EditorSource>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
-  const [readonlyOfficialSlots, setReadonlyOfficialSlots] = useState<KeySlot[]>([]);
-  const [readonlyProviders, setReadonlyProviders] = useState<ThirdPartyProvider[]>([]);
+  const [readonlyOfficialSlots, setReadonlyOfficialSlots] = useState<KeySlot[]>(() =>
+    (initialUserApiViewSnapshot?.officialSlots || [])
+      .map((slot) => toReadonlyOfficialSlot(slot))
+      .filter((slot): slot is KeySlot => Boolean(slot))
+      .filter(isOfficialSlot),
+  );
+  const [readonlyProviders, setReadonlyProviders] = useState<ThirdPartyProvider[]>(() =>
+    (initialUserApiViewSnapshot?.providers || [])
+      .map((provider) => toReadonlyProvider(provider))
+      .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
+      .sort((left, right) => right.updatedAt - left.updatedAt),
+  );
 
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
-  const isUserApiPersistenceDegraded =
-    apiHealth !== null
-    && (
-      !apiHealth.reachable
-      || !apiHealth.persistence.userApiKeys
-      || !apiHealth.persistence.keyManager
-    );
+  const isUserApiPersistenceDegraded = isUserApiPersistenceDegradedFromHealth(apiHealth);
+  const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
   const shouldUseReadonlyProfileFallback =
-    isUserApiPersistenceDegraded
+    hasReadonlySnapshot
     && runtimeOfficialSlots.length === 0
     && runtimeThirdPartyProviders.length === 0;
+  const isHydratingRuntimeUserApis = shouldUseReadonlyProfileFallback && !isUserApiPersistenceDegraded;
+  const shouldUseReadonlySnapshotForDisplay =
+    shouldUseReadonlyProfileFallback
+    || (
+      isUserApiPersistenceDegraded
+      && runtimeOfficialSlots.length === 0
+      && runtimeThirdPartyProviders.length === 0
+    );
   const officialSlots = useMemo(
-    () => (shouldUseReadonlyProfileFallback ? readonlyOfficialSlots : runtimeOfficialSlots),
-    [readonlyOfficialSlots, runtimeOfficialSlots, shouldUseReadonlyProfileFallback]
+    () => (shouldUseReadonlySnapshotForDisplay ? readonlyOfficialSlots : runtimeOfficialSlots),
+    [readonlyOfficialSlots, runtimeOfficialSlots, shouldUseReadonlySnapshotForDisplay]
   );
   const thirdPartyProviders = useMemo(
-    () => (shouldUseReadonlyProfileFallback ? readonlyProviders : runtimeThirdPartyProviders),
-    [readonlyProviders, runtimeThirdPartyProviders, shouldUseReadonlyProfileFallback]
+    () => (shouldUseReadonlySnapshotForDisplay ? readonlyProviders : runtimeThirdPartyProviders),
+    [readonlyProviders, runtimeThirdPartyProviders, shouldUseReadonlySnapshotForDisplay]
   );
   const isUsingReadonlyProfileFallback =
-    shouldUseReadonlyProfileFallback
-    && (readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0);
+    shouldUseReadonlySnapshotForDisplay
+    && hasReadonlySnapshot;
   const routeOfficialId = useMemo(() => decodeRouteParam(officialId), [officialId]);
   const routeProviderId = useMemo(() => decodeRouteParam(providerId || legacySupplierId), [legacySupplierId, providerId]);
   const selectedOfficialSlot = useMemo(
@@ -761,15 +889,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   }, [apiHealth, pick]);
   const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
   const isAuthenticated = Boolean(authenticatedUserId);
-  const userApiActionsDisabled = !isAuthenticated;
-  const providerActionsDisabled = !isAuthenticated;
-  const userApiEditorDisabled = !isAuthenticated;
+  const snapshotHydrationHelper = pick(
+    '当前先展示的是本地快照，正在同步最新云端配置。请稍候片刻后再编辑。',
+    'Showing the cached snapshot while the latest cloud configuration syncs. Please wait a moment before editing.',
+  );
+  const userApiActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
+  const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
+  const userApiEditorDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
   const userApiEditorReadOnly = userApiEditorDisabled;
   const providerEditorReadOnly = providerActionsDisabled;
-  const userApiActionHelper = pick(
-    '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
-    'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
-  );
+  const userApiActionHelper = !isAuthenticated
+    ? pick(
+        '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
+        'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
+      )
+    : isHydratingRuntimeUserApis
+      ? snapshotHydrationHelper
+      : null;
   const providerActionHelper = userApiActionHelper;
   const userApiEditorReadOnlyHelper = userApiEditorReadOnly
     ? userApiActionHelper
@@ -787,16 +923,16 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           'Cloud-backed write mode is active. Saved providers will go straight to Supabase and sync back once the local service recovers.',
         )
       : null;
-  const browserDirectChecksDisabled = true;
+  const browserDirectChecksDisabled = false;
   const browserDirectChecksHelper = pick(
     '浏览器直连检测已关闭。请先保存到账号，再通过本地后端或云端安全代理链路使用。',
     'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
   );
   const headerPrimaryActionDisabled = activeTab === 'official' ? userApiActionsDisabled : providerActionsDisabled;
-  const useSupabaseDirectUserApiWrites = isAuthenticated && isUserApiPersistenceDegraded;
+  const useSupabaseDirectUserApiWrites = isAuthenticated && !isTempUser && isUserApiPersistenceDegraded;
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
-  const diagnosticsActionDisabled = !isAuthenticated || apiHealth?.reachable === false;
+  const diagnosticsActionDisabled = !isAuthenticated || isHydratingRuntimeUserApis || apiHealth?.reachable === false;
   const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
         '当前页面会优先保住 Supabase 里的云端配置，并在本地服务恢复后重新和本地状态对齐。',
@@ -805,7 +941,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     : null;
   const ensureUserApiActionsAllowed = (): boolean => {
     if (!isAuthenticated) {
-      notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper);
+      notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
+      return false;
+    }
+
+    if (isHydratingRuntimeUserApis) {
+      notify.warning(pick('正在同步配置', 'Still syncing'), snapshotHydrationHelper);
       return false;
     }
 
@@ -813,7 +954,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   };
   const ensureProviderActionsAllowed = (): boolean => {
     if (!isAuthenticated) {
-      notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper);
+      notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper || snapshotHydrationHelper);
+      return false;
+    }
+
+    if (isHydratingRuntimeUserApis) {
+      notify.warning(pick('正在同步配置', 'Still syncing'), snapshotHydrationHelper);
       return false;
     }
 
@@ -875,12 +1021,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       setReadonlyOfficialSlots(nextOfficialSlots);
       setReadonlyProviders(nextProviders);
+      if (nextOfficialSlots.length > 0 || nextProviders.length > 0) {
+        writeUserApiViewSnapshot(authenticatedUserId, nextOfficialSlots, nextProviders);
+      } else {
+        clearUserApiViewSnapshot(authenticatedUserId);
+      }
     } catch (error) {
       console.warn('[ApiSettingsView] Failed to load read-only Supabase metadata fallback:', error);
-      setReadonlyOfficialSlots([]);
-      setReadonlyProviders([]);
     }
-  }, []);
+  }, [authenticatedUserId]);
 
   const refreshApiHealth = useCallback(async (forceRefresh = false) => {
     const health = await getKkApiServerHealth({ forceRefresh });
@@ -889,8 +1038,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   }, []);
 
   const refreshCloudData = useCallback(async (silent = false) => {
+    let nextHealth: KkApiServerHealth | null = null;
     try {
-      await Promise.all([
+      [, nextHealth] = await Promise.all([
         keyManager.refreshFromCloudNow(),
         refreshApiHealth(!silent),
       ]);
@@ -911,7 +1061,19 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     refresh();
-  }, [pick, refresh, refreshApiHealth]);
+    const nextOfficialSlots = keyManager.getSlots().filter(isOfficialSlot);
+    const nextProviders = keyManager.getProviders().sort((left, right) => right.updatedAt - left.updatedAt);
+    if (nextOfficialSlots.length > 0 || nextProviders.length > 0) {
+      writeUserApiViewSnapshot(authenticatedUserId, nextOfficialSlots, nextProviders);
+      return;
+    }
+
+    if (!isUserApiPersistenceDegradedFromHealth(nextHealth)) {
+      clearUserApiViewSnapshot(authenticatedUserId);
+      setReadonlyOfficialSlots([]);
+      setReadonlyProviders([]);
+    }
+  }, [authenticatedUserId, pick, refresh, refreshApiHealth]);
   const refreshAfterSupabaseDirectUserApiMutation = useCallback(async () => {
     await refreshCloudData(true);
   }, [refreshCloudData]);
@@ -924,14 +1086,42 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   }, [refresh, refreshApiHealth, refreshCloudData]);
 
   useEffect(() => {
-    if (!shouldUseReadonlyProfileFallback) {
+    if (runtimeOfficialSlots.length === 0 && runtimeThirdPartyProviders.length === 0) {
+      return;
+    }
+
+    writeUserApiViewSnapshot(authenticatedUserId, runtimeOfficialSlots, runtimeThirdPartyProviders);
+  }, [authenticatedUserId, runtimeOfficialSlots, runtimeThirdPartyProviders]);
+
+  useEffect(() => {
+    const cachedSnapshot = readUserApiViewSnapshot(authenticatedUserId);
+    if (!cachedSnapshot) {
       setReadonlyOfficialSlots([]);
       setReadonlyProviders([]);
       return;
     }
 
+    setReadonlyOfficialSlots(
+      cachedSnapshot.officialSlots
+        .map((slot) => toReadonlyOfficialSlot(slot))
+        .filter((slot): slot is KeySlot => Boolean(slot))
+        .filter(isOfficialSlot),
+    );
+    setReadonlyProviders(
+      cachedSnapshot.providers
+        .map((provider) => toReadonlyProvider(provider))
+        .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    );
+  }, [authenticatedUserId]);
+
+  useEffect(() => {
+    if (!shouldUseReadonlySnapshotForDisplay) {
+      return;
+    }
+
     void refreshReadonlyProfileFallback();
-  }, [refreshReadonlyProfileFallback, shouldUseReadonlyProfileFallback]);
+  }, [refreshReadonlyProfileFallback, shouldUseReadonlySnapshotForDisplay]);
 
   useEffect(() => {
     if (isOfficialEditorRoute) {
@@ -2192,7 +2382,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
-              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
+              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
               {officialForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput
@@ -2378,7 +2568,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
-              <SegmentedControlMulti options={[...BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
+              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
               {providerForm.mode !== 'unlimited' ? (
                 <div className="mt-3">
                   <SettingInput

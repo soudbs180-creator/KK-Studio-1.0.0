@@ -5,7 +5,6 @@
  * Similar to Gemini Balance but runs entirely on frontend.
  * NOW SUPPORTS: Supabase Cloud Sync & Third-Party API Proxies
  */
-import { tempUserService } from './tempUserService';
 import { subscribeAuthSessionChange } from './authSessionEvents';
 import {
     clearCloudSyncPendingFlagsOnRevisionMatch,
@@ -42,6 +41,7 @@ import {
     resolveProviderTokenLimit,
 } from './keyManagerEffectiveSlot';
 import {
+    applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
     AuthMethod,
     buildGeminiHeaders,
@@ -55,7 +55,7 @@ import {
     resolveApiProtocolFormat,
 } from '../api/apiConfig';
 import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
-import { resolveProviderKeyType, resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderKeyType, resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import type { ChannelConfig } from '../api/channelConfig';
 import {
     extractKeyManagerCloudSlots,
@@ -837,7 +837,7 @@ function shouldFilterModel(modelId: string): boolean {
  * Normalize a model list, applying migrations, deduplication, and the official Google whitelist.
  * @param provider Optional provider label used to decide whether official Google rules apply
  */
-export function normalizeModelList(models: string[], provider?: string): string[] {
+export function normalizeModelList(models: string[], provider?: string, baseUrl?: string): string[] {
     const isOfficialGoogle = provider === 'Google';
 
     // 1. Migrate & Normalize
@@ -868,6 +868,10 @@ export function normalizeModelList(models: string[], provider?: string): string[
             if (isGoogleImageLike && !GOOGLE_IMAGE_WHITELIST.includes(id)) {
                 return false;
             }
+        }
+
+        if (resolveProviderModelCompatibilityIssue({ provider, baseUrl, modelId: id })) {
+            return false;
         }
 
         // Fix: If it is 'nano-banana' (which shouldn't exist after step 1), kill it.
@@ -1079,7 +1083,7 @@ const inferModelType = (modelId: string): GlobalModelType => {
         id.includes('recraft') || id.includes('seedream');
     if (isImage) return 'image';
 
-    const isAudio = id.includes('lyria') || id.includes('audio') || id.includes('music') ||
+    const isAudio = id.includes('lyria') || id.includes('audio') || id.includes('music') || id.includes('tts') ||
         id.includes('suno') || id.includes('voicemod') || id.includes('elevenlabs') ||
         id.includes('fish-audio');
     if (isAudio) return 'audio';
@@ -1108,6 +1112,8 @@ export class KeyManager {
     private state: KeyManagerState;
     private listeners: Set<() => void> = new Set();
     private userId: string | null = null;
+    private authHasSession = false;
+    private authIsTempUser = false;
     private isSyncing = false;
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
@@ -1149,6 +1155,9 @@ export class KeyManager {
         });
 
         subscribeAuthSessionChange((detail) => {
+            this.authHasSession = detail.hasSession;
+            this.authIsTempUser = detail.isTempUser;
+
             if (detail.isTempUser || !detail.hasSession) {
                 return;
             }
@@ -1190,7 +1199,7 @@ export class KeyManager {
     }
 
     private ensureAuthenticatedUserApiMode(): string | null {
-        if (this.userId && !tempUserService.getCachedTempUser()) {
+        if (this.userId) {
             return null;
         }
 
@@ -1249,7 +1258,6 @@ export class KeyManager {
 
         try {
             const key = this.getStorageKey();
-            localStorage.removeItem(key);
             const stored = localStorage.getItem(key);
 
             // If scoped key not found, DO NOT fallback to global key to prevent leakage.
@@ -1298,7 +1306,7 @@ export class KeyManager {
                     }
 
                     // Normalize and deduplicate the supported model list before storing it.
-                    supportedModels = normalizeModelList(supportedModels, provider);
+                    supportedModels = normalizeModelList(supportedModels, provider, baseUrl);
 
                     return {
                         ...s,
@@ -1400,16 +1408,16 @@ export class KeyManager {
         this.hasHydratedCloudState = false;
         resetCloudSyncState(this.cloudSyncState);
         this.loadProviders(true);
+        this.state = this.loadState();
+        this.globalModelListCache = null;
+        this.notifyListeners();
 
         if (userId) {
             console.log('[KeyManager] User login:', userId);
 
             // Prime local cache first for responsive UI.
-            const localState = this.loadState();
-            if (localState.slots.length > 0) {
-                console.log('[KeyManager] Local cache loaded:', localState.slots.length, 'slots');
-                this.state = localState;
-                this.notifyListeners();
+            if (this.state.slots.length > 0) {
+                console.log('[KeyManager] Local cache loaded:', this.state.slots.length, 'slots');
             }
 
             // Then hydrate cloud state asynchronously.
@@ -1599,75 +1607,65 @@ export class KeyManager {
         try {
             this.isSyncing = true;
             console.log('[KeyManager] Loading cloud state via API/Supabase...');
-            const canUseLegacyApi = shouldUseLegacyWebApiFallback();
-            const accessToken = canUseLegacyApi
-                ? await getPreferredKkApiAccessToken()
-                : undefined;
+            let preferredPayload: unknown = null;
+            let loadError: unknown = null;
 
-            let apiPayload: unknown = null;
-            let apiError: unknown = null;
+            if (this.authIsTempUser) {
+                const accessToken = await getPreferredKkApiAccessToken();
 
-            if (canUseLegacyApi) {
                 try {
                     const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
                     if (response.success) {
-                        apiPayload = response.data;
+                        preferredPayload = response.data;
                     } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
-                        apiError = new Error(response.error.message || 'Cloud fetch failed.');
+                        loadError = new Error(response.error.message || 'Cloud fetch failed.');
                         console.warn('[KeyManager] Cloud fetch via API failed:', response.error);
                     }
                 } catch (error) {
-                    apiError = error;
+                    loadError = error;
                     console.warn('[KeyManager] Cloud fetch via API threw:', error);
                 }
-            }
-
-            let supabasePayload: unknown = null;
-            let supabaseError: unknown = null;
-            try {
-                supabasePayload = await loadUserApisPayloadViaSupabase(activeUserId);
-            } catch (error) {
-                supabaseError = error;
-                console.warn('[KeyManager] Cloud fetch via Supabase failed:', error);
+            } else {
+                try {
+                    preferredPayload = await loadUserApisPayloadViaSupabase(activeUserId);
+                } catch (error) {
+                    loadError = error;
+                    console.warn('[KeyManager] Cloud fetch via Supabase failed:', error);
+                }
             }
 
             if (this.userId !== activeUserId) {
                 return;
             }
 
-            const apiDensity = getUserApisPayloadDensity(apiPayload);
-            const supabaseDensity = getUserApisPayloadDensity(supabasePayload);
-            const preferredPayload =
-                apiDensity > 0
-                    ? apiPayload
-                    : supabaseDensity > 0
-                        ? supabasePayload
-                        : apiPayload ?? supabasePayload;
+            const preferredDensity = getUserApisPayloadDensity(preferredPayload);
 
             const hasLocalState = this.state.slots.length > 0 || this.providers.length > 0;
-            if ((preferredPayload == null || getUserApisPayloadDensity(preferredPayload) === 0) && hasLocalState && (apiError || supabaseError)) {
+            if ((preferredPayload == null || preferredDensity === 0) && hasLocalState && loadError) {
                 console.warn('[KeyManager] Cloud payload empty during degraded sync, preserving local state.');
                 return;
             }
 
-            if (canUseLegacyApi && apiDensity === 0 && supabaseDensity > 0) {
-                const normalizedCloudPayload = isUserApisEnvelope(supabasePayload)
-                    ? supabasePayload as { version?: number; slots?: unknown[]; providers?: unknown[] }
+            if (!this.authIsTempUser && shouldUseLegacyWebApiFallback() && !this.hasHydratedCloudState && preferredDensity > 0) {
+                const normalizedCloudPayload = isUserApisEnvelope(preferredPayload)
+                    ? preferredPayload as { version?: number; slots?: unknown[]; providers?: unknown[] }
                     : {
                         version: 2,
-                        slots: extractKeyManagerCloudSlots(supabasePayload),
-                        providers: extractUserApiProvidersFromPayload(supabasePayload),
+                        slots: extractKeyManagerCloudSlots(preferredPayload),
+                        providers: extractUserApiProvidersFromPayload(preferredPayload),
                     };
 
-                void legacyWebApiClient.replaceKeyManagerCloudState({
-                    version: Number(normalizedCloudPayload.version || 2),
-                    slots: Array.isArray(normalizedCloudPayload.slots)
-                        ? normalizedCloudPayload.slots as Record<string, unknown>[]
-                        : [],
-                    providers: Array.isArray(normalizedCloudPayload.providers)
-                        ? normalizedCloudPayload.providers as Record<string, unknown>[]
-                        : [],
-                }, { accessToken }).catch((error) => {
+                void getPreferredKkApiAccessToken().then((accessToken) => (
+                    legacyWebApiClient.replaceKeyManagerCloudState({
+                        version: Number(normalizedCloudPayload.version || 2),
+                        slots: Array.isArray(normalizedCloudPayload.slots)
+                            ? normalizedCloudPayload.slots as Record<string, unknown>[]
+                            : [],
+                        providers: Array.isArray(normalizedCloudPayload.providers)
+                            ? normalizedCloudPayload.providers as Record<string, unknown>[]
+                            : [],
+                    }, { accessToken })
+                )).catch((error) => {
                     console.warn('[KeyManager] Failed to seed local key-manager store from cloud payload:', error);
                 });
             }
@@ -1734,17 +1732,12 @@ export class KeyManager {
             return;
         }
 
-        if (tempUserService.getCachedTempUser()) {
-            console.log('[KeyManager] Skip cloud upload for temp user');
-            return;
-        }
-
         if (!options?.ignoreBackoff && Date.now() < this.cloudSyncBackoffUntil) {
             return;
         }
 
         try {
-            const canUseLegacyApi = shouldUseLegacyWebApiFallback();
+            const canUseLegacyApi = shouldUseLegacyWebApiFallback() || this.authIsTempUser;
             console.log('[KeyManager] Uploading key-manager state via local API/cloud sync...', {
                 userId: activeUserId,
                 slotCount: state.slots.length
@@ -1792,6 +1785,26 @@ export class KeyManager {
                         localApiError = new Error(errorMessage);
                     }
                 }
+            }
+
+            if (this.authIsTempUser) {
+                if (this.userId !== activeUserId) {
+                    return;
+                }
+
+                if (localApiPayload) {
+                    this.hasHydratedCloudState = true;
+                    this.applyCloudPayload(localApiPayload);
+                    this.cloudSyncBackoffUntil = 0;
+                    requestCostSync().catch(console.error);
+                    return;
+                }
+
+                if (localApiError) {
+                    throw localApiError;
+                }
+
+                return;
             }
 
             try {
@@ -2390,7 +2403,8 @@ export class KeyManager {
             normalizedModelId.includes('gemini-3.1-flash-image') ||
             normalizedModelId.includes('gemini-3-pro-image') ||
             normalizedModelId === 'gemini-2.5-flash-image' ||
-            normalizedModelId.includes('lyria');
+            normalizedModelId.includes('lyria') ||
+            normalizedModelId.includes('tts');
 
         // Routing strategy:
         // 1. If a suffix is present, try to match that explicit route.
@@ -2465,7 +2479,18 @@ export class KeyManager {
 
         const allSlots = [...providerSlots, ...filteredLegacySlots];
 
+        const getSlotModelCompatibilityIssue = (slot: KeySlot) => (
+            resolveProviderModelCompatibilityIssue({
+                provider: slot.provider,
+                baseUrl: slot.baseUrl,
+                modelId: normalizedModelId,
+            })
+        );
+
         const modelSupportedBySlot = (slot: KeySlot) => {
+            if (getSlotModelCompatibilityIssue(slot)) {
+                return false;
+            }
             const supported = slot.supportedModels || [];
             if (supported.includes('*')) return true;
             return supported.some(m => {
@@ -2570,8 +2595,19 @@ export class KeyManager {
                 // Step 3: if model filtering removes every explicit route-name match, fall back to the name matches so manual routing still wins.
                 // This keeps explicit slot routing stable even when a slot's advertised model list is incomplete or temporarily stale.
                 if (nameMatchedCandidates.length > 0 && modelFilteredCandidates.length === 0) {
-                    console.log(`[KeyManager] Name-matched candidates for suffix '${normalizedSuffix}' but model filter rejected '${normalizedModelId}', fallback to name matches.`);
-                    candidates = nameMatchedCandidates;
+                    const compatibilityIssues = nameMatchedCandidates
+                        .map(candidate => getSlotModelCompatibilityIssue(candidate))
+                        .filter((issue): issue is string => Boolean(issue));
+
+                    if (compatibilityIssues.length > 0) {
+                        console.warn(
+                            `[KeyManager] Route-matched candidates for suffix '${normalizedSuffix}' are incompatible with '${normalizedModelId}': ${compatibilityIssues[0]}`,
+                        );
+                        candidates = [];
+                    } else {
+                        console.log(`[KeyManager] Name-matched candidates for suffix '${normalizedSuffix}' but model filter rejected '${normalizedModelId}', fallback to name matches.`);
+                        candidates = nameMatchedCandidates;
+                    }
                 } else if (modelFilteredCandidates.length > 0) {
                     candidates = modelFilteredCandidates;
                 } else {
@@ -3032,7 +3068,7 @@ export class KeyManager {
         }
 
         // Normalize provider models before the new slot enters the shared routing pool.
-        supportedModels = normalizeModelList(supportedModels, options?.provider);
+        supportedModels = normalizeModelList(supportedModels, options?.provider, options?.baseUrl);
 
         const newSlot: KeySlot = {
             id: `key_${Date.now()}`,
@@ -3129,7 +3165,7 @@ export class KeyManager {
                 slot.compatibilityMode = runtime.compatibilityMode;
             }
             if (updates.supportedModels) {
-                slot.supportedModels = normalizeModelList(updates.supportedModels, slot.provider);
+                slot.supportedModels = normalizeModelList(updates.supportedModels, slot.provider, slot.baseUrl);
             }
             slot.updatedAt = Date.now();
             await this.saveState();
@@ -3294,11 +3330,11 @@ export class KeyManager {
 
                     if (slot.provider === 'Google') {
                         // Google models must remain official only
-                        slot.supportedModels = normalizeModelList(newModels, 'Google')
+                        slot.supportedModels = normalizeModelList(newModels, 'Google', slot.baseUrl)
                             .filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
                     } else {
                         // For proxies, we just take what they give us (plus normalization)
-                        slot.supportedModels = normalizeModelList(newModels, slot.provider);
+                        slot.supportedModels = normalizeModelList(newModels, slot.provider, slot.baseUrl);
                     }
                 } else {
                     console.warn(`[KeyManager] Refresh valid but no models found for ${id}. Keeping old list.`);
@@ -3472,7 +3508,7 @@ export class KeyManager {
             if (slot.disabled || slot.status === 'invalid' || !slot.key) return;
 
             if (slot.supportedModels && slot.supportedModels.length > 0) {
-                let cleanModels = normalizeModelList(slot.supportedModels, slot.provider);
+                let cleanModels = normalizeModelList(slot.supportedModels, slot.provider, slot.baseUrl);
 
                 cleanModels.forEach(rawModelStr => {
                     const { id, name, description } = parseModelString(rawModelStr);
@@ -3521,7 +3557,7 @@ export class KeyManager {
                     return;
                 }
 
-                const cleanModels = normalizeModelList(provider.models || [], 'Custom');
+                const cleanModels = normalizeModelList(provider.models || [], provider.name, provider.baseUrl);
 
                 cleanModels.forEach(rawModelStr => {
                     const { id, name, description } = parseModelString(rawModelStr);
@@ -3753,7 +3789,7 @@ export class KeyManager {
             capabilities: this.buildChannelCapabilities(slot.supportedModels || [], pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
-            supportedModels: normalizeModelList(slot.supportedModels || [], slot.provider),
+            supportedModels: normalizeModelList(slot.supportedModels || [], slot.provider, slot.baseUrl),
             group: slot.group,
             compatibilityMode: slot.compatibilityMode,
             source: slot.provider === 'SystemProxy' ? 'system' : 'user-slot',
@@ -3785,7 +3821,7 @@ export class KeyManager {
             capabilities: this.buildChannelCapabilities(provider.models || [], pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
-            supportedModels: normalizeModelList(provider.models || [], runtime.uiProvider),
+            supportedModels: normalizeModelList(provider.models || [], runtime.uiProvider, provider.baseUrl),
             group: provider.group,
             compatibilityMode: runtime.compatibilityMode,
             source: 'provider',
@@ -4105,7 +4141,7 @@ export class KeyManager {
             slot.disabled = !provider.isActive;
             slot.format = normalizeApiProtocolFormat(provider.format, slot.format || 'auto');
             if (provider.models?.length) {
-                slot.supportedModels = normalizeModelList(provider.models, slot.provider);
+                slot.supportedModels = normalizeModelList(provider.models, slot.provider, slot.baseUrl);
             }
             slot.type = determineKeyType(slot.provider, slot.baseUrl);
 
@@ -4561,7 +4597,11 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
             baseUrl,
             format: 'openai',
         });
-        const response = await fetch(buildOpenAIEndpoint(baseUrl, 'models'), {
+        const response = await fetch(applyOpenAICompatAuthToUrl(
+            buildOpenAIEndpoint(baseUrl, 'models'),
+            runtime.authMethod as AuthMethod,
+            apiKey,
+        ), {
             headers: buildProxyHeaders(runtime.authMethod as AuthMethod, apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat)
         });
 
@@ -4784,7 +4824,11 @@ export async function autoDetectAndConfigureModels(
     }
 
     // Normalize the discovered models before categorizing them.
-    const normalizedModels = normalizeModelList(models, resolvedFormat === 'gemini' ? 'Google' : 'Proxy');
+    const normalizedModels = normalizeModelList(
+        models,
+        resolvedFormat === 'gemini' ? String(runtime.uiProvider || 'Google') : 'Proxy',
+        baseUrl,
+    );
 
     const categories = categorizeModels(normalizedModels);
 

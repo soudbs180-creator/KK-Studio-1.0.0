@@ -110,6 +110,20 @@ function Get-ListeningProcessIdByPort {
     return $null
 }
 
+function Get-KnownDevProcessIds {
+    param([int]$Port)
+
+    return @(Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessName -in @('node', 'npm', 'cmd', 'powershell') } |
+        ForEach-Object {
+            $resolvedProcessId = 0
+            if ([int]::TryParse([string]$_.Id, [ref]$resolvedProcessId) -and (Is-KnownDevProcess -ProcessId $resolvedProcessId -Port $Port)) {
+                $resolvedProcessId
+            }
+        } |
+        Select-Object -Unique)
+}
+
 function Is-KnownDevProcess {
     param(
         [int]$ProcessId,
@@ -137,13 +151,12 @@ function Is-KnownDevProcess {
     }
 
     if ($Port -eq 3000) {
-        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' -or $commandLine -like '*npm run dev*'
+        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     if ($Port -eq 3001) {
         return $commandLine -match 'scripts[\\/]+run-api-dev\.mjs' `
-            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' `
-            -or $commandLine -like '*npm run dev*'
+            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     return $false
@@ -155,17 +168,13 @@ function Clear-KnownDevPortConflicts {
         [int[]]$AllowedProcessIds = @()
     )
 
-    $listenerIds = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique)
-
-    foreach ($processId in $listenerIds) {
+    $knownProcessIds = @(Get-KnownDevProcessIds -Port $Port | Where-Object { $_ -notin $AllowedProcessIds })
+    foreach ($processId in $knownProcessIds) {
         if ($processId -in $AllowedProcessIds) {
             continue
         }
 
-        if (Is-KnownDevProcess -ProcessId $processId -Port $Port) {
-            Stop-ProcessTree -ProcessId $processId
-        }
+        Stop-ProcessTree -ProcessId $processId
     }
 }
 
@@ -202,6 +211,50 @@ function Test-UrlReady {
     }
 
     return $false
+}
+
+function Wait-UrlReadyOrExit {
+    param(
+        [string]$Url,
+        [int]$ProcessId,
+        [int]$Attempts = 1,
+        [int]$DelayMilliseconds = 250
+    )
+
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt += 1) {
+        if (Test-UrlReady -Url $Url) {
+            return $true
+        }
+
+        $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $process) {
+            return $false
+        }
+
+        if ($attempt -lt ($Attempts - 1)) {
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return $false
+}
+
+function Get-LogSnippet {
+    param(
+        [string]$Path,
+        [int]$LineCount = 12
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    $lines = @(Get-Content -LiteralPath $Path -ErrorAction SilentlyContinue | Select-Object -Last $LineCount)
+    if (-not $lines.Count) {
+        return $null
+    }
+
+    return ($lines -join [Environment]::NewLine)
 }
 
 function Assert-PortAvailable {
@@ -283,6 +336,11 @@ if (-not (Test-Path -LiteralPath $apiScript)) {
     throw "API dev script was not found at $apiScript."
 }
 
+& $nodeExe $apiScript --check
+if ($LASTEXITCODE -ne 0) {
+    throw "Local API config preflight failed. Update apps/api/.env.local before starting the dev stack."
+}
+
 if ($Restart) {
     Stop-TrackedProcess -PidFile $vitePidFile
     Stop-TrackedProcess -PidFile $apiPidFile
@@ -305,11 +363,18 @@ if (-not $apiPid) {
         -StdErrLog $apiErrLog
 }
 
-if (-not (Test-UrlReady -Url $apiUrl -Attempts 80 -DelayMilliseconds 500)) {
+if (-not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
+    $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+    if ($apiLogSnippet) {
+        throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
+    }
+
     throw "The local API server did not become ready in time. Check $apiErrLog"
 }
 
-$apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $apiPid
+# Keep the API pid file pinned to the stable `node --watch` supervisor process.
+# The child listener PID rotates on every restart and causes duplicate watchers if we persist it here.
+Set-Content -LiteralPath $apiPidFile -Value $apiPid -Encoding ascii
 
 $vitePid = Get-AliveProcessId -PidFile $vitePidFile
 if ($vitePid -and -not (Test-UrlReady -Url $viteUrl)) {
@@ -328,7 +393,12 @@ if (-not $vitePid) {
         -StdErrLog $viteErrLog
 }
 
-if (-not (Test-UrlReady -Url $viteUrl -Attempts 80 -DelayMilliseconds 500)) {
+if (-not (Wait-UrlReadyOrExit -Url $viteUrl -ProcessId $vitePid -Attempts 80 -DelayMilliseconds 500)) {
+    $viteLogSnippet = Get-LogSnippet -Path $viteErrLog
+    if ($viteLogSnippet) {
+        throw "The Vite dev server did not become ready. Latest error output:`n$viteLogSnippet"
+    }
+
     throw "The Vite dev server did not become ready in time. Check $viteErrLog"
 }
 

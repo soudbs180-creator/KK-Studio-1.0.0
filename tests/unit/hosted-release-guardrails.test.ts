@@ -12,11 +12,16 @@ function readSource(relativePath: string): string {
 test("hosted preflight checks verify auth prerequisites and keep local API fallback out of Vercel", () => {
   const source = readSource("scripts/diagnose-hosted-release.mjs");
 
+  assert.match(source, /from "\.\/lib\/env-contract\.mjs";/);
   assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_KK_API_BASE_URL",\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*\];/);
+  assert.match(source, /const frontendSnapshots = snapshots\.frontendSnapshots;/);
+  assert.match(source, /const localApiSnapshots = snapshots\.apiSnapshots;/);
   assert.match(source, /label: "vercel whoami"/);
   assert.match(source, /label: "npx vercel whoami"/);
   assert.match(source, /label: "supabase projects list"/);
   assert.match(source, /label: "npx supabase projects list"/);
+  assert.match(source, /printSection\("Supabase Project Alignment"\);/);
+  assert.match(source, /SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL/);
   assert.match(source, /Vercel authentication is unavailable\./);
   assert.match(source, /Supabase authentication is unavailable\./);
   assert.match(source, /It does not read remote Vercel or Supabase dashboard state\./);
@@ -48,6 +53,9 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   const source = readSource("docs/development/hosted-release-runbook.md");
 
   assert.match(source, /User-owned API routes must use `userRoute` and must not consume credits\./);
+  assert.match(source, /`apps\/api\/\.env\.local` is the authoritative local API source/);
+  assert.match(source, /npm run api:diagnose/);
+  assert.match(source, /npm run release:hosted:check/);
   assert.match(source, /1\. Supabase database migrations/);
   assert.match(source, /2\. Supabase Edge Functions/);
   assert.match(source, /3\. Vercel frontend/);

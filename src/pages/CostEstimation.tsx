@@ -227,7 +227,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   embedded = false,
 }) => {
   const { pick, locale } = useLocale();
-  const { balance, usageLogs, refreshBilling } = useBilling();
+  const { balance, usageLogs, refreshBilling, fetchLogs } = useBilling();
   const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
 
   const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
@@ -236,6 +236,10 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   const [creditModelCount, setCreditModelCount] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   useEffect(() => {
     setSummaryRows(getHistorySummary(30));

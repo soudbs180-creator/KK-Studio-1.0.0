@@ -8,12 +8,14 @@ $services = @(
         Name = 'vite'
         Port = 3000
         Url = 'http://127.0.0.1:3000/'
+        TimeoutSec = 3
         PidFile = Join-Path $runDir 'dev-vite.pid'
     },
     @{
         Name = 'api'
         Port = 3001
         Url = 'http://127.0.0.1:3001/healthz'
+        TimeoutSec = 10
         PidFile = Join-Path $runDir 'dev-api.pid'
     }
 )
@@ -83,13 +85,12 @@ function Is-KnownDevProcess {
     }
 
     if ($Port -eq 3000) {
-        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' -or $commandLine -like '*npm run dev*'
+        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     if ($Port -eq 3001) {
         return $commandLine -match 'scripts[\\/]+run-api-dev\.mjs' `
-            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' `
-            -or $commandLine -like '*npm run dev*'
+            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     return $false
@@ -116,10 +117,13 @@ function Get-PortOwnerProcessId {
 }
 
 function Test-UrlReady {
-    param([string]$Url)
+    param(
+        [string]$Url,
+        [int]$TimeoutSec = 3
+    )
 
     try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec
         return $response.StatusCode -ge 200 -and $response.StatusCode -lt 500
     } catch {
         return $false
@@ -141,7 +145,7 @@ foreach ($service in $services) {
         }
     }
 
-    $isHealthy = Test-UrlReady -Url $service.Url
+    $isHealthy = Test-UrlReady -Url $service.Url -TimeoutSec $service.TimeoutSec
     Write-Host ("{0}: pid={1}; port={2}; running={3}; healthy={4}" -f `
         $service.Name,
         ($(if ($pidValue) { $pidValue } else { 'none' })),

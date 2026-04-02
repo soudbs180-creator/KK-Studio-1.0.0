@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { tempUserService, type TempUserSession } from '../services/auth/tempUserService';
@@ -6,6 +6,7 @@ import { setKkApiAccessToken } from '../services/api/kkApiClient';
 import { startKkApiAccessTokenSessionSync } from '../services/api/authAccessToken';
 import { clearStoredAdminSession } from '../services/api/adminSession';
 import { emitAuthSessionChange } from '../services/auth/authSessionEvents';
+import { keyManager } from '../services/auth/keyManager';
 
 interface AuthContextType {
     session: Session | null;
@@ -51,6 +52,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         latestTempUserSessionRef.current = tempUserSession;
     }, [tempUserSession]);
+
+    useLayoutEffect(() => {
+        const nextUserId = tempUserSession ? null : (user?.id || null);
+        void keyManager.setUserId(nextUserId).catch((error) => {
+            console.warn('[AuthContext] Failed to sync KeyManager user scope:', error);
+        });
+    }, [tempUserSession, user?.id]);
 
     useEffect(() => {
         const stopSessionSync = startKkApiAccessTokenSessionSync();

@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -39,6 +39,22 @@ export interface FileBackedAuthDataRepositoryOptions {
 }
 
 const tempUserExpiryMs = 24 * 60 * 60 * 1000;
+const tempFileSuffix = ".tmp";
+const replaceAttempts = 4;
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function isRetryableWindowsReplaceError(error: unknown): boolean {
+  const code = typeof error === "object" && error && "code" in error
+    ? String((error as { code?: unknown }).code || "")
+    : "";
+
+  return code === "EPERM" || code === "EBUSY" || code === "EACCES";
+}
 
 function buildDefaultFilePath(): string {
   const configuredPath = String(process.env.KK_LOCAL_AUTH_DATA_FILE || "").trim();
@@ -141,6 +157,25 @@ export class FileBackedAuthDataRepository implements AuthDataRepository {
     });
     await this.saveProfile(profile);
     return this.extractKeyManagerState(profile.userApisPayload);
+  }
+
+  async getTempUserSession(userId: string): Promise<TempUserSessionDto | null> {
+    const state = await this.readState();
+    const tempUser = state.tempUsers?.[userId];
+    if (!tempUser) {
+      return null;
+    }
+
+    const expiresAtMs = Date.parse(String(tempUser.expiresAt || ""));
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      await this.withState(async (currentState) => ({
+        state: this.pruneExpiredTempUsers(currentState),
+        result: undefined,
+      }));
+      return null;
+    }
+
+    return { ...tempUser };
   }
 
   async createTempUser(userAgent?: string): Promise<TempUserSessionDto> {
@@ -254,10 +289,64 @@ export class FileBackedAuthDataRepository implements AuthDataRepository {
   private async writeState(state: PersistedAuthDataState): Promise<void> {
     const directory = path.dirname(this.filePath);
     await mkdir(directory, { recursive: true });
+    await this.cleanupStaleTempFiles(directory);
 
-    const tempPath = `${this.filePath}.tmp`;
-    await writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
-    await rename(tempPath, this.filePath);
+    const serializedState = JSON.stringify(state, null, 2);
+    const tempPath = `${this.filePath}.${process.pid}.${randomUUID()}${tempFileSuffix}`;
+
+    await writeFile(tempPath, serializedState, "utf8");
+
+    try {
+      await this.commitTempFile(tempPath, serializedState);
+    } finally {
+      await rm(tempPath, { force: true }).catch(() => undefined);
+    }
+  }
+
+  private async commitTempFile(tempPath: string, serializedState: string): Promise<void> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < replaceAttempts; attempt += 1) {
+      try {
+        await rename(tempPath, this.filePath);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableWindowsReplaceError(error) || attempt === replaceAttempts - 1) {
+          break;
+        }
+
+        await delay(30 * (attempt + 1));
+      }
+    }
+
+    if (isRetryableWindowsReplaceError(lastError)) {
+      await writeFile(this.filePath, serializedState, "utf8");
+      return;
+    }
+
+    try {
+      await copyFile(tempPath, this.filePath);
+    } catch {
+      throw lastError;
+    }
+  }
+
+  private async cleanupStaleTempFiles(directory: string): Promise<void> {
+    const fileName = path.basename(this.filePath);
+    const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+
+    await Promise.all(entries.map(async (entry) => {
+      if (!entry.isFile()) {
+        return;
+      }
+
+      if (!entry.name.startsWith(`${fileName}.`) || !entry.name.endsWith(tempFileSuffix)) {
+        return;
+      }
+
+      await rm(path.join(directory, entry.name), { force: true }).catch(() => undefined);
+    }));
   }
 
   private decodeProfile(

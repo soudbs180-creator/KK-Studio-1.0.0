@@ -7,7 +7,6 @@ import {
   HardDrive,
   KeyRound,
   LayoutDashboard,
-  RefreshCw,
   ScrollText,
   Wallet,
 } from 'lucide-react';
@@ -141,7 +140,7 @@ const RingRow: React.FC<{
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
-  const { balance, billingLogs, usageLogs } = useBilling();
+  const { balance, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
@@ -157,7 +156,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [storageUsageMb, setStorageUsageMb] = useState(0);
   const [storedImages, setStoredImages] = useState(0);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
-  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const formatNumber = (value: number, maximumFractionDigits = 0) =>
     new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value);
@@ -195,37 +197,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   };
 
   const refreshDashboard = async () => {
-    setRefreshing(true);
-    try {
-      const nextStats = keyManager.getStats();
-      const allSlots = keyManager.getSlots();
-      const providers = keyManager.getProviders();
-      const cost = getTodayCosts();
-      const [nextStorageMode, usageBytes, imageIds] = await Promise.all([
-        getStorageMode(),
-        getStorageUsage().catch(() => 0),
-        getAllImageIds().catch(() => []),
-      ]);
+    const nextStats = keyManager.getStats();
+    const allSlots = keyManager.getSlots();
+    const providers = keyManager.getProviders();
+    const cost = getTodayCosts();
+    const [nextStorageMode, usageBytes, imageIds] = await Promise.all([
+      getStorageMode(),
+      getStorageUsage().catch(() => 0),
+      getAllImageIds().catch(() => []),
+    ]);
 
-      const official = allSlots.filter((slot) => {
-        if (!slot.key || slot.disabled) return false;
-        if (slot.baseUrl) return false;
-        if (slot.provider === 'SystemProxy') return false;
-        return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
-      });
+    const official = allSlots.filter((slot) => {
+      if (!slot.key || slot.disabled) return false;
+      if (slot.baseUrl) return false;
+      if (slot.provider === 'SystemProxy') return false;
+      return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
+    });
 
-      setStats(nextStats);
-      setTodayCostUsd(cost.totalCostUsd || 0);
-      setTodayTokens(cost.totalTokens || 0);
-      setOfficialCount(official.length);
-      setProviderCount(providers.length);
-      setActiveProviderCount(providers.filter((item) => item.isActive).length);
-      setStorageMode(nextStorageMode);
-      setStorageUsageMb(usageBytes / (1024 * 1024));
-      setStoredImages(imageIds.length);
-    } finally {
-      setRefreshing(false);
-    }
+    setStats(nextStats);
+    setTodayCostUsd(cost.totalCostUsd || 0);
+    setTodayTokens(cost.totalTokens || 0);
+    setOfficialCount(official.length);
+    setProviderCount(providers.length);
+    setActiveProviderCount(providers.filter((item) => item.isActive).length);
+    setStorageMode(nextStorageMode);
+    setStorageUsageMb(usageBytes / (1024 * 1024));
+    setStoredImages(imageIds.length);
   };
 
   useEffect(() => {
@@ -395,9 +392,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             <SettingsBadge tone={statusTone}>
               {hasCriticalLogs ? pick('需要处理', 'Needs Attention') : hasAvailableRoute ? pick('系统运行中', 'System Active') : pick('等待配置', 'Setup Required')}
             </SettingsBadge>
-            <SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refreshDashboard()}>
-              {pick('刷新', 'Refresh')}
-            </SettingsActionButton>
             <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate('api-management')}>
               {pick('打开 API 管理', 'Open API Management')}
             </SettingsActionButton>

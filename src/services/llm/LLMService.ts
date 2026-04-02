@@ -28,7 +28,7 @@ import {
     isSecureProxySessionReauthError,
 } from '../model/secureModelProxy';
 import { resolveKkApiBaseUrl } from '../api/kkApiClient';
-import { resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import { resolveProviderIdentity } from '../../utils/providerDisplay';
 import { getModelPricing } from '../model/modelPricing';
 
@@ -397,6 +397,15 @@ export class LLMService {
             }
 
             try {
+                const compatibilityIssue = resolveProviderModelCompatibilityIssue({
+                    provider: keySlot.provider,
+                    baseUrl: keySlot.baseUrl,
+                    modelId: options.modelId,
+                });
+                if (compatibilityIssue) {
+                    throw new Error(compatibilityIssue);
+                }
+
                 if (keySlot.provider === 'SystemProxy') {
                     const response = await callSecureSystemProxyImage({
                         modelId: options.modelId,

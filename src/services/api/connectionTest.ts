@@ -6,6 +6,7 @@
  */
 
 import {
+  applyOpenAICompatAuthToUrl,
   type ApiProtocolFormat,
   type AuthMethod,
   buildClaudeEndpoint,
@@ -171,8 +172,16 @@ async function runOpenAIChatTest(cleanBase: string, config: ConnectionConfig): P
     runtime.authorizationValueFormat,
   );
   const modelId = getModelId(resolved);
-  const chatUrl = buildOpenAIEndpoint(base, '/chat/completions');
-  const responsesUrl = buildOpenAIEndpoint(base, '/responses');
+  const chatUrl = applyOpenAICompatAuthToUrl(
+    buildOpenAIEndpoint(base, '/chat/completions'),
+    runtime.authMethod as AuthMethod,
+    resolved.apiKey,
+  );
+  const responsesUrl = applyOpenAICompatAuthToUrl(
+    buildOpenAIEndpoint(base, '/responses'),
+    runtime.authMethod as AuthMethod,
+    resolved.apiKey,
+  );
   const chatBody = {
     model: modelId,
     stream: false,
@@ -465,7 +474,11 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
       ? buildGeminiModelsEndpoint(cleanBase, resolved.apiKey, runtime.authMethod as AuthMethod, resolved.provider)
       : nativeClaude
         ? buildClaudeEndpoint(cleanBase || 'https://api.anthropic.com', '/models')
-      : buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models');
+      : applyOpenAICompatAuthToUrl(
+          buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models'),
+          runtime.authMethod as AuthMethod,
+          resolved.apiKey,
+        );
     const headers = nativeGemini
       ? buildGeminiHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, runtime.authorizationValueFormat)
       : nativeClaude

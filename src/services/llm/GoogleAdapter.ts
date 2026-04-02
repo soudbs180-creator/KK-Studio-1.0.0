@@ -850,19 +850,19 @@ export class GoogleAdapter implements LLMAdapter {
     /**
      * Google Audio/Music Generation
      * Handles:
-     * - Lyria (:predict)
+     * - Lyria-family music requests (:generateContent)
      * - Gemini 2.0+ (:generateContent with responseModalities)
      */
     async generateAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
 
-        // Strategy A: Lyria Music Generation (:predict)
+        // Strategy A: Lyria-family music generation (:generateContent)
         if (options.modelId.includes('lyria')) {
-            const url = `${cleanBase}/v1beta/models/${options.modelId}:predict?key=${keySlot.key}`;
+            const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent?key=${keySlot.key}`;
             const payload = {
-                instances: [{ prompt: options.prompt }],
-                parameters: {
-                    audioConfig: { audioFormat: "audio/wav" }
+                contents: [{ role: "user", parts: [{ text: options.prompt }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO", "TEXT"]
                 }
             };
 
@@ -878,15 +878,18 @@ export class GoogleAdapter implements LLMAdapter {
             }
 
             const data = await response.json();
-            const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-            if (b64) {
+            const audioPart = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData || p.inline_data);
+            const b64Raw = audioPart?.inlineData?.data || audioPart?.inline_data?.data;
+            if (b64Raw) {
+                const mimeType = audioPart?.inlineData?.mimeType || audioPart?.inline_data?.mime_type || 'audio/wav';
+                const b64 = String(b64Raw).replace(/[\s\r\n]+/g, '');
                 return {
-                    url: `data:audio/wav;base64,${b64}`,
+                    url: `data:${mimeType};base64,${b64}`,
                     status: 'success',
                     provider: 'Google',
                     model: options.modelId,
                     metadata: {
-                        requestPath: '/v1beta/models/:predict',
+                        requestPath: '/v1beta/models/:generateContent',
                         requestBodyPreview: buildSafeRequestBodyPreview(payload)
                     }
                 };
@@ -899,7 +902,7 @@ export class GoogleAdapter implements LLMAdapter {
             contents: [{ role: "user", parts: [{ text: options.prompt }] }],
             generationConfig: {
                 responseModalities: ["AUDIO"],
-                audioConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
             }
         };
 

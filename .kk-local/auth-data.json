@@ -98782,23 +98782,517 @@
           }
         ]
       }
+    },
+    "07a11773-6bfa-4d06-9dd6-090cf8c328fb": {
+      "id": "07a11773-6bfa-4d06-9dd6-090cf8c328fb",
+      "email": "07a11773-6bfa-4d06-9dd6-090cf8c328fb@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "7788a816-8987-4d3c-b4c6-e0d878a70b61": {
+      "id": "7788a816-8987-4d3c-b4c6-e0d878a70b61",
+      "email": "7788a816-8987-4d3c-b4c6-e0d878a70b61@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
+    },
+    "c57928cb-d59b-40d5-9e64-5b1898bab419": {
+      "id": "c57928cb-d59b-40d5-9e64-5b1898bab419",
+      "email": "c57928cb-d59b-40d5-9e64-5b1898bab419@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "fbc52764-7943-4c44-96e8-678c4366b681": {
+      "id": "fbc52764-7943-4c44-96e8-678c4366b681",
+      "email": "fbc52764-7943-4c44-96e8-678c4366b681@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
+    },
+    "3763455a-7650-4caa-b24e-a6e288010caf": {
+      "id": "3763455a-7650-4caa-b24e-a6e288010caf",
+      "email": "3763455a-7650-4caa-b24e-a6e288010caf@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "ad27474c-95b2-49e0-944c-3d2db57863bf": {
+      "id": "ad27474c-95b2-49e0-944c-3d2db57863bf",
+      "email": "ad27474c-95b2-49e0-944c-3d2db57863bf@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
+    },
+    "9595989b-c950-48e4-9189-2f8211d531d9": {
+      "id": "9595989b-c950-48e4-9189-2f8211d531d9",
+      "email": "9595989b-c950-48e4-9189-2f8211d531d9@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "db256547-04ea-43e0-aeda-b9de1b4cb8af": {
+      "id": "db256547-04ea-43e0-aeda-b9de1b4cb8af",
+      "email": "db256547-04ea-43e0-aeda-b9de1b4cb8af@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
+    },
+    "cdff3a92-5670-4df7-b8b3-cda43427a00b": {
+      "id": "cdff3a92-5670-4df7-b8b3-cda43427a00b",
+      "email": "cdff3a92-5670-4df7-b8b3-cda43427a00b@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "162142cb-6973-4d4b-9513-92dc065bf204": {
+      "id": "162142cb-6973-4d4b-9513-92dc065bf204",
+      "email": "162142cb-6973-4d4b-9513-92dc065bf204@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
+    },
+    "fc66e23c-7f90-4606-9c2d-6c04df8104a9": {
+      "id": "fc66e23c-7f90-4606-9c2d-6c04df8104a9",
+      "email": "fc66e23c-7f90-4606-9c2d-6c04df8104a9@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [],
+        "providers": [],
+        "entries": [
+          {
+            "id": "temp-entry-1",
+            "key": "sk-temp-entry-1",
+            "name": "Temp Key",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ]
+      }
+    },
+    "9e2ccc0f-abbf-4394-a12d-e10c36588791": {
+      "id": "9e2ccc0f-abbf-4394-a12d-e10c36588791",
+      "email": "9e2ccc0f-abbf-4394-a12d-e10c36588791@temp.local",
+      "userApisPayload": {
+        "version": 2,
+        "slots": [
+          {
+            "id": "temp-slot-1",
+            "key": "sk-temp-slot-1",
+            "name": "Temp Slot",
+            "provider": "OpenAI",
+            "type": "official",
+            "format": "openai",
+            "supportedModels": [
+              "gpt-4o-mini"
+            ],
+            "disabled": false,
+            "createdAt": 1700000000001,
+            "updatedAt": 1700000000001,
+            "status": "unknown",
+            "failCount": 0,
+            "successCount": 0,
+            "totalCost": 0,
+            "budgetLimit": -1,
+            "tokenLimit": -1,
+            "usedTokens": 0,
+            "lastUsed": null,
+            "lastError": null
+          }
+        ],
+        "providers": [],
+        "entries": []
+      }
     }
   },
   "tempUsers": {
-    "f840324a-d9db-4098-987c-24bfe9380da4": {
-      "userId": "f840324a-d9db-4098-987c-24bfe9380da4",
-      "email": "f840324a-d9db-4098-987c-24bfe9380da4@temp.local",
-      "nickname": "Guest_f840324a",
-      "createdAt": "2026-03-31T14:54:14.520Z",
-      "expiresAt": "2026-04-01T14:54:14.520Z",
+    "07a11773-6bfa-4d06-9dd6-090cf8c328fb": {
+      "userId": "07a11773-6bfa-4d06-9dd6-090cf8c328fb",
+      "email": "07a11773-6bfa-4d06-9dd6-090cf8c328fb@temp.local",
+      "nickname": "Guest_07a11773",
+      "createdAt": "2026-04-02T03:58:44.853Z",
+      "expiresAt": "2026-04-03T03:58:44.853Z",
       "isTempUser": true
     },
-    "f4d21e86-b55f-487a-a126-09300878ef88": {
-      "userId": "f4d21e86-b55f-487a-a126-09300878ef88",
-      "email": "f4d21e86-b55f-487a-a126-09300878ef88@temp.local",
-      "nickname": "Guest_f4d21e86",
-      "createdAt": "2026-03-31T15:07:02.739Z",
-      "expiresAt": "2026-04-01T15:07:02.739Z",
+    "7788a816-8987-4d3c-b4c6-e0d878a70b61": {
+      "userId": "7788a816-8987-4d3c-b4c6-e0d878a70b61",
+      "email": "7788a816-8987-4d3c-b4c6-e0d878a70b61@temp.local",
+      "nickname": "Guest_7788a816",
+      "createdAt": "2026-04-02T03:58:45.062Z",
+      "expiresAt": "2026-04-03T03:58:45.062Z",
+      "isTempUser": true
+    },
+    "c57928cb-d59b-40d5-9e64-5b1898bab419": {
+      "userId": "c57928cb-d59b-40d5-9e64-5b1898bab419",
+      "email": "c57928cb-d59b-40d5-9e64-5b1898bab419@temp.local",
+      "nickname": "Guest_c57928cb",
+      "createdAt": "2026-04-02T06:47:58.280Z",
+      "expiresAt": "2026-04-03T06:47:58.280Z",
+      "isTempUser": true
+    },
+    "fbc52764-7943-4c44-96e8-678c4366b681": {
+      "userId": "fbc52764-7943-4c44-96e8-678c4366b681",
+      "email": "fbc52764-7943-4c44-96e8-678c4366b681@temp.local",
+      "nickname": "Guest_fbc52764",
+      "createdAt": "2026-04-02T06:47:58.481Z",
+      "expiresAt": "2026-04-03T06:47:58.481Z",
+      "isTempUser": true
+    },
+    "3763455a-7650-4caa-b24e-a6e288010caf": {
+      "userId": "3763455a-7650-4caa-b24e-a6e288010caf",
+      "email": "3763455a-7650-4caa-b24e-a6e288010caf@temp.local",
+      "nickname": "Guest_3763455a",
+      "createdAt": "2026-04-02T09:05:59.623Z",
+      "expiresAt": "2026-04-03T09:05:59.623Z",
+      "isTempUser": true
+    },
+    "ad27474c-95b2-49e0-944c-3d2db57863bf": {
+      "userId": "ad27474c-95b2-49e0-944c-3d2db57863bf",
+      "email": "ad27474c-95b2-49e0-944c-3d2db57863bf@temp.local",
+      "nickname": "Guest_ad27474c",
+      "createdAt": "2026-04-02T09:05:59.822Z",
+      "expiresAt": "2026-04-03T09:05:59.822Z",
+      "isTempUser": true
+    },
+    "9595989b-c950-48e4-9189-2f8211d531d9": {
+      "userId": "9595989b-c950-48e4-9189-2f8211d531d9",
+      "email": "9595989b-c950-48e4-9189-2f8211d531d9@temp.local",
+      "nickname": "Guest_9595989b",
+      "createdAt": "2026-04-02T09:22:25.896Z",
+      "expiresAt": "2026-04-03T09:22:25.896Z",
+      "isTempUser": true
+    },
+    "db256547-04ea-43e0-aeda-b9de1b4cb8af": {
+      "userId": "db256547-04ea-43e0-aeda-b9de1b4cb8af",
+      "email": "db256547-04ea-43e0-aeda-b9de1b4cb8af@temp.local",
+      "nickname": "Guest_db256547",
+      "createdAt": "2026-04-02T09:22:26.111Z",
+      "expiresAt": "2026-04-03T09:22:26.111Z",
+      "isTempUser": true
+    },
+    "cdff3a92-5670-4df7-b8b3-cda43427a00b": {
+      "userId": "cdff3a92-5670-4df7-b8b3-cda43427a00b",
+      "email": "cdff3a92-5670-4df7-b8b3-cda43427a00b@temp.local",
+      "nickname": "Guest_cdff3a92",
+      "createdAt": "2026-04-02T09:37:14.694Z",
+      "expiresAt": "2026-04-03T09:37:14.694Z",
+      "isTempUser": true
+    },
+    "162142cb-6973-4d4b-9513-92dc065bf204": {
+      "userId": "162142cb-6973-4d4b-9513-92dc065bf204",
+      "email": "162142cb-6973-4d4b-9513-92dc065bf204@temp.local",
+      "nickname": "Guest_162142cb",
+      "createdAt": "2026-04-02T09:37:14.909Z",
+      "expiresAt": "2026-04-03T09:37:14.909Z",
+      "isTempUser": true
+    },
+    "fc66e23c-7f90-4606-9c2d-6c04df8104a9": {
+      "userId": "fc66e23c-7f90-4606-9c2d-6c04df8104a9",
+      "email": "fc66e23c-7f90-4606-9c2d-6c04df8104a9@temp.local",
+      "nickname": "Guest_fc66e23c",
+      "createdAt": "2026-04-02T09:42:36.810Z",
+      "expiresAt": "2026-04-03T09:42:36.810Z",
+      "isTempUser": true
+    },
+    "9e2ccc0f-abbf-4394-a12d-e10c36588791": {
+      "userId": "9e2ccc0f-abbf-4394-a12d-e10c36588791",
+      "email": "9e2ccc0f-abbf-4394-a12d-e10c36588791@temp.local",
+      "nickname": "Guest_9e2ccc0f",
+      "createdAt": "2026-04-02T09:42:37.029Z",
+      "expiresAt": "2026-04-03T09:42:37.029Z",
       "isTempUser": true
     }
   }

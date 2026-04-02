@@ -3,6 +3,7 @@ import { after, before, describe, test } from "node:test";
 
 import { createApiServer } from "../../apps/api/src/server.ts";
 import { InMemoryCreditAccountRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-credit-account-repository.ts";
+import { TEMP_USER_ID_HEADER } from "../../packages/shared/src/index.ts";
 
 function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
   const address = server.address();
@@ -392,6 +393,9 @@ describe("api server contract", () => {
     assert.equal(tempUserPayload.success, true);
     assert.equal(tempUserPayload.data.isTempUser, true);
     assert.match(tempUserPayload.data.email, /@temp\.local$/);
+    const tempUserHeaders = {
+      [TEMP_USER_ID_HEADER]: tempUserPayload.data.userId,
+    };
 
     const unauthorizedEntries = await fetch(`${baseUrl}/api/v1/profile/user-apis`, {
       headers: {
@@ -399,6 +403,60 @@ describe("api server contract", () => {
       },
     });
     assert.equal(unauthorizedEntries.status, 401);
+
+    const tempUserEntriesResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis`, {
+      method: "PUT",
+      headers: {
+        ...tempUserHeaders,
+        "content-type": "application/json",
+        "x-request-id": "req-contract-temp-user-apis-save",
+      },
+      body: JSON.stringify({
+        entries: [
+          {
+            id: "temp-entry-1",
+            key: "sk-temp-entry-1",
+            name: "Temp Key",
+            provider: "OpenAI",
+            type: "official",
+            format: "openai",
+            baseUrl: "https://api.openai.com/v1",
+            supportedModels: ["gpt-4o-mini"],
+            disabled: false,
+            createdAt: 1700000000001,
+            updatedAt: 1700000000001,
+            status: "unknown",
+            failCount: 0,
+            successCount: 0,
+            totalCost: 0,
+            budgetLimit: -1,
+            tokenLimit: -1,
+            usedTokens: 0,
+            lastUsed: null,
+            lastError: null,
+          },
+        ],
+      }),
+    });
+
+    assert.equal(tempUserEntriesResponse.status, 200);
+    const tempUserEntriesPayload = await tempUserEntriesResponse.json();
+    assert.equal(tempUserEntriesPayload.success, true);
+    assert.equal(tempUserEntriesPayload.data.entries.length, 1);
+    assert.equal(tempUserEntriesPayload.data.entries[0].id, "temp-entry-1");
+
+    const tempUserEntriesGet = await fetch(`${baseUrl}/api/v1/profile/user-apis`, {
+      headers: {
+        ...tempUserHeaders,
+        "x-request-id": "req-contract-temp-user-apis-get",
+      },
+    });
+
+    assert.equal(tempUserEntriesGet.status, 200);
+    const tempUserEntriesGetPayload = await tempUserEntriesGet.json();
+    assert.equal(tempUserEntriesGetPayload.success, true);
+    assert.equal(tempUserEntriesGetPayload.data.entries.length, 1);
+    assert.equal(tempUserEntriesGetPayload.data.entries[0].provider, "OpenAI");
 
     const userApiEntriesResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis`, {
       method: "PUT",
@@ -456,12 +514,81 @@ describe("api server contract", () => {
   });
 
   test("profile key-manager cloud-state endpoints honor the contract shape", async () => {
+    const tempUserResponse = await fetch(`${baseUrl}/api/v1/auth/temp-users`, {
+      method: "POST",
+      headers: {
+        "x-request-id": "req-contract-temp-user-key-manager",
+      },
+    });
+    assert.equal(tempUserResponse.status, 201);
+    const tempUserPayload = await tempUserResponse.json();
+    assert.equal(tempUserPayload.success, true);
+
+    const tempUserHeaders = {
+      [TEMP_USER_ID_HEADER]: tempUserPayload.data.userId,
+    };
+
     const unauthorizedState = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
       headers: {
         "x-request-id": "req-contract-key-manager-unauthorized",
       },
     });
     assert.equal(unauthorizedState.status, 401);
+
+    const tempSaveResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      method: "PUT",
+      headers: {
+        ...tempUserHeaders,
+        "content-type": "application/json",
+        "x-request-id": "req-contract-temp-key-manager-save",
+      },
+      body: JSON.stringify({
+        version: 2,
+        slots: [
+          {
+            id: "temp-slot-1",
+            key: "sk-temp-slot-1",
+            name: "Temp Slot",
+            provider: "OpenAI",
+            type: "official",
+            format: "openai",
+            supportedModels: ["gpt-4o-mini"],
+            disabled: false,
+            createdAt: 1700000000001,
+            updatedAt: 1700000000001,
+            status: "unknown",
+            failCount: 0,
+            successCount: 0,
+            totalCost: 0,
+            budgetLimit: -1,
+            tokenLimit: -1,
+            usedTokens: 0,
+            lastUsed: null,
+            lastError: null,
+          },
+        ],
+        providers: [],
+      }),
+    });
+
+    assert.equal(tempSaveResponse.status, 200);
+    const tempSavePayload = await tempSaveResponse.json();
+    assert.equal(tempSavePayload.success, true);
+    assert.equal(tempSavePayload.data.slots.length, 1);
+    assert.equal(tempSavePayload.data.slots[0].id, "temp-slot-1");
+
+    const tempGetResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      headers: {
+        ...tempUserHeaders,
+        "x-request-id": "req-contract-temp-key-manager-get",
+      },
+    });
+
+    assert.equal(tempGetResponse.status, 200);
+    const tempGetPayload = await tempGetResponse.json();
+    assert.equal(tempGetPayload.success, true);
+    assert.equal(tempGetPayload.data.slots.length, 1);
+    assert.equal(tempGetPayload.data.slots[0].id, "temp-slot-1");
 
     const saveResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
       method: "PUT",

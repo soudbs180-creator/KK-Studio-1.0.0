@@ -10,6 +10,7 @@ import {
 
 interface AuthenticatedProfileContext {
   userId: string;
+  email: string | null;
 }
 
 interface ProfileUserApisRow {
@@ -26,6 +27,14 @@ export interface UserApisEnvelope {
 }
 
 type JsonRecord = Record<string, unknown>;
+
+const USER_APIS_PAYLOAD_CACHE_TTL_MS = 15_000;
+
+const userApisPayloadCache = new Map<string, {
+  payload: UserApisEnvelope | null;
+  expiresAt: number;
+}>();
+const userApisPayloadInFlight = new Map<string, Promise<unknown | null>>();
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error && 'message' in error) {
@@ -67,6 +76,19 @@ function toArray(value: unknown): unknown[] {
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneEnvelope(payload: UserApisEnvelope | null): UserApisEnvelope | null {
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    version: payload.version,
+    slots: [...payload.slots],
+    providers: [...payload.providers],
+    entries: [...payload.entries],
+  };
 }
 
 function isEncryptedSecretEnvelope(value: unknown): boolean {
@@ -114,6 +136,34 @@ function payloadHasEncryptedSecrets(rawPayload: unknown): boolean {
   return slotsContainEncryptedKey || providersContainEncryptedKey || entriesContainEncryptedKey;
 }
 
+function getCachedUserApisPayload(userId: string): UserApisEnvelope | null | undefined {
+  const cached = userApisPayloadCache.get(userId);
+  if (!cached) {
+    return undefined;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    userApisPayloadCache.delete(userId);
+    return undefined;
+  }
+
+  return cloneEnvelope(cached.payload);
+}
+
+function setCachedUserApisPayload(userId: string, payload: unknown | null): UserApisEnvelope | null {
+  const normalizedPayload = payload == null ? null : normalizeEnvelope(payload);
+  userApisPayloadCache.set(userId, {
+    payload: cloneEnvelope(normalizedPayload),
+    expiresAt: Date.now() + USER_APIS_PAYLOAD_CACHE_TTL_MS,
+  });
+  return cloneEnvelope(normalizedPayload);
+}
+
+function invalidateCachedUserApisPayload(userId: string): void {
+  userApisPayloadCache.delete(userId);
+  userApisPayloadInFlight.delete(userId);
+}
+
 async function loadUserApisPayloadDirectlyFromProfile(
   userId: string,
 ): Promise<unknown | null> {
@@ -134,12 +184,8 @@ async function saveUserApisPayloadDirectlyToProfile(
   userId: string,
   rawPayload: unknown,
 ): Promise<void> {
-  const { data, error: userError } = await supabase.auth.getUser();
-  if (userError) {
-    throw new Error(getErrorMessage(userError, 'Failed to resolve Supabase user session.'));
-  }
-
-  const email = data.user?.email ?? null;
+  const sessionSnapshot = await getAuthenticatedProfileContext(userId);
+  const email = sessionSnapshot?.email ?? null;
   const { error } = await supabase
     .from('profiles')
     .upsert({
@@ -297,18 +343,20 @@ async function saveNormalizedUserApisPayloadDirectlyToProfile(
   };
 
   await saveUserApisPayloadDirectlyToProfile(userId, persistablePayload);
+  invalidateCachedUserApisPayload(userId);
   return persistablePayload;
 }
 
 async function getAuthenticatedProfileContext(
   expectedUserId?: string,
 ): Promise<AuthenticatedProfileContext | null> {
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getSession();
   if (error) {
     throw new Error(getErrorMessage(error, 'Failed to resolve Supabase user session.'));
   }
 
-  const userId = String(data.user?.id || '').trim();
+  const sessionUser = data.session?.user;
+  const userId = String(sessionUser?.id || '').trim();
   if (!userId) {
     return null;
   }
@@ -317,7 +365,10 @@ async function getAuthenticatedProfileContext(
     return null;
   }
 
-  return { userId };
+  return {
+    userId,
+    email: sessionUser?.email ?? null,
+  };
 }
 
 export function getUserApisPayloadDensity(rawPayload: unknown): number {
@@ -364,62 +415,75 @@ export async function loadUserApisPayloadViaSupabase(
     return null;
   }
 
-  const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
-  const directProfileDensity = getUserApisPayloadDensity(directProfilePayload);
-  const directProfileHasEncryptedSecrets = payloadHasEncryptedSecrets(directProfilePayload);
+  const cachedPayload = getCachedUserApisPayload(context.userId);
+  if (cachedPayload !== undefined) {
+    return cachedPayload;
+  }
 
-  if (!shouldUseLegacyWebApiFallback()) {
+  const existingInFlight = userApisPayloadInFlight.get(context.userId);
+  if (existingInFlight) {
+    return await existingInFlight;
+  }
+
+  const loadPromise = (async (): Promise<unknown | null> => {
+    const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
+    const directProfileDensity = getUserApisPayloadDensity(directProfilePayload);
+    const directProfileHasEncryptedSecrets = payloadHasEncryptedSecrets(directProfilePayload);
+
     if (directProfileDensity > 0 && !directProfileHasEncryptedSecrets) {
       return normalizeEnvelope(directProfilePayload);
+    }
+
+    if (!shouldUseLegacyWebApiFallback()) {
+      if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
+        return sanitizeClientVisibleEnvelope(normalizeEnvelope(directProfilePayload));
+      }
+
+      return null;
+    }
+
+    const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
+      legacyWebApiClient.getKeyManagerCloudState(),
+      legacyWebApiClient.getUserApiEntries(),
+    ]);
+
+    const keyManagerState = unwrapOrUndefined(
+      keyManagerResponse,
+    );
+    const userApiEntries = unwrapOrUndefined(
+      userApiEntriesResponse,
+    );
+    const combinedApiPayload =
+      keyManagerState || userApiEntries
+        ? combineUserApisEnvelopeSources(keyManagerState, userApiEntries)
+        : null;
+    const combinedApiDensity = getUserApisPayloadDensity(combinedApiPayload);
+
+    if (combinedApiDensity > 0) {
+      return combinedApiPayload;
     }
 
     if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
       return sanitizeClientVisibleEnvelope(normalizeEnvelope(directProfilePayload));
     }
 
-    return null;
-  }
+    if (!keyManagerState && !userApiEntries) {
+      throw new Error(
+        getApiFailureMessage(keyManagerResponse)
+        || getApiFailureMessage(userApiEntriesResponse)
+        || 'Failed to load key-manager cloud state.',
+      );
+    }
 
-  const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
-    legacyWebApiClient.getKeyManagerCloudState(),
-    legacyWebApiClient.getUserApiEntries(),
-  ]);
-
-  const keyManagerState = unwrapOrUndefined(
-    keyManagerResponse,
-  );
-  const userApiEntries = unwrapOrUndefined(
-    userApiEntriesResponse,
-  );
-  const combinedApiPayload =
-    keyManagerState || userApiEntries
-      ? combineUserApisEnvelopeSources(keyManagerState, userApiEntries)
-      : null;
-  const combinedApiDensity = getUserApisPayloadDensity(combinedApiPayload);
-
-  if (combinedApiDensity > 0) {
     return combinedApiPayload;
-  }
+  })()
+    .then((payload) => setCachedUserApisPayload(context.userId, payload))
+    .finally(() => {
+      userApisPayloadInFlight.delete(context.userId);
+    });
 
-  if (directProfileDensity > 0 && !directProfileHasEncryptedSecrets) {
-    return normalizeEnvelope(directProfilePayload);
-  }
-
-  if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
-    throw new Error(
-      'Supabase profile contains encrypted user_apis payload, but the local API server is not available to decrypt it.',
-    );
-  }
-
-  if (!keyManagerState && !userApiEntries) {
-    throw new Error(
-      getApiFailureMessage(keyManagerResponse)
-      || getApiFailureMessage(userApiEntriesResponse)
-      || 'Failed to load key-manager cloud state.',
-    );
-  }
-
-  return combinedApiPayload;
+  userApisPayloadInFlight.set(context.userId, loadPromise);
+  return await loadPromise;
 }
 
 export async function saveUserApisPayloadViaSupabase(

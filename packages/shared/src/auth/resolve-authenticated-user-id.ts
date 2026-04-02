@@ -4,6 +4,7 @@ export const AUTHENTICATED_USER_ROLE_HEADER = "x-authenticated-user-role";
 export const ADMIN_SESSION_TOKEN_HEADER = "x-admin-session-token";
 export const AUTHENTICATED_ADMIN_SESSION_HEADER = "x-authenticated-admin-session";
 export const AUTHENTICATED_ADMIN_SESSION_EXPIRES_AT_HEADER = "x-authenticated-admin-session-expires-at";
+export const TEMP_USER_ID_HEADER = "x-kk-temp-user-id";
 
 export interface AuthenticatedAdminSession {
   active: boolean;
@@ -51,6 +52,12 @@ export function resolveAdminSessionToken(
   headers: Record<string, string>,
 ): string | undefined {
   return readInternalHeader(headers, ADMIN_SESSION_TOKEN_HEADER);
+}
+
+export function resolveTempUserId(
+  headers: Record<string, string>,
+): string | undefined {
+  return readInternalHeader(headers, TEMP_USER_ID_HEADER);
 }
 
 export function resolveAuthenticatedAdminSession(

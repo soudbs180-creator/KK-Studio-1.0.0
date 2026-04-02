@@ -13,7 +13,7 @@ test('keyManager only uses legacy key-manager cloud routes when runtime fallback
   const source = readSource('src/services/auth/keyManager.ts');
 
   assert.match(source, /shouldUseLegacyWebApiFallback/);
-  assert.match(source, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\);/);
+  assert.match(source, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
   assert.match(source, /if \(canUseLegacyApi\) \{/);
   assert.match(source, /const accessToken = await getPreferredKkApiAccessToken\(\);/);
   assert.match(source, /legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\)/);

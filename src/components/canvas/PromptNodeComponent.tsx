@@ -731,6 +731,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     ).trim();
     const shellReferenceImages = node.referenceImages?.slice(0, isThumbnailShell ? 1 : 2) || [];
     const stackZIndex = stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex);
+    const cardSurfaceZIndex = (node.isGenerating || showError)
+        ? stackZIndex + 120
+        : stackZIndex;
     const renderPos = isDragging ? localPosRef.current : node.position;
     const renderLeft = snapCanvasCoordinate(renderPos.x - cardWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(renderPos.y - cardHeight, zoomScale || 1);
@@ -784,12 +787,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ref={containerRef}
                 className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
                 style={isChatMode ? {
-                    zIndex: stackZIndex,
                     opacity: 1,
                 } : {
                     left: renderLeft - originX,
                     top: renderTop - originY,
-                    zIndex: stackZIndex,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     willChange: isDragging ? 'transform, left, top' : 'auto',
@@ -812,6 +813,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         boxShadow: shellCardShadow,
                         transform: promptCardTransform,
                         transformOrigin: '50% 50%',
+                        zIndex: cardSurfaceZIndex,
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'transform, box-shadow, border-color',
                     }}
@@ -933,12 +935,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             ref={containerRef}
             className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
                 style={isChatMode ? {
-                    zIndex: stackZIndex,
                     opacity: 1,
                 } : {
                     left: renderLeft - originX,
                     top: renderTop - originY,
-                    zIndex: stackZIndex,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                 willChange: isDragging ? 'transform, left, top' : 'auto', // 🚀 [性能优化] 拖拽时启用GPU加速
@@ -962,6 +962,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     boxShadow: mainCardShadow,
                     transform: promptCardTransform,
                     transformOrigin: '50% 50%',
+                    zIndex: cardSurfaceZIndex,
                     transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                     transitionProperty: 'transform, box-shadow, border-color',
                 }}

@@ -30,8 +30,12 @@ export const MODEL_REGISTRY: Record<string, ModelCapability> = {
     'gemini-3-pro-image-preview': { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', provider: 'Google', type: 'image' },
     'gemini-2.5-flash-image': { id: 'gemini-2.5-flash-image', name: 'Nano Banana', provider: 'Google', type: 'image' },
     'veo-2.0-generate-001': { id: 'veo-2.0-generate-001', name: 'Veo 2.0', provider: 'Google', type: 'video' },
-    'lyria-realtime-v1': { id: 'lyria-realtime-v1', name: 'Lyria Music', provider: 'Google', type: 'audio', isSystemInternal: true },
-    'gemini-2.0-flash-audio': { id: 'gemini-2.0-flash-audio', name: 'Gemini 2.0 Audio', provider: 'Google', type: 'audio' },
+    'lyria-3-pro-preview': { id: 'lyria-3-pro-preview', name: 'Lyria 3 Pro Preview', provider: 'Google', type: 'audio' },
+    'lyria-3-clip-preview': { id: 'lyria-3-clip-preview', name: 'Lyria 3 Clip Preview', provider: 'Google', type: 'audio' },
+    'lyria-realtime-v1': { id: 'lyria-realtime-v1', name: 'Lyria Music (Legacy)', provider: 'Google', type: 'audio', isSystemInternal: true },
+    'gemini-2.5-flash-preview-tts': { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash TTS', provider: 'Google', type: 'audio' },
+    'gemini-2.5-pro-preview-tts': { id: 'gemini-2.5-pro-preview-tts', name: 'Gemini 2.5 Pro TTS', provider: 'Google', type: 'audio' },
+    'gemini-2.0-flash-audio': { id: 'gemini-2.0-flash-audio', name: 'Gemini 2.0 Audio (Legacy)', provider: 'Google', type: 'audio' },
     
     // --- Audio/Music Models ---
     'suno-v4': { id: 'suno-v4', name: 'Suno V4', provider: 'Custom', type: 'audio' },

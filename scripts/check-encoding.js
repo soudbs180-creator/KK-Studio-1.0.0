@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const roots = [
+const scanRoots = [
   'src',
   'apps',
   'api',
@@ -16,9 +16,13 @@ const roots = [
   'tests',
   'vite.config.ts',
   'vercel.json',
+  'README.md',
+  'PROJECT_ROOT_GUIDE.md',
+  '.env.example',
+  path.join('apps', 'api', '.env.local.example'),
 ];
 
-const extensions = new Set([
+const scanExtensions = new Set([
   '.ts',
   '.tsx',
   '.js',
@@ -33,54 +37,38 @@ const extensions = new Set([
   '.yml',
 ]);
 
-const suspiciousTokens = [
-  '閿?',
-  '闁?',
-  '妫?',
-  '闁稿繑濞婂Λ?',
-  '闂冨懎鐭曠划?',
-  '缂傚啯鍨圭划鍫曟閺嶇虎鍤?',
-  'API Key 闂€鐐靛У閺?',
-  '闁炬儳顦伴弲銉︽媴閸℃鍤掗梻鍕姈缁?',
-  '缂傚倸鎼惃?',
-  '闁衡偓椤栨瑧甯?',
-  '缂佸鍨伴崹搴ㄥ礂閸涱厸鍋?',
-  '闁活潿鍔嶉崺?',
-  '濞戞挸顑堝ù?',
-  '濡澘瀚～?',
-  '棣?',
-  '皎眳?',
-  '閴?',
-  '閽跨媴绗?',
-  '馃',
-  '鉂',
-  '鉁',
-  '瑙ｆ瀽',
-  '鐢诲竷',
-  '鍥剧墖',
-  '椤圭洰',
-  '鏈湴',
-  '鏂囨。',
-  '鍔犺浇',
+const suspiciousFragments = [
+  '鏄竴娆',
+  '鍙戠幇',
+  '缂栫爜',
+  '璇峰',
   '淇濆瓨',
-  '鎭㈠',
-  '纭繚',
-  '鍚堝苟',
-  '鏁版嵁',
-  '榛樿',
-  '缁熻',
-  '璁板綍',
-  '鏍囪',
-  '鍖呭惈',
-  '绗?',
-  '璺?',
-  '渚涘簲鍟',
-  '鎵句笉鍒',
-  '妫板嫮',
+  '鏆傛椂',
+  '妫€娴',
+  '褰撳墠',
+  '瀹樻柟',
+  '绗笁鏂',
+  '鎺ュ彛',
+  '鍒锋柊',
+  '娴忚鍣',
+  '鐢ㄤ簬鎵胯浇',
+  'SUPABASE_SERVICE_ROLE_KEY=浣犵殑',
 ];
 
-const suspiciousCharSet = new Set('瑙鏋鍥鐢纭鍚鏈椤娓鎭榛闄鍏鏃鍔鍒鍙鍐寮娌缁绗鍖馃鉁鉂渚妫');
-const skipDirectories = new Set(['node_modules', 'dist', '.git', '.npm-cache', 'coverage', '.agent']);
+const suspiciousCharSet = new Set('鍙闂妫璇淇鏂褰缂閹鏆閲棰渚涘簲鍐娴瀹閫绗鐢浣');
+const skipDirectories = new Set([
+  'node_modules',
+  'dist',
+  '.git',
+  '.npm-cache',
+  'coverage',
+  '.agent',
+  '.agents',
+  '.kk-local',
+  '.tmp-playwright',
+  'release',
+  'workspace',
+]);
 const ignoreFiles = new Set([
   path.resolve(process.argv[1]),
   path.resolve('scripts/fix-garbled-chars.cjs'),
@@ -88,7 +76,11 @@ const ignoreFiles = new Set([
 const issues = [];
 
 function shouldScan(filePath) {
-  return extensions.has(path.extname(filePath));
+  if (ignoreFiles.has(path.resolve(filePath))) {
+    return false;
+  }
+
+  return scanExtensions.has(path.extname(filePath)) || path.basename(filePath).startsWith('.env');
 }
 
 function countSuspiciousChars(text) {
@@ -102,12 +94,25 @@ function countSuspiciousChars(text) {
 }
 
 function hasSuspiciousText(text) {
-  if (suspiciousTokens.some((token) => token && text.includes(token))) {
+  if (
+    text.startsWith('//')
+    || text.startsWith('/*')
+    || text.startsWith('*')
+    || text.startsWith('*/')
+  ) {
+    return false;
+  }
+
+  if (text.includes('pick(') || text.includes('suspiciousLocaleCharSet')) {
+    return false;
+  }
+
+  if (suspiciousFragments.some((fragment) => text.includes(fragment))) {
     return true;
   }
 
   const suspiciousCharCount = countSuspiciousChars(text);
-  if (suspiciousCharCount >= 4) {
+  if (suspiciousCharCount >= 2) {
     return true;
   }
 
@@ -119,45 +124,56 @@ function hasSuspiciousText(text) {
 }
 
 function walk(targetPath) {
-  if (!fs.existsSync(targetPath)) return;
-  if (ignoreFiles.has(path.resolve(targetPath))) return;
+  if (!fs.existsSync(targetPath)) {
+    return;
+  }
 
-  const stat = fs.statSync(targetPath);
+  const resolvedPath = path.resolve(targetPath);
+  if (ignoreFiles.has(resolvedPath)) {
+    return;
+  }
+
+  const stat = fs.statSync(resolvedPath);
   if (stat.isDirectory()) {
-    for (const entry of fs.readdirSync(targetPath, { withFileTypes: true })) {
+    for (const entry of fs.readdirSync(resolvedPath, { withFileTypes: true })) {
       if (skipDirectories.has(entry.name)) {
         continue;
       }
-      walk(path.join(targetPath, entry.name));
+
+      walk(path.join(resolvedPath, entry.name));
     }
     return;
   }
 
-  if (!shouldScan(targetPath)) return;
+  if (!shouldScan(resolvedPath)) {
+    return;
+  }
 
-  const content = fs.readFileSync(targetPath, 'utf8');
+  const content = fs.readFileSync(resolvedPath, 'utf8');
   const lines = content.split(/\r?\n/);
 
   lines.forEach((line, index) => {
     const trimmed = line.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
 
     if (hasSuspiciousText(trimmed)) {
-      issues.push(`${targetPath}:${index + 1}: ${trimmed}`);
+      issues.push(`${resolvedPath}:${index + 1}: ${trimmed}`);
     }
   });
 }
 
-for (const target of roots) {
+for (const target of scanRoots) {
   walk(path.resolve(target));
 }
 
 if (issues.length > 0) {
-  console.error('发现可疑乱码，请检查以下位置:');
+  console.error('Found suspicious mojibake text. Please review the following locations:');
   for (const issue of issues) {
     console.error(issue);
   }
   process.exit(1);
 }
 
-console.log('编码巡检通过：未发现可疑乱码。');
+console.log('Encoding check passed: no suspicious mojibake text found.');

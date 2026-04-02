@@ -58,6 +58,7 @@ export const syncService = {
       console.log('[SyncService] Layout saved via KK API');
     } catch (e) {
       console.error('[SyncService] Failed to save layout:', e);
+      throw e;
     }
   },
 
@@ -72,7 +73,7 @@ export const syncService = {
       return normalizeCanvasArray(data.canvases);
     } catch (e) {
       console.error('[SyncService] Failed to load layout:', e);
-      return [];
+      throw e;
     }
   },
 

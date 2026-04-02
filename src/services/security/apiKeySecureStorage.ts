@@ -13,6 +13,7 @@ import {
   type StoredUserApiEntry,
 } from '../api/userApiProfileStorage';
 import { extractUserApiEntriesFromPayload } from '../api/userApiPayload';
+import { shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { supabase } from '../../lib/supabase';
 import { callSecureSystemProxyChat } from '../model/secureModelProxy';
 
@@ -137,12 +138,12 @@ function toUserApiKeyInfoFromRawEntry(rawEntry: unknown): UserApiKeyInfo | null 
 }
 
 async function loadUserApiKeyMetadataFromProfile(): Promise<UserApiKeyInfo[]> {
-  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const { data: authData, error: authError } = await supabase.auth.getSession();
   if (authError) {
     throw authError;
   }
 
-  const userId = normalizeString(authData.user?.id);
+  const userId = normalizeString(authData.session?.user?.id);
   if (!userId) {
     return [];
   }
@@ -164,7 +165,24 @@ async function loadUserApiKeyMetadataFromProfile(): Promise<UserApiKeyInfo[]> {
 }
 
 export const getUserApiKeys = async (): Promise<UserApiKeyInfo[]> => {
-  let loadError: unknown = null;
+  let metadataError: unknown = null;
+
+  try {
+    const metadataEntries = await loadUserApiKeyMetadataFromProfile();
+    if (metadataEntries.length > 0) {
+      return metadataEntries;
+    }
+  } catch (error) {
+    metadataError = error;
+  }
+
+  if (!shouldUseLegacyWebApiFallback()) {
+    if (metadataError) {
+      throw metadataError;
+    }
+
+    return [];
+  }
 
   try {
     const entries = await loadUserApiEntries();
@@ -175,24 +193,16 @@ export const getUserApiKeys = async (): Promise<UserApiKeyInfo[]> => {
     if (hydratedEntries.length > 0) {
       return hydratedEntries;
     }
-  } catch (error) {
-    loadError = error;
+  } catch (entriesError) {
+    if (metadataError) {
+      throw metadataError;
+    }
+
+    throw entriesError;
   }
 
-  try {
-    const metadataEntries = await loadUserApiKeyMetadataFromProfile();
-    if (metadataEntries.length > 0) {
-      return metadataEntries;
-    }
-  } catch (profileError) {
-    if (loadError) {
-      throw loadError;
-    }
-    throw profileError;
-  }
-
-  if (loadError) {
-    throw loadError;
+  if (metadataError) {
+    throw metadataError;
   }
 
   return [];

@@ -1530,6 +1530,26 @@ export const MODEL_DESCRIPTIONS: Record<string, { category: string; description:
         description: 'MiniMax 音乐生成',
         rank: 'MiniMax Music'
     },
+    'gemini-2.5-flash-preview-tts': {
+        category: 'Audio Generation',
+        description: 'Google Gemini 2.5 Flash TTS',
+        rank: 'Gemini 2.5 Flash TTS'
+    },
+    'gemini-2.5-pro-preview-tts': {
+        category: 'Audio Generation',
+        description: 'Google Gemini 2.5 Pro TTS',
+        rank: 'Gemini 2.5 Pro TTS'
+    },
+    'lyria-3-pro-preview': {
+        category: 'Audio Generation',
+        description: 'Google Lyria 3 Pro music generation',
+        rank: 'Lyria 3 Pro Preview'
+    },
+    'lyria-3-clip-preview': {
+        category: 'Audio Generation',
+        description: 'Google Lyria 3 Clip music generation',
+        rank: 'Lyria 3 Clip Preview'
+    },
     'gemini-2.0-flash-audio': {
         category: '音频生成',
         description: 'Google Gemini 多模态语音生成',
@@ -1675,6 +1695,34 @@ export function getAudioCapability(modelId: string): AudioCapability | undefined
             supportsSpeedControl: false
         };
     }
+
+    if (lowerModelId.includes('tts')) {
+        return {
+            supportedDurations: [30, 60, 120, 300, 600],
+            maxDuration: 600,
+            formats: ['wav', 'mp3'],
+            supportsCustomLyrics: false,
+            supportsInstrumental: false,
+            supportsContinuation: false,
+            supportsStyleTags: false,
+            supportsVoiceSelection: true,
+            supportsSpeedControl: true
+        };
+    }
+
+    if (lowerModelId.includes('lyria')) {
+        return {
+            supportedDurations: [30, 60, 120],
+            maxDuration: 120,
+            formats: ['wav'],
+            supportsCustomLyrics: false,
+            supportsInstrumental: true,
+            supportsContinuation: false,
+            supportsStyleTags: false,
+            supportsVoiceSelection: false,
+            supportsSpeedControl: false
+        };
+    }
     
     return undefined;
 }
@@ -1693,6 +1741,7 @@ export function isAudioModel(modelId: string): boolean {
         lowerModelId.includes('minimax-tts') ||
         lowerModelId.includes('minimax-music') ||
         lowerModelId.includes('lyria') ||
+        lowerModelId.includes('tts') ||
         (lowerModelId.includes('audio') && !lowerModelId.includes('video'));
 }
 

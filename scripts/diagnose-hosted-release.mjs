@@ -3,25 +3,20 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
+import {
+  collectEnvSnapshots,
+  compareSupabaseProjectRefs,
+  findSnapshotEntries,
+  findIgnoredLegacySecrets,
+  getEffectiveValue,
+  isPlaceholder,
+  resolveRepoRoot,
+  summarizeValue,
+} from "./lib/env-contract.mjs";
+
 const scriptPath = fileURLToPath(import.meta.url);
-const repoRoot = path.resolve(path.dirname(scriptPath), "..");
+const repoRoot = resolveRepoRoot(import.meta.url);
 const rootPath = repoRoot;
-
-const envFiles = [
-  path.join(rootPath, ".env"),
-  path.join(rootPath, ".env.local"),
-  path.join(rootPath, "apps", "api", ".env"),
-  path.join(rootPath, "apps", "api", ".env.local"),
-  path.join(rootPath, "supabase", ".env.functions.local"),
-];
-
-const placeholderPatterns = [
-  /^replace-with-/i,
-  /^your[-_]/i,
-  /^changeme$/i,
-  /^todo$/i,
-  /^placeholder$/i,
-];
 
 const hostedFrontendRequired = [
   "VITE_SUPABASE_URL",
@@ -60,73 +55,6 @@ const functionSecretsRecommended = [
   "KK_INTERNAL_ROUTE_PROXY_SECRET",
   "SYSTEM_PROXY_TASK_SECRET",
 ];
-
-function isPlaceholder(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) return false;
-  return placeholderPatterns.some((pattern) => pattern.test(normalized));
-}
-
-function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-
-  return fs
-    .readFileSync(filePath, "utf8")
-    .split(/\r?\n/)
-    .reduce((acc, line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) return acc;
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) return acc;
-      const key = trimmed.slice(0, separatorIndex).trim();
-      let value = trimmed.slice(separatorIndex + 1).trim();
-      if (
-        (value.startsWith("\"") && value.endsWith("\""))
-        || (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      acc[key] = value;
-      return acc;
-    }, {});
-}
-
-function summarizeValue(value) {
-  if (!String(value || "").trim()) return "<missing>";
-  if (isPlaceholder(value)) return "<placeholder>";
-  return "<present>";
-}
-
-function collectEnvSnapshots() {
-  return envFiles
-    .filter((filePath) => fs.existsSync(filePath))
-    .map((filePath) => ({
-      filePath,
-      values: parseEnvFile(filePath),
-    }));
-}
-
-function getEffectiveValue(snapshots, key) {
-  const processValue = process.env[key];
-  if (String(processValue || "").trim()) {
-    return {
-      source: "process.env",
-      value: processValue,
-    };
-  }
-
-  for (let index = snapshots.length - 1; index >= 0; index -= 1) {
-    const snapshot = snapshots[index];
-    if (Object.prototype.hasOwnProperty.call(snapshot.values, key)) {
-      return {
-        source: path.relative(rootPath, snapshot.filePath) || snapshot.filePath,
-        value: snapshot.values[key],
-      };
-    }
-  }
-
-  return null;
-}
 
 function formatStatus(sourceRecord) {
   if (!sourceRecord) return "<missing>";
@@ -262,7 +190,10 @@ function printKeyStatuses(title, snapshots, keys) {
 }
 
 function run() {
-  const snapshots = collectEnvSnapshots();
+  const snapshots = collectEnvSnapshots(rootPath, { includeFunctionEnv: true });
+  const frontendSnapshots = snapshots.frontendSnapshots;
+  const localApiSnapshots = snapshots.apiSnapshots;
+  const hostedFunctionSnapshots = [...snapshots.apiSnapshots, ...snapshots.functionSnapshots];
   const vercelProject = readVercelProject();
   const vercelCli = inspectCommandAvailability("vercel", ["--version"], {
     label: "npx vercel",
@@ -302,9 +233,21 @@ function run() {
 
   printSection("Local Snapshot");
   console.log(`- repo: ${rootPath}`);
-  console.log(`- env files found: ${snapshots.length}`);
-  snapshots.forEach((snapshot) => {
-    console.log(`  * ${path.relative(rootPath, snapshot.filePath)}`);
+  console.log(`- frontend env files: ${frontendSnapshots.length}`);
+  frontendSnapshots.forEach((snapshot) => {
+    console.log(`  * ${snapshot.relativePath}`);
+  });
+  console.log(`- local API env files: ${localApiSnapshots.length}`);
+  localApiSnapshots.forEach((snapshot) => {
+    console.log(`  * ${snapshot.relativePath}`);
+  });
+  console.log(`- function env files: ${snapshots.functionSnapshots.length}`);
+  snapshots.functionSnapshots.forEach((snapshot) => {
+    console.log(`  * ${snapshot.relativePath}`);
+  });
+  console.log(`- ignored legacy env files: ${snapshots.ignoredSnapshots.length}`);
+  snapshots.ignoredSnapshots.forEach((snapshot) => {
+    console.log(`  * ${snapshot.relativePath}`);
   });
 
   printSection("Tooling");
@@ -327,15 +270,23 @@ function run() {
     console.log(`- orgId: ${vercelProject.orgId || "<missing>"}`);
   }
 
-  printKeyStatuses("Hosted Frontend Required Env", snapshots, hostedFrontendRequired);
-  printKeyStatuses("Hosted Frontend Recommended Env", snapshots, hostedFrontendRecommended);
-  printKeyStatuses("Hosted Frontend Optional Env", snapshots, hostedFrontendOptional);
-  printKeyStatuses("Supabase Function Required Secrets", snapshots, functionSecretsRequired);
-  printKeyStatuses("Supabase Function Recommended Secrets", snapshots, functionSecretsRecommended);
+  printKeyStatuses("Hosted Frontend Required Env", frontendSnapshots, hostedFrontendRequired);
+  printKeyStatuses("Hosted Frontend Recommended Env", frontendSnapshots, hostedFrontendRecommended);
+  printKeyStatuses("Hosted Frontend Optional Env", frontendSnapshots, hostedFrontendOptional);
+  printKeyStatuses("Supabase Function Required Secrets", hostedFunctionSnapshots, functionSecretsRequired);
+  printKeyStatuses("Supabase Function Recommended Secrets", hostedFunctionSnapshots, functionSecretsRecommended);
+
+  const publicSupabaseUrl = getEffectiveValue(frontendSnapshots, "VITE_SUPABASE_URL")?.value;
+  const serverSupabaseUrl = getEffectiveValue(localApiSnapshots, "SUPABASE_URL")?.value || publicSupabaseUrl;
+  const projectAlignment = compareSupabaseProjectRefs(publicSupabaseUrl, serverSupabaseUrl);
+  printSection("Supabase Project Alignment");
+  console.log(`- public project ref: ${projectAlignment.publicProjectRef || "<missing>"}`);
+  console.log(`- server project ref: ${projectAlignment.serverProjectRef || "<missing>"}`);
+  console.log(`- project refs match: ${projectAlignment.matches === undefined ? "<unknown>" : String(projectAlignment.matches)}`);
 
   printSection("Hosted Frontend Forbidden Env");
   hostedFrontendForbidden.forEach((key) => {
-    const value = getEffectiveValue(snapshots, key);
+    const value = getEffectiveValue(frontendSnapshots, key);
     if (!value) {
       console.log(`- ${key}: <not set>`);
       return;
@@ -361,23 +312,43 @@ function run() {
   if (!supabaseAuth.authenticated) {
     blockers.push("Supabase authentication is unavailable. Run `supabase login` or export `SUPABASE_ACCESS_TOKEN` before releasing.");
   }
+  if (projectAlignment.matches === false) {
+    blockers.push("SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL. Align the frontend and server env values before releasing.");
+  }
   hostedFrontendRequired.forEach((key) => {
-    const value = getEffectiveValue(snapshots, key);
+    const value = getEffectiveValue(frontendSnapshots, key);
     if (!value || isPlaceholder(value.value)) {
       remoteChecks.push(`Hosted frontend env ${key} is missing or still a placeholder in the local snapshot. Confirm it in Vercel before deploying.`);
     }
   });
   functionSecretsRequired.forEach((key) => {
-    const value = getEffectiveValue(snapshots, key);
+    const value = getEffectiveValue(hostedFunctionSnapshots, key);
     if (!value || isPlaceholder(value.value)) {
       remoteChecks.push(`Function secret ${key} is missing or still a placeholder in the local snapshot. Confirm it in Supabase Secrets before deploying.`);
     }
   });
   hostedFrontendForbidden.forEach((key) => {
-    const value = getEffectiveValue(snapshots, key);
+    const value = getEffectiveValue(frontendSnapshots, key);
     if (value && String(value.value || "").trim()) {
       warnings.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Keep it local-only and do not copy it into Vercel.`);
     }
+  });
+  const misplacedRootServerEnv = findSnapshotEntries(frontendSnapshots, [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_ANON_KEY",
+    "USER_API_ENCRYPTION_SECRET",
+  ]);
+  misplacedRootServerEnv.forEach((entry) => {
+    warnings.push(`Root env file ${entry.source} contains server-only key ${entry.key}. Local API startup ignores root server values, so move it into apps/api/.env.local or Supabase secrets.`);
+  });
+  const ignoredLegacySecrets = findIgnoredLegacySecrets(snapshots.ignoredSnapshots, [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SECRET_KEY",
+  ]);
+  ignoredLegacySecrets.forEach((entry) => {
+    warnings.push(`Legacy env file ${entry.source} still contains ${entry.key}. Hosted checks ignore server/.env, so move active server secrets into apps/api/.env.local or Supabase secrets.`);
   });
 
   printSection("Immediate Blockers");

@@ -45,10 +45,14 @@ export interface AuthDataServiceOptions {
   cloudMirror?: UserScopedAuthDataMirror;
 }
 
+const USER_APIS_RECONCILE_TTL_MS = 15_000;
+
 export class AuthDataService {
   private readonly logger = consoleLogger.child({ module: "auth-data" });
   private readonly repository: AuthDataRepository;
   private readonly cloudMirror?: UserScopedAuthDataMirror;
+  private readonly reconcileCompletedAt = new Map<string, number>();
+  private readonly reconcileInFlight = new Map<string, Promise<void>>();
 
   constructor(repository: AuthDataRepository, options: AuthDataServiceOptions = {}) {
     this.repository = repository;
@@ -151,29 +155,48 @@ export class AuthDataService {
       return;
     }
 
-    try {
-      const [localPayload, cloudPayload] = await Promise.all([
-        this.repository.getUserApisPayload(userId, email),
-        this.cloudMirror.loadUserApisPayload(accessToken, userId),
-      ]);
-
-      const localDensity = getPayloadDensity(localPayload);
-      const cloudDensity = getPayloadDensity(cloudPayload);
-
-      if (localDensity === 0 && cloudDensity > 0) {
-        await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
-        return;
-      }
-
-      if (localDensity > 0 && !arePayloadsEquivalent(cloudPayload, localPayload)) {
-        await this.cloudMirror.saveUserApisPayload(accessToken, userId, email, localPayload);
-      }
-    } catch (error) {
-      this.logger.warn("Failed to reconcile local auth data with the user-scoped Supabase mirror.", {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const now = Date.now();
+    const lastCompletedAt = this.reconcileCompletedAt.get(userId) || 0;
+    if (now - lastCompletedAt < USER_APIS_RECONCILE_TTL_MS) {
+      return;
     }
+
+    const inFlight = this.reconcileInFlight.get(userId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const reconcilePromise = (async () => {
+      try {
+        const [localPayload, cloudPayload] = await Promise.all([
+          this.repository.getUserApisPayload(userId, email),
+          this.cloudMirror!.loadUserApisPayload(accessToken, userId),
+        ]);
+
+        const localDensity = getPayloadDensity(localPayload);
+        const cloudDensity = getPayloadDensity(cloudPayload);
+
+        if (localDensity === 0 && cloudDensity > 0) {
+          await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
+          return;
+        }
+
+        if (localDensity > 0 && !arePayloadsEquivalent(cloudPayload, localPayload)) {
+          await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+        }
+      } catch (error) {
+        this.logger.warn("Failed to reconcile local auth data with the user-scoped Supabase mirror.", {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        this.reconcileCompletedAt.set(userId, Date.now());
+        this.reconcileInFlight.delete(userId);
+      }
+    })();
+
+    this.reconcileInFlight.set(userId, reconcilePromise);
+    return reconcilePromise;
   }
 
   private async pushLocalUserApisPayloadToCloud(
@@ -188,6 +211,7 @@ export class AuthDataService {
     try {
       const localPayload = await this.repository.getUserApisPayload(userId, email);
       await this.cloudMirror.saveUserApisPayload(accessToken, userId, email, localPayload);
+      this.reconcileCompletedAt.set(userId, Date.now());
     } catch (error) {
       this.logger.warn("Failed to mirror local auth data to the user-scoped Supabase profile.", {
         userId,
@@ -212,5 +236,9 @@ export class AuthDataService {
       data: tempUser,
       meta: buildRequestMeta(requestId, clientVersion),
     };
+  }
+
+  async resolveTempUserSession(userId: string): Promise<TempUserSessionDto | null> {
+    return await this.repository.getTempUserSession(userId);
   }
 }

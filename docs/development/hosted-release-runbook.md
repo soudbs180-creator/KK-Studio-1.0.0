@@ -21,6 +21,21 @@ Do not deploy the frontend first when the Edge Functions are still on an older r
 
 ## Current Hosted Requirements
 
+### Local development env authority
+
+Keep the local runtime split explicit:
+
+- Root `.env` / `.env.local` are for frontend public env such as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and local-only `VITE_KK_API_BASE_URL`.
+- `apps/api/.env.local` is the authoritative local API source for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `USER_API_ENCRYPTION_SECRET`.
+- `server/.env` is legacy-only and is ignored by the current local API startup and diagnostics.
+
+Before shipping, verify both local and hosted assumptions explicitly:
+
+```bash
+npm run api:diagnose
+npm run release:hosted:check
+```
+
 ### Vercel frontend
 
 Required:
@@ -103,7 +118,8 @@ You also need one of these:
 Run:
 
 ```bash
-node scripts/diagnose-hosted-release.mjs
+npm run api:diagnose
+npm run release:hosted:check
 npm run verify:changes
 npm run test:unit
 npm run build
@@ -111,6 +127,8 @@ npm run build
 
 What must be true before release:
 
+- Local `/healthz` reports `status: ok`
+- `config.canonicalPersistenceReady` is `true`
 - No hosted-required env shows as missing or placeholder in the local snapshot
 - `VITE_KK_API_BASE_URL` is not present in the hosted env plan
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` is not present in the hosted env plan

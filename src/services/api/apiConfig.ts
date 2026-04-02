@@ -175,6 +175,27 @@ export function buildOpenAIEndpoint(baseUrl: string | undefined, endpoint: strin
     return `${cleanBase}/${endpoint.replace(/^\/+/, '')}`;
 }
 
+export function applyOpenAICompatAuthToUrl(
+    url: string,
+    authMethod: AuthMethod,
+    apiKey: string,
+): string {
+    if (authMethod !== 'query' || !apiKey) {
+        return url;
+    }
+
+    const token = getApiKeyToken(apiKey);
+
+    try {
+        const parsed = new URL(url);
+        parsed.searchParams.set('key', token);
+        return parsed.toString();
+    } catch {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}key=${encodeURIComponent(token)}`;
+    }
+}
+
 export function normalizeClaudeBaseUrl(url: string | undefined): string {
     if (!url) return '';
 

@@ -20,8 +20,10 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(supabaseUserApiSource, /shouldUseLegacyWebApiFallback/);
   assert.match(supabaseUserApiSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
   assert.match(userApiProfileSource, /const canUseLegacyWebApi = shouldUseLegacyWebApiFallback\(\);/);
-  assert.match(userApiProfileSource, /canUseLegacyWebApi\s*&&\s*\(localEntries.length === 0 \|\| !areEntrySetsEquivalent\(localEntries, mergedEntries\)\)/);
-  assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\);/);
+  assert.match(userApiProfileSource, /canUseLegacyWebApi\s*&&\s*\(localEntries.length === 0 \|\| !areEntrySetsEquivalent\(localEntries, cloudEntries\)\)/);
+  assert.match(userApiProfileSource, /const mergedEntries = mergeUserApiEntrySets\(localEntries, cloudEntries\);/);
+  assert.match(userApiProfileSource, /entries: mergedEntries,/);
+  assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
   assert.match(keyManagerSource, /if \(canUseLegacyApi\) \{[\s\S]*legacyWebApiClient\.getKeyManagerCloudState/);
   assert.match(keyManagerSource, /if \(canUseLegacyApi && apiDensity === 0 && supabaseDensity > 0\) \{/);
   assert.match(keyManagerSource, /if \(canUseLegacyApi\) \{[\s\S]*legacyWebApiClient\.replaceKeyManagerCloudState/);

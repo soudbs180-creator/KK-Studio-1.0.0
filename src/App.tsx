@@ -954,12 +954,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       if (!active) return;
 
       // 1. Sync User ID
-      if (user) {
+      const authenticatedUserId = user && !isTempUser ? user.id : null;
+      const keyManagerUserId = user?.id || null;
+
+      if (authenticatedUserId) {
         import('./services/billing/costService').then(async ({ setUserId }) => {
           if (!active) return;
-          await setUserId(user.id);
+          await setUserId(authenticatedUserId);
         }).catch(err => console.error('[App] CostService sync failed:', err));
-        await keyManager.setUserId(user.id);
+        await keyManager.setUserId(keyManagerUserId);
         if (!active) return;
 
         // [New] Mark user as logged in on this browser (for future skips)
@@ -969,7 +972,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           if (!active) return;
           await setUserId(null);
         }).catch(err => console.error('[App] CostService reset failed:', err));
-        await keyManager.setUserId(null);
+        await keyManager.setUserId(keyManagerUserId);
         if (!active) return;
       }
 
@@ -1034,7 +1037,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     return () => {
       active = false;
     };
-  }, [user, authLoading]);
+  }, [user, isTempUser, authLoading]);
 
   // Generation config state
   // Generation config state with Persistence

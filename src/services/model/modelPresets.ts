@@ -2,87 +2,89 @@ export interface ModelPreset {
     id: string;
     label: string;
     provider: string; // 'Google' | 'OpenAI' | 'Midjourney' | 'Stability' | 'Luma' | 'Runway' | 'Other'
-    type: 'image' | 'video' | 'chat' | 'image+chat' | 'audio';  // ✨ 支持多模态
+    type: 'image' | 'video' | 'chat' | 'image+chat' | 'audio';
     description?: string;
 }
 
 export const MODEL_PRESETS: ModelPreset[] = [
     // ============================================
-    // Gemini Image 系列
-    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image', provider: 'Google', type: 'image', description: '极速生成，适合快速验证灵感' },
-    { id: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2', provider: 'Google', type: 'image', description: '最新预览版，极速生成且支持多达 14 张参考图' },
-    { id: 'gemini-3-pro-image-preview', label: 'Nano Banana Pro', provider: 'Google', type: 'image', description: '增强细节与构图，适合高质量预览' },
+    // Gemini image models
+    // ============================================
+    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image', provider: 'Google', type: 'image', description: 'Fast official Google image generation model.' },
+    { id: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2', provider: 'Google', type: 'image', description: 'Preview image model with stronger reference-image support.' },
+    { id: 'gemini-3-pro-image-preview', label: 'Nano Banana Pro', provider: 'Google', type: 'image', description: 'Higher quality Google image generation preview model.' },
 
     // ============================================
-    // Google Veo 系列 (视频生成)
-    // 参考: https://ai.google.dev/gemini-api/docs/models/video
+    // Google Veo video generation
     // ============================================
-    { id: 'veo-3.1-generate-preview', label: 'Veo 3.1', provider: 'Google', type: 'video', description: '最新视频生成模型 (预览版)' },
-    { id: 'veo-3.1-fast-generate-preview', label: 'Veo 3.1 Fast', provider: 'Google', type: 'video', description: 'Veo 3.1 快速版' },
+    { id: 'veo-3.1-generate-preview', label: 'Veo 3.1', provider: 'Google', type: 'video', description: 'Latest Veo video generation preview model.' },
+    { id: 'veo-3.1-fast-generate-preview', label: 'Veo 3.1 Fast', provider: 'Google', type: 'video', description: 'Faster Veo 3.1 preview variant.' },
 
     // ============================================
-    // Google Audio/Music 音乐生成
+    // Google audio and speech generation
     // ============================================
-    { id: 'lyria-realtime-v1', label: 'Lyria Music', provider: 'Google', type: 'audio', description: 'Google 官方音乐生成模型，支持高质量音频' },
-    { id: 'gemini-2.0-flash-audio', label: 'Gemini 2.0 Audio', provider: 'Google', type: 'audio', description: 'Gemini 2.0 多模态语音生成' },
+    { id: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS', provider: 'Google', type: 'audio', description: 'Official low-latency Google TTS preview model.' },
+    { id: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro TTS', provider: 'Google', type: 'audio', description: 'Official higher-quality Google TTS preview model.' },
+    { id: 'lyria-3-pro-preview', label: 'Lyria 3 Pro Preview', provider: 'Google', type: 'audio', description: 'Official Google music generation preview model for longer, higher-fidelity output.' },
+    { id: 'lyria-3-clip-preview', label: 'Lyria 3 Clip Preview', provider: 'Google', type: 'audio', description: 'Official Google music generation preview model optimized for shorter clips.' },
 
     // ============================================
-    // Suno 音乐生成 (第三方代理)
+    // Suno music generation
     // ============================================
-    { id: 'suno-v4', label: 'Suno V4', provider: 'Custom', type: 'audio', description: '最新版 Suno，支持片段续写、风格迁移等全场景，最长 4 分钟' },
-    { id: 'suno-v3.5', label: 'Suno V3.5', provider: 'Custom', type: 'audio', description: '高性价比流派音乐生成，最长 3 分钟' },
-    { id: 'suno-v3', label: 'Suno V3', provider: 'Custom', type: 'audio', description: '入门级音乐生成，最长 2 分钟' },
+    { id: 'suno-v4', label: 'Suno V4', provider: 'Custom', type: 'audio', description: 'Latest Suno model with continuation and style controls.' },
+    { id: 'suno-v3.5', label: 'Suno V3.5', provider: 'Custom', type: 'audio', description: 'Balanced Suno music generation model.' },
+    { id: 'suno-v3', label: 'Suno V3', provider: 'Custom', type: 'audio', description: 'Entry-level Suno music generation model.' },
 
     // ============================================
-    // Udio 音乐生成
+    // Udio music generation
     // ============================================
-    { id: 'udio-v1', label: 'Udio V1', provider: 'Custom', type: 'audio', description: '高保真音乐生成，支持多种风格，音质优秀' },
+    { id: 'udio-v1', label: 'Udio V1', provider: 'Custom', type: 'audio', description: 'High-fidelity music generation model.' },
 
     // ============================================
-    // Riffusion 音乐生成
+    // Riffusion music generation
     // ============================================
-    { id: 'riffusion', label: 'Riffusion', provider: 'Custom', type: 'audio', description: '基于扩散模型的音乐生成，适合短音频片段' },
+    { id: 'riffusion', label: 'Riffusion', provider: 'Custom', type: 'audio', description: 'Diffusion-based short music clip generation model.' },
 
     // ============================================
-    // MiniMax 语音/音乐
+    // MiniMax speech and music
     // ============================================
-    { id: 'minimax-tts', label: 'MiniMax TTS', provider: 'Custom', type: 'audio', description: '多语种高质量人声配音，支持语速调节' },
-    { id: 'minimax-music', label: 'MiniMax Music', provider: 'Custom', type: 'audio', description: 'MiniMax 音乐生成模型' },
+    { id: 'minimax-tts', label: 'MiniMax TTS', provider: 'Custom', type: 'audio', description: 'Multilingual speech synthesis with voice and speed controls.' },
+    { id: 'minimax-music', label: 'MiniMax Music', provider: 'Custom', type: 'audio', description: 'MiniMax music generation model.' },
 
     // ============================================
-    // OpenAI (DALL-E) - 需通过第三方 API 代理
+    // OpenAI image generation
     // ============================================
-    { id: 'dall-e-3', label: 'DALL-E 3', provider: 'OpenAI', type: 'image', description: 'OpenAI 最强绘图模型' },
+    { id: 'dall-e-3', label: 'DALL-E 3', provider: 'OpenAI', type: 'image', description: 'OpenAI image generation model.' },
 
     // ============================================
-    // Flux (需通过代理 API)
+    // FLUX image generation
     // ============================================
-    { id: 'flux-pro', label: 'FLUX.1 Pro', provider: 'Black Forest Labs', type: 'image', description: '顶级开源模型商业版' },
-    { id: 'flux-schnell', label: 'FLUX.1 Schnell', provider: 'Black Forest Labs', type: 'image', description: 'FLUX 极速版' },
+    { id: 'flux-pro', label: 'FLUX.1 Pro', provider: 'Black Forest Labs', type: 'image', description: 'Top-tier FLUX commercial model.' },
+    { id: 'flux-schnell', label: 'FLUX.1 Schnell', provider: 'Black Forest Labs', type: 'image', description: 'Fast FLUX image model.' },
 ];
 
 export const CHAT_MODEL_PRESETS: ModelPreset[] = [
     // ============================================
-    // Google Gemini 系列 (多模态对话)
+    // Google Gemini chat models
     // ============================================
-    { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro 预览', provider: 'Google', type: 'chat', description: '世界最强多模态模型，顶级推理能力' },
-    { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash 预览', provider: 'Google', type: 'chat', description: 'Gemini 3 快速版，新鲜力兼鲜' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash（极快式）', provider: 'Google', type: 'chat', description: '速度优先，低成本对话模型' },
+    { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', provider: 'Google', type: 'chat', description: 'Top-end multimodal reasoning model.' },
+    { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'Google', type: 'chat', description: 'Fast general-purpose Gemini preview model.' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', type: 'chat', description: 'Low-latency Gemini 2.5 chat model.' },
 
     // ============================================
-    // DeepSeek 系列
+    // DeepSeek chat models
     // ============================================
-    { id: 'deepseek-chat', label: 'DeepSeek V3', provider: 'DeepSeek', type: 'chat', description: '性价比极高的通用对话模型' },
-    { id: 'deepseek-reasoner', label: 'DeepSeek R1', provider: 'DeepSeek', type: 'chat', description: 'DeepSeek 推理增强模型 (R1)' },
+    { id: 'deepseek-chat', label: 'DeepSeek V3', provider: 'DeepSeek', type: 'chat', description: 'General-purpose DeepSeek chat model.' },
+    { id: 'deepseek-reasoner', label: 'DeepSeek R1', provider: 'DeepSeek', type: 'chat', description: 'DeepSeek reasoning-focused model.' },
 
     // ============================================
-    // OpenAI 系列
+    // OpenAI chat models
     // ============================================
-    { id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI', type: 'chat', description: 'OpenAI 旗舰全能模型' },
-    { id: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'OpenAI', type: 'chat', description: '快速且低成本的轻量级模型' },
+    { id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI', type: 'chat', description: 'Flagship OpenAI multimodal model.' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'OpenAI', type: 'chat', description: 'Smaller, lower-cost GPT-4o variant.' },
 
     // ============================================
-    // Anthropic 系列
+    // Anthropic chat models
     // ============================================
-    { id: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet', provider: 'Anthropic', type: 'chat', description: 'Anthropic 最强平衡模型' },
+    { id: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet', provider: 'Anthropic', type: 'chat', description: 'Balanced Anthropic flagship model.' },
 ];

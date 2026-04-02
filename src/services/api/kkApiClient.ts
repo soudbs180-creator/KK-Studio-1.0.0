@@ -2,7 +2,10 @@ import {
   createKkApiClient,
   type KkApiClient,
 } from "../../../packages/contracts/src/index.ts";
-import { ADMIN_SESSION_TOKEN_HEADER } from "../../../packages/shared/src/index.ts";
+import {
+  ADMIN_SESSION_TOKEN_HEADER,
+  TEMP_USER_ID_HEADER,
+} from "../../../packages/shared/src/index.ts";
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 import {
   getPreferredKkApiAccessToken,
@@ -10,6 +13,36 @@ import {
   setStoredKkApiAccessToken,
 } from "./authAccessToken.ts";
 import { getStoredAdminSessionToken } from "./adminSession.ts";
+
+const TEMP_USER_STORAGE_KEY = "temp_user_session_v1";
+
+function readStoredTempUserId(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TEMP_USER_STORAGE_KEY);
+    if (!raw) {
+      return undefined;
+    }
+
+    const session = JSON.parse(raw) as {
+      expiresAt?: number;
+      user?: { id?: unknown };
+    };
+    const expiresAt = Number(session?.expiresAt || 0);
+    if (Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt <= Date.now()) {
+      window.localStorage.removeItem(TEMP_USER_STORAGE_KEY);
+      return undefined;
+    }
+
+    const userId = String(session?.user?.id || "").trim();
+    return userId || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function isLoopbackHostname(hostname: string): boolean {
   const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
@@ -103,6 +136,7 @@ export function createLegacyWebApiClient(): KkApiClient {
     getClientVersion: () => "kk-legacy-web",
     getDefaultHeaders: () => ({
       [ADMIN_SESSION_TOKEN_HEADER]: getStoredAdminSessionToken(),
+      [TEMP_USER_ID_HEADER]: readStoredTempUserId(),
     }),
   });
 }

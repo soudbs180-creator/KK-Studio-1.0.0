@@ -1,6 +1,7 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
 import { waitForAuthSessionChange } from '../auth/authSessionEvents';
+import { resolveKkApiBaseUrl, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -141,6 +142,11 @@ type SecureProxyBoundaryError = Error & {
 
 let refreshCloudSessionPromise: Promise<CloudSessionResolution | null> | null = null;
 let invalidateCloudSessionPromise: Promise<void> | null = null;
+let lastCloudSessionInvalidationWarningAt = 0;
+
+const TRANSIENT_PROXY_RETRY_STATUS_CODES = new Set([502, 503, 504]);
+const MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS = 2;
+const TRANSIENT_PROXY_RETRY_BASE_DELAY_MS = 250;
 
 function getSecureProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
@@ -148,6 +154,76 @@ function getSecureProxyEndpoint(): string {
 
 function getLocalUserRouteProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/user-route-proxy`;
+}
+
+function getLocalSystemProxyEndpoint(): string {
+  return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/system`;
+}
+
+function shouldUseLocalSystemProxy(): boolean {
+  return shouldUseLegacyWebApiFallback();
+}
+
+function isRetryableProxyFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (error.name === 'AbortError') {
+    return false;
+  }
+
+  const message = String(error.message || '').trim().toLowerCase();
+  return (
+    error.name === 'TypeError'
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('load failed')
+  );
+}
+
+function shouldRetryProxyResponse(response?: Response): boolean {
+  return Boolean(response && TRANSIENT_PROXY_RETRY_STATUS_CODES.has(response.status));
+}
+
+function waitForProxyRetry(attempt: number): Promise<void> {
+  const delayMs = Math.max(0, TRANSIENT_PROXY_RETRY_BASE_DELAY_MS * attempt);
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, delayMs);
+  });
+}
+
+async function fetchWithTransientProxyRetry(
+  url: string,
+  init: RequestInit,
+  proxyName: string,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (!shouldRetryProxyResponse(response) || attempt >= MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS) {
+        return response;
+      }
+
+      console.warn(
+        `[secureModelProxy] ${proxyName} returned ${response.status}; retrying (${attempt}/${MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS})`,
+      );
+    } catch (error) {
+      if (!isRetryableProxyFetchError(error) || attempt >= MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS) {
+        throw error;
+      }
+
+      console.warn(
+        `[secureModelProxy] ${proxyName} request failed; retrying (${attempt}/${MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS})`,
+        error,
+      );
+    }
+
+    await waitForProxyRetry(attempt);
+  }
+
+  throw new Error(`${proxyName} request failed after retrying.`);
 }
 
 function buildSecureProxyBoundaryError(
@@ -329,8 +405,8 @@ async function resolveCloudSession(
   if (!resolvedSession?.accessToken) {
     // secure-model-proxy is backed by Supabase auth and must never use the
     // legacy compatibility token from the web API login flow. If we fail to
-    // recover a valid cloud session here, clear the stale local auth cache so
-    // the UI can stop presenting a phantom logged-in state.
+    // recover a valid cloud session here, surface a reauth error without
+    // force-clearing the browser's local session cache.
     await invalidateCloudSession(`Unable to recover Supabase session for ${feature}`);
     throw buildCloudSessionError(feature);
   }
@@ -344,11 +420,16 @@ async function invalidateCloudSession(reason: string): Promise<void> {
   }
 
   invalidateCloudSessionPromise = (async () => {
-    try {
-      console.warn('[secureModelProxy] Clearing invalid Supabase auth session:', reason);
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (error) {
-      console.warn('[secureModelProxy] Failed to clear invalid Supabase auth session:', error);
+    const now = Date.now();
+    if (now - lastCloudSessionInvalidationWarningAt >= 10_000) {
+      // Preserve the browser's local session cache here. Supabase can briefly
+      // return transient 401s during refresh races or platform hiccups, and
+      // force-signing the user out on the first miss is too disruptive.
+      console.warn(
+        '[secureModelProxy] Reauth is required, but preserving the local Supabase session cache to avoid an unexpected sign-out:',
+        reason,
+      );
+      lastCloudSessionInvalidationWarningAt = now;
     }
   })().finally(() => {
     invalidateCloudSessionPromise = null;
@@ -403,7 +484,7 @@ async function invokeSecureSystemProxyHttp(
   accessToken: string,
   body: Record<string, unknown>
 ): Promise<SecureProxyInvokeResult> {
-  const response = await fetch(getSecureProxyEndpoint(), {
+  const response = await fetchWithTransientProxyRetry(getSecureProxyEndpoint(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -411,7 +492,7 @@ async function invokeSecureSystemProxyHttp(
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
-  });
+  }, 'secure-model-proxy');
 
   let data: any = null;
   let parseError: Error | null = null;
@@ -460,9 +541,20 @@ async function invokeSecureSystemProxy(
   feature: string,
   body: Record<string, unknown>
 ): Promise<any> {
-  const invokeWithToken = async (accessToken: string): Promise<SecureProxyInvokeResult> => (
-    invokeSecureSystemProxyHttp(accessToken, body)
-  );
+  const invokeWithToken = async (accessToken: string): Promise<SecureProxyInvokeResult> => {
+    try {
+      return await invokeSecureSystemProxyHttp(accessToken, body);
+    } catch (error) {
+      if (isRetryableProxyFetchError(error)) {
+        throw buildSecureProxyBoundaryError('System proxy is temporarily unavailable. Please try again.', {
+          status: 502,
+          feature,
+        });
+      }
+
+      throw error;
+    }
+  };
 
   const session = await resolveCloudSession(feature);
   let result = await invokeWithToken(session.accessToken);
@@ -496,6 +588,12 @@ type LocalUserRouteProxyHttpResult = {
   responseBody: string;
 };
 
+type LocalSystemProxyHttpResult = {
+  response?: Response;
+  payload: any;
+  responseBody: string;
+};
+
 function isInvalidJwtResponse(responseBody: string, payload: any): boolean {
   const joinedMessage = [
     payload?.error?.message,
@@ -513,7 +611,7 @@ async function invokeLocalUserRouteProxyHttp(
   accessToken: string,
   body: Record<string, unknown>,
 ): Promise<LocalUserRouteProxyHttpResult> {
-  const response = await fetch(getLocalUserRouteProxyEndpoint(), {
+  const response = await fetchWithTransientProxyRetry(getLocalUserRouteProxyEndpoint(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -521,7 +619,36 @@ async function invokeLocalUserRouteProxyHttp(
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
-  });
+  }, 'user-route-proxy');
+
+  let payload: any = null;
+  let responseBody = '';
+  try {
+    responseBody = await response.clone().text();
+    payload = responseBody ? JSON.parse(responseBody) : null;
+  } catch {
+    payload = null;
+  }
+
+  return {
+    response,
+    payload,
+    responseBody,
+  };
+}
+
+async function invokeLocalSystemProxyHttp(
+  accessToken: string,
+  body: Record<string, unknown>,
+): Promise<LocalSystemProxyHttpResult> {
+  const response = await fetchWithTransientProxyRetry(getLocalSystemProxyEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  }, 'local-system-proxy');
 
   let payload: any = null;
   let responseBody = '';
@@ -550,7 +677,9 @@ async function invokeLocalUserRouteProxy(
     result = await invokeLocalUserRouteProxyHttp(session.accessToken, body);
   } catch (error: any) {
     throw buildSecureProxyBoundaryError(
-      error?.message || 'Failed to reach the user-route proxy.',
+      isRetryableProxyFetchError(error)
+        ? 'User-route proxy is temporarily unavailable. Please try again.'
+        : error?.message || 'Failed to reach the user-route proxy.',
       {
         code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
         status: 502,
@@ -607,11 +736,81 @@ async function invokeLocalUserRouteProxy(
   return result.payload.data;
 }
 
+async function invokeLocalSystemProxy(
+  feature: string,
+  body: Record<string, unknown>,
+): Promise<any> {
+  const invokeWithToken = async (accessToken: string): Promise<LocalSystemProxyHttpResult> => {
+    try {
+      return await invokeLocalSystemProxyHttp(accessToken, body);
+    } catch (error) {
+      if (isRetryableProxyFetchError(error)) {
+        throw buildSecureProxyBoundaryError('Local system proxy is temporarily unavailable. Please try again.', {
+          status: 502,
+          feature,
+        });
+      }
+
+      throw error;
+    }
+  };
+
+  const session = await resolveCloudSession(feature);
+  let result = await invokeWithToken(session.accessToken);
+
+  if (result.response?.status === 401 || isInvalidJwtResponse(result.responseBody, result.payload)) {
+    try {
+      console.warn('[secureModelProxy] Local system proxy returned 401/Invalid JWT, forcing session refresh before retry');
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
+      if (recoveredSession.accessToken) {
+        result = await invokeWithToken(recoveredSession.accessToken);
+      }
+    } catch (error) {
+      console.warn('[secureModelProxy] Cloud session recovery failed after local system proxy 401:', error);
+      if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (!result.response?.ok || !result.payload?.success) {
+    const errorMessage =
+      result.payload?.error?.message
+      || result.responseBody
+      || `Local system proxy failed with status ${result.response?.status ?? 500}`;
+
+    if (
+      result.response?.status === 401
+      || isInvalidJwtResponse(result.responseBody, result.payload)
+    ) {
+      await invalidateCloudSession(`local-system-proxy returned 401 during ${feature}`);
+      throw buildSessionReauthError(feature, result.responseBody);
+    }
+
+    throw buildSecureProxyBoundaryError(errorMessage, {
+      status: result.response?.status,
+      responseBody: result.responseBody,
+      feature,
+    });
+  }
+
+  return result.payload.data;
+}
+
 export async function cancelSecureSystemProxyTask(taskId: string): Promise<boolean> {
   if (String(taskId || '').startsWith('local_proxy:')) {
     await invokeLocalUserRouteProxy('task cancel', {
       mode: 'cancel_task',
       localTaskId: taskId,
+    });
+
+    return true;
+  }
+
+  if (shouldUseLocalSystemProxy()) {
+    await invokeLocalSystemProxy('task cancel', {
+      mode: 'cancel_task',
+      taskId,
     });
 
     return true;
@@ -635,6 +834,15 @@ export async function deleteSecureSystemProxyTask(taskId: string): Promise<boole
     return true;
   }
 
+  if (shouldUseLocalSystemProxy()) {
+    await invokeLocalSystemProxy('task delete', {
+      mode: 'delete_task',
+      taskId,
+    });
+
+    return true;
+  }
+
   await invokeSecureSystemProxy('task delete', {
     mode: 'delete_task',
     taskId,
@@ -648,6 +856,15 @@ export async function downloadSecureSystemProxyTaskContent(taskId: string): Prom
     const data = await invokeLocalUserRouteProxy('task download', {
       mode: 'download_task',
       localTaskId: taskId,
+    });
+
+    return String(data.url || '');
+  }
+
+  if (shouldUseLocalSystemProxy()) {
+    const data = await invokeLocalSystemProxy('task download', {
+      mode: 'download_task',
+      taskId,
     });
 
     return String(data.url || '');
@@ -687,15 +904,24 @@ export async function callSecureSystemProxyChat(
     content: normalizeMessageContent(message.content),
   }));
 
-  const data = await invokeSecureSystemProxy('chat generation', {
-    mode: 'chat',
-    modelId: payload.modelId,
-    userRoute: payload.userRoute,
-    messages: normalizedMessages,
-    temperature: payload.temperature,
-    maxTokens: payload.maxTokens,
-    stream: payload.stream ?? false,
-  });
+  const data = shouldUseLocalSystemProxy()
+    ? await invokeLocalSystemProxy('chat generation', {
+      mode: 'chat',
+      modelId: payload.modelId,
+      messages: normalizedMessages,
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+      stream: payload.stream ?? false,
+    })
+    : await invokeSecureSystemProxy('chat generation', {
+      mode: 'chat',
+      modelId: payload.modelId,
+      userRoute: payload.userRoute,
+      messages: normalizedMessages,
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+      stream: payload.stream ?? false,
+    });
 
   return {
     content: data.content || '',
@@ -741,16 +967,26 @@ export async function callSecureSystemProxyImage(
     });
   }
 
-  const data = await invokeSecureSystemProxy('image generation', {
-    mode: 'image',
-    modelId: payload.modelId,
-    userRoute: payload.userRoute,
-    prompt: payload.prompt,
-    aspectRatio: payload.aspectRatio,
-    imageSize: payload.imageSize,
-    imageCount: payload.imageCount ?? 1,
-    referenceImages: payload.referenceImages ?? [],
-  });
+  const data = shouldUseLocalSystemProxy()
+    ? await invokeLocalSystemProxy('image generation', {
+      mode: 'image',
+      modelId: payload.modelId,
+      prompt: payload.prompt,
+      aspectRatio: payload.aspectRatio,
+      imageSize: payload.imageSize,
+      imageCount: payload.imageCount ?? 1,
+      referenceImages: payload.referenceImages ?? [],
+    })
+    : await invokeSecureSystemProxy('image generation', {
+      mode: 'image',
+      modelId: payload.modelId,
+      userRoute: payload.userRoute,
+      prompt: payload.prompt,
+      aspectRatio: payload.aspectRatio,
+      imageSize: payload.imageSize,
+      imageCount: payload.imageCount ?? 1,
+      referenceImages: payload.referenceImages ?? [],
+    });
 
   return {
     urls: Array.isArray(data.urls) ? data.urls : [],
@@ -792,18 +1028,30 @@ export async function callSecureSystemProxyVideo(
     });
   }
 
-  const data = await invokeSecureSystemProxy('video generation', {
-    mode: 'video',
-    modelId: payload.modelId,
-    userRoute: payload.userRoute,
-    prompt: payload.prompt,
-    aspectRatio: payload.aspectRatio,
-    resolution: payload.resolution,
-    duration: payload.duration,
-    videoDuration: payload.videoDuration,
-    imageUrl: payload.imageUrl,
-    imageTailUrl: payload.imageTailUrl,
-  });
+  const data = shouldUseLocalSystemProxy()
+    ? await invokeLocalSystemProxy('video generation', {
+      mode: 'video',
+      modelId: payload.modelId,
+      prompt: payload.prompt,
+      aspectRatio: payload.aspectRatio,
+      resolution: payload.resolution,
+      duration: payload.duration,
+      videoDuration: payload.videoDuration,
+      imageUrl: payload.imageUrl,
+      imageTailUrl: payload.imageTailUrl,
+    })
+    : await invokeSecureSystemProxy('video generation', {
+      mode: 'video',
+      modelId: payload.modelId,
+      userRoute: payload.userRoute,
+      prompt: payload.prompt,
+      aspectRatio: payload.aspectRatio,
+      resolution: payload.resolution,
+      duration: payload.duration,
+      videoDuration: payload.videoDuration,
+      imageUrl: payload.imageUrl,
+      imageTailUrl: payload.imageTailUrl,
+    });
 
   return {
     taskId: data.taskId || '',
@@ -849,12 +1097,18 @@ export async function callSecureSystemProxyAudio(
     });
   }
 
-  const data = await invokeSecureSystemProxy('audio generation', {
-    mode: 'audio',
-    modelId: payload.modelId,
-    userRoute: payload.userRoute,
-    prompt: payload.prompt,
-  });
+  const data = shouldUseLocalSystemProxy()
+    ? await invokeLocalSystemProxy('audio generation', {
+      mode: 'audio',
+      modelId: payload.modelId,
+      prompt: payload.prompt,
+    })
+    : await invokeSecureSystemProxy('audio generation', {
+      mode: 'audio',
+      modelId: payload.modelId,
+      userRoute: payload.userRoute,
+      prompt: payload.prompt,
+    });
 
   return {
     url: data.url || '',
@@ -883,10 +1137,15 @@ export async function callLocalUserRouteProxyAudio(
 }
 
 export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<SecureProxyTaskStatusResponse> {
-  const data = await invokeSecureSystemProxy('task status', {
-    mode: 'task_status',
-    taskId,
-  });
+  const data = shouldUseLocalSystemProxy()
+    ? await invokeLocalSystemProxy('task status', {
+      mode: 'task_status',
+      taskId,
+    })
+    : await invokeSecureSystemProxy('task status', {
+      mode: 'task_status',
+      taskId,
+    });
 
   return {
     status: data.status || 'pending',

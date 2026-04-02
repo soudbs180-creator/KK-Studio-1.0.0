@@ -7,6 +7,7 @@
 
 import { legacyWebApiClient } from '../api/kkApiClient';
 import {
+    applyOpenAICompatAuthToUrl,
     buildGeminiHeaders,
     buildGeminiModelsEndpoint,
     buildOpenAIEndpoint,
@@ -827,7 +828,11 @@ export async function fetchProviderModels(
         const response = await fetch(
             resolvedFormat === 'gemini'
                 ? buildGeminiModelsEndpoint(baseUrl, apiKey, geminiAuthMethod)
-                : buildOpenAIEndpoint(baseUrl, 'models'),
+                : applyOpenAICompatAuthToUrl(
+                    buildOpenAIEndpoint(baseUrl, 'models'),
+                    runtime.authMethod as 'query' | 'header',
+                    apiKey,
+                ),
             {
                 method: 'GET',
                 headers: resolvedFormat === 'gemini'

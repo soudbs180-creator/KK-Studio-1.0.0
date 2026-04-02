@@ -1,3 +1,3 @@
 # tests/unit
 
-用于承载领域服务、状态机、价格计算、积分计算等纯逻辑测试。
+Unit tests cover domain logic, runtime guards, API contracts, and source-level regression checks that are fast enough to run on every local iteration.

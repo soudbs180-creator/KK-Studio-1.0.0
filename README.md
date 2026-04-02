@@ -1,213 +1,56 @@
 # KK Studio v1.4.0
-A visual canvas workspace for multimodal creation, orchestration, and operations.
 
-![Version](https://img.shields.io/badge/version-1.4.0-indigo.svg)
-![React](https://img.shields.io/badge/React-19-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
-![Vite](https://img.shields.io/badge/Vite-6-purple)
-![Node](https://img.shields.io/badge/Node-24.x-339933)
+KK Studio is a multimodal canvas workspace for image, video, audio, and presentation workflows. It combines prompt authoring, model routing, user API management, workspace sync, and operational tooling in a single app.
 
----
+## Highlights
 
-## 项目简介
+- Visual canvas for prompts, assets, and generated results
+- Multiple model routes, including official endpoints and third-party providers
+- Local-first workflows with Supabase-backed auth, storage, and sync
+- Built-in settings surfaces for billing, diagnostics, logging, and provider management
 
-KK Studio 是一款面向图像、多模态与提示词生产的可视化 AI 工作台。它不只是“填参数然后等待生成结果”的工具，而是把创作编排、模型接入、成本观察、日志排查和存储管理集中到同一个工作区里，让个人创作者和小团队都能在一套界面中完成从想法到结果的闭环。
+## Tech Stack
 
-当前 `v1.4.0` 版本聚焦三条主线：
-- 管理后台与鉴权链路稳态：服务端 Supabase 配置解析收口，管理员会话、认证仓储与回退路径更清晰
-- 设置中心体验升级：总览、存储、系统日志等页面结构重整，并补齐中英双语表达能力
-- 工作区细节打磨：默认头像、用户资料、供应商管理、成本估算和画布周边交互继续收口
-
----
-
-## 项目优势
-
-### 1. 创作流可视化，而不是黑盒提交
-- 基于无限画布组织 Prompt、图片结果、参考图和分组结构，适合探索式创作
-- 支持拖拽、框选、整理、缩放与节点编排，思路变化时不需要推倒重来
-- 画布交互天然适合把“输入、参考、结果、复盘”放在同一空间里管理
-
-### 2. 多模型与多渠道接入更灵活
-- 支持 Google Gemini、NewAPI、OpenAI Compatible 等多种接入方式
-- 可以把官方链路与第三方供应商放在统一管理面板里维护
-- 更适合需要在模型能力、可用性、价格之间做平衡的团队
-
-### 3. 成本、日志、路由、存储都在一个工作台内闭环
-- 不只是“能生成”，还强调生成之后的成本可见性、日志可追溯性和工作区可维护性
-- 设置中心可以同时看到链路状态、余额信息、日志健康度和存储状态
-- 适合持续运营，而不是一次性的 Demo 型工具
-
-### 4. 本地优先，兼顾长期项目安全感
-- 支持浏览器缓存、设备私有存储与本地文件夹模式
-- 即使在复杂创作流程中，也能尽量降低内容丢失与上下文断裂的风险
-- 对频繁迭代的图像项目、视觉实验和多轮提示词打磨更友好
-
-### 5. 面向扩展的后台与工程结构
-- 既有前台创作体验，也有后台设置、管理控制台、支付边车和 Supabase 数据能力
-- 适合继续往团队协作、权限分层、账务和可观察性方向扩展
-- 文档、版本源和 AI 修改规则已经同步，后续多人协作更容易保持一致
-
----
-
-## 核心能力
-
-### 无限画布
-| 能力 | 说明 |
-|------|------|
-| 无限平移与缩放 | 空格拖拽、鼠标中键和平滑滚轮缩放 |
-| 多节点组织 | 支持框选、批量移动、删除与分组 |
-| 结果可视化沉淀 | Prompt、图片、参考图和结果卡片可并排留存在同一画布 |
-| 快速整理 | 通过自动整理与布局能力降低大画布混乱度 |
-
-### AI 生成与模型接入
-| 能力 | 说明 |
-|------|------|
-| 多渠道接入 | Gemini、兼容 OpenAI 协议的代理与第三方渠道统一配置 |
-| 参考图与多模态输入 | 支持结合参考图进行风格和构图引导 |
-| 成本追踪 | 对模型调用、图像生成与费用展示做统一口径管理 |
-| 聊天与创作协同 | 悬浮助手、上下文对话与画布工作区互补配合 |
-
-### 设置与运维能力
-| 能力 | 说明 |
-|------|------|
-| 设置中心 | Dashboard、API 管理、存储、日志、管理控制台统一入口 |
-| 双语基础能力 | 设置页支持 `zh-CN / en-US` 切换，便于面向不同使用者扩展 |
-| 系统日志 | 支持筛选、导出和实时流查看 |
-| 存储治理 | 支持缓存观察、工作区修复和项目合并等维护动作 |
-
-### 用户与后台管理
-| 能力 | 说明 |
-|------|------|
-| 管理员链路 | 管理会话、权限判断与后台能力逐步收口 |
-| 用户资料 | 用户资料和头像体系进一步规范化 |
-| 支付边车服务 | `payment-server/` 独立承担支付和 MCP 相关能力 |
-| Supabase 支撑 | Auth、Database、Edge Functions 为核心数据底座 |
-
----
-
-## 适用场景
-
-- 图像生成、参考图迭代、提示词调优
-- 多模型路由与供应商成本比较
-- 需要把“创作工作台”和“运维设置台”做在一起的 AI 产品
-- 面向个人创作者、小型工作室或内部创意工具团队
-
----
-
-## 快速开始
-
-### 环境要求
+- React 19
+- TypeScript 5.8
+- Vite 6
 - Node.js 24.x
-- Chrome 100+ 或 Edge
-- 建议启用硬件加速
+- Supabase
 
-### 安装运行
-```bash
-git clone https://github.com/your-repo/kk-studio.git
-cd kk-studio
-npm install
-npm run dev
-```
+## Local Development
 
-### 常用命令
+1. Copy `.env.example` to `.env` if you need frontend-level overrides.
+2. Copy `apps/api/.env.local.example` to `apps/api/.env.local`.
+3. Fill in a real `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env.local`.
+4. Install dependencies with `npm install`.
+5. Start the local stack with `npm run dev:start`.
+
+The local API startup is now strict: it only reads root `.env` / `.env.local` and `apps/api/.env` / `apps/api/.env.local`, and it intentionally ignores legacy `server/.env` files.
+
+## Common Commands
+
 ```bash
+npm run dev:start
+npm run dev:status
+npm run dev:stop
 npm run typecheck
-npm run check:encoding
+npm run test:unit
 npm run build
+npm run check:encoding
 ```
 
-### API 配置
-1. 打开应用左下角的设置入口。
-2. 进入“接口管理 / API Management”。
-3. 添加 Google Gemini Key 或兼容 OpenAI 协议的渠道。
-4. 完成链路测试后开始创作。
+## Project Layout
 
----
+- `src/`: frontend application
+- `apps/api/`: Node API and authenticated server flows
+- `payment-server/`: payment sidecar service
+- `supabase/`: migrations and edge-function assets
+- `scripts/`: development, verification, and release scripts
+- `tests/`: unit, contract, and e2e coverage
+- `docs/`: runbooks, reports, and implementation notes
 
-## 快捷键
+## Notes
 
-| 操作 | 快捷键 |
-|------|--------|
-| 画布平移 | `空格 + 拖拽` / `鼠标中键` |
-| 画布缩放 | `滚轮` |
-| 查看原图 | `双击图片` |
-| 关闭预览 | `双击` / `点击背景` |
-| 删除节点 | `Delete` / `Backspace` |
-| 全选 | `Ctrl + A` |
-| 搜索 | `Ctrl + K` |
-
----
-
-## 技术栈
-
-| 类别 | 技术 |
-|------|------|
-| 前端 | React 19、TypeScript 5.8、Vite 6 |
-| 样式与动效 | Tailwind CSS 4、Lucide、Framer Motion |
-| 状态与交互 | React Context、本地状态与画布交互层 |
-| 数据与鉴权 | Supabase、Node API、Edge Functions |
-| 支付与边车 | `payment-server/` |
-| 部署 | Vercel、Netlify、本地可移植打包 |
-
----
-
-## 项目结构
-
-```text
-<project-root>/
-├── src/                    # 主前端应用
-├── apps/api/               # Node API 与服务端鉴权能力
-├── payment-server/         # 支付边车与 MCP 客户端
-├── supabase/               # 迁移、函数与数据层配置
-├── docs/                   # 开发文档、报告与规格说明
-├── scripts/                # 构建、巡检、发布脚本
-├── tests/                  # 测试与验证脚本
-└── .agent/                 # 项目级 AI 修改规则
-```
-
----
-
-## v1.4.0 更新说明
-
-### 版本重点
-- 设置中心重构为更清晰的工作台式结构，总览、存储、日志与管理控制台的导航关系更统一
-- 引入 `LocaleProvider` 与本地化视图基座，为设置页提供中英双语表达能力
-- 管理后台链路继续收口，服务端 Supabase 配置解析、认证数据访问与管理员会话路径更稳定
-- 用户资料与默认头像策略补齐，注册与资料展示的一致性更好
-- 成本估算、供应商管理、日志查看和存储维护等能力继续向“可运营”方向打磨
-
-### 对外建议描述
-- 强调“可视化创作 + 多模型接入 + 运维闭环”三位一体，而不是单纯的图片生成工具
-- 强调 `v1.4.0` 更适合长期使用和持续运营，尤其是设置中心、日志、存储与后台能力的补齐
-- 如果面向团队介绍，可突出本地优先、成本可见和后台可扩展这三点
-
----
-
-## 历史版本摘录
-
-### v1.3.7 (2026-03-10)
-- 引入画布性能分级渲染与卡片缩略外壳模式
-- 为工作流兼容层预留数据结构底座
-- 统一图像成本展示口径，并优化移动端与窄卡片信息密度
-
-### v1.2.9 (2026-02-07)
-- 增加 GPU 渲染优化与粒子背景能力
-- 修复主卡丢失与生成失败时的错误状态显示
-
-### v1.2.5 (2026-02-03)
-- 接入 Veo 视频生成 API
-- 增强副卡排列模式与参考图限制控制
-- 补充计费参考信息与通知层级优化
-
----
-
-## 相关文档
-
-- [移动端 UI 优化报告](docs/reports/mobile-ui-optimization.md)
-- [模型服务文档](docs/development/model-service.md)
-- [开发进度](docs/development/progress.md)
-- [开发交接](docs/development/session-handoff.md)
-
----
-
-**Made with care by KK Studio Team**
+- Runtime artifacts under `.kk-local/` are local state, not source-of-truth project files.
+- If local development behaves inconsistently, check `npm run dev:status` and the logs under `.kk-local/logs/`.
+- For a quick repo orientation, see [PROJECT_ROOT_GUIDE.md](PROJECT_ROOT_GUIDE.md).

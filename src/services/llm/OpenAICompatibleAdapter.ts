@@ -1,9 +1,12 @@
 import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, AudioGenerationOptions, AudioGenerationResult, extractRefImageData } from './LLMAdapter';
 import { KeySlot, keyManager } from '../auth/keyManager';
 import {
+    type AuthMethod,
+    applyOpenAICompatAuthToUrl,
     buildOpenAIEndpoint,
     buildGeminiEndpoint,
     buildGeminiHeaders,
+    buildProxyHeaders,
     formatAuthorizationHeaderValue,
     normalizeApiProtocolFormat,
     normalizeGeminiBaseUrl,
@@ -220,7 +223,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
                 // Exponential backoff: 1500ms, 3000ms...
                 const delayMs = 1500 * Math.pow(2, attempt - 1);
-                console.warn(`[OpenAICompatibleAdapter] fetchWithTimeout: Attempt ${attempt} failed for ${url}. Error: ${err.message}. Retrying in ${delayMs}ms...`);
+                console.warn(`[OpenAICompatibleAdapter] fetchWithTimeout: Attempt ${attempt} failed for ${this.getRequestPathFromUrl(url)}. Error: ${err.message}. Retrying in ${delayMs}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delayMs));
             } finally {
                 clearTimeout(timeoutId);
@@ -277,6 +280,53 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         } catch {
             return url;
         }
+    }
+
+    private buildOpenAICompatRequestTarget(
+        url: string,
+        keySlot: KeySlot,
+        options: {
+            includeJsonContentType?: boolean;
+            includeAccept?: boolean;
+        } = {},
+    ): { url: string; headers: Record<string, string>; requestPath: string } {
+        const includeJsonContentType = options.includeJsonContentType !== false;
+        const includeAccept = options.includeAccept !== false;
+        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot);
+        let headers: Record<string, string> = {
+            ...(includeAccept ? { Accept: 'application/json' } : {}),
+            ...buildProxyHeaders(
+                runtime.authMethod as AuthMethod,
+                keySlot.key,
+                runtime.headerName,
+                keySlot.group,
+                runtime.authorizationValueFormat,
+            ),
+        };
+
+        headers = this.applyCustomHeaders(headers, keySlot);
+
+        if (!includeJsonContentType) {
+            delete headers['Content-Type'];
+            delete headers['content-type'];
+        }
+
+        if (runtime.authMethod === 'query') {
+            delete headers['Authorization'];
+            delete headers['authorization'];
+
+            const runtimeHeaderName = String(runtime.headerName || '').trim();
+            if (runtimeHeaderName) {
+                delete headers[runtimeHeaderName];
+                delete headers[runtimeHeaderName.toLowerCase()];
+            }
+        }
+
+        return {
+            url: applyOpenAICompatAuthToUrl(url, runtime.authMethod as AuthMethod, keySlot.key),
+            headers,
+            requestPath: this.getRequestPathFromUrl(url),
+        };
     }
 
     private buildHttpError(params: {
@@ -1214,21 +1264,29 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         requestPath?: string;
         headers?: Record<string, string>;
     }): Promise<{ payload: any; requestPath: string }> {
-        const headers = params.headers
-            ? { ...params.headers }
-            : this.buildImageRequestHeaders(params.keySlot, true);
+        const target = params.headers
+            ? {
+                url: params.url,
+                headers: { ...params.headers },
+                requestPath: params.requestPath || this.getRequestPathFromUrl(params.url),
+            }
+            : this.buildOpenAICompatRequestTarget(params.url, params.keySlot, {
+                includeJsonContentType: true,
+                includeAccept: true,
+            });
+        const headers = target.headers;
         if (params.method === 'POST') {
             headers['Content-Type'] = 'application/json';
         }
 
-        const response = await this.fetchWithTimeout(params.url, {
+        const response = await this.fetchWithTimeout(target.url, {
             method: params.method || 'GET',
             headers,
             body: params.body,
             signal: params.signal,
         }, this.getTimeoutMs(params.keySlot, 120000), 1);
 
-        const requestPath = params.requestPath || this.getRequestPathFromUrl(params.url);
+        const requestPath = target.requestPath;
         const raw = await response.text().catch(() => '');
 
         if (!response.ok) {
@@ -1538,9 +1596,13 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const detailUrl = new URL(`${cleanBase}${WUYIN_DETAIL_PATH}`);
         detailUrl.searchParams.set('id', taskId);
 
-        const response = await this.fetchWithTimeout(detailUrl.toString(), {
+        const target = this.buildOpenAICompatRequestTarget(detailUrl.toString(), keySlot, {
+            includeJsonContentType: true,
+            includeAccept: true,
+        });
+        const response = await this.fetchWithTimeout(target.url, {
             method: 'GET',
-            headers: this.buildImageRequestHeaders(keySlot, true),
+            headers: target.headers,
             signal,
         }, this.getTimeoutMs(keySlot, 120000), 1);
 
@@ -1681,12 +1743,15 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             );
         }
 
-        const headers = this.buildImageRequestHeaders(keySlot, true);
+        const target = this.buildOpenAICompatRequestTarget(url, keySlot, {
+            includeJsonContentType: true,
+            includeAccept: true,
+        });
         const payload = this.applyCustomBody(body, keySlot);
         const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
-        const response = await this.fetchWithTimeout(url, {
+        const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
-            headers,
+            headers: target.headers,
             body: JSON.stringify(payload),
             signal: options.signal,
         }, this.getTimeoutMs(keySlot, 120000), 1);
@@ -1818,7 +1883,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
         }
 
-        const headers = this.buildImageRequestHeaders(keySlot, true);
+        const target = this.buildOpenAICompatRequestTarget(url, keySlot, {
+            includeJsonContentType: true,
+            includeAccept: true,
+        });
         const payload = this.applyCustomBody(body, keySlot);
         const payloadStr = JSON.stringify(payload);
         const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
@@ -1826,8 +1894,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
             options,
             parserType: 'openai-compatible-image',
-            url,
-            headers,
+            url: target.url,
+            headers: target.headers,
             body: payloadStr,
             timeoutMs: this.getTimeoutMs(keySlot, 400000),
             requestPath,
@@ -1858,9 +1926,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        const response = await this.fetchWithTimeout(url, {
+        const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
-            headers,
+            headers: target.headers,
             body: payloadStr,
             signal: options.signal,
         }, this.getTimeoutMs(keySlot, 400000), 1);
@@ -2210,30 +2278,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
     }
 
-    private buildImageRequestHeaders(keySlot: KeySlot, includeJsonContentType: boolean): Record<string, string> {
-        let headers: Record<string, string> = {
-            'Accept': 'application/json',
-            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot)
-        };
-
-        if (includeJsonContentType) {
-            headers['Content-Type'] = 'application/json';
-        }
-
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            headers[keySlot.headerName] = keySlot.key;
-        }
-
-        headers = this.applyCustomHeaders(headers, keySlot);
-
-        if (!includeJsonContentType) {
-            delete headers['Content-Type'];
-            delete headers['content-type'];
-        }
-
-        return headers;
-    }
-
     private applyCustomFormData(formData: FormData, keySlot: KeySlot): FormData {
         const custom = keySlot.customBody;
         if (!custom || typeof custom !== 'object' || Array.isArray(custom)) {
@@ -2471,19 +2515,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return messages;
     }
 
-    private buildOpenAICompatibleHeaders(keySlot: KeySlot): Record<string, string> {
-        let headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot),
-        };
-
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            headers[keySlot.headerName] = keySlot.key;
-        }
-
-        return this.applyCustomHeaders(headers, keySlot);
-    }
-
     private buildChatCompletionsBody(options: ChatOptions, messages: any[]): any {
         let body: any = {
             model: options.modelId,
@@ -2562,34 +2593,42 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
     private async chatWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<string> {
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
-        const chatUrl = buildOpenAIEndpoint(baseUrl, '/chat/completions');
-        const responsesUrl = buildOpenAIEndpoint(baseUrl, '/responses');
+        const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
+            includeJsonContentType: true,
+            includeAccept: false,
+        });
+        const responsesTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/responses'), keySlot, {
+            includeJsonContentType: true,
+            includeAccept: false,
+        });
         const messages = this.buildOpenAICompatibleMessages(options);
-        const headers = this.buildOpenAICompatibleHeaders(keySlot);
         const chatBody = this.applyCustomBody(this.buildChatCompletionsBody(options, messages), keySlot);
         const responsesBody = this.buildResponsesApiBody(options, messages, false, keySlot);
         const preferResponses = modelPrefersResponsesApi(options.modelId);
 
-        const executeJsonRequest = async (url: string, body: any): Promise<any> => {
+        const executeJsonRequest = async (
+            target: { url: string; headers: Record<string, string>; requestPath: string },
+            body: any,
+        ): Promise<any> => {
             const payloadStr = JSON.stringify(body);
             if (payloadStr.length > 48 * 1024 * 1024) {
                 console.error(`[OpenAICompatibleAdapter] Chat request payload (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) is close to the 50MB limit.`);
             }
 
-            const response = await this.fetchWithTimeout(url, {
+            const response = await this.fetchWithTimeout(target.url, {
                 method: 'POST',
-                headers,
+                headers: target.headers,
                 body: payloadStr,
                 signal: options.signal
             }, this.getTimeoutMs(keySlot, 120000), 1);
 
-            return this.parseOpenAIJsonResponse(response, url, keySlot, body);
+            return this.parseOpenAIJsonResponse(response, target.requestPath, keySlot, body);
         };
 
         try {
             const data = preferResponses
-                ? await executeJsonRequest(responsesUrl, responsesBody)
-                : await executeJsonRequest(chatUrl, chatBody);
+                ? await executeJsonRequest(responsesTarget, responsesBody)
+                : await executeJsonRequest(chatTarget, chatBody);
             keyManager.reportCallResult(keySlot.id, true);
             return extractOpenAITextPayload(data) || '';
         } catch (error: any) {
@@ -2597,7 +2636,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
             if (!preferResponses && shouldRetryWithResponsesApi(error?.status, combinedErrorText)) {
                 try {
-                    const data = await executeJsonRequest(responsesUrl, responsesBody);
+                    const data = await executeJsonRequest(responsesTarget, responsesBody);
                     keyManager.reportCallResult(keySlot.id, true);
                     return extractOpenAITextPayload(data) || '';
                 } catch (responsesError: any) {
@@ -2606,7 +2645,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     logError(
                         'OpenAIAdapter',
                         responsesError instanceof Error ? responsesError : new Error(finalMessage),
-                        `URL: ${responsesUrl}\nStatus: ${responsesError?.status ?? 'unknown'}\nRaw Response: ${String(responsesError?.responseBody || '').slice(0, 500)}`,
+                        `Path: ${responsesTarget.requestPath}\nStatus: ${responsesError?.status ?? 'unknown'}\nRaw Response: ${String(responsesError?.responseBody || '').slice(0, 500)}`,
                     );
                     throw responsesError;
                 }
@@ -2617,7 +2656,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             logError(
                 'OpenAIAdapter',
                 error instanceof Error ? error : new Error(errMsg),
-                `URL: ${preferResponses ? responsesUrl : chatUrl}\nStatus: ${error?.status ?? 'unknown'}\nRaw Response: ${String(error?.responseBody || '').slice(0, 500)}`,
+                `Path: ${preferResponses ? responsesTarget.requestPath : chatTarget.requestPath}\nStatus: ${error?.status ?? 'unknown'}\nRaw Response: ${String(error?.responseBody || '').slice(0, 500)}`,
             );
             throw error;
         }
@@ -2625,10 +2664,15 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
     private async chatStreamWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<void> {
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
-        const chatUrl = buildOpenAIEndpoint(baseUrl, '/chat/completions');
-        const responsesUrl = buildOpenAIEndpoint(baseUrl, '/responses');
+        const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
+            includeJsonContentType: true,
+            includeAccept: false,
+        });
+        const responsesTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/responses'), keySlot, {
+            includeJsonContentType: true,
+            includeAccept: false,
+        });
         const messages = this.buildOpenAICompatibleMessages(options);
-        const headers = this.buildOpenAICompatibleHeaders(keySlot);
         const chatBody = this.applyCustomBody({
             ...this.buildChatCompletionsBody(options, messages),
             stream: true
@@ -2636,10 +2680,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const responsesBody = this.buildResponsesApiBody(options, messages, true, keySlot);
         const preferResponses = modelPrefersResponsesApi(options.modelId);
 
-        const streamRequest = async (url: string, body: any, mode: 'chat' | 'responses'): Promise<void> => {
-            const response = await this.fetchWithTimeout(url, {
+        const streamRequest = async (
+            target: { url: string; headers: Record<string, string>; requestPath: string },
+            body: any,
+            mode: 'chat' | 'responses',
+        ): Promise<void> => {
+            const response = await this.fetchWithTimeout(target.url, {
                 method: 'POST',
-                headers,
+                headers: target.headers,
                 body: JSON.stringify(body),
                 signal: options.signal
             }, this.getTimeoutMs(keySlot, 120000), 1);
@@ -2649,7 +2697,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 throw this.buildHttpError({
                     message: text || `HTTP ${response.status}`,
                     status: response.status,
-                    requestPath: this.getRequestPathFromUrl(url),
+                    requestPath: target.requestPath,
                     requestBody: this.buildSafeRequestBodyPreview(body),
                     responseBody: text.slice(0, 1600),
                     provider: keySlot.provider,
@@ -2693,7 +2741,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         try {
             await streamRequest(
-                preferResponses ? responsesUrl : chatUrl,
+                preferResponses ? responsesTarget : chatTarget,
                 preferResponses ? responsesBody : chatBody,
                 preferResponses ? 'responses' : 'chat',
             );
@@ -2701,7 +2749,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const combinedErrorText = [error?.message, error?.responseBody].filter(Boolean).join('\n');
             if (!preferResponses && shouldRetryWithResponsesApi(error?.status, combinedErrorText)) {
                 try {
-                    await streamRequest(responsesUrl, responsesBody, 'responses');
+                    await streamRequest(responsesTarget, responsesBody, 'responses');
                     return;
                 } catch (responsesError: any) {
                     keyManager.reportCallResult(keySlot.id, false, responsesError?.message || error?.message || 'Streaming request failed');
@@ -4226,13 +4274,16 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         reportedImageSize: string
     ): Promise<ImageGenerationResult> {
-        const headers = this.buildImageRequestHeaders(keySlot, false);
+        const target = this.buildOpenAICompatRequestTarget(url, keySlot, {
+            includeJsonContentType: false,
+            includeAccept: true,
+        });
         const requestBody = this.applyCustomFormData(formData, keySlot);
         const requestBodyPreview = this.buildSafeFormDataPreview(requestBody);
 
-        const response = await this.fetchWithTimeout(url, {
+        const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
-            headers,
+            headers: target.headers,
             body: requestBody,
             signal: options.signal
         }, this.getTimeoutMs(keySlot, 400000), 1);
@@ -4251,7 +4302,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
 
             keyManager.reportCallResult(keySlot.id, false, detail);
-            logError('OpenAIAdapter', new Error(detail), `URL: ${url}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
+            logError('OpenAIAdapter', new Error(detail), `Path: ${requestPath}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
             throw this.buildHttpError({
                 message: `[${response.status}] ${detail}`,
                 status: response.status,
@@ -4293,7 +4344,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private async executeImageRequest(url: string, body: any, keySlot: KeySlot, options: ImageGenerationOptions): Promise<ImageGenerationResult> {
-        let headers = this.buildImageRequestHeaders(keySlot, true);
+        const target = this.buildOpenAICompatRequestTarget(url, keySlot, {
+            includeJsonContentType: true,
+            includeAccept: true,
+        });
+        let headers = target.headers;
 
         body = this.applyCustomBody(body, keySlot);
 
@@ -4307,7 +4362,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
             options,
             parserType: 'openai-compatible-image',
-            url,
+            url: target.url,
             headers,
             body: payloadStr,
             timeoutMs: this.getTimeoutMs(keySlot, 400000),
@@ -4331,7 +4386,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        const response = await this.fetchWithTimeout(url, {
+        const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
             headers,
             body: payloadStr,
@@ -4349,7 +4404,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 if (raw) detail = raw.slice(0, 500);
             }
             keyManager.reportCallResult(keySlot.id, false, detail);
-            logError('OpenAIAdapter', new Error(detail), `URL: ${url}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
+            logError('OpenAIAdapter', new Error(detail), `Path: ${requestPath}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
             throw this.buildHttpError({
                 message: `[${response.status}] ${detail}`,
                 status: response.status,

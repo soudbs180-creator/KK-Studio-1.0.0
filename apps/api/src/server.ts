@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { URL } from "node:url";
 
 import { buildApiManifest, apiLogger } from "./app.ts";
@@ -8,6 +8,7 @@ import {
   AUTHENTICATED_ADMIN_SESSION_HEADER,
   env,
   resolveAdminSessionToken,
+  resolveTempUserId,
 } from "../../../packages/shared/src/index.ts";
 import {
   applyAuthenticatedHeaders,
@@ -17,9 +18,13 @@ import {
   type RequestAuthenticator,
 } from "./lib/request-authenticator.ts";
 import {
+  assertServerSupabaseConfigConsistency,
+  probeServerSupabasePersistence,
   resolveServerSupabaseConfig,
   summarizeServerSupabaseConfig,
   type ServerSupabaseConfig,
+  type ServerSupabasePersistenceProbe,
+  type ServerSupabaseProbeCheck,
 } from "./lib/server-supabase-config.ts";
 import {
   AdminConsoleService,
@@ -37,7 +42,9 @@ import {
   handleListAssets,
 } from "./modules/asset-library/index.ts";
 import {
+  LocalSystemProxyService,
   LocalUserRouteProxyService,
+  handleInvokeLocalSystemProxy,
   handleInvokeLocalUserRouteProxy,
 } from "./modules/model-proxy/index.ts";
 import {
@@ -195,12 +202,146 @@ const defaultTurnstileVerifier: TurnstileVerifier = async () => ({
   error: "Turnstile verifier is not configured for the API skeleton.",
 });
 
+type CriticalPersistenceCapability =
+  | "guestSessions"
+  | "workspaceLayout"
+  | "billing"
+  | "creditProviders";
+
+type RepositoryModeMap = {
+  adminConsole: RepositoryBackend;
+  authData: RepositoryBackend;
+  creditAccounts: RepositoryBackend;
+  creditExchangeRates: RepositoryBackend;
+  creditProviders: RepositoryBackend;
+  workspaceLayout: RepositoryBackend;
+};
+
+interface CriticalPersistenceState {
+  label: string;
+  ready: boolean;
+  repositories: Record<string, RepositoryBackend>;
+  blockers: string[];
+}
+
+interface RuntimePersistenceState {
+  configSummary: ReturnType<typeof summarizeServerSupabaseConfig>;
+  criticalPersistence: Record<CriticalPersistenceCapability, CriticalPersistenceState>;
+  runtimeBlockers: string[];
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function buildCriticalPersistenceState(
+  label: string,
+  repositories: Record<string, RepositoryBackend>,
+  configSummary: ReturnType<typeof summarizeServerSupabaseConfig>,
+  repositoryBlockers: Record<string, string>,
+  probeChecks: Array<ServerSupabaseProbeCheck | undefined> = [],
+): CriticalPersistenceState {
+  const probeBlockers = probeChecks
+    .filter((check): check is ServerSupabaseProbeCheck => {
+      if (check == null) {
+        return false;
+      }
+
+      return check.ready === false;
+    })
+    .flatMap((check) => String(check.blocker || "").split(",").map((value) => value.trim()).filter(Boolean));
+  const blockers = [
+    ...(Array.isArray(configSummary.blockers) ? configSummary.blockers : []),
+    ...Object.entries(repositories)
+      .filter(([, repository]) => repository !== "supabase")
+      .map(([key]) => repositoryBlockers[key])
+      .filter(Boolean),
+    ...probeBlockers,
+  ];
+
+  return {
+    label,
+    ready:
+      configSummary.canonicalPersistenceReady
+      && Object.values(repositories).every((repository) => repository === "supabase")
+      && probeBlockers.length === 0,
+    repositories,
+    blockers: dedupeStrings(blockers),
+  };
+}
+
+function buildServerConfigErrorResponse(
+  requestId: string,
+  clientVersion: string | undefined,
+  capability: CriticalPersistenceCapability,
+  state: CriticalPersistenceState,
+) {
+  return {
+    success: false,
+    error: {
+      code: "SERVER_PERSISTENCE_REQUIRED",
+      message: `${state.label} require the API server to use the canonical Supabase backend.`,
+      details: [
+        {
+          capability,
+          repositories: state.repositories,
+          blockers: state.blockers,
+        },
+      ],
+    },
+    meta: buildErrorMeta(requestId, clientVersion),
+  };
+}
+
+function resolveCriticalPersistenceCapability(
+  pathname: string,
+): CriticalPersistenceCapability | undefined {
+  if (pathname === "/api/v1/auth/temp-users") {
+    return "guestSessions";
+  }
+
+  if (
+    pathname === "/api/v1/workspaces/layout"
+    || pathname === "/api/v1/workspaces/layout/cloud-images"
+  ) {
+    return "workspaceLayout";
+  }
+
+  if (
+    pathname === "/api/v1/billing/credits/balance"
+    || pathname === "/api/v1/billing/credits/transactions"
+    || pathname === "/api/v1/billing/exchange-rates"
+    || pathname === "/api/v1/billing/credits/debit"
+    || pathname === "/api/v1/billing/credits/refunds"
+    || pathname === "/api/v1/admin/billing/exchange-rates"
+    || pathname === "/api/v1/admin/billing/recharges"
+    || pathname === "/internal/v1/payment-settlements"
+  ) {
+    return "billing";
+  }
+
+  if (
+    pathname === "/api/v1/model-catalog/active-credit-models"
+    || pathname === "/api/v1/provider-pricing-cache"
+    || pathname === "/api/v1/admin/credit-providers"
+    || /^\/api\/v1\/admin\/credit-providers\/[^/]+(?:\/pricing-cache)?$/.test(pathname)
+  ) {
+    return "creditProviders";
+  }
+
+  return undefined;
+}
+
 export interface ApiServerOptions {
   adminConsoleRepository?: AdminConsoleRepository;
   creditAccountRepository?: CreditAccountRepository;
   requestAuthenticator?: RequestAuthenticator;
   resolveAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined;
   verifyTurnstileToken?: TurnstileVerifier;
+  allowDegradedPersistence?: boolean;
+  probeServerSupabasePersistence?: (
+    config: ServerSupabaseConfig,
+  ) => Promise<ServerSupabasePersistenceProbe>;
 }
 
 type RepositoryBackend = "memory" | "supabase" | "local-file" | "custom";
@@ -373,11 +514,109 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
   });
 }
 
-export function createApiServer(
+function buildRuntimePersistenceState(
+  serverSupabaseConfig: ServerSupabaseConfig,
+  repositoryModes: RepositoryModeMap,
+  persistenceProbe?: ServerSupabasePersistenceProbe,
+): RuntimePersistenceState {
+  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig, {
+    persistenceProbe,
+  });
+  const criticalPersistence = {
+    guestSessions: buildCriticalPersistenceState(
+      "Guest temp sessions",
+      { authData: repositoryModes.authData },
+      configSummary,
+      { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
+      [persistenceProbe?.checks.guestSessions],
+    ),
+    workspaceLayout: buildCriticalPersistenceState(
+      "Workspace layout sync",
+      { workspaceLayout: repositoryModes.workspaceLayout },
+      configSummary,
+      { workspaceLayout: "WORKSPACE_LAYOUT_REPOSITORY_DEGRADED" },
+      [persistenceProbe?.checks.workspaceLayout],
+    ),
+    billing: buildCriticalPersistenceState(
+      "Billing and credit persistence",
+      {
+        creditAccounts: repositoryModes.creditAccounts,
+        creditExchangeRates: repositoryModes.creditExchangeRates,
+      },
+      configSummary,
+      {
+        creditAccounts: "CREDIT_ACCOUNT_REPOSITORY_DEGRADED",
+        creditExchangeRates: "CREDIT_EXCHANGE_RATE_REPOSITORY_DEGRADED",
+      },
+      [persistenceProbe?.checks.billing],
+    ),
+    creditProviders: buildCriticalPersistenceState(
+      "Credit provider catalog",
+      { creditProviders: repositoryModes.creditProviders },
+      configSummary,
+      { creditProviders: "CREDIT_PROVIDER_REPOSITORY_DEGRADED" },
+      [persistenceProbe?.checks.creditProviders],
+    ),
+  } satisfies Record<CriticalPersistenceCapability, CriticalPersistenceState>;
+
+  return {
+    configSummary,
+    criticalPersistence,
+    runtimeBlockers: dedupeStrings(
+      Object.values(criticalPersistence).flatMap((state) => state.blockers),
+    ),
+  };
+}
+
+function logApiServerStarted(server: Server, requestedPort: number) {
+  const address = server.address();
+  const resolvedPort = address && typeof address !== "string"
+    ? address.port
+    : requestedPort;
+  apiLogger.info("API skeleton server started", { port: resolvedPort });
+}
+
+function listenApiServer(server: Server, port: number): Promise<Server> {
+  if (server.listening) {
+    return Promise.resolve(server);
+  }
+
+  return new Promise((resolve, reject) => {
+    const handleError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const handleListening = () => {
+      cleanup();
+      logApiServerStarted(server, port);
+      resolve(server);
+    };
+    const cleanup = () => {
+      server.off("error", handleError);
+      server.off("listening", handleListening);
+    };
+
+    server.once("error", handleError);
+    server.once("listening", handleListening);
+
+    try {
+      server.listen(port);
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+function buildApiServer(
   port = Number(process.env.PORT || 3001),
   options: ApiServerOptions = {},
 ) {
   const serverSupabaseConfig = resolveServerSupabaseConfig();
+  const allowDegradedPersistence = options.allowDegradedPersistence ?? (port === 0);
+  if (!allowDegradedPersistence) {
+    assertServerSupabaseConfigConsistency(serverSupabaseConfig);
+  }
   const authDataRepository = createAuthDataRepository(serverSupabaseConfig);
   const adminConsoleRepository =
     options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
@@ -404,6 +643,7 @@ export function createApiServer(
     cloudMirror: authDataCloudMirror,
   });
   const userRouteDiagnosticsService = new UserRouteDiagnosticsService(authDataService);
+  const localSystemProxyService = new LocalSystemProxyService(serverSupabaseConfig);
   const localUserRouteProxyService = new LocalUserRouteProxyService(authDataService, serverSupabaseConfig);
   const adminConsoleService = new AdminConsoleService(adminConsoleRepository);
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
@@ -473,7 +713,32 @@ export function createApiServer(
       SupabaseWorkspaceLayoutRepository,
     ),
   } as const;
-  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig);
+  const resolvePersistenceProbe = options.probeServerSupabasePersistence || probeServerSupabasePersistence;
+  let cachedPersistenceProbe: ServerSupabasePersistenceProbe | undefined;
+  let cachedPersistenceProbeAt = 0;
+  let pendingPersistenceProbe: Promise<ServerSupabasePersistenceProbe> | undefined;
+  const persistenceProbeTtlMs = 30_000;
+
+  async function getPersistenceProbe(): Promise<ServerSupabasePersistenceProbe> {
+    const now = Date.now();
+    if (cachedPersistenceProbe && (now - cachedPersistenceProbeAt) < persistenceProbeTtlMs) {
+      return cachedPersistenceProbe;
+    }
+
+    if (!pendingPersistenceProbe) {
+      pendingPersistenceProbe = resolvePersistenceProbe(serverSupabaseConfig)
+        .then((probe) => {
+          cachedPersistenceProbe = probe;
+          cachedPersistenceProbeAt = Date.now();
+          return probe;
+        })
+        .finally(() => {
+          pendingPersistenceProbe = undefined;
+        });
+    }
+
+    return pendingPersistenceProbe;
+  }
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -487,21 +752,46 @@ export function createApiServer(
       const userRoutePricingMatch = pathname.match(/^\/api\/v1\/profile\/user-routes\/([^/]+)\/pricing-sync$/);
 
       try {
+        const requiredCapability = !allowDegradedPersistence
+          ? resolveCriticalPersistenceCapability(pathname)
+          : undefined;
+        const shouldProbePersistence = pathname === "/healthz" || Boolean(requiredCapability);
+        const persistenceProbe = shouldProbePersistence
+          ? await getPersistenceProbe()
+          : cachedPersistenceProbe;
+        const {
+          configSummary,
+          criticalPersistence,
+          runtimeBlockers,
+        } = buildRuntimePersistenceState(serverSupabaseConfig, repositoryModes, persistenceProbe);
         const authenticatedUser = await requestAuthenticator.authenticate(headers);
+        const tempUserId = String(resolveTempUserId(headers) || "").trim();
+        const tempUserSession = !authenticatedUser && tempUserId
+          ? await authDataService.resolveTempUserSession(tempUserId)
+          : null;
+        const effectiveAuthenticatedUser = authenticatedUser || (
+          tempUserSession
+            ? {
+              userId: tempUserSession.userId,
+              email: tempUserSession.email || undefined,
+              role: undefined,
+            }
+            : undefined
+        );
         let requestHeaders = headers;
-        if (authenticatedUser) {
+        if (effectiveAuthenticatedUser) {
           const access = await adminConsoleService.getAccess(
-            authenticatedUser.userId,
+            effectiveAuthenticatedUser.userId,
             requestId,
             clientVersion,
             resolveAdminSessionToken(headers),
           );
           const authenticatedRole = access.success
             ? access.data.role
-            : authenticatedUser.role;
+            : effectiveAuthenticatedUser.role;
 
           requestHeaders = applyAuthenticatedHeaders(headers, {
-            ...authenticatedUser,
+            ...effectiveAuthenticatedUser,
             role: authenticatedRole,
           });
 
@@ -514,25 +804,32 @@ export function createApiServer(
         }
 
         if (pathname === "/healthz") {
+          const overallStatus = Object.values(criticalPersistence).every((state) => state.ready)
+            ? "ok"
+            : "degraded";
           writeJson(res, 200, {
             success: true,
             data: {
               service: "kk-studio-api",
-              status: "ok",
+              status: overallStatus,
               config: configSummary,
               repositories: repositoryModes,
               persistence: {
                 userApiKeys:
-                  (repositoryModes.authData === "supabase"
-                    && configSummary.hasUserApiEncryptionSecret)
-                  || repositoryModes.authData === "local-file",
+                  repositoryModes.authData === "supabase"
+                  && configSummary.hasUserApiEncryptionSecret,
                 keyManager:
-                  (repositoryModes.authData === "supabase"
-                    && configSummary.hasUserApiEncryptionSecret)
-                  || repositoryModes.authData === "local-file",
-                credits: repositoryModes.creditAccounts === "supabase",
-                creditProviders: repositoryModes.creditProviders === "supabase",
-                workspaceLayout: repositoryModes.workspaceLayout === "supabase",
+                  repositoryModes.authData === "supabase"
+                  && configSummary.hasUserApiEncryptionSecret,
+                tempUsers: criticalPersistence.guestSessions.ready,
+                credits: criticalPersistence.billing.ready,
+                creditProviders: criticalPersistence.creditProviders.ready,
+                workspaceLayout: criticalPersistence.workspaceLayout.ready,
+              },
+              runtime: {
+                allowDegradedPersistence,
+                blockers: runtimeBlockers,
+                criticalPersistence,
               },
             },
             meta: {
@@ -547,6 +844,25 @@ export function createApiServer(
         if (pathname === "/api/manifest") {
           writeJson(res, 200, buildApiManifest(requestId, clientVersion));
           return;
+        }
+
+        if (!allowDegradedPersistence) {
+          if (requiredCapability) {
+            const state = criticalPersistence[requiredCapability];
+            if (!state.ready) {
+              writeJson(
+                res,
+                503,
+                buildServerConfigErrorResponse(
+                  requestId,
+                  clientVersion,
+                  requiredCapability,
+                  state,
+                ),
+              );
+              return;
+            }
+          }
         }
 
         if (req.method === "POST" && pathname === "/api/v1/auth/register") {
@@ -681,6 +997,17 @@ export function createApiServer(
           const result = await handleSyncUserRoutePricing(
             userRouteDiagnosticsService,
             decodeURIComponent(userRoutePricingMatch[1] || ""),
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/model-proxy/system") {
+          const body = await readJsonBody(req);
+          const result = await handleInvokeLocalSystemProxy(
+            localSystemProxyService,
+            body,
             requestHeaders,
           );
           writeJson(res, result.statusCode, result.body);
@@ -986,13 +1313,34 @@ export function createApiServer(
     })();
   });
 
-  server.listen(port, () => {
-    apiLogger.info("API skeleton server started", { port });
-  });
-
   return server;
 }
 
+export function createApiServer(
+  port = Number(process.env.PORT || 3001),
+  options: ApiServerOptions = {},
+) {
+  const server = buildApiServer(port, options);
+  server.listen(port, () => {
+    logApiServerStarted(server, port);
+  });
+  return server;
+}
+
+export async function startApiServer(
+  port = Number(process.env.PORT || 3001),
+  options: ApiServerOptions = {},
+) {
+  const server = buildApiServer(port, options);
+  return listenApiServer(server, port);
+}
+
 if (process.env.RUN_KK_API_SKELETON === "true") {
-  createApiServer();
+  await startApiServer().catch((error: any) => {
+    apiLogger.error("Failed to start API skeleton server", {
+      port: Number(process.env.PORT || 3001),
+      error: error?.message || String(error),
+    });
+    throw error;
+  });
 }

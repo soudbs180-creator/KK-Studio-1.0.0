@@ -27,6 +27,17 @@ interface ProfileUserApisRow {
   user_apis: unknown;
 }
 
+interface TempUserRow {
+  id: string;
+  created_at: string | null;
+  expires_at: string | null;
+  is_active: boolean | null;
+  metadata: {
+    email?: string;
+    nickname?: string;
+  } | null;
+}
+
 export interface SupabaseAuthDataRepositoryOptions {
   supabaseUrl: string;
   serviceRoleKey: string;
@@ -160,6 +171,40 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     }
 
     return this.extractKeyManagerState(mergedPayload);
+  }
+
+  async getTempUserSession(userId: string): Promise<TempUserSessionDto | null> {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await this.client
+      .from("temp_users")
+      .select("id, created_at, expires_at, is_active, metadata")
+      .eq("id", userId)
+      .eq("is_active", true)
+      .gt("expires_at", nowIso)
+      .maybeSingle<TempUserRow>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    const createdAt = String(data.created_at || nowIso);
+    const expiresAt = String(data.expires_at || "");
+    if (!expiresAt) {
+      return null;
+    }
+
+    return {
+      userId: data.id,
+      email: String(data.metadata?.email || `${data.id}@temp.local`),
+      nickname: String(data.metadata?.nickname || `Guest_${data.id.replace(/-/g, "").slice(0, 8)}`),
+      createdAt,
+      expiresAt,
+      isTempUser: true,
+    };
   }
 
   async createTempUser(userAgent?: string): Promise<TempUserSessionDto> {

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import { createKkApiClient } from "../../packages/contracts/src/index.ts";
+import { TEMP_USER_ID_HEADER } from "../../packages/shared/src/index.ts";
 import {
+  createLegacyWebApiClient,
   isLoopbackHostname,
   shouldUseLegacyWebApiFallback,
 } from "../../src/services/api/kkApiClient.ts";
@@ -665,6 +667,76 @@ describe("kk api client", () => {
       slots: [],
       providers: [],
     });
+  });
+
+  test("legacy web api client forwards the cached temp user header", async () => {
+    const originalFetch = globalThis.fetch;
+    const globalLike = globalThis as typeof globalThis & {
+      window?: {
+        localStorage?: {
+          getItem: (key: string) => string | null;
+          setItem: (key: string, value: string) => void;
+          removeItem: (key: string) => void;
+        };
+      };
+    };
+    const originalWindow = globalLike.window;
+    const storage = new Map<string, string>([
+      ["temp_user_session_v1", JSON.stringify({
+        user: { id: "temp-user-123" },
+        expiresAt: Date.now() + 60_000,
+      })],
+    ]);
+    const requests: Array<{ url: string; headers: Headers }> = [];
+
+    globalLike.window = {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+      },
+    };
+    globalThis.fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          version: 2,
+          slots: [],
+          providers: [],
+          entries: [],
+        },
+        meta: {
+          requestId: "req-temp-user-header",
+          timestamp: "2026-04-02T00:00:00.000Z",
+        },
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    try {
+      const client = createLegacyWebApiClient();
+      await client.getKeyManagerCloudState();
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalLike.window = originalWindow;
+    }
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "http://127.0.0.1:3001/api/v1/profile/key-manager-state");
+    assert.equal(requests[0].headers.get(TEMP_USER_ID_HEADER), "temp-user-123");
   });
 
   test("builds workspace layout sync requests with the expected paths", async () => {

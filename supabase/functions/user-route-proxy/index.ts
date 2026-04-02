@@ -54,6 +54,15 @@ type ResolvedUserRoute = {
   compatibilityMode?: 'standard' | 'chat';
 };
 
+function shouldForceQueryAuthForProvider(provider: string, baseUrl: string): boolean {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+  return normalizedProvider === 'gpt-best'
+    || normalizedProvider === 'gptbest'
+    || normalizedBaseUrl.includes('gpt-best')
+    || normalizedBaseUrl.includes('gptbest');
+}
+
 type EncodedUserTask = {
   kind: 'user-video';
   userId: string;
@@ -404,6 +413,11 @@ async function resolveSecureProxyUserRoute(
     String(matchedRecord.baseUrl || matchedRecord.base_url || '').trim(),
     format,
   );
+  const authMethod = shouldForceQueryAuthForProvider(provider, baseUrl)
+    ? 'query'
+    : matchedRecord.authMethod === 'query'
+      ? 'query'
+      : 'header';
 
   return {
     routeId: normalizedRouteId,
@@ -412,7 +426,7 @@ async function resolveSecureProxyUserRoute(
     baseUrl,
     apiKey,
     format,
-    authMethod: matchedRecord.authMethod === 'query' ? 'query' : 'header',
+    authMethod,
     headerName: typeof matchedRecord.headerName === 'string' ? matchedRecord.headerName.trim() : undefined,
     compatibilityMode:
       matchedRecord.compatibilityMode === 'chat'
@@ -668,6 +682,57 @@ async function appendOpenAIVideoReference(formData: FormData, imageSource: strin
   formData.append('image', imageSource);
 }
 
+type GeminiGeneratedVideoPayload = {
+  uri: string;
+  mimeType: string;
+  bytesBase64Encoded: string;
+};
+
+function extractGeminiGeneratedVideoPayload(payload: any): GeminiGeneratedVideoPayload | null {
+  const candidates = [
+    payload?.response?.generateVideoResponse?.generatedSamples?.[0]?.video,
+    payload?.response?.generatedSamples?.[0]?.video,
+    payload?.response?.video,
+    payload?.generatedSamples?.[0]?.video,
+    Array.isArray(payload?.response?.videos)
+      ? payload.response.videos[0]?.video || payload.response.videos[0]
+      : null,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const uri = String(candidate?.uri || '').trim();
+    const bytesBase64Encoded = String(candidate?.bytesBase64Encoded || '').trim();
+    if (!uri && !bytesBase64Encoded) continue;
+
+    return {
+      uri,
+      mimeType: String(candidate?.mimeType || candidate?.mime_type || 'video/mp4').trim() || 'video/mp4',
+      bytesBase64Encoded,
+    };
+  }
+
+  return null;
+}
+
+async function downloadVideoAsDataUrl(videoUrl: string, headers: HeadersInit): Promise<string> {
+  const downloadResponse = await fetch(videoUrl, { headers });
+  if (!downloadResponse.ok) {
+    throw new Error('Failed to download generated video');
+  }
+
+  const videoBuffer = await downloadResponse.arrayBuffer();
+  const bytes = new Uint8Array(videoBuffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, offset + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return `data:video/mp4;base64,${btoa(binary)}`;
+}
+
 async function signTaskPayload(secret: string, payload: EncodedUserTask): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -850,68 +915,34 @@ async function handleTaskOperation(
       return json({ success: true, status: 'failed', deducted: false, endpointType });
     }
 
-    const responsePayload = statusData?.response || {};
-    const generatedVideos = Array.isArray(responsePayload.videos) ? responsePayload.videos : [];
-    const downloadableVideo = generatedVideos.find((video: any) => {
-      const uri = String(video?.video?.uri || video?.uri || '').trim();
-      return uri.startsWith('gs://');
-    });
-
-    if (!downloadableVideo) {
+    const generatedVideo = extractGeminiGeneratedVideoPayload(statusData);
+    if (!generatedVideo) {
       return taskResultNotReady();
     }
 
-    const fetchAuth = buildGeminiAuth(`${apiBase}/${operationName}:fetchPredictOperationResult`, route);
-    const downloadResponse = await fetch(fetchAuth.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(fetchAuth.headers as Record<string, string>),
-      },
-      body: JSON.stringify({ operationName }),
-    });
-
-    if (!downloadResponse.ok) {
-      const errorText = await downloadResponse.text();
-      return json({ success: false, error: `Result fetch failed: ${downloadResponse.status} ${errorText}` }, 502);
-    }
-
-    const downloadData = await downloadResponse.json();
-    const directVideo = downloadData?.generatedSamples?.[0]?.video;
-    const uri = String(directVideo?.uri || '').trim();
-    const mimeType = String(directVideo?.mimeType || 'video/mp4');
-    const bytesBase64Encoded = String(directVideo?.bytesBase64Encoded || '').trim();
-
-    if (!uri && !bytesBase64Encoded) {
-      return taskResultNotReady();
-    }
-
-    if (bytesBase64Encoded) {
+    if (generatedVideo.bytesBase64Encoded) {
       return json({
         success: true,
         status: 'success',
-        url: `data:${mimeType};base64,${bytesBase64Encoded}`,
+        url: `data:${generatedVideo.mimeType};base64,${generatedVideo.bytesBase64Encoded}`,
         deducted: false,
         endpointType,
       });
     }
 
-    if (body.mode === 'download_task') {
+    try {
+      const mediaAuth = buildGeminiAuth(generatedVideo.uri, route);
+      const dataUrl = await downloadVideoAsDataUrl(mediaAuth.url, mediaAuth.headers);
       return json({
         success: true,
-        url: uri,
+        status: 'success',
+        url: dataUrl,
         deducted: false,
         endpointType,
       });
+    } catch {
+      return taskResultNotReady('Generated video is still processing');
     }
-
-    return json({
-      success: true,
-      status: 'success',
-      url: uri,
-      deducted: false,
-      endpointType,
-    });
   }
 
   const openaiBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
@@ -1532,9 +1563,7 @@ Deno.serve(async (req) => {
     } else if (body.mode === 'audio' && endpointType === 'gemini') {
       const isLyria = modelId.toLowerCase().includes('lyria');
       const auth = buildGeminiAuth(
-        isLyria
-          ? `${baseUrl}/v1beta/models/${modelId}:predict`
-          : `${baseUrl}/v1beta/models/${modelId}:generateContent`,
+        `${baseUrl}/v1beta/models/${modelId}:generateContent`,
         route,
       );
 
@@ -1547,14 +1576,16 @@ Deno.serve(async (req) => {
         body: JSON.stringify(
           isLyria
             ? {
-                instances: [{ prompt: body.prompt || '' }],
-                parameters: { audioConfig: { audioFormat: 'audio/wav' } },
+                contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
+                generationConfig: {
+                  responseModalities: ['AUDIO', 'TEXT'],
+                },
               }
             : {
                 contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
                 generationConfig: {
                   responseModalities: ['AUDIO'],
-                  audioConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
+                  speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
                 },
               },
         ),
@@ -1566,22 +1597,14 @@ Deno.serve(async (req) => {
       }
 
       const result = await audioResponse.json();
-      if (isLyria) {
-        const b64 = result?.predictions?.[0]?.bytesBase64Encoded;
-        if (!b64) {
-          return json({ success: false, error: 'No audio data returned from upstream' }, 502);
-        }
-        audioUrl = `data:audio/wav;base64,${String(b64).replace(/\s+/g, '')}`;
-      } else {
-        const audioPart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData || part?.inline_data);
-        const inline = audioPart?.inlineData || audioPart?.inline_data;
-        const mimeType = inline?.mimeType || inline?.mime_type || 'audio/wav';
-        const audioData = String(inline?.data || '').replace(/\s+/g, '');
-        if (!audioData) {
-          return json({ success: false, error: 'No audio data returned from upstream' }, 502);
-        }
-        audioUrl = `data:${mimeType};base64,${audioData}`;
+      const audioPart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData || part?.inline_data);
+      const inline = audioPart?.inlineData || audioPart?.inline_data;
+      const mimeType = inline?.mimeType || inline?.mime_type || 'audio/wav';
+      const audioData = String(inline?.data || '').replace(/\s+/g, '');
+      if (!audioData) {
+        return json({ success: false, error: 'No audio data returned from upstream' }, 502);
       }
+      audioUrl = `data:${mimeType};base64,${audioData}`;
     } else if (body.mode === 'audio') {
       const auth = buildOpenAICompatAuth(`${baseUrl}/v1/audio/generations`, route);
       const audioResponse = await fetch(auth.url, {

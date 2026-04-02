@@ -1,73 +1,23 @@
-import fs from "fs";
-import path from "path";
+import {
+  collectEnvSnapshots,
+  compareSupabaseProjectRefs,
+  describeSupabaseServerKey,
+  findSnapshotEntries,
+  findIgnoredLegacySecrets,
+  getEffectiveValue,
+  resolveRepoRoot,
+  summarizeValue,
+} from "./lib/env-contract.mjs";
 
-const repoRoot = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
-const rootPath = repoRoot.replace(/^\/([a-zA-Z]):/, "$1:");
+const rootPath = resolveRepoRoot(import.meta.url);
 
-const envFiles = [
-  path.join(rootPath, ".env"),
-  path.join(rootPath, ".env.local"),
-  path.join(rootPath, "apps", "api", ".env"),
-  path.join(rootPath, "apps", "api", ".env.local"),
-  path.join(rootPath, "server", ".env"),
-  path.join(rootPath, "server", ".env.local"),
-];
+function printKeyStatus(label, record) {
+  if (!record) {
+    console.log(`- ${label}: <missing>`);
+    return;
+  }
 
-const placeholderPatterns = [
-  /^replace-with-/i,
-  /^your[-_]/i,
-  /^changeme$/i,
-  /^todo$/i,
-  /^你的/i,
-  /^请填写/i,
-];
-
-function isPlaceholder(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) return false;
-  return placeholderPatterns.some((pattern) => pattern.test(normalized));
-}
-
-function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-
-  return fs
-    .readFileSync(filePath, "utf8")
-    .split(/\r?\n/)
-    .reduce((acc, line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) return acc;
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) return acc;
-      const key = trimmed.slice(0, separatorIndex).trim();
-      let value = trimmed.slice(separatorIndex + 1).trim();
-      if (
-        (value.startsWith('"') && value.endsWith('"'))
-        || (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      acc[key] = value;
-      return acc;
-    }, {});
-}
-
-function summarizeValue(value) {
-  if (!String(value || "").trim()) return "<empty>";
-  if (isPlaceholder(value)) return "<placeholder>";
-  return "<present>";
-}
-
-function summarizeFile(filePath, keys) {
-  if (!fs.existsSync(filePath)) return null;
-  const values = parseEnvFile(filePath);
-  const output = {};
-  keys.forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(values, key)) {
-      output[key] = summarizeValue(values[key]);
-    }
-  });
-  return output;
+  console.log(`- ${label}: ${summarizeValue(record.value)} from ${record.source}`);
 }
 
 async function fetchHealth() {
@@ -86,24 +36,84 @@ async function fetchHealth() {
 }
 
 async function run() {
-  const keys = [
+  const snapshots = collectEnvSnapshots(rootPath);
+  const frontendKeys = [
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY",
+    "VITE_KK_API_BASE_URL",
+  ];
+  const apiServerKeys = [
     "SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_SECRET_KEY",
     "SUPABASE_ANON_KEY",
     "USER_API_ENCRYPTION_SECRET",
-    "VITE_KK_API_BASE_URL",
   ];
+  const misplacedRootServerEnv = findSnapshotEntries(snapshots.frontendSnapshots, apiServerKeys);
 
-  console.log("[diagnose-api-env] Env file summary:");
-  envFiles.forEach((filePath) => {
-    const summary = summarizeFile(filePath, keys);
-    if (!summary) return;
+  console.log("[diagnose-api-env] Frontend env search order:");
+  snapshots.searchedFiles.frontend.forEach((filePath) => {
     console.log(`- ${filePath}`);
-    Object.entries(summary).forEach(([key, value]) => {
-      console.log(`  ${key}=${value}`);
-    });
   });
+
+  console.log("[diagnose-api-env] Local API env search order:");
+  snapshots.searchedFiles.api.forEach((filePath) => {
+    console.log(`- ${filePath}`);
+  });
+
+  console.log("[diagnose-api-env] Ignored legacy env files:");
+  snapshots.searchedFiles.ignoredLegacy.forEach((filePath) => {
+    console.log(`- ${filePath}`);
+  });
+
+  console.log("[diagnose-api-env] Frontend public env sources:");
+  frontendKeys.forEach((key) => {
+    printKeyStatus(key, getEffectiveValue(snapshots.frontendSnapshots, key));
+  });
+
+  console.log("[diagnose-api-env] Local API server env sources:");
+  apiServerKeys.forEach((key) => {
+    printKeyStatus(key, getEffectiveValue(snapshots.apiSnapshots, key));
+  });
+  const serverKey =
+    getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SERVICE_ROLE_KEY")?.value
+    || getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SECRET_KEY")?.value;
+  const serverKeyDescription = describeSupabaseServerKey(serverKey);
+  console.log("[diagnose-api-env] Service-role key validation:");
+  console.log(`- status: ${serverKeyDescription.status}`);
+  if (serverKeyDescription.reason) {
+    console.log(`- detail: ${serverKeyDescription.reason}`);
+  }
+
+  const ignoredLegacySecrets = findIgnoredLegacySecrets(snapshots.ignoredSnapshots, [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SECRET_KEY",
+  ]);
+  console.log("[diagnose-api-env] Ignored legacy service-role entries:");
+  if (ignoredLegacySecrets.length === 0) {
+    console.log("- none");
+  } else {
+    ignoredLegacySecrets.forEach((entry) => {
+      console.log(`- ${entry.key}: ${summarizeValue(entry.value)} from ${entry.source}`);
+    });
+  }
+
+  console.log("[diagnose-api-env] Ignored root server env entries:");
+  if (misplacedRootServerEnv.length === 0) {
+    console.log("- none");
+  } else {
+    misplacedRootServerEnv.forEach((entry) => {
+      console.log(`- ${entry.key}: ${summarizeValue(entry.value)} from ${entry.source}`);
+    });
+  }
+
+  const publicUrl = getEffectiveValue(snapshots.frontendSnapshots, "VITE_SUPABASE_URL")?.value;
+  const serverUrl = getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_URL")?.value || publicUrl;
+  const projectAlignment = compareSupabaseProjectRefs(publicUrl, serverUrl);
+  console.log("[diagnose-api-env] Supabase project alignment:");
+  console.log(`- public project ref: ${projectAlignment.publicProjectRef || "<missing>"}`);
+  console.log(`- server project ref: ${projectAlignment.serverProjectRef || "<missing>"}`);
+  console.log(`- project refs match: ${projectAlignment.matches === undefined ? "<unknown>" : String(projectAlignment.matches)}`);
 
   const health = await fetchHealth();
   console.log("[diagnose-api-env] /healthz:");
@@ -115,13 +125,25 @@ async function run() {
   const config = health.data?.config || {};
   const repos = health.data?.repositories || {};
   const persistence = health.data?.persistence || {};
-  console.log(`- hasServiceRoleKey: ${Boolean(config.hasServiceRoleKey)}`);
-  console.log(`- hasUserApiEncryptionSecret: ${Boolean(config.hasUserApiEncryptionSecret)}`);
+  const runtime = health.data?.runtime || {};
+  console.log(`- status: ${health.data?.status || "unknown"}`);
+  console.log(`- config.supabaseProjectRef: ${config.supabaseProjectRef || "<missing>"}`);
+  console.log(`- config.publicSupabaseProjectRef: ${config.publicSupabaseProjectRef || "<missing>"}`);
+  console.log(`- config.projectRefMatches: ${config.projectRefMatches === undefined ? "<unknown>" : String(config.projectRefMatches)}`);
+  console.log(`- config.hasServiceRoleKey: ${Boolean(config.hasServiceRoleKey)}`);
+  console.log(`- config.hasUserApiEncryptionSecret: ${Boolean(config.hasUserApiEncryptionSecret)}`);
+  console.log(`- config.canonicalPersistenceReady: ${Boolean(config.canonicalPersistenceReady)}`);
   console.log(`- repositories.authData: ${repos.authData || "unknown"}`);
   console.log(`- repositories.creditAccounts: ${repos.creditAccounts || "unknown"}`);
   console.log(`- repositories.creditProviders: ${repos.creditProviders || "unknown"}`);
+  console.log(`- repositories.workspaceLayout: ${repos.workspaceLayout || "unknown"}`);
   console.log(`- persistence.userApiKeys: ${Boolean(persistence.userApiKeys)}`);
+  console.log(`- persistence.tempUsers: ${Boolean(persistence.tempUsers)}`);
   console.log(`- persistence.credits: ${Boolean(persistence.credits)}`);
+  console.log(`- persistence.creditProviders: ${Boolean(persistence.creditProviders)}`);
+  console.log(`- persistence.workspaceLayout: ${Boolean(persistence.workspaceLayout)}`);
+  console.log(`- runtime.allowDegradedPersistence: ${Boolean(runtime.allowDegradedPersistence)}`);
+  console.log(`- runtime.blockers: ${Array.isArray(runtime.blockers) ? runtime.blockers.join(", ") || "<none>" : "<unknown>"}`);
 }
 
 run();

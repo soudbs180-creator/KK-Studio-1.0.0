@@ -98,13 +98,12 @@ function Is-KnownDevProcess {
     }
 
     if ($Port -eq 3000) {
-        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' -or $commandLine -like '*npm run dev*'
+        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     if ($Port -eq 3001) {
         return $commandLine -match 'scripts[\\/]+run-api-dev\.mjs' `
-            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' `
-            -or $commandLine -like '*npm run dev*'
+            -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
     return $false
@@ -130,6 +129,20 @@ function Get-PortOwnerProcessId {
     return $null
 }
 
+function Get-KnownDevProcessIds {
+    param([int]$Port)
+
+    return @(Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessName -in @('node', 'npm', 'cmd', 'powershell') } |
+        ForEach-Object {
+            $resolvedProcessId = 0
+            if ([int]::TryParse([string]$_.Id, [ref]$resolvedProcessId) -and (Is-KnownDevProcess -ProcessId $resolvedProcessId -Port $Port)) {
+                $resolvedProcessId
+            }
+        } |
+        Select-Object -Unique)
+}
+
 foreach ($service in $services) {
     $processId = Get-AliveProcessId -PidFile $service.PidFile
     if ($processId) {
@@ -139,6 +152,12 @@ foreach ($service in $services) {
     $fallbackProcessId = Get-PortOwnerProcessId -Port $service.Port
     if ($fallbackProcessId -and (Is-KnownDevProcess -ProcessId $fallbackProcessId -Port $service.Port)) {
         & taskkill /PID $fallbackProcessId /T /F | Out-Null
+    }
+
+    foreach ($knownProcessId in @(Get-KnownDevProcessIds -Port $service.Port)) {
+        if ($knownProcessId -ne $processId -and $knownProcessId -ne $fallbackProcessId) {
+            & taskkill /PID $knownProcessId /T /F | Out-Null
+        }
     }
 
     Remove-StalePidFile -PidFile $service.PidFile

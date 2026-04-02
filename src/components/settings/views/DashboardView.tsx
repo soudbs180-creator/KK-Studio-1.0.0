@@ -175,7 +175,7 @@ const DashboardStorageRow: React.FC<{ label: string; value: string; helper: stri
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
-  const { balance, billingLogs, usageLogs } = useBilling();
+  const { balance, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = formatRemainingCredits(balance, 'en-US');
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
@@ -192,6 +192,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [storedImages, setStoredImages] = useState(0);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const refreshDashboard = async () => {
     setRefreshing(true);

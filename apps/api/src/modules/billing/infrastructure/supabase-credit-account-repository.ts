@@ -212,42 +212,38 @@ export class SupabaseCreditAccountRepository implements CreditAccountRepository 
   async getOrCreate(userId: string): Promise<CreditBalanceDto> {
     this.assertUserId(userId);
 
-    const { error: upsertError } = await this.client
+    const existing = await this.getExistingAccount(userId);
+    if (existing) {
+      return toCreditBalanceDto(existing);
+    }
+
+    const { error: insertError } = await this.client
       .from("user_credits")
-      .upsert({
+      .insert({
         user_id: userId,
         balance: 0,
-      }, {
-        onConflict: "user_id",
-        ignoreDuplicates: true,
       });
 
-    if (upsertError) {
-      throw upsertError;
+    if (insertError) {
+      // Another request may have created the row after our existence check.
+      if (String(insertError.code || "") !== "23505") {
+        throw insertError;
+      }
     }
 
-    const { data, error } = await this.client
-      .from("user_credits")
-      .select("user_id, balance, frozen, created_at, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle<UserCreditsRow>();
-
-    if (error) {
-      throw error;
+    const created = await this.getExistingAccount(userId);
+    if (created) {
+      return toCreditBalanceDto(created);
     }
 
-    if (!data) {
-      return {
-        accountId: userId,
-        userId,
-        balance: 0,
-        frozenBalance: 0,
-        createdAt: buildFallbackTimestamp(),
-        updatedAt: buildFallbackTimestamp(),
-      };
-    }
-
-    return toCreditBalanceDto(data);
+    return {
+      accountId: userId,
+      userId,
+      balance: 0,
+      frozenBalance: 0,
+      createdAt: buildFallbackTimestamp(),
+      updatedAt: buildFallbackTimestamp(),
+    };
   }
 
   async findDebitByIdempotencyKey(
@@ -410,7 +406,7 @@ export class SupabaseCreditAccountRepository implements CreditAccountRepository 
       ].join(", "))
       .eq("user_id", userId)
       .eq("type", "refund")
-      .contains("metadata", { source_transaction_id: transactionId })
+      .eq("metadata->>source_transaction_id", transactionId)
       .order("completed_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(1)
