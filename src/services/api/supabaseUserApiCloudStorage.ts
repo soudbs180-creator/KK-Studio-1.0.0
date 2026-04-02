@@ -1,3 +1,4 @@
+import type { UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
 import { supabase } from '../../lib/supabase.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
 import {
@@ -13,12 +14,6 @@ interface AuthenticatedProfileContext {
   email: string | null;
 }
 
-interface ProfileUserApisRow {
-  id?: string;
-  email?: string | null;
-  user_apis: unknown;
-}
-
 export interface UserApisEnvelope {
   version: number;
   slots: unknown[];
@@ -29,12 +24,14 @@ export interface UserApisEnvelope {
 type JsonRecord = Record<string, unknown>;
 
 const USER_APIS_PAYLOAD_CACHE_TTL_MS = 15_000;
+const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000';
+const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
 const userApisPayloadCache = new Map<string, {
   payload: UserApisEnvelope | null;
   expiresAt: number;
 }>();
-const userApisPayloadInFlight = new Map<string, Promise<unknown | null>>();
+const userApisPayloadInFlight = new Map<string, Promise<UserApisEnvelope | null>>();
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error && 'message' in error) {
@@ -74,6 +71,31 @@ function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function toNumericValue(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -95,12 +117,16 @@ function isEncryptedSecretEnvelope(value: unknown): boolean {
   return isRecord(value) && value.__kkUserApiSecret === true;
 }
 
+function isRedactedSecretPlaceholder(value: unknown): boolean {
+  return typeof value === 'string' && value.startsWith(REDACTED_SECRET_PREFIX);
+}
+
 function toClientVisibleSecret(value: unknown): unknown {
-  if (!isEncryptedSecretEnvelope(value)) {
-    return value;
+  if (isEncryptedSecretEnvelope(value) || isRedactedSecretPlaceholder(value)) {
+    return CLIENT_VISIBLE_SECRET_PLACEHOLDER;
   }
 
-  return 'sk-readonly-0000';
+  return value;
 }
 
 function sanitizeClientVisibleEnvelope(payload: UserApisEnvelope): UserApisEnvelope {
@@ -110,6 +136,12 @@ function sanitizeClientVisibleEnvelope(payload: UserApisEnvelope): UserApisEnvel
   ): unknown[] => items.map((item) => {
     if (!isRecord(item)) {
       return item;
+    }
+
+    if (!(secretField in item)) {
+      return {
+        ...item,
+      };
     }
 
     return {
@@ -124,16 +156,6 @@ function sanitizeClientVisibleEnvelope(payload: UserApisEnvelope): UserApisEnvel
     providers: sanitizeItems(payload.providers, 'apiKey'),
     entries: sanitizeItems(payload.entries, 'key'),
   };
-}
-
-function payloadHasEncryptedSecrets(rawPayload: unknown): boolean {
-  const payload = normalizeEnvelope(rawPayload);
-
-  const slotsContainEncryptedKey = payload.slots.some((slot) => isRecord(slot) && isEncryptedSecretEnvelope(slot.key));
-  const providersContainEncryptedKey = payload.providers.some((provider) => isRecord(provider) && isEncryptedSecretEnvelope(provider.apiKey));
-  const entriesContainEncryptedKey = payload.entries.some((entry) => isRecord(entry) && isEncryptedSecretEnvelope(entry.key));
-
-  return slotsContainEncryptedKey || providersContainEncryptedKey || entriesContainEncryptedKey;
 }
 
 function getCachedUserApisPayload(userId: string): UserApisEnvelope | null | undefined {
@@ -172,57 +194,6 @@ function invalidateCachedUserApisPayload(userId: string): void {
   userApisPayloadInFlight.delete(userId);
 }
 
-async function loadUserApisPayloadDirectlyFromProfile(
-  userId: string,
-): Promise<unknown | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('user_apis')
-    .eq('id', userId)
-    .maybeSingle<ProfileUserApisRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  return data?.user_apis ?? null;
-}
-
-async function saveUserApisPayloadDirectlyToProfile(
-  userId: string,
-  rawPayload: unknown,
-): Promise<void> {
-  const sessionSnapshot = await getAuthenticatedProfileContext(userId);
-  const email = sessionSnapshot?.email ?? null;
-  const { error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: userId,
-      email,
-      user_apis: rawPayload,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'id',
-      ignoreDuplicates: false,
-    });
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function loadUserApisPayloadMetadataViaSupabase(
-  expectedUserId?: string,
-): Promise<unknown | null> {
-  const context = await getAuthenticatedProfileContext(expectedUserId);
-  if (!context) {
-    return null;
-  }
-
-  const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
-  return normalizeEnvelope(directProfilePayload);
-}
-
 function normalizeEnvelope(rawPayload: unknown): UserApisEnvelope {
   if (isUserApisEnvelope(rawPayload)) {
     const payload = rawPayload as Record<string, unknown>;
@@ -244,6 +215,107 @@ function normalizeEnvelope(rawPayload: unknown): UserApisEnvelope {
 
 function normalizeRecordId(value: unknown): string {
   return isRecord(value) ? String(value.id || '').trim() : '';
+}
+
+function resolveUserApiEntryType(
+  rawEntry: JsonRecord,
+  provider: string,
+  baseUrl?: string,
+): UserApiEntryDto['type'] {
+  if (rawEntry.type === 'official' || rawEntry.type === 'proxy' || rawEntry.type === 'third-party') {
+    return rawEntry.type;
+  }
+
+  const normalizedProvider = provider.trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+
+  if (!normalizedBaseUrl && normalizedProvider === 'google') {
+    return 'official';
+  }
+
+  if (normalizedBaseUrl.includes('googleapis.com')) {
+    return 'official';
+  }
+
+  return normalizedBaseUrl ? 'proxy' : 'third-party';
+}
+
+function resolveUserApiEntryFormat(
+  rawEntry: JsonRecord,
+  provider: string,
+  baseUrl?: string,
+): UserApiEntryDto['format'] {
+  if (
+    rawEntry.format === 'gemini'
+    || rawEntry.format === 'openai'
+    || rawEntry.format === 'auto'
+    || rawEntry.format === 'claude'
+  ) {
+    return rawEntry.format;
+  }
+
+  return resolveUserApiEntryType(rawEntry, provider, baseUrl) === 'official'
+    ? 'gemini'
+    : 'auto';
+}
+
+function normalizeUserApiEntryDto(rawEntry: unknown): UserApiEntryDto {
+  const now = Date.now();
+  const entry = isRecord(rawEntry) ? rawEntry : {};
+  const provider = String(entry.provider || 'Custom').trim() || 'Custom';
+  const rawBaseUrl = String(entry.baseUrl ?? entry.base_url ?? '').trim();
+  const baseUrl = rawBaseUrl || undefined;
+  const createdAt = toNumericValue(entry.createdAt ?? entry.created_at, now);
+  const updatedAt = toNumericValue(entry.updatedAt ?? entry.updated_at, createdAt);
+  const disabled =
+    typeof entry.disabled === 'boolean'
+      ? entry.disabled
+      : typeof entry.is_active === 'boolean'
+        ? !entry.is_active
+        : false;
+
+  return {
+    id: String(entry.id || '').trim(),
+    key: String(entry.key || ''),
+    name: String(entry.name || `${provider} Key`).trim() || `${provider} Key`,
+    provider,
+    type: resolveUserApiEntryType(entry, provider, baseUrl),
+    format: resolveUserApiEntryFormat(entry, provider, baseUrl),
+    baseUrl,
+    supportedModels: toStringArray(entry.supportedModels ?? entry.supported_models),
+    disabled,
+    createdAt,
+    updatedAt,
+    status:
+      entry.status === 'valid'
+      || entry.status === 'invalid'
+      || entry.status === 'rate_limited'
+      || entry.status === 'unknown'
+        ? entry.status
+        : 'unknown',
+    failCount: Number(entry.failCount ?? entry.fail_count ?? 0),
+    successCount: Number(entry.successCount ?? entry.success_count ?? 0),
+    totalCost: Number(entry.totalCost ?? entry.total_cost ?? 0),
+    budgetLimit: Number.isFinite(Number(entry.budgetLimit ?? entry.budget_limit))
+      ? Number(entry.budgetLimit ?? entry.budget_limit)
+      : -1,
+    tokenLimit: Number.isFinite(Number(entry.tokenLimit ?? entry.token_limit))
+      ? Number(entry.tokenLimit ?? entry.token_limit)
+      : -1,
+    usedTokens: Number(entry.usedTokens ?? entry.used_tokens ?? 0),
+    lastUsed:
+      entry.lastUsed == null && entry.last_used == null
+        ? null
+        : toNumericValue(entry.lastUsed ?? entry.last_used, now),
+    lastError:
+      entry.lastError == null && entry.last_error == null
+        ? null
+        : String(entry.lastError ?? entry.last_error),
+  };
+}
+
+function normalizeUserApiEntryDtos(entries: unknown[]): UserApiEntryDto[] {
+  return entries.map((entry) => normalizeUserApiEntryDto(entry));
 }
 
 function upsertArrayRecordById(
@@ -285,7 +357,9 @@ function shouldReusePersistedSecret(value: unknown): boolean {
   }
 
   const normalized = value.trim();
-  return normalized.length === 0 || normalized === 'sk-readonly-0000' || normalized.startsWith('__kk_redacted__:');
+  return normalized.length === 0
+    || normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER
+    || isRedactedSecretPlaceholder(normalized);
 }
 
 function mergeRecordArrayWithPersistedSecret(
@@ -336,23 +410,8 @@ function mergeRecordArrayWithPersistedSecret(
   });
 }
 
-async function saveNormalizedUserApisPayloadDirectlyToProfile(
-  userId: string,
-  payload: UserApisEnvelope,
-): Promise<UserApisEnvelope> {
-  const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadDirectlyFromProfile(userId),
-  );
-  const persistablePayload: UserApisEnvelope = {
-    version: payload.version,
-    slots: mergeRecordArrayWithPersistedSecret(existingPayload.slots, payload.slots, 'key'),
-    providers: mergeRecordArrayWithPersistedSecret(existingPayload.providers, payload.providers, 'apiKey'),
-    entries: mergeRecordArrayWithPersistedSecret(existingPayload.entries, payload.entries, 'key'),
-  };
-
-  await saveUserApisPayloadDirectlyToProfile(userId, persistablePayload);
-  invalidateCachedUserApisPayload(userId);
-  return persistablePayload;
+function arraysEqual(left: unknown[], right: unknown[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 async function getAuthenticatedProfileContext(
@@ -390,6 +449,126 @@ async function getAuthenticatedProfileContext(
     userId,
     email: resolvedUser?.email ?? null,
   };
+}
+
+async function loadUserApisPayloadViaApi(
+  context: AuthenticatedProfileContext,
+  options?: {
+    preferUserApiEntries?: boolean;
+  },
+): Promise<UserApisEnvelope> {
+  const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
+    legacyWebApiClient.getKeyManagerCloudState(),
+    legacyWebApiClient.getUserApiEntries(),
+  ]);
+
+  const keyManagerState = unwrapOrUndefined(keyManagerResponse);
+  const userApiEntries = unwrapOrUndefined(userApiEntriesResponse);
+  const combinedApiPayload =
+    keyManagerState || userApiEntries
+      ? combineUserApisEnvelopeSources(keyManagerState, userApiEntries, options)
+      : null;
+
+  if (combinedApiPayload) {
+    return normalizeEnvelope(combinedApiPayload);
+  }
+
+  throw new Error(
+    getApiFailureMessage(keyManagerResponse)
+    || getApiFailureMessage(userApiEntriesResponse)
+    || `Failed to load user API payload for ${context.userId}.`,
+  );
+}
+
+async function loadUserApisPayloadRaw(
+  expectedUserId?: string,
+): Promise<UserApisEnvelope | null> {
+  const context = await getAuthenticatedProfileContext(expectedUserId);
+  if (!context) {
+    return null;
+  }
+
+  const cachedPayload = getCachedUserApisPayload(context.userId);
+  if (cachedPayload !== undefined) {
+    return cachedPayload;
+  }
+
+  const existingInFlight = userApisPayloadInFlight.get(context.userId);
+  if (existingInFlight) {
+    return await existingInFlight;
+  }
+
+  const loadPromise = loadUserApisPayloadViaApi(context)
+    .then((payload) => setCachedUserApisPayload(context.userId, payload) ?? payload)
+    .finally(() => {
+      userApisPayloadInFlight.delete(context.userId);
+    });
+
+  userApisPayloadInFlight.set(context.userId, loadPromise);
+  return await loadPromise;
+}
+
+async function persistUserApisPayloadViaApi(
+  context: AuthenticatedProfileContext,
+  payload: UserApisEnvelope,
+  existingPayloadInput?: UserApisEnvelope | null,
+): Promise<UserApisEnvelope> {
+  const existingPayload = normalizeEnvelope(
+    existingPayloadInput ?? await loadUserApisPayloadRaw(context.userId),
+  );
+  const persistablePayload: UserApisEnvelope = {
+    version: payload.version,
+    slots: mergeRecordArrayWithPersistedSecret(existingPayload.slots, payload.slots, 'key'),
+    providers: mergeRecordArrayWithPersistedSecret(existingPayload.providers, payload.providers, 'apiKey'),
+    entries: mergeRecordArrayWithPersistedSecret(existingPayload.entries, payload.entries, 'key'),
+  };
+
+  const slotsChanged =
+    persistablePayload.version !== existingPayload.version
+    || !arraysEqual(persistablePayload.slots, existingPayload.slots)
+    || !arraysEqual(persistablePayload.providers, existingPayload.providers);
+  const entriesChanged = !arraysEqual(persistablePayload.entries, existingPayload.entries);
+
+  if (!slotsChanged && !entriesChanged) {
+    return setCachedUserApisPayload(context.userId, existingPayload) || existingPayload;
+  }
+
+  invalidateCachedUserApisPayload(context.userId);
+
+  if (slotsChanged) {
+    const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+      version: persistablePayload.version,
+      slots: persistablePayload.slots as JsonRecord[],
+      providers: persistablePayload.providers as JsonRecord[],
+    });
+
+    if (!response.success) {
+      throw new Error(response.error?.message || 'Failed to save key-manager cloud state.');
+    }
+  }
+
+  if (entriesChanged) {
+    const response = await legacyWebApiClient.replaceUserApiEntries({
+      entries: normalizeUserApiEntryDtos(persistablePayload.entries),
+    });
+
+    if (!response.success) {
+      throw new Error(response.error?.message || 'Failed to save user API entries.');
+    }
+  }
+
+  const latestPayload =
+    await loadUserApisPayloadViaApi(context, { preferUserApiEntries: true })
+      .catch(() => persistablePayload);
+
+  return setCachedUserApisPayload(context.userId, latestPayload) ?? latestPayload;
+}
+
+export async function loadUserApisPayloadMetadataViaSupabase(
+  expectedUserId?: string,
+): Promise<unknown | null> {
+  const payload = await loadUserApisPayloadRaw(expectedUserId);
+  return payload ? sanitizeClientVisibleEnvelope(payload) : null;
 }
 
 export function getUserApisPayloadDensity(rawPayload: unknown): number {
@@ -431,80 +610,8 @@ export function combineUserApisEnvelopeSources(
 export async function loadUserApisPayloadViaSupabase(
   expectedUserId?: string,
 ): Promise<unknown | null> {
-  const context = await getAuthenticatedProfileContext(expectedUserId);
-  if (!context) {
-    return null;
-  }
-
-  const cachedPayload = getCachedUserApisPayload(context.userId);
-  if (cachedPayload !== undefined) {
-    return cachedPayload;
-  }
-
-  const existingInFlight = userApisPayloadInFlight.get(context.userId);
-  if (existingInFlight) {
-    return await existingInFlight;
-  }
-
-  const loadPromise = (async (): Promise<unknown | null> => {
-    const directProfilePayload = await loadUserApisPayloadDirectlyFromProfile(context.userId);
-    const directProfileDensity = getUserApisPayloadDensity(directProfilePayload);
-    const directProfileHasEncryptedSecrets = payloadHasEncryptedSecrets(directProfilePayload);
-
-    if (directProfileDensity > 0 && !directProfileHasEncryptedSecrets) {
-      return normalizeEnvelope(directProfilePayload);
-    }
-
-    if (!shouldUseLegacyWebApiFallback()) {
-      if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
-        return sanitizeClientVisibleEnvelope(normalizeEnvelope(directProfilePayload));
-      }
-
-      return null;
-    }
-
-    const [keyManagerResponse, userApiEntriesResponse] = await Promise.all([
-      legacyWebApiClient.getKeyManagerCloudState(),
-      legacyWebApiClient.getUserApiEntries(),
-    ]);
-
-    const keyManagerState = unwrapOrUndefined(
-      keyManagerResponse,
-    );
-    const userApiEntries = unwrapOrUndefined(
-      userApiEntriesResponse,
-    );
-    const combinedApiPayload =
-      keyManagerState || userApiEntries
-        ? combineUserApisEnvelopeSources(keyManagerState, userApiEntries)
-        : null;
-    const combinedApiDensity = getUserApisPayloadDensity(combinedApiPayload);
-
-    if (combinedApiDensity > 0) {
-      return combinedApiPayload;
-    }
-
-    if (directProfileDensity > 0 && directProfileHasEncryptedSecrets) {
-      return sanitizeClientVisibleEnvelope(normalizeEnvelope(directProfilePayload));
-    }
-
-    if (!keyManagerState && !userApiEntries) {
-      throw new Error(
-        getApiFailureMessage(keyManagerResponse)
-        || getApiFailureMessage(userApiEntriesResponse)
-        || 'Failed to load key-manager cloud state.',
-      );
-    }
-
-    return combinedApiPayload;
-  })()
-    .then((payload) => setCachedUserApisPayload(context.userId, payload))
-    .finally(() => {
-      userApisPayloadInFlight.delete(context.userId);
-    });
-
-  userApisPayloadInFlight.set(context.userId, loadPromise);
-  return await loadPromise;
+  const payload = await loadUserApisPayloadRaw(expectedUserId);
+  return payload ? sanitizeClientVisibleEnvelope(payload) : null;
 }
 
 export async function saveUserApisPayloadViaSupabase(
@@ -513,11 +620,11 @@ export async function saveUserApisPayloadViaSupabase(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to save user_apis.');
+    throw new Error('Authenticated Supabase session is required to save user API data.');
   }
 
   const payload = normalizeEnvelope(rawPayload);
-  return saveNormalizedUserApisPayloadDirectlyToProfile(context.userId, payload);
+  return persistUserApisPayloadViaApi(context, payload);
 }
 
 export async function upsertUserApiSlotViaSupabase(
@@ -535,7 +642,7 @@ export async function upsertUserApiSlotViaSupabase(
   }
 
   const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadDirectlyFromProfile(context.userId),
+    await loadUserApisPayloadRaw(context.userId),
   );
   const existingSlots = existingPayload.slots.filter(isRecord);
   const existingSlot = existingSlots.find((item) => normalizeRecordId(item) === slotId);
@@ -558,7 +665,7 @@ export async function upsertUserApiSlotViaSupabase(
     slots: upsertArrayRecordById(existingPayload.slots, nextSlot),
   };
 
-  return saveNormalizedUserApisPayloadDirectlyToProfile(context.userId, nextPayload);
+  return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);
 }
 
 export async function removeUserApiSlotViaSupabase(
@@ -576,14 +683,14 @@ export async function removeUserApiSlotViaSupabase(
   }
 
   const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadDirectlyFromProfile(context.userId),
+    await loadUserApisPayloadRaw(context.userId),
   );
   const nextPayload: UserApisEnvelope = {
     ...existingPayload,
     slots: existingPayload.slots.filter((item) => normalizeRecordId(item) !== normalizedSlotId),
   };
 
-  return saveNormalizedUserApisPayloadDirectlyToProfile(context.userId, nextPayload);
+  return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);
 }
 
 export async function upsertUserApiProviderViaSupabase(
@@ -601,7 +708,7 @@ export async function upsertUserApiProviderViaSupabase(
   }
 
   const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadDirectlyFromProfile(context.userId),
+    await loadUserApisPayloadRaw(context.userId),
   );
   const existingProviders = existingPayload.providers.filter(isRecord);
   const existingProvider = existingProviders.find((item) => normalizeRecordId(item) === providerId);
@@ -615,7 +722,7 @@ export async function upsertUserApiProviderViaSupabase(
     nextProvider.apiKey = existingProvider.apiKey;
   }
 
-  if (!isEncryptedSecretEnvelope(nextProvider.apiKey) && shouldReusePersistedSecret(nextProvider.apiKey)) {
+  if (shouldReusePersistedSecret(nextProvider.apiKey) && !existingProvider) {
     throw new Error('A real API key is required when creating a new provider.');
   }
 
@@ -624,7 +731,7 @@ export async function upsertUserApiProviderViaSupabase(
     providers: upsertArrayRecordById(existingPayload.providers, nextProvider),
   };
 
-  return saveNormalizedUserApisPayloadDirectlyToProfile(context.userId, nextPayload);
+  return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);
 }
 
 export async function removeUserApiProviderViaSupabase(
@@ -642,14 +749,14 @@ export async function removeUserApiProviderViaSupabase(
   }
 
   const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadDirectlyFromProfile(context.userId),
+    await loadUserApisPayloadRaw(context.userId),
   );
   const nextPayload: UserApisEnvelope = {
     ...existingPayload,
     providers: existingPayload.providers.filter((item) => normalizeRecordId(item) !== normalizedProviderId),
   };
 
-  return saveNormalizedUserApisPayloadDirectlyToProfile(context.userId, nextPayload);
+  return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);
 }
 
 export async function mergeUserApisPayloadViaSupabase(
@@ -660,7 +767,16 @@ export async function mergeUserApisPayloadViaSupabase(
   },
   expectedUserId?: string,
 ): Promise<unknown> {
-  const existingPayload = await loadUserApisPayloadViaSupabase(expectedUserId);
+  const context = await getAuthenticatedProfileContext(expectedUserId);
+  if (!context) {
+    throw new Error('Authenticated Supabase session is required to save user API data.');
+  }
+
+  const existingPayload = await loadUserApisPayloadRaw(context.userId);
   const mergedPayload = mergeUserApisPayload(existingPayload, updates);
-  return saveUserApisPayloadViaSupabase(mergedPayload, expectedUserId);
+  return persistUserApisPayloadViaApi(
+    context,
+    normalizeEnvelope(mergedPayload),
+    normalizeEnvelope(existingPayload),
+  );
 }

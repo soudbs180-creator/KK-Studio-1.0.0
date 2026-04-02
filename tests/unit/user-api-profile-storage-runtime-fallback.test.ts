@@ -8,10 +8,11 @@ import {
   saveUserApiEntries,
 } from '../../src/services/api/userApiProfileStorage.ts';
 
+const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
-const originalFrom = supabase.from;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const locationLike = globalThis as { location?: { origin?: string } };
@@ -41,44 +42,14 @@ function createEntry(id: string) {
   };
 }
 
-function mockAuthenticatedProfile(profilePayload: unknown) {
-  supabase.auth.getUser = async () =>
+function mockAuthenticatedUser() {
+  supabase.auth.getSession = async () =>
     ({
       data: {
-        user: {
-          id: 'user-1',
-          email: 'user-1@example.com',
-        },
+        session: null,
       },
       error: null,
-    }) as Awaited<ReturnType<typeof originalGetUser>>;
-
-  supabase.from = ((table: string) => {
-    assert.equal(table, 'profiles');
-
-    return {
-      select(column: string) {
-        assert.equal(column, 'user_apis');
-        return this;
-      },
-      eq(column: string, value: string) {
-        assert.equal(column, 'id');
-        assert.equal(value, 'user-1');
-        return this;
-      },
-      async maybeSingle() {
-        return {
-          data: profilePayload == null ? null : { user_apis: profilePayload },
-          error: null,
-        };
-      },
-    };
-  }) as typeof supabase.from;
-}
-
-function mockAuthenticatedProfileReadWrite(profilePayload: unknown) {
-  let currentPayload = profilePayload;
-  const upsertCalls: Array<{ value: Record<string, unknown> }> = [];
+    }) as Awaited<ReturnType<typeof originalGetSession>>;
 
   supabase.auth.getUser = async () =>
     ({
@@ -90,48 +61,14 @@ function mockAuthenticatedProfileReadWrite(profilePayload: unknown) {
       },
       error: null,
     }) as Awaited<ReturnType<typeof originalGetUser>>;
-
-  supabase.from = ((table: string) => {
-    assert.equal(table, 'profiles');
-
-    return {
-      select(column: string) {
-        assert.equal(column, 'user_apis');
-        return this;
-      },
-      eq(column: string, value: string) {
-        assert.equal(column, 'id');
-        assert.equal(value, 'user-1');
-        return this;
-      },
-      async maybeSingle() {
-        return {
-          data: currentPayload == null ? null : { user_apis: currentPayload },
-          error: null,
-        };
-      },
-      async upsert(value: Record<string, unknown>) {
-        currentPayload = value.user_apis;
-        upsertCalls.push({ value });
-        return {
-          data: null,
-          error: null,
-        };
-      },
-    };
-  }) as typeof supabase.from;
-
-  return {
-    getCurrentPayload: () => currentPayload,
-    upsertCalls,
-  };
 }
 
 afterEach(() => {
+  supabase.auth.getSession = originalGetSession;
   supabase.auth.getUser = originalGetUser;
-  supabase.from = originalFrom;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
   if (typeof originalKkApiBaseUrl === 'string') {
     process.env.VITE_KK_API_BASE_URL = originalKkApiBaseUrl;
@@ -142,73 +79,113 @@ afterEach(() => {
 });
 
 describe('user api profile storage runtime fallback', () => {
-  test('loads user API entries from Supabase on hosted runtimes without touching the legacy Web API', async () => {
+  test('loads user API entries from the typed auth API on hosted runtimes', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    mockAuthenticatedProfile({
-      version: 2,
-      slots: [],
-      providers: [],
-      entries: [
-        {
-          ...createEntry('entry-1'),
-          key: {
-            __kkUserApiSecret: true,
-          },
-        },
-      ],
-    });
+    mockAuthenticatedUser();
 
-    let legacyCalls = 0;
+    let keyManagerCalls = 0;
+    let userApiCalls = 0;
     legacyWebApiClient.getKeyManagerCloudState = async () => {
-      legacyCalls += 1;
-      throw new Error('legacy key-manager endpoint should stay unused');
+      keyManagerCalls += 1;
+      return {
+        success: true,
+        data: {
+          version: 2,
+          slots: [],
+          providers: [],
+          entries: [],
+        },
+      };
     };
     legacyWebApiClient.getUserApiEntries = async () => {
-      legacyCalls += 1;
-      throw new Error('legacy user-api endpoint should stay unused');
+      userApiCalls += 1;
+      return {
+        success: true,
+        data: {
+          entries: [
+            {
+              ...createEntry('entry-1'),
+              key: '__kk_redacted__:key:entry-1',
+            },
+          ],
+        },
+      };
     };
 
     const entries = await loadUserApiEntries();
 
-    assert.equal(legacyCalls, 0);
+    assert.equal(keyManagerCalls, 1);
+    assert.equal(userApiCalls, 1);
     assert.equal(entries.length, 1);
     assert.equal(entries[0].id, 'entry-1');
     assert.equal(entries[0].key, 'sk-readonly-0000');
   });
 
-  test('saves user API entries directly to Supabase on hosted runtimes without seeding the legacy Web API', async () => {
+  test('saves user API entries through the typed auth API on hosted runtimes', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    const profile = mockAuthenticatedProfileReadWrite({
-      version: 2,
-      slots: [],
-      providers: [],
-      entries: [],
-    });
+    mockAuthenticatedUser();
 
+    let keyManagerCalls = 0;
+    let userApiReads = 0;
     let legacyWrites = 0;
-    legacyWebApiClient.replaceUserApiEntries = async () => {
+    let persistedEntries: Array<Record<string, unknown>> = [];
+
+    legacyWebApiClient.getKeyManagerCloudState = async () => {
+      keyManagerCalls += 1;
+      return {
+        success: true,
+        data: {
+          version: 2,
+          slots: [],
+          providers: [],
+          entries: [],
+        },
+      };
+    };
+    legacyWebApiClient.getUserApiEntries = async () => {
+      userApiReads += 1;
+      return {
+        success: true,
+        data: {
+          entries: persistedEntries,
+        },
+      };
+    };
+    legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+      throw new Error('key-manager state should stay unchanged when only entry rows change');
+    };
+    legacyWebApiClient.replaceUserApiEntries = async (input) => {
       legacyWrites += 1;
-      throw new Error('legacy user-api writes should stay unused');
+      persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
+        ...entry,
+        key: `__kk_redacted__:key:${String(entry.id || '')}`,
+      }));
+      return {
+        success: true,
+        data: {
+          entries: persistedEntries,
+        },
+      };
     };
 
     await saveUserApiEntries([createEntry('entry-2')]);
 
-    assert.equal(legacyWrites, 0);
-    assert.equal(profile.upsertCalls.length, 1);
-
-    const savedPayload = profile.getCurrentPayload() as {
-      entries: Array<{ id: string; key: string }>;
-    };
-    assert.deepEqual(savedPayload.entries.map((entry) => ({
-      id: entry.id,
-      key: entry.key,
-    })), [
-      {
-        id: 'entry-2',
-        key: 'sk-entry-2',
-      },
-    ]);
+    assert.equal(legacyWrites, 1);
+    assert.equal(keyManagerCalls, 2);
+    assert.equal(userApiReads, 2);
+    assert.deepEqual(
+      persistedEntries.map((entry) => ({
+        id: entry.id,
+        key: entry.key,
+      })),
+      [
+        {
+          id: 'entry-2',
+          key: '__kk_redacted__:key:entry-2',
+        },
+      ],
+    );
   });
 });

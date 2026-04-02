@@ -7,23 +7,34 @@ import {
   combineUserApisEnvelopeSources,
   getUserApisPayloadDensity,
   loadUserApisPayloadViaSupabase,
-  removeUserApiSlotViaSupabase,
   removeUserApiProviderViaSupabase,
+  removeUserApiSlotViaSupabase,
   saveUserApisPayloadViaSupabase,
-  upsertUserApiSlotViaSupabase,
   upsertUserApiProviderViaSupabase,
+  upsertUserApiSlotViaSupabase,
 } from '../../src/services/api/supabaseUserApiCloudStorage.ts';
 import { mergeUserApisPayload } from '../../src/services/api/userApiPayload.ts';
 
+const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
+
+const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
-const originalFrom = supabase.from;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
+const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const locationLike = globalThis as { location?: { origin?: string } };
 const originalLocation = locationLike.location;
 
-function createEntry(id: string) {
+type MutableEnvelope = {
+  version: number;
+  slots: Array<Record<string, unknown>>;
+  providers: Array<Record<string, unknown>>;
+  entries: Array<Record<string, unknown>>;
+};
+
+function createEntry(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
     key: `sk-${id}`,
@@ -44,48 +55,113 @@ function createEntry(id: string) {
     usedTokens: 0,
     lastUsed: null,
     lastError: null,
+    ...overrides,
   };
 }
 
-function mockAuthenticatedProfile(profilePayload: unknown) {
-  supabase.auth.getUser = async () =>
-    ({
-      data: {
-        user: {
-          id: 'user-1',
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetUser>>;
-
-  supabase.from = ((table: string) => {
-    assert.equal(table, 'profiles');
-
-    return {
-      select(column: string) {
-        assert.equal(column, 'user_apis');
-        return this;
-      },
-      eq(column: string, value: string) {
-        assert.equal(column, 'id');
-        assert.equal(value, 'user-1');
-        return this;
-      },
-      async maybeSingle() {
-        return {
-          data: {
-            user_apis: profilePayload,
-          },
-          error: null,
-        };
-      },
-    };
-  }) as typeof supabase.from;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function mockAuthenticatedProfileReadWrite(profilePayload: unknown) {
-  let currentPayload = profilePayload;
-  const upsertCalls: Array<{ value: Record<string, unknown>; options?: Record<string, unknown> }> = [];
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function getRecordId(value: unknown): string {
+  return isRecord(value) ? String(value.id || '').trim() : '';
+}
+
+function buildRedactedSecret(recordId: string, field: string): string {
+  return `${REDACTED_SECRET_PREFIX}${field}:${recordId}`;
+}
+
+function shouldPreservePersistedSecret(value: unknown): boolean {
+  const normalized = String(value || '').trim();
+  return normalized.length === 0
+    || normalized === 'sk-readonly-0000'
+    || normalized.startsWith(REDACTED_SECRET_PREFIX);
+}
+
+function mergeRecordArray(
+  existing: Array<Record<string, unknown>>,
+  next: Array<Record<string, unknown>>,
+  secretField?: 'key' | 'apiKey',
+): Array<Record<string, unknown>> {
+  const existingById = new Map<string, Record<string, unknown>>();
+
+  existing.forEach((item) => {
+    const id = getRecordId(item);
+    if (id) {
+      existingById.set(id, item);
+    }
+  });
+
+  return next.map((item) => {
+    const id = getRecordId(item);
+    if (!id) {
+      return item;
+    }
+
+    const persisted = existingById.get(id);
+    if (!persisted) {
+      return { ...item };
+    }
+
+    const merged = {
+      ...persisted,
+      ...item,
+    };
+
+    if (secretField && shouldPreservePersistedSecret(item[secretField])) {
+      merged[secretField] = persisted[secretField];
+    }
+
+    return merged;
+  });
+}
+
+function normalizeEnvelope(rawPayload: unknown): MutableEnvelope {
+  const payload = isRecord(rawPayload) ? rawPayload : {};
+  return {
+    version: Number(payload.version || 2),
+    slots: toArray(payload.slots).filter(isRecord).map((slot) => ({ ...slot })),
+    providers: toArray(payload.providers).filter(isRecord).map((provider) => ({ ...provider })),
+    entries: toArray(payload.entries).filter(isRecord).map((entry) => ({ ...entry })),
+  };
+}
+
+function redactRecords(
+  records: Array<Record<string, unknown>>,
+  secretField: 'key' | 'apiKey',
+): Array<Record<string, unknown>> {
+  return records.map((record) => {
+    const id = getRecordId(record) || 'configured';
+    const nextRecord = { ...record };
+    const rawSecret = nextRecord[secretField];
+    if (typeof rawSecret === 'string' && rawSecret.trim()) {
+      nextRecord[secretField] = buildRedactedSecret(id, secretField);
+    }
+    return nextRecord;
+  });
+}
+
+function sanitizeEnvelopeForApi(payload: MutableEnvelope): MutableEnvelope {
+  return {
+    version: payload.version,
+    slots: redactRecords(payload.slots, 'key'),
+    providers: redactRecords(payload.providers, 'apiKey'),
+    entries: redactRecords(payload.entries, 'key'),
+  };
+}
+
+function mockAuthenticatedUser() {
+  supabase.auth.getSession = async () =>
+    ({
+      data: {
+        session: null,
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetSession>>;
 
   supabase.auth.getUser = async () =>
     ({
@@ -97,48 +173,71 @@ function mockAuthenticatedProfileReadWrite(profilePayload: unknown) {
       },
       error: null,
     }) as Awaited<ReturnType<typeof originalGetUser>>;
+}
 
-  supabase.from = ((table: string) => {
-    assert.equal(table, 'profiles');
+function mockApiState(initialPayload: unknown) {
+  mockAuthenticatedUser();
+
+  let currentPayload = normalizeEnvelope(initialPayload);
+  const keyManagerReplaceCalls: Array<Record<string, unknown>> = [];
+  const userApiReplaceCalls: Array<Record<string, unknown>> = [];
+
+  legacyWebApiClient.getKeyManagerCloudState = async () => ({
+    success: true,
+    data: sanitizeEnvelopeForApi(currentPayload),
+  });
+
+  legacyWebApiClient.getUserApiEntries = async () => ({
+    success: true,
+    data: {
+      entries: sanitizeEnvelopeForApi(currentPayload).entries,
+    },
+  });
+
+  legacyWebApiClient.replaceKeyManagerCloudState = async (input) => {
+    keyManagerReplaceCalls.push(input as Record<string, unknown>);
+    currentPayload = {
+      version: Number(input.version || currentPayload.version || 2),
+      slots: mergeRecordArray(currentPayload.slots, toArray(input.slots).filter(isRecord), 'key'),
+      providers: mergeRecordArray(currentPayload.providers, toArray(input.providers).filter(isRecord), 'apiKey'),
+      entries: currentPayload.entries,
+    };
 
     return {
-      select(column: string) {
-        assert.equal(column, 'user_apis');
-        return this;
-      },
-      eq(column: string, value: string) {
-        assert.equal(column, 'id');
-        assert.equal(value, 'user-1');
-        return this;
-      },
-      async maybeSingle() {
-        return {
-          data: currentPayload == null ? null : { user_apis: currentPayload },
-          error: null,
-        };
-      },
-      async upsert(value: Record<string, unknown>, options?: Record<string, unknown>) {
-        upsertCalls.push({ value, options });
-        currentPayload = value.user_apis;
-        return {
-          data: null,
-          error: null,
-        };
+      success: true,
+      data: sanitizeEnvelopeForApi(currentPayload),
+    };
+  };
+
+  legacyWebApiClient.replaceUserApiEntries = async (input) => {
+    userApiReplaceCalls.push(input as Record<string, unknown>);
+    currentPayload = {
+      ...currentPayload,
+      entries: mergeRecordArray(currentPayload.entries, toArray(input.entries).filter(isRecord), 'key'),
+    };
+
+    return {
+      success: true,
+      data: {
+        entries: sanitizeEnvelopeForApi(currentPayload).entries,
       },
     };
-  }) as typeof supabase.from;
+  };
 
   return {
-    getCurrentPayload: () => currentPayload,
-    upsertCalls,
+    getCurrentPayload: () => normalizeEnvelope(currentPayload),
+    keyManagerReplaceCalls,
+    userApiReplaceCalls,
   };
 }
 
 afterEach(() => {
+  supabase.auth.getSession = originalGetSession;
   supabase.auth.getUser = originalGetUser;
-  supabase.from = originalFrom;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
+  legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
   if (typeof originalKkApiBaseUrl === 'string') {
     process.env.VITE_KK_API_BASE_URL = originalKkApiBaseUrl;
   } else {
@@ -282,10 +381,11 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
-  test('loads the combined API payload when the direct profile is empty but API endpoints still have state', async () => {
+  test('loads the combined typed API payload when cloud state and user-api entries are split across endpoints', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
-    locationLike.location = { origin: 'http://127.0.0.1:3000' };
-    mockAuthenticatedProfile(null);
+    locationLike.location = { origin: 'https://kk-studio.vercel.app' };
+    mockAuthenticatedUser();
+
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: true,
       data: {
@@ -312,49 +412,15 @@ describe('user api cloud storage helpers', () => {
     });
   });
 
-  test('falls back to direct profile payload when local API endpoints are unavailable', async () => {
-    delete process.env.VITE_KK_API_BASE_URL;
-    locationLike.location = { origin: 'http://127.0.0.1:3000' };
-    mockAuthenticatedProfile({
-      version: 2,
-      slots: [{ id: 'slot-1' }],
-      providers: [{ id: 'provider-1' }],
-      entries: [createEntry('entry-1')],
-    });
-    legacyWebApiClient.getKeyManagerCloudState = async () => ({
-      success: false,
-      error: {
-        message: 'key manager unavailable',
-      },
-    });
-    legacyWebApiClient.getUserApiEntries = async () => ({
-      success: false,
-      error: {
-        message: 'user api unavailable',
-      },
-    });
-
-    const payload = await loadUserApisPayloadViaSupabase();
-
-    assert.deepEqual(payload, {
-      version: 2,
-      slots: [{ id: 'slot-1' }],
-      providers: [{ id: 'provider-1' }],
-      entries: [createEntry('entry-1')],
-    });
-  });
-
-  test('uses read-only Supabase payloads on hosted runtimes without touching the legacy Web API', async () => {
+  test('returns client-visible placeholders when the typed auth API redacts stored secrets', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    mockAuthenticatedProfile({
+    mockApiState({
       version: 2,
       slots: [
         {
           id: 'slot-1',
-          key: {
-            __kkUserApiSecret: true,
-          },
+          key: 'server-slot-secret',
           provider: 'Google',
           type: 'official',
           format: 'gemini',
@@ -364,36 +430,20 @@ describe('user api cloud storage helpers', () => {
         {
           id: 'provider-1',
           name: 'SiliconFlow',
-          apiKey: {
-            __kkUserApiSecret: true,
-          },
+          apiKey: 'server-provider-secret',
           format: 'openai',
           isActive: true,
         },
       ],
       entries: [
-        {
-          ...createEntry('entry-1'),
-          key: {
-            __kkUserApiSecret: true,
-          },
-        },
+        createEntry('entry-1', {
+          key: 'server-entry-secret',
+        }),
       ],
     });
 
-    let legacyCalls = 0;
-    legacyWebApiClient.getKeyManagerCloudState = async () => {
-      legacyCalls += 1;
-      throw new Error('legacy API should not be called on hosted runtimes');
-    };
-    legacyWebApiClient.getUserApiEntries = async () => {
-      legacyCalls += 1;
-      throw new Error('legacy API should not be called on hosted runtimes');
-    };
-
     const payload = await loadUserApisPayloadViaSupabase();
 
-    assert.equal(legacyCalls, 0);
     assert.deepEqual(payload, {
       version: 2,
       slots: [
@@ -416,29 +466,20 @@ describe('user api cloud storage helpers', () => {
       ],
       entries: [
         {
-          ...createEntry('entry-1'),
+          ...createEntry('entry-1', {
+            key: 'server-entry-secret',
+          }),
           key: 'sk-readonly-0000',
         },
       ],
     });
   });
 
-  test('returns readonly placeholders for encrypted direct profile payloads when hosted runtimes skip the legacy API', async () => {
+  test('throws when both typed auth endpoints fail instead of bypassing the API layer', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    mockAuthenticatedProfile({
-      version: 2,
-      slots: [],
-      providers: [],
-      entries: [
-        {
-          id: 'entry-1',
-          key: {
-            __kkUserApiSecret: true,
-          },
-        },
-      ],
-    });
+    mockAuthenticatedUser();
+
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: false,
       error: {
@@ -452,27 +493,19 @@ describe('user api cloud storage helpers', () => {
       },
     });
 
-    const payload = await loadUserApisPayloadViaSupabase() as {
-      entries: Array<{ id: string; key: string }>;
-    };
-
-    assert.deepEqual(payload.entries, [
-      {
-        id: 'entry-1',
-        key: 'sk-readonly-0000',
-      },
-    ]);
+    await assert.rejects(
+      () => loadUserApisPayloadViaSupabase(),
+      /key manager unavailable|user api unavailable/,
+    );
   });
 
-  test('saves the merged user_apis payload directly to profiles.user_apis and preserves encrypted secrets', async () => {
-    const encryptedSlotSecret = { __kkUserApiSecret: true, ciphertext: 'slot-secret' };
-    const encryptedEntrySecret = { __kkUserApiSecret: true, ciphertext: 'entry-secret' };
-    const profile = mockAuthenticatedProfileReadWrite({
+  test('saves the merged user API payload through typed auth APIs and preserves persisted secrets', async () => {
+    const api = mockApiState({
       version: 2,
       slots: [
         {
           id: 'slot-1',
-          key: encryptedSlotSecret,
+          key: 'server-slot-secret',
           provider: 'Google',
           type: 'official',
           format: 'gemini',
@@ -480,10 +513,9 @@ describe('user api cloud storage helpers', () => {
       ],
       providers: [],
       entries: [
-        {
-          ...createEntry('entry-1'),
-          key: encryptedEntrySecret,
-        },
+        createEntry('entry-1', {
+          key: 'server-entry-secret',
+        }),
       ],
     });
 
@@ -507,23 +539,23 @@ describe('user api cloud storage helpers', () => {
           status: 'valid',
         },
       ],
-    });
+    }) as MutableEnvelope;
 
-    assert.equal(profile.upsertCalls.length, 1);
-    assert.deepEqual(payload, profile.getCurrentPayload());
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 1);
 
-    const savedPayload = profile.getCurrentPayload() as {
-      slots: Array<Record<string, unknown>>;
-      entries: Array<Record<string, unknown>>;
-    };
-    assert.deepEqual(savedPayload.slots[0].key, encryptedSlotSecret);
+    const savedPayload = api.getCurrentPayload();
+    assert.equal(savedPayload.slots[0].key, 'server-slot-secret');
     assert.equal(savedPayload.slots[0].disabled, true);
-    assert.deepEqual(savedPayload.entries[0].key, encryptedEntrySecret);
+    assert.equal(savedPayload.entries[0].key, 'server-entry-secret');
     assert.equal(savedPayload.entries[0].status, 'valid');
+
+    assert.equal(payload.slots[0].key, buildRedactedSecret('slot-1', 'key'));
+    assert.equal(payload.entries[0].key, buildRedactedSecret('entry-1', 'key'));
   });
 
-  test('creates an official endpoint directly in profiles.user_apis when degraded mode needs Supabase fallback', async () => {
-    const profile = mockAuthenticatedProfileReadWrite({
+  test('creates an official endpoint through the typed key-manager cloud API', async () => {
+    const api = mockApiState({
       version: 2,
       slots: [],
       providers: [],
@@ -539,22 +571,22 @@ describe('user api cloud storage helpers', () => {
       key: 'sk-live-slot-1',
       supportedModels: ['gemini-2.5-flash'],
       disabled: false,
-    });
+    }) as MutableEnvelope;
 
-    assert.equal(profile.upsertCalls.length, 1);
-    assert.deepEqual(payload, profile.getCurrentPayload());
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 0);
 
-    const savedSlot = (profile.getCurrentPayload() as { slots: Array<Record<string, unknown>> }).slots[0];
+    const savedSlot = api.getCurrentPayload().slots[0];
     assert.equal(savedSlot.id, 'slot-1');
     assert.equal(savedSlot.name, 'Google');
     assert.equal(savedSlot.provider, 'Google');
     assert.equal(savedSlot.key, 'sk-live-slot-1');
     assert.deepEqual(savedSlot.supportedModels, ['gemini-2.5-flash']);
+    assert.equal(payload.slots[0].key, buildRedactedSecret('slot-1', 'key'));
   });
 
   test('reuses the persisted official endpoint secret when editing with the readonly placeholder', async () => {
-    const encryptedSecret = { __kkUserApiSecret: true, ciphertext: 'slot-secret' };
-    const profile = mockAuthenticatedProfileReadWrite({
+    const api = mockApiState({
       version: 2,
       slots: [
         {
@@ -563,7 +595,7 @@ describe('user api cloud storage helpers', () => {
           provider: 'Google',
           type: 'official',
           format: 'gemini',
-          key: encryptedSecret,
+          key: 'server-slot-secret',
           disabled: false,
         },
       ],
@@ -581,14 +613,14 @@ describe('user api cloud storage helpers', () => {
       disabled: true,
     });
 
-    const savedSlot = (profile.getCurrentPayload() as { slots: Array<Record<string, unknown>> }).slots[0];
+    const savedSlot = api.getCurrentPayload().slots[0];
     assert.equal(savedSlot.name, 'Google Updated');
-    assert.deepEqual(savedSlot.key, encryptedSecret);
+    assert.equal(savedSlot.key, 'server-slot-secret');
     assert.equal(savedSlot.disabled, true);
   });
 
-  test('removes an official endpoint directly from profiles.user_apis', async () => {
-    const profile = mockAuthenticatedProfileReadWrite({
+  test('removes an official endpoint through the typed key-manager cloud API', async () => {
+    const api = mockApiState({
       version: 2,
       slots: [
         { id: 'slot-1', name: 'Google' },
@@ -598,18 +630,19 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await removeUserApiSlotViaSupabase('slot-1');
+    const payload = await removeUserApiSlotViaSupabase('slot-1') as MutableEnvelope;
 
-    assert.equal(profile.upsertCalls.length, 1);
-    assert.deepEqual(payload, profile.getCurrentPayload());
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 0);
+    assert.deepEqual(payload.slots.map((slot) => slot.id), ['slot-2']);
     assert.deepEqual(
-      (profile.getCurrentPayload() as { slots: Array<{ id: string }> }).slots.map((slot) => slot.id),
+      api.getCurrentPayload().slots.map((slot) => slot.id),
       ['slot-2'],
     );
   });
 
-  test('creates a provider directly in profiles.user_apis when degraded mode needs Supabase fallback', async () => {
-    const profile = mockAuthenticatedProfileReadWrite({
+  test('creates a provider through the typed key-manager cloud API', async () => {
+    const api = mockApiState({
       version: 2,
       slots: [],
       providers: [],
@@ -623,28 +656,23 @@ describe('user api cloud storage helpers', () => {
       apiKey: 'sk-live-provider-1',
       format: 'openai',
       isActive: true,
-    });
+    }) as MutableEnvelope;
 
-    assert.equal(profile.upsertCalls.length, 1);
-    assert.deepEqual(payload, profile.getCurrentPayload());
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 0);
 
-    const savedProvider = ((profile.getCurrentPayload() as { providers: Array<Record<string, unknown>> }).providers[0]);
+    const savedProvider = api.getCurrentPayload().providers[0];
     assert.equal(savedProvider.id, 'provider-1');
     assert.equal(savedProvider.name, 'SiliconFlow');
     assert.equal(savedProvider.baseUrl, 'https://api.siliconflow.cn/v1');
     assert.equal(savedProvider.apiKey, 'sk-live-provider-1');
     assert.equal(savedProvider.format, 'openai');
     assert.equal(savedProvider.isActive, true);
-
-    const [{ value, options }] = profile.upsertCalls;
-    assert.equal(value.id, 'user-1');
-    assert.equal(value.email, 'user-1@example.com');
-    assert.equal(options?.onConflict, 'id');
+    assert.equal(payload.providers[0].apiKey, buildRedactedSecret('provider-1', 'apiKey'));
   });
 
   test('reuses the persisted provider secret when editing with the readonly placeholder', async () => {
-    const encryptedSecret = { __kkUserApiSecret: true, ciphertext: 'secret' };
-    const profile = mockAuthenticatedProfileReadWrite({
+    const api = mockApiState({
       version: 2,
       slots: [],
       providers: [
@@ -652,7 +680,7 @@ describe('user api cloud storage helpers', () => {
           id: 'provider-1',
           name: 'Old Provider',
           baseUrl: 'https://old.example.com/v1',
-          apiKey: encryptedSecret,
+          apiKey: 'server-provider-secret',
           format: 'openai',
           isActive: false,
         },
@@ -669,16 +697,16 @@ describe('user api cloud storage helpers', () => {
       isActive: true,
     });
 
-    const savedProvider = ((profile.getCurrentPayload() as { providers: Array<Record<string, unknown>> }).providers[0]);
+    const savedProvider = api.getCurrentPayload().providers[0];
     assert.equal(savedProvider.name, 'Updated Provider');
     assert.equal(savedProvider.baseUrl, 'https://new.example.com/v1');
-    assert.deepEqual(savedProvider.apiKey, encryptedSecret);
+    assert.equal(savedProvider.apiKey, 'server-provider-secret');
     assert.equal(savedProvider.format, 'gemini');
     assert.equal(savedProvider.isActive, true);
   });
 
   test('rejects creating a new provider when the api key is still the readonly placeholder', async () => {
-    mockAuthenticatedProfileReadWrite({
+    mockApiState({
       version: 2,
       slots: [],
       providers: [],
@@ -696,8 +724,8 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
-  test('removes a provider directly from profiles.user_apis', async () => {
-    const profile = mockAuthenticatedProfileReadWrite({
+  test('removes a provider through the typed key-manager cloud API', async () => {
+    const api = mockApiState({
       version: 2,
       slots: [],
       providers: [
@@ -707,12 +735,13 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await removeUserApiProviderViaSupabase('provider-1');
+    const payload = await removeUserApiProviderViaSupabase('provider-1') as MutableEnvelope;
 
-    assert.equal(profile.upsertCalls.length, 1);
-    assert.deepEqual(payload, profile.getCurrentPayload());
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 0);
+    assert.deepEqual(payload.providers.map((provider) => provider.id), ['provider-2']);
     assert.deepEqual(
-      (profile.getCurrentPayload() as { providers: Array<{ id: string }> }).providers.map((provider) => provider.id),
+      api.getCurrentPayload().providers.map((provider) => provider.id),
       ['provider-2'],
     );
   });

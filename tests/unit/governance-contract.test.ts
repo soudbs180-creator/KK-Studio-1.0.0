@@ -130,18 +130,11 @@ test("migration allowlist registry tracks every approved architecture exception 
     assert.ok(entry?.removalCondition, `${requiredEntry} must define a removal condition`);
   }
 
-  const requiredFrontendEntries = [
-    "src/services/api/supabaseUserApiCloudStorage.ts",
-    "src/services/security/apiKeySecureStorage.ts",
-  ];
-
-  for (const requiredEntry of requiredFrontendEntries) {
-    const entry = registry.frontendSupabaseAccess.find((candidate) => candidate.path === requiredEntry);
-    assert.ok(entry, `missing frontend Supabase migration allowlist entry for ${requiredEntry}`);
-    assert.ok(entry?.reason, `${requiredEntry} must define a rationale`);
-    assert.ok(entry?.regressionTests.length, `${requiredEntry} must list regression tests`);
-    assert.ok(entry?.removalCondition, `${requiredEntry} must define a removal condition`);
-  }
+  assert.deepEqual(
+    registry.frontendSupabaseAccess,
+    [],
+    "frontend Supabase migration allowlist should be empty once browser data access is fully routed through typed APIs",
+  );
 });
 
 test("auth access token compatibility storage is session-scoped and clears legacy localStorage", () => {

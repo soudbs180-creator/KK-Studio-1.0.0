@@ -1,9 +1,9 @@
 /**
  * Profile-scoped user API key storage.
  *
- * Canonical storage now lives in `profiles.user_apis`.
- * Keys are masked in the UI, and profile access relies on row-level security
- * instead of the removed legacy `user_api_keys` table/view/RPC chain.
+ * Canonical storage now lives behind the typed auth API surface.
+ * Frontend callers only see redacted metadata and never touch profile rows
+ * directly when listing or mutating BYOK credentials.
  */
 
 import {
@@ -12,9 +12,6 @@ import {
   mutateUserApiEntries,
   type StoredUserApiEntry,
 } from '../api/userApiProfileStorage';
-import { extractUserApiEntriesFromPayload } from '../api/userApiPayload';
-import { shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
-import { supabase } from '../../lib/supabase';
 import { callSecureSystemProxyChat } from '../model/secureModelProxy';
 
 export interface UserApiKeyInfo {
@@ -48,50 +45,6 @@ export const API_PROVIDERS: { value: ApiProvider; label: string }[] = [
   { value: 'Custom', label: '自定义' },
 ];
 
-interface ProfileUserApisRow {
-  user_apis: unknown;
-}
-
-type JsonRecord = Record<string, unknown>;
-
-function isRecord(value: unknown): value is JsonRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function hasStoredSecret(value: unknown): boolean {
-  if (typeof value === 'string') {
-    return value.trim().length > 0;
-  }
-
-  return isRecord(value) && value.__kkUserApiSecret === true;
-}
-
-function toCreatedAtIso(value: unknown): string {
-  const fallback = new Date(0).toISOString();
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return new Date(value).toISOString();
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      return new Date(numeric).toISOString();
-    }
-
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString();
-    }
-  }
-
-  return fallback;
-}
-
 function maskKeyStatus(entry: StoredUserApiEntry): string {
   if (!entry.key) return '***MISSING***';
   return entry.disabled ? '***DISABLED***' : '***CONFIGURED***';
@@ -109,103 +62,11 @@ function toUserApiKeyInfo(entry: StoredUserApiEntry): UserApiKeyInfo {
   };
 }
 
-function toUserApiKeyInfoFromRawEntry(rawEntry: unknown): UserApiKeyInfo | null {
-  const raw = isRecord(rawEntry) ? rawEntry : null;
-  if (!raw) return null;
-
-  const id = normalizeString(raw.id);
-  if (!id) return null;
-
-  const provider = normalizeString(raw.provider) || 'Custom';
-  const name = normalizeString(raw.name) || `${provider} Key`;
-  const disabled =
-    typeof raw.disabled === 'boolean'
-      ? raw.disabled
-      : typeof raw.is_active === 'boolean'
-        ? !raw.is_active
-        : false;
-  const baseUrl = normalizeString(raw.baseUrl ?? raw.base_url) || null;
-
-  return {
-    id,
-    name,
-    provider,
-    key_status: hasStoredSecret(raw.key) ? (disabled ? '***DISABLED***' : '***CONFIGURED***') : '***MISSING***',
-    base_url: baseUrl,
-    is_active: !disabled,
-    created_at: toCreatedAtIso(raw.createdAt ?? raw.created_at),
-  };
-}
-
-async function loadUserApiKeyMetadataFromProfile(): Promise<UserApiKeyInfo[]> {
-  const { data: authData, error: authError } = await supabase.auth.getSession();
-  if (authError) {
-    throw authError;
-  }
-
-  const userId = normalizeString(authData.session?.user?.id);
-  if (!userId) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('user_apis')
-    .eq('id', userId)
-    .maybeSingle<ProfileUserApisRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  return extractUserApiEntriesFromPayload(data?.user_apis)
-    .map((entry) => toUserApiKeyInfoFromRawEntry(entry))
-    .filter((entry): entry is UserApiKeyInfo => Boolean(entry))
-    .sort((left, right) => right.created_at.localeCompare(left.created_at));
-}
-
 export const getUserApiKeys = async (): Promise<UserApiKeyInfo[]> => {
-  let metadataError: unknown = null;
-
-  try {
-    const metadataEntries = await loadUserApiKeyMetadataFromProfile();
-    if (metadataEntries.length > 0) {
-      return metadataEntries;
-    }
-  } catch (error) {
-    metadataError = error;
-  }
-
-  if (!shouldUseLegacyWebApiFallback()) {
-    if (metadataError) {
-      throw metadataError;
-    }
-
-    return [];
-  }
-
-  try {
-    const entries = await loadUserApiEntries();
-    const hydratedEntries = entries
-      .map((entry) => toUserApiKeyInfo(entry))
-      .sort((left, right) => right.created_at.localeCompare(left.created_at));
-
-    if (hydratedEntries.length > 0) {
-      return hydratedEntries;
-    }
-  } catch (entriesError) {
-    if (metadataError) {
-      throw metadataError;
-    }
-
-    throw entriesError;
-  }
-
-  if (metadataError) {
-    throw metadataError;
-  }
-
-  return [];
+  const entries = await loadUserApiEntries();
+  return entries
+    .map((entry) => toUserApiKeyInfo(entry))
+    .sort((left, right) => right.created_at.localeCompare(left.created_at));
 };
 
 export const addUserApiKey = async (

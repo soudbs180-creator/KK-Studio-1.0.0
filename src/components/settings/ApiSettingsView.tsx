@@ -850,14 +850,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (!apiHealth.reachable) {
       return pick(
         '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在 Supabase，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
-        'The local API server is unavailable. Signed-in BYOK settings still live in Supabase, and this page will keep using the cloud-backed view until the local service recovers.',
+        'The local API server is unavailable. Signed-in BYOK settings still live in the account-backed cloud record, and this page will keep using the cloud view until the local service recovers.',
       );
     }
 
     if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
       return pick(
         '当前本地 API 仍在内存模式，但已登录用户的 BYOK 修改会直接写入 Supabase，并在本地服务恢复后继续同步。',
-        'The local API server is still running in memory mode, but signed-in BYOK changes now write straight to Supabase and will sync back once the local service recovers.',
+        'The local API server is still running in memory mode, but signed-in BYOK changes now write straight to the account-backed cloud record and will sync back once the local service recovers.',
       );
     }
 
@@ -912,7 +912,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     : isUserApiPersistenceDegraded
       ? pick(
           '当前处于云端直写模式。你保存的官方接口会直接进入 Supabase，并在本地服务恢复后继续同步。',
-          'Cloud-backed write mode is active. Saved official endpoints will go straight to Supabase and sync back once the local service recovers.',
+          'Cloud-backed write mode is active. Saved official endpoints will go straight to the account-backed cloud record and sync back once the local service recovers.',
         )
       : null;
   const providerEditorReadOnlyHelper = providerEditorReadOnly
@@ -920,7 +920,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     : isUserApiPersistenceDegraded
       ? pick(
           '当前处于云端直写模式。你保存的供应商会直接进入 Supabase，并在本地服务恢复后继续同步。',
-          'Cloud-backed write mode is active. Saved providers will go straight to Supabase and sync back once the local service recovers.',
+          'Cloud-backed write mode is active. Saved providers will go straight to the account-backed cloud record and sync back once the local service recovers.',
         )
       : null;
   const browserDirectChecksDisabled = false;
@@ -929,14 +929,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
   );
   const headerPrimaryActionDisabled = activeTab === 'official' ? userApiActionsDisabled : providerActionsDisabled;
-  const useSupabaseDirectUserApiWrites = isAuthenticated && !isTempUser && isUserApiPersistenceDegraded;
+  const useCloudBackedUserApiWrites = isAuthenticated && !isTempUser && isUserApiPersistenceDegraded;
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
   const diagnosticsActionDisabled = !isAuthenticated || isHydratingRuntimeUserApis || apiHealth?.reachable === false;
   const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
         '当前页面会优先保住 Supabase 里的云端配置，并在本地服务恢复后重新和本地状态对齐。',
-        'This page now prioritizes preserving the Supabase-backed cloud record and will realign local state after the local service recovers.',
+        'This page now prioritizes preserving the account-backed cloud record and will realign local state after the local service recovers.',
       )
     : null;
   const ensureUserApiActionsAllowed = (): boolean => {
@@ -1027,7 +1027,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         clearUserApiViewSnapshot(authenticatedUserId);
       }
     } catch (error) {
-      console.warn('[ApiSettingsView] Failed to load read-only Supabase metadata fallback:', error);
+      console.warn('[ApiSettingsView] Failed to load read-only cloud metadata fallback:', error);
     }
   }, [authenticatedUserId]);
 
@@ -1074,7 +1074,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       setReadonlyProviders([]);
     }
   }, [authenticatedUserId, pick, refresh, refreshApiHealth]);
-  const refreshAfterSupabaseDirectUserApiMutation = useCallback(async () => {
+  const refreshAfterCloudUserApiMutation = useCallback(async () => {
     await refreshCloudData(true);
   }, [refreshCloudData]);
 
@@ -1319,7 +1319,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     };
 
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         const existingSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
         await upsertUserApiSlotViaSupabase({
           id: nextSlotId,
@@ -1344,7 +1344,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           totalCost: existingSlot?.totalCost || 0,
           ...payload,
         });
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else if (officialForm.id) {
         await keyManager.updateKey(officialForm.id, {
           name: officialForm.provider,
@@ -1430,7 +1430,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     };
 
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
         await upsertUserApiProviderViaSupabase({
           id: nextProviderId,
@@ -1457,7 +1457,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           activitySummary: existingProvider?.activitySummary,
           ...payload,
         });
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else if (providerForm.id) {
         keyManager.updateProvider(providerForm.id, {
           name: providerForm.name.trim(),
@@ -1501,9 +1501,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     await run(`official-delete:${id}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         await removeUserApiSlotViaSupabase(id);
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else {
         keyManager.removeKey(id);
         await keyManager.syncToCloudNow();
@@ -1523,9 +1523,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     await run(`provider-delete:${id}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         await removeUserApiProviderViaSupabase(id);
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else {
         keyManager.removeProvider(id);
         await keyManager.syncToCloudNow();
@@ -1546,7 +1546,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         await upsertUserApiSlotViaSupabase({
           id: slot.id,
           name: slot.name,
@@ -1571,7 +1571,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           budgetLimit: slot.budgetLimit,
           tokenLimit: slot.tokenLimit,
         });
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else {
         await keyManager.updateKey(slot.id, { disabled: nextDisabled });
         await keyManager.syncToCloudNow();
@@ -1591,7 +1591,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
-      if (useSupabaseDirectUserApiWrites) {
+      if (useCloudBackedUserApiWrites) {
         await upsertUserApiProviderViaSupabase({
           id: provider.id,
           name: provider.name,
@@ -1614,7 +1614,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           customCostMode: provider.customCostMode,
           customCostValue: provider.customCostValue,
         });
-        await refreshAfterSupabaseDirectUserApiMutation();
+        await refreshAfterCloudUserApiMutation();
       } else {
         keyManager.updateProvider(provider.id, { isActive: nextActive });
         await keyManager.syncToCloudNow();
@@ -1988,9 +1988,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         badge={
           <SettingsBadge tone={isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}>
             {isUsingReadonlyProfileFallback
-              ? pick('来自 Supabase 的只读回显', 'Read-only data from Supabase')
+              ? pick('来自云端记录的只读回显', 'Read-only data from cloud record')
               : isUserApiPersistenceDegraded
-                ? pick('本地 API 未连接 Supabase 持久化', 'Local API is not using Supabase persistence')
+                ? pick('本地 API 未连接云端持久化', 'Local API is not using cloud persistence')
                 : connectedChannels > 0
                   ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
                   : pick('尚未接入链路', 'No routes connected yet')}
@@ -2015,7 +2015,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             {isUserApiPersistenceDegraded ? (
               <SettingsMetricCard
                 label={pick('持久化状态', 'Persistence status')}
-                value={isUsingReadonlyProfileFallback ? pick('正在展示 Supabase 只读数据', 'Showing read-only Supabase data') : pick('本地 API 仍在内存模式', 'Local API still uses memory mode')}
+                value={isUsingReadonlyProfileFallback ? pick('正在展示云端只读数据', 'Showing read-only cloud data') : pick('本地 API 仍在内存模式', 'Local API still uses memory mode')}
                 helper={userApiReadOnlyHelper || userApiPersistenceHelper || pick('云端配置仍会继续保留，等本地服务恢复后会重新和本地状态对齐。', 'Cloud-backed settings remain preserved and will realign with local state once the service recovers.')}
                 icon={RefreshCw}
                 tone="rose"

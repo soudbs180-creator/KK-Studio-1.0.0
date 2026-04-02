@@ -10,6 +10,8 @@ import {
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
+const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
+const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -106,6 +108,7 @@ function resolveBaseUrl(provider: string, baseUrl?: unknown): string | undefined
 function normalizeEntry(rawEntry: unknown): StoredUserApiEntry {
   const now = Date.now();
   const raw = (rawEntry && typeof rawEntry === 'object' ? rawEntry : {}) as JsonRecord;
+  const id = String(raw.id || generateId());
   const provider = String(raw.provider || 'Custom').trim() || 'Custom';
   const baseUrl = resolveBaseUrl(provider, raw.baseUrl ?? raw.base_url);
   const createdAt = toTimestamp(raw.createdAt ?? raw.created_at, now);
@@ -118,8 +121,11 @@ function normalizeEntry(rawEntry: unknown): StoredUserApiEntry {
         : false;
 
   return {
-    id: String(raw.id || generateId()),
-    key: String(raw.key || ''),
+    id,
+    key:
+      String(raw.key || '').trim() === READONLY_SECRET_PLACEHOLDER
+        ? `${REDACTED_SECRET_PREFIX}key:${id}`
+        : String(raw.key || ''),
     name: String(raw.name || `${provider} Key`).trim(),
     provider,
     type: resolveApiType(provider, baseUrl),

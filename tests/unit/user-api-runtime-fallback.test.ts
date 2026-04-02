@@ -9,10 +9,11 @@ import {
   saveUserApiEntries,
 } from '../../src/services/api/userApiProfileStorage.ts';
 
+const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
-const originalFrom = supabase.from;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const locationLike = globalThis as { location?: { origin?: string } };
@@ -49,7 +50,15 @@ function setProductionRuntime() {
   };
 }
 
-function mockAuthenticatedProfile(profilePayload: unknown) {
+function mockAuthenticatedUser() {
+  supabase.auth.getSession = async () =>
+    ({
+      data: {
+        session: null,
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetSession>>;
+
   supabase.auth.getUser = async () =>
     ({
       data: {
@@ -60,51 +69,14 @@ function mockAuthenticatedProfile(profilePayload: unknown) {
       },
       error: null,
     }) as Awaited<ReturnType<typeof originalGetUser>>;
-
-  let currentPayload = profilePayload;
-  const upsertCalls: Array<{ value: Record<string, unknown>; options?: Record<string, unknown> }> = [];
-
-  supabase.from = ((table: string) => {
-    assert.equal(table, 'profiles');
-
-    return {
-      select(column: string) {
-        assert.equal(column, 'user_apis');
-        return this;
-      },
-      eq(column: string, value: string) {
-        assert.equal(column, 'id');
-        assert.equal(value, 'user-1');
-        return this;
-      },
-      async maybeSingle() {
-        return {
-          data: currentPayload == null ? null : { user_apis: currentPayload },
-          error: null,
-        };
-      },
-      async upsert(value: Record<string, unknown>, options?: Record<string, unknown>) {
-        upsertCalls.push({ value, options });
-        currentPayload = value.user_apis;
-        return {
-          data: null,
-          error: null,
-        };
-      },
-    };
-  }) as typeof supabase.from;
-
-  return {
-    getCurrentPayload: () => currentPayload,
-    upsertCalls,
-  };
 }
 
 afterEach(() => {
+  supabase.auth.getSession = originalGetSession;
   supabase.auth.getUser = originalGetUser;
-  supabase.from = originalFrom;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
 
   if (typeof originalBaseUrl === 'string') {
@@ -116,99 +88,151 @@ afterEach(() => {
   locationLike.location = originalLocation;
 });
 
-test('loadUserApisPayloadViaSupabase skips legacy API hydration on non-local runtimes', async () => {
+test('loadUserApisPayloadViaSupabase uses the typed auth API on non-local runtimes', async () => {
   setProductionRuntime();
-  const profilePayload = {
-    version: 2,
-    slots: [{ id: 'slot-1' }],
-    providers: [{ id: 'provider-1' }],
-    entries: [createEntry('entry-1')],
-  };
-  mockAuthenticatedProfile(profilePayload);
+  mockAuthenticatedUser();
 
   let keyManagerCalls = 0;
   let userApiCalls = 0;
   legacyWebApiClient.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
-    throw new Error('legacy key-manager endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        version: 2,
+        slots: [{ id: 'slot-1' }],
+        providers: [{ id: 'provider-1' }],
+        entries: [],
+      },
+    };
   };
   legacyWebApiClient.getUserApiEntries = async () => {
     userApiCalls += 1;
-    throw new Error('legacy user-api endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        entries: [createEntry('entry-1')],
+      },
+    };
   };
 
   const payload = await loadUserApisPayloadViaSupabase();
 
-  assert.deepEqual(payload, profilePayload);
-  assert.equal(keyManagerCalls, 0);
-  assert.equal(userApiCalls, 0);
-});
-
-test('loadUserApiEntries reads Supabase payload without seeding the legacy API on production runtimes', async () => {
-  setProductionRuntime();
-  mockAuthenticatedProfile({
+  assert.deepEqual(payload, {
     version: 2,
-    slots: [],
-    providers: [],
+    slots: [{ id: 'slot-1' }],
+    providers: [{ id: 'provider-1' }],
     entries: [createEntry('entry-1')],
   });
+  assert.equal(keyManagerCalls, 1);
+  assert.equal(userApiCalls, 1);
+});
+
+test('loadUserApiEntries reads the typed auth API payload without seeding the local compatibility bridge on production runtimes', async () => {
+  setProductionRuntime();
+  mockAuthenticatedUser();
 
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
   let replaceUserApiCalls = 0;
   legacyWebApiClient.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
-    throw new Error('legacy key-manager endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      },
+    };
   };
   legacyWebApiClient.getUserApiEntries = async () => {
     getUserApiCalls += 1;
-    throw new Error('legacy user-api endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        entries: [createEntry('entry-1')],
+      },
+    };
   };
   legacyWebApiClient.replaceUserApiEntries = async () => {
     replaceUserApiCalls += 1;
-    throw new Error('legacy user-api replace endpoint should not be used');
+    throw new Error('compatibility bridge writes should stay unused');
   };
 
   const entries = await loadUserApiEntries();
 
   assert.equal(entries.length, 1);
   assert.equal(entries[0].id, 'entry-1');
-  assert.equal(keyManagerCalls, 0);
-  assert.equal(getUserApiCalls, 0);
+  assert.equal(keyManagerCalls, 1);
+  assert.equal(getUserApiCalls, 1);
   assert.equal(replaceUserApiCalls, 0);
 });
 
-test('saveUserApiEntries writes only to Supabase when legacy fallback is disabled', async () => {
+test('saveUserApiEntries writes through the typed auth API on hosted runtimes', async () => {
   setProductionRuntime();
-  const profile = mockAuthenticatedProfile({
-    version: 2,
-    slots: [],
-    providers: [],
-    entries: [],
-  });
+  mockAuthenticatedUser();
 
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
   let replaceUserApiCalls = 0;
+  let persistedEntries: Array<Record<string, unknown>> = [];
+
   legacyWebApiClient.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
-    throw new Error('legacy key-manager endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      },
+    };
   };
   legacyWebApiClient.getUserApiEntries = async () => {
     getUserApiCalls += 1;
-    throw new Error('legacy user-api endpoint should not be used');
+    return {
+      success: true,
+      data: {
+        entries: persistedEntries,
+      },
+    };
   };
-  legacyWebApiClient.replaceUserApiEntries = async () => {
+  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+    throw new Error('key-manager state should not be rewritten when only entries change');
+  };
+  legacyWebApiClient.replaceUserApiEntries = async (input) => {
     replaceUserApiCalls += 1;
-    throw new Error('legacy user-api replace endpoint should not be used');
+    persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
+      ...entry,
+      key: `__kk_redacted__:key:${String(entry.id || '')}`,
+    }));
+
+    return {
+      success: true,
+      data: {
+        entries: persistedEntries,
+      },
+    };
   };
 
   await saveUserApiEntries([createEntry('entry-2')]);
 
-  assert.equal(profile.upsertCalls.length, 1);
-  const savedPayload = profile.getCurrentPayload() as { entries: Array<{ id: string }> };
-  assert.deepEqual(savedPayload.entries.map((entry) => entry.id), ['entry-2']);
-  assert.equal(keyManagerCalls, 0);
-  assert.equal(getUserApiCalls, 0);
-  assert.equal(replaceUserApiCalls, 0);
+  assert.equal(keyManagerCalls, 2);
+  assert.equal(getUserApiCalls, 2);
+  assert.equal(replaceUserApiCalls, 1);
+  assert.deepEqual(
+    persistedEntries.map((entry) => ({
+      id: entry.id,
+      key: entry.key,
+    })),
+    [
+      {
+        id: 'entry-2',
+        key: '__kk_redacted__:key:entry-2',
+      },
+    ],
+  );
 });

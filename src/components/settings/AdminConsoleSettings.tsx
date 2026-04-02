@@ -137,8 +137,11 @@ const AdminConsoleSettings: React.FC = () => {
     const userId = user?.id;
     if (!userId) {
       notify.error(
-        pick('管理员身份缺失', 'Missing admin identity'),
-        pick('请先登录管理员账号后再继续操作。', 'Please sign in with an admin account before continuing.')
+        pick('缺少管理员身份', 'Missing admin identity'),
+        pick(
+          '请先登录管理员账号后再继续操作。',
+          'Please sign in with an admin account before continuing.'
+        )
       );
       return null;
     }
@@ -155,7 +158,10 @@ const AdminConsoleSettings: React.FC = () => {
     if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
       notify.error(
         pick('信息不完整', 'Incomplete information'),
-        pick('请填写旧密码、新密码和确认密码。', 'Enter the current password, new password, and confirmation password.')
+        pick(
+          '请输入当前密码、新密码和确认密码。',
+          'Enter the current password, new password, and confirmation password.'
+        )
       );
       return;
     }
@@ -187,8 +193,11 @@ const AdminConsoleSettings: React.FC = () => {
       );
 
       if (!response.success) {
-        throw new Error(response.error?.message || pick('管理员密码修改失败。', 'Failed to change the admin password.'));
+        throw new Error(
+          response.error?.message || pick('管理员密码修改失败。', 'Failed to change the admin password.')
+        );
       }
+
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -203,7 +212,7 @@ const AdminConsoleSettings: React.FC = () => {
     } catch (error) {
       notify.error(
         pick('修改失败', 'Update failed'),
-        getErrorMessage(error, pick('请检查旧密码后重试。', 'Check the current password and try again.'))
+        getErrorMessage(error, pick('请检查当前密码后重试。', 'Check the current password and try again.'))
       );
     } finally {
       setChangingPassword(false);
@@ -226,7 +235,7 @@ const AdminConsoleSettings: React.FC = () => {
 
     if (!Number.isFinite(rechargeAmount) || rechargeAmount <= 0) {
       notify.error(
-        pick('充值金额无效', 'Invalid recharge amount'),
+        pick('充值数额无效', 'Invalid recharge amount'),
         pick('充值积分必须大于 0。', 'Recharge credits must be greater than 0.')
       );
       return;
@@ -234,22 +243,20 @@ const AdminConsoleSettings: React.FC = () => {
 
     setRecharging(true);
     try {
-      let balanceAfter = 0;
-
       const response = await legacyWebApiClient.adminRechargeCredits(
         {
           identity: identity.trim(),
           creditAmount: rechargeAmount,
           description: rechargeRemark.trim() || defaultRechargeRemark,
         },
-        buildAdminRequestOptions(buildRequestId('admin-recharge', identity))
+        buildAdminRequestOptions(buildRequestId('admin-recharge', userId))
       );
 
       if (!response.success) {
         throw new Error(response.error?.message || pick('充值失败。', 'Recharge failed.'));
       }
 
-      balanceAfter = Number(response.data.balanceAfter || 0);
+      const balanceAfter = Number(response.data.balanceAfter || 0);
       notify.success(
         pick('充值成功', 'Recharge completed'),
         pick(`最新余额：${balanceAfter} 积分`, `Latest balance: ${balanceAfter} credits`)
@@ -258,14 +265,17 @@ const AdminConsoleSettings: React.FC = () => {
     } catch (error) {
       notify.error(
         pick('充值失败', 'Recharge failed'),
-        getErrorMessage(error, pick('请检查用户信息后重试。', 'Check the target user information and try again.'))
+        getErrorMessage(
+          error,
+          pick('请检查目标用户信息后重试。', 'Check the target user information and try again.')
+        )
       );
     } finally {
       setRecharging(false);
     }
   };
 
-const handleSetAdmin = async () => {
+  const handleSetAdmin = async () => {
     const userId = requireAdminUserId();
     if (!userId) {
       return;
@@ -282,18 +292,20 @@ const handleSetAdmin = async () => {
     setSettingAdmin(true);
     try {
       const normalizedIdentity = newAdminIdentity.trim();
-
       const response = await legacyWebApiClient.setUserRole(
         {
           identity: normalizedIdentity,
           role: 'admin',
         },
-        buildAdminRequestOptions(buildRequestId('admin-role', normalizedIdentity))
+        buildAdminRequestOptions(buildRequestId('admin-role', userId))
       );
 
       if (!response.success) {
-        throw new Error(response.error?.message || pick('授予管理员权限失败。', 'Failed to grant admin access.'));
+        throw new Error(
+          response.error?.message || pick('授予管理员权限失败。', 'Failed to grant admin access.')
+        );
       }
+
       notify.success(
         pick('设置成功', 'Role updated'),
         pick(
@@ -318,25 +330,34 @@ const handleSetAdmin = async () => {
         <MetricCard
           value={pick('至少 8 位', '8+ characters')}
           label={pick('密码策略', 'Password policy')}
-          helper={pick('建议尽快替换默认管理员密码', 'Replace the default admin password as soon as possible.')}
+          helper={pick(
+            '建议尽快替换默认管理员密码。',
+            'Replace the default admin password as soon as possible.'
+          )}
           tone="amber"
         />
         <MetricCard
           value={amountLabel}
           label={pick('本次充值', 'Recharge amount')}
-          helper={pick('提交前可再次核对金额', 'Review the amount one more time before submitting.')}
+          helper={pick('提交前可再次核对金额。', 'Review the amount one more time before submitting.')}
           tone="emerald"
         />
         <MetricCard
           value={pick('高权限操作', 'Privileged actions')}
           label={pick('影响范围', 'Impact scope')}
-          helper={pick('会直接影响后台配置与用户积分', 'Changes here directly affect admin settings and user credits.')}
+          helper={pick(
+            '这里的变更会直接影响管理员设置与用户积分。',
+            'Changes here directly affect admin settings and user credits.'
+          )}
           tone="rose"
         />
         <MetricCard
           value={pick('3 项', '3 actions')}
           label={pick('当前模块', 'Current module')}
-          helper={pick('改密、充值、授予管理员', 'Password change, recharge, and grant-admin tools.')}
+          helper={pick(
+            '改密、充值和授予管理员权限。',
+            'Password change, recharge, and grant-admin tools.'
+          )}
           tone="neutral"
         />
       </div>
@@ -360,7 +381,7 @@ const handleSetAdmin = async () => {
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
               <SettingInput
-                label={pick('旧密码', 'Current password')}
+                label={pick('当前密码', 'Current password')}
                 type="password"
                 value={oldPassword}
                 onChange={setOldPassword}
@@ -384,7 +405,7 @@ const handleSetAdmin = async () => {
 
             <div className="rounded-2xl border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-tertiary)_45%,transparent)] p-4 text-[13px] leading-6 text-[var(--text-secondary)]">
               {pick(
-                '建议同时使用字母、数字和符号组合。修改成功后，重新进入后台时需要使用新密码再次验证。',
+                '建议同时使用字母、数字和符号组合。修改成功后，需要使用新密码重新解锁后台。',
                 'Use a mix of letters, numbers, and symbols when possible. After the password changes, you will need to unlock the console again with the new password.'
               )}
             </div>
@@ -460,7 +481,10 @@ const handleSetAdmin = async () => {
               label={pick('用户 ID 或邮箱', 'User ID or email')}
               value={newAdminIdentity}
               onChange={setNewAdminIdentity}
-              placeholder={pick('输入后将授予管理员权限', 'Enter a user ID or email to grant admin access')}
+              placeholder={pick(
+                '输入后将授予管理员权限',
+                'Enter a user ID or email to grant admin access'
+              )}
             />
 
             <div className="flex gap-2">
@@ -490,14 +514,12 @@ const handleSetAdmin = async () => {
             </div>
             <div className="mt-3 text-[13px] leading-6 text-[var(--text-secondary)]">
               {pick(
-                '如果这一步失败，请先确认当前账号仍然是 admin，并且本地 API 与',
-                'If this action fails, first confirm the current account still has the admin role and that the local API matches'
+                '如果这一步失败，请先确认当前账号仍然是 admin，并且本地 API、部署环境和云端数据源都使用同一套后台配置。',
+                'If this action fails, first confirm the current account still has the admin role and that the local API, deployed environment, and cloud data source all point to the same backend configuration.'
               )}
-              <code className="mx-1 rounded bg-black/10 px-1 py-0.5">apps/api/.env.local</code>
-              {pick(
-                '中的配置保持一致，并确认部署环境和云端数据源使用的是同一套后台配置。',
-                'configuration in apps/api/.env.local, and make sure the deployed environment and cloud data source point to the same backend configuration.'
-              )}
+            </div>
+            <div className="mt-3">
+              <code className="rounded bg-black/10 px-1 py-0.5">apps/api/.env.local</code>
             </div>
           </div>
         </div>

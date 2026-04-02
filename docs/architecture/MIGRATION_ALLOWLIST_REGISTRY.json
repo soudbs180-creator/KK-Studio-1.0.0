@@ -44,36 +44,5 @@
       "removalCondition": "Delete once the legacy server bootstrap no longer mounts billing routes directly."
     }
   ],
-  "frontendSupabaseAccess": [
-    {
-      "path": "src/services/api/supabaseUserApiCloudStorage.ts",
-      "tables": [
-        "profiles"
-      ],
-      "procedures": [],
-      "buckets": [],
-      "reason": "User API payload migration still requires one direct profile read while the typed cloud-storage facade is being completed.",
-      "canonicalSource": "apps/api/src/modules/auth",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/user-api-cloud-storage.test.ts"
-      ],
-      "removalCondition": "Delete once user API profile hydration is served only through typed API contracts."
-    },
-    {
-      "path": "src/services/security/apiKeySecureStorage.ts",
-      "tables": [
-        "profiles"
-      ],
-      "procedures": [],
-      "buckets": [],
-      "reason": "Secure key storage still reads the profile runtime directly during the auth and secret-storage migration.",
-      "canonicalSource": "apps/api/src/modules/auth",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/frontend-key-boundary-hardening.test.ts"
-      ],
-      "removalCondition": "Delete once secure key storage is accessed exclusively through typed auth/security APIs."
-    }
-  ]
+  "frontendSupabaseAccess": []
 }

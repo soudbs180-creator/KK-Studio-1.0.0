@@ -129,11 +129,14 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiProviderViaSupabase({'));
   assert.ok(apiSettingsViewSource.includes('await removeUserApiProviderViaSupabase(id);'));
 
-  assert.ok(supabaseUserApiStorageSource.includes('async function saveUserApisPayloadDirectlyToProfile('));
   assert.ok(supabaseUserApiStorageSource.includes('export async function saveUserApisPayloadViaSupabase('));
   assert.ok(supabaseUserApiStorageSource.includes('export async function upsertUserApiSlotViaSupabase('));
   assert.ok(supabaseUserApiStorageSource.includes('export async function removeUserApiSlotViaSupabase('));
   assert.ok(supabaseUserApiStorageSource.includes('export async function upsertUserApiProviderViaSupabase('));
   assert.ok(supabaseUserApiStorageSource.includes('export async function removeUserApiProviderViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes("normalized === 'sk-readonly-0000'"));
+  assert.ok(supabaseUserApiStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
+  assert.ok(supabaseUserApiStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
+  assert.ok(supabaseUserApiStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));
+  assert.ok(supabaseUserApiStorageSource.includes('normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER'));
+  assert.doesNotMatch(supabaseUserApiStorageSource, /\.from\('profiles'\)/);
 });
