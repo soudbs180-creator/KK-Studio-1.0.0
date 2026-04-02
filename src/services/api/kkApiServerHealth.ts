@@ -232,7 +232,7 @@ export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> 
 
   if (!userDataPersisted) {
     throw new KkApiPersistenceUnavailableError(
-      'Local API server is not persisting user API data yet. Restart the API server with local-file or Supabase-backed auth storage enabled before saving user API settings.',
+      'Local API server is not persisting user API data yet. Restart the API server with local-file or cloud-backed auth storage enabled before saving user API settings.',
       health,
     );
   }
@@ -247,7 +247,9 @@ export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> 
   return health;
 }
 
-export async function isKkApiBillingPersistedViaSupabase(): Promise<boolean> {
+export async function isKkApiBillingPersistedInCloud(): Promise<boolean> {
   const health = await getKkApiServerHealth();
   return health.reachable && health.verified && health.repositories.creditAccounts === 'supabase' && health.persistence.credits;
 }
+
+export const isKkApiBillingPersistedViaSupabase = isKkApiBillingPersistedInCloud;

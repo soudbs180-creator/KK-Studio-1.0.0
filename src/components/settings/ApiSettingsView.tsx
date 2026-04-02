@@ -22,12 +22,12 @@ import type { ApiProtocolFormat } from '../../services/api/apiConfig';
 import { legacyWebApiClient } from '../../services/api/kkApiClient';
 import { getKkApiServerHealth, type KkApiServerHealth } from '../../services/api/kkApiServerHealth';
 import {
-  loadUserApisPayloadMetadataViaSupabase,
-  removeUserApiProviderViaSupabase,
-  removeUserApiSlotViaSupabase,
-  upsertUserApiProviderViaSupabase,
-  upsertUserApiSlotViaSupabase,
-} from '../../services/api/supabaseUserApiCloudStorage';
+  loadUserApisPayloadMetadataFromCloudRecord,
+  removeUserApiProviderFromCloudRecord,
+  removeUserApiSlotFromCloudRecord,
+  upsertUserApiProviderToCloudRecord,
+  upsertUserApiSlotToCloudRecord,
+} from '../../services/api/userApiCloudRecordStorage';
 import {
   extractKeyManagerCloudSlots,
   extractUserApiProvidersFromPayload,
@@ -849,14 +849,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     if (!apiHealth.reachable) {
       return pick(
-        '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在 Supabase，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
+        '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在账号云端记录里，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
         'The local API server is unavailable. Signed-in BYOK settings still live in the account-backed cloud record, and this page will keep using the cloud view until the local service recovers.',
       );
     }
 
     if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
       return pick(
-        '当前本地 API 仍在内存模式，但已登录用户的 BYOK 修改会直接写入 Supabase，并在本地服务恢复后继续同步。',
+        '当前本地 API 仍在内存模式，但已登录用户的 BYOK 修改会直接写入账号云端记录，并在本地服务恢复后继续同步。',
         'The local API server is still running in memory mode, but signed-in BYOK changes now write straight to the account-backed cloud record and will sync back once the local service recovers.',
       );
     }
@@ -911,7 +911,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     ? userApiActionHelper
     : isUserApiPersistenceDegraded
       ? pick(
-          '当前处于云端直写模式。你保存的官方接口会直接进入 Supabase，并在本地服务恢复后继续同步。',
+          '当前处于云端直写模式。你保存的官方接口会直接进入账号云端记录，并在本地服务恢复后继续同步。',
           'Cloud-backed write mode is active. Saved official endpoints will go straight to the account-backed cloud record and sync back once the local service recovers.',
         )
       : null;
@@ -919,7 +919,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     ? providerActionHelper
     : isUserApiPersistenceDegraded
       ? pick(
-          '当前处于云端直写模式。你保存的供应商会直接进入 Supabase，并在本地服务恢复后继续同步。',
+          '当前处于云端直写模式。你保存的供应商会直接进入账号云端记录，并在本地服务恢复后继续同步。',
           'Cloud-backed write mode is active. Saved providers will go straight to the account-backed cloud record and sync back once the local service recovers.',
         )
       : null;
@@ -935,7 +935,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const diagnosticsActionDisabled = !isAuthenticated || isHydratingRuntimeUserApis || apiHealth?.reachable === false;
   const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
-        '当前页面会优先保住 Supabase 里的云端配置，并在本地服务恢复后重新和本地状态对齐。',
+        '当前页面会优先保住账号云端记录里的配置，并在本地服务恢复后重新和本地状态对齐。',
         'This page now prioritizes preserving the account-backed cloud record and will realign local state after the local service recovers.',
       )
     : null;
@@ -1009,7 +1009,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
   const refreshReadonlyProfileFallback = useCallback(async () => {
     try {
-      const payload = await loadUserApisPayloadMetadataViaSupabase();
+      const payload = await loadUserApisPayloadMetadataFromCloudRecord();
       const nextOfficialSlots = extractKeyManagerCloudSlots(payload)
         .map((slot) => toReadonlyOfficialSlot(slot))
         .filter((slot): slot is KeySlot => Boolean(slot))
@@ -1321,7 +1321,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
       if (useCloudBackedUserApiWrites) {
         const existingSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
-        await upsertUserApiSlotViaSupabase({
+        await upsertUserApiSlotToCloudRecord({
           id: nextSlotId,
           name: officialForm.provider,
           provider: officialForm.provider as Provider,
@@ -1432,7 +1432,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
       if (useCloudBackedUserApiWrites) {
         const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
-        await upsertUserApiProviderViaSupabase({
+        await upsertUserApiProviderToCloudRecord({
           id: nextProviderId,
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
@@ -1502,7 +1502,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     await run(`official-delete:${id}`, async () => {
       if (useCloudBackedUserApiWrites) {
-        await removeUserApiSlotViaSupabase(id);
+        await removeUserApiSlotFromCloudRecord(id);
         await refreshAfterCloudUserApiMutation();
       } else {
         keyManager.removeKey(id);
@@ -1524,7 +1524,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     await run(`provider-delete:${id}`, async () => {
       if (useCloudBackedUserApiWrites) {
-        await removeUserApiProviderViaSupabase(id);
+        await removeUserApiProviderFromCloudRecord(id);
         await refreshAfterCloudUserApiMutation();
       } else {
         keyManager.removeProvider(id);
@@ -1547,7 +1547,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
       if (useCloudBackedUserApiWrites) {
-        await upsertUserApiSlotViaSupabase({
+        await upsertUserApiSlotToCloudRecord({
           id: slot.id,
           name: slot.name,
           provider: slot.provider,
@@ -1592,7 +1592,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
       if (useCloudBackedUserApiWrites) {
-        await upsertUserApiProviderViaSupabase({
+        await upsertUserApiProviderToCloudRecord({
           id: provider.id,
           name: provider.name,
           baseUrl: provider.baseUrl,

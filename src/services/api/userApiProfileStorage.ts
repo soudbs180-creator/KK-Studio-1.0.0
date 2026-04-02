@@ -4,9 +4,9 @@ import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient
 import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth.ts';
 import { extractUserApiEntriesFromPayload } from './userApiPayload.ts';
 import {
-  loadUserApisPayloadViaSupabase,
-  mergeUserApisPayloadViaSupabase,
-} from './supabaseUserApiCloudStorage.ts';
+  loadUserApisPayloadFromCloudRecord,
+  mergeUserApisPayloadToCloudRecord,
+} from './userApiCloudRecordStorage.ts';
 
 const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
@@ -291,8 +291,8 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
   let cloudError: unknown = null;
 
   try {
-    const supabasePayload = await loadUserApisPayloadViaSupabase();
-    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(supabasePayload));
+    const cloudPayload = await loadUserApisPayloadFromCloudRecord();
+    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(cloudPayload));
   } catch (error) {
     cloudError = error;
   }
@@ -316,7 +316,7 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     scheduleLegacyEntrySeed(mergedEntries);
 
     if (localEntries.length > 0 && !areEntrySetsEquivalent(mergedEntries, cloudEntries)) {
-      void mergeUserApisPayloadViaSupabase({
+      void mergeUserApisPayloadToCloudRecord({
         entries: mergedEntries,
       }).catch((error) => {
         if (!isKkApiPersistenceUnavailableError(error)) {
@@ -331,7 +331,7 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
   if (localEntries.length > 0) {
     const mergedEntries = mergeUserApiEntrySets(localEntries, cloudEntries);
     if (mergedEntries.length > 0) {
-      void mergeUserApisPayloadViaSupabase({
+      void mergeUserApisPayloadToCloudRecord({
         entries: mergedEntries,
       }).catch((error) => {
         if (!isKkApiPersistenceUnavailableError(error)) {
@@ -366,7 +366,7 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
   const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
   let cloudPayload: unknown = null;
 
-  cloudPayload = await mergeUserApisPayloadViaSupabase({
+  cloudPayload = await mergeUserApisPayloadToCloudRecord({
     entries: normalizedEntries,
   });
 

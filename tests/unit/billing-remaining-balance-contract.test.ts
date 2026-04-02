@@ -114,7 +114,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 
 test('user api settings keep working when local API persistence degrades to memory mode', () => {
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const supabaseUserApiStorageSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
+  const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = providerActionsDisabled;'));
@@ -122,21 +122,22 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('disabled={headerPrimaryActionDisabled} onClick={activeTab === \'official\' ? beginCreateOfficial : beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerEditorReadOnly}'));
-  assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotViaSupabase({'));
-  assert.ok(apiSettingsViewSource.includes('await removeUserApiSlotViaSupabase(id);'));
+  assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotToCloudRecord({'));
+  assert.ok(apiSettingsViewSource.includes('await removeUserApiSlotFromCloudRecord(id);'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={() => void saveProvider()}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)}'));
-  assert.ok(apiSettingsViewSource.includes('await upsertUserApiProviderViaSupabase({'));
-  assert.ok(apiSettingsViewSource.includes('await removeUserApiProviderViaSupabase(id);'));
+  assert.ok(apiSettingsViewSource.includes('await upsertUserApiProviderToCloudRecord({'));
+  assert.ok(apiSettingsViewSource.includes('await removeUserApiProviderFromCloudRecord(id);'));
 
-  assert.ok(supabaseUserApiStorageSource.includes('export async function saveUserApisPayloadViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes('export async function upsertUserApiSlotViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes('export async function removeUserApiSlotViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes('export async function upsertUserApiProviderViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes('export async function removeUserApiProviderViaSupabase('));
-  assert.ok(supabaseUserApiStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
-  assert.ok(supabaseUserApiStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
-  assert.ok(supabaseUserApiStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));
-  assert.ok(supabaseUserApiStorageSource.includes('normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER'));
-  assert.doesNotMatch(supabaseUserApiStorageSource, /\.from\('profiles'\)/);
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function saveUserApisPayloadToCloudRecord('));
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function upsertUserApiSlotToCloudRecord('));
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function removeUserApiSlotFromCloudRecord('));
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function upsertUserApiProviderToCloudRecord('));
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function removeUserApiProviderFromCloudRecord('));
+  assert.ok(userApiCloudRecordStorageSource.includes('export const saveUserApisPayloadViaSupabase = saveUserApisPayloadToCloudRecord;'));
+  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
+  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
+  assert.ok(userApiCloudRecordStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));
+  assert.ok(userApiCloudRecordStorageSource.includes('normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER'));
+  assert.doesNotMatch(userApiCloudRecordStorageSource, /\.from\('profiles'\)/);
 });

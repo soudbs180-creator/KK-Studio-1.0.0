@@ -3,7 +3,7 @@ import { afterEach, test } from 'node:test';
 
 import { supabase } from '../../src/lib/supabase.ts';
 import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
-import { loadUserApisPayloadViaSupabase } from '../../src/services/api/supabaseUserApiCloudStorage.ts';
+import { loadUserApisPayloadFromCloudRecord } from '../../src/services/api/userApiCloudRecordStorage.ts';
 import {
   loadUserApiEntries,
   saveUserApiEntries,
@@ -88,7 +88,7 @@ afterEach(() => {
   locationLike.location = originalLocation;
 });
 
-test('loadUserApisPayloadViaSupabase uses the typed auth API on non-local runtimes', async () => {
+test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local runtimes', async () => {
   setProductionRuntime();
   mockAuthenticatedUser();
 
@@ -116,7 +116,7 @@ test('loadUserApisPayloadViaSupabase uses the typed auth API on non-local runtim
     };
   };
 
-  const payload = await loadUserApisPayloadViaSupabase();
+  const payload = await loadUserApisPayloadFromCloudRecord();
 
   assert.deepEqual(payload, {
     version: 2,

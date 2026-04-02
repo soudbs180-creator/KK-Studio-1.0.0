@@ -10,15 +10,15 @@ function readSource(relativePath: string): string {
 }
 
 test('runtime-sensitive services keep legacy fallback guarded while routing guest and workspace flows through the API layer', () => {
-  const supabaseUserApiSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
+  const userApiCloudRecordSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
   const userApiProfileSource = readSource('src/services/api/userApiProfileStorage.ts');
   const keyManagerSource = readSource('src/services/auth/keyManager.ts');
   const billingContextSource = readSource('src/context/BillingContext.tsx');
   const syncServiceSource = readSource('src/services/system/syncService.ts');
   const tempUserServiceSource = readSource('src/services/auth/tempUserService.ts');
 
-  assert.match(supabaseUserApiSource, /shouldUseLegacyWebApiFallback/);
-  assert.match(supabaseUserApiSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
+  assert.match(userApiCloudRecordSource, /shouldUseLegacyWebApiFallback/);
+  assert.match(userApiCloudRecordSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
   assert.match(userApiProfileSource, /const canUseLegacyWebApi = shouldUseLegacyWebApiFallback\(\);/);
   assert.match(userApiProfileSource, /if \(canUseLegacyWebApi\) \{\s*try \{\s*localEntries = await loadLocalUserApiEntriesViaApi\(\);/);
   assert.match(userApiProfileSource, /const mergedEntries = mergeUserApiEntrySets\(localEntries, cloudEntries\);/);

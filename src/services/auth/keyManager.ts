@@ -64,9 +64,9 @@ import {
 } from '../api/userApiPayload';
 import {
     getUserApisPayloadDensity,
-    loadUserApisPayloadViaSupabase,
-    mergeUserApisPayloadViaSupabase,
-} from '../api/supabaseUserApiCloudStorage';
+    loadUserApisPayloadFromCloudRecord,
+    mergeUserApisPayloadToCloudRecord,
+} from '../api/userApiCloudRecordStorage';
 import { isKkApiPersistenceUnavailableError } from '../api/kkApiServerHealth';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
@@ -1627,7 +1627,7 @@ export class KeyManager {
                 }
             } else {
                 try {
-                    preferredPayload = await loadUserApisPayloadViaSupabase(activeUserId);
+                    preferredPayload = await loadUserApisPayloadFromCloudRecord(activeUserId);
                 } catch (error) {
                     loadError = error;
                     console.warn('[KeyManager] Cloud fetch via Supabase failed:', error);
@@ -1807,7 +1807,7 @@ export class KeyManager {
                 return;
             }
 
-            const savedPayload = await mergeUserApisPayloadViaSupabase({
+            const savedPayload = await mergeUserApisPayloadToCloudRecord({
                 slots: state.slots as unknown as Record<string, unknown>[],
                 providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
             }, activeUserId);

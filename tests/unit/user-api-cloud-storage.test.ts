@@ -6,13 +6,13 @@ import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
 import {
   combineUserApisEnvelopeSources,
   getUserApisPayloadDensity,
-  loadUserApisPayloadViaSupabase,
-  removeUserApiProviderViaSupabase,
-  removeUserApiSlotViaSupabase,
-  saveUserApisPayloadViaSupabase,
-  upsertUserApiProviderViaSupabase,
-  upsertUserApiSlotViaSupabase,
-} from '../../src/services/api/supabaseUserApiCloudStorage.ts';
+  loadUserApisPayloadFromCloudRecord,
+  removeUserApiProviderFromCloudRecord,
+  removeUserApiSlotFromCloudRecord,
+  saveUserApisPayloadToCloudRecord,
+  upsertUserApiProviderToCloudRecord,
+  upsertUserApiSlotToCloudRecord,
+} from '../../src/services/api/userApiCloudRecordStorage.ts';
 import { mergeUserApisPayload } from '../../src/services/api/userApiPayload.ts';
 
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -402,7 +402,7 @@ describe('user api cloud storage helpers', () => {
       },
     });
 
-    const payload = await loadUserApisPayloadViaSupabase();
+    const payload = await loadUserApisPayloadFromCloudRecord();
 
     assert.deepEqual(payload, {
       version: 2,
@@ -442,7 +442,7 @@ describe('user api cloud storage helpers', () => {
       ],
     });
 
-    const payload = await loadUserApisPayloadViaSupabase();
+    const payload = await loadUserApisPayloadFromCloudRecord();
 
     assert.deepEqual(payload, {
       version: 2,
@@ -494,7 +494,7 @@ describe('user api cloud storage helpers', () => {
     });
 
     await assert.rejects(
-      () => loadUserApisPayloadViaSupabase(),
+      () => loadUserApisPayloadFromCloudRecord(),
       /key manager unavailable|user api unavailable/,
     );
   });
@@ -519,7 +519,7 @@ describe('user api cloud storage helpers', () => {
       ],
     });
 
-    const payload = await saveUserApisPayloadViaSupabase({
+    const payload = await saveUserApisPayloadToCloudRecord({
       version: 2,
       slots: [
         {
@@ -562,7 +562,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await upsertUserApiSlotViaSupabase({
+    const payload = await upsertUserApiSlotToCloudRecord({
       id: 'slot-1',
       name: 'Google',
       provider: 'Google',
@@ -603,7 +603,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    await upsertUserApiSlotViaSupabase({
+    await upsertUserApiSlotToCloudRecord({
       id: 'slot-1',
       name: 'Google Updated',
       provider: 'Google',
@@ -630,7 +630,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await removeUserApiSlotViaSupabase('slot-1') as MutableEnvelope;
+    const payload = await removeUserApiSlotFromCloudRecord('slot-1') as MutableEnvelope;
 
     assert.equal(api.keyManagerReplaceCalls.length, 1);
     assert.equal(api.userApiReplaceCalls.length, 0);
@@ -649,7 +649,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await upsertUserApiProviderViaSupabase({
+    const payload = await upsertUserApiProviderToCloudRecord({
       id: 'provider-1',
       name: 'SiliconFlow',
       baseUrl: 'https://api.siliconflow.cn/v1',
@@ -688,7 +688,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    await upsertUserApiProviderViaSupabase({
+    await upsertUserApiProviderToCloudRecord({
       id: 'provider-1',
       name: 'Updated Provider',
       baseUrl: 'https://new.example.com/v1',
@@ -714,7 +714,7 @@ describe('user api cloud storage helpers', () => {
     });
 
     await assert.rejects(
-      () => upsertUserApiProviderViaSupabase({
+      () => upsertUserApiProviderToCloudRecord({
         id: 'provider-1',
         name: 'Placeholder Provider',
         baseUrl: 'https://placeholder.example.com/v1',
@@ -735,7 +735,7 @@ describe('user api cloud storage helpers', () => {
       entries: [],
     });
 
-    const payload = await removeUserApiProviderViaSupabase('provider-1') as MutableEnvelope;
+    const payload = await removeUserApiProviderFromCloudRecord('provider-1') as MutableEnvelope;
 
     assert.equal(api.keyManagerReplaceCalls.length, 1);
     assert.equal(api.userApiReplaceCalls.length, 0);

@@ -28,7 +28,7 @@ This registry defines the single source of truth for cross-cutting KK Studio dat
 
 | Data | Canonical source | Allowed projections | Forbidden behavior |
 | --- | --- | --- | --- |
-| Workspace/canvas layout | API contract and Supabase-backed runtime repositories | local cache, OPFS snapshots for recovery | Local cache mutating cloud state outside the typed API path |
+| Workspace/canvas layout | API contract and cloud-backed runtime repositories | local cache, OPFS snapshots for recovery | Local cache mutating cloud state outside the typed API path |
 | Workflow documents | API contract and server-side repositories | read-only compatibility adapters | Dual-write through legacy and migrated routes |
 
 ## Billing and Payments

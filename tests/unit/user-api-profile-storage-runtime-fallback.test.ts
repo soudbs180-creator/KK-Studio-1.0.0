@@ -119,7 +119,7 @@ describe('user api profile storage runtime fallback', () => {
     assert.equal(userApiCalls, 1);
     assert.equal(entries.length, 1);
     assert.equal(entries[0].id, 'entry-1');
-    assert.equal(entries[0].key, 'sk-readonly-0000');
+    assert.equal(entries[0].key, '__kk_redacted__:key:entry-1');
   });
 
   test('saves user API entries through the typed auth API on hosted runtimes', async () => {
