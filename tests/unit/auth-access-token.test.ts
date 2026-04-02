@@ -7,7 +7,6 @@ import {
   getStoredKkApiAccessToken,
   refreshPreferredKkApiAccessToken,
   setStoredKkApiAccessToken,
-  shouldRefreshKkApiTokenSession,
   syncStoredKkApiAccessTokenWithSupabaseSession,
 } from "../../src/services/api/authAccessToken.ts";
 
@@ -151,10 +150,11 @@ test("refresh token falls back to the stored compatibility token when Supabase r
   }
 });
 
-test("sync refreshes the Supabase session when the access token is close to expiry", async () => {
+test("sync keeps the current Supabase session token without proactively refreshing it", async () => {
   const { sessionStorage } = installBrowserStorage();
   const originalGetSession = supabase.auth.getSession;
   const originalRefreshSession = supabase.auth.refreshSession;
+  let refreshCalls = 0;
 
   supabase.auth.getSession = async () =>
     ({
@@ -167,8 +167,9 @@ test("sync refreshes the Supabase session when the access token is close to expi
       error: null,
     }) as Awaited<ReturnType<typeof originalGetSession>>;
 
-  supabase.auth.refreshSession = async () =>
-    ({
+  supabase.auth.refreshSession = async () => {
+    refreshCalls += 1;
+    return ({
       data: {
         session: {
           access_token: "fresh-token",
@@ -177,12 +178,14 @@ test("sync refreshes the Supabase session when the access token is close to expi
       },
       error: null,
     }) as Awaited<ReturnType<typeof originalRefreshSession>>;
+  };
 
   try {
     const token = await syncStoredKkApiAccessTokenWithSupabaseSession();
 
-    assert.equal(token, "fresh-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-token");
+    assert.equal(token, "expiring-token");
+    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "expiring-token");
+    assert.equal(refreshCalls, 0);
   } finally {
     restoreAuthMocks(originalGetSession, originalRefreshSession);
   }
@@ -212,20 +215,42 @@ test("sync preserves the stored compatibility token when Supabase reports no act
   }
 });
 
-test("refresh threshold helper only triggers near the session expiry window", () => {
-  const nowMs = Date.now();
+test("concurrent refresh requests share a single Supabase refresh call", async () => {
+  const { sessionStorage } = installBrowserStorage();
+  const originalGetSession = supabase.auth.getSession;
+  const originalRefreshSession = supabase.auth.refreshSession;
+  let refreshCalls = 0;
+  let resolveRefresh:
+    | ((value: Awaited<ReturnType<typeof originalRefreshSession>>) => void)
+    | undefined;
 
-  assert.equal(
-    shouldRefreshKkApiTokenSession({
-      expires_at: Math.floor((nowMs + 60_000) / 1000),
-    }, nowMs),
-    true,
-  );
-  assert.equal(
-    shouldRefreshKkApiTokenSession({
-      expires_at: Math.floor((nowMs + 3_600_000) / 1000),
-    }, nowMs),
-    false,
-  );
-  assert.equal(shouldRefreshKkApiTokenSession(null, nowMs), false);
+  supabase.auth.refreshSession = async () => {
+    refreshCalls += 1;
+    return await new Promise<Awaited<ReturnType<typeof originalRefreshSession>>>((resolve) => {
+      resolveRefresh = resolve;
+    });
+  };
+
+  try {
+    const firstRefresh = refreshPreferredKkApiAccessToken();
+    const secondRefresh = refreshPreferredKkApiAccessToken();
+
+    resolveRefresh?.({
+      data: {
+        session: {
+          access_token: "fresh-token",
+        },
+      },
+      error: null,
+    } as Awaited<ReturnType<typeof originalRefreshSession>>);
+
+    const [firstToken, secondToken] = await Promise.all([firstRefresh, secondRefresh]);
+
+    assert.equal(firstToken, "fresh-token");
+    assert.equal(secondToken, "fresh-token");
+    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-token");
+    assert.equal(refreshCalls, 1);
+  } finally {
+    restoreAuthMocks(originalGetSession, originalRefreshSession);
+  }
 });

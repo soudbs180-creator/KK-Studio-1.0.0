@@ -291,11 +291,6 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     cloudError = error;
   }
 
-  if (cloudEntries.length > 0) {
-    scheduleLegacyEntrySeed(cloudEntries);
-    return cloudEntries;
-  }
-
   let localEntries: StoredUserApiEntry[] = [];
   let localError: unknown = null;
 
@@ -305,6 +300,26 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     } catch (error) {
       localError = error;
     }
+  }
+
+  if (cloudEntries.length > 0) {
+    const mergedEntries = localEntries.length > 0
+      ? mergeUserApiEntrySets(localEntries, cloudEntries)
+      : cloudEntries;
+
+    scheduleLegacyEntrySeed(mergedEntries);
+
+    if (localEntries.length > 0 && !areEntrySetsEquivalent(mergedEntries, cloudEntries)) {
+      void mergeUserApisPayloadViaSupabase({
+        entries: mergedEntries,
+      }).catch((error) => {
+        if (!isKkApiPersistenceUnavailableError(error)) {
+          console.warn('[userApiProfileStorage] Failed to converge merged user API payload to cloud:', error);
+        }
+      });
+    }
+
+    return mergedEntries;
   }
 
   if (localEntries.length > 0) {
@@ -343,42 +358,26 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
   );
 
   const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
-  let localError: unknown = null;
-  let localSaveSucceeded = false;
+  let cloudPayload: unknown = null;
 
-  if (canUseLegacyWebApi) {
-    try {
-      await saveLocalUserApiEntriesViaApi(normalizedEntries);
-      localSaveSucceeded = true;
-    } catch (error) {
-      localError = error;
-    }
+  cloudPayload = await mergeUserApisPayloadViaSupabase({
+    entries: normalizedEntries,
+  });
+
+  if (!canUseLegacyWebApi) {
+    return;
   }
 
   try {
-    await mergeUserApisPayloadViaSupabase({
-      entries: normalizedEntries,
-    });
-    return;
-  } catch (supabaseError) {
-    if (localSaveSucceeded && isKkApiPersistenceUnavailableError(supabaseError)) {
-      return;
+    await saveLocalUserApiEntriesViaApi(
+      normalizeEntries(
+        extractUserApiEntriesFromPayload(cloudPayload),
+      ),
+    );
+  } catch (error) {
+    if (!isKkApiPersistenceUnavailableError(error)) {
+      console.warn('[userApiProfileStorage] Cloud save succeeded, but local bridge sync failed:', error);
     }
-
-    if (localSaveSucceeded) {
-      console.warn('[userApiProfileStorage] Cloud sync failed after local save, keeping local copy as source of truth:', supabaseError);
-      return;
-    }
-
-    if (localError) {
-      throw new Error(
-        typeof localError === 'object' && localError && 'message' in localError
-          ? String((localError as { message?: unknown }).message || 'Failed to save user API entries.')
-          : 'Failed to save user API entries.',
-      );
-    }
-
-    throw supabaseError;
   }
 }
 
