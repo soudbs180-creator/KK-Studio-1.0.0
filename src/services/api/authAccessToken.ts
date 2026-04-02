@@ -3,9 +3,9 @@ import { subscribeAuthSessionChange } from "../auth/authSessionEvents.ts";
 
 const accessTokenStorageKey = "kk.api.access_token";
 const ACCESS_TOKEN_SYNC_INTERVAL_MS = 4 * 60 * 1000;
-const ACCESS_TOKEN_REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 let inMemoryCompatibilityAccessToken: string | undefined;
 let stopAccessTokenSessionSync: (() => void) | null = null;
+let refreshAccessTokenPromise: Promise<string | undefined> | null = null;
 
 function getSessionStorage(): Storage | undefined {
   if (typeof window === "undefined") {
@@ -78,36 +78,12 @@ export function setStoredKkApiAccessToken(token?: string) {
   localStorage?.removeItem(accessTokenStorageKey);
 }
 
-type SessionWithAccessToken = {
-  access_token?: string | null;
-  expires_at?: number | null;
-};
-
-export function shouldRefreshKkApiTokenSession(
-  session: SessionWithAccessToken | null | undefined,
-  nowMs = Date.now(),
-): boolean {
-  const expiresAtSeconds = Number(session?.expires_at || 0);
-  if (!Number.isFinite(expiresAtSeconds) || expiresAtSeconds <= 0) {
-    return false;
-  }
-
-  return expiresAtSeconds * 1000 - nowMs <= ACCESS_TOKEN_REFRESH_THRESHOLD_MS;
-}
-
 export async function syncStoredKkApiAccessTokenWithSupabaseSession(): Promise<string | undefined> {
   try {
+    // Treat background sync as a read-only path. Eager refreshes here can create
+    // refresh-token rotation churn when many tabs or requests ask for a token at once.
     const { data } = await supabase.auth.getSession();
-    let activeSession = data.session;
-
-    if (shouldRefreshKkApiTokenSession(activeSession)) {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (!refreshError && refreshData.session?.access_token) {
-        activeSession = refreshData.session;
-      }
-    }
-
-    const sessionAccessToken = activeSession?.access_token || undefined;
+    const sessionAccessToken = data.session?.access_token || undefined;
     if (sessionAccessToken) {
       if (sessionAccessToken !== getStoredKkApiAccessToken()) {
         setStoredKkApiAccessToken(sessionAccessToken);
@@ -126,24 +102,36 @@ export async function getPreferredKkApiAccessToken(): Promise<string | undefined
 }
 
 export async function refreshPreferredKkApiAccessToken(): Promise<string | undefined> {
-  try {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error) {
-      return getStoredKkApiAccessToken();
-    }
-
-    const refreshedAccessToken = data.session?.access_token || undefined;
-    if (refreshedAccessToken) {
-      if (refreshedAccessToken !== getStoredKkApiAccessToken()) {
-        setStoredKkApiAccessToken(refreshedAccessToken);
-      }
-      return refreshedAccessToken;
-    }
-  } catch {
-    // Fall through to the stored compatibility token below.
+  if (refreshAccessTokenPromise) {
+    return refreshAccessTokenPromise;
   }
 
-  return getStoredKkApiAccessToken();
+  // Collapse concurrent 401 retry paths onto a single refresh so we don't
+  // serially rotate the refresh token several times in the same burst.
+  refreshAccessTokenPromise = (async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        return getStoredKkApiAccessToken();
+      }
+
+      const refreshedAccessToken = data.session?.access_token || undefined;
+      if (refreshedAccessToken) {
+        if (refreshedAccessToken !== getStoredKkApiAccessToken()) {
+          setStoredKkApiAccessToken(refreshedAccessToken);
+        }
+        return refreshedAccessToken;
+      }
+    } catch {
+      // Fall through to the stored compatibility token below.
+    }
+
+    return getStoredKkApiAccessToken();
+  })().finally(() => {
+    refreshAccessTokenPromise = null;
+  });
+
+  return refreshAccessTokenPromise;
 }
 
 export function startKkApiAccessTokenSessionSync(): () => void {
@@ -177,6 +165,7 @@ export function startKkApiAccessTokenSessionSync(): () => void {
 
     if (detail.accessToken) {
       setStoredKkApiAccessToken(detail.accessToken);
+      return;
     }
 
     triggerSync();
