@@ -378,6 +378,14 @@ function run() {
     });
   }
 
+  if (blockers.length > 0) {
+    console.error(
+      `[release:hosted:check] Preflight blocked by ${blockers.length} issue(s). Please fix them before releasing.`
+    );
+    process.exitCode = 1;
+    process.exit(1);
+  }
+
   printSection("Notes");
   console.log("- This script only checks local files and current process env. It does not read remote Vercel or Supabase dashboard state.");
   console.log("- Production Edge Function secrets can be managed in Supabase Dashboard or with `npx supabase secrets set --env-file <file>`.");

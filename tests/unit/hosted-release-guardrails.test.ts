@@ -31,7 +31,11 @@ test("hosted release workflow pushes migrations before deploying edge functions 
   const source = readSource("scripts/release-hosted.mjs");
 
   assert.match(source, /const skipMigrations = args\.has\("--skip-migrations"\);/);
-  assert.match(source, /runStep\("Link Supabase project", `npx supabase link --project-ref \$\{projectRef\}`\);/);
+  assert.match(source, /const productionProjectRef =/);
+  assert.match(source, /const previewProjectRef = process\.env\.SUPABASE_PROJECT_REF_PREVIEW;/);
+  assert.match(source, /if \(previewProjectRef && productionProjectRef && previewProjectRef === productionProjectRef\) \{/);
+  assert.match(source, /const supabaseProjectRef = preview\s+\?\s+previewProjectRef\s+:\s+productionProjectRef;/);
+  assert.match(source, /runStep\("Link Supabase project", `npx supabase link --project-ref \$\{supabaseProjectRef\}`\);/);
   assert.match(source, /runStep\("Push Supabase migrations", "npx supabase db push"\);/);
   assert.match(source, /runStep\("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy"\);/);
   assert.match(source, /runStep\("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy"\);/);

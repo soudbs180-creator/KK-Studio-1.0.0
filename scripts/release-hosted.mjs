@@ -4,7 +4,10 @@ import { fileURLToPath } from "url";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
-const projectRef = "ovdjhdofjysanamgkfng";
+const productionProjectRef =
+  process.env.SUPABASE_PROJECT_REF_PRODUCTION
+  || process.env.SUPABASE_PROJECT_REF;
+const previewProjectRef = process.env.SUPABASE_PROJECT_REF_PREVIEW;
 
 const args = new Set(process.argv.slice(2));
 const skipCheck = args.has("--skip-check");
@@ -56,23 +59,39 @@ function main() {
     return;
   }
 
+  if (previewProjectRef && productionProjectRef && previewProjectRef === productionProjectRef) {
+    throw new Error("SUPABASE_PROJECT_REF_PREVIEW must differ from production to keep preview and production data isolated.");
+  }
+
+  const supabaseProjectRef = preview
+    ? previewProjectRef
+    : productionProjectRef;
+
+  if (!supabaseProjectRef) {
+    throw new Error(
+      preview
+        ? "Missing SUPABASE_PROJECT_REF_PREVIEW for preview releases."
+        : "Missing SUPABASE_PROJECT_REF_PRODUCTION or SUPABASE_PROJECT_REF for production releases."
+    );
+  }
+
   console.log("[release:hosted] Starting hosted release workflow");
   console.log(`[release:hosted] repo: ${repoRoot}`);
-  console.log(`[release:hosted] supabase project ref: ${projectRef}`);
+  console.log(`[release:hosted] supabase project ref: ${supabaseProjectRef}`);
 
   if (!skipCheck) {
     runStep("Hosted preflight check", "npm run release:hosted:check");
   }
 
-    if (!skipSupabase) {
-      runStep("Link Supabase project", `npx supabase link --project-ref ${projectRef}`);
-      if (!skipMigrations) {
-        runStep("Push Supabase migrations", "npx supabase db push");
-      }
-      runStep("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy");
-      runStep("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy");
-      runStep("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models");
-      runStep("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth");
+  if (!skipSupabase) {
+    runStep("Link Supabase project", `npx supabase link --project-ref ${supabaseProjectRef}`);
+    if (!skipMigrations) {
+      runStep("Push Supabase migrations", "npx supabase db push");
+    }
+    runStep("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy");
+    runStep("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy");
+    runStep("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models");
+    runStep("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth");
   }
 
   if (!skipVercel) {

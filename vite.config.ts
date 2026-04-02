@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, Plugin } from 'vite';
 import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo';
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
+const TURNSTILE_DIAGNOSTIC_ENTRY = path.resolve(__dirname, 'turnstile-diagnostic.html');
 
 const WORKSPACE_DATA_DIRS = new Set([
     'picture',
@@ -614,7 +615,9 @@ export default defineConfig(({ mode }) => {
             rollupOptions: {
                 input: {
                     index: path.resolve(__dirname, 'index.html'),
-                    'turnstile-diagnostic': path.resolve(__dirname, 'turnstile-diagnostic.html'),
+                    ...(fs.existsSync(TURNSTILE_DIAGNOSTIC_ENTRY)
+                        ? { 'turnstile-diagnostic': TURNSTILE_DIAGNOSTIC_ENTRY }
+                        : {}),
                 },
                 output: {
                     manualChunks: resolveManualChunk,

@@ -125,7 +125,7 @@ router.post('/alipay', async (req, res) => {
         if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
             if (!userId) {
                 console.error('[payment-webhook] Missing userId in Alipay webhook:', outTradeNo);
-                return res.send('success');
+                return res.status(400).send('failure');
             }
 
             const rechargeSuccess = await applyPaymentSettlement(
@@ -158,9 +158,9 @@ router.post('/alipay', async (req, res) => {
 router.post('/wechat', async (req, res) => {
     console.log('[payment-webhook] Received WeChat Pay notify');
 
-    // Skip verification in development if WeChat V3 key is not configured.
     if (!process.env.WECHATPAY_API_V3_KEY) {
-        return res.status(200).json({ code: 'SUCCESS', message: '开发模式忽略验签' });
+        console.error('[payment-webhook] Missing WECHATPAY_API_V3_KEY, refusing to process callback.');
+        return res.status(500).json({ code: 'FAIL', message: 'WECHATPAY_API_V3_KEY missing' });
     }
 
     try {
@@ -189,10 +189,15 @@ router.post('/wechat', async (req, res) => {
 
         if (!isValid) {
             console.error('[payment-webhook] WeChat signature verification failed.');
-            return res.status(401).json({ code: 'FAIL', message: '验签失败' });
+            return res.status(401).json({ code: 'FAIL', message: 'signature verification failed' });
         }
 
         const resource = req.body.resource;
+        if (!resource || !resource.ciphertext || !resource.associated_data || !resource.nonce) {
+            console.error('[payment-webhook] Invalid WeChat callback payload: missing resource envelope.');
+            return res.status(400).json({ code: 'FAIL', message: 'invalid resource payload' });
+        }
+
         const decryptData = wxpay.decipher_gcm(
             resource.ciphertext,
             resource.associated_data,
@@ -206,30 +211,31 @@ router.post('/wechat', async (req, res) => {
             const userId = decodeURIComponent(decryptData.attach || '');
             const transactionId = decryptData.transaction_id;
 
-            if (userId) {
-                const rechargeSuccess = await applyPaymentSettlement(
-                    userId,
-                    transactionId,
-                    amount,
-                    'CNY',
-                    'wechat',
-                    outTradeNo,
-                    decryptData
-                );
-                if (rechargeSuccess) {
-                    return res.status(200).json({ code: 'SUCCESS', message: '成功' });
-                }
-
-                return res.status(500).json({ code: 'FAIL', message: '数据库加币失败' });
+            if (!userId) {
+                console.error('[payment-webhook] Missing attach userId in WeChat webhook:', outTradeNo);
+                return res.status(400).json({ code: 'FAIL', message: 'missing attach userId' });
             }
 
-            console.error('[payment-webhook] Missing attach userId in WeChat webhook:', outTradeNo);
+            const rechargeSuccess = await applyPaymentSettlement(
+                userId,
+                transactionId,
+                amount,
+                'CNY',
+                'wechat',
+                outTradeNo,
+                decryptData
+            );
+            if (rechargeSuccess) {
+                return res.status(200).json({ code: 'SUCCESS', message: 'success' });
+            }
+
+            return res.status(500).json({ code: 'FAIL', message: 'database settlement failed' });
         }
 
-        res.status(200).json({ code: 'SUCCESS', message: '成功' });
+        return res.status(200).json({ code: 'SUCCESS', message: 'ignored' });
     } catch (error) {
         console.error('[payment-webhook] Failed to process WeChat webhook:', error);
-        res.status(500).json({ code: 'FAIL', message: '内部错误' });
+        res.status(500).json({ code: 'FAIL', message: 'internal error' });
     }
 });
 
