@@ -25,12 +25,37 @@ const rules = [
   {
     name: 'root diagnostic patches',
     targetDir: path.join(workspaceDir, 'diagnostics', 'patches'),
-    matches: (entryName) => /^(app-compare|canvas-compare)\.patch$/i.test(entryName),
+    matches: (entryName) => /^(app-compare|canvas-compare|tmp)\.patch$/i.test(entryName),
   },
   {
     name: 'root typecheck dumps',
     targetDir: path.join(workspaceDir, 'diagnostics', 'typecheck'),
     matches: (entryName) => /^check-tc.*\.(json|js)$/i.test(entryName),
+  },
+  {
+    name: 'playwright temp workspace',
+    targetDir: path.join(workspaceDir, 'local-artifacts', 'playwright'),
+    matches: (entryName) => /^\.tmp-playwright$/i.test(entryName),
+  },
+  {
+    name: 'root temp diagnostics logs',
+    targetDir: path.join(workspaceDir, 'diagnostics', 'logs'),
+    matches: (entryName) => /^tmp-.*\.(err|out)$/i.test(entryName),
+  },
+  {
+    name: 'root html diagnostics',
+    targetDir: path.join(workspaceDir, 'diagnostics', 'html'),
+    matches: (entryName) => /^\.tmp-.*\.html?$/i.test(entryName) || /^turnstile-diagnostic\.html$/i.test(entryName),
+  },
+  {
+    name: 'root temp helper scripts',
+    targetDir: path.join(workspaceDir, 'local-artifacts', 'temp-scripts'),
+    matches: (entryName) => /^\.tmp-.*\.(c?js|mjs|py)$/i.test(entryName) || /^temp_.*\.(c?js|mjs|py)$/i.test(entryName),
+  },
+  {
+    name: 'root extracted text fragments',
+    targetDir: path.join(workspaceDir, 'local-artifacts', 'text-fragments'),
+    matches: (entryName) => /^(current_block|extracted_section)\.txt$/i.test(entryName),
   },
 ];
 

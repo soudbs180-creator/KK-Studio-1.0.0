@@ -69,6 +69,7 @@ If you only want to clean up local clutter later, check:
 ### Maintenance helpers
 
 - `npm run organize:local`: safely moves obvious root-level temp artifacts into `workspace/`
+- It now also collects root `tmp-*.err/out`, `.tmp-*` HTML/JS helper files, extracted text fragments, and `.tmp-playwright/`
 - It also moves nested `.bak` / backup files out of `src/`, `docs/`, and `scripts/` into `workspace/local-artifacts/source-backups/`
 - `npm run package:portable`: rebuilds the portable client bundle
 - `npm run publish:portable`: creates a hosted portable update archive + manifest under `release/publish/`
