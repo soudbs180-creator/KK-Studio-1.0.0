@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Settings } from 'lucide-react';
-import SettingsPanelV2 from './SettingsPanel.v2';
+import SettingsPanel from './SettingsPanel';
 
 // 示例按钮组件
 export const SettingsButton: React.FC = () => {
@@ -22,7 +22,7 @@ export const SettingsButton: React.FC = () => {
       </button>
 
       <BrowserRouter>
-        <SettingsPanelV2 
+        <SettingsPanel 
           isOpen={isOpen} 
           onClose={() => setIsOpen(false)}
         />
@@ -85,7 +85,7 @@ export const SettingsComparison: React.FC = () => {
 
       {/* 加载新版本的SettingsPanel */}
       <BrowserRouter>
-        <SettingsPanelV2 
+        <SettingsPanel 
           isOpen={showNew} 
           onClose={() => setShowNew(false)}
         />

@@ -197,11 +197,7 @@ export const SettingsImprovementShowcase: React.FC = () => {
                 修改导入
               </h3>
               <div className="bg-black/30 rounded-lg p-3 font-mono text-sm">
-                // 旧版本
-                // import SettingsPanel from './SettingsPanel';
-                
-                // 新版本 ✅
-                import SettingsPanel from './SettingsPanel.v2';
+                import SettingsPanel from './SettingsPanel';
               </div>
             </div>
           </div>
@@ -224,7 +220,7 @@ export const SettingsImprovementShowcase: React.FC = () => {
           <h2 className="text-xl font-bold mb-4">改进文件清单</h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
-              { file: 'SettingsPanel.v2.tsx', desc: '主组件（路由版）', status: '新增' },
+              { file: 'SettingsPanel.tsx', desc: '主组件（路由版）', status: '新增' },
               { file: 'DashboardView.tsx', desc: '仪表盘视图', status: '提取' },
               { file: 'StorageSettingsView.tsx', desc: '存储设置视图', status: '提取' },
               { file: 'SystemLogsView.tsx', desc: '系统日志视图', status: '提取' },

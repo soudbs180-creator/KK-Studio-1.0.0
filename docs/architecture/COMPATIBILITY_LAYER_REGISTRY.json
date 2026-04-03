@@ -57,20 +57,7 @@
       ],
       "removalCondition": "Delete when all workflow-aware UI surfaces consume the migrated workflow shape directly."
     },
-    {
-      "path": "src/components/settings/SettingsPanel.v2.tsx",
-      "role": "compatibility-layer",
-      "currentPurpose": "UI migration surface for settings redesign while the legacy settings panel remains in circulation.",
-      "upstreamCanonicalSource": "src/components/settings/SettingsPanel.tsx",
-      "downstreamDependents": [
-        "src/routes/settingsRoutes.tsx"
-      ],
-      "riskLevel": "low",
-      "regressionTests": [
-        "tests/unit/frontend-key-boundary-hardening.test.ts"
-      ],
-      "removalCondition": "Delete after settings routes use one production panel implementation."
-    },
+
     {
       "path": "src/components/settings/SettingsScaffold.tsx",
       "role": "compatibility-layer",

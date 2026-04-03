@@ -7,7 +7,7 @@
 - [x] 创建路由配置文件 `src/routes/settingsRoutes.tsx`
 - [x] 创建 DashboardView 组件（从 SettingsPanel 提取）
 - [x] 创建骨架屏组件系统
-- [x] 创建 SettingsPanel.v2.tsx（路由版本）
+- [x] 创建 SettingsPanel.localized.tsx（路由实现）
 
 ### Phase 2: 视图组件提取（已完成）
 - [x] **StorageSettingsView** - 存储设置视图（507行）
@@ -22,7 +22,7 @@
   - 日志导出功能
   - 清空日志操作
 
-- [x] **SettingsPanel.v2.tsx 更新**
+- [x] **SettingsPanel.localized.tsx 更新**
   - 集成所有新视图
   - 完成路由配置
   - 移动端适配
@@ -38,7 +38,7 @@ src/
 │   └── settingsRoutes.tsx                    # ✅ 路由配置
 ├── components/settings/
 │   ├── SettingsPanel.tsx                      # 原始版本（保留）
-│   ├── SettingsPanel.v2.tsx                   # ✅ 新版本（使用路由）
+│   ├── SettingsPanel.localized.tsx         # ✅ 当前主实现（使用路由）
 │   ├── SettingsScaffold.tsx                   # UI 脚手架
 │   ├── ApiSettingsView.tsx                    # API管理（待优化）
 │   ├── AdminSystem.tsx                        # 管理员后台
@@ -62,7 +62,7 @@ src/
 | 文件 | 改进前 | 改进后 | 变化 |
 |------|--------|--------|------|
 | SettingsPanel.tsx | 1636行 | 保留（向后兼容） | - |
-| SettingsPanel.v2.tsx | - | 480行 | 全新创建 |
+| SettingsPanel.localized.tsx | - | 480行 | 当前主实现 |
 | DashboardView | 在SettingsPanel内 | 580行 | ✅ 提取 |
 | StorageSettingsView | 在SettingsPanel内 | 507行 | ✅ 提取 |
 | SystemLogsView | 在SettingsPanel内 | 215行 | ✅ 提取 |
@@ -121,12 +121,12 @@ src/
 ```tsx
 // App.tsx
 import { BrowserRouter } from 'react-router-dom';
-import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 function App() {
   return (
     <BrowserRouter>
-      <SettingsPanelV2 
+      <SettingsPanel 
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
@@ -139,7 +139,7 @@ function App() {
 
 ```tsx
 // 保持原有调用方式，只修改导入路径
-import SettingsPanel from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 // 其他代码完全不变
 <SettingsPanel 
@@ -156,7 +156,7 @@ import SettingsPanel from './components/settings/SettingsPanel.v2';
   <Route 
     path="/settings/*" 
     element={
-      <SettingsPanelV2 
+      <SettingsPanel 
         isOpen={true} 
         onClose={() => navigate('/')} 
       />
@@ -173,7 +173,7 @@ import SettingsPanel from './components/settings/SettingsPanel.v2';
 - ✅ 所有 props 完全一致
 - ✅ 调用方式完全相同
 - ✅ 视觉效果保持一致
-- ✅ 旧版本文件保留（SettingsPanel.tsx）
+- ✅ 稳定入口保留（SettingsPanel.tsx）
 
 ### 新增功能
 - ✅ URL 路由支持
@@ -250,7 +250,7 @@ import SettingsPanel from './components/settings/SettingsPanel.v2';
 ## 💡 使用建议
 
 ### 推荐场景
-1. **新项目**: 直接使用 SettingsPanel.v2.tsx
+1. **新项目**: 直接使用 SettingsPanel.tsx
 2. **现有项目**: 渐进式迁移，先测试再替换
 3. **路由集成**: 如果需要URL访问设置页
 

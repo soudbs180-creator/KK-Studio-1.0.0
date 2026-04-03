@@ -10,7 +10,7 @@
 ✅ src/components/settings/views/StorageSettingsView.tsx  # 存储设置视图（507行）
 ✅ src/components/settings/views/SystemLogsView.tsx       # 系统日志视图（215行）
 ✅ src/components/settings/views/SettingsSkeleton.tsx     # 骨架屏组件
-✅ src/components/settings/SettingsPanel.v2.tsx           # 新版主组件（480行）
+✅ src/components/settings/SettingsPanel.localized.tsx # 当前主实现（路由版）
 
 📄 文档:
 ✅ docs/SETTINGS_QUICK_START.md      # 快速启动指南
@@ -76,10 +76,10 @@
 ### 最简单的使用方法
 
 ```tsx
-import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 // 使用方式与原版完全相同！
-<SettingsPanelV2 
+<SettingsPanel 
   isOpen={showSettings}
   onClose={() => setShowSettings(false)}
   initialView="dashboard"  // 可选
@@ -92,7 +92,7 @@ import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
 import { BrowserRouter } from 'react-router-dom';
 
 <BrowserRouter>
-  <SettingsPanelV2 isOpen={true} onClose={() => {}} />
+  <SettingsPanel isOpen={true} onClose={() => {}} />
 </BrowserRouter>
 ```
 
@@ -107,7 +107,7 @@ import { BrowserRouter } from 'react-router-dom';
 ## 📁 文件清单
 
 ### 核心文件
-1. **SettingsPanel.v2.tsx** - 主组件（使用React Router）
+1. **SettingsPanel.localized.tsx** - 当前主实现（使用React Router）
 2. **DashboardView.tsx** - 仪表盘视图
 3. **StorageSettingsView.tsx** - 存储设置视图
 4. **SystemLogsView.tsx** - 系统日志视图
@@ -150,7 +150,7 @@ import { BrowserRouter } from 'react-router-dom';
 // 从：
 import SettingsPanel from './components/settings/SettingsPanel';
 // 改为：
-import SettingsPanel from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 // 其他代码完全不用改！
 ```

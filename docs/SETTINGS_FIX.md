@@ -5,7 +5,7 @@
 
 ## 已修复 ✅
 
-**文件**: `src/components/settings/SettingsPanel.v2.tsx`
+**文件**: `src/components/settings/SettingsPanel.localized.tsx`
 
 **修复内容**:
 1. 将 `SettingsPanelContent` 组件移到 `SettingsPanel` 之前定义

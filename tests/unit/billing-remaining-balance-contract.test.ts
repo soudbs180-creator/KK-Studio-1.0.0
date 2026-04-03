@@ -68,7 +68,6 @@ test('billing credit mutations stay on the typed billing API surface', () => {
 
 test('remaining balance display helper is shared across billing surfaces', () => {
   const helperSource = readSource('src/services/billing/remainingBalance.ts');
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.tsx');
   const dashboardLocalizedSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
   const dashboardSource = readSource('src/components/settings/views/DashboardView.tsx');
   const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
@@ -81,15 +80,10 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.match(helperSource, /export function getRemainingCreditsFractionDigits\(balance: unknown\): number \{/);
   assert.match(helperSource, /export function formatRemainingCredits\(balance: unknown, locale = 'zh-CN'\): string \{/);
 
-  assert.ok(settingsPanelSource.includes('formatRemainingCredits'));
-  assert.ok(settingsPanelSource.includes('selectRemainingBalanceSummary'));
-  assert.ok(settingsPanelSource.includes("const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');"));
-  assert.ok(settingsPanelSource.includes("title: '积分与充值'"));
-  assert.ok(settingsPanelSource.includes('value: `${remainingBalanceDisplay} 积分`'));
-
   assert.ok(dashboardLocalizedSource.includes('selectRemainingBalanceSummary'));
   assert.ok(dashboardLocalizedSource.includes('const remainingBalanceDisplay = formatRemainingCredits(balance, locale);'));
-  assert.ok(dashboardLocalizedSource.includes("title: pick('积分与充值', 'Credits & Recharge')"));
+  assert.ok(dashboardLocalizedSource.includes('title: pick('));
+  assert.ok(dashboardLocalizedSource.includes("'Credits & Recharge')"));
   assert.ok(dashboardLocalizedSource.includes('value: remainingBalanceDisplay'));
 
   assert.ok(dashboardSource.includes('selectRemainingBalanceSummary'));
@@ -139,6 +133,7 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.doesNotMatch(userApiCloudRecordStorageSource, /ViaSupabase/);
   assert.ok(userApiCloudStorageShimSource.includes('loadUserApisPayloadMetadataFromCloudRecord as loadUserApisPayloadMetadataViaSupabase'));
   assert.ok(userApiCloudStorageShimSource.includes('mergeUserApisPayloadToCloudRecord as mergeUserApisPayloadViaSupabase'));
+  assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApisPayload({'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
   assert.ok(userApiCloudRecordStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));

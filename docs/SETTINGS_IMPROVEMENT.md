@@ -32,7 +32,7 @@
    - [x] 统一的脉冲动画效果
    - [x] 提升加载体验
 
-3. **`src/components/settings/SettingsPanel.v2.tsx`**
+3. **`src/components/settings/SettingsPanel.localized.tsx`**
    - [x] 使用 react-router 重写主组件
    - [x] 支持响应式布局（桌面端 + 移动端）
    - [x] 懒加载所有视图组件
@@ -97,7 +97,7 @@ src/components/settings/
 ```
 src/components/settings/
 ├── SettingsPanel.tsx              # 原始版本（保留兼容）
-├── SettingsPanel.v2.tsx           # ✅ 新版本（使用路由）
+├── SettingsPanel.localized.tsx  # ✅ 当前主实现（使用路由）
 ├── SettingsScaffold.tsx           # UI组件
 ├── views/                         # ✅ 视图组件目录
 │   ├── DashboardView.tsx          # ✅ 仪表盘
@@ -128,7 +128,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* 其他路由 */}
-        <Route path="/settings/*" element={<SettingsPanelV2 isOpen={true} onClose={() => {}} />} />
+        <Route path="/settings/*" element={<SettingsPanel isOpen={true} onClose={() => {}} />} />
       </Routes>
     </BrowserRouter>
   );
@@ -137,9 +137,9 @@ function App() {
 
 ### 3. 或者直接使用（保持原有调用方式）
 ```tsx
-import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
-<SettingsPanelV2 
+<SettingsPanel 
   isOpen={showSettings}
   onClose={() => setShowSettings(false)}
   initialView="api-management"
@@ -187,7 +187,7 @@ import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
 import SettingsPanel from './components/settings/SettingsPanel';
 
 // 新版本
-import SettingsPanel from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 ```
 
 两个版本可以并存，直到确认新版本稳定。

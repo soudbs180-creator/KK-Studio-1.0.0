@@ -34,7 +34,7 @@
 ├── src/components/settings/views/
 │   ├── DashboardView.tsx                           # 仪表盘视图
 │   └── SettingsSkeleton.tsx                        # 骨架屏组件
-├── src/components/settings/SettingsPanel.v2.tsx    # 新版设置面板
+├── src/components/settings/SettingsPanel.localized.tsx # 当前主实现
 └── docs/SETTINGS_IMPROVEMENT.md                    # 改进文档
 
 📝 修改:
@@ -51,7 +51,7 @@
 
 ```tsx
 // 在需要的地方使用 v2 版本
-import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
@@ -59,7 +59,7 @@ function App() {
   return (
     <>
       {/* 其他组件 */}
-      <SettingsPanelV2 
+      <SettingsPanel 
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         initialView="dashboard"  // 可选: 'dashboard' | 'api-management' | etc.
@@ -76,7 +76,7 @@ function App() {
 ```tsx
 // App.tsx
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import SettingsPanelV2 from './components/settings/SettingsPanel.v2';
+import SettingsPanel from './components/settings/SettingsPanel';
 
 function App() {
   return (
@@ -86,7 +86,7 @@ function App() {
         <Route 
           path="/settings/*" 
           element={
-            <SettingsPanelV2 
+            <SettingsPanel 
               isOpen={true} 
               onClose={() => window.history.back()} 
             />
@@ -181,7 +181,7 @@ window.dispatchEvent(event);
 
 ```tsx
 // 直接渲染新版设置面板
-<SettingsPanelV2 
+<SettingsPanel 
   isOpen={true} 
   onClose={() => {}}
   initialView="dashboard"

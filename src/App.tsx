@@ -345,8 +345,7 @@ import {
 } from './canvas/performanceProfile';
 
 const UserProfileModal = lazy(() => import('./components/modals/UserProfileModal'));
-// const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel')); // 旧版本
-const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel.v2')); // ✅ 新版本 v2.0 - 路由支持、骨架屏、移动端优化
+const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel')); // single production entry
 const SearchPalette = lazy(() => import('./components/layout/SearchPalette'));
 const TagInputModal = lazy(() => import('./components/modals/TagInputModal'));
 const TutorialOverlay = lazy(() => import('./components/common/TutorialOverlay'));

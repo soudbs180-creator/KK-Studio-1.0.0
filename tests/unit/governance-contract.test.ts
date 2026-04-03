@@ -65,7 +65,6 @@ test("compatibility layer registry tracks the required migration files", () => {
     "src/services/llm/syncImageBridge.ts",
     "src/services/model/modelPricingOverrideBridge.ts",
     "src/workflow/adapters/workflowToLegacy.ts",
-    "src/components/settings/SettingsPanel.v2.tsx",
     "src/components/settings/SettingsScaffold.tsx",
     "apps/api/src/modules/auth/presentation/mount-legacy-auth-routes.ts",
     "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts",

@@ -9,10 +9,10 @@
 // const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'));
 
 // ✅ 新版本
-const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel.v2'));
+const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'));
 ```
 
-### 2. 更新了 SettingsPanel.v2.tsx
+### 2. 更新了 SettingsPanel.localized.tsx
 - 添加了 `MemoryRouter` 包裹
 - 所有视图组件已集成
 - 骨架屏系统已就绪
@@ -22,7 +22,7 @@ const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel.v2'
 src/
 ├── routes/settingsRoutes.tsx                    ✅ 路由配置
 ├── components/settings/
-│   ├── SettingsPanel.v2.tsx                     ✅ 主组件（已集成MemoryRouter）
+│   ├── SettingsPanel.localized.tsx           ✅ 主实现（已集成MemoryRouter）
 │   └── views/
 │       ├── DashboardView.tsx                    ✅ 仪表盘视图
 │       ├── StorageSettingsView.tsx              ✅ 存储设置视图
@@ -156,7 +156,7 @@ if (skeleton) {
 const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'));
 
 // 注释掉新版本
-// const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel.v2'));
+// const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel'));
 ```
 
 保存并刷新即可。
