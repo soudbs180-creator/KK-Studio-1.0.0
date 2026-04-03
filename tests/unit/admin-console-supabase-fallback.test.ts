@@ -11,11 +11,11 @@ function readSource(relativePath: string): string {
 
 test('admin console actions use the typed API path for role grants without Supabase fallback', () => {
   const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
-  const fallbackSource = readSource('src/services/admin/supabaseAdminFallbackService.ts');
+  const adminRoleSource = readSource('src/services/admin/adminAccountRole.ts');
 
   assert.match(adminConsoleSource, /legacyWebApiClient\.setUserRole/);
   assert.doesNotMatch(adminConsoleSource, /setUserRoleViaSupabase/);
   assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
-  assert.doesNotMatch(fallbackSource, /supabase\.rpc\(/);
-  assert.doesNotMatch(fallbackSource, /setUserRoleViaSupabase/);
+  assert.doesNotMatch(adminRoleSource, /supabase\.rpc\(/);
+  assert.doesNotMatch(adminRoleSource, /setUserRoleViaSupabase/);
 });

@@ -7,7 +7,7 @@ import {
   type AppAccountRole,
   isAdminAccountRole,
   normalizeAppAccountRole,
-} from '../services/admin/supabaseAdminFallbackService';
+} from '../services/admin/adminAccountRole';
 
 type UseAdminRoleResult = {
   authLoading: boolean;
