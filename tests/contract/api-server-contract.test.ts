@@ -665,6 +665,124 @@ describe("api server contract", () => {
     assert.equal(getPayload.data.entries[0].id, "contract-entry-1");
   });
 
+  test("profile unified user-api payload endpoint enforces auth, validation, and version persistence", async () => {
+    const unauthorizedResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis/payload`, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-contract-user-apis-payload-unauthorized",
+      },
+      body: JSON.stringify({
+        version: 4,
+        slots: [],
+        providers: [],
+        entries: [],
+      }),
+    });
+    assert.equal(unauthorizedResponse.status, 401);
+
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis/payload`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer contract-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-contract-user-apis-payload-invalid",
+      },
+      body: JSON.stringify({
+        version: 0,
+        slots: [{ key: "sk-missing-id" }],
+        providers: [],
+        entries: [],
+      }),
+    });
+    assert.equal(invalidResponse.status, 400);
+    const invalidPayload = await invalidResponse.json();
+    assert.equal(invalidPayload.success, false);
+    assert.equal(invalidPayload.error.code, "INVALID_REQUEST");
+
+    const saveResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis/payload`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer contract-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-contract-user-apis-payload-save",
+      },
+      body: JSON.stringify({
+        version: 7,
+        slots: [
+          {
+            id: "contract-payload-slot-1",
+            key: "sk-contract-payload-slot-1",
+            name: "Contract Payload Slot",
+            provider: "OpenAI",
+            format: "openai",
+            supportedModels: ["gpt-4o-mini"],
+          },
+        ],
+        providers: [
+          {
+            id: "contract-payload-provider-1",
+            apiKey: "provider-payload-secret-1",
+            name: "Contract Payload Provider",
+            baseUrl: "https://provider.payload.local/v1",
+            format: "openai",
+            models: ["gpt-4o-mini"],
+          },
+        ],
+        entries: [
+          {
+            id: "contract-payload-entry-1",
+            key: "sk-contract-payload-entry-1",
+            name: "Contract Payload Entry",
+            provider: "OpenAI",
+            type: "official",
+            format: "openai",
+            baseUrl: "https://api.openai.com/v1",
+            supportedModels: ["gpt-4o-mini"],
+            disabled: false,
+            createdAt: 1700000000010,
+            updatedAt: 1700000000010,
+            status: "unknown",
+            failCount: 0,
+            successCount: 0,
+            totalCost: 0,
+            budgetLimit: -1,
+            tokenLimit: -1,
+            usedTokens: 0,
+            lastUsed: null,
+            lastError: null,
+          },
+        ],
+      }),
+    });
+
+    assert.equal(saveResponse.status, 200);
+    const savePayload = await saveResponse.json();
+    assert.equal(savePayload.success, true);
+    assert.equal(savePayload.data.version, 7);
+    assert.equal(savePayload.data.slots[0].id, "contract-payload-slot-1");
+    assert.match(String(savePayload.data.slots[0].key || ""), /^__kk_redacted__:/);
+    assert.equal(savePayload.data.providers[0].id, "contract-payload-provider-1");
+    assert.match(String(savePayload.data.providers[0].apiKey || ""), /^__kk_redacted__:/);
+    assert.equal(savePayload.data.entries[0].id, "contract-payload-entry-1");
+    assert.match(String(savePayload.data.entries[0].key || ""), /^__kk_redacted__:/);
+
+    const getResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      headers: {
+        authorization: "Bearer contract-user-token",
+        "x-request-id": "req-contract-user-apis-payload-get",
+      },
+    });
+
+    assert.equal(getResponse.status, 200);
+    const getPayload = await getResponse.json();
+    assert.equal(getPayload.success, true);
+    assert.equal(getPayload.data.version, 7);
+    assert.equal(getPayload.data.slots[0].id, "contract-payload-slot-1");
+    assert.equal(getPayload.data.providers[0].id, "contract-payload-provider-1");
+    assert.equal(getPayload.data.entries[0].id, "contract-payload-entry-1");
+  });
+
   test("model catalog and admin model endpoints honor the contract shape", async () => {
     const listResponse = await fetch(`${baseUrl}/api/v1/model-catalog/models?kind=image`, {
       headers: {

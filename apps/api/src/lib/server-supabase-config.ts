@@ -474,6 +474,13 @@ export function assertServerSupabaseConfigConsistency(config: ServerSupabaseConf
       + "Point the local API and frontend env at the same Supabase project.",
     );
   }
+
+  if (config.supabaseUrl && config.serviceRoleKey && !config.userApiEncryptionSecret) {
+    throw new Error(
+      "USER_API_ENCRYPTION_SECRET is required when canonical Supabase auth-data persistence is enabled. "
+      + "Set USER_API_ENCRYPTION_SECRET (or PROFILE_USER_APIS_ENCRYPTION_SECRET) before starting the API server.",
+    );
+  }
 }
 
 export function summarizeServerSupabaseConfig(

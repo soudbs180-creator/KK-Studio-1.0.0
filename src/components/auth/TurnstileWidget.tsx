@@ -174,6 +174,9 @@ export async function ensureTurnstileScript(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.dataset.turnstileScript = 'true';
+    if ('fetchPriority' in script) {
+      script.fetchPriority = 'high';
+    }
     script.onload = () => {
       waitForTurnstile().then(resolve).catch(reject);
     };

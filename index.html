@@ -10,6 +10,8 @@
     <meta name="description" content="KK Studio - AI Image Generation Workspace" />
     <title>KK Studio - AI Image Workspace</title>
     <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="dns-prefetch" href="//challenges.cloudflare.com" />
+    <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
@@ -51,6 +53,28 @@
 
 <body>
     <div id="root"></div>
+    <script>
+        (function () {
+            var turnstileScriptUrl = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+            var turnstileScriptSelector = 'script[data-turnstile-script="true"]';
+
+            if (document.querySelector(turnstileScriptSelector)) {
+                return;
+            }
+
+            var script = document.createElement('script');
+            script.src = turnstileScriptUrl;
+            script.async = true;
+            script.defer = true;
+            script.dataset.turnstileScript = 'true';
+
+            if ('fetchPriority' in script) {
+                script.fetchPriority = 'high';
+            }
+
+            document.head.appendChild(script);
+        })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
 </body>
 

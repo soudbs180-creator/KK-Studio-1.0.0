@@ -12,6 +12,7 @@ const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
@@ -68,6 +69,7 @@ afterEach(() => {
   supabase.auth.getUser = originalGetUser;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
   legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
   if (typeof originalKkApiBaseUrl === 'string') {
@@ -129,7 +131,7 @@ describe('user api profile storage runtime fallback', () => {
 
     let keyManagerCalls = 0;
     let userApiReads = 0;
-    let legacyWrites = 0;
+    let unifiedWrites = 0;
     let persistedEntries: Array<Record<string, unknown>> = [];
 
     legacyWebApiClient.getKeyManagerCloudState = async () => {
@@ -156,8 +158,11 @@ describe('user api profile storage runtime fallback', () => {
     legacyWebApiClient.replaceKeyManagerCloudState = async () => {
       throw new Error('key-manager state should stay unchanged when only entry rows change');
     };
-    legacyWebApiClient.replaceUserApiEntries = async (input) => {
-      legacyWrites += 1;
+    legacyWebApiClient.replaceUserApiEntries = async () => {
+      throw new Error('split entry writes should stay unused when the unified payload route is available');
+    };
+    legacyWebApiClient.replaceUserApisPayload = async (input) => {
+      unifiedWrites += 1;
       persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
         ...entry,
         key: `__kk_redacted__:key:${String(entry.id || '')}`,
@@ -165,6 +170,9 @@ describe('user api profile storage runtime fallback', () => {
       return {
         success: true,
         data: {
+          version: Number(input.version || 2),
+          slots: input.slots || [],
+          providers: input.providers || [],
           entries: persistedEntries,
         },
       };
@@ -172,9 +180,9 @@ describe('user api profile storage runtime fallback', () => {
 
     await saveUserApiEntries([createEntry('entry-2')]);
 
-    assert.equal(legacyWrites, 1);
-    assert.equal(keyManagerCalls, 2);
-    assert.equal(userApiReads, 2);
+    assert.equal(unifiedWrites, 1);
+    assert.equal(keyManagerCalls, 1);
+    assert.equal(userApiReads, 1);
     assert.deepEqual(
       persistedEntries.map((entry) => ({
         id: entry.id,

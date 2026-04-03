@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -20,7 +20,7 @@ import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstil
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import AnoAI from '@/components/ui/animated-shader-background';
+import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
 import { startWechatLogin } from '../../services/auth/wechatAuth';
@@ -41,8 +41,14 @@ type StarPoint = {
   opacity: string;
 };
 
+type IdleSchedulerWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DeferredAuthShaderBackground = lazy(() => import('@/components/ui/animated-shader-background'));
 const TURNSTILE_MISSING_SITE_KEY_MESSAGE =
   '当前部署未配置 Turnstile 前端 Site Key，请在 Vercel 项目环境变量中添加 VITE_TURNSTILE_SITE_KEY 后重新部署。';
 const TURNSTILE_DISABLED_MESSAGE =
@@ -160,6 +166,7 @@ const LoginScreen: React.FC = () => {
   const [wechatError, setWechatError] = useState<string | null>(null);
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
+  const [showShaderBackground, setShowShaderBackground] = useState(false);
 
   const resolveAuthErrorMessage = useCallback(
     (authError: unknown, targetView: AuthView) => {
@@ -210,6 +217,78 @@ const LoginScreen: React.FC = () => {
     void ensureTurnstileScript().catch(() => {
       // Widget 内部会显示更具体的错误信息
     });
+  }, [turnstileAvailable]);
+
+  useEffect(() => {
+    const idleWindow = window as IdleSchedulerWindow;
+    let disposed = false;
+    let revealHandle: number | null = null;
+    let fallbackHandle: number | null = null;
+    let revealScheduled = false;
+
+    const revealShaderBackground = () => {
+      if (disposed) {
+        return;
+      }
+
+      startTransition(() => {
+        setShowShaderBackground(true);
+      });
+    };
+
+    const scheduleShaderReveal = () => {
+      if (disposed || revealScheduled) {
+        return;
+      }
+
+      revealScheduled = true;
+
+      if (typeof idleWindow.requestIdleCallback === 'function') {
+        revealHandle = idleWindow.requestIdleCallback(() => {
+          revealShaderBackground();
+        }, { timeout: 600 });
+        return;
+      }
+
+      revealHandle = window.setTimeout(revealShaderBackground, 180);
+    };
+
+    if (turnstileAvailable && window.turnstile?.render) {
+      scheduleShaderReveal();
+    } else if (turnstileAvailable) {
+      void ensureTurnstileScript()
+        .catch(() => {
+          // Widget internals surface the actual loading error.
+        })
+        .finally(() => {
+          scheduleShaderReveal();
+        });
+
+      fallbackHandle = window.setTimeout(() => {
+        scheduleShaderReveal();
+      }, 1600);
+    } else {
+      scheduleShaderReveal();
+    }
+
+    return () => {
+      disposed = true;
+
+      if (revealHandle !== null) {
+        if (
+          typeof idleWindow.requestIdleCallback === 'function'
+          && typeof idleWindow.cancelIdleCallback === 'function'
+        ) {
+          idleWindow.cancelIdleCallback(revealHandle);
+        } else {
+          window.clearTimeout(revealHandle);
+        }
+      }
+
+      if (fallbackHandle !== null) {
+        window.clearTimeout(fallbackHandle);
+      }
+    };
   }, [turnstileAvailable]);
 
   const localErrors = useMemo(
@@ -354,10 +433,10 @@ const LoginScreen: React.FC = () => {
     }
 
     if (view === 'login') {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await signInWithPasswordWithFallback({
         email: emailValue,
         password,
-        ...(captchaToken ? { options: { captchaToken } } : {}),
+        ...(captchaToken ? { captchaToken } : {}),
       });
       if (signInError) throw signInError;
       return;
@@ -536,7 +615,11 @@ const LoginScreen: React.FC = () => {
       )}
 
       <div className="auth-shader-background" aria-hidden>
-        <AnoAI className="auth-shader-canvas" />
+        {showShaderBackground ? (
+          <Suspense fallback={null}>
+            <DeferredAuthShaderBackground className="auth-shader-canvas" />
+          </Suspense>
+        ) : null}
       </div>
 
       <div className="auth-background" aria-hidden>

@@ -118,11 +118,11 @@ function normalizeError(error: any): Error {
   };
 
   if (isSecureProxySessionReauthError(error)) {
-    return withMeta(new Error(SECURE_PROXY_SESSION_REAUTH_MESSAGE));
+    return withMeta(new Error(error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE));
   }
 
   if (isSecureProxyGuestModeError(error)) {
-    return withMeta(new Error(SECURE_PROXY_GUEST_MODE_MESSAGE));
+    return withMeta(new Error(error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE));
   }
   
   if (msg.includes('cancelled')) return withMeta(new Error("任务已取消"));

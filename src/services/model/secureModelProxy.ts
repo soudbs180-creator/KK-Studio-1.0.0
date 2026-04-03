@@ -1,6 +1,7 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
 import { waitForAuthSessionChange } from '../auth/authSessionEvents';
+import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { resolveKkApiBaseUrl, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
@@ -110,8 +111,10 @@ export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
 export const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
 export const LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE = 'LOCAL_USER_ROUTE_PROXY_UNAVAILABLE';
 export const LOCAL_USER_ROUTE_NOT_FOUND_CODE = 'USER_ROUTE_NOT_FOUND';
-export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '登录已过期，请重新登录后继续使用系统积分模型。';
-export const SECURE_PROXY_GUEST_MODE_MESSAGE = '游客模式不支持云同步和系统积分模型，请先登录正式账号。';
+export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
+export const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
+
+type SecureProxyRouteKind = 'system' | 'user-route';
 
 type SecureProxyInvokeResult = {
   data: any;
@@ -125,6 +128,7 @@ type CloudSessionResolution = {
 
 type ResolveCloudSessionOptions = {
   forceRefresh?: boolean;
+  routeKind?: SecureProxyRouteKind;
 };
 
 type SecureProxyBoundaryErrorCode =
@@ -281,9 +285,10 @@ export function isLocalUserRouteProxyFallbackError(error: unknown): error is Sec
 
 function buildSessionReauthError(
   feature: string,
-  responseBody = ''
+  responseBody = '',
+  routeKind: SecureProxyRouteKind = 'system',
 ): SecureProxyBoundaryError {
-  return buildSecureProxyBoundaryError(SECURE_PROXY_SESSION_REAUTH_MESSAGE, {
+  return buildSecureProxyBoundaryError(getSessionReauthMessage(routeKind), {
     code: SECURE_PROXY_SESSION_REAUTH_CODE,
     status: 401,
     responseBody,
@@ -291,20 +296,47 @@ function buildSessionReauthError(
   });
 }
 
-function buildCloudSessionError(feature: string): SecureProxyBoundaryError {
+function buildCloudSessionError(
+  feature: string,
+  routeKind: SecureProxyRouteKind = 'system',
+): SecureProxyBoundaryError {
   if (tempUserService.getCachedTempUser()) {
-    return buildSecureProxyBoundaryError(SECURE_PROXY_GUEST_MODE_MESSAGE, {
+    return buildSecureProxyBoundaryError(getGuestModeMessage(routeKind), {
       code: SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE,
       status: 403,
       feature,
     });
   }
 
-  return buildSecureProxyBoundaryError(SECURE_PROXY_SESSION_REAUTH_MESSAGE, {
+  return buildSecureProxyBoundaryError(getSessionReauthMessage(routeKind), {
     code: SECURE_PROXY_SESSION_REAUTH_CODE,
     status: 401,
     feature,
   });
+}
+
+function getSessionReauthMessage(routeKind: SecureProxyRouteKind): string {
+  if (routeKind === 'user-route') {
+    return '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u7ee7\u7eed\u4f7f\u7528\u4f60\u914d\u7f6e\u7684 API \u8def\u7531\u3002';
+  }
+
+  return '\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u7ee7\u7eed\u4f7f\u7528\u7cfb\u7edf\u79ef\u5206\u6a21\u578b\u3002';
+}
+
+function getGuestModeMessage(routeKind: SecureProxyRouteKind): string {
+  if (routeKind === 'user-route') {
+    return '\u6e38\u5ba2\u6a21\u5f0f\u4e0d\u652f\u6301\u4e91\u540c\u6b65\u548c\u4f60\u914d\u7f6e\u7684 API \u8def\u7531\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
+  }
+
+  return '\u6e38\u5ba2\u6a21\u5f0f\u4e0d\u652f\u6301\u4e91\u540c\u6b65\u548c\u7cfb\u7edf\u79ef\u5206\u6a21\u578b\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
+}
+
+async function resolveStoredCloudAccessToken(forceRefresh = false): Promise<string | null> {
+  const token = forceRefresh
+    ? await refreshPreferredKkApiAccessToken()
+    : await getPreferredKkApiAccessToken();
+
+  return String(token || '').trim() || null;
 }
 
 async function readCloudSession(feature: string) {
@@ -386,8 +418,17 @@ async function resolveCloudSession(
   feature: string,
   options: ResolveCloudSessionOptions = {},
 ): Promise<CloudSessionResolution> {
-  const session = await readCloudSession(feature);
   const shouldForceRefresh = options.forceRefresh === true;
+  const routeKind = options.routeKind || 'system';
+  let session: Awaited<ReturnType<typeof readCloudSession>> | null = null;
+  let sessionReadError: unknown = null;
+
+  try {
+    session = await readCloudSession(feature);
+  } catch (error) {
+    sessionReadError = error;
+    console.warn('[secureModelProxy] Failed to read current cloud session, falling back to token recovery:', error);
+  }
 
   if (!shouldForceRefresh && hasUsableCloudSession(session)) {
     return {
@@ -396,7 +437,18 @@ async function resolveCloudSession(
   }
 
   const resolvedSession = await recoverCloudSession(feature);
-  if (!resolvedSession?.accessToken && !shouldForceRefresh && session?.access_token) {
+  if (resolvedSession?.accessToken) {
+    return resolvedSession;
+  }
+
+  const storedAccessToken = await resolveStoredCloudAccessToken(shouldForceRefresh);
+  if (storedAccessToken) {
+    return {
+      accessToken: storedAccessToken,
+    };
+  }
+
+  if (!shouldForceRefresh && session?.access_token) {
     return {
       accessToken: session.access_token,
     };
@@ -404,11 +456,14 @@ async function resolveCloudSession(
 
   if (!resolvedSession?.accessToken) {
     // secure-model-proxy is backed by Supabase auth and must never use the
-    // legacy compatibility token from the web API login flow. If we fail to
-    // recover a valid cloud session here, surface a reauth error without
+    // stale in-memory browser session object alone. If we fail to recover a
+    // valid access token here, surface a reauth error without
     // force-clearing the browser's local session cache.
-    await invalidateCloudSession(`Unable to recover Supabase session for ${feature}`);
-    throw buildCloudSessionError(feature);
+    const reason = sessionReadError instanceof Error
+      ? `Unable to recover Supabase session for ${feature}: ${sessionReadError.message}`
+      : `Unable to recover Supabase session for ${feature}`;
+    await invalidateCloudSession(reason);
+    throw buildCloudSessionError(feature, routeKind);
   }
 
   return resolvedSession;
@@ -464,7 +519,7 @@ async function buildInvocationError(
     // It can also happen when the Edge Function deployment/config drifts from the
     // frontend auth project. Keep the local session intact here so users see a
     // recoverable auth error instead of being force-signed-out mid-generation.
-    return buildSessionReauthError(feature, responseBody);
+    return buildSessionReauthError(feature, responseBody, 'system');
   } else if (status === 403) {
     message = `System credit ${feature} is not available for the current account.`;
   } else if (responseBody) {
@@ -559,13 +614,13 @@ async function invokeSecureSystemProxy(
     }
   };
 
-  const session = await resolveCloudSession(feature);
+  const session = await resolveCloudSession(feature, { routeKind: 'system' });
   let result = await invokeWithToken(session.accessToken);
 
   if (result.response?.status === 401) {
     try {
       console.warn('[secureModelProxy] Proxy returned 401, forcing session refresh before retry');
-      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'system' });
       if (recoveredSession.accessToken) {
         result = await invokeWithToken(recoveredSession.accessToken);
       }
@@ -673,7 +728,7 @@ async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
-  const session = await resolveCloudSession(feature);
+  const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
 
   let result: LocalUserRouteProxyHttpResult;
   try {
@@ -699,7 +754,7 @@ async function invokeLocalUserRouteProxy(
   if (shouldRetryWithFreshSession) {
     try {
       console.warn('[secureModelProxy] User-route proxy returned 401/Invalid JWT, forcing session refresh before retry');
-      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'user-route' });
       if (recoveredSession.accessToken) {
         result = await invokeLocalUserRouteProxyHttp(recoveredSession.accessToken, body);
       }
@@ -725,7 +780,7 @@ async function invokeLocalUserRouteProxy(
       // Preserve the current local session for the same reason as the secure
       // system proxy path above: a backend-side auth mismatch should not kick
       // the user back to the login screen while their browser session still exists.
-      throw buildSessionReauthError(feature, result.responseBody);
+      throw buildSessionReauthError(feature, result.responseBody, 'user-route');
     }
 
     throw buildSecureProxyBoundaryError(errorMessage, {
@@ -760,13 +815,13 @@ async function invokeLocalSystemProxy(
     }
   };
 
-  const session = await resolveCloudSession(feature);
+  const session = await resolveCloudSession(feature, { routeKind: 'system' });
   let result = await invokeWithToken(session.accessToken);
 
   if (result.response?.status === 401 || isInvalidJwtResponse(result.responseBody, result.payload)) {
     try {
       console.warn('[secureModelProxy] Local system proxy returned 401/Invalid JWT, forcing session refresh before retry');
-      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true });
+      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'system' });
       if (recoveredSession.accessToken) {
         result = await invokeWithToken(recoveredSession.accessToken);
       }
@@ -789,7 +844,7 @@ async function invokeLocalSystemProxy(
       || isInvalidJwtResponse(result.responseBody, result.payload)
     ) {
       await invalidateCloudSession(`local-system-proxy returned 401 during ${feature}`);
-      throw buildSessionReauthError(feature, result.responseBody);
+      throw buildSessionReauthError(feature, result.responseBody, 'system');
     }
 
     throw buildSecureProxyBoundaryError(errorMessage, {

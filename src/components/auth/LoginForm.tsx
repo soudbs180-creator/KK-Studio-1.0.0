@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowRight, Loader2, Lock, Mail, Shield } from 'lucide-react';
 
-import { supabase } from '../../lib/supabase';
 import { notify } from '../../services/system/notificationService';
+import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { useLocale } from '../../context/LocaleContext';
 import { TurnstileWidget, useTurnstile } from './TurnstileWidget';
 
@@ -58,10 +58,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await signInWithPasswordWithFallback({
         email: formData.email,
         password: formData.password,
-        ...(turnstileToken ? { options: { captchaToken: turnstileToken } } : {}),
+        ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
       });
 
       if (!error) {

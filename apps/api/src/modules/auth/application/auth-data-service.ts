@@ -3,6 +3,7 @@ import {
   type ApiResponse,
   type KeyManagerCloudStateDto,
   type ReplaceKeyManagerCloudStateRequestDto,
+  type ReplaceUserApisPayloadRequestDto,
   type SecureProxyUserRouteConfigDto,
   type ReplaceUserApiEntriesRequestDto,
   type TempUserSessionDto,
@@ -41,6 +42,18 @@ function getPayloadDensity(raw: unknown): number {
   return normalized.slots.length + normalized.providers.length + normalized.entries.length;
 }
 
+function clonePayloadSnapshot<T>(value: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+
+  if (typeof value === "undefined") {
+    return value;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export interface AuthDataServiceOptions {
   cloudMirror?: UserScopedAuthDataMirror;
 }
@@ -57,6 +70,64 @@ export class AuthDataService {
   constructor(repository: AuthDataRepository, options: AuthDataServiceOptions = {}) {
     this.repository = repository;
     this.cloudMirror = options.cloudMirror;
+  }
+
+  private shouldMirrorToCloud(accessToken?: string): boolean {
+    return Boolean(this.cloudMirror && accessToken);
+  }
+
+  private async captureRollbackPayload(
+    userId: string,
+    email: string | undefined,
+    accessToken?: string,
+  ): Promise<unknown | undefined> {
+    if (!this.shouldMirrorToCloud(accessToken)) {
+      return undefined;
+    }
+
+    return clonePayloadSnapshot(
+      normalizeUserApisPayload(await this.repository.getUserApisPayload(userId, email)),
+    );
+  }
+
+  private async rollbackLocalUserApisPayload(
+    userId: string,
+    email: string | undefined,
+    snapshot: unknown | undefined,
+  ): Promise<boolean> {
+    if (typeof snapshot === "undefined") {
+      return true;
+    }
+
+    try {
+      await this.repository.replaceUserApisPayload(userId, email, clonePayloadSnapshot(snapshot));
+      return true;
+    } catch (error) {
+      this.logger.error("Failed to roll back local user API payload after a cloud mirror failure.", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  private buildCloudMirrorFailureResponse<T>(
+    requestId: string,
+    clientVersion: string | undefined,
+    message: string,
+    rollbackSucceeded: boolean,
+  ): ApiResponse<T> {
+    return {
+      success: false,
+      error: {
+        code: "CLOUD_MIRROR_FAILED",
+        message: rollbackSucceeded
+          ? `${message} Local changes were rolled back.`
+          : `${message} Local rollback also failed; manual reconciliation is required.`,
+        details: [{ rollbackSucceeded }],
+      },
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
   }
 
   async listUserApiEntries(
@@ -83,8 +154,24 @@ export class AuthDataService {
     clientVersion?: string,
     accessToken?: string,
   ): Promise<ApiResponse<UserApiEntryListDto>> {
+    const rollbackPayload = await this.captureRollbackPayload(userId, email, accessToken);
     const entries = await this.repository.replaceUserApiEntries(userId, email, input.entries);
-    await this.pushLocalUserApisPayloadToCloud(userId, email, accessToken);
+    try {
+      await this.pushLocalUserApisPayloadToCloud(userId, email, accessToken);
+    } catch (error) {
+      const rollbackSucceeded = await this.rollbackLocalUserApisPayload(userId, email, rollbackPayload);
+      this.logger.warn("Failed to persist user API entries to the cloud mirror.", {
+        userId,
+        rollbackSucceeded,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.buildCloudMirrorFailureResponse(
+        requestId,
+        clientVersion,
+        "Failed to persist user API entries to the cloud mirror.",
+        rollbackSucceeded,
+      );
+    }
     this.logger.info("User API entries replaced via migrated auth module", {
       userId,
       entryCount: entries.length,
@@ -93,6 +180,53 @@ export class AuthDataService {
     return {
       success: true,
       data: { entries },
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async replaceUserApisPayload(
+    userId: string,
+    email: string | undefined,
+    input: ReplaceUserApisPayloadRequestDto,
+    requestId: string,
+    clientVersion?: string,
+    accessToken?: string,
+  ): Promise<ApiResponse<KeyManagerCloudStateDto>> {
+    const rollbackPayload = await this.captureRollbackPayload(userId, email, accessToken);
+    await this.repository.replaceUserApisPayload(userId, email, {
+      version: input.version,
+      slots: input.slots,
+      providers: input.providers,
+      entries: input.entries,
+    });
+    try {
+      await this.pushLocalUserApisPayloadToCloud(userId, email, accessToken);
+    } catch (error) {
+      const rollbackSucceeded = await this.rollbackLocalUserApisPayload(userId, email, rollbackPayload);
+      this.logger.warn("Failed to persist user API payload to the cloud mirror.", {
+        userId,
+        rollbackSucceeded,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.buildCloudMirrorFailureResponse(
+        requestId,
+        clientVersion,
+        "Failed to persist user API payload to the cloud mirror.",
+        rollbackSucceeded,
+      );
+    }
+
+    const state = await this.repository.getKeyManagerCloudState(userId, email);
+    this.logger.info("User API payload replaced via unified auth module route", {
+      userId,
+      slotCount: state.slots.length,
+      providerCount: state.providers.length,
+      entryCount: state.entries.length,
+    });
+
+    return {
+      success: true,
+      data: state,
       meta: buildRequestMeta(requestId, clientVersion),
     };
   }
@@ -131,8 +265,24 @@ export class AuthDataService {
     clientVersion?: string,
     accessToken?: string,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>> {
+    const rollbackPayload = await this.captureRollbackPayload(userId, email, accessToken);
     const state = await this.repository.replaceKeyManagerCloudState(userId, email, input);
-    await this.pushLocalUserApisPayloadToCloud(userId, email, accessToken);
+    try {
+      await this.pushLocalUserApisPayloadToCloud(userId, email, accessToken);
+    } catch (error) {
+      const rollbackSucceeded = await this.rollbackLocalUserApisPayload(userId, email, rollbackPayload);
+      this.logger.warn("Failed to persist key-manager cloud state to the cloud mirror.", {
+        userId,
+        rollbackSucceeded,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.buildCloudMirrorFailureResponse(
+        requestId,
+        clientVersion,
+        "Failed to persist key-manager state to the cloud mirror.",
+        rollbackSucceeded,
+      );
+    }
     this.logger.info("Key manager cloud state replaced via migrated auth module", {
       userId,
       slotCount: state.slots.length,
@@ -181,7 +331,17 @@ export class AuthDataService {
           return;
         }
 
-        if (localDensity > 0 && !arePayloadsEquivalent(cloudPayload, localPayload)) {
+        if (cloudDensity === 0 && localDensity > 0) {
+          await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+          return;
+        }
+
+        if (localDensity > 0 && cloudDensity > 0 && !arePayloadsEquivalent(cloudPayload, localPayload)) {
+          if (cloudDensity > localDensity) {
+            await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
+            return;
+          }
+
           await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
         }
       } catch (error) {
@@ -208,16 +368,9 @@ export class AuthDataService {
       return;
     }
 
-    try {
-      const localPayload = await this.repository.getUserApisPayload(userId, email);
-      await this.cloudMirror.saveUserApisPayload(accessToken, userId, email, localPayload);
-      this.reconcileCompletedAt.set(userId, Date.now());
-    } catch (error) {
-      this.logger.warn("Failed to mirror local auth data to the user-scoped Supabase profile.", {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const localPayload = await this.repository.getUserApisPayload(userId, email);
+    await this.cloudMirror.saveUserApisPayload(accessToken, userId, email, localPayload);
+    this.reconcileCompletedAt.set(userId, Date.now());
   }
 
   async createTempUser(

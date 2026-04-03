@@ -31,6 +31,7 @@ import { resolveKkApiBaseUrl } from '../api/kkApiClient';
 import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import { resolveProviderIdentity } from '../../utils/providerDisplay';
 import { getModelPricing } from '../model/modelPricing';
+import { isSystemModelRoute } from '../model/modelRoute';
 
 export class LLMService {
     private static instance: LLMService;
@@ -559,8 +560,7 @@ export class LLMService {
     }
 
     public resolveKey(modelId: string, preferredKeyId?: string): KeySlot | null {
-        const lowerModelId = modelId.toLowerCase();
-        const isSystemRoute = lowerModelId.includes('@system');
+        const isSystemRoute = isSystemModelRoute(modelId);
 
         if (isSystemRoute) {
             // For system credit models, return a virtual slot

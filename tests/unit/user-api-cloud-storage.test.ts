@@ -21,6 +21,7 @@ const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
@@ -179,6 +180,7 @@ function mockApiState(initialPayload: unknown) {
   mockAuthenticatedUser();
 
   let currentPayload = normalizeEnvelope(initialPayload);
+  const unifiedReplaceCalls: Array<Record<string, unknown>> = [];
   const keyManagerReplaceCalls: Array<Record<string, unknown>> = [];
   const userApiReplaceCalls: Array<Record<string, unknown>> = [];
 
@@ -193,6 +195,21 @@ function mockApiState(initialPayload: unknown) {
       entries: sanitizeEnvelopeForApi(currentPayload).entries,
     },
   });
+
+  legacyWebApiClient.replaceUserApisPayload = async (input) => {
+    unifiedReplaceCalls.push(input as Record<string, unknown>);
+    currentPayload = {
+      version: Number(input.version || currentPayload.version || 2),
+      slots: mergeRecordArray(currentPayload.slots, toArray(input.slots).filter(isRecord), 'key'),
+      providers: mergeRecordArray(currentPayload.providers, toArray(input.providers).filter(isRecord), 'apiKey'),
+      entries: mergeRecordArray(currentPayload.entries, toArray(input.entries).filter(isRecord), 'key'),
+    };
+
+    return {
+      success: true,
+      data: sanitizeEnvelopeForApi(currentPayload),
+    };
+  };
 
   legacyWebApiClient.replaceKeyManagerCloudState = async (input) => {
     keyManagerReplaceCalls.push(input as Record<string, unknown>);
@@ -226,6 +243,7 @@ function mockApiState(initialPayload: unknown) {
 
   return {
     getCurrentPayload: () => normalizeEnvelope(currentPayload),
+    unifiedReplaceCalls,
     keyManagerReplaceCalls,
     userApiReplaceCalls,
   };
@@ -236,6 +254,7 @@ afterEach(() => {
   supabase.auth.getUser = originalGetUser;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
   legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
   if (typeof originalKkApiBaseUrl === 'string') {
@@ -499,7 +518,7 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
-  test('saves the merged user API payload through typed auth APIs and preserves persisted secrets', async () => {
+  test('saves the merged user API payload through the unified typed auth API and preserves persisted secrets', async () => {
     const api = mockApiState({
       version: 2,
       slots: [
@@ -541,8 +560,9 @@ describe('user api cloud storage helpers', () => {
       ],
     }) as MutableEnvelope;
 
-    assert.equal(api.keyManagerReplaceCalls.length, 1);
-    assert.equal(api.userApiReplaceCalls.length, 1);
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
+    assert.equal(api.userApiReplaceCalls.length, 0);
 
     const savedPayload = api.getCurrentPayload();
     assert.equal(savedPayload.slots[0].key, 'server-slot-secret');
@@ -554,7 +574,64 @@ describe('user api cloud storage helpers', () => {
     assert.equal(payload.entries[0].key, buildRedactedSecret('entry-1', 'key'));
   });
 
-  test('creates an official endpoint through the typed key-manager cloud API', async () => {
+  test('falls back to split typed auth endpoints when the unified payload write route is unavailable', async () => {
+    const api = mockApiState({
+      version: 2,
+      slots: [
+        {
+          id: 'slot-1',
+          key: 'server-slot-secret',
+          provider: 'Google',
+          type: 'official',
+          format: 'gemini',
+        },
+      ],
+      providers: [],
+      entries: [
+        createEntry('entry-1', {
+          key: 'server-entry-secret',
+        }),
+      ],
+    });
+
+    legacyWebApiClient.replaceUserApisPayload = async () => ({
+      success: false,
+      error: {
+        code: 'HTTP_404',
+        message: 'route not found',
+      },
+    });
+
+    const payload = await saveUserApisPayloadToCloudRecord({
+      version: 2,
+      slots: [
+        {
+          id: 'slot-1',
+          key: 'sk-readonly-0000',
+          provider: 'Google',
+          type: 'official',
+          format: 'gemini',
+          disabled: true,
+        },
+      ],
+      providers: [],
+      entries: [
+        {
+          ...createEntry('entry-1'),
+          key: 'sk-readonly-0000',
+          status: 'valid',
+        },
+      ],
+    }) as MutableEnvelope;
+
+    assert.equal(api.unifiedReplaceCalls.length, 0);
+    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.userApiReplaceCalls.length, 1);
+    assert.equal(payload.slots[0].key, buildRedactedSecret('slot-1', 'key'));
+    assert.equal(payload.entries[0].key, buildRedactedSecret('entry-1', 'key'));
+  });
+
+  test('creates an official endpoint through the unified typed auth payload API', async () => {
     const api = mockApiState({
       version: 2,
       slots: [],
@@ -573,7 +650,8 @@ describe('user api cloud storage helpers', () => {
       disabled: false,
     }) as MutableEnvelope;
 
-    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
     assert.equal(api.userApiReplaceCalls.length, 0);
 
     const savedSlot = api.getCurrentPayload().slots[0];
@@ -619,7 +697,7 @@ describe('user api cloud storage helpers', () => {
     assert.equal(savedSlot.disabled, true);
   });
 
-  test('removes an official endpoint through the typed key-manager cloud API', async () => {
+  test('removes an official endpoint through the unified typed auth payload API', async () => {
     const api = mockApiState({
       version: 2,
       slots: [
@@ -632,7 +710,8 @@ describe('user api cloud storage helpers', () => {
 
     const payload = await removeUserApiSlotFromCloudRecord('slot-1') as MutableEnvelope;
 
-    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
     assert.equal(api.userApiReplaceCalls.length, 0);
     assert.deepEqual(payload.slots.map((slot) => slot.id), ['slot-2']);
     assert.deepEqual(
@@ -641,7 +720,7 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
-  test('creates a provider through the typed key-manager cloud API', async () => {
+  test('creates a provider through the unified typed auth payload API', async () => {
     const api = mockApiState({
       version: 2,
       slots: [],
@@ -658,7 +737,8 @@ describe('user api cloud storage helpers', () => {
       isActive: true,
     }) as MutableEnvelope;
 
-    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
     assert.equal(api.userApiReplaceCalls.length, 0);
 
     const savedProvider = api.getCurrentPayload().providers[0];
@@ -724,7 +804,7 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
-  test('removes a provider through the typed key-manager cloud API', async () => {
+  test('removes a provider through the unified typed auth payload API', async () => {
     const api = mockApiState({
       version: 2,
       slots: [],
@@ -737,7 +817,8 @@ describe('user api cloud storage helpers', () => {
 
     const payload = await removeUserApiProviderFromCloudRecord('provider-1') as MutableEnvelope;
 
-    assert.equal(api.keyManagerReplaceCalls.length, 1);
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
     assert.equal(api.userApiReplaceCalls.length, 0);
     assert.deepEqual(payload.providers.map((provider) => provider.id), ['provider-2']);
     assert.deepEqual(

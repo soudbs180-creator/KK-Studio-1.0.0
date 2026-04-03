@@ -13,6 +13,7 @@ const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
+const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
@@ -77,6 +78,7 @@ afterEach(() => {
   supabase.auth.getUser = originalGetUser;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
+  legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
   legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
 
@@ -183,7 +185,7 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
 
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
-  let replaceUserApiCalls = 0;
+  let replaceUserApiPayloadCalls = 0;
   let persistedEntries: Array<Record<string, unknown>> = [];
 
   legacyWebApiClient.getKeyManagerCloudState = async () => {
@@ -210,8 +212,11 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
   legacyWebApiClient.replaceKeyManagerCloudState = async () => {
     throw new Error('key-manager state should not be rewritten when only entries change');
   };
-  legacyWebApiClient.replaceUserApiEntries = async (input) => {
-    replaceUserApiCalls += 1;
+  legacyWebApiClient.replaceUserApiEntries = async () => {
+    throw new Error('split entry writes should stay unused when the unified payload route is available');
+  };
+  legacyWebApiClient.replaceUserApisPayload = async (input) => {
+    replaceUserApiPayloadCalls += 1;
     persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
       ...entry,
       key: `__kk_redacted__:key:${String(entry.id || '')}`,
@@ -220,6 +225,9 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
     return {
       success: true,
       data: {
+        version: Number(input.version || 2),
+        slots: input.slots || [],
+        providers: input.providers || [],
         entries: persistedEntries,
       },
     };
@@ -227,9 +235,9 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
 
   await saveUserApiEntries([createEntry('entry-2')]);
 
-  assert.equal(keyManagerCalls, 2);
-  assert.equal(getUserApiCalls, 2);
-  assert.equal(replaceUserApiCalls, 1);
+  assert.equal(keyManagerCalls, 1);
+  assert.equal(getUserApiCalls, 1);
+  assert.equal(replaceUserApiPayloadCalls, 1);
   assert.deepEqual(
     persistedEntries.map((entry) => ({
       id: entry.id,
@@ -254,7 +262,7 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
 
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
-  let replaceUserApiCalls = 0;
+  let replaceUserApiPayloadCalls = 0;
 
   legacyWebApiClient.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
@@ -281,7 +289,10 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
     throw new Error('key-manager state should stay unchanged when only entry rows change');
   };
   legacyWebApiClient.replaceUserApiEntries = async () => {
-    replaceUserApiCalls += 1;
+    throw new Error('split entry writes should stay unused when the unified payload route fails');
+  };
+  legacyWebApiClient.replaceUserApisPayload = async () => {
+    replaceUserApiPayloadCalls += 1;
     return {
       success: false,
       error: {
@@ -297,7 +308,7 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
 
   assert.equal(keyManagerCalls, 1);
   assert.equal(getUserApiCalls, 1);
-  assert.equal(replaceUserApiCalls, 1);
+  assert.equal(replaceUserApiPayloadCalls, 1);
 });
 
 test('loadUserApiEntries keeps canonical cloud fields when the local compatibility copy has the same revision', async () => {

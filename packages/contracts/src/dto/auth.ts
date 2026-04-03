@@ -67,6 +67,13 @@ export interface ReplaceUserApiEntriesRequestDto {
   entries: UserApiEntryDto[];
 }
 
+export interface ReplaceUserApisPayloadRequestDto {
+  version?: number;
+  slots: KeyManagerCloudRecordDto[];
+  providers: KeyManagerCloudRecordDto[];
+  entries: UserApiEntryDto[];
+}
+
 export interface KeyManagerCloudRecordDto {
   [key: string]: unknown;
 }

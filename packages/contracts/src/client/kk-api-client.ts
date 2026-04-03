@@ -17,6 +17,7 @@ import type {
   LoginResponseDto,
   ProfileDto,
   ReplaceKeyManagerCloudStateRequestDto,
+  ReplaceUserApisPayloadRequestDto,
   RegisterRequestDto,
   RegisterResponseDto,
   ReplaceUserApiEntriesRequestDto,
@@ -127,6 +128,10 @@ export interface KkApiClient {
     input: ReplaceUserApiEntriesRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserApiEntryListDto>>;
+  replaceUserApisPayload(
+    input: ReplaceUserApisPayloadRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
   getKeyManagerCloudState(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
@@ -605,6 +610,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<UserApiEntryListDto>(
         config,
         "api/v1/profile/user-apis",
+        {
+          method: "PUT",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    replaceUserApisPayload(input, options) {
+      return requestJson<KeyManagerCloudStateDto>(
+        config,
+        "api/v1/profile/user-apis/payload",
         {
           method: "PUT",
           body: JSON.stringify(input),

@@ -20,6 +20,8 @@ const trackedEnvKeys = [
   "SUPABASE_SECRET_KEY",
   "VITE_SUPABASE_ANON_KEY",
   "SUPABASE_ANON_KEY",
+  "USER_API_ENCRYPTION_SECRET",
+  "PROFILE_USER_APIS_ENCRYPTION_SECRET",
 ];
 
 const originalEnv = new Map(trackedEnvKeys.map((key) => [key, process.env[key]]));
@@ -43,6 +45,8 @@ describe("api server persistence guards", () => {
   process.env.SUPABASE_ANON_KEY = "anon";
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   delete process.env.SUPABASE_SECRET_KEY;
+  delete process.env.USER_API_ENCRYPTION_SECRET;
+  delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
   const server = createApiServer(0, {
     allowDegradedPersistence: false,
@@ -91,6 +95,7 @@ describe("api server persistence guards", () => {
     assert.equal(payload.data.config.canonicalPersistenceReady, false);
     assert.equal(payload.data.config.projectRefMatches, true);
     assert.equal(payload.data.runtime.allowDegradedPersistence, false);
+    assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
     assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
     assert.equal(payload.data.runtime.criticalPersistence.workspaceLayout.ready, false);
     assert.match(
@@ -121,6 +126,25 @@ describe("api server persistence guards", () => {
     const layoutPayload = await layoutResponse.json();
     assert.equal(layoutPayload.success, false);
     assert.equal(layoutPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
+
+    const authDataResponse = await fetch(`${baseUrl}/api/v1/profile/user-apis/payload`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer guard-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-guard-auth-data",
+      },
+      body: JSON.stringify({
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      }),
+    });
+    assert.equal(authDataResponse.status, 503);
+    const authDataPayload = await authDataResponse.json();
+    assert.equal(authDataPayload.success, false);
+    assert.equal(authDataPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
   });
 });
 
@@ -131,6 +155,8 @@ describe("api server live Supabase probe guards", () => {
   process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
   process.env.SUPABASE_ANON_KEY = "anon";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_invalid_probe";
+  process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
+  delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
   const invalidProbe: ServerSupabasePersistenceProbe = {
     checkedAt: "2026-04-01T00:00:00.000Z",
@@ -193,6 +219,7 @@ describe("api server live Supabase probe guards", () => {
     assert.equal(payload.data.config.hasServiceRoleKey, true);
     assert.equal(payload.data.config.hasValidServiceRoleKey, false);
     assert.equal(payload.data.config.canonicalPersistenceReady, false);
+    assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
     assert.match(payload.data.runtime.blockers.join(","), /SUPABASE_SERVICE_ROLE_KEY_INVALID/);
   });
 
@@ -207,5 +234,16 @@ describe("api server live Supabase probe guards", () => {
     const tempUserPayload = await tempUserResponse.json();
     assert.equal(tempUserPayload.success, false);
     assert.equal(tempUserPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
+
+    const authDataResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      headers: {
+        authorization: "Bearer guard-user-token",
+        "x-request-id": "req-guard-invalid-auth-data",
+      },
+    });
+    assert.equal(authDataResponse.status, 503);
+    const authDataPayload = await authDataResponse.json();
+    assert.equal(authDataPayload.success, false);
+    assert.equal(authDataPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
   });
 });

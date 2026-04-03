@@ -19,6 +19,7 @@ import { keyManager, getModelMetadata } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { getModelCapabilities } from './services/model/modelCapabilities';
+import { isSystemModelRoute } from './services/model/modelRoute';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
@@ -2985,7 +2986,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     let requiredCredits = 0;
     let perImageCreditCost = 0;
     let paymentTransactionId: string | undefined = undefined;
-    const useServerSideCreditSettlement = isCreditModel && config.model.toLowerCase().includes('@system');
+    const useServerSideCreditSettlement = isCreditModel && isSystemModelRoute(config.model);
     if (isCreditModel) {
       if (authLoading) {
         import('./services/system/notificationService').then(({ notify }) => {
@@ -3623,7 +3624,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       hasRetryCustomUserKey,
       executionNode.keySlotId,
     );
-    const retryUseServerSideCreditSettlement = retryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
+    const retryUseServerSideCreditSettlement = retryIsCreditModel && isSystemModelRoute(executionNode.model);
     const retryPerImageCreditCost = retryIsCreditModel
       ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
       : 0;
@@ -4312,7 +4313,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       hasPageRetryCustomUserKey,
       executionNode.keySlotId,
     );
-    const pageRetryUseServerSideCreditSettlement = pageRetryIsCreditModel && executionNode.model.toLowerCase().includes('@system');
+    const pageRetryUseServerSideCreditSettlement = pageRetryIsCreditModel && isSystemModelRoute(executionNode.model);
     const pageRetryPerImageCreditCost = pageRetryIsCreditModel
       ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
       : 0;

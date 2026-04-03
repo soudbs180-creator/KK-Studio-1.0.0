@@ -134,3 +134,16 @@ test("root frontend env files do not hydrate server-only API secrets", () => {
   assert.equal(process.env.SUPABASE_URL, "https://frontend-ref.supabase.co");
   assert.equal(process.env.SUPABASE_SERVICE_ROLE_KEY, undefined);
 });
+
+test("runtime env helper keeps Vite public vars on explicit import.meta.env keys", () => {
+  const runtimeEnvSource = fs.readFileSync(
+    path.join(ROOT_DIR, "src", "utils", "runtimeEnv.ts"),
+    "utf8",
+  );
+
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_URL/);
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_TURNSTILE_SITE_KEY/);
+  assert.doesNotMatch(runtimeEnvSource, /const meta = import\.meta/);
+  assert.doesNotMatch(runtimeEnvSource, /meta\.env;\s*$/m);
+});

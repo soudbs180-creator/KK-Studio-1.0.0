@@ -1,4 +1,4 @@
-import type { UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
+import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
 import { supabase } from '../../lib/supabase.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
 import {
@@ -65,6 +65,28 @@ function getApiFailureMessage(
   }
 
   return response.error?.message || undefined;
+}
+
+function isUnifiedUserApisPayloadEndpointUnavailable(
+  response: {
+    success: boolean;
+    error?: {
+      code?: string | null;
+      details?: unknown;
+    };
+  },
+): boolean {
+  if (response.success) {
+    return false;
+  }
+
+  const code = String(response.error?.code || '').trim().toUpperCase();
+  if (code === 'HTTP_404' || code === 'HTTP_405') {
+    return true;
+  }
+
+  const details = Array.isArray(response.error?.details) ? response.error?.details : [];
+  return details.some((detail) => isRecord(detail) && (detail.status === 404 || detail.status === 405));
 }
 
 function toArray(value: unknown): unknown[] {
@@ -534,6 +556,21 @@ async function persistUserApisPayloadViaApi(
   }
 
   invalidateCachedUserApisPayload(context.userId);
+
+  const unifiedResponse = await legacyWebApiClient.replaceUserApisPayload({
+    version: persistablePayload.version,
+    slots: persistablePayload.slots as JsonRecord[],
+    providers: persistablePayload.providers as JsonRecord[],
+    entries: normalizeUserApiEntryDtos(persistablePayload.entries),
+  });
+  if (unifiedResponse.success) {
+    const latestPayload = normalizeEnvelope(unifiedResponse.data as KeyManagerCloudStateDto);
+    return setCachedUserApisPayload(context.userId, latestPayload) ?? latestPayload;
+  }
+
+  if (!isUnifiedUserApisPayloadEndpointUnavailable(unifiedResponse)) {
+    throw new Error(unifiedResponse.error?.message || 'Failed to save user API payload.');
+  }
 
   if (slotsChanged) {
     const response = await legacyWebApiClient.replaceKeyManagerCloudState({

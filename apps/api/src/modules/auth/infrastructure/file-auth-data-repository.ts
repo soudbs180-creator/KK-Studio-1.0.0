@@ -132,7 +132,12 @@ export class FileBackedAuthDataRepository implements AuthDataRepository {
     payload: unknown,
   ): Promise<void> {
     const profile = await this.ensureProfile(userId, email);
-    profile.userApisPayload = payload;
+    profile.userApisPayload = mergeUserApisPayload(profile.userApisPayload, payload as {
+      version?: number;
+      slots?: unknown[];
+      providers?: unknown[];
+      entries?: unknown[];
+    });
     await this.saveProfile(profile);
   }
 
@@ -152,6 +157,7 @@ export class FileBackedAuthDataRepository implements AuthDataRepository {
   ): Promise<KeyManagerCloudStateDto> {
     const profile = await this.ensureProfile(userId, email);
     profile.userApisPayload = mergeUserApisPayload(profile.userApisPayload, {
+      version: state.version,
       slots: state.slots,
       providers: state.providers,
     });

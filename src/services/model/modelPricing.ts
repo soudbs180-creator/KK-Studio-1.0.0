@@ -5,6 +5,7 @@ import {
   parseModelVariantMeta,
 } from '../auth/keyManager';
 import { adminModelService } from './adminModelService';
+import { isSystemModelRouteSuffix } from './modelRoute';
 import { registerModelPricingOverrideHandler } from './modelPricingOverrideBridge';
 
 export type ModelPricing = {
@@ -516,7 +517,7 @@ export const isCreditBasedModel = (
   }
 
   const suffix = lowerId.includes('@') ? lowerId.split('@')[1] : '';
-  if (suffix.startsWith('system') || suffix === 'systemproxy') {
+  if (isSystemModelRouteSuffix(suffix)) {
     return adminModelService.isAdminModel(normalizedModelId);
   }
 

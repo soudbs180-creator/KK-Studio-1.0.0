@@ -604,9 +604,15 @@ describe("kk api client", () => {
     await client.replaceUserApiEntries({
       entries: [],
     });
+    await client.replaceUserApisPayload({
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [],
+    });
     await client.createTempUser();
 
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 4);
     assert.equal(requests[0].url, "http://127.0.0.1:3001/api/v1/profile/user-apis");
     assert.equal(requests[0].method, "GET");
     assert.equal(requests[1].url, "http://127.0.0.1:3001/api/v1/profile/user-apis");
@@ -614,8 +620,16 @@ describe("kk api client", () => {
     assert.deepEqual(JSON.parse(requests[1].body || "{}"), {
       entries: [],
     });
-    assert.equal(requests[2].url, "http://127.0.0.1:3001/api/v1/auth/temp-users");
-    assert.equal(requests[2].method, "POST");
+    assert.equal(requests[2].url, "http://127.0.0.1:3001/api/v1/profile/user-apis/payload");
+    assert.equal(requests[2].method, "PUT");
+    assert.deepEqual(JSON.parse(requests[2].body || "{}"), {
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [],
+    });
+    assert.equal(requests[3].url, "http://127.0.0.1:3001/api/v1/auth/temp-users");
+    assert.equal(requests[3].method, "POST");
   });
 
   test("builds key-manager cloud-state requests with the expected paths", async () => {

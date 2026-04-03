@@ -90,6 +90,20 @@ test("server supabase config detects project ref mismatch and throws a readable 
   );
 });
 
+test("server supabase config requires an auth-data encryption secret for canonical persistence", () => {
+  resetEnv({
+    VITE_SUPABASE_URL: "https://aligned-ref.supabase.co",
+    SUPABASE_URL: "https://aligned-ref.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test_key",
+  });
+
+  const config = resolveServerSupabaseConfig();
+  assert.throws(
+    () => assertServerSupabaseConfigConsistency(config),
+    /USER_API_ENCRYPTION_SECRET is required/,
+  );
+});
+
 test("server supabase config marks canonical persistence unavailable when the live probe fails", () => {
   resetEnv({
     VITE_SUPABASE_URL: "https://aligned-ref.supabase.co",

@@ -232,6 +232,7 @@ export function sanitizeKeyManagerCloudStateForClient(raw: unknown): {
 export function mergeUserApisPayload(
   existingRaw: unknown,
   updates: {
+    version?: number;
     slots?: unknown[];
     providers?: unknown[];
     entries?: unknown[];
@@ -253,9 +254,13 @@ export function mergeUserApisPayload(
     updates.entries !== undefined
       ? mergeArrayRecordsById(existingEntries, updates.entries, SECRET_ARRAY_FIELDS.entries)
       : existingEntries;
+  const nextVersion =
+    typeof updates.version === "number" && Number.isFinite(updates.version)
+      ? updates.version
+      : extractUserApisPayloadVersion(existingRaw);
 
   return {
-    version: 2,
+    version: nextVersion,
     slots: nextSlots,
     providers: nextProviders,
     entries: nextEntries,

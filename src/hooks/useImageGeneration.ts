@@ -295,11 +295,11 @@ export const useImageGeneration = (options: {
 
   const getDisplayableGenerationError = useCallback((error: any) => {
     if (isSecureProxySessionReauthError(error)) {
-      return SECURE_PROXY_SESSION_REAUTH_MESSAGE;
+      return error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE;
     }
 
     if (isSecureProxyGuestModeError(error)) {
-      return SECURE_PROXY_GUEST_MODE_MESSAGE;
+      return error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
     }
 
     return error?.message || 'Unknown error';

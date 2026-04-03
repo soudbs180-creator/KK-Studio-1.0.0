@@ -80,7 +80,12 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
     payload: unknown,
   ): Promise<void> {
     const profile = this.ensureProfile(userId, email);
-    profile.userApisPayload = payload;
+    profile.userApisPayload = mergeUserApisPayload(profile.userApisPayload, payload as {
+      version?: number;
+      slots?: unknown[];
+      providers?: unknown[];
+      entries?: unknown[];
+    });
     this.profiles.set(userId, profile);
   }
 
@@ -100,6 +105,7 @@ export class InMemoryAuthDataRepository implements AuthDataRepository {
   ): Promise<KeyManagerCloudStateDto> {
     const profile = this.ensureProfile(userId, email);
     profile.userApisPayload = mergeUserApisPayload(profile.userApisPayload, {
+      version: state.version,
       slots: state.slots,
       providers: state.providers,
     });

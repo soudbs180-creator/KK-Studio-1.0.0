@@ -44,7 +44,7 @@ describe("file-backed auth data repository", () => {
       ]);
 
       await first.replaceKeyManagerCloudState("user-1", "user-1@example.com", {
-        version: 2,
+        version: 4,
         slots: [
           {
             id: "slot-1",
@@ -85,6 +85,7 @@ describe("file-backed auth data repository", () => {
       assert.match(String(entries[0].key || ""), /^__kk_redacted__:/);
 
       const state = await second.getKeyManagerCloudState("user-1", "user-1@example.com");
+      assert.equal(state.version, 4);
       assert.equal(state.slots.length, 1);
       assert.equal(state.providers.length, 1);
       assert.match(String((state.providers[0] as { apiKey?: unknown }).apiKey || ""), /^__kk_redacted__:/);

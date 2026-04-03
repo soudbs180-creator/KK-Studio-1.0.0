@@ -559,8 +559,45 @@ function nutrientDocumentProxyPlugin(): Plugin {
     };
 }
 
+function authPasswordProxyPlugin(): Plugin {
+    return {
+        name: 'auth-password-proxy',
+        configureServer(server) {
+            server.middlewares.use(async (req, res, next) => {
+                const requestPath = getRequestPath(req.url);
+                if (requestPath !== '/api/auth-password-login') {
+                    return next();
+                }
+
+                if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+                    return next();
+                }
+
+                const body = req.method === 'POST' ? await readIncomingBody(req) : undefined;
+                const requestOrigin = req.headers.host
+                    ? `http://${req.headers.host}`
+                    : 'http://localhost:3000';
+                const { default: authPasswordHandler } = await import('./api/auth-password-login.ts');
+
+                const response = await authPasswordHandler(new Request(`${requestOrigin}${req.url || '/api/auth-password-login'}`, {
+                    method: req.method,
+                    headers: createProxyRequestHeaders(req.headers),
+                    body,
+                }));
+
+                await writeFetchResponse(res, response);
+            });
+        },
+    };
+}
+
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    Object.entries(env).forEach(([key, value]) => {
+        if (!(key in process.env)) {
+            process.env[key] = value;
+        }
+    });
     return {
         server: {
             port: 3000,
@@ -589,7 +626,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), authPasswordProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

@@ -62,6 +62,7 @@ import {
   handleGetKeyManagerCloudState,
   handleGetProfile,
   handleGetUserApiEntries,
+  handleReplaceUserApisPayload,
   handleStartWechatBind,
   handleStartWechatLogin,
   handleWechatCallback,
@@ -203,6 +204,7 @@ const defaultTurnstileVerifier: TurnstileVerifier = async () => ({
 });
 
 type CriticalPersistenceCapability =
+  | "authData"
   | "guestSessions"
   | "workspaceLayout"
   | "billing"
@@ -240,6 +242,7 @@ function buildCriticalPersistenceState(
   configSummary: ReturnType<typeof summarizeServerSupabaseConfig>,
   repositoryBlockers: Record<string, string>,
   probeChecks: Array<ServerSupabaseProbeCheck | undefined> = [],
+  extraBlockers: string[] = [],
 ): CriticalPersistenceState {
   const probeBlockers = probeChecks
     .filter((check): check is ServerSupabaseProbeCheck => {
@@ -257,6 +260,7 @@ function buildCriticalPersistenceState(
       .map(([key]) => repositoryBlockers[key])
       .filter(Boolean),
     ...probeBlockers,
+    ...extraBlockers,
   ];
 
   return {
@@ -264,7 +268,8 @@ function buildCriticalPersistenceState(
     ready:
       configSummary.canonicalPersistenceReady
       && Object.values(repositories).every((repository) => repository === "supabase")
-      && probeBlockers.length === 0,
+      && probeBlockers.length === 0
+      && extraBlockers.length === 0,
     repositories,
     blockers: dedupeStrings(blockers),
   };
@@ -296,6 +301,14 @@ function buildServerConfigErrorResponse(
 function resolveCriticalPersistenceCapability(
   pathname: string,
 ): CriticalPersistenceCapability | undefined {
+  if (
+    pathname === "/api/v1/profile/user-apis"
+    || pathname === "/api/v1/profile/user-apis/payload"
+    || pathname === "/api/v1/profile/key-manager-state"
+  ) {
+    return "authData";
+  }
+
   if (pathname === "/api/v1/auth/temp-users") {
     return "guestSessions";
   }
@@ -523,6 +536,14 @@ function buildRuntimePersistenceState(
     persistenceProbe,
   });
   const criticalPersistence = {
+    authData: buildCriticalPersistenceState(
+      "Profile user API storage",
+      { authData: repositoryModes.authData },
+      configSummary,
+      { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
+      [persistenceProbe?.checks.authData],
+      configSummary.hasUserApiEncryptionSecret ? [] : ["USER_API_ENCRYPTION_SECRET_MISSING"],
+    ),
     guestSessions: buildCriticalPersistenceState(
       "Guest temp sessions",
       { authData: repositoryModes.authData },
@@ -764,44 +785,6 @@ function buildApiServer(
           criticalPersistence,
           runtimeBlockers,
         } = buildRuntimePersistenceState(serverSupabaseConfig, repositoryModes, persistenceProbe);
-        const authenticatedUser = await requestAuthenticator.authenticate(headers);
-        const tempUserId = String(resolveTempUserId(headers) || "").trim();
-        const tempUserSession = !authenticatedUser && tempUserId
-          ? await authDataService.resolveTempUserSession(tempUserId)
-          : null;
-        const effectiveAuthenticatedUser = authenticatedUser || (
-          tempUserSession
-            ? {
-              userId: tempUserSession.userId,
-              email: tempUserSession.email || undefined,
-              role: undefined,
-            }
-            : undefined
-        );
-        let requestHeaders = headers;
-        if (effectiveAuthenticatedUser) {
-          const access = await adminConsoleService.getAccess(
-            effectiveAuthenticatedUser.userId,
-            requestId,
-            clientVersion,
-            resolveAdminSessionToken(headers),
-          );
-          const authenticatedRole = access.success
-            ? access.data.role
-            : effectiveAuthenticatedUser.role;
-
-          requestHeaders = applyAuthenticatedHeaders(headers, {
-            ...effectiveAuthenticatedUser,
-            role: authenticatedRole,
-          });
-
-          if (access.success && access.data.adminSessionActive) {
-            requestHeaders[AUTHENTICATED_ADMIN_SESSION_HEADER] = "true";
-            if (access.data.adminSessionExpiresAt) {
-              requestHeaders[AUTHENTICATED_ADMIN_SESSION_EXPIRES_AT_HEADER] = access.data.adminSessionExpiresAt;
-            }
-          }
-        }
 
         if (pathname === "/healthz") {
           const overallStatus = Object.values(criticalPersistence).every((state) => state.ready)
@@ -821,6 +804,7 @@ function buildApiServer(
                 keyManager:
                   repositoryModes.authData === "supabase"
                   && configSummary.hasUserApiEncryptionSecret,
+                authData: criticalPersistence.authData.ready,
                 tempUsers: criticalPersistence.guestSessions.ready,
                 credits: criticalPersistence.billing.ready,
                 creditProviders: criticalPersistence.creditProviders.ready,
@@ -861,6 +845,45 @@ function buildApiServer(
                 ),
               );
               return;
+            }
+          }
+        }
+
+        const authenticatedUser = await requestAuthenticator.authenticate(headers);
+        const tempUserId = String(resolveTempUserId(headers) || "").trim();
+        const tempUserSession = !authenticatedUser && tempUserId
+          ? await authDataService.resolveTempUserSession(tempUserId)
+          : null;
+        const effectiveAuthenticatedUser = authenticatedUser || (
+          tempUserSession
+            ? {
+              userId: tempUserSession.userId,
+              email: tempUserSession.email || undefined,
+              role: undefined,
+            }
+            : undefined
+        );
+        let requestHeaders = headers;
+        if (effectiveAuthenticatedUser) {
+          const access = await adminConsoleService.getAccess(
+            effectiveAuthenticatedUser.userId,
+            requestId,
+            clientVersion,
+            resolveAdminSessionToken(headers),
+          );
+          const authenticatedRole = access.success
+            ? access.data.role
+            : effectiveAuthenticatedUser.role;
+
+          requestHeaders = applyAuthenticatedHeaders(headers, {
+            ...effectiveAuthenticatedUser,
+            role: authenticatedRole,
+          });
+
+          if (access.success && access.data.adminSessionActive) {
+            requestHeaders[AUTHENTICATED_ADMIN_SESSION_HEADER] = "true";
+            if (access.data.adminSessionExpiresAt) {
+              requestHeaders[AUTHENTICATED_ADMIN_SESSION_EXPIRES_AT_HEADER] = access.data.adminSessionExpiresAt;
             }
           }
         }
@@ -966,6 +989,13 @@ function buildApiServer(
         if (req.method === "PUT" && pathname === "/api/v1/profile/user-apis") {
           const body = await readJsonBody(req);
           const result = await handleReplaceUserApiEntries(authDataService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "PUT" && pathname === "/api/v1/profile/user-apis/payload") {
+          const body = await readJsonBody(req);
+          const result = await handleReplaceUserApisPayload(authDataService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
         }

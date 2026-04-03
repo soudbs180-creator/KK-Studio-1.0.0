@@ -28,6 +28,7 @@ import {
   listLinkedAuthProviders,
   startGoogleBind,
 } from '../../services/auth/identityLinking';
+import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { startWechatBind } from '../../services/auth/wechatAuth';
 import {
   enrollTotpFactor,
@@ -383,12 +384,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setMessage(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await signInWithPasswordWithFallback({
         email: user.email,
         password: oldPassword,
       });
       if (signInError) {
-        throw new Error('旧密码验证失败，请检查后重试。');
+        const lowerMessage = String(signInError.message || '').toLowerCase();
+        if (lowerMessage.includes('invalid login credentials')) {
+          throw new Error('旧密码验证失败，请检查后重试。');
+        }
+        throw signInError;
       }
 
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });

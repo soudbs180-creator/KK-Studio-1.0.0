@@ -113,7 +113,13 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
   ): Promise<void> {
     this.assertWritableEncryptionConfigured();
     const existing = await this.getOrCreateProfile(userId, email);
-    const encryptedPayload = this.encryptPayload(payload);
+    const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), payload as {
+      version?: number;
+      slots?: unknown[];
+      providers?: unknown[];
+      entries?: unknown[];
+    });
+    const encryptedPayload = this.encryptPayload(mergedPayload);
 
     const { error } = await this.client
       .from("profiles")
@@ -149,6 +155,7 @@ export class SupabaseAuthDataRepository implements AuthDataRepository {
     this.assertWritableEncryptionConfigured();
     const existing = await this.getOrCreateProfile(userId, email);
     const mergedPayload = mergeUserApisPayload(this.decryptPayload(existing?.user_apis), {
+      version: state.version,
       slots: state.slots,
       providers: state.providers,
     });
