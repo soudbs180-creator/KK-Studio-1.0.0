@@ -115,6 +115,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 test('user api settings keep working when local API persistence degrades to memory mode', () => {
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
+  const userApiCloudStorageShimSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = providerActionsDisabled;'));
@@ -134,7 +135,10 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(userApiCloudRecordStorageSource.includes('export async function removeUserApiSlotFromCloudRecord('));
   assert.ok(userApiCloudRecordStorageSource.includes('export async function upsertUserApiProviderToCloudRecord('));
   assert.ok(userApiCloudRecordStorageSource.includes('export async function removeUserApiProviderFromCloudRecord('));
-  assert.ok(userApiCloudRecordStorageSource.includes('export const saveUserApisPayloadViaSupabase = saveUserApisPayloadToCloudRecord;'));
+  assert.ok(userApiCloudRecordStorageSource.includes('export async function mergeUserApisPayloadToCloudRecord('));
+  assert.doesNotMatch(userApiCloudRecordStorageSource, /ViaSupabase/);
+  assert.ok(userApiCloudStorageShimSource.includes('loadUserApisPayloadMetadataFromCloudRecord as loadUserApisPayloadMetadataViaSupabase'));
+  assert.ok(userApiCloudStorageShimSource.includes('mergeUserApisPayloadToCloudRecord as mergeUserApisPayloadViaSupabase'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
   assert.ok(userApiCloudRecordStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));

@@ -419,7 +419,7 @@ async function getAuthenticatedProfileContext(
 ): Promise<AuthenticatedProfileContext | null> {
   const sessionResult = await supabase.auth.getSession();
   if (sessionResult.error) {
-    throw new Error(getErrorMessage(sessionResult.error, 'Failed to resolve Supabase user session.'));
+    throw new Error(getErrorMessage(sessionResult.error, 'Failed to resolve authenticated user session.'));
   }
 
   const sessionUser = sessionResult.data.session?.user;
@@ -431,7 +431,7 @@ async function getAuthenticatedProfileContext(
         return null;
       }
 
-      throw new Error(getErrorMessage(userResult.error, 'Failed to resolve Supabase user profile.'));
+      throw new Error(getErrorMessage(userResult.error, 'Failed to resolve authenticated user profile.'));
     }
 
     return userResult.data.user ?? null;
@@ -620,7 +620,7 @@ export async function saveUserApisPayloadToCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to save user API data.');
+    throw new Error('An authenticated session is required to save user API data.');
   }
 
   const payload = normalizeEnvelope(rawPayload);
@@ -633,7 +633,7 @@ export async function upsertUserApiSlotToCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to save official endpoint settings.');
+    throw new Error('An authenticated session is required to save official endpoint settings.');
   }
 
   const slotId = String(slotInput.id || '').trim();
@@ -674,7 +674,7 @@ export async function removeUserApiSlotFromCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to remove official endpoint settings.');
+    throw new Error('An authenticated session is required to remove official endpoint settings.');
   }
 
   const normalizedSlotId = String(slotId || '').trim();
@@ -699,7 +699,7 @@ export async function upsertUserApiProviderToCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to save provider settings.');
+    throw new Error('An authenticated session is required to save provider settings.');
   }
 
   const providerId = String(providerInput.id || '').trim();
@@ -740,7 +740,7 @@ export async function removeUserApiProviderFromCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to remove provider settings.');
+    throw new Error('An authenticated session is required to remove provider settings.');
   }
 
   const normalizedProviderId = String(providerId || '').trim();
@@ -769,7 +769,7 @@ export async function mergeUserApisPayloadToCloudRecord(
 ): Promise<unknown> {
   const context = await getAuthenticatedProfileContext(expectedUserId);
   if (!context) {
-    throw new Error('Authenticated Supabase session is required to save user API data.');
+    throw new Error('An authenticated session is required to save user API data.');
   }
 
   const existingPayload = await loadUserApisPayloadRaw(context.userId);
@@ -780,12 +780,3 @@ export async function mergeUserApisPayloadToCloudRecord(
     normalizeEnvelope(existingPayload),
   );
 }
-
-export const loadUserApisPayloadMetadataViaSupabase = loadUserApisPayloadMetadataFromCloudRecord;
-export const loadUserApisPayloadViaSupabase = loadUserApisPayloadFromCloudRecord;
-export const saveUserApisPayloadViaSupabase = saveUserApisPayloadToCloudRecord;
-export const upsertUserApiSlotViaSupabase = upsertUserApiSlotToCloudRecord;
-export const removeUserApiSlotViaSupabase = removeUserApiSlotFromCloudRecord;
-export const upsertUserApiProviderViaSupabase = upsertUserApiProviderToCloudRecord;
-export const removeUserApiProviderViaSupabase = removeUserApiProviderFromCloudRecord;
-export const mergeUserApisPayloadViaSupabase = mergeUserApisPayloadToCloudRecord;

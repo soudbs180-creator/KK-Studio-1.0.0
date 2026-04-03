@@ -251,5 +251,3 @@ export async function isKkApiBillingPersistedInCloud(): Promise<boolean> {
   const health = await getKkApiServerHealth();
   return health.reachable && health.verified && health.repositories.creditAccounts === 'supabase' && health.persistence.credits;
 }
-
-export const isKkApiBillingPersistedViaSupabase = isKkApiBillingPersistedInCloud;

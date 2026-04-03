@@ -1,8 +1,9 @@
 /**
  * Compatibility facade for legacy user API key consumers.
  *
- * Canonical storage now lives in `profiles.user_apis`, so this service keeps
- * the old shape while delegating all mutations to the profile-backed storage.
+ * Canonical storage now lives behind the authenticated cloud-record API
+ * surface, so this service keeps the old shape while delegating mutations to
+ * the shared runtime storage layer.
  */
 
 import {

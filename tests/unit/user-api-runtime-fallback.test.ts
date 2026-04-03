@@ -16,6 +16,7 @@ const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 const locationLike = globalThis as { location?: { origin?: string } };
 const originalLocation = locationLike.location;
 
@@ -83,6 +84,12 @@ afterEach(() => {
     process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
   } else {
     delete process.env.VITE_KK_API_BASE_URL;
+  }
+
+  if (typeof originalLegacyFallback === 'string') {
+    process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+  } else {
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
   }
 
   locationLike.location = originalLocation;
@@ -234,5 +241,134 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
         key: '__kk_redacted__:key:entry-2',
       },
     ],
+  );
+});
+
+test('saveUserApiEntries does not report success or seed the compatibility bridge when the cloud write fails', async () => {
+  process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
+  process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+  locationLike.location = {
+    origin: 'http://localhost:5173',
+  };
+  mockAuthenticatedUser();
+
+  let keyManagerCalls = 0;
+  let getUserApiCalls = 0;
+  let replaceUserApiCalls = 0;
+
+  legacyWebApiClient.getKeyManagerCloudState = async () => {
+    keyManagerCalls += 1;
+    return {
+      success: true,
+      data: {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      },
+    };
+  };
+  legacyWebApiClient.getUserApiEntries = async () => {
+    getUserApiCalls += 1;
+    return {
+      success: true,
+      data: {
+        entries: [],
+      },
+    };
+  };
+  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+    throw new Error('key-manager state should stay unchanged when only entry rows change');
+  };
+  legacyWebApiClient.replaceUserApiEntries = async () => {
+    replaceUserApiCalls += 1;
+    return {
+      success: false,
+      error: {
+        message: 'cloud write failed',
+      },
+    };
+  };
+
+  await assert.rejects(
+    () => saveUserApiEntries([createEntry('entry-fail')]),
+    /cloud write failed/,
+  );
+
+  assert.equal(keyManagerCalls, 1);
+  assert.equal(getUserApiCalls, 1);
+  assert.equal(replaceUserApiCalls, 1);
+});
+
+test('loadUserApiEntries keeps canonical cloud fields when the local compatibility copy has the same revision', async () => {
+  process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
+  process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+  locationLike.location = {
+    origin: 'http://localhost:5173',
+  };
+  mockAuthenticatedUser();
+
+  let userApiReads = 0;
+  const replacePayloads: Array<Array<Record<string, unknown>>> = [];
+
+  legacyWebApiClient.getKeyManagerCloudState = async () => ({
+    success: true,
+    data: {
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [],
+    },
+  });
+  legacyWebApiClient.getUserApiEntries = async () => {
+    userApiReads += 1;
+    return {
+      success: true,
+      data: {
+        entries: [
+          userApiReads === 1
+            ? {
+                ...createEntry('entry-3'),
+                name: 'Cloud Entry',
+                key: '__kk_redacted__:key:entry-3',
+              }
+            : {
+                ...createEntry('entry-3'),
+                name: 'Local Entry',
+                key: 'sk-local-entry-3',
+              },
+        ],
+      },
+    };
+  };
+  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+    throw new Error('key-manager state should stay unchanged when only entry rows differ');
+  };
+  legacyWebApiClient.replaceUserApiEntries = async (input) => {
+    replacePayloads.push(
+      (input.entries as Array<Record<string, unknown>>).map((entry) => ({ ...entry })),
+    );
+    return {
+      success: true,
+      data: {
+        entries: input.entries,
+      },
+    };
+  };
+
+  const entries = await loadUserApiEntries();
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].name, 'Cloud Entry');
+  assert.equal(entries[0].key, 'sk-local-entry-3');
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(
+    replacePayloads.some(
+      (payload) => payload.length === 1
+        && payload[0].name === 'Cloud Entry'
+        && payload[0].key === 'sk-local-entry-3',
+    ),
   );
 });

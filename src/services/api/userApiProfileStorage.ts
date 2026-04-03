@@ -200,9 +200,11 @@ function mergeUserApiEntrySets(
 
     const existingRevision = resolveEntryRevision(existing);
     const candidateRevision = resolveEntryRevision(candidate);
+    // Cloud remains canonical on revision ties so a stale compatibility mirror
+    // cannot overwrite hosted metadata. Secret preservation is handled below.
     const preferCandidate =
       candidateRevision > existingRevision
-      || (candidateRevision === existingRevision && source === 'local');
+      || (candidateRevision === existingRevision && source === 'cloud');
 
     const newer = preferCandidate ? candidate : existing;
     const older = preferCandidate ? existing : candidate;

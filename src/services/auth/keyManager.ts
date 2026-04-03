@@ -3,7 +3,7 @@
  *
  * Provides multi-key rotation, status monitoring, and automatic failover.
  * Similar to Gemini Balance but runs entirely on frontend.
- * NOW SUPPORTS: Supabase Cloud Sync & Third-Party API Proxies
+ * NOW SUPPORTS: Cloud-backed Sync & Third-Party API Proxies
  */
 import { subscribeAuthSessionChange } from './authSessionEvents';
 import {
@@ -1630,7 +1630,7 @@ export class KeyManager {
                     preferredPayload = await loadUserApisPayloadFromCloudRecord(activeUserId);
                 } catch (error) {
                     loadError = error;
-                    console.warn('[KeyManager] Cloud fetch via Supabase failed:', error);
+                    console.warn('[KeyManager] Cloud fetch via authenticated API failed:', error);
                 }
             }
 
@@ -1818,7 +1818,7 @@ export class KeyManager {
 
             this.hasHydratedCloudState = true;
             this.applyCloudPayload(savedPayload);
-            console.log('[KeyManager] Supabase cloud sync succeeded!');
+            console.log('[KeyManager] Cloud sync succeeded.');
             this.cloudSyncBackoffUntil = 0;
 
             if (canUseLegacyApi) {

@@ -6,7 +6,7 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 
 - Visual canvas for prompts, assets, and generated results
 - Multiple model routes, including official endpoints and third-party providers
-- Local-first workflows with Supabase-backed auth, storage, and sync
+- Local-first workflows with Supabase auth plus API-mediated cloud storage and sync
 - Built-in settings surfaces for billing, diagnostics, logging, and provider management
 
 ## Tech Stack
