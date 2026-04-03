@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { resolveAuthRedirectOrigin } from '../../config/authRedirect.ts';
+import { supabase } from '../../lib/supabase.ts';
 
 export type BindableAuthProvider = 'google' | 'wechat';
 export type BindCallbackMode = `${BindableAuthProvider}-bind`;
@@ -19,11 +20,6 @@ function normalizeProviderName(provider: unknown): string | undefined {
 
   const normalized = provider.trim().toLowerCase();
   return normalized || undefined;
-}
-
-async function getSupabaseClient() {
-  const module = await import('../../lib/supabase.ts');
-  return module.supabase;
 }
 
 export function buildBindCallbackUrl(
@@ -99,7 +95,6 @@ export function resolveBindFailureMessage(
 }
 
 export async function startGoogleBind(): Promise<string> {
-  const supabase = await getSupabaseClient();
   const { data, error } = await supabase.auth.linkIdentity({
     provider: 'google',
     options: {
@@ -120,7 +115,6 @@ export async function startGoogleBind(): Promise<string> {
 }
 
 export async function listLinkedAuthProviders(): Promise<string[]> {
-  const supabase = await getSupabaseClient();
   const { data, error } = await supabase.auth.getUserIdentities();
 
   if (error) {
