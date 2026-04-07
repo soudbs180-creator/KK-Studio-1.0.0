@@ -47,4 +47,10 @@ npm run build
 ```
 
 ---
+## 6. Refresh Coordination
+- [x] Billing refresh keeps background sync silent and limits blocking loading to unresolved bootstrap.
+- [x] Admin model catalog auto-refresh now shares one cooldown policy across focus, visibility, timer, and broadcast triggers.
+- [x] API settings keep snapshot-backed views interactive while cloud reconciliation runs in the background.
+- [x] Third-party provider management now scopes busy states to the active action instead of locking the whole page behind one loading flag.
+
 *Report Updated: 2026-03-28*
