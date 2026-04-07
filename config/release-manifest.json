@@ -1,12 +1,12 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.0",
-  "displayVersion": "v1.4.0",
-  "releaseDate": "2026-03-28",
+  "version": "1.4.1",
+  "displayVersion": "v1.4.1",
+  "releaseDate": "2026-04-07",
   "releaseNotes": [
-    "Main app, payment sidecar, and documentation are aligned to version 1.4.0.",
-    "Release metadata is centralized for packaging, publishing, and update validation.",
-    "Architecture and governance baselines are enforced to reduce version drift and unsafe compatibility changes."
+    "Main app, payment sidecar, and documentation are aligned to version 1.4.1.",
+    "User-route proxy startup, billing hydration, and canvas persistence regressions are fixed in this patch release.",
+    "Validation gates now cover build, tests, and env-only Supabase audits more accurately."
   ],
   "versionTargets": {
     "rootPackage": "package.json",

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -13,6 +11,11 @@ import {
   type CreateAdminSessionInput,
   type ResolvedRoleChangeTarget,
 } from "./in-memory-admin-console-repository.ts";
+import {
+  hashAdminPassword,
+  isLegacyMd5PasswordHash,
+  verifyAdminPasswordHash,
+} from "./password-hashing.ts";
 
 interface ProfileRow {
   id: string;
@@ -38,10 +41,6 @@ interface AdminSessionRow {
 export interface SupabaseAdminConsoleRepositoryOptions {
   supabaseUrl: string;
   serviceRoleKey: string;
-}
-
-function hashPassword(password: string): string {
-  return createHash("md5").update(password, "utf8").digest("hex");
 }
 
 function isUuid(value: string): boolean {
@@ -88,13 +87,15 @@ export class SupabaseAdminConsoleRepository implements AdminConsoleRepository {
 
   async verifyAdminPassword(password: string): Promise<boolean> {
     const adminAuth = await this.getAdminAuthRow();
-    return adminAuth.password_hash === hashPassword(password);
+    return verifyAdminPasswordHash(password, adminAuth.password_hash);
   }
 
   async getAdminPasswordState(): Promise<AdminPasswordState> {
     const adminAuth = await this.getAdminAuthRow();
     return {
-      requiresPasswordChange: adminAuth.requires_password_change !== false,
+      requiresPasswordChange:
+        adminAuth.requires_password_change !== false
+        || isLegacyMd5PasswordHash(adminAuth.password_hash),
     };
   }
 
@@ -161,14 +162,14 @@ export class SupabaseAdminConsoleRepository implements AdminConsoleRepository {
 
   async changeAdminPassword(oldPassword: string, newPassword: string): Promise<void> {
     const adminAuth = await this.getAdminAuthRow();
-    if (adminAuth.password_hash !== hashPassword(oldPassword)) {
+    if (!verifyAdminPasswordHash(oldPassword, adminAuth.password_hash)) {
       throw new AdminConsolePasswordInvalidError("Incorrect old password.");
     }
 
     const { error } = await this.client
       .from("admin_auth")
       .update({
-        password_hash: hashPassword(newPassword),
+        password_hash: hashAdminPassword(newPassword),
         requires_password_change: false,
         updated_at: new Date().toISOString(),
       })

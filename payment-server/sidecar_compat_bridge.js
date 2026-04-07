@@ -2,10 +2,12 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const AUTHENTICATED_USER_ID_HEADER = 'x-authenticated-user-id';
+const AUTHENTICATED_USER_EMAIL_HEADER = 'x-authenticated-user-email';
+const AUTHENTICATED_USER_ROLE_HEADER = 'x-authenticated-user-role';
 
 let paymentModulePromise;
 let paymentServicePromise;
-let runtimePaymentBridge;
+let requestAuthenticatorPromise;
 
 function getSupabaseServiceRoleKey() {
   return String(
@@ -26,15 +28,7 @@ function loadPaymentModule() {
   return paymentModulePromise;
 }
 
-function loadRuntimePaymentBridge() {
-  if (!runtimePaymentBridge) {
-    runtimePaymentBridge = require('./runtime_payment_bridge');
-  }
-
-  return runtimePaymentBridge;
-}
-
-function buildLegacyCompatibilityHeaders(headers = {}, queryUserId = '') {
+function normalizeHeaderMap(headers = {}) {
   const normalized = {};
 
   for (const [key, value] of Object.entries(headers || {})) {
@@ -48,16 +42,107 @@ function buildLegacyCompatibilityHeaders(headers = {}, queryUserId = '') {
     }
   }
 
-  const internalToken = String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || '').trim();
-  if (internalToken && !normalized['x-internal-token']) {
-    normalized['x-internal-token'] = internalToken;
-  }
-
-  if (queryUserId && !normalized[AUTHENTICATED_USER_ID_HEADER]) {
-    normalized[AUTHENTICATED_USER_ID_HEADER] = String(queryUserId).trim();
-  }
-
   return normalized;
+}
+
+function stripTrustedHeaders(headers) {
+  const sanitized = { ...headers };
+  delete sanitized['x-internal-token'];
+  delete sanitized[AUTHENTICATED_USER_ID_HEADER];
+  delete sanitized[AUTHENTICATED_USER_EMAIL_HEADER];
+  delete sanitized[AUTHENTICATED_USER_ROLE_HEADER];
+  return sanitized;
+}
+
+async function getRequestAuthenticator() {
+  if (!requestAuthenticatorPromise) {
+    const moduleUrl = pathToFileURL(
+      path.resolve(__dirname, '../apps/api/src/lib/request-authenticator.ts'),
+    ).href;
+    requestAuthenticatorPromise = import(moduleUrl).then((mod) => {
+      const supabaseUrl = String(
+        process.env.SUPABASE_URL
+        || process.env.VITE_SUPABASE_URL
+        || ''
+      ).trim();
+      const supabaseAuthKey = String(
+        getSupabaseServiceRoleKey()
+        || process.env.SUPABASE_ANON_KEY
+        || process.env.VITE_SUPABASE_ANON_KEY
+        || ''
+      ).trim();
+
+      if (!supabaseUrl || !supabaseAuthKey) {
+        return undefined;
+      }
+
+      return mod.createRequestAuthenticator({
+        supabaseUrl,
+        supabaseAuthKey,
+      });
+    });
+  }
+
+  return requestAuthenticatorPromise;
+}
+
+function buildAuthRequiredResult(message = 'Authentication is required for legacy payment routes.') {
+  return {
+    statusCode: 401,
+    body: {
+      success: false,
+      error: {
+        code: 'AUTH_REQUIRED',
+        message,
+      },
+    },
+  };
+}
+
+function buildForbiddenResult(message) {
+  return {
+    statusCode: 403,
+    body: {
+      success: false,
+      error: {
+        code: 'AUTH_FORBIDDEN',
+        message,
+      },
+    },
+  };
+}
+
+async function buildLegacyCompatibilityHeaders(headers = {}, options = {}) {
+  const normalized = stripTrustedHeaders(normalizeHeaderMap(headers));
+  const authenticator = await getRequestAuthenticator();
+  if (!authenticator) {
+    return {
+      errorResult: buildAuthRequiredResult('Legacy payment routes are unavailable because server-side auth verification is not configured.'),
+    };
+  }
+
+  const authenticatedUser = await authenticator.authenticate(normalized);
+  if (!authenticatedUser?.userId) {
+    return {
+      errorResult: buildAuthRequiredResult(),
+    };
+  }
+
+  const expectedUserId = String(options.queryUserId || '').trim();
+  if (expectedUserId && expectedUserId !== authenticatedUser.userId) {
+    return {
+      errorResult: buildForbiddenResult('The requested userId does not match the authenticated user.'),
+    };
+  }
+
+  return {
+    headers: {
+      ...normalized,
+      [AUTHENTICATED_USER_ID_HEADER]: authenticatedUser.userId,
+      ...(authenticatedUser.email ? { [AUTHENTICATED_USER_EMAIL_HEADER]: authenticatedUser.email } : {}),
+      ...(authenticatedUser.role ? { [AUTHENTICATED_USER_ROLE_HEADER]: authenticatedUser.role } : {}),
+    },
+  };
 }
 
 async function createCompatibilityPaymentService() {
@@ -93,15 +178,17 @@ async function getCompatibilityPaymentService() {
 async function handleLegacyCreateQrCodeThroughSidecar(query, headers, origin, options = {}) {
   const paymentModule = await loadPaymentModule();
   const service = await getCompatibilityPaymentService();
-  const compatibilityHeaders = buildLegacyCompatibilityHeaders(
-    headers,
-    query.get('userId') || '',
-  );
+  const compatibility = await buildLegacyCompatibilityHeaders(headers, {
+    queryUserId: query.get('userId') || '',
+  });
+  if (compatibility.errorResult) {
+    return compatibility.errorResult;
+  }
 
   return paymentModule.handleLegacyCreateQrCode(
     service,
     query,
-    compatibilityHeaders,
+    compatibility.headers,
     origin,
     options,
   );
@@ -110,15 +197,17 @@ async function handleLegacyCreateQrCodeThroughSidecar(query, headers, origin, op
 async function handleLegacyRedirectThroughSidecar(query, headers, origin, options = {}) {
   const paymentModule = await loadPaymentModule();
   const service = await getCompatibilityPaymentService();
-  const compatibilityHeaders = buildLegacyCompatibilityHeaders(
-    headers,
-    query.get('userId') || '',
-  );
+  const compatibility = await buildLegacyCompatibilityHeaders(headers, {
+    queryUserId: query.get('userId') || '',
+  });
+  if (compatibility.errorResult) {
+    return compatibility.errorResult;
+  }
 
   return paymentModule.handleLegacyRedirect(
     service,
     query,
-    compatibilityHeaders,
+    compatibility.headers,
     origin,
     options,
   );
@@ -127,15 +216,17 @@ async function handleLegacyRedirectThroughSidecar(query, headers, origin, option
 async function handleLegacyGetStatusThroughSidecar(query, headers) {
   const paymentModule = await loadPaymentModule();
   const service = await getCompatibilityPaymentService();
-  const compatibilityHeaders = buildLegacyCompatibilityHeaders(
-    headers,
-    query.get('userId') || '',
-  );
+  const compatibility = await buildLegacyCompatibilityHeaders(headers, {
+    queryUserId: query.get('userId') || '',
+  });
+  if (compatibility.errorResult) {
+    return compatibility.errorResult;
+  }
 
   return paymentModule.handleLegacyGetStatus(
     service,
     query,
-    compatibilityHeaders,
+    compatibility.headers,
   );
 }
 
@@ -166,20 +257,24 @@ async function handleLegacyPaymentCallbackThroughSidecar(input, options = {}) {
     };
   }
 
-  if (result.error?.code !== 'PAYMENT_ORDER_NOT_FOUND' || options.disableRuntimeFallback) {
+  if (result.error?.code === 'PAYMENT_ORDER_NOT_FOUND') {
+    return {
+      success: false,
+      source: 'sidecar',
+      error: {
+        ...result.error,
+        message: 'The payment order could not be found in the canonical sidecar store. Legacy runtime fallback is disabled for missing orders.',
+      },
+    };
+  }
+
+  if (!result.success) {
     return {
       success: false,
       source: 'sidecar',
       error: result.error,
     };
   }
-
-  const { handleLegacySuccessfulPaymentCallback } = loadRuntimePaymentBridge();
-  const fallbackResult = await handleLegacySuccessfulPaymentCallback(input, options);
-  return {
-    ...fallbackResult,
-    source: 'runtime-fallback',
-  };
 }
 
 module.exports = {

@@ -21,6 +21,18 @@ interface NodeBounds {
     height: number;
 }
 
+// Keep the actively dragged node above every normal canvas layer without
+// disturbing the persisted z-index ordering once the drag ends.
+export const DRAG_STACK_Z_INDEX_BOOST = 1_000_000;
+
+export const elevateCanvasStackZIndex = (
+    baseStackZIndex: number,
+    isDragging: boolean
+): number => {
+    const normalizedBase = Number.isFinite(baseStackZIndex) ? baseStackZIndex : 0;
+    return isDragging ? normalizedBase + DRAG_STACK_Z_INDEX_BOOST : normalizedBase;
+};
+
 /**
  * Gets the height of the PromptBar to calculate visible canvas area
  */

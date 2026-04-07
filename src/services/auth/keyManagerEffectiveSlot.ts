@@ -86,9 +86,10 @@ export function buildEffectiveSlotFromProvider<TSlot extends EffectiveKeySlot>(
         usedTokens: provider.usage?.totalTokens || 0,
         totalCost: provider.usage?.totalCost || 0,
         format,
-        supportedModels: provider.models?.length
-            ? normalizeModels(provider.models.map((model) => parseModelString(model).id || model), slot.provider)
-            : slot.supportedModels,
+        supportedModels: normalizeModels(
+            (provider.models || []).map((model) => parseModelString(model).id || model),
+            slot.provider
+        ),
         type: determineKeyType(slot.provider, provider.baseUrl || slot.baseUrl),
         authMethod: runtime.authMethod as AuthMethod,
         headerName: runtime.headerName,

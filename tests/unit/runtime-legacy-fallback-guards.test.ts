@@ -26,44 +26,44 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
   assert.match(keyManagerSource, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
   assert.match(keyManagerSource, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
-  assert.match(billingContextSource, /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
-  assert.match(billingContextSource, /legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
-  assert.match(billingContextSource, /legacyWebApiClient\.listCreditTransactions\(/);
-  assert.match(billingContextSource, /legacyWebApiClient\.debitCredits\(\{/);
-  assert.match(billingContextSource, /legacyWebApiClient\.refundCredits\(\{/);
+  assert.match(billingContextSource, /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
+  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /kkWebApiClient\.listCreditTransactions\(/);
+  assert.match(billingContextSource, /kkWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /kkWebApiClient\.refundCredits\(\{/);
   assert.doesNotMatch(billingContextSource, /shouldUseLegacyWebApiFallback/);
   assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
   assert.doesNotMatch(billingContextSource, /\.channel\(/);
   assert.doesNotMatch(syncServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
-  assert.match(syncServiceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
-  assert.match(syncServiceSource, /legacyWebApiClient\.saveWorkspaceLayout/);
-  assert.match(syncServiceSource, /legacyWebApiClient\.getWorkspaceLayout/);
-  assert.match(syncServiceSource, /legacyWebApiClient\.cleanupCloudImages/);
+  assert.match(syncServiceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(syncServiceSource, /kkWebApiClient\.saveWorkspaceLayout/);
+  assert.match(syncServiceSource, /kkWebApiClient\.getWorkspaceLayout/);
+  assert.match(syncServiceSource, /kkWebApiClient\.cleanupCloudImages/);
   assert.doesNotMatch(syncServiceSource, /\.storage\s*\.\s*from\(/);
   assert.doesNotMatch(tempUserServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
-  assert.match(tempUserServiceSource, /import \{ legacyWebApiClient \} from '\.\.\/api\/kkApiClient';/);
-  assert.match(tempUserServiceSource, /legacyWebApiClient\.createTempUser/);
+  assert.match(tempUserServiceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(tempUserServiceSource, /kkWebApiClient\.createTempUser/);
   assert.doesNotMatch(tempUserServiceSource, /\.from\('temp_users'\)\s*\.insert\(/);
 });
 
-test('admin UI entrypoints use the typed API path directly without Supabase fallback bridges', () => {
+test('admin UI entrypoints use the shared web API client without Supabase fallback bridges', () => {
   const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
   const adminSystemSource = readSource('src/components/settings/AdminSystem.tsx');
   const adminRoleSource = readSource('src/hooks/useAdminRole.ts');
 
-  assert.match(adminConsoleSource, /legacyWebApiClient\.changeAdminPassword/);
-  assert.match(adminConsoleSource, /legacyWebApiClient\.adminRechargeCredits/);
-  assert.match(adminConsoleSource, /legacyWebApiClient\.setUserRole/);
+  assert.match(adminConsoleSource, /kkWebApiClient\.changeAdminPassword/);
+  assert.match(adminConsoleSource, /kkWebApiClient\.adminRechargeCredits/);
+  assert.match(adminConsoleSource, /kkWebApiClient\.setUserRole/);
   assert.doesNotMatch(adminConsoleSource, /shouldUseLegacyWebApiFallback/);
   assert.doesNotMatch(adminConsoleSource, /ViaSupabase/);
   assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
 
-  assert.match(adminSystemSource, /legacyWebApiClient\.verifyAdminPassword/);
+  assert.match(adminSystemSource, /kkWebApiClient\.verifyAdminPassword/);
   assert.doesNotMatch(adminSystemSource, /shouldUseLegacyWebApiFallback/);
   assert.doesNotMatch(adminSystemSource, /ViaSupabase/);
   assert.doesNotMatch(adminSystemSource, /supabaseAdminFallbackService/);
 
-  assert.match(adminRoleSource, /legacyWebApiClient/);
+  assert.match(adminRoleSource, /kkWebApiClient/);
   assert.match(adminRoleSource, /\.getAdminAccess\(buildAdminRequestOptions\(\)\)/);
   assert.doesNotMatch(adminRoleSource, /shouldUseLegacyWebApiFallback/);
   assert.doesNotMatch(adminRoleSource, /getKkApiServerHealth/);

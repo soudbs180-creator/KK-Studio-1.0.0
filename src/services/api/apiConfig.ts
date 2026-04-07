@@ -8,7 +8,7 @@ import {
     resolveProviderRuntime,
     type ProviderStrategyAuthMethod,
     type ProviderStrategyAuthorizationValueFormat,
-} from './providerStrategy';
+} from './providerStrategy.ts';
 
 /**
  * API authentication method

@@ -1,5 +1,5 @@
-import { GenerationMode } from '../../types';
-import { KeySlot } from '../auth/keyManager';
+import type { GenerationMode } from '../../types.ts';
+import type { KeySlot } from '../auth/keyManager.ts';
 
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';

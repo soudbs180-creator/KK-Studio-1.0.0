@@ -417,22 +417,25 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, [showDownloadMenu]);
 
     // 5. Download flow
-    const handleSingleDownload = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        try {
-            // Prefer the locally recovered original before remote fallbacks.
-            let target = await getStrictOriginalImage(image.id);
-            if (!target && image.storageId && image.storageId !== image.id) {
-                target = await getStrictOriginalImage(image.storageId);
-            }
+	    const handleSingleDownload = async (e: React.MouseEvent) => {
+	        e.stopPropagation();
+	        try {
+	            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
+	            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
+	            // Prefer the locally recovered original before remote fallbacks.
+	            let target = await getStrictOriginalImage(image.id);
+	            if (!target && image.storageId && image.storageId !== image.id) {
+	                target = await getStrictOriginalImage(image.storageId);
+	            }
 
-            target = target || image.originalUrl || image.apiResultUrl || displaySrc || image.url;
-            if (!target) return;
+	            target = target || image.originalUrl || null;
+	            if (!target && (isVideoMode || isAudioMode)) {
+	                target = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
+	            }
+	            if (!target) return;
 
-            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
-            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
-            const exportType = isAudioMode ? 'Audio' : (isVideoMode ? 'Video' : 'Image');
-            const exportExt = isAudioMode ? '.mp3' : (isVideoMode ? '.mp4' : '.png');
+	            const exportType = isAudioMode ? 'Audio' : (isVideoMode ? 'Video' : 'Image');
+	            const exportExt = isAudioMode ? '.mp3' : (isVideoMode ? '.mp4' : '.png');
             const filename = generateDownloadFilename(exportType, exportExt);
 
             // Download data/blob URLs directly; fetch http(s) URLs as blobs first.
@@ -450,12 +453,17 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             } finally {
                 setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
             }
-        } catch (err) {
-            // Final fallback: open the asset in a new tab.
-            const fallback = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
-            if (fallback) window.open(fallback, '_blank', 'noopener,noreferrer');
-        }
-    };
+	        } catch (err) {
+	            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
+	            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
+	            if (isVideoMode || isAudioMode) {
+	                const fallback = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
+	                if (fallback) window.open(fallback, '_blank', 'noopener,noreferrer');
+	                return;
+	            }
+	            notify.warning('原图不可用', '当前仅有预览图，未找到可下载的原图。');
+	        }
+	    };
 
     const handleDownload = (e: React.MouseEvent) => {
         e.stopPropagation();

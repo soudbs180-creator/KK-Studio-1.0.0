@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AspectRatio } from '../../types';
 import { getCardDimensions } from '../../utils/styleUtils';
+import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+import { toReferenceImageDataUrl } from '../../utils/referenceImageStorage';
 
 interface ReferenceImage {
     id?: string;
@@ -39,6 +41,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const dragStartPos = useRef({ x: 0, y: 0 });
+    const stackZIndex = elevateCanvasStackZIndex(40, isDragging);
 
     // 生成计时器
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -148,11 +151,12 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     if (!isGenerating) {
         return (
             <div
-                className="absolute z-40 flex flex-col items-center"
+                className="absolute flex flex-col items-center"
                 style={{
                     left: position.x + dragOffset.x,
                     top: position.y + dragOffset.y,
                     transform: 'translate(-50%, -100%)',
+                    zIndex: stackZIndex,
                     cursor: isDragging ? 'grabbing' : 'grab'
                 }}
                 onMouseDown={handleMouseDown}
@@ -183,7 +187,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                             {referenceImages.slice(0, 3).map((img, idx) => (
                                 <img
                                     key={img.id || idx}
-                                    src={`data:${img.mimeType};base64,${img.data}`}
+                                    src={toReferenceImageDataUrl(img.data, img.mimeType)}
                                     alt="Reference"
                                     className="w-8 h-8 object-cover rounded border border-[var(--border-light)]"
                                 />
@@ -212,11 +216,12 @@ const PendingNode: React.FC<PendingNodeProps> = ({
 
     return (
         <div
-            className="absolute z-40 flex flex-col items-center"
+            className="absolute flex flex-col items-center"
             style={{
                 left: position.x,
                 top: position.y,
                 transform: 'translate(-50%, -100%)',
+                zIndex: stackZIndex,
                 cursor: isDragging ? 'grabbing' : 'grab'
             }}
             onMouseDown={handleMouseDown}
@@ -240,7 +245,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                         {referenceImages.slice(0, 3).map((img, idx) => (
                             <img
                                 key={img.id || idx}
-                                src={`data:${img.mimeType};base64,${img.data}`}
+                                src={toReferenceImageDataUrl(img.data, img.mimeType)}
                                 alt="Reference"
                                 className="w-8 h-8 object-cover rounded border border-[var(--border-light)]"
                             />

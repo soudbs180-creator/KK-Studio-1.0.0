@@ -27,7 +27,7 @@ paths:
   /api/v1/auth/register:
     post:
       tags: [Auth API]
-      summary: Register a user account
+      summary: Legacy password registration endpoint (disabled)
       operationId: registerUser
       parameters:
         - $ref: '#/components/parameters/XRequestId'
@@ -39,20 +39,14 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
-        '201':
-          description: User registered successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RegisterResponseEnvelope'
+        '501':
+          $ref: '#/components/responses/RouteDisabled'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '409':
-          $ref: '#/components/responses/Conflict'
   /api/v1/auth/login:
     post:
       tags: [Auth API]
-      summary: Login with email and password
+      summary: Legacy password login endpoint (disabled)
       operationId: loginUser
       parameters:
         - $ref: '#/components/parameters/XRequestId'
@@ -64,16 +58,10 @@ paths:
             schema:
               $ref: '#/components/schemas/LoginRequest'
       responses:
-        '200':
-          description: Login succeeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoginResponseEnvelope'
+        '501':
+          $ref: '#/components/responses/RouteDisabled'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /api/v1/auth/temp-users:
     post:
       tags: [Auth API]
@@ -963,6 +951,12 @@ components:
             $ref: '#/components/schemas/ErrorResponseEnvelope'
     UnprocessableEntity:
       description: Domain rules rejected the request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    RouteDisabled:
+      description: Legacy password-auth route is intentionally disabled; use the hosted Supabase auth flow instead
       content:
         application/json:
           schema:

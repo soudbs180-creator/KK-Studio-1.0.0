@@ -21,7 +21,7 @@ import {
   loadStoredAdminSystemTab,
   saveStoredAdminSystemTab,
 } from '../../services/admin/adminConsoleState';
-import { legacyWebApiClient } from '../../services/api/kkApiClient';
+import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
 import { SettingsActionButton, SettingsBadge, SettingsViewShell } from './SettingsScaffold';
 import AdminConsoleSettings from './AdminConsoleSettings';
@@ -215,7 +215,7 @@ export const AdminSystem: React.FC<{ initialTab?: AdminTab }> = ({ initialTab = 
 
     setVerifying(true);
     try {
-      const response = await legacyWebApiClient.verifyAdminPassword(
+      const response = await kkWebApiClient.verifyAdminPassword(
         { password },
         buildAdminRequestOptions(buildAdminRequestId('admin-unlock', user.id))
       );

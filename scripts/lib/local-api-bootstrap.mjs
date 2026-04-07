@@ -14,6 +14,8 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.join(__dirname, "..", "..");
+const DEFAULT_JSON_BODY_MAX_BYTES = 1024 * 1024;
+const DEFAULT_PROFILE_JSON_BODY_MAX_BYTES = 4 * 1024 * 1024;
 
 function resolveEffectiveValue(snapshots, key) {
   const resolved = getEffectiveValue(snapshots, key);
@@ -27,6 +29,32 @@ function formatSearchedFiles(snapshots, repoRoot) {
   return snapshots.searchedFiles.primary
     .map((filePath) => path.relative(repoRoot, filePath))
     .join(", ");
+}
+
+function parsePositiveInteger(rawValue, fallback) {
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function applyLocalApiBodyLimitDefaults() {
+  const explicitGlobalBodyLimit = String(process.env.KK_API_MAX_JSON_BODY_BYTES || "").trim();
+  const explicitProfileBodyLimit = String(process.env.KK_API_PROFILE_MAX_JSON_BODY_BYTES || "").trim();
+  const explicitKeyManagerBodyLimit = String(process.env.KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES || "").trim();
+
+  const effectiveGlobalBodyLimit = parsePositiveInteger(
+    explicitGlobalBodyLimit,
+    DEFAULT_JSON_BODY_MAX_BYTES,
+  );
+
+  if (!explicitGlobalBodyLimit) {
+    process.env.KK_API_MAX_JSON_BODY_BYTES = String(effectiveGlobalBodyLimit);
+  }
+
+  if (!explicitProfileBodyLimit && !explicitKeyManagerBodyLimit) {
+    process.env.KK_API_PROFILE_MAX_JSON_BODY_BYTES = String(
+      Math.max(effectiveGlobalBodyLimit, DEFAULT_PROFILE_JSON_BODY_MAX_BYTES),
+    );
+  }
 }
 
 export async function assertLocalApiConfig(options = {}) {
@@ -132,6 +160,7 @@ export async function startLocalApiServer(options = {}) {
 
   process.env.RUN_KK_API_SKELETON = "false";
   process.env.PORT = String(port);
+  applyLocalApiBodyLimitDefaults();
 
   const serverEntry = pathToFileURL(path.join(repoRoot, "apps", "api", "src", "server.ts")).href;
   const serverModule = await import(serverEntry);

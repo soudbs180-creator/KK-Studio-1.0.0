@@ -58,7 +58,7 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
   assert.match(source, /private shouldUseSecureProxyUserRoute\(keySlot: KeySlot\): boolean \{/);
   assert.match(source, /return Boolean\(keyManager\.getUserId\(\)\);/);
   assert.match(source, /private shouldFallbackToCloudUserRouteAfterLocalProxy\(\s*error: unknown,\s*\): boolean \{/);
-  assert.match(source, /void error;\s*return false;/);
+  assert.match(source, /return !message\.includes\('browser direct provider calls are disabled'\);/);
   assert.match(source, /private createCloudFallbackNotice\(action: string, keySlot: Pick<KeySlot, 'name' \| 'provider'>\): string \{/);
   assert.match(source, /falling back to cloud/);
   assert.match(source, /private decorateTaskStatusResult\(/);
@@ -68,10 +68,10 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
   assert.match(source, /response = await callLocalUserRouteProxyVideo\(\{/);
   assert.match(source, /response = await callLocalUserRouteProxyAudio\(\{/);
   assert.match(source, /userRoute: buildSecureProxyUserRouteFromSlotId\(routeId\),/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('chat routing', keySlot\), error\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('image routing', keySlot\), error\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('video routing', keySlot\), error\);/);
-  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('audio routing', keySlot\), error\);/);
+  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('chat routing', keySlot\), normalizedUserRouteError\);/);
+  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('image routing', keySlot\), normalizedUserRouteError\);/);
+  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('video routing', keySlot\), normalizedUserRouteError\);/);
+  assert.match(source, /console\.warn\(this\.createCloudFallbackNotice\('audio routing', keySlot\), normalizedUserRouteError\);/);
   assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('chat routing', keySlot\);/);
   assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('image routing', keySlot\);/);
   assert.match(source, /this\.throwBrowserDirectProviderCallBlocked\('video routing', keySlot\);/);
@@ -193,10 +193,14 @@ test('BillingContext clears balance and transaction state immediately when the u
   assert.match(source, /setShowRechargeModal\(false\);/);
   assert.match(source, /setHydratedUserId\(activeBillingUserId\);/);
   assert.match(source, /const hasHydratedCurrentBillingScope = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
-  assert.match(source, /const visibleBalance = hasHydratedCurrentBillingScope \? balance : 0;/);
-  assert.match(source, /const visibleBillingLogs = hasHydratedCurrentBillingScope \? billingLogs : \[\];/);
-  assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope \? usageLogs : \[\];/);
-  assert.match(source, /const visibleLoading = activeBillingUserId \? !hasHydratedCurrentBillingScope : false;/);
+  assert.match(source, /const canStartBillingBootstrap = isStageReady\('background_ready'\);/);
+  assert.match(source, /const hasVisibleBillingSeed = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
+  assert.match(source, /const refreshMode = resolveBillingRefreshMode\(\{\s*silent: options\?\.silent === true,\s*hasVisibleBillingSeed,\s*\}\);/);
+  assert.match(source, /const renderCachedSnapshot = !hasHydratedCurrentBillingScope && activeBillingUserId/);
+  assert.match(source, /const visibleBalance = hasHydratedCurrentBillingScope\s*\?\s*balance\s*:\s*\(renderCachedSnapshot\?\.balance \?\? 0\);/);
+  assert.match(source, /const visibleBillingLogs = hasHydratedCurrentBillingScope\s*\?\s*billingLogs\s*:\s*\(renderCachedSnapshot\?\.billingLogs \?\? \[\]\);/);
+  assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope\s*\?\s*usageLogs\s*:\s*\(renderCachedSnapshot\?\.usageLogs \?\? \[\]\);/);
+  assert.match(source, /const visibleLoading = activeBillingUserId[\s\S]*\?\s*\(\(!hasHydratedCurrentBillingScope && !renderCachedSnapshot\) \|\| loading \|\| !canStartBillingBootstrap\)[\s\S]*:\s*false;/);
   assert.match(source, /refreshing,/);
 });
 

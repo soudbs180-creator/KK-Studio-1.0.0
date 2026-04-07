@@ -1,11 +1,11 @@
-import type { Provider } from '../../types';
+import type { Provider } from '../../types.ts';
 import type {
     ChannelEndpointStyle,
     ChannelManagementSupport,
     ChannelPricingSupport,
     ProtocolFamily,
     ProviderFamily,
-} from './channelConfig';
+} from './channelConfig.ts';
 
 export type ProviderStrategyFormat = 'auto' | 'openai' | 'gemini' | 'claude';
 export type ProviderStrategyAuthMethod = 'query' | 'header';
@@ -17,6 +17,7 @@ export type ProviderStrategyImageProfile =
     | 'gpt-best-extended'
     | 'antigravity'
     | 'chat-preferred';
+export type ProviderStrategyImageRoutingPolicy = 'chat-first' | 'surface-first';
 export type ProviderStrategyVideoApiStyle =
     | 'openai-v1-videos'
     | 'legacy-video-generations'
@@ -43,6 +44,7 @@ export interface ProviderStrategy {
     claudeAuthorizationValueFormat?: ProviderStrategyAuthorizationValueFormat;
     defaultCompatibilityMode?: ProviderStrategyCompatibilityMode;
     imageProfile?: ProviderStrategyImageProfile;
+    imageRoutingPolicy?: ProviderStrategyImageRoutingPolicy;
     videoApiStyle?: ProviderStrategyVideoApiStyle;
     pricingSupport?: ChannelPricingSupport;
     managementSupport?: ChannelManagementSupport;
@@ -82,9 +84,19 @@ export interface ResolvedProviderRuntime {
     geminiNative: boolean;
     claudeNative: boolean;
     imageProfile: ProviderStrategyImageProfile;
+    imageRoutingPolicy: ProviderStrategyImageRoutingPolicy;
     videoApiStyle: ProviderStrategyVideoApiStyle;
     isKnownProvider: boolean;
     uiProvider: Provider | 'Custom';
+}
+
+export interface ProviderEvidence {
+    providerId: 'gpt-best' | 'unknown';
+    confidence: 'high' | 'medium' | 'low';
+    sourceType: 'explicit-provider' | 'docs-url' | 'api-base' | 'unknown';
+    isDocumentationUrl: boolean;
+    canUseAsApiBaseUrl: boolean;
+    reason: string;
 }
 
 export type ProviderRuntime = ResolvedProviderRuntime;
@@ -111,6 +123,7 @@ const FALLBACK_STRATEGY: ProviderStrategy = {
     claudeAuthorizationValueFormat: 'bearer',
     defaultCompatibilityMode: 'standard',
     imageProfile: 'openai-strict',
+    imageRoutingPolicy: 'chat-first',
     videoApiStyle: 'openai-v1-videos',
     pricingSupport: 'none',
     managementSupport: 'none',
@@ -167,7 +180,7 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         label: '12AI',
         known: true,
         providerFamily: '12ai',
-        providerPatterns: [/^12ai$/i],
+        providerPatterns: [/^12ai$/i, /^12\s*ai$/i],
         hostPatterns: [/^cdn\.12ai\.org$/i, /^new\.12ai\.org$/i, /^hk\.12ai\.org$/i, /(^|\.)12ai\.(org|xyz|io|net)$/i],
         basePatterns: [/12ai\.(org|xyz|io|net)/i],
         defaultFormat: 'gemini',
@@ -183,11 +196,36 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         claudeAuthorizationValueFormat: 'bearer',
         defaultCompatibilityMode: 'standard',
         imageProfile: 'openai-strict',
+        imageRoutingPolicy: 'surface-first',
         videoApiStyle: 'openai-v1-videos',
         pricingSupport: 'manual',
         managementSupport: 'none',
         respectProviderOnCustomHost: true,
         uiProvider: '12AI',
+    },
+    {
+        id: 'flow2api',
+        label: 'Flow2API',
+        known: true,
+        providerFamily: 'generic-openai',
+        providerPatterns: [/^flow2api$/i, /^flow-2-api$/i, /^flow 2 api$/i],
+        basePatterns: [/flow2api/i],
+        defaultFormat: 'openai',
+        supportedFormats: ['openai', 'gemini'],
+        defaultAuthMethod: 'header',
+        geminiAuthMethod: 'header',
+        defaultHeaderName: AUTHORIZATION_HEADER,
+        geminiHeaderName: GOOGLE_API_HEADER,
+        authorizationValueFormat: 'bearer',
+        geminiAuthorizationValueFormat: 'raw',
+        defaultCompatibilityMode: 'chat',
+        imageProfile: 'chat-preferred',
+        imageRoutingPolicy: 'chat-first',
+        videoApiStyle: 'openai-v1-videos',
+        pricingSupport: 'manual',
+        managementSupport: 'none',
+        respectProviderOnCustomHost: true,
+        uiProvider: 'Flow2API',
     },
     {
         id: 'wuyinkeji',
@@ -248,19 +286,23 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         label: 'Suxi',
         known: true,
         providerFamily: 'newapi-family',
-        providerPatterns: [/^suxi$/i],
-        hostPatterns: [/^suxi\.ai$/i, /(^|\.)suxi\./i],
-        basePatterns: [/suxi/i],
+        providerPatterns: [/^suxi$/i, /^new[-\s]*suxi(?:\s*ai)?$/i, /^newsuxi(?:ai)?$/i],
+        hostPatterns: [/^suxi\.ai$/i, /^new\.suxi\.ai$/i, /(^|\.)suxi\./i],
+        basePatterns: [/new\.suxi\.ai/i, /suxi/i],
         defaultFormat: 'openai',
-        supportedFormats: ['openai', 'gemini'],
+        supportedFormats: ['openai', 'gemini', 'claude'],
         defaultAuthMethod: 'header',
         geminiAuthMethod: 'header',
+        claudeAuthMethod: 'header',
         defaultHeaderName: AUTHORIZATION_HEADER,
         geminiHeaderName: AUTHORIZATION_HEADER,
+        claudeHeaderName: AUTHORIZATION_HEADER,
         authorizationValueFormat: 'bearer',
         geminiAuthorizationValueFormat: 'bearer',
+        claudeAuthorizationValueFormat: 'bearer',
         defaultCompatibilityMode: 'chat',
         imageProfile: 'chat-preferred',
+        imageRoutingPolicy: 'surface-first',
         videoApiStyle: 'legacy-video-generations',
         pricingSupport: 'native',
         managementSupport: 'native',
@@ -400,13 +442,13 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         label: 'GPT-Best',
         known: true,
         providerFamily: 'newapi-family',
-        providerPatterns: [/^gpt-best$/i, /^gptbest$/i],
+        providerPatterns: [/^gpt-best$/i, /^gptbest$/i, /^gpt\s*best$/i],
         basePatterns: [/gpt-best/i, /gptbest/i],
         defaultFormat: 'openai',
         supportedFormats: ['openai', 'gemini', 'claude'],
-        defaultAuthMethod: 'query',
-        geminiAuthMethod: 'query',
-        claudeAuthMethod: 'query',
+        defaultAuthMethod: 'header',
+        geminiAuthMethod: 'header',
+        claudeAuthMethod: 'header',
         defaultHeaderName: AUTHORIZATION_HEADER,
         geminiHeaderName: AUTHORIZATION_HEADER,
         claudeHeaderName: AUTHORIZATION_HEADER,
@@ -415,6 +457,7 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         claudeAuthorizationValueFormat: 'bearer',
         defaultCompatibilityMode: 'standard',
         imageProfile: 'gpt-best-extended',
+        imageRoutingPolicy: 'surface-first',
         videoApiStyle: 'unified-v2-generations',
         pricingSupport: 'native',
         managementSupport: 'native',
@@ -512,6 +555,10 @@ function normalizeProviderName(provider?: string | Provider): string {
     return String(provider || '').trim().toLowerCase();
 }
 
+function normalizeProviderAlias(provider?: string | Provider): string {
+    return String(provider || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 function normalizeFormat(format: unknown, fallback: ProviderStrategyFormat = 'auto'): ProviderStrategyFormat {
     const normalized = String(format || '').trim().toLowerCase();
     if (normalized === 'openai' || normalized === 'gemini' || normalized === 'claude' || normalized === 'auto') {
@@ -574,6 +621,75 @@ export function isLikelyDocumentationBaseUrl(baseUrl?: string): boolean {
     }
 
     return /\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)(?:$|[?#])/i.test(raw);
+}
+
+function isGptBestProviderAlias(provider?: string | Provider): boolean {
+    const normalized = normalizeProviderAlias(provider);
+    return normalized === 'gpt-best'
+        || normalized === 'gptbest'
+        || normalized === 'gpt best';
+}
+
+function isGptBestDocumentationUrl(baseUrl?: string): boolean {
+    const raw = normalizeBaseUrl(baseUrl);
+    if (!raw) return false;
+
+    return normalizeHost(raw) === 'gpt-best.apifox.cn'
+        && /\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)(?:$|[?#])/i.test(raw);
+}
+
+export function detectGptBestEvidence(input: {
+    provider?: string | Provider;
+    baseUrl?: string;
+}): ProviderEvidence {
+    const providerAliasHit = isGptBestProviderAlias(input.provider);
+    const docsHit = isGptBestDocumentationUrl(input.baseUrl);
+    const host = normalizeHost(input.baseUrl);
+    const hostLooksLikeApiBase = Boolean(host) && !docsHit && /(^|[.-])gpt-?best(?=[.-]|$)/i.test(host);
+
+    if (providerAliasHit) {
+        return {
+            providerId: 'gpt-best',
+            confidence: 'high',
+            sourceType: 'explicit-provider',
+            isDocumentationUrl: docsHit,
+            canUseAsApiBaseUrl: Boolean(normalizeBaseUrl(input.baseUrl)) && !docsHit,
+            reason: docsHit
+                ? 'Matched GPT Best provider alias and Apifox documentation URL.'
+                : 'Matched GPT Best provider alias.',
+        };
+    }
+
+    if (docsHit) {
+        return {
+            providerId: 'gpt-best',
+            confidence: 'medium',
+            sourceType: 'docs-url',
+            isDocumentationUrl: true,
+            canUseAsApiBaseUrl: false,
+            reason: 'Matched GPT Best Apifox documentation URL.',
+        };
+    }
+
+    if (hostLooksLikeApiBase) {
+        return {
+            providerId: 'gpt-best',
+            confidence: 'medium',
+            sourceType: 'api-base',
+            isDocumentationUrl: false,
+            canUseAsApiBaseUrl: true,
+            reason: 'Host looks like a GPT Best API domain.',
+        };
+    }
+
+    return {
+        providerId: 'unknown',
+        confidence: 'low',
+        sourceType: 'unknown',
+        isDocumentationUrl: false,
+        canUseAsApiBaseUrl: false,
+        reason: 'No GPT Best evidence found.',
+    };
 }
 
 function matchesAny(patterns: RegExp[] | undefined, value: string): boolean {
@@ -654,6 +770,7 @@ const PROVIDER_IMAGE_MODEL_ALIASES: Record<string, string> = {
 const TWELVE_AI_SUPPORTED_IMAGE_MODELS = new Set([
     'gemini-2.5-flash-image',
     'gemini-2.5-flash-image-c',
+    'gemini-3.1-flash-image-preview',
     'gemini-3-pro-image-preview',
     'gemini-3-pro-image-preview-c',
 ]);
@@ -679,6 +796,10 @@ function looksLikeImageModel(modelId: string): boolean {
         || modelId.startsWith('imagen-');
 }
 
+function looksLikeVideoModel(modelId: string): boolean {
+    return /(veo|sora|seedance|runway|luma|kling|pika|video)/i.test(modelId);
+}
+
 export function resolveProviderModelCompatibilityIssue(input: {
     provider?: string | Provider;
     baseUrl?: string;
@@ -700,7 +821,11 @@ export function resolveProviderModelCompatibilityIssue(input: {
         && looksLikeImageModel(normalizedModelId)
         && !TWELVE_AI_SUPPORTED_IMAGE_MODELS.has(normalizedModelId)
     ) {
-        return `12AI 图片路由当前只支持 gemini-2.5-flash-image 和 gemini-3-pro-image-preview，当前模型 ${normalizedModelId} 不在 12AI 文档支持列表中。`;
+        return `12AI 图片路由当前只支持 gemini-2.5-flash-image、gemini-3.1-flash-image-preview 和 gemini-3-pro-image-preview，当前模型 ${normalizedModelId} 不在 12AI 文档支持列表中。`;
+    }
+
+    if (runtime.strategyId === 'flow2api' && looksLikeVideoModel(normalizedModelId)) {
+        return `Flow2API is currently supported in KK Studio only as an image gateway. Video model ${normalizedModelId} is not wired into KK Studio task polling yet.`;
     }
 
     return null;
@@ -714,7 +839,22 @@ export function isProviderModelCompatible(input: {
     return !resolveProviderModelCompatibilityIssue(input);
 }
 
+export function shouldBypassChatCompatibilityForImages(
+    input: ProviderRuntimeInput | ResolvedProviderRuntime,
+): boolean {
+    const runtime = 'strategy' in input ? input : resolveProviderRuntime(input);
+    return runtime.imageRoutingPolicy === 'surface-first';
+}
+
 export function resolveProviderStrategy(provider?: string | Provider, baseUrl?: string): ProviderStrategy {
+    const gptBestEvidence = detectGptBestEvidence({ provider, baseUrl });
+    if (gptBestEvidence.providerId === 'gpt-best') {
+        const gptBestStrategy = PROVIDER_STRATEGIES.find((strategy) => strategy.id === 'gpt-best');
+        if (gptBestStrategy) {
+            return gptBestStrategy;
+        }
+    }
+
     const baseMatch = findStrategyByBase(baseUrl);
     if (baseMatch) {
         return baseMatch;
@@ -765,10 +905,8 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
                     : (strategy.defaultAuthMethod || 'header')
         );
 
-    // GPT Best live docs currently advertise query-string auth (`?key=`).
-    // Force old header-based saved configs onto the documented path.
     if (strategy.id === 'gpt-best') {
-        authMethod = 'query';
+        authMethod = 'header';
     }
 
     const defaultHeaderName = protocolFamily === 'gemini-native'
@@ -809,6 +947,7 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
         geminiNative: protocolFamily === 'gemini-native',
         claudeNative: protocolFamily === 'claude-native',
         imageProfile: strategy.imageProfile || 'openai-strict',
+        imageRoutingPolicy: strategy.imageRoutingPolicy || 'chat-first',
         videoApiStyle: strategy.videoApiStyle || 'openai-v1-videos',
         isKnownProvider: strategy.known,
         uiProvider: strategy.uiProvider || 'Custom',

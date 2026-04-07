@@ -1,13 +1,12 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
-import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
 import { calculateImageHash } from '../utils/imageUtils';
 import { getCardDimensions } from '../utils/styleUtils';
-import { supabase } from '../lib/supabase'; // Import supabase for auth check
 import { notificationService, notify } from '../services/system/notificationService';
 import { logError, logInfo } from '../services/system/systemLogService';
 import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
@@ -17,7 +16,6 @@ import { createEmptyWorkflowGraph } from '../workflow/types';
 import { canvasToWorkflow, syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
 import { workflowToLegacyCanvas } from '../workflow/adapters/workflowToLegacy';
 import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
-import { sanitizeWorkflowForStorage } from '../workflow/persistence/workflowSerializer';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
 import {
@@ -25,6 +23,15 @@ import {
     normalizeReferenceImagesStorage,
     toReferenceImageDataUrl,
 } from '../utils/referenceImageStorage';
+import {
+    clearPersistedCanvasStorageSnapshot,
+    getCachedStrippedCanvases,
+    persistCanvasStateToLocalStorage,
+} from './canvasPersistence';
+import { useCanvasCloudSync } from './useCanvasCloudSync';
+import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
+import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
+import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
 import {
     buildImageResultIdentity,
@@ -34,6 +41,8 @@ import {
     getPromptCompletedTasks,
     normalizePersistentResultUrl,
 } from '../utils/imageResultPersistence';
+import { useAuth } from './AuthContext';
+import { useAppStartup } from './AppStartupContext';
 
 const MAX_CANVASES = 10;
 
@@ -172,47 +181,8 @@ const DEFAULT_STATE: CanvasState = {
     viewportCenter: { x: 0, y: 0 } // 默认画布中心
 };
 
-const stripReferenceImageData = (
-    referenceImages: PromptNode['referenceImages'],
-    aggressive: boolean
-): PromptNode['referenceImages'] => (
-    normalizeReferenceImagesStorage(referenceImages)?.map(ref => {
-        // [CRITICAL FIX] Keep small reference images in localStorage to prevent data loss on fast refresh.
-        // If storage quota is exceeded, we retry with aggressive mode that strips all ref data.
-        const shouldKeep = !aggressive && ref.data && ref.data.length < 500000;
-        return {
-            ...ref,
-            data: shouldKeep ? ref.data : ''
-        };
-    })
-);
-
 const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
     syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph);
-
-// Helper to strip image URLs and Reference Image data for localStorage
-const stripImageUrls = (canvases: Canvas[], aggressive: boolean = false): Canvas[] => {
-    return canvases.map(c => ({
-        ...c,
-        imageNodes: c.imageNodes.map(img => ({
-            ...img,
-            url: '', // Clear URL for localStorage, will be loaded from IndexedDB
-            originalUrl: '' // Clear Original URL to save space
-        })),
-        promptNodes: c.promptNodes.map(pn => ({
-            ...pn,
-            referenceImages: stripReferenceImageData(pn.referenceImages, aggressive)
-        })),
-        workflow: sanitizeWorkflowForStorage(c.workflow, aggressive)
-    }));
-};
-
-const hasLocalOnlyCanvasMedia = (canvases: Canvas[]): boolean => (
-    canvases.some((canvas) =>
-        canvas.imageNodes.length > 0
-        || canvas.promptNodes.some((promptNode) => Array.isArray(promptNode.referenceImages) && promptNode.referenceImages.length > 0)
-    )
-);
 
 type LocalMediaCacheEntry = {
     url?: string;
@@ -271,32 +241,28 @@ const resolveOriginalPersistSourceForDisk = async (
 ): Promise<string | null> => {
     const explicitOriginal = normalizeMediaCacheSource(image.originalUrl)
         || normalizeMediaCacheSource(image.apiResultUrl);
-    if (explicitOriginal) {
+    if (explicitOriginal && !explicitOriginal.startsWith('blob:')) {
         return explicitOriginal;
     }
 
     const storageId = image.storageId || image.id;
     if (storageId) {
         const cachedOriginal = await getStrictOriginalImage(storageId);
-        if (cachedOriginal) {
+        if (cachedOriginal && !cachedOriginal.startsWith('blob:')) {
             return cachedOriginal;
         }
     }
 
     if (isGeneratedMediaVideoLike(image)) {
-        return normalizeMediaCacheSource(image.url) || null;
+        const stableVideoSource = normalizeMediaCacheSource(image.url);
+        return stableVideoSource && !stableVideoSource.startsWith('blob:')
+            ? stableVideoSource
+            : null;
     }
 
     return null;
 };
 
-const buildStorageState = (state: CanvasState, aggressive: boolean = false): CanvasState => ({
-    ...state,
-    canvases: stripImageUrls(state.canvases, aggressive),
-    history: {},
-    fileSystemHandle: null,
-    folderName: null
-});
 
 const getExpectedPromptImageCount = (node?: Partial<PromptNode> | null): number => (
     Math.max(1, Number(node?.lastGenerationTotalCount || node?.parallelCount || 1) || 1)
@@ -476,7 +442,7 @@ const buildPromptRecoveryEntries = (
                 provider: task.provider,
                 providerLabel: task.providerLabel,
                 model: task.model,
-                modelLabel: task.modelLabel,
+                modelLabel: resolveModelDisplayName(task.model, task.modelLabel),
                 cost: task.cost,
                 costSource: task.costSource,
                 tokens: task.tokens,
@@ -590,6 +556,60 @@ const hasRecoverablePendingTask = (node?: Partial<PromptNode> | null): boolean =
     if (getPendingTaskIdsFromPrompt(node).length > 0) return true;
     if (getPendingSyncRequestsFromPrompt(node).length > 0) return true;
     return typeof node.jobId === 'string' && node.jobId.trim().length > 0;
+};
+
+const buildPersistedImageRecoverySignature = (canvases: Canvas[] = []): string => {
+    const tokens: string[] = [];
+
+    canvases.forEach((canvas) => {
+        const imageNodes = canvas.imageNodes || [];
+        const promptNodes = canvas.promptNodes || [];
+
+        imageNodes.forEach((imageNode) => {
+            if (!imageNode.url || !imageNode.originalUrl) {
+                tokens.push(`img:${canvas.id}:${imageNode.id}`);
+            }
+        });
+
+        promptNodes.forEach((promptNode) => {
+            const recoveryEntries = buildPromptRecoveryEntries(promptNode);
+            if (!recoveryEntries.length) return;
+
+            const existingChildren = imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
+            const seenResultKeys = new Set<string>();
+
+            existingChildren.forEach((imageNode) => {
+                const identity = buildImageResultIdentity(imageNode);
+                if (identity) {
+                    seenResultKeys.add(identity);
+                }
+                const fallbackIdentity = buildTaskResultIdentity({
+                    taskId: imageNode.sourceTaskId,
+                    resultIndex: imageNode.sourceResultIndex,
+                    url: normalizePersistentResultUrl(imageNode.apiResultUrl || imageNode.originalUrl || imageNode.url),
+                });
+                if (fallbackIdentity) {
+                    seenResultKeys.add(fallbackIdentity);
+                }
+            });
+
+            const hasMissingRecoveryEntry = recoveryEntries.some((entry) => {
+                const identity = buildTaskResultIdentity({
+                    taskId: entry.taskId,
+                    resultIndex: entry.resultIndex,
+                    url: entry.url,
+                });
+                if (!identity) return false;
+                return !seenResultKeys.has(identity);
+            });
+
+            if (hasMissingRecoveryEntry) {
+                tokens.push(`prompt:${canvas.id}:${promptNode.id}`);
+            }
+        });
+    });
+
+    return tokens.join('|');
 };
 
 const resolvePromptChildImageIds = (
@@ -779,31 +799,9 @@ const hasUnrecoverableSyncGenerationInFlight = (state?: CanvasState | null): boo
     );
 };
 
-const persistCanvasStateToLocalStorage = (state: CanvasState, context: string = 'canvas-save') => {
-    const write = (aggressive: boolean) => {
-        const serialized = JSON.stringify(buildStorageState(state, aggressive));
-        if (!aggressive && serialized.length > 4500000) {
-            console.warn(`[CanvasContext] Canvas state approaching localStorage quota limit during ${context}.`);
-        }
-        localStorage.setItem(STORAGE_KEY, serialized);
-        return serialized.length;
-    };
-
-    try {
-        write(false);
-    } catch (error: any) {
-        if (error?.name !== 'QuotaExceededError') throw error;
-
-        try {
-            const fallbackLength = write(true);
-            console.warn(`[CanvasContext] localStorage quota exceeded during ${context}, retried with aggressive payload (${fallbackLength} chars).`);
-        } catch (fallbackError) {
-            throw fallbackError;
-        }
-    }
-};
-
 export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user, session, isTempUser } = useAuth();
+    const { isStageReady } = useAppStartup();
     const [isLoading, setIsLoading] = useState(true);
     const [isShellReady, setIsShellReady] = useState(false);
     const [state, setState] = useState<CanvasState>(() => {
@@ -849,6 +847,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error('[CanvasProvider] Failed to parse stored state (Resetting):', e);
             try {
                 localStorage.removeItem(STORAGE_KEY);
+                clearPersistedCanvasStorageSnapshot();
             } catch (cleanupErr) {
                 console.error('[CanvasProvider] Failed to clear localStorage:', cleanupErr);
             }
@@ -1254,6 +1253,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0);
     };
 
+    const canLoadCloudLayout = Boolean(user && session && !isTempUser && isStageReady('profile_ready'));
+    const canSaveCloudLayout = Boolean(user && session && !isTempUser && isStageReady('workspace_ready'));
+
     const isCanvasEffectivelyEmpty = (canvas?: Canvas | null): boolean => getCanvasCardCount(canvas) === 0;
 
     const mergeItemsById = <T extends { id: string }>(localItems: T[] = [], diskItems: T[] = []): T[] => {
@@ -1363,9 +1365,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Cloud sync: load and merge on init.
     useEffect(() => {
         const loadCloud = async () => {
-            // Wait for auth?
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+            if (!canLoadCloudLayout) return;
 
             try {
                 const cloudCanvases = await syncService.loadLayout();
@@ -1436,31 +1436,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         };
 
-        if (!isLoading) loadCloud();
-    }, [isLoading]);
+        if (!isLoading && canLoadCloudLayout) loadCloud();
+    }, [isLoading, canLoadCloudLayout]);
 
-    // Cloud sync: auto-save.
-    const cloudMediaSyncWarningShownRef = useRef(false);
-    useEffect(() => {
-        if (isLoading || state.canvases.length === 0) return;
-
-        if (hasLocalOnlyCanvasMedia(state.canvases)) {
-            if (!cloudMediaSyncWarningShownRef.current) {
-                console.warn('[CanvasContext] Cloud layout sync skipped because the canvas still depends on local-only media assets.');
-                cloudMediaSyncWarningShownRef.current = true;
-            }
-            return;
-        }
-
-        cloudMediaSyncWarningShownRef.current = false;
-
-        const timer = setTimeout(() => {
-            const stripped = stripImageUrls(state.canvases);
-            syncService.saveLayout(stripped).catch(e => console.error('[CanvasContext] Cloud save failed', e));
-        }, 3000); // 3s debounce
-
-        return () => clearTimeout(timer);
-    }, [state.canvases, isLoading]);
+    useCanvasCloudSync(state.canvases, isLoading, canSaveCloudLayout);
     const isLoadingRef = useRef(isLoading);
     // Mark operations that need an urgent flush and should bypass the 200ms debounce.
     const urgentSaveRef = useRef(false);
@@ -1469,59 +1448,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isLoadingRef.current = isLoading;
     }, [state, isLoading]);
 
-    // Persistence Mechanism
-    useEffect(() => {
-        // 1. Debounced Auto-Save
-        if (isLoading) return;
-
-        const saveState = async () => {
-            try {
-                persistCanvasStateToLocalStorage(state, 'debounced-save');
-            } catch (error: any) {
-                if (error.name === 'QuotaExceededError') console.error('localStorage quota exceeded.');
-                else console.error('Failed to save state:', error);
-            }
-        };
-
-        let timer: any;
-        if (urgentSaveRef.current) {
-            // Urgent path: save immediately, bypass debounce, and reset the flag.
-            urgentSaveRef.current = false;
-            saveState();
-        } else {
-            timer = setTimeout(saveState, 200);
-        }
-
-        return () => clearTimeout(timer);
-    }, [state, isLoading]);
-
-    // 2. Stable Safety Save (Unload / Hidden) - Unmounts only once
-    useEffect(() => {
-        const handleSave = (source: 'visibility' | 'beforeunload') => {
-            if (isLoadingRef.current) return;
-            try {
-                const currentState = stateRef.current;
-                const stateToPersist = source === 'beforeunload'
-                    ? markInterruptedSyncPromptGenerations(currentState)
-                    : currentState;
-                persistCanvasStateToLocalStorage(stateToPersist, source === 'beforeunload' ? 'beforeunload-save' : 'visibility-save');
-            } catch (e) {
-                console.error('Failed to save state on unload:', e);
-            }
-        };
-
-        const handleBeforeUnloadSave = () => handleSave('beforeunload');
-        window.addEventListener('beforeunload', handleBeforeUnloadSave);
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') handleSave('visibility');
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnloadSave);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, []);
+    useCanvasLocalPersistence({
+        state,
+        isLoading,
+        storageKey: STORAGE_KEY,
+        stateRef,
+        isLoadingRef,
+        urgentSaveRef,
+        prepareBeforeUnloadState: markInterruptedSyncPromptGenerations,
+    });
 
     // Hydrate Reference Images from IDB (if stripped from localStorage)
     useEffect(() => {
@@ -1935,11 +1870,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     const sourceForTypeCheck = node.originalUrl || node.apiResultUrl || node.url || '';
                     const isVideo = node.mode === 'video' || sourceForTypeCheck.startsWith('data:video/');
                     const storageId = node.storageId || node.id;
-                    const preferredOriginalSource = node.originalUrl || node.apiResultUrl || node.url || '';
+                    const preferredOriginalSource = normalizePersistableMediaSource(
+                        node.originalUrl || '',
+                        isVideo ? 'video/mp4' : (node.mimeType || 'image/png')
+                    );
                     const stableOriginalSource = preferredOriginalSource.startsWith('blob:')
                         ? null
                         : preferredOriginalSource;
-                    const previewSource = stableOriginalSource || preferredOriginalSource;
+                    const previewSource = normalizePersistableMediaSource(
+                        node.apiResultUrl || node.url || node.originalUrl || '',
+                        isVideo ? 'video/mp4' : (node.mimeType || 'image/png')
+                    );
 
                     // [Key fix] Save the original asset to the most durable store first.
                     // A. File system first: persist to local disk when available.
@@ -2310,8 +2251,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, [updateCanvas]);
 
+    const persistedImageRecoverySignature = useMemo(
+        () => buildPersistedImageRecoverySignature(state.canvases),
+        [state.canvases]
+    );
+    const canHydratePersistedTaskResults = Boolean(user && session && isStageReady('background_ready'));
+
     useEffect(() => {
-        if (isLoading) return;
+        if (isLoading || !canHydratePersistedTaskResults || !persistedImageRecoverySignature) return;
 
         let cancelled = false;
 
@@ -2432,7 +2379,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             imageSize: promptNode.imageSize,
                             timestamp: entry.completedAt || promptNode.timestamp || Date.now(),
                             model: entry.model || promptNode.model,
-                            modelLabel: entry.modelLabel || promptNode.modelLabel,
+                            modelLabel: resolveModelDisplayName(
+                                entry.model || promptNode.model,
+                                entry.modelLabel || promptNode.modelLabel,
+                            ),
                             modelColorStart: promptNode.modelColorStart,
                             modelColorEnd: promptNode.modelColorEnd,
                             modelColorSecondary: promptNode.modelColorSecondary,
@@ -2481,6 +2431,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (imageUpdates.length > 0) {
                 updateNodes({ imageNodes: imageUpdates });
                 cacheWrites.forEach(({ storageId, url }) => {
+                    if (url.startsWith('blob:')) {
+                        return;
+                    }
                     void saveOriginalImage(storageId, url).catch(() => undefined);
                 });
             }
@@ -2495,7 +2448,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => {
             cancelled = true;
         };
-    }, [addImageNodes, isLoading, state.canvases, updateNodes]);
+    }, [addImageNodes, canHydratePersistedTaskResults, isLoading, persistedImageRecoverySignature, updateNodes]);
 
     const addWorkflowNode = useCallback((node: WorkflowNode) => {
         if (!isWorkflowUtilityNodeKind(node.kind)) {
@@ -2687,7 +2640,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const deletePromptNode = useCallback((id: string) => {
         pushToHistory();
 
-        urgentSaveRef.current = true; // 鐖惰妭鐐瑰垹闄ゅ悗鍚屾瀛樼洏
+        urgentSaveRef.current = true; // 父节点删除后同步存盘
         updateCanvas(c => {
             // [Strict Logic] Delete Main Card -> Sub-cards become Lonely Sub Cards (Orphaned)
             // DO NOT delete the images. Just clear their parentPromptId.
@@ -2808,6 +2761,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // Clear localStorage
         localStorage.removeItem(STORAGE_KEY);
+        clearPersistedCanvasStorageSnapshot();
         // Clear IndexedDB images
         clearAllImages();
         // Reset to default state
@@ -4428,105 +4382,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return () => window.clearInterval(interval);
     }, [state.fileSystemHandle, runLocalFolderRefresh]);
 
-    // Enhanced Persistence (Local Storage + File System)
-    useEffect(() => {
-        if (isLoading) return;
-
-        const saveState = async () => {
-            // [Fix] Set the write lock so refresh cannot read half-written state.
-            isSavingRef.current = true;
-            try {
-                // 1. Save to LocalStorage (Only if NOT using File System)
-                if (!state.fileSystemHandle) {
-                    try {
-                        persistCanvasStateToLocalStorage(state, 'periodic-save');
-                    } catch (e: any) {
-                        if (e.name === 'QuotaExceededError') console.error('localStorage quota exceeded.');
-                        else console.error('Failed to save state:', e);
-                    }
-                }
-
-                // 2. Save to File System if connected
-                if (state.fileSystemHandle) {
-                    try {
-                        // Gather all dirty/needed images
-                        const imagesToSave = new Map<string, Blob>();
-
-                        const allImages = new Map<string, string>();
-                        state.canvases.forEach(c => {
-                            c.imageNodes.forEach(img => {
-                                const storageId = img.storageId || img.id;
-                                if (!storageId) return;
-                                allImages.set(storageId, '');
-                            });
-                        });
-
-                        for (const [id] of allImages.entries()) {
-                            const imageNode = state.canvases
-                                .flatMap(canvas => canvas.imageNodes)
-                                .find(img => (img.storageId || img.id) === id);
-                            if (!imageNode) continue;
-
-                            const url = await resolveOriginalPersistSourceForDisk(imageNode);
-                            if (!url) {
-                                continue;
-                            }
-
-                            // Only fetch if it's a blob url (local)
-                            if (url.startsWith('blob:') || url.startsWith('data:') || /^https?:\/\//i.test(url)) {
-                                try {
-                                    const res = await fetch(url);
-                                    if (!res.ok) throw new Error('Fetch status: ' + res.status);
-                                    const blob = await res.blob();
-                                    imagesToSave.set(id, blob);
-                                } catch (err: any) {
-                                    // [Fix] Ignore known blob errors to prevent console spam.
-                                    if (err.message && err.message.includes('ERR_UPLOAD_FILE_CHANGED')) {
-                                        console.warn('[CanvasContext] Blob reference lost for ' + id + ' (file changed/moved), skipping save.');
-                                    } else if (err instanceof TypeError && String(err.message || '').includes('Failed to fetch')) {
-                                        // blob/data URLs can expire before save completes; this failure is safe to ignore.
-                                    } else {
-                                        console.warn('[CanvasContext] Skip saving image ' + id + ' (fetch failed):', err);
-                                    }
-                                }
-                            }
-                        }
-
-                        // Prepare Clean State for JSON
-                        // [Defensive fix] Ensure canvases is non-empty and still contains activeCanvasId.
-                        const cleanCanvases = stripImageUrls(state.canvases);
-                        if (cleanCanvases.length === 0) {
-                            console.error('[CanvasContext] Aborting save: canvases array is empty! This would wipe project.json');
-                            return;
-                        }
-
-                        const fsState = {
-                            canvases: cleanCanvases,
-                            activeCanvasId: state.activeCanvasId || cleanCanvases[0]?.id || 'default',
-                            version: 1
-                        };
-
-                        console.log('[CanvasContext] Saving project to disk:', {
-                            canvasesCount: fsState.canvases.length,
-                            activeCanvasId: fsState.activeCanvasId,
-                            imagesToSave: imagesToSave.size
-                        });
-
-                        await fileSystemService.saveProject(state.fileSystemHandle, fsState as any, imagesToSave);
-
-                    } catch (error) {
-                        console.error('File System Save Failed:', error);
-                    }
-                }
-            } finally {
-                // [Fix] Release the write lock.
-                isSavingRef.current = false;
-            }
-        };
-
-        const timer = setTimeout(saveState, 1000); // 1s debounce for FS operations
-        return () => clearTimeout(timer);
-    }, [state, isLoading]);
+    useCanvasFileSystemPersistence({
+        canvases: state.canvases,
+        activeCanvasId: state.activeCanvasId,
+        fileSystemHandle: state.fileSystemHandle,
+        isLoading,
+        stateRef,
+        isSavingRef,
+        resolveOriginalPersistSourceForDisk,
+    });
 
 
     /**

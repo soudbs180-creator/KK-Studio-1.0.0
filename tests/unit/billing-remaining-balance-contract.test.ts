@@ -14,7 +14,7 @@ test('billing balance refresh still resolves remaining balance from canonical so
 
   assert.match(
     billingContextSource,
-    /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/,
+    /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/,
   );
   assert.match(
     billingContextSource,
@@ -47,19 +47,27 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
+    /if \(!canStartBillingBootstrap\) \{\s*return;\s*\}/,
+  );
+  assert.match(
+    billingContextSource,
     /const refreshPromise = \(includeTransactions\s*\?\s*Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*:\s*refreshBalanceOnly\(\)\.then\(\(canonicalBalance\) => \[canonicalBalance, undefined\] as const\)\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
   );
   assert.match(
     billingContextSource,
-    /const response = await legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\);/,
+    /const response = await kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\);/,
   );
   assert.match(
     billingContextSource,
-    /const response = await legacyWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*buildBillingRequestOptions\(apiAccessToken\),\s*\);/,
+    /const response = await kkWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*buildBillingRequestOptions\(apiAccessToken\),\s*\);/,
   );
   assert.match(
     billingContextSource,
     /void refreshBilling\(\{\s*includeTransactions: true,\s*silent: true,\s*\}\);/,
+  );
+  assert.match(
+    billingContextSource,
+    /void refreshBilling\(\{\s*includeTransactions: false,\s*silent: true,\s*\}\);/,
   );
   assert.match(
     billingContextSource,
@@ -72,14 +80,28 @@ test('billing balance refresh still resolves remaining balance from canonical so
   assert.doesNotMatch(billingContextSource, /total_spent/i);
 });
 
-test('billing credit mutations stay on the typed billing API surface', () => {
+test('billing credit mutations stay on the shared web API surface', () => {
   const billingContextSource = readSource('src/context/BillingContext.tsx');
 
-  assert.match(billingContextSource, /const response = await legacyWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /const response = await kkWebApiClient\.debitCredits\(\{/);
   assert.match(billingContextSource, /transactionId: response\.data\.ledgerId,/);
-  assert.match(billingContextSource, /const response = await legacyWebApiClient\.refundCredits\(\{/);
+  assert.match(billingContextSource, /const response = await kkWebApiClient\.refundCredits\(\{/);
   assert.doesNotMatch(billingContextSource, /supabase\.rpc\('consume_credits', \{/);
   assert.doesNotMatch(billingContextSource, /supabase\.rpc\('refund_credits', \{/);
+});
+
+test('recharge modal success path refreshes canonical billing balance and transaction logs', () => {
+  const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
+
+  assert.match(rechargeModalSource, /const \{ showRechargeModal, setShowRechargeModal, refreshBilling \} = useBilling\(\);/);
+  assert.match(
+    rechargeModalSource,
+    /if \(response\.data\.paymentOrderStatus === 'paid' && response\.data\.settlementApplied\) \{\s*setPaymentStatus\('success'\);\s*setPaymentMessage\('支付成功，积分已经同步到当前余额。'\);\s*await refreshBilling\(\{ includeTransactions: true \}\);/,
+  );
+  assert.doesNotMatch(
+    rechargeModalSource,
+    /if \(response\.data\.paymentOrderStatus === 'paid' && response\.data\.settlementApplied\) \{\s*setPaymentStatus\('success'\);\s*setPaymentMessage\('支付成功，积分已经同步到当前余额。'\);\s*await refreshBilling\(\);/,
+  );
 });
 
 test('remaining balance display helper is shared across billing surfaces', () => {
@@ -97,7 +119,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.match(helperSource, /export function formatRemainingCredits\(balance: unknown, locale = 'zh-CN'\): string \{/);
 
   assert.ok(dashboardLocalizedSource.includes('selectRemainingBalanceSummary'));
-  assert.ok(dashboardLocalizedSource.includes('const remainingBalanceDisplay = formatRemainingCredits(balance, locale);'));
+  assert.ok(dashboardLocalizedSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);"));
   assert.ok(dashboardLocalizedSource.includes('title: pick('));
   assert.ok(dashboardLocalizedSource.includes("'Credits & Recharge')"));
   assert.ok(dashboardLocalizedSource.includes('value: remainingBalanceDisplay'));
@@ -108,18 +130,18 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.ok(dashboardSource.includes('value: remainingBalanceDisplay'));
 
   assert.ok(profileModalSource.includes("const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');"));
-  assert.ok(profileModalSource.includes('积分'));
-  assert.ok(profileModalSource.includes('仅管理员积分模型会消耗这里的积分，个人 API 不扣积分'));
-  assert.ok(profileModalSource.includes('void refreshBilling();'));
+  assert.ok(profileModalSource.includes('const remainingBalanceHint = latestRecharge'));
+  assert.ok(profileModalSource.includes('个人 API 不扣积分'));
+  assert.ok(profileModalSource.includes("void refreshBilling({ includeTransactions: true });"));
 
-  assert.ok(costEstimationSource.includes('const { balance, usageLogs, refreshBilling, fetchLogs } = useBilling();'));
-  assert.ok(costEstimationSource.includes('const remainingBalanceDisplay = formatRemainingCredits(balance, locale);'));
+  assert.ok(costEstimationSource.includes('const { balance, loading: billingLoading, usageLogs, refreshBilling, fetchLogs } = useBilling();'));
+  assert.ok(costEstimationSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);"));
   assert.ok(costEstimationSource.includes('value={remainingBalanceDisplay}'));
   assert.ok(costEstimationSource.includes('await refreshBilling();'));
 
   assert.ok(mobileHeaderSource.includes("const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
-  assert.ok(promptBarSource.includes("const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');"));
-  assert.ok(chatSidebarSource.includes("const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');"));
+  assert.ok(promptBarSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
+  assert.ok(chatSidebarSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
 });
 
 test('user api settings keep working when local API persistence degrades to memory mode', () => {

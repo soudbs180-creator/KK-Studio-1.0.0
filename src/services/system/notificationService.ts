@@ -4,8 +4,8 @@
  * Error messages are formatted to be AI-readable for debugging
  */
 
-import { addLog, LogLevel } from './systemLogService';
-import { localizeUserFacingText, pickByDocumentLanguage } from '../../utils/localeText';
+import { addLog, LogLevel } from './systemLogService.ts';
+import { localizeUserFacingText, pickByDocumentLanguage } from '../../utils/localeText.ts';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info' | 'alipay' | 'wechat' | 'paypal';
 

@@ -5,6 +5,7 @@ type JsonRecord = Record<string, unknown>;
 type LegacyArrayKind = "slots" | "entries" | "unknown";
 
 const REDACTED_SECRET_PREFIX = "__kk_redacted__:";
+const CLIENT_VISIBLE_SECRET_PLACEHOLDER = "sk-readonly-0000";
 const SECRET_ARRAY_FIELDS = {
   slots: ["key"],
   providers: ["apiKey"],
@@ -78,7 +79,9 @@ function shouldPreservePersistedSecret(value: unknown): boolean {
   }
 
   const normalized = value.trim();
-  return normalized.length === 0 || isRedactedSecretPlaceholder(normalized);
+  return normalized.length === 0
+    || normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER
+    || isRedactedSecretPlaceholder(normalized);
 }
 
 function buildRedactedSecretPlaceholder(recordId: string, field: string): string {

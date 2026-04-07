@@ -5,8 +5,9 @@ import { tempUserService, type TempUserSession } from '../services/auth/tempUser
 import { setKkApiAccessToken } from '../services/api/kkApiClient';
 import { startKkApiAccessTokenSessionSync } from '../services/api/authAccessToken';
 import { clearStoredAdminSession } from '../services/api/adminSession';
-import { emitAuthSessionChange } from '../services/auth/authSessionEvents';
+import { emitAuthSessionChange, subscribeAuthSessionInvalidationRequest } from '../services/auth/authSessionEvents';
 import { keyManager } from '../services/auth/keyManager';
+import { setTaskPersistenceStorageUserId } from '../services/persistence/taskPersistence';
 
 interface AuthContextType {
     session: Session | null;
@@ -55,6 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useLayoutEffect(() => {
         const nextUserId = tempUserSession ? null : (user?.id || null);
+        const nextTaskStorageUserId = tempUserSession?.user?.id || user?.id || null;
+        setTaskPersistenceStorageUserId(nextTaskStorageUserId);
         void keyManager.setUserId(nextUserId).catch((error) => {
             console.warn('[AuthContext] Failed to sync KeyManager user scope:', error);
         });
@@ -99,6 +102,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const currentTempUserSession = latestTempUserSessionRef.current;
             if (currentSession?.user && currentUser) {
                 console.warn('[AuthContext] Preserving existing Supabase session:', reason);
+                emitAuthSessionChange({
+                    hasSession: true,
+                    userId: currentSession.user.id,
+                    accessToken: currentSession.access_token || undefined,
+                    refreshToken: currentSession.refresh_token || undefined,
+                    isTempUser: false,
+                });
                 setLoading(false);
                 return;
             }
@@ -127,6 +137,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             settleAuthState(null);
             expectedSessionClearReasonRef.current = null;
         };
+
+        const unsubscribeSessionInvalidation = subscribeAuthSessionInvalidationRequest((reason) => {
+            void invalidateStaleAuthState(reason || 'external session invalidation request');
+        });
 
         const recoverUnexpectedSessionLoss = (reason: string) => {
             if (!active || authRecoveryPromiseRef.current) {
@@ -190,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     hasSession: true,
                     userId: nextSession.user.id,
                     accessToken: nextSession.access_token || undefined,
+                    refreshToken: nextSession.refresh_token || undefined,
                     isTempUser: false,
                 });
                 setLoading(false);
@@ -276,6 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => {
             active = false;
             window.clearTimeout(sessionTimeout);
+            unsubscribeSessionInvalidation();
             subscription.unsubscribe();
         };
     }, []);

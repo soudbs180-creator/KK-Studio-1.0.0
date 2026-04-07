@@ -54,6 +54,12 @@ type ResolvedUserRoute = {
   compatibilityMode?: 'standard' | 'chat';
 };
 
+const RESPONSE_ONLY_MODEL_PATTERNS = [
+  /^o3-pro$/i,
+  /^codex-mini-latest$/i,
+  /^o3-deep-research(?:-[\d-]+)?$/i,
+];
+
 function shouldForceQueryAuthForProvider(provider: string, baseUrl: string): boolean {
   const normalizedProvider = String(provider || '').trim().toLowerCase();
   const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
@@ -533,6 +539,19 @@ function mapAspectRatioToOpenAI(aspectRatio?: string): string {
   }
 }
 
+function is12AIGeminiBaseUrl(baseUrl: string): boolean {
+  const normalizedBaseUrl = String(baseUrl || '').trim();
+  if (!normalizedBaseUrl) return false;
+
+  try {
+    const candidate = /^https?:\/\//i.test(normalizedBaseUrl) ? normalizedBaseUrl : `https://${normalizedBaseUrl}`;
+    const host = new URL(candidate).hostname.toLowerCase();
+    return /(^|\.)12ai\.(org|xyz|io|net)$/i.test(host);
+  } catch {
+    return false;
+  }
+}
+
 function getVideoDurationSeconds(body: ProxyRequest): number | undefined {
   if (typeof body.duration === 'number' && Number.isFinite(body.duration) && body.duration > 0) {
     return Math.round(body.duration);
@@ -551,6 +570,43 @@ function isGeminiImageCompatModel(modelId: string): boolean {
   return (lower.includes('gemini') && lower.includes('image'))
     || lower.includes('nano-banana')
     || lower.includes('banana');
+}
+
+function modelPrefersResponsesApi(modelId: string): boolean {
+  const normalized = getUpstreamModelId(modelId).toLowerCase();
+  return RESPONSE_ONLY_MODEL_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function shouldRetryWithResponsesApi(status: number | undefined, errorText: string | undefined): boolean {
+  if (!errorText) return false;
+
+  const text = String(errorText || '').toLowerCase();
+  if (!text) return false;
+
+  if (text.includes('/v1/responses') || text.includes('use /v1/responses')) {
+    return true;
+  }
+
+  if ((text.includes('responses api') || text.includes('response api')) && !text.includes('image')) {
+    return true;
+  }
+
+  if (
+    (text.includes('chat/completions') || text.includes('/chat/completions'))
+    && (text.includes('not supported') || text.includes('unsupported') || text.includes('invalid'))
+  ) {
+    return true;
+  }
+
+  if (
+    status === 400
+    && text.includes('responses')
+    && (text.includes('model') || text.includes('endpoint'))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function toOpenAIImageUrl(ref: string | { data: string; mimeType?: string }): string | null {
@@ -603,6 +659,60 @@ function extractImageUrlsFromOpenAICompatPayload(data: any): string[] {
   return Array.from(new Set(urls));
 }
 
+function buildResponsesRequestBody(body: ProxyRequest, modelId: string): Record<string, unknown> {
+  return {
+    model: modelId,
+    input: (body.messages || []).map((message) => ({
+      role: message.role,
+      content: [
+        {
+          type: 'input_text',
+          text: String(message.content || ''),
+        },
+      ],
+    })),
+    stream: false,
+    temperature: body.temperature ?? 0.7,
+    max_output_tokens: body.maxTokens ?? 2048,
+  };
+}
+
+function extractTextFromResponsesPayload(payload: any): string {
+  const directOutputText = String(payload?.output_text || '').trim();
+  if (directOutputText) {
+    return directOutputText;
+  }
+
+  if (!Array.isArray(payload?.output)) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  for (const item of payload.output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const block of content) {
+      const text = String(block?.text || block?.content || '').trim();
+      if (text) {
+        parts.push(text);
+      }
+    }
+  }
+
+  return parts.join('').trim();
+}
+
+function extractOpenAIUsage(payload: any): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  const promptTokens = Number(payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens ?? 0) || 0;
+  const completionTokens = Number(payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens ?? 0) || 0;
+  const totalTokens = Number(payload?.usage?.total_tokens ?? (promptTokens + completionTokens)) || 0;
+
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens,
+  };
+}
+
 function buildGoogleImageExtraBody(body: ProxyRequest): Record<string, unknown> | undefined {
   const imageConfig: Record<string, unknown> = {};
   const aspectRatio = normalizeAspectRatio(body.aspectRatio);
@@ -624,15 +734,20 @@ function buildGoogleImageExtraBody(body: ProxyRequest): Record<string, unknown> 
   };
 }
 
-async function toInlineImagePart(ref: string | { data: string; mimeType?: string }) {
+async function toInlineImagePart(ref: string | { data: string; mimeType?: string }, useSnakeCase = false) {
   if (typeof ref === 'string') {
     const match = ref.match(/^data:(.+?);base64,(.+)$/);
     if (match) {
       return {
-        inlineData: {
-          mimeType: match[1] || 'image/png',
-          data: match[2] || '',
-        },
+        [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+          ? {
+              mime_type: match[1] || 'image/png',
+              data: match[2] || '',
+            }
+          : {
+              mimeType: match[1] || 'image/png',
+              data: match[2] || '',
+            },
       };
     }
     return null;
@@ -642,18 +757,28 @@ async function toInlineImagePart(ref: string | { data: string; mimeType?: string
   const match = rawData.match(/^data:(.+?);base64,(.+)$/);
   if (match) {
     return {
-      inlineData: {
-        mimeType: match[1] || ref.mimeType || 'image/png',
-        data: match[2] || '',
-      },
+      [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+        ? {
+            mime_type: match[1] || ref.mimeType || 'image/png',
+            data: match[2] || '',
+          }
+        : {
+            mimeType: match[1] || ref.mimeType || 'image/png',
+            data: match[2] || '',
+          },
     };
   }
 
   return {
-    inlineData: {
-      mimeType: ref.mimeType || 'image/png',
-      data: rawData,
-    },
+    [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+      ? {
+          mime_type: ref.mimeType || 'image/png',
+          data: rawData,
+        }
+      : {
+          mimeType: ref.mimeType || 'image/png',
+          data: rawData,
+        },
   };
 }
 
@@ -1122,10 +1247,31 @@ Deno.serve(async (req) => {
     };
 
     if (body.mode === 'chat' && endpointType === 'gemini') {
-      const geminiMessages = (body.messages || []).map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content || '' }],
-      }));
+      const useSnakeCase = is12AIGeminiBaseUrl(baseUrl);
+      const systemMessages = (body.messages || [])
+        .filter((message) => message.role === 'system')
+        .map((message) => String(message.content || '').trim())
+        .filter(Boolean);
+      const geminiMessages = (body.messages || [])
+        .filter((message) => message.role !== 'system')
+        .map((message) => ({
+          role: message.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: message.content || '' }],
+        }));
+      const payload: Record<string, unknown> = {
+        contents: geminiMessages.length > 0
+          ? geminiMessages
+          : [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        generationConfig: {
+          temperature: body.temperature ?? 0.7,
+          maxOutputTokens: body.maxTokens ?? 2048,
+        },
+      };
+      if (systemMessages.length > 0) {
+        payload[useSnakeCase ? 'system_instruction' : 'systemInstruction'] = {
+          parts: systemMessages.map((text) => ({ text })),
+        };
+      }
 
       const auth = buildGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, route);
       const geminiResponse = await fetch(auth.url, {
@@ -1134,13 +1280,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
           ...(auth.headers as Record<string, string>),
         },
-        body: JSON.stringify({
-          contents: geminiMessages,
-          generationConfig: {
-            temperature: body.temperature ?? 0.7,
-            maxOutputTokens: body.maxTokens ?? 2048,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!geminiResponse.ok) {
@@ -1205,38 +1345,68 @@ Deno.serve(async (req) => {
           + Number(result?.usage?.output_tokens || 0),
       };
     } else if (body.mode === 'chat') {
-      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, route);
-      const chatResponse = await fetch(auth.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(auth.headers as Record<string, string>),
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: body.messages,
-          max_tokens: body.maxTokens ?? 2048,
-          temperature: body.temperature ?? 0.7,
-          stream: false,
-        }),
-      });
-
-      if (!chatResponse.ok) {
-        const errorText = await chatResponse.text();
-        return json({ success: false, error: `Upstream error: ${chatResponse.status} ${errorText}` }, 502);
-      }
-
-      const result = await chatResponse.json();
-      content = result?.choices?.[0]?.message?.content || '';
-      usage = {
-        promptTokens: Number(result?.usage?.prompt_tokens || 0),
-        completionTokens: Number(result?.usage?.completion_tokens || 0),
-        totalTokens: Number(result?.usage?.total_tokens || 0),
+      const chatAuth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, route);
+      const responsesAuth = buildOpenAICompatAuth(`${baseUrl}/v1/responses`, route);
+      const chatBody = {
+        model: modelId,
+        messages: body.messages,
+        max_tokens: body.maxTokens ?? 2048,
+        temperature: body.temperature ?? 0.7,
+        stream: false,
       };
+      const responsesBody = buildResponsesRequestBody(body, modelId);
+      const preferResponses = modelPrefersResponsesApi(modelId);
+
+      const invokeOpenAIJson = async (
+        auth: { url: string; headers: Record<string, string> },
+        payload: Record<string, unknown>,
+      ): Promise<any> => {
+        const response = await fetch(auth.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Upstream error: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+      };
+
+      try {
+        const result = preferResponses
+          ? await invokeOpenAIJson(responsesAuth, responsesBody)
+          : await invokeOpenAIJson(chatAuth, chatBody);
+        content = preferResponses ? extractTextFromResponsesPayload(result) : (result?.choices?.[0]?.message?.content || '');
+        usage = extractOpenAIUsage(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error || '');
+        const statusMatch = message.match(/Upstream error:\s*(\d+)/i);
+        const status = statusMatch?.[1] ? Number(statusMatch[1]) : undefined;
+
+        if (!preferResponses && shouldRetryWithResponsesApi(status, message)) {
+          try {
+            const result = await invokeOpenAIJson(responsesAuth, responsesBody);
+            content = extractTextFromResponsesPayload(result);
+            usage = extractOpenAIUsage(result);
+          } catch (responsesError) {
+            const finalMessage = responsesError instanceof Error ? responsesError.message : String(responsesError || '');
+            return json({ success: false, error: finalMessage }, 502);
+          }
+        } else {
+          return json({ success: false, error: message }, 502);
+        }
+      }
     } else if (body.mode === 'image' && endpointType === 'gemini') {
+      const useSnakeCase = is12AIGeminiBaseUrl(baseUrl);
       const parts: any[] = [];
       for (const ref of body.referenceImages || []) {
-        const inlinePart = await toInlineImagePart(ref);
+        const inlinePart = await toInlineImagePart(ref, useSnakeCase);
         if (inlinePart) parts.push(inlinePart);
       }
       parts.push({ text: body.prompt || '' });

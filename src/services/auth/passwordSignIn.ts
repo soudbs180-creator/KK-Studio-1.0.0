@@ -1,7 +1,11 @@
 import { supabase } from '../../lib/supabase.ts';
 import { readRuntimeOrigin } from '../../utils/runtimeEnv.ts';
+import { shouldUseLegacyWebApiFallback } from '../api/kkApiClient.ts';
 
 const PASSWORD_SIGN_IN_PROXY_PATH = '/api/auth-password-login';
+export const HOSTED_PASSWORD_PROXY_DISABLED_CODE = 'HOSTED_PASSWORD_PROXY_DISABLED';
+export const HOSTED_PASSWORD_PROXY_DISABLED_MESSAGE =
+  'Hosted runtime does not allow the legacy password-login proxy fallback. Check Supabase Auth reachability and hosted environment alignment.';
 
 export type PasswordSignInParams = {
   email: string;
@@ -53,7 +57,8 @@ function canUseHostedPasswordProxy(): boolean {
 
   try {
     const parsed = new URL(origin);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && shouldUseLegacyWebApiFallback();
   } catch {
     return false;
   }
@@ -161,8 +166,15 @@ export async function signInWithPasswordWithFallback(
     return directResult;
   }
 
-  if (!isNetworkErrorLike(directResult.error) || !canUseHostedPasswordProxy()) {
+  if (!isNetworkErrorLike(directResult.error)) {
     return directResult;
+  }
+
+  if (!canUseHostedPasswordProxy()) {
+    return {
+      error: new Error(`${HOSTED_PASSWORD_PROXY_DISABLED_CODE}: ${HOSTED_PASSWORD_PROXY_DISABLED_MESSAGE}`),
+      usedProxy: false,
+    };
   }
 
   const proxyResult = await signInViaHostedProxy(params);

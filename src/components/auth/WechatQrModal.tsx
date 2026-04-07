@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, QrCode, X } from 'lucide-react';
 
 import { parseWechatAuthorizationUrl } from '../../services/auth/wechatAuthUtils.ts';
-import { localizeUserFacingText } from '../../utils/localeText';
+import { getDocumentLanguage, localizeUserFacingText, type ResolvedLanguage } from '../../utils/localeText';
+import { getWechatQrModalCopy } from './authLocalization';
 
 interface WechatQrModalProps {
   isOpen: boolean;
+  language?: ResolvedLanguage;
   title: string;
   description: string;
   authorizationUrl?: string | null;
@@ -40,13 +42,13 @@ const WECHAT_LOGIN_SCRIPT_SRC = 'https://res.wx.qq.com/connect/zh_CN/htmledition
 
 let wechatLoginScriptPromise: Promise<void> | null = null;
 
-function formatExpiryText(expiresAt?: string | null): string | null {
+function formatExpiryText(language: ResolvedLanguage, expiresAt?: string | null): string | null {
   if (!expiresAt) return null;
 
   const date = new Date(expiresAt);
   if (Number.isNaN(date.getTime())) return null;
 
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(language, {
     hour12: false,
     month: '2-digit',
     day: '2-digit',
@@ -132,6 +134,7 @@ function ensureWechatLoginScript(): Promise<void> {
 
 const WechatQrModal: React.FC<WechatQrModalProps> = ({
   isOpen,
+  language = getDocumentLanguage(),
   title,
   description,
   authorizationUrl,
@@ -143,6 +146,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 }) => {
   const [widgetState, setWidgetState] = useState<WechatWidgetState>('idle');
   const [widgetHint, setWidgetHint] = useState<string | null>(null);
+  const copy = useMemo(() => getWechatQrModalCopy(language), [language]);
   const widgetMountId = useMemo(
     () => `wechat-login-widget-${Math.random().toString(36).slice(2)}`,
     [],
@@ -167,7 +171,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
     if (!widgetConfig) {
       setWidgetState('fallback');
-      setWidgetHint('微信二维码链接无法识别，已切换到备用展示方式。');
+      setWidgetHint(copy.invalidUrlFallback);
       return;
     }
 
@@ -217,12 +221,12 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
           }
 
           setWidgetState('fallback');
-          setWidgetHint('微信二维码组件未能正常渲染，已自动切换到备用展示方式。');
+          setWidgetHint(copy.widgetRenderFallback);
         }, 1400);
       } catch {
         if (disposed) return;
         setWidgetState('fallback');
-        setWidgetHint('微信二维码组件加载失败，已自动切换到备用展示方式。');
+        setWidgetHint(copy.widgetLoadFallback);
       }
     };
 
@@ -239,11 +243,11 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
         mountNode.innerHTML = '';
       }
     };
-  }, [authorizationUrl, error, isOpen, loading, widgetConfig, widgetMountId]);
+  }, [authorizationUrl, copy.invalidUrlFallback, copy.widgetLoadFallback, copy.widgetRenderFallback, error, isOpen, loading, widgetConfig, widgetMountId]);
 
   if (!isOpen) return null;
 
-  const expiryText = formatExpiryText(expiresAt);
+  const expiryText = formatExpiryText(language, expiresAt);
   const emptyState = !loading && !error && !authorizationUrl;
   const showFallbackIframe = widgetState === 'fallback' && Boolean(authorizationUrl);
 
@@ -260,18 +264,18 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-emerald-300">
               <QrCode size={18} />
-              <span className="text-sm font-medium">微信扫码</span>
+              <span className="text-sm font-medium">{copy.badge}</span>
             </div>
             <h3 className="mt-2 text-lg font-semibold text-white">{title}</h3>
             <p className="mt-1 text-sm text-slate-300">{description}</p>
-            {expiryText && <p className="mt-2 text-xs text-slate-400">二维码有效期至 {expiryText}</p>}
+            {expiryText && <p className="mt-2 text-xs text-slate-400">{copy.expiresAt(expiryText)}</p>}
           </div>
 
           <button
             type="button"
             onClick={onClose}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-slate-300 transition hover:border-white/20 hover:text-white"
-            aria-label="关闭微信扫码弹窗"
+            aria-label={copy.closeAria}
           >
             <X size={18} />
           </button>
@@ -281,7 +285,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
           {loading && (
             <div className="flex h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-slate-300">
               <Loader2 size={24} className="animate-spin" />
-              <p className="mt-3 text-sm">正在生成微信扫码二维码...</p>
+              <p className="mt-3 text-sm">{copy.loading}</p>
             </div>
           )}
 
@@ -293,7 +297,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
           {emptyState && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-              暂时没有拿到微信二维码地址。请确认 KK API 已启动，或检查微信登录服务端配置。
+              {copy.emptyState}
             </div>
           )}
 
@@ -313,7 +317,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
                     {widgetState === 'loading' && (
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 text-slate-500">
                         <Loader2 size={24} className="animate-spin" />
-                        <p className="text-sm">正在加载微信官方扫码组件...</p>
+                        <p className="text-sm">{copy.loadingWidget}</p>
                       </div>
                     )}
                     <div
@@ -331,14 +335,14 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-slate-400">如果二维码区域没有正常显示，可以改用新页面打开。</p>
+                <p className="text-xs text-slate-400">{copy.fallbackHelp}</p>
                 <button
                   type="button"
                   onClick={onOpenInNewPage}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/15"
                 >
                   <ExternalLink size={16} />
-                  在新页面打开
+                  {copy.openInNewPage}
                 </button>
               </div>
             </>

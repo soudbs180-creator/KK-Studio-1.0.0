@@ -14,6 +14,30 @@ type AuthorizationValueFormat = "bearer" | "raw";
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com";
 const GOOGLE_DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 const CLAUDE_DEFAULT_BASE_URL = "https://api.anthropic.com";
+const TWELVE_AI_DOCUMENTED_MODELS = [
+  "gpt-5.1",
+  "gemini-2.5-pro",
+  "gemini-2.5-pro-c",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-c",
+  "gemini-3.1-pro-preview",
+  "gemini-3.1-pro-preview-c",
+  "gemini-3.1-flash-image-preview",
+  "gemini-2.5-flash-image",
+  "gemini-2.5-flash-image-c",
+  "gemini-3-pro-image-preview",
+  "gemini-3-pro-image-preview-c",
+  "claude-4-sonnet",
+  "runway-gen3",
+  "luma-video",
+  "kling-v1",
+  "sv3d",
+  "flux-kontext-max",
+  "recraft-v3-svg",
+  "ideogram-v2",
+  "suno-v3.5",
+  "minimax-t2a-01",
+];
 
 export class UserRouteDiagnosticsError extends Error {
   readonly code: string;
@@ -71,6 +95,24 @@ function inferRouteFormat(routeConfig: SecureProxyUserRouteConfigDto): ResolvedR
   return "openai";
 }
 
+function is12AIBaseUrl(baseUrl: string | undefined): boolean {
+  const normalized = normalizeString(baseUrl);
+  if (!normalized) return false;
+
+  try {
+    const candidate = /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
+    const host = new URL(candidate).hostname.toLowerCase();
+    return /(^|\.)12ai\.(org|xyz|io|net)$/i.test(host);
+  } catch {
+    return false;
+  }
+}
+
+function isGoogleOfficialGeminiBaseUrl(baseUrl: string | undefined): boolean {
+  const normalized = normalizeString(baseUrl).toLowerCase();
+  return normalized.includes("googleapis.com") || normalized.includes("generativelanguage.googleapis.com");
+}
+
 function inferAuthMethod(
   routeConfig: SecureProxyUserRouteConfigDto,
   format: ResolvedRouteFormat,
@@ -79,7 +121,7 @@ function inferAuthMethod(
     return routeConfig.authMethod;
   }
 
-  return format === "gemini" && normalizeString(routeConfig.baseUrl).includes("googleapis.com")
+  return format === "gemini" && (isGoogleOfficialGeminiBaseUrl(routeConfig.baseUrl) || is12AIBaseUrl(routeConfig.baseUrl))
     ? "query"
     : "header";
 }
@@ -97,7 +139,7 @@ function inferHeaderName(
     return "x-goog-api-key";
   }
   if (format === "claude") {
-    return "x-api-key";
+    return is12AIBaseUrl(routeConfig.baseUrl) ? "Authorization" : "x-api-key";
   }
 
   return "Authorization";
@@ -111,8 +153,12 @@ function inferAuthorizationValueFormat(
   const baseUrl = normalizeString(routeConfig.baseUrl).toLowerCase();
   const provider = normalizeString(routeConfig.provider).toLowerCase();
   const normalizedHeader = headerName.toLowerCase();
+  const is12AI = is12AIBaseUrl(routeConfig.baseUrl);
 
   if (format === "gemini" || format === "claude") {
+    if (format === "claude" && is12AI) {
+      return "bearer";
+    }
     return "raw";
   }
 
@@ -185,6 +231,19 @@ function buildGeminiModelsEndpoint(
   authMethod: ResolvedAuthMethod,
 ): string {
   const endpoint = `${normalizeGeminiBaseUrl(baseUrl)}/v1beta/models`;
+  if (authMethod === "query") {
+    return `${endpoint}?key=${encodeURIComponent(getApiKeyToken(apiKey))}`;
+  }
+  return endpoint;
+}
+
+function buildGeminiGenerateContentEndpoint(
+  baseUrl: string | undefined,
+  modelId: string,
+  apiKey: string,
+  authMethod: ResolvedAuthMethod,
+): string {
+  const endpoint = `${normalizeGeminiBaseUrl(baseUrl)}/v1beta/models/${encodeURIComponent(modelId)}:generateContent`;
   if (authMethod === "query") {
     return `${endpoint}?key=${encodeURIComponent(getApiKeyToken(apiKey))}`;
   }
@@ -394,12 +453,23 @@ export class UserRouteDiagnosticsService {
     const authMethod = inferAuthMethod(routeConfig, format);
     const headerName = inferHeaderName(routeConfig, format);
     const authorizationValueFormat = inferAuthorizationValueFormat(routeConfig, format, headerName);
+    const is12AI = is12AIBaseUrl(routeConfig.baseUrl);
     const endpointUrl =
-      format === "gemini"
-        ? buildGeminiModelsEndpoint(routeConfig.baseUrl, routeConfig.apiKey, authMethod)
-        : format === "claude"
-          ? buildClaudeEndpoint(routeConfig.baseUrl, "models")
-          : buildOpenAIEndpoint(routeConfig.baseUrl, "models");
+      is12AI
+        ? (
+          format === "gemini"
+            ? buildGeminiGenerateContentEndpoint(routeConfig.baseUrl, "gemini-2.5-flash", routeConfig.apiKey, authMethod)
+            : format === "claude"
+              ? buildClaudeEndpoint(routeConfig.baseUrl, "messages")
+              : buildOpenAIEndpoint(routeConfig.baseUrl, "chat/completions")
+        )
+        : (
+          format === "gemini"
+            ? buildGeminiModelsEndpoint(routeConfig.baseUrl, routeConfig.apiKey, authMethod)
+            : format === "claude"
+              ? buildClaudeEndpoint(routeConfig.baseUrl, "models")
+              : buildOpenAIEndpoint(routeConfig.baseUrl, "models")
+        );
     const headers = buildHeaders(
       routeConfig,
       format,
@@ -414,8 +484,28 @@ export class UserRouteDiagnosticsService {
 
     try {
       const response = await fetch(endpointUrl, {
-        method: "GET",
+        method: is12AI ? "POST" : "GET",
         headers,
+        body: is12AI
+          ? JSON.stringify(
+            format === "gemini"
+              ? {
+                  contents: [{ role: "user", parts: [{ text: "Connectivity check" }] }],
+                }
+              : format === "claude"
+                ? {
+                    model: "claude-4-sonnet",
+                    messages: [{ role: "user", content: [{ type: "text", text: "Connectivity check" }] }],
+                    max_tokens: 16,
+                  }
+                : {
+                    model: "gpt-5.1",
+                    messages: [{ role: "user", content: [{ type: "text", text: "Connectivity check" }] }],
+                    max_tokens: 16,
+                    stream: false,
+                  },
+          )
+          : undefined,
         signal: controller.signal,
       });
       const latencyMs = Date.now() - startedAt;
@@ -443,7 +533,7 @@ export class UserRouteDiagnosticsService {
         endpointUrl,
         latencyMs,
         resolvedFormat: format,
-        models: normalizeModels(payload),
+        models: is12AI ? TWELVE_AI_DOCUMENTED_MODELS : normalizeModels(payload),
       };
     } catch (error) {
       const message =

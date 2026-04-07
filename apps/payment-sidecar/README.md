@@ -8,8 +8,9 @@ Current responsibilities:
   Creates a typed payment order and returns a unified envelope.
 - `GET /payment/v1/orders/{merchantOrderNo}/status`
   Returns the typed status view used by the migrated frontend payment client.
-- `POST /payment/v1/callbacks/alipay`
-  Accepts the Alipay-style callback payload and writes settlement back to the main API.
+- `POST /internal/v1/payment-callbacks/alipay`
+  Accepts the normalized internal callback payload and writes settlement back to the main API.
+  This route is for trusted internal callers only.
 - `GET /api/pay/qrcode`
   Legacy compatibility route used by the existing recharge modal.
 - `GET /api/pay/status`
@@ -24,6 +25,7 @@ Architecture notes:
 - The sidecar resolves `creditAmount` on the server from `amount + currency` and does not trust client-supplied credit totals.
 - Credit settlement is written back through the main API internal contract:
   `POST /internal/v1/payment-settlements`
+- Public third-party provider webhooks should terminate at the verified `payment-server/webhook.js` handlers instead of the sidecar.
 - When `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) are present, the sidecar stores orders and callbacks in Supabase.
 - When those server-side credentials are missing, the sidecar falls back to the in-memory repository for local development and isolated tests.
 

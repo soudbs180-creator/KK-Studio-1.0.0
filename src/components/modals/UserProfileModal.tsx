@@ -214,7 +214,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
     if (safeView === 'billing') {
-      void refreshBilling();
+      void refreshBilling({ includeTransactions: true });
     }
 
     if (safeView === 'security') {
@@ -299,7 +299,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const openBilling = () => {
     setView('billing');
-    void refreshBilling();
+    void refreshBilling({ includeTransactions: true });
   };
 
   const loadSecurityState = async () => {

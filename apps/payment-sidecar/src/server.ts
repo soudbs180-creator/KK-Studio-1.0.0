@@ -35,6 +35,12 @@ class JsonBodyParseError extends Error {
   readonly code = "INVALID_JSON_BODY";
 }
 
+class PayloadTooLargeError extends Error {
+  readonly code = "PAYLOAD_TOO_LARGE";
+}
+
+const defaultMaxJsonBodyBytes = 1024 * 1024;
+
 function writeBody(
   res: ServerResponse,
   statusCode: number,
@@ -71,16 +77,22 @@ function normalizeHeaders(req: IncomingMessage): Record<string, string> {
 }
 
 function buildRequestOrigin(req: IncomingMessage, headers: Record<string, string>): string {
-  const forwardedProto = headers["x-forwarded-proto"];
-  const protocol = forwardedProto || "http";
-  const host = headers.host || `127.0.0.1:${req.socket.localPort || 0}`;
+  const protocol = (req.socket as typeof req.socket & { encrypted?: boolean }).encrypted ? "https" : "http";
+  const host = `127.0.0.1:${req.socket.localPort || 0}`;
   return `${protocol}://${host}`;
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<any> {
   const chunks: Buffer[] = [];
+  const maxBytes = Number(process.env.PAYMENT_SIDECAR_MAX_JSON_BODY_BYTES || defaultMaxJsonBodyBytes);
+  let totalBytes = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += bufferChunk.length;
+    if (Number.isFinite(maxBytes) && maxBytes > 0 && totalBytes > maxBytes) {
+      throw new PayloadTooLargeError(`Request body exceeds ${maxBytes} bytes.`);
+    }
+    chunks.push(bufferChunk);
   }
 
   if (chunks.length === 0) {
@@ -104,6 +116,20 @@ function buildErrorMeta(requestId: string, clientVersion?: string) {
     requestId,
     clientVersion,
     timestamp: new Date().toISOString(),
+  };
+}
+
+function buildDeprecatedCallbackRoutePayload(requestId: string, clientVersion?: string) {
+  return {
+    success: false,
+    error: {
+      code: "PUBLIC_CALLBACK_ROUTE_DISABLED",
+      message:
+        "The public callback route is disabled on the payment sidecar. "
+        + "Use the verified payment-server webhook for third-party providers, or "
+        + "POST normalized internal callbacks to /internal/v1/payment-callbacks/alipay.",
+    },
+    meta: buildErrorMeta(requestId, clientVersion),
   };
 }
 
@@ -268,13 +294,7 @@ export function createPaymentSidecarServer(
           return;
         }
 
-        if (
-          req.method === "POST"
-          && (
-            pathname === "/payment/v1/callbacks/alipay"
-            || pathname === "/api/pay/notify/alipay"
-          )
-        ) {
+        if (req.method === "POST" && pathname === "/internal/v1/payment-callbacks/alipay") {
           const body = await readJsonBody(req);
           const result = await handleAlipayCallback(service, body, requestHeaders);
           if (result.redirectTo) {
@@ -286,9 +306,25 @@ export function createPaymentSidecarServer(
           return;
         }
 
+        if (
+          req.method === "POST"
+          && (
+            pathname === "/payment/v1/callbacks/alipay"
+            || pathname === "/api/pay/notify/alipay"
+          )
+        ) {
+          writeBody(res, 410, buildDeprecatedCallbackRoutePayload(requestId, clientVersion));
+          return;
+        }
+
         const checkoutMatch = pathname.match(/^\/payment\/v1\/orders\/([^/]+)\/checkout$/);
         if (req.method === "GET" && checkoutMatch) {
-          const result = await handleCheckoutPage(service, decodeURIComponent(checkoutMatch[1]));
+          const result = await handleCheckoutPage(
+            service,
+            decodeURIComponent(checkoutMatch[1]),
+            requestHeaders,
+            req.socket.remoteAddress,
+          );
           writeBody(res, result.statusCode, result.body ?? "", result.contentType);
           return;
         }
@@ -307,7 +343,12 @@ export function createPaymentSidecarServer(
 
         const checkoutCompleteMatch = pathname.match(/^\/payment\/v1\/orders\/([^/]+)\/complete$/);
         if (req.method === "POST" && checkoutCompleteMatch) {
-          const result = await handleCheckoutComplete(service, decodeURIComponent(checkoutCompleteMatch[1]), requestHeaders);
+          const result = await handleCheckoutComplete(
+            service,
+            decodeURIComponent(checkoutCompleteMatch[1]),
+            requestHeaders,
+            req.socket.remoteAddress,
+          );
           if (result.redirectTo) {
             writeRedirect(res, result.redirectTo);
             return;
@@ -357,6 +398,18 @@ export function createPaymentSidecarServer(
       } catch (error: any) {
         if (error instanceof JsonBodyParseError) {
           writeBody(res, 400, {
+            success: false,
+            error: {
+              code: error.code,
+              message: error.message,
+            },
+            meta: buildErrorMeta(requestId, clientVersion),
+          });
+          return;
+        }
+
+        if (error instanceof PayloadTooLargeError) {
+          writeBody(res, 413, {
             success: false,
             error: {
               code: error.code,

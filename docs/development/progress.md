@@ -1,4 +1,4 @@
-# Project Progress Report - KK Studio v1.4.0
+# Project Progress Report - KK Studio v1.4.1
 
 ## 状态
 **Current Status**: Active / Documentation Baseline Synced
@@ -6,10 +6,11 @@
 ## 1. 已完成
 
 ### 1.1 版本与说明统一
-- [x] 主项目版本统一为 `1.4.0`
+- [x] 主项目版本统一为 `1.4.1`
 - [x] 画布展示版本继续以 `src/config/appInfo.ts` 集中管理
-- [x] README、开发进度、交接文档、移动端报告同步到 `v1.4.0`
-- [x] 支付子服务版本元信息同步到 `1.4.0`
+- [x] README、开发进度、交接文档、移动端报告同步到 `v1.4.1`
+- [x] 支付子服务版本元信息同步到 `1.4.1`
+- [x] 修复 Node/ESM 启动链、用户路由云回退、账单 hydrate 误判与 Canvas 本地持久化问题
 - [x] 构建版本清单补充 `releaseDate / releaseNotes`，便于后续发布与更新校验
 
 ### 1.2 文档表达升级
@@ -26,18 +27,21 @@
 ## 2. 当前重点
 - **稳定优先**：在不破坏既有使用路径的前提下，继续把设置、后台和鉴权链路做稳
 - **部署一致性**：继续降低本地与线上环境差异，尤其是服务端配置与会话相关行为
-- **文档一致性**：今后所有“当前版本”说明以 `1.4.0` 为基线
+- **文档一致性**：今后所有“当前版本”说明以 `1.4.1` 为基线
+- **多供应商架构方案**：已补充独立供应商 / 多协议面 / surface 路由的分层改造方案，详见 `docs/development/multi-vendor-provider-architecture.md`
 
 ## 3. 待继续项
 - [ ] 对设置中心、管理后台和登录注册链路做一轮完整回归
 - [ ] 继续压缩重型设置页面与首屏无关资源
 - [ ] 继续核对 Supabase 迁移链与运行时依赖是否完全一致
 - [ ] 为双语设置页补齐更多实际入口与边界验证
+- [ ] 按多供应商架构方案推进 Phase 1，先修正鉴权覆盖、图片路由冲突与模型列表漂移
 
 ## 4. 已知观察
 - 当前工作区仍有较大规模的业务改动在进行中，版本文档已同步，但仍建议做完整验证
 - `@lobehub/icons` 与部分设置页面相关资源体积仍值得继续关注
 - 历史文档保留旧版本号仅用于追溯，不代表当前发布基线
+- 当前多供应商接入能力已覆盖大多数行业请求方法，但供应商事实、协议面和执行逻辑仍需进一步解耦
 
 ## 5. 推荐回归检查
 ```bash
@@ -53,4 +57,4 @@ npm run build
 - [x] API settings keep snapshot-backed views interactive while cloud reconciliation runs in the background.
 - [x] Third-party provider management now scopes busy states to the active action instead of locking the whole page behind one loading flag.
 
-*Report Updated: 2026-03-28*
+*Report Updated: 2026-04-07*

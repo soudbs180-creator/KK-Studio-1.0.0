@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -53,6 +53,46 @@ test("release manifest stays aligned with runtime app info", () => {
   assert.equal(APP_DISPLAY_VERSION, releaseManifest.displayVersion);
   assert.equal(APP_RELEASE_DATE, releaseManifest.releaseDate);
   assert.deepEqual(APP_RELEASE_NOTES, releaseManifest.releaseNotes);
+});
+
+test("portable release bundle stays aligned with the current workspace build when present locally", () => {
+  const distManifestPath = path.join(ROOT_DIR, "dist", "app-version.json");
+  const portableManifestPath = path.join(ROOT_DIR, "release", "KK-Studio-Portable", "app", "dist", "app-version.json");
+
+  if (!existsSync(distManifestPath) || !existsSync(portableManifestPath)) {
+    return;
+  }
+
+  const distManifest = JSON.parse(readFileSync(distManifestPath, "utf8")) as {
+    version?: string;
+    buildTime?: string;
+  };
+  const portableManifest = JSON.parse(readFileSync(portableManifestPath, "utf8")) as {
+    version?: string;
+    buildTime?: string;
+  };
+
+  assert.equal(portableManifest.version, releaseManifest.version);
+  assert.deepEqual(
+    { ...portableManifest, buildTime: undefined },
+    { ...distManifest, buildTime: undefined },
+  );
+  assert.equal(
+    readSource("release/KK-Studio-Portable/app/portable-app-server.cjs"),
+    readSource("scripts/portable-app-server.cjs"),
+  );
+  assert.equal(
+    readSource("release/KK-Studio-Portable/support/portable-launch.ps1"),
+    readSource("scripts/portable-launch.ps1"),
+  );
+  assert.equal(
+    readSource("release/KK-Studio-Portable/support/portable-stop.ps1"),
+    readSource("scripts/portable-stop.ps1"),
+  );
+  assert.equal(
+    readSource("release/KK-Studio-Portable/support/portable-self-update.ps1"),
+    readSource("scripts/portable-self-update.ps1"),
+  );
 });
 
 test("compatibility layer registry tracks the required migration files", () => {
@@ -225,10 +265,10 @@ test("payment-server legacy shell delegates order creation through the sidecar c
   assert.match(paymentWebhookSource, /require\('\.\/sidecar_compat_bridge'\)/);
   assert.match(paymentWebhookSource, /handleLegacyPaymentCallbackThroughSidecar/);
   assert.doesNotMatch(paymentWebhookSource, /require\('\.\/runtime_payment_bridge'\)/);
-  assert.match(billingContextSource, /import \{ legacyWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
-  assert.match(billingContextSource, /legacyWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
-  assert.match(billingContextSource, /legacyWebApiClient\.debitCredits\(\{/);
-  assert.match(billingContextSource, /legacyWebApiClient\.refundCredits\(\{/);
+  assert.match(billingContextSource, /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
+  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /kkWebApiClient\.debitCredits\(\{/);
+  assert.match(billingContextSource, /kkWebApiClient\.refundCredits\(\{/);
   assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);
   assert.doesNotMatch(billingContextSource, /\.from\('user_credits'\)/);
   assert.doesNotMatch(billingContextSource, /\.from\('credit_transactions'\)/);

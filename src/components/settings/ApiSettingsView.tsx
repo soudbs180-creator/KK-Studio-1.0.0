@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -19,8 +19,12 @@ import {
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
-import { legacyWebApiClient } from '../../services/api/kkApiClient';
-import { getKkApiServerHealth, type KkApiServerHealth } from '../../services/api/kkApiServerHealth';
+import { kkWebApiClient } from '../../services/api/kkApiClient';
+import {
+  getKkApiServerHealth,
+  isKkApiUserDataPersistedInCloudFromHealth,
+  type KkApiServerHealth,
+} from '../../services/api/kkApiServerHealth';
 import {
   loadUserApisPayloadMetadataFromCloudRecord,
   removeUserApiProviderFromCloudRecord,
@@ -38,6 +42,7 @@ import { useLocale } from '../../context/LocaleContext';
 import keyManager, {
   type KeySlot,
   type ThirdPartyProvider,
+  resolveEffectiveProviderModels,
 } from '../../services/auth/keyManager';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
@@ -66,12 +71,15 @@ import {
   SettingToggle,
   StatusBadge,
 } from './ui/index';
+import {
+  buildApiManagementListState,
+  readApiManagementListState,
+  type ApiManagementTab,
+} from './apiManagementRouteState';
 
 type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
-type TabType = 'official' | 'third-party';
-type EditorMode = TabType | null;
-type EditorSource = 'route' | 'local' | null;
+type TabType = ApiManagementTab;
 const UI_TOKEN_UNIT_LABEL = 'Tokens';
 const UI_TOKEN_LIMIT_LABEL = 'Token limit';
 const UI_LEGACY_TOKEN_LIMIT_LABEL = 'Legacy token limit';
@@ -164,6 +172,10 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeProviderConnectionValue(value: unknown): string {
+  return normalizeString(value).replace(/\/+$/, '').toLowerCase();
 }
 
 function normalizeNumber(value: unknown, fallback = 0): number {
@@ -660,6 +672,9 @@ type ConsoleEndpointCardMetric = {
   label: React.ReactNode;
   value: React.ReactNode;
   helper?: React.ReactNode;
+  className?: string;
+  valueClassName?: string;
+  helperClassName?: string;
 };
 
 type ConsoleEndpointCardProps = {
@@ -675,7 +690,48 @@ type ConsoleEndpointCardProps = {
   actions: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
+  cardRef?: React.Ref<HTMLElement>;
 };
+
+function flattenCardActions(node: React.ReactNode): React.ReactNode[] {
+  return React.Children.toArray(node).flatMap((child) => {
+    if (React.isValidElement(child) && child.type === React.Fragment) {
+      return flattenCardActions((child.props as { children?: React.ReactNode }).children);
+    }
+
+    return [child];
+  });
+}
+
+function decorateCardActionNode(
+  node: React.ReactNode,
+  options: {
+    className: string;
+    tone?: 'primary' | 'secondary' | 'danger';
+  },
+): React.ReactNode {
+  if (!React.isValidElement(node)) {
+    return node;
+  }
+
+  const existingProps = node.props as {
+    className?: string;
+    tone?: 'primary' | 'secondary' | 'danger';
+  };
+
+  const nextClassName = [existingProps.className, options.className].filter(Boolean).join(' ');
+
+  return React.cloneElement(
+    node as React.ReactElement<{
+      className?: string;
+      tone?: 'primary' | 'secondary' | 'danger';
+    }>,
+    {
+      className: nextClassName,
+      tone: existingProps.tone ?? options.tone,
+    },
+  );
+}
 
 const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
   title,
@@ -690,18 +746,32 @@ const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
   actions,
   footer,
   className = '',
+  cardRef,
 }) => {
   const cardClass = ['settings-provider-card', className].filter(Boolean).join(' ');
   const progressPercentage = progress?.percentage ?? 0;
   const progressTone = progressPercentage >= 90 ? 'rose' : progressPercentage >= 70 ? 'amber' : 'indigo';
+  const actionItems = flattenCardActions(actions);
+  const [primaryAction, ...secondaryActions] = actionItems;
+  const primaryActionNode = decorateCardActionNode(primaryAction, {
+    className: 'settings-provider-card__primary-action settings-provider-card__action-button--wrap',
+    tone: 'primary',
+  });
+  const secondaryActionNodes = secondaryActions.map((action, index) => (
+    <React.Fragment key={`secondary-action-${index}`}>
+      {decorateCardActionNode(action, {
+        className: 'settings-provider-card__action-button--wrap',
+      })}
+    </React.Fragment>
+  ));
 
   return (
-    <article className={cardClass}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
+    <article ref={cardRef} className={cardClass}>
+      <div className="settings-provider-card__header">
+        <div className="settings-provider-card__header-main">
           <div className="settings-provider-card__avatar">{avatar}</div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="settings-provider-card__header-copy">
+            <div className="settings-provider-card__header-title-row">
               <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
               {badges}
             </div>
@@ -709,15 +779,31 @@ const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
             {meta ? <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{meta}</div> : null}
           </div>
         </div>
-        <StatusBadge status={status.status} label={status.label} />
+        <div className="settings-provider-card__header-side">
+          <StatusBadge status={status.status} label={status.label} />
+          {primaryActionNode ? (
+            <div className="settings-provider-card__header-primary-action">
+              {primaryActionNode}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="settings-provider-card__metrics">
         {metrics.map((metric, index) => (
-          <div key={`${metric.label}-${index}`} className="settings-provider-card__metric">
+          <div
+            key={`${metric.label}-${index}`}
+            className={['settings-provider-card__metric', metric.className].filter(Boolean).join(' ')}
+          >
             <div className="settings-provider-card__metric-label">{metric.label}</div>
-            <div className="settings-provider-card__metric-value">{metric.value}</div>
-            {metric.helper ? <div className="settings-provider-card__metric-helper">{metric.helper}</div> : null}
+            <div className={['settings-provider-card__metric-value', metric.valueClassName].filter(Boolean).join(' ')}>
+              {metric.value}
+            </div>
+            {metric.helper ? (
+              <div className={['settings-provider-card__metric-helper', metric.helperClassName].filter(Boolean).join(' ')}>
+                {metric.helper}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -743,7 +829,13 @@ const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
         </div>
       ) : null}
 
-      <div className="settings-provider-card__actions">{actions}</div>
+      {secondaryActionNodes.length > 0 ? (
+        <div className="settings-provider-card__actions">
+          <div className="settings-provider-card__actions-layout">
+            <div className="settings-provider-card__actions-secondary">{secondaryActionNodes}</div>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 };
@@ -769,14 +861,19 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const [providers, setProviders] = useState<ThirdPartyProvider[]>(() => keyManager.getProviders());
   const initialUserApiViewSnapshot = !isTempUser ? readUserApiViewSnapshot(user?.id || null) : null;
   const [activeTab, setActiveTab] = useState<TabType>('official');
-  const [editorMode, setEditorMode] = useState<EditorMode>(null);
   const [officialForm, setOfficialForm] = useState<OfficialForm>(officialDefaults);
   const [providerForm, setProviderForm] = useState<ProviderForm>(providerDefaults);
   const [editingOfficialId, setEditingOfficialId] = useState<string | null>(null);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
-  const [editorSource, setEditorSource] = useState<EditorSource>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
+  const [returnHighlight, setReturnHighlight] = useState<{
+    officialId?: string;
+    providerId?: string;
+  } | null>(null);
+  const officialCardRegistryRef = useRef(new Map<string, HTMLElement>());
+  const providerCardRegistryRef = useRef(new Map<string, HTMLElement>());
+  const consumedListStateKeyRef = useRef<string | null>(null);
   const [readonlyOfficialSlots, setReadonlyOfficialSlots] = useState<KeySlot[]>(() =>
     (initialUserApiViewSnapshot?.officialSlots || [])
       .map((slot) => toReadonlyOfficialSlot(slot))
@@ -831,6 +928,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   }, [routeProviderId, thirdPartyProviders]);
   const isOfficialEditorRoute = Boolean(routeOfficialId);
   const isProviderEditorRoute = Boolean(routeProviderId);
+  const activeEditorMode: TabType | null = isOfficialEditorRoute ? 'official' : isProviderEditorRoute ? 'third-party' : null;
   const isCreatingOfficial = routeOfficialId === ROUTE_NEW_ITEM;
   const isCreatingProvider = routeProviderId === ROUTE_NEW_ITEM;
   const providerRouteMissing = isProviderEditorRoute && !isCreatingProvider && !selectedProvider && !initialSupplier;
@@ -980,10 +1078,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     return true;
   };
-  const showInlineOfficialCreate = editorMode === null && activeTab === 'official';
-  const showInlineProviderCreate = editorMode === null && activeTab === 'third-party';
-  const showOfficialEditor = editorMode === 'official' || showInlineOfficialCreate;
-  const showProviderEditor = editorMode === 'third-party' || showInlineProviderCreate;
+  const showInlineOfficialCreate = activeEditorMode === null && activeTab === 'official';
+  const showInlineProviderCreate = activeEditorMode === null && activeTab === 'third-party';
+  const showOfficialEditor = activeEditorMode === 'official' || showInlineOfficialCreate;
+  const showProviderEditor = activeEditorMode === 'third-party' || showInlineProviderCreate;
 
   const latencyCards = useMemo(() => {
     const officialItems = officialSlots
@@ -1133,8 +1231,6 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   useEffect(() => {
     if (isOfficialEditorRoute) {
       setActiveTab('official');
-      setEditorMode('official');
-      setEditorSource('route');
 
       if (isCreatingOfficial) {
         setEditingOfficialId(null);
@@ -1153,8 +1249,6 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     if (isProviderEditorRoute) {
       setActiveTab('third-party');
-      setEditorMode('third-party');
-      setEditorSource('route');
 
       if (isCreatingProvider) {
         setEditingProviderId(null);
@@ -1178,16 +1272,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       return;
     }
 
-    if (editorSource === 'route' && location.pathname === API_MANAGEMENT_HOME_PATH) {
-      setEditorMode(null);
+    if (location.pathname === API_MANAGEMENT_HOME_PATH) {
       setEditingOfficialId(null);
       setEditingProviderId(null);
       setOfficialForm(officialDefaults);
       setProviderForm(providerDefaults);
-      setEditorSource(null);
     }
   }, [
-    editorSource,
     initialSupplier,
     isCreatingOfficial,
     isCreatingProvider,
@@ -1198,11 +1289,78 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     selectedProvider?.id,
   ]);
 
-  const run = async (key: string, task: () => Promise<void>) => {
+  useEffect(() => {
+    if (activeEditorMode || consumedListStateKeyRef.current === location.key) {
+      return;
+    }
+
+    consumedListStateKeyRef.current = location.key;
+    const listState = readApiManagementListState(location.state);
+    if (!listState) {
+      return;
+    }
+
+    setActiveTab(listState.activeTab);
+    if (listState.highlightOfficialId || listState.highlightProviderId) {
+      setReturnHighlight({
+        officialId: listState.highlightOfficialId,
+        providerId: listState.highlightProviderId,
+      });
+    }
+  }, [activeEditorMode, location.key, location.state]);
+
+  useEffect(() => {
+    if (!returnHighlight?.officialId && !returnHighlight?.providerId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setReturnHighlight(null);
+    }, 2200);
+
+    return () => window.clearTimeout(timer);
+  }, [returnHighlight]);
+
+  useEffect(() => {
+    if (activeEditorMode) {
+      return;
+    }
+
+    const targetId = activeTab === 'official' ? returnHighlight?.officialId : returnHighlight?.providerId;
+    if (!targetId) {
+      return;
+    }
+
+    const registry = activeTab === 'official' ? officialCardRegistryRef.current : providerCardRegistryRef.current;
+    const targetNode = registry.get(targetId);
+    if (!targetNode) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      targetNode.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, thirdPartyProviders.length]);
+
+  const run = async (
+    key: string,
+    task: () => Promise<void>,
+    options?: {
+      skipRefresh?: boolean;
+    },
+  ) => {
     setBusy(key);
     try {
       await task();
-      refresh();
+      if (!options?.skipRefresh) {
+        refresh();
+      }
     } catch (error) {
       const message =
         error instanceof Error && error.message.trim()
@@ -1215,17 +1373,42 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
   };
 
+  const returnToApiManagementList = useCallback(
+    (tab: TabType, options?: { highlightOfficialId?: string | null; highlightProviderId?: string | null }) => {
+      navigate(API_MANAGEMENT_HOME_PATH, {
+        state: buildApiManagementListState(tab, options),
+      });
+    },
+    [navigate],
+  );
+
+  const registerOfficialCardRef = useCallback((id: string, node: HTMLElement | null) => {
+    if (node) {
+      officialCardRegistryRef.current.set(id, node);
+      return;
+    }
+
+    officialCardRegistryRef.current.delete(id);
+  }, []);
+
+  const registerProviderCardRef = useCallback((id: string, node: HTMLElement | null) => {
+    if (node) {
+      providerCardRegistryRef.current.set(id, node);
+      return;
+    }
+
+    providerCardRegistryRef.current.delete(id);
+  }, []);
+
   const beginCreateOfficial = () => {
     if (!ensureUserApiActionsAllowed()) {
       return;
     }
 
     setActiveTab('official');
-    setEditorMode('official');
     setEditingOfficialId(null);
     setEditingProviderId(null);
     setOfficialForm(officialDefaults);
-    setEditorSource('local');
     navigate(buildOfficialEditorPath());
   };
 
@@ -1235,11 +1418,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     setActiveTab('third-party');
-    setEditorMode('third-party');
     setEditingOfficialId(null);
     setEditingProviderId(null);
     setProviderForm(initialSupplier ? toProviderFormFromSupplier(initialSupplier) : providerDefaults);
-    setEditorSource('local');
     navigate(buildProviderEditorPath());
   };
 
@@ -1249,11 +1430,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     setActiveTab('official');
-    setEditorMode('official');
     setEditingOfficialId(slot.id);
     setEditingProviderId(null);
     setOfficialForm(toOfficialForm(slot));
-    setEditorSource('local');
     navigate(buildOfficialEditorPath(slot.id));
   };
 
@@ -1263,22 +1442,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     setActiveTab('third-party');
-    setEditorMode('third-party');
     setEditingOfficialId(null);
     setEditingProviderId(provider.id);
     setProviderForm(toProviderForm(provider));
-    setEditorSource('local');
     navigate(buildProviderEditorPath(provider.id));
   };
 
   const cancelEdit = () => {
-    setEditorMode(null);
     setEditingOfficialId(null);
     setEditingProviderId(null);
     setOfficialForm(officialDefaults);
     setProviderForm(providerDefaults);
-    setEditorSource(null);
-    navigate(API_MANAGEMENT_HOME_PATH);
+    if (isOfficialEditorRoute) {
+      returnToApiManagementList('official', { highlightOfficialId: editingOfficialId });
+      return;
+    }
+
+    returnToApiManagementList('third-party', { highlightProviderId: editingProviderId });
   };
 
   const saveOfficial = async () => {
@@ -1640,7 +1820,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     await run(`official-check:${slot.id}`, async () => {
-      const response = await legacyWebApiClient.checkUserRouteConnectivity(slot.id);
+      const response = await kkWebApiClient.checkUserRouteConnectivity(slot.id);
       if (!response.success) {
         notify.warning(
           pick('检测失败', 'Check failed'),
@@ -1677,7 +1857,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     await run(`provider-check:${provider.id}`, async () => {
-      const response = await legacyWebApiClient.checkUserRouteConnectivity(provider.id);
+      const response = await kkWebApiClient.checkUserRouteConnectivity(provider.id);
       if (!response.success) {
         notify.warning(
           pick('检测失败', 'Check failed'),
@@ -1721,7 +1901,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     }
 
     await run(`provider-price:${provider.id}`, async () => {
-      const response = await legacyWebApiClient.syncUserRoutePricing(provider.id);
+      const response = await kkWebApiClient.syncUserRoutePricing(provider.id);
       if (!response.success) {
         notify.warning(
           pick('同步失败', 'Sync failed'),
@@ -1835,7 +2015,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
   return (
     <SettingsViewShell>
-      {editorMode === 'official' ? (
+      {activeEditorMode === 'official' ? (
         <SettingsHero
           eyebrow={pick('接口编辑', 'Endpoint editor')}
           title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增官方接口', 'New official endpoint')}
@@ -1903,7 +2083,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         />
       ) : null}
 
-      {editorMode === 'third-party' ? (
+      {activeEditorMode === 'third-party' ? (
         <SettingsHero
           eyebrow={pick('供应商编辑', 'Provider editor')}
           title={editingProviderId ? providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider') : pick('新增供应商', 'New provider')}
@@ -1981,7 +2161,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         />
       ) : null}
 
-      {editorMode === null ? (
+      {activeEditorMode === null ? (
         <>
           <SettingsHero
         eyebrow={pick('高级设置', 'Advanced settings')}

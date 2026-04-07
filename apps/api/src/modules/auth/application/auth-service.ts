@@ -76,21 +76,19 @@ export class AuthService {
       return this.rateLimited("Too many register attempts for this email.");
     }
 
-    this.logger.info("Register request accepted by migrated auth module", {
+    this.logger.info("Register request validated by the migrated auth module", {
       email: emailCheck.normalizedEmail,
       ip: context.ip,
     });
 
-    return {
-      statusCode: 200,
-      body: {
-        success: true,
-        message: "Register succeeded.",
-        data: {
-          message: "Register succeeded.",
-        },
-      },
-    };
+    this.logger.warn("Register request rejected because password auth is disabled on the API service", {
+      email: emailCheck.normalizedEmail,
+      ip: context.ip,
+    });
+
+    return this.routeDisabled(
+      "Password registration is not available on /api/v1/auth/register. Use the hosted Supabase auth flow instead.",
+    );
   }
 
   async login(input: LoginRequestDto, context: AuthRequestContext): Promise<AuthHandlerResult> {
@@ -114,21 +112,19 @@ export class AuthService {
       return this.rateLimited("Too many login attempts from this IP.");
     }
 
-    this.logger.info("Login request accepted by migrated auth module", {
+    this.logger.info("Login request validated by the migrated auth module", {
       email: emailCheck.normalizedEmail,
       ip: context.ip,
     });
 
-    return {
-      statusCode: 200,
-      body: {
-        success: true,
-        message: "Login succeeded.",
-        data: {
-          message: "Login succeeded.",
-        },
-      },
-    };
+    this.logger.warn("Login request rejected because password auth is disabled on the API service", {
+      email: emailCheck.normalizedEmail,
+      ip: context.ip,
+    });
+
+    return this.routeDisabled(
+      "Password login is not available on /api/v1/auth/login. Use the hosted Supabase auth flow instead.",
+    );
   }
 
   async sendCode(input: SendCodeRequestDto, context: AuthRequestContext): Promise<AuthHandlerResult> {
@@ -150,21 +146,19 @@ export class AuthService {
       return this.rateLimited("Too many send-code attempts for this email.");
     }
 
-    this.logger.info("Send-code request accepted by migrated auth module", {
+    this.logger.info("Send-code request validated by the migrated auth module", {
       email: emailCheck.normalizedEmail,
       ip: context.ip,
     });
 
-    return {
-      statusCode: 200,
-      body: {
-        success: true,
-        message: "Verification code sent.",
-        data: {
-          message: "Verification code sent.",
-        },
-      },
-    };
+    this.logger.warn("Send-code request rejected because password auth is disabled on the API service", {
+      email: emailCheck.normalizedEmail,
+      ip: context.ip,
+    });
+
+    return this.routeDisabled(
+      "Verification-code login is not available on the API service. Use the hosted Supabase auth flow instead.",
+    );
   }
 
   registerProfile(email: string): { created: boolean; profile: ProfileDto } {
@@ -210,6 +204,16 @@ export class AuthService {
   private rateLimited(error: string): AuthHandlerResult {
     return {
       statusCode: 429,
+      body: {
+        success: false,
+        error,
+      },
+    };
+  }
+
+  private routeDisabled(error: string): AuthHandlerResult {
+    return {
+      statusCode: 501,
       body: {
         success: false,
         error,

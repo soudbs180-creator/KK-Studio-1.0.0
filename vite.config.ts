@@ -640,7 +640,7 @@ export default defineConfig(({ mode }) => {
         build: {
             // 确保构建时清理旧文件
             emptyOutDir: true,
-            chunkSizeWarningLimit: 1000,
+            chunkSizeWarningLimit: 700,
             rollupOptions: {
                 input: {
                     index: path.resolve(__dirname, 'index.html'),

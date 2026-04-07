@@ -66,6 +66,13 @@ export const PROVIDER_REGISTRY: Record<Provider, ProviderMetadata> = {
         description: '12AI 官方聚合信道',
         docsUrl: 'https://doc.12ai.org/'
     },
+    Flow2API: {
+        id: 'Flow2API',
+        label: 'Flow2API',
+        defaultBaseUrl: 'http://127.0.0.1:8000',
+        description: 'Self-hosted Flow2API media gateway',
+        docsUrl: 'https://github.com/TheSmallHanCat/flow2api'
+    },
     Custom: {
         id: 'Custom',
         label: 'Custom / Proxy',

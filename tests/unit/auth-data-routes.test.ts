@@ -813,6 +813,62 @@ describe("auth data routes", () => {
     );
   });
 
+  test("heals a local provider placeholder from the cloud mirror before resolving a secure proxy route", async () => {
+    const mirror = new FakeUserScopedAuthDataMirror();
+    mirror.payload = {
+      version: 2,
+      slots: [],
+      providers: [
+        {
+          id: "provider-cloud-1",
+          name: "Cloud Provider",
+          baseUrl: "https://provider.example.com/v1",
+          apiKey: "sk-cloud-provider-secret",
+          format: "openai",
+          isActive: true,
+        },
+      ],
+      entries: [],
+    };
+
+    const repository = new InMemoryAuthDataRepository();
+    await repository.replaceKeyManagerCloudState("user-auth-data-mirror-4", "user-auth-data-mirror-4@example.com", {
+      version: 2,
+      slots: [],
+      providers: [
+        {
+          id: "provider-cloud-1",
+          name: "Cloud Provider",
+          baseUrl: "https://provider.example.com/v1",
+          apiKey: `${REDACTED_API_KEY_PREFIX}provider-cloud-1`,
+          format: "openai",
+          isActive: true,
+        } as any,
+      ],
+    });
+
+    const service = new AuthDataService(repository, {
+      cloudMirror: mirror,
+    });
+
+    const resolved = await service.resolveSecureProxyUserRouteConfig(
+      "user-auth-data-mirror-4",
+      "user-auth-data-mirror-4@example.com",
+      "provider-cloud-1",
+      "supabase-user-token-4",
+    );
+
+    assert.equal(resolved?.routeId, "provider-cloud-1");
+    assert.equal(resolved?.apiKey, "sk-cloud-provider-secret");
+
+    const localPayload = await repository.getUserApisPayload("user-auth-data-mirror-4", "user-auth-data-mirror-4@example.com");
+    const providers = (localPayload as { providers?: Array<{ id?: string; apiKey?: string }> }).providers || [];
+    assert.equal(
+      providers.find((provider) => provider.id === "provider-cloud-1")?.apiKey,
+      "sk-cloud-provider-secret",
+    );
+  });
+
   test("creates guest temp users through the auth module", async () => {
     const service = new AuthDataService(new InMemoryAuthDataRepository());
     const result = await handleCreateTempUser(service, {

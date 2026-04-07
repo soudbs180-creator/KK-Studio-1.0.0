@@ -240,6 +240,49 @@ describe("payment-server runtime payment bridge", () => {
     assert.equal(orderPatchBody.settlement_ledger_id, "44444444-4444-4444-4444-444444444444");
   });
 
+  test("fails closed when the runtime payment order is missing instead of auto-creating it", async () => {
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const fetchImpl = async (input: string | URL, init?: RequestInit) => {
+      const request = { url: String(input), init };
+      requests.push(request);
+
+      if (request.url.includes("/rest/v1/payment_orders") && init?.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "[]",
+        } as Response;
+      }
+
+      throw new Error(`Unexpected request: ${request.url}`);
+    };
+
+    const result = await handleLegacySuccessfulPaymentCallback({
+      userId: "44444444-4444-4444-4444-444444444444",
+      callbackId: "trade-alipay-missing",
+      merchantOrderNo: "ORDER_MISSING",
+      amount: 5,
+      currency: "CNY",
+      providerCode: "alipay",
+      payload: { source: "alipay" },
+    }, {
+      baseUrl: "https://api.kk.local",
+      internalToken: "payment-internal-token",
+      supabaseUrl: "https://db.kk.local",
+      serviceRoleKey: "service-role-key",
+      fetchImpl,
+    });
+
+    assert.equal(result.success, false);
+    assert.equal(result.error?.code, "PAYMENT_ORDER_NOT_FOUND");
+    assert.match(String(result.error?.message || ""), /must not auto-create or settle missing orders/i);
+    assert.equal(
+      requests.some((request) => request.url.endsWith("/internal/v1/payment-settlements")),
+      false,
+    );
+    assert.equal(requests.length, 1);
+  });
+
   test("maps settled and unsettled runtime orders to legacy trade statuses", () => {
     const waiting = buildRuntimePaymentStatusView({
       id: "payment-order-waiting",

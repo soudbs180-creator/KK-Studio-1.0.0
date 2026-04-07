@@ -8,7 +8,7 @@
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
-import { keyManager } from '../auth/keyManager';
+import { keyManager, parseModelString, resolveEffectiveProviderModels } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';
 import { supabase } from '../../lib/supabase';
 import { adminModelService } from './adminModelService';
@@ -107,7 +107,13 @@ class ModelCaller {
       .filter((provider) => provider.isActive && provider.baseUrl && provider.apiKey);
 
     for (const provider of providers) {
-      const hasModel = provider.models.some((candidate) => this.isModelMatch(modelId, candidate));
+      const providerModels = resolveEffectiveProviderModels({
+        provider: provider.name,
+        baseUrl: provider.baseUrl,
+        format: provider.format,
+        models: provider.models,
+      });
+      const hasModel = providerModels.some((candidate) => this.isModelMatch(modelId, parseModelString(candidate).id || candidate));
       if (hasModel) {
         return {
           route: buildSecureProxyUserRouteFromSlotId(provider.id),
@@ -182,6 +188,7 @@ class ModelCaller {
         stream: false,
       });
 
+      const hasConfirmedCreditSettlement = Boolean(response.ledgerId && typeof response.balanceAfter === 'number');
       if (!response.deducted) {
         console.error(
           '[ModelCaller] Secure system proxy returned success without confirming credit deduction.',
@@ -196,6 +203,19 @@ class ModelCaller {
           success: false,
           error: 'Credit settlement could not be confirmed. Please retry the request.',
         };
+      }
+
+      if (!hasConfirmedCreditSettlement) {
+        console.warn(
+          '[ModelCaller] Secure system proxy returned a billed response without ledger metadata; accepting for backward compatibility.',
+          {
+            modelId: options.modelId,
+            expectedCredits: Math.max(1, Math.ceil(Number(creditCost || 0))),
+            userId: user.id,
+            ledgerId: response.ledgerId,
+            balanceAfter: response.balanceAfter,
+          },
+        );
       }
 
       return {

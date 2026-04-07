@@ -74,6 +74,19 @@ export const PROVIDER_CAPABILITY_REGISTRY: ProviderCapabilityProfile[] = [
         modelPatterns: [/./]
     },
     {
+        provider: 'Flow2API',
+        adapterId: 'openai-compatible-adapter',
+        capability: {
+            chat: true,
+            stream: false,
+            image: true,
+            video: false,
+            multimodal: true
+        },
+        modelPatterns: [/^gemini-.*image/i, /^imagen-/i],
+        notes: 'Flow2API is best treated as an image-focused media gateway in KK-Studio'
+    },
+    {
         provider: 'Custom',
         adapterId: 'openai-compatible-adapter',
         capability: {

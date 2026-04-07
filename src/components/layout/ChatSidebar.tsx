@@ -1,6 +1,6 @@
 ﻿
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, Loader2, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -8,7 +8,7 @@ import { keyManager } from '../../services/auth/keyManager';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
-import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '../../services/model/modelLibraryRefresh';
+import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
@@ -401,8 +401,8 @@ Return STRICT JSON only:
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
-    const { balance, setShowRechargeModal } = useBilling();
-    const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
+    const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
+    const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const canAccessSystemCreditModels = !!user && !isTempUser;
     const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
@@ -411,9 +411,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
+    const [isModelMenuLoading, setIsModelMenuLoading] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const modelMenuButtonRef = useRef<HTMLButtonElement>(null);
+    const modelMenuRequestRef = useRef(0);
     const [modelMenuLayout, setModelMenuLayout] = useState<{ left: number; bottom: number; width: number } | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
     const [sessionContextMenu, setSessionContextMenu] = useState<SessionContextMenu | null>(null);
@@ -685,31 +687,44 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         scheduleAutoClose();
     }, [scheduleAutoClose]);
 
+    const closeModelMenu = useCallback(() => {
+        modelMenuRequestRef.current += 1;
+        setIsModelMenuLoading(false);
+        setShowModelMenu(false);
+    }, []);
+
     const handleToggleModelMenu = useCallback(async () => {
         registerActivity();
 
         if (showModelMenu) {
-            setShowModelMenu(false);
+            closeModelMenu();
             return;
         }
 
         updateModelMenuLayout();
+        const requestId = modelMenuRequestRef.current + 1;
+        modelMenuRequestRef.current = requestId;
+        setShowModelMenu(true);
+        setIsModelMenuLoading(true);
+
         let nextAvailableModels = availableModels;
 
-        if (nextAvailableModels.length > 0) {
-            refreshModelLibraryDataInBackground();
-        } else {
-            try {
-                await refreshModelLibraryData({ force: true });
-            } catch (error) {
-                console.warn('[ChatSidebar] Model library refresh failed before empty-state open:', error);
-            }
-
-            nextAvailableModels = buildAvailableChatModels(canBrowseSystemCreditModels);
-            setAvailableModels(nextAvailableModels);
+        try {
+            await refreshModelLibraryData({ force: nextAvailableModels.length === 0 });
+        } catch (error) {
+            console.warn('[ChatSidebar] Model library refresh failed before menu open:', error);
         }
 
+        if (modelMenuRequestRef.current !== requestId) {
+            return;
+        }
+
+        nextAvailableModels = buildAvailableChatModels(canBrowseSystemCreditModels);
+        setAvailableModels(nextAvailableModels);
+
         if (nextAvailableModels.length === 0) {
+            setIsModelMenuLoading(false);
+            setShowModelMenu(false);
             onOpenSettings?.('api-management');
             return;
         }
@@ -724,10 +739,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             setSelectedModel(matchedSelectedModel);
         }
 
-        setShowModelMenu(true);
+        setIsModelMenuLoading(false);
     }, [
         availableModels,
         canBrowseSystemCreditModels,
+        closeModelMenu,
         onOpenSettings,
         registerActivity,
         selectedModel.description,
@@ -815,9 +831,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const handleSelectModelFromMenu = useCallback((model: ChatSidebarModelMenuItem) => {
         setSelectedModel(model);
-        setShowModelMenu(false);
+        closeModelMenu();
         setModelSearch('');
-    }, []);
+    }, [closeModelMenu]);
 
     const handleModelContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, modelId: string) => {
         event.preventDefault();
@@ -2236,7 +2252,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     <>
                                         {ReactDOM.createPortal(
                                             <>
-                                                <div className="fixed inset-0 z-[10000]" onClick={() => setShowModelMenu(false)} />
+                                                <div className="fixed inset-0 z-[10000]" onClick={closeModelMenu} />
 
                                                 {modelMenuLayout && (
                                                     <div
@@ -2249,33 +2265,34 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                         }}
                                                     >
                                                         <div className="flex flex-col gap-2">
-                                                            {/* Search Module */}
-                                                            <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-xl p-2 relative z-30">
-                                                                <div className="relative flex items-center">
-                                                                    <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                                    </svg>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={modelSearch}
-                                                                        onChange={(e) => setModelSearch(e.target.value)}
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        placeholder="搜索模型..."
-                                                                        className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
-                                                                        autoFocus
-                                                                    />
-                                                                    {modelSearch && (
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
-                                                                            className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                                                        >
-                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    )}
+                                                            {!isModelMenuLoading && (
+                                                                <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-xl p-2 relative z-30">
+                                                                    <div className="relative flex items-center">
+                                                                        <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                                        </svg>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={modelSearch}
+                                                                            onChange={(e) => setModelSearch(e.target.value)}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            placeholder="搜索模型..."
+                                                                            className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
+                                                                            autoFocus
+                                                                        />
+                                                                        {modelSearch && (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                                                className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                                                            >
+                                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
+                                                            )}
 
                                                             {/* Model List Module */}
                                                             <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-2xl p-1.5 max-h-[50vh] overflow-y-auto overflow-x-hidden scrollbar-thin relative z-30">
@@ -2283,23 +2300,42 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                     <span>选择模型 (右键可顶置)</span>
                                                                 </div>
 
-                                                                {filteredModelMenuItems
-                                                                    .map((model) => {
-                                                                        return (
-                                                                            <ChatSidebarModelMenuButton
-                                                                                key={model.id}
-                                                                                model={model}
-                                                                                selected={selectedModel.id === model.id}
-                                                                                onSelect={handleSelectModelFromMenu}
-                                                                                onOpenContextMenu={handleModelContextMenu}
-                                                                            />
-                                                                        );
-                                                                    })}
-                                                                {filteredModelMenuItems.length === 0 && (
-                                                                        <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
-                                                                            未找到匹配的模型
+                                                                {isModelMenuLoading ? (
+                                                                    <div className="px-2 py-4">
+                                                                        <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                                            <Loader2 size={14} className="animate-spin" />
+                                                                            <span>正在同步最新模型库...</span>
                                                                         </div>
-                                                                    )}
+                                                                        <div className="mt-4 space-y-2">
+                                                                            {Array.from({ length: 4 }).map((_, index) => (
+                                                                                <div
+                                                                                    key={`chat-sidebar-model-loading-${index}`}
+                                                                                    className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                                                                />
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        {filteredModelMenuItems
+                                                                            .map((model) => {
+                                                                                return (
+                                                                                    <ChatSidebarModelMenuButton
+                                                                                        key={model.id}
+                                                                                        model={model}
+                                                                                        selected={selectedModel.id === model.id}
+                                                                                        onSelect={handleSelectModelFromMenu}
+                                                                                        onOpenContextMenu={handleModelContextMenu}
+                                                                                    />
+                                                                                );
+                                                                            })}
+                                                                        {filteredModelMenuItems.length === 0 && (
+                                                                            <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
+                                                                                未找到匹配的模型
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

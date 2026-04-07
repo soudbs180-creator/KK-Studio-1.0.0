@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 
+import {
+  hashAdminPassword,
+  isLegacyMd5PasswordHash,
+  verifyAdminPasswordHash,
+} from "./password-hashing.ts";
+
 export type AdminRole = "user" | "admin";
 
 export interface AdminProfileRecord {
@@ -68,10 +74,6 @@ export interface AdminConsoleRepository {
   setUserRole(identity: string, role: AdminRole): Promise<ResolvedRoleChangeTarget>;
 }
 
-function hashPassword(password: string): string {
-  return createHash("md5").update(password, "utf8").digest("hex");
-}
-
 export function hashAdminSessionToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
@@ -79,7 +81,7 @@ export function hashAdminSessionToken(token: string): string {
 export class InMemoryAdminConsoleRepository implements AdminConsoleRepository {
   private readonly profiles = new Map<string, AdminProfileRecord>();
   private readonly adminSessions = new Map<string, AdminSessionRecord>();
-  private adminPasswordHash = hashPassword("123456");
+  private adminPasswordHash = hashAdminPassword("123456");
   private requiresPasswordChange = true;
 
   constructor(seedProfiles?: AdminProfileRecord[]) {
@@ -107,12 +109,12 @@ export class InMemoryAdminConsoleRepository implements AdminConsoleRepository {
   }
 
   async verifyAdminPassword(password: string): Promise<boolean> {
-    return this.adminPasswordHash === hashPassword(password);
+    return verifyAdminPasswordHash(password, this.adminPasswordHash);
   }
 
   async getAdminPasswordState(): Promise<AdminPasswordState> {
     return {
-      requiresPasswordChange: this.requiresPasswordChange,
+      requiresPasswordChange: this.requiresPasswordChange || isLegacyMd5PasswordHash(this.adminPasswordHash),
     };
   }
 
@@ -161,7 +163,7 @@ export class InMemoryAdminConsoleRepository implements AdminConsoleRepository {
       throw new AdminConsolePasswordInvalidError("Incorrect old password.");
     }
 
-    this.adminPasswordHash = hashPassword(newPassword);
+    this.adminPasswordHash = hashAdminPassword(newPassword);
     this.requiresPasswordChange = false;
   }
 

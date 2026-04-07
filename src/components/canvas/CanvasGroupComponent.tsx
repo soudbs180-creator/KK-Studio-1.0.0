@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from
 import { CanvasGroup } from '../../types';
 import { Type, GripHorizontal, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 
 export interface CanvasGroupProps {
     group: CanvasGroup;
@@ -35,6 +36,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
     const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
+    const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
 
     // Direct DOM Refs
     const containerRef = useRef<HTMLDivElement>(null);
@@ -205,7 +207,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     width: bounds.width,
                     height: bounds.height,
                     transform: `translate(${bounds.x}px, ${bounds.y}px)`,
-                    zIndex: stackZIndex,
+                    zIndex: effectiveStackZIndex,
                     pointerEvents: 'auto',
                     willChange: isDragging ? 'transform' : 'auto',
                     // Disable transition during drag to prevent rubber-banding

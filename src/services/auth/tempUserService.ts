@@ -1,5 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient';
 import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
@@ -82,7 +82,7 @@ class TempUserService {
 
   async createTempUser(): Promise<TempUserSession> {
     try {
-      const response = await legacyWebApiClient.createTempUser();
+      const response = await kkWebApiClient.createTempUser();
       if (!response.success) {
         console.error('[TempUser] Failed to create temp user session via API:', response.error);
         throw new Error(response.error.message || 'Failed to create guest session.');

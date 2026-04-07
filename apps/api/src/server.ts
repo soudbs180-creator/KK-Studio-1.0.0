@@ -49,6 +49,7 @@ import {
 } from "./modules/model-proxy/index.ts";
 import {
   AuthDataService,
+  type AuthDataRepository,
   AuthService,
   FileBackedAuthDataRepository,
   InMemoryAuthDataRepository,
@@ -74,6 +75,7 @@ import {
   handleVersionedLogin,
   handleVersionedRegister,
 } from "./modules/auth/index.ts";
+import { InMemoryRateLimiter } from "./modules/auth/infrastructure/in-memory-rate-limiter.ts";
 import {
   handleApplyPaymentSettlement,
   CreditExchangeRateService,
@@ -135,6 +137,32 @@ class JsonBodyParseError extends Error {
   readonly code = "INVALID_JSON_BODY";
 }
 
+class PayloadTooLargeError extends Error {
+  readonly code = "PAYLOAD_TOO_LARGE";
+}
+
+const defaultMaxJsonBodyBytes = 1024 * 1024;
+const defaultExpandedProfileJsonBodyBytes = 4 * 1024 * 1024;
+
+function resolveJsonBodyMaxBytes(pathname?: string): number {
+  const defaultMaxBytes = Number(process.env.KK_API_MAX_JSON_BODY_BYTES || defaultMaxJsonBodyBytes);
+  const expandedProfileMaxBytes = Number(
+    process.env.KK_API_PROFILE_MAX_JSON_BODY_BYTES
+      || process.env.KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES
+      || Math.max(defaultMaxBytes, defaultExpandedProfileJsonBodyBytes),
+  );
+
+  if (
+    pathname === "/api/v1/profile/user-apis"
+    || pathname === "/api/v1/profile/user-apis/payload"
+    || pathname === "/api/v1/profile/key-manager-state"
+  ) {
+    return expandedProfileMaxBytes;
+  }
+
+  return defaultMaxBytes;
+}
+
 function writeJson(res: ServerResponse, statusCode: number, payload: unknown) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(statusCode, {
@@ -173,10 +201,24 @@ function getRequestIp(req: IncomingMessage): string {
   return req.socket.remoteAddress || "unknown";
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<any> {
+async function readJsonBody(
+  req: IncomingMessage,
+  options?: {
+    maxBytes?: number;
+  },
+): Promise<any> {
   const chunks: Buffer[] = [];
+  const maxBytes = Number(
+    options?.maxBytes ?? process.env.KK_API_MAX_JSON_BODY_BYTES ?? defaultMaxJsonBodyBytes,
+  );
+  let totalBytes = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += bufferChunk.length;
+    if (Number.isFinite(maxBytes) && maxBytes > 0 && totalBytes > maxBytes) {
+      throw new PayloadTooLargeError(`Request body exceeds ${maxBytes} bytes.`);
+    }
+    chunks.push(bufferChunk);
   }
 
   if (chunks.length === 0) return {};
@@ -236,6 +278,14 @@ function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function isTruthyQueryValue(value: string | null): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
 function buildCriticalPersistenceState(
   label: string,
   repositories: Record<string, RepositoryBackend>,
@@ -254,7 +304,7 @@ function buildCriticalPersistenceState(
     })
     .flatMap((check) => String(check.blocker || "").split(",").map((value) => value.trim()).filter(Boolean));
   const blockers = [
-    ...(Array.isArray(configSummary.blockers) ? configSummary.blockers : []),
+    ...(Array.isArray(configSummary.structuralBlockers) ? configSummary.structuralBlockers : []),
     ...Object.entries(repositories)
       .filter(([, repository]) => repository !== "supabase")
       .map(([key]) => repositoryBlockers[key])
@@ -266,7 +316,7 @@ function buildCriticalPersistenceState(
   return {
     label,
     ready:
-      configSummary.canonicalPersistenceReady
+      Boolean(configSummary.canonicalConfigReady ?? configSummary.canonicalPersistenceReady)
       && Object.values(repositories).every((repository) => repository === "supabase")
       && probeBlockers.length === 0
       && extraBlockers.length === 0,
@@ -347,6 +397,7 @@ function resolveCriticalPersistenceCapability(
 
 export interface ApiServerOptions {
   adminConsoleRepository?: AdminConsoleRepository;
+  authDataRepository?: AuthDataRepository;
   creditAccountRepository?: CreditAccountRepository;
   requestAuthenticator?: RequestAuthenticator;
   resolveAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined;
@@ -358,6 +409,7 @@ export interface ApiServerOptions {
 }
 
 type RepositoryBackend = "memory" | "supabase" | "local-file" | "custom";
+const tempUserRateLimitRule = { max: 10, windowMs: 60 * 60 * 1000 } as const;
 
 function resolveRepositoryBackend(
   repository: unknown,
@@ -638,7 +690,7 @@ function buildApiServer(
   if (!allowDegradedPersistence) {
     assertServerSupabaseConfigConsistency(serverSupabaseConfig);
   }
-  const authDataRepository = createAuthDataRepository(serverSupabaseConfig);
+  const authDataRepository = options.authDataRepository || createAuthDataRepository(serverSupabaseConfig);
   const adminConsoleRepository =
     options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
   const creditAccountRepository =
@@ -691,6 +743,7 @@ function buildApiServer(
     supabaseUrl: serverSupabaseConfig.supabaseUrl,
     supabaseAuthKey: serverSupabaseConfig.authKey,
   });
+  const tempUserRateLimiter = new InMemoryRateLimiter();
   const generationService = new GenerationService(new InMemoryGenerationTaskRepository());
   const modelCatalogService = new ModelCatalogService(new InMemoryModelCatalogRepository());
   const creditProviderService = new CreditProviderService(creditProviderRepository);
@@ -776,7 +829,8 @@ function buildApiServer(
         const requiredCapability = !allowDegradedPersistence
           ? resolveCriticalPersistenceCapability(pathname)
           : undefined;
-        const shouldProbePersistence = pathname === "/healthz" || Boolean(requiredCapability);
+        const forceHealthProbe = pathname === "/healthz" && isTruthyQueryValue(url.searchParams.get("probe"));
+        const shouldProbePersistence = forceHealthProbe || Boolean(requiredCapability);
         const persistenceProbe = shouldProbePersistence
           ? await getPersistenceProbe()
           : cachedPersistenceProbe;
@@ -896,6 +950,17 @@ function buildApiServer(
         }
 
         if (req.method === "POST" && pathname === "/api/v1/auth/temp-users") {
+          if (!tempUserRateLimiter.consume("temp-user-ip", getRequestIp(req), tempUserRateLimitRule)) {
+            writeJson(res, 429, {
+              success: false,
+              error: {
+                code: "RATE_LIMITED",
+                message: "Too many temporary-user requests from this IP.",
+              },
+              meta: buildErrorMeta(requestId, clientVersion),
+            });
+            return;
+          }
           const result = await handleCreateTempUser(authDataService, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
@@ -987,14 +1052,18 @@ function buildApiServer(
         }
 
         if (req.method === "PUT" && pathname === "/api/v1/profile/user-apis") {
-          const body = await readJsonBody(req);
+          const body = await readJsonBody(req, {
+            maxBytes: resolveJsonBodyMaxBytes(pathname),
+          });
           const result = await handleReplaceUserApiEntries(authDataService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
         }
 
         if (req.method === "PUT" && pathname === "/api/v1/profile/user-apis/payload") {
-          const body = await readJsonBody(req);
+          const body = await readJsonBody(req, {
+            maxBytes: resolveJsonBodyMaxBytes(pathname),
+          });
           const result = await handleReplaceUserApisPayload(authDataService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
@@ -1007,7 +1076,9 @@ function buildApiServer(
         }
 
         if (req.method === "PUT" && pathname === "/api/v1/profile/key-manager-state") {
-          const body = await readJsonBody(req);
+          const body = await readJsonBody(req, {
+            maxBytes: resolveJsonBodyMaxBytes(pathname),
+          });
           const result = await handleReplaceKeyManagerCloudState(authDataService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;
@@ -1321,6 +1392,18 @@ function buildApiServer(
       } catch (error: any) {
         if (error instanceof JsonBodyParseError) {
           writeJson(res, 400, {
+            success: false,
+            error: {
+              code: error.code,
+              message: error.message,
+            },
+            meta: buildErrorMeta(requestId, clientVersion),
+          });
+          return;
+        }
+
+        if (error instanceof PayloadTooLargeError) {
+          writeJson(res, 413, {
             success: false,
             error: {
               code: error.code,

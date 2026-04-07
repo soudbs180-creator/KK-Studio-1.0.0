@@ -57,7 +57,9 @@ import {
 import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
 import { resolveProviderKeyType, resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import type { ChannelConfig } from '../api/channelConfig';
+import { buildChannelSurfaceView } from '../api/providerChannelSurfaceView.ts';
 import {
+    compactUserApisPayloadForTransport,
     extractKeyManagerCloudSlots,
     extractUserApiProvidersFromPayload,
     isUserApisEnvelope,
@@ -67,7 +69,9 @@ import {
     loadUserApisPayloadFromCloudRecord,
     mergeUserApisPayloadToCloudRecord,
 } from '../api/userApiCloudRecordStorage';
-import { isKkApiPersistenceUnavailableError } from '../api/kkApiServerHealth';
+import {
+    isKkApiPersistenceUnavailableError,
+} from '../api/kkApiServerHealth';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
@@ -87,6 +91,8 @@ import {
 } from '../billing/newApiPricingService';
 import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
 import { notify } from '../system/notificationService';
+import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
+import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 
 const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
 
@@ -577,6 +583,7 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
             'gemini-2.5-pro', 'gemini-2.5-pro-c',
             'gemini-2.5-flash', 'gemini-2.5-flash-c',
             'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-c',
+            'gemini-3.1-flash-image-preview',
             'gemini-2.5-flash-image', 'gemini-2.5-flash-image-c',
             'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-c',
             'claude-4-sonnet', 'runway-gen3', 'luma-video', 'kling-v1', 'sv3d',
@@ -596,11 +603,24 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
         name: '12AI NanoBanana',
         baseUrl: 'https://cdn.12ai.org',
         models: [
+            'gemini-3.1-flash-image-preview',
             'gemini-2.5-flash-image', 'gemini-2.5-flash-image-c',
             'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-c'
         ],
         format: 'gemini',
         icon: '\u{1F34C}'
+    },
+    'flow2api': {
+        name: 'Flow2API',
+        baseUrl: 'http://127.0.0.1:8000',
+        models: [
+            'gemini-3.1-flash-image-landscape',
+            'gemini-3.1-flash-image-portrait',
+            'gemini-3.0-pro-image-landscape',
+            'imagen-4.0-generate-preview-landscape'
+        ],
+        format: 'openai',
+        icon: '\u{1F30A}'
     },
     'wuyinkeji-nanobanana2': {
         name: 'Wuyin Keji NanoBanana2',
@@ -624,6 +644,46 @@ export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'a
         icon: '\u2699\uFE0F'
     }
 };
+
+export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
+    if (strategyId !== '12ai') {
+        return [];
+    }
+
+    return Array.from(new Set([
+        ...(PROVIDER_PRESETS['12ai']?.models || []),
+        ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
+    ]));
+}
+
+export function resolveEffectiveProviderModels(input: {
+    provider?: string;
+    baseUrl?: string;
+    format?: ApiProtocolFormat;
+    models?: string[];
+}): string[] {
+    const runtime = resolveProviderRuntime({
+        provider: input.provider,
+        baseUrl: input.baseUrl,
+        format: input.format,
+    });
+    const normalizedModels = normalizeModelList(
+        Array.isArray(input.models) ? input.models : [],
+        runtime.uiProvider || input.provider,
+        input.baseUrl,
+    );
+
+    if (normalizedModels.length > 0) {
+        return normalizedModels;
+    }
+
+    const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+    if (documentedModels.length === 0) {
+        return normalizedModels;
+    }
+
+    return normalizeModelList(documentedModels, runtime.uiProvider || input.provider, input.baseUrl);
+}
 
 /**
  * Resolve the 12AI base URL from the region service so callers share one source of truth.
@@ -661,6 +721,7 @@ export const MODEL_MIGRATION_MAP: Record<string, string> = {
     'nano banana pro': 'gemini-3-pro-image-preview',
     'nano-banana-2': 'gemini-3.1-flash-image-preview',
     'nano banana 2': 'gemini-3.1-flash-image-preview',
+    'gemini-2.5-flash-image-preview': 'gemini-2.5-flash-image',
 
     // Normalize legacy "-latest" aliases
     'gemini-flash-lite-latest': 'gemini-2.5-flash-lite',
@@ -693,6 +754,16 @@ export const DEPRECATED_MODELS = Object.keys(MODEL_MIGRATION_MAP);
  */
 export function normalizeModelId(modelId: string): string {
     const raw = (modelId || '').trim();
+    const parsedVariant = parseModelVariantMeta(raw);
+    const variantCanonical = String(parsedVariant.canonicalId || '').trim();
+    if (variantCanonical && variantCanonical !== raw) {
+        const canonicalTarget = MODEL_MIGRATION_MAP[variantCanonical]
+            || MODEL_MIGRATION_MAP[variantCanonical.toLowerCase()]
+            || variantCanonical;
+        console.log(`[ModelMigration] Canonicalizing "${modelId}" -> "${canonicalTarget}"`);
+        return canonicalTarget;
+    }
+
     const normalized = MODEL_MIGRATION_MAP[raw];
     if (normalized) {
         console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${normalized}"`);
@@ -720,7 +791,7 @@ export interface ModelVariantMeta {
     baseId: string;
     canonicalId: string; // for dedup (keeps speed tier, strips ratio/quality/date)
     speed?: 'fast' | 'slow';
-    quality?: '4k' | '2k' | '1k' | 'high' | 'hd' | 'ultra' | 'medium' | 'low' | 'standard';
+    quality?: '512px' | '4k' | '2k' | '1k' | 'high' | 'hd' | 'ultra' | 'medium' | 'low' | 'standard';
     ratio?: string;
 }
 
@@ -736,7 +807,7 @@ export function parseModelVariantMeta(modelId: string): ModelVariantMeta {
         .replace(/-\d{8}$/i, '');
 
     const ratioRegex = /(16[x-]9|9[x-]16|1[x-]1|4[x-]3|3[x-]4|21[x-]9|9[x-]21|3[x-]2|2[x-]3|4[x-]5|5[x-]4)$/i;
-    const qualityRegex = /(4k|2k|1k|hd|high|ultra|medium|low|standard)$/i;
+    const qualityRegex = /(512px|4k|2k|1k|hd|high|ultra|medium|low|standard)$/i;
     const speedRegex = /(fast|slow)$/i;
 
     let ratio: string | undefined;
@@ -780,6 +851,7 @@ export function appendModelVariantLabel(baseName: string, modelId: string): stri
 
     if (parsed.quality) {
         const qualityMap: Record<string, string> = {
+            '512px': '512px',
             '4k': '4K',
             '2k': '2K',
             '1k': '1K',
@@ -959,9 +1031,9 @@ const GOOGLE_CHAT_MODELS = [
     { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro \u9884\u89C8', icon: '\u{1F680}', description: '\u66F4\u5F3A\u63A8\u7406\u4E0E\u590D\u6742\u4EFB\u52A1\u80FD\u529B\uFF0C\u9002\u5408\u4E13\u4E1A\u5DE5\u4F5C\u6D41' },
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash \u9884\u89C8', icon: '\u26A1', description: '\u65B0\u4E00\u4EE3 Flash\uFF0C\u5E73\u8861\u8D28\u91CF\u4E0E\u901F\u5EA6' },
     // Multimodal models
-    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 Flash Image', icon: '\u{1F5BC}\uFE0F', description: '\u56FE\u50CF\u751F\u6210\u6A21\u578B\uFF0C\u9002\u5408\u901A\u7528\u521B\u4F5C\u573A\u666F' },
-    { id: 'gemini-3-pro-image-preview', name: 'Gemini 3 Pro Image (Preview)', icon: '\u{1F3A8}', description: '\u9AD8\u8D28\u91CF\u56FE\u50CF\u751F\u6210\uFF0C\u9002\u5408\u4E13\u4E1A\u521B\u4F5C' },
-    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image', icon: '\u{1F34C}', description: '\u5FEB\u901F\u56FE\u50CF\u6A21\u578B\uFF0C\u9002\u5408\u9AD8\u9891\u51FA\u56FE\u573A\u666F' },
+    { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2', icon: '\u{1F34C}', description: '\u7B2C\u4E8C\u4EE3 Nano Banana \u56FE\u50CF\u6A21\u578B\uFF0C\u53C2\u8003\u56FE\u4E0E\u9AD8\u6E05\u80FD\u529B\u66F4\u5F3A' },
+    { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', icon: '\u{1F34C}', description: '\u9AD8\u8D28\u91CF Nano Banana Pro \u9884\u89C8\u56FE\u50CF\u6A21\u578B' },
+    { id: 'gemini-2.5-flash-image', name: 'Nano Banana', icon: '\u{1F34C}', description: '\u7ECF\u5178 Nano Banana \u5FEB\u901F\u51FA\u56FE\u6A21\u578B' },
 ];
 
 const GOOGLE_MODEL_METADATA = new Map<string, {
@@ -1016,9 +1088,11 @@ export const getModelMetadata = (modelId: string) => {
         const exactModel = keyManager.getGlobalModelList().find(model => model.id === exactId);
         if (exactModel) {
             return {
-                name: exactModel.name,
+                name: resolveModelDisplayName(exactId, exactModel.name),
                 icon: exactModel.icon,
-                description: exactModel.description
+                description: exactModel.description,
+                endpointType: exactModel.endpointType,
+                endpointTypes: exactModel.endpointTypes,
             };
         }
     }
@@ -1117,6 +1191,7 @@ export class KeyManager {
     private isSyncing = false;
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
+    private startupStage: AppStartupStage = 'background_ready';
     private providerStorageScope: ProviderStorageScope = 'none';
     private cloudSyncState = createKeyManagerCloudSyncState();
     private pendingCloudSyncPromise: Promise<void> | null = null;
@@ -1426,6 +1501,11 @@ export class KeyManager {
                     return;
                 }
 
+                if (!this.canHydrateCloudState()) {
+                    console.log('[KeyManager] Deferring cloud hydration until startup reaches workspace_ready.');
+                    return;
+                }
+
                 this.loadFromCloud().then(() => {
                     if (this.userId !== userId) {
                         return;
@@ -1436,7 +1516,9 @@ export class KeyManager {
                             console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
                         });
                     }
-                    this.subscribeRealtime(userId);
+                    if (this.canPollCloudState()) {
+                        this.subscribeRealtime(userId);
+                    }
                 });
             }, 100);
         } else {
@@ -1447,6 +1529,52 @@ export class KeyManager {
     }
 
     private realtimeChannel: ReturnType<typeof setInterval> | null = null;
+
+    private canHydrateCloudState(): boolean {
+        return isStartupStageReady(this.startupStage, 'workspace_ready');
+    }
+
+    private canPollCloudState(): boolean {
+        return isStartupStageReady(this.startupStage, 'background_ready');
+    }
+
+    setStartupStage(stage: AppStartupStage): void {
+        this.startupStage = stage;
+
+        if (!this.userId || this.userId.startsWith('dev-user-')) {
+            return;
+        }
+
+        if (!this.canPollCloudState()) {
+            this.unsubscribeRealtime();
+        }
+
+        if (this.canHydrateCloudState() && !this.hasHydratedCloudState && !this.isSyncing) {
+            const activeUserId = this.userId;
+            void this.loadFromCloud().then(() => {
+                if (this.userId !== activeUserId) {
+                    return;
+                }
+
+                if (this.providerStorageScope === 'user' && this.providers.length > 0) {
+                    void this.saveToCloud(this.state).catch((syncError) => {
+                        console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
+                    });
+                }
+
+                if (this.canPollCloudState()) {
+                    this.subscribeRealtime(activeUserId);
+                }
+            }).catch((error) => {
+                console.warn('[KeyManager] Deferred cloud hydration failed:', error);
+            });
+            return;
+        }
+
+        if (this.canPollCloudState() && this.hasHydratedCloudState && !this.realtimeChannel) {
+            this.subscribeRealtime(this.userId);
+        }
+    }
 
     private subscribeRealtime(userId: string) {
         this.unsubscribeRealtime();
@@ -1476,7 +1604,10 @@ export class KeyManager {
             preserveLocalProvidersOnEmpty?: boolean;
         }
     ) {
-        const cloudProviders = this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload));
+        const previousProviders = [...this.providers];
+        const cloudProviders = this.mergeCloudProvidersWithLocalRuntimeState(
+            this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload))
+        );
         const hasProviderEnvelope = isUserApisEnvelope(rawPayload) && 'providers' in rawPayload;
         const shouldPreserveLocalProviders =
             options?.preserveLocalProvidersOnEmpty === true
@@ -1587,6 +1718,16 @@ export class KeyManager {
         });
 
         this.state.slots = cloudSlots;
+        // Re-apply provider-linked slot overrides so the runtime model library
+        // reflects the latest provider enablement and model lists from cloud payloads.
+        this.providers.forEach((provider) => {
+            this.syncLegacySlotsWithProvider(provider, undefined, { persistState: false });
+        });
+        previousProviders
+            .filter((provider) => !this.providers.some((candidate) => candidate.id === provider.id))
+            .forEach((provider) => {
+                this.clearLegacySlotsForRemovedProvider(provider, { persistState: false });
+            });
         console.log('[KeyManager] Cloud sync completed (overwrite mode). Keys:', this.state.slots.length);
         this.notifyListeners();
     }
@@ -1747,6 +1888,16 @@ export class KeyManager {
                 this.hasHydratedCloudState || this.providers.length > 0
                     ? this.providers
                     : undefined;
+            const compactTransportPayload = compactUserApisPayloadForTransport({
+                version: 2,
+                slots: state.slots as unknown as Record<string, unknown>[],
+                providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                entries: [],
+            });
+            const compactSlots =
+                extractKeyManagerCloudSlots(compactTransportPayload) as Record<string, unknown>[];
+            const compactProviders =
+                extractUserApiProvidersFromPayload(compactTransportPayload) as Record<string, unknown>[] | undefined;
 
             let localApiPayload: unknown = null;
             let localApiError: Error | null = null;
@@ -1756,8 +1907,8 @@ export class KeyManager {
                     const accessToken = await getPreferredKkApiAccessToken();
                     const response = await legacyWebApiClient.replaceKeyManagerCloudState({
                         version: 2,
-                        slots: state.slots as unknown as Record<string, unknown>[],
-                        providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                        slots: compactSlots,
+                        providers: compactProviders,
                     }, { accessToken });
 
                     if (response.success) {
@@ -1808,8 +1959,8 @@ export class KeyManager {
             }
 
             const savedPayload = await mergeUserApisPayloadToCloudRecord({
-                slots: state.slots as unknown as Record<string, unknown>[],
-                providers: nextProviders as unknown as Record<string, unknown>[] | undefined,
+                slots: compactSlots,
+                providers: compactProviders,
             }, activeUserId);
 
             if (this.userId !== activeUserId) {
@@ -1954,6 +2105,10 @@ export class KeyManager {
 
     private ensureCloudHydration(): void {
         if (!this.userId || this.userId.startsWith('dev-user-')) {
+            return;
+        }
+
+        if (!this.canHydrateCloudState()) {
             return;
         }
 
@@ -2135,6 +2290,10 @@ export class KeyManager {
                 authMethod,
                 headerName,
             });
+            const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+            if (documentedModels.length > 0) {
+                return documentedModels;
+            }
             const resolvedAuthMethod = runtime.authMethod as AuthMethod;
             const resolvedHeader = runtime.headerName;
             const headers: Record<string, string> = {
@@ -2415,7 +2574,7 @@ export class KeyManager {
         // Convert third-party providers into temporary KeySlot objects so routing stays unified.
         this.loadProviders();
         const providerSlots: KeySlot[] = this.providers.filter(p => p.isActive).map(p => {
-            const provider = (['Google', 'OpenAI', 'Anthropic', 'Volcengine', 'Aliyun', 'Tencent', 'SiliconFlow', '12AI'].includes(p.name) ? p.name : 'Custom') as Provider;
+            const provider = (['Google', 'OpenAI', 'Anthropic', 'Volcengine', 'Aliyun', 'Tencent', 'SiliconFlow', '12AI', 'Flow2API'].includes(p.name) ? p.name : 'Custom') as Provider;
             const format = normalizeApiProtocolFormat(p.format, 'auto');
             const runtime = resolveProviderRuntime({
                 provider,
@@ -2423,6 +2582,12 @@ export class KeyManager {
                 format,
             });
             const authMethod = runtime.authMethod as AuthMethod;
+            const effectiveProviderModels = resolveEffectiveProviderModels({
+                provider: p.name,
+                baseUrl: p.baseUrl,
+                format: p.format,
+                models: p.models,
+            });
 
             return {
                 id: p.id,
@@ -2441,7 +2606,7 @@ export class KeyManager {
                 totalCost: p.usage?.totalCost || 0,
                 successCount: 0,
                 failCount: 0,
-                supportedModels: p.models,
+                supportedModels: effectiveProviderModels,
                 type: 'third-party',
                 lastUsed: p.lastChecked || 0,
                 lastError: p.lastError || null,
@@ -3267,15 +3432,11 @@ export class KeyManager {
     }
 
     public getKey(id: string): KeySlot | undefined {
-        return this.state.slots.find(s => s.id === id);
+        return this.getProjectedSlots().find(s => s.id === id);
     }
 
     public getEffectiveKey(id: string): KeySlot | undefined {
-        const slot = this.state.slots.find((item) => item.id === id);
-        if (!slot) return undefined;
-
-        const linkedProvider = this.findLinkedProviderForSlot(slot);
-        return linkedProvider ? this.buildEffectiveSlotFromProvider(slot, linkedProvider) : slot;
+        return this.getProjectedSlots().find((item) => item.id === id);
     }
     /**
      * Refresh a single key
@@ -3290,6 +3451,7 @@ export class KeyManager {
         const slot = this.state.slots.find(s => s.id === id);
         if (slot) {
             console.log(`[KeyManager] Refreshing key ${id} (Syncing models: YES)`);
+            const linkedProvider = this.findLinkedProviderForSlot(slot);
 
             // 1. Validation phase
             // We pass syncModels=true for Google.
@@ -3339,11 +3501,20 @@ export class KeyManager {
                         slot.supportedModels = normalizeModelList(newModels, slot.provider, slot.baseUrl);
                     }
                 } else {
-                    console.warn(`[KeyManager] Refresh valid but no models found for ${id}. Keeping old list.`);
+                    console.warn(`[KeyManager] Refresh valid but no models found for ${id}. Clearing stale model list.`);
+                    slot.supportedModels = [];
+                }
+
+                if (linkedProvider) {
+                    linkedProvider.models = normalizeModelList(slot.supportedModels || [], linkedProvider.name, linkedProvider.baseUrl);
+                    linkedProvider.updatedAt = Date.now();
                 }
             }
 
             this.saveState();
+            if (linkedProvider) {
+                this.saveProviders();
+            }
             this.notifyListeners();
         }
     }
@@ -3425,6 +3596,7 @@ export class KeyManager {
         tokenGroup?: string;
         billingType?: string;
         endpointType?: string;
+        endpointTypes?: string[];
         colorStart?: string; // Gradient start color used in the model picker UI
         colorEnd?: string;
         colorSecondary?: string;
@@ -3433,7 +3605,20 @@ export class KeyManager {
     }[] {
         // Cache key includes active slots, admin models, and providers so the list stays fresh.
         const activeSlots = this.state.slots.filter(s => !s.disabled && s.status !== 'invalid');
-        const slotsHash = `${activeSlots.length}-${activeSlots.map(s => s.id).join(',')}`;
+        const slotsHash = `${activeSlots.length}-${activeSlots
+            .map((slot) => {
+                const supportedModels = normalizeModelList(slot.supportedModels || [], slot.provider, slot.baseUrl).join('||');
+                return [
+                    slot.id,
+                    slot.provider,
+                    String(slot.baseUrl || ''),
+                    String(slot.format || ''),
+                    String(slot.status || ''),
+                    slot.disabled ? '1' : '0',
+                    supportedModels,
+                ].join(':');
+            })
+            .join(',')}`;
 
         // Include adminModels in the cache signature so admin updates invalidate the list immediately.
         const adminModels = [...adminModelService.getModels()].sort((left, right) => {
@@ -3457,7 +3642,24 @@ export class KeyManager {
         // Include providers in the cache signature so provider changes refresh the list immediately.
         this.loadProviders();
         const providerHash = `${this.providers.length}-${this.providers
-            .map(p => `${p.id}:${p.isActive ? '1' : '0'}:${p.models.length}:${p.updatedAt}`)
+            .map((provider) => {
+                const effectiveProviderModels = resolveEffectiveProviderModels({
+                    provider: provider.name,
+                    baseUrl: provider.baseUrl,
+                    format: provider.format,
+                    models: provider.models,
+                }).join('||');
+
+                return [
+                    provider.id,
+                    provider.isActive ? '1' : '0',
+                    provider.name,
+                    String(provider.baseUrl || ''),
+                    String(provider.format || ''),
+                    String(provider.updatedAt || 0),
+                    effectiveProviderModels,
+                ].join(':');
+            })
             .join(',')}`;
         const combinedHash = `${slotsHash}|${adminHash}|${providerHash}`;
 
@@ -3483,7 +3685,8 @@ export class KeyManager {
             tags?: string[];
             tokenGroup?: string;
             billingType?: string;
-            endpointType?: string;
+        endpointType?: string;
+        endpointTypes?: string[];
             colorStart?: string; // Gradient start color used in the model picker UI
             colorEnd?: string;
             colorSecondary?: string;
@@ -3559,7 +3762,12 @@ export class KeyManager {
                     return;
                 }
 
-                const cleanModels = normalizeModelList(provider.models || [], provider.name, provider.baseUrl);
+                const cleanModels = resolveEffectiveProviderModels({
+                    provider: provider.name,
+                    baseUrl: provider.baseUrl,
+                    format: provider.format,
+                    models: provider.models,
+                });
 
                 cleanModels.forEach(rawModelStr => {
                     const { id, name, description } = parseModelString(rawModelStr);
@@ -3589,6 +3797,7 @@ export class KeyManager {
                         tokenGroup: pricingMeta?.tokenGroup,
                         billingType: pricingMeta?.billingType,
                         endpointType: pricingMeta?.endpointType,
+                        endpointTypes: pricingMeta?.endpointTypes,
                     });
                 });
             });
@@ -3741,9 +3950,16 @@ export class KeyManager {
     /**
      * Get all key slots
      */
+    private getProjectedSlots(): KeySlot[] {
+        return this.state.slots.map((slot) => {
+            const linkedProvider = this.findLinkedProviderForSlot(slot);
+            return linkedProvider ? this.buildEffectiveSlotFromProvider(slot, linkedProvider) : slot;
+        });
+    }
+
     getSlots(): KeySlot[] {
         this.ensureCloudHydration();
-        return [...this.state.slots];
+        return this.getProjectedSlots();
     }
 
     private buildChannelCapabilities(models: string[], pricingSupport: ChannelConfig['pricingSupport'], managementSupport: ChannelConfig['managementSupport']) {
@@ -3774,6 +3990,10 @@ export class KeyManager {
         });
         const pricingSupport = runtime.pricingSupport === 'native' ? 'native' : runtime.pricingSupport === 'manual' ? 'manual' : 'none';
         const managementSupport = runtime.managementSupport === 'native' ? 'native' : runtime.managementSupport === 'external' ? 'external' : 'none';
+        const surfaces = buildChannelSurfaceView({
+            runtime,
+            documentedModels: getDocumentedStaticModelsForProvider(runtime.strategyId),
+        });
 
         return {
             id: slot.id,
@@ -3792,6 +4012,7 @@ export class KeyManager {
             pricingSupport,
             managementSupport,
             supportedModels: normalizeModelList(slot.supportedModels || [], slot.provider, slot.baseUrl),
+            surfaces,
             group: slot.group,
             compatibilityMode: slot.compatibilityMode,
             source: slot.provider === 'SystemProxy' ? 'system' : 'user-slot',
@@ -3804,8 +4025,18 @@ export class KeyManager {
             baseUrl: provider.baseUrl,
             format: provider.format,
         });
+        const effectiveProviderModels = resolveEffectiveProviderModels({
+            provider: provider.name,
+            baseUrl: provider.baseUrl,
+            format: provider.format,
+            models: provider.models,
+        });
         const pricingSupport = runtime.pricingSupport === 'native' ? 'native' : runtime.pricingSupport === 'manual' ? 'manual' : 'none';
         const managementSupport = runtime.managementSupport === 'native' ? 'native' : runtime.managementSupport === 'external' ? 'external' : 'none';
+        const surfaces = buildChannelSurfaceView({
+            runtime,
+            documentedModels: getDocumentedStaticModelsForProvider(runtime.strategyId),
+        });
 
         return {
             id: provider.id,
@@ -3820,10 +4051,11 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(provider.models || [], pricingSupport, managementSupport),
+            capabilities: this.buildChannelCapabilities(effectiveProviderModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
-            supportedModels: normalizeModelList(provider.models || [], runtime.uiProvider, provider.baseUrl),
+            supportedModels: effectiveProviderModels,
+            surfaces,
             group: provider.group,
             compatibilityMode: runtime.compatibilityMode,
             source: 'provider',
@@ -3833,7 +4065,7 @@ export class KeyManager {
     getChannelConfigs(options?: { includeDisabled?: boolean; includeProviders?: boolean }): ChannelConfig[] {
         const includeDisabled = options?.includeDisabled ?? true;
         const includeProviders = options?.includeProviders ?? true;
-        const slotChannels = this.state.slots
+        const slotChannels = this.getProjectedSlots()
             .filter((slot) => includeDisabled || !slot.disabled)
             .map((slot) => this.buildSlotChannelConfig(slot));
 
@@ -3850,7 +4082,7 @@ export class KeyManager {
     }
 
     getChannelConfig(id: string): ChannelConfig | undefined {
-        const slot = this.state.slots.find((item) => item.id === id);
+        const slot = this.getProjectedSlots().find((item) => item.id === id);
         if (slot) {
             return this.buildSlotChannelConfig(slot);
         }
@@ -3870,7 +4102,7 @@ export class KeyManager {
         disabled: number;
         rateLimited: number;
     } {
-        const slots = this.state.slots;
+        const slots = this.getProjectedSlots();
         return {
             total: slots.length,
             valid: slots.filter(s => s.status === 'valid' && !s.disabled).length,
@@ -3884,7 +4116,7 @@ export class KeyManager {
      * Check if any valid keys are available
      */
     hasValidKeys(): boolean {
-        return this.state.slots.some(s => !s.disabled && s.status !== 'invalid');
+        return this.getProjectedSlots().some(s => !s.disabled && s.status !== 'invalid');
     }
 
     /**
@@ -3902,7 +4134,7 @@ export class KeyManager {
             return false;
         }
 
-        const hasValidSlot = this.state.slots.some(s => {
+        const hasValidSlot = this.getProjectedSlots().some(s => {
             if (s.disabled || s.status === 'invalid') return false;
             // Budget check: if budget is set and exhausted, it's effectively invalid
             if (this.isUsageLimitExceeded(s)) return false;
@@ -3934,8 +4166,15 @@ export class KeyManager {
                 usedTokens: p.usage?.totalTokens,
             })) return false;
 
+            const effectiveProviderModels = resolveEffectiveProviderModels({
+                provider: p.name,
+                baseUrl: p.baseUrl,
+                format: p.format,
+                models: p.models,
+            });
+
             // Check if model matches asterisk or specifically supported
-            if (p.models.includes('*') || p.models.includes(normalizedModelId)) return true;
+            if (effectiveProviderModels.includes('*') || effectiveProviderModels.includes(normalizedModelId)) return true;
 
             // Check if suffix matches provider name
             if (suffix) {
@@ -4003,8 +4242,15 @@ export class KeyManager {
         this.loadProviders();
 
         const now = Date.now();
+        const providerModels = resolveEffectiveProviderModels({
+            provider: config.name,
+            baseUrl: config.baseUrl,
+            format: config.format,
+            models: config.models,
+        });
         const provider: ThirdPartyProvider = {
             ...config,
+            models: providerModels,
             format: normalizeApiProtocolFormat(config.format, 'auto'),
             id: `provider_${now}_${Math.random().toString(36).substr(2, 9)}`,
             usage: {
@@ -4061,10 +4307,21 @@ export class KeyManager {
             || Object.prototype.hasOwnProperty.call(updates, 'lastError')
             || Object.prototype.hasOwnProperty.call(updates, 'lastChecked')
         );
+        const nextProviderModels = updates.models !== undefined
+            ? updates.models
+            : connectionFieldsChanged
+                ? []
+                : previousProvider.models;
 
         const nextProvider: ThirdPartyProvider = {
             ...previousProvider,
             ...updates,
+            models: resolveEffectiveProviderModels({
+                provider: String((updates.name ?? previousProvider.name) || '').trim(),
+                baseUrl: String((updates.baseUrl ?? previousProvider.baseUrl) || '').trim(),
+                format: normalizedFormat,
+                models: nextProviderModels,
+            }),
             format: normalizedFormat,
             updatedAt: Date.now()
         };
@@ -4094,8 +4351,9 @@ export class KeyManager {
 
     private syncLegacySlotsWithProvider(
         provider: ThirdPartyProvider,
-        previousProvider?: Partial<ThirdPartyProvider>
-    ): void {
+        previousProvider?: Partial<ThirdPartyProvider>,
+        options?: { persistState?: boolean }
+    ): boolean {
         const candidateProviders = [provider, previousProvider]
             .filter((item): item is Partial<ThirdPartyProvider> => !!item && !!item.baseUrl)
             .map((item) => ({
@@ -4105,7 +4363,7 @@ export class KeyManager {
             }))
             .filter((item) => !!item.baseUrl);
 
-        if (candidateProviders.length === 0) return;
+        if (candidateProviders.length === 0) return false;
 
         const matchedSlots = this.state.slots.filter((slot) => {
             const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
@@ -4133,39 +4391,134 @@ export class KeyManager {
             }
         }
 
-        if (matchedSlots.length === 0) return;
+        if (matchedSlots.length === 0) return false;
+
+        let changed = false;
 
         matchedSlots.forEach((slot) => {
-            slot.key = String(provider.apiKey || '').trim();
-            slot.name = provider.name;
-            slot.baseUrl = provider.baseUrl;
-            slot.group = provider.group;
-            slot.disabled = !provider.isActive;
-            slot.format = normalizeApiProtocolFormat(provider.format, slot.format || 'auto');
-            if (provider.models?.length) {
-                slot.supportedModels = normalizeModelList(provider.models, slot.provider, slot.baseUrl);
-            }
-            slot.type = determineKeyType(slot.provider, slot.baseUrl);
+            const nextKey = String(provider.apiKey || '').trim();
+            const nextName = provider.name;
+            const nextBaseUrl = provider.baseUrl;
+            const nextGroup = provider.group;
+            const nextDisabled = !provider.isActive;
+            const nextFormat = normalizeApiProtocolFormat(provider.format, slot.format || 'auto');
+            const nextSupportedModels = normalizeModelList(provider.models || [], slot.provider, nextBaseUrl);
+            const nextType = determineKeyType(slot.provider, nextBaseUrl);
 
             const runtime = resolveProviderRuntime({
                 provider: slot.provider,
-                baseUrl: slot.baseUrl,
-                format: slot.format,
+                baseUrl: nextBaseUrl,
+                format: nextFormat,
                 authMethod: slot.authMethod,
                 headerName: slot.headerName,
                 compatibilityMode: slot.compatibilityMode,
             });
 
-            slot.authMethod = runtime.authMethod as AuthMethod;
-            slot.headerName = runtime.headerName;
-            slot.compatibilityMode = runtime.compatibilityMode;
-            slot.updatedAt = Date.now();
+            const nextAuthMethod = runtime.authMethod as AuthMethod;
+            const nextHeaderName = runtime.headerName;
+            const nextCompatibilityMode = runtime.compatibilityMode;
+            const slotModels = Array.isArray(slot.supportedModels) ? slot.supportedModels : [];
+            const modelsChanged = slotModels.join('||') !== nextSupportedModels.join('||');
+
+            const slotChanged = (
+                String(slot.key || '') !== nextKey
+                || String(slot.name || '') !== String(nextName || '')
+                || String(slot.baseUrl || '') !== String(nextBaseUrl || '')
+                || String(slot.group || '') !== String(nextGroup || '')
+                || Boolean(slot.disabled) !== nextDisabled
+                || normalizeApiProtocolFormat(slot.format, 'auto') !== nextFormat
+                || modelsChanged
+                || slot.type !== nextType
+                || slot.authMethod !== nextAuthMethod
+                || slot.headerName !== nextHeaderName
+                || slot.compatibilityMode !== nextCompatibilityMode
+            );
+
+            slot.key = nextKey;
+            slot.name = nextName;
+            slot.baseUrl = nextBaseUrl;
+            slot.group = nextGroup;
+            slot.disabled = nextDisabled;
+            slot.format = nextFormat;
+            slot.supportedModels = nextSupportedModels;
+            slot.type = nextType;
+            slot.authMethod = nextAuthMethod;
+            slot.headerName = nextHeaderName;
+            slot.compatibilityMode = nextCompatibilityMode;
+
+            if (slotChanged) {
+                slot.updatedAt = Date.now();
+                changed = true;
+            }
         });
 
-        this.saveState();
-        console.log(
-            `[KeyManager] Synced ${matchedSlots.length} legacy slot(s) from provider ${provider.name}: ${matchedSlots.map((slot) => `${slot.name}[${slot.id}]`).join(', ')}`
-        );
+        if (changed && options?.persistState !== false) {
+            this.saveState();
+        }
+        if (changed) {
+            console.log(
+                `[KeyManager] Synced ${matchedSlots.length} legacy slot(s) from provider ${provider.name}: ${matchedSlots.map((slot) => `${slot.name}[${slot.id}]`).join(', ')}`
+            );
+        }
+
+        return changed;
+    }
+
+    private clearLegacySlotsForRemovedProvider(
+        provider: ThirdPartyProvider,
+        options?: { persistState?: boolean }
+    ): boolean {
+        const candidateProviders = [{
+            baseUrl: normalizeProviderLinkValue(provider.baseUrl),
+            apiKey: String(provider.apiKey || '').trim(),
+            name: normalizeProviderLinkValue(provider.name),
+        }].filter((item) => !!item.baseUrl);
+
+        if (candidateProviders.length === 0) return false;
+
+        const matchedSlots = this.state.slots.filter((slot) => {
+            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
+            if (!slotBaseUrl) return false;
+
+            return candidateProviders.some((candidate) => {
+                if (slotBaseUrl !== candidate.baseUrl) return false;
+
+                const slotKey = String(slot.key || '').trim();
+                const slotName = normalizeProviderLinkValue(slot.name);
+
+                if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
+                if (candidate.name && slotName && slotName === candidate.name) return true;
+                return false;
+            });
+        });
+
+        if (matchedSlots.length === 0) return false;
+
+        let changed = false;
+
+        matchedSlots.forEach((slot) => {
+            const slotModels = Array.isArray(slot.supportedModels) ? slot.supportedModels : [];
+            const slotChanged = Boolean(slot.disabled !== true || slotModels.length > 0);
+
+            slot.disabled = true;
+            slot.supportedModels = [];
+
+            if (slotChanged) {
+                slot.updatedAt = Date.now();
+                changed = true;
+            }
+        });
+
+        if (changed && options?.persistState !== false) {
+            this.saveState();
+        }
+        if (changed) {
+            console.log(
+                `[KeyManager] Cleared ${matchedSlots.length} linked legacy slot(s) after provider removal: ${matchedSlots.map((slot) => `${slot.name}[${slot.id}]`).join(', ')}`
+            );
+        }
+
+        return changed;
     }
 
     private findLinkedProviderForSlot(slot: KeySlot): ThirdPartyProvider | null {
@@ -4190,7 +4543,9 @@ export class KeyManager {
         const index = this.providers.findIndex(p => p.id === id);
         if (index === -1) return false;
 
+        const removedProvider = this.providers[index];
         this.providers.splice(index, 1);
+        this.clearLegacySlotsForRemovedProvider(removedProvider, { persistState: false });
         this.saveProviders();
         this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
@@ -4369,7 +4724,15 @@ export class KeyManager {
         return normalizeStoredProviders<ThirdPartyProvider>(
             rawProviders,
             (models, providerName) => normalizeModelList(models, providerName),
-        );
+        ).map((provider) => ({
+            ...provider,
+            models: resolveEffectiveProviderModels({
+                provider: provider.name,
+                baseUrl: provider.baseUrl,
+                format: provider.format,
+                models: provider.models,
+            }),
+        }));
     }
 
     private persistProvidersLocal(): void {
@@ -4378,6 +4741,35 @@ export class KeyManager {
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
         }
+    }
+
+    private mergeCloudProvidersWithLocalRuntimeState(
+        cloudProviders: ThirdPartyProvider[],
+    ): ThirdPartyProvider[] {
+        if (cloudProviders.length === 0 || this.providers.length === 0) {
+            return cloudProviders;
+        }
+
+        const localProvidersById = new Map<string, ThirdPartyProvider>();
+        this.providers.forEach((provider) => {
+            const normalizedId = String(provider.id || "").trim();
+            if (normalizedId) {
+                localProvidersById.set(normalizedId, provider);
+            }
+        });
+
+        return cloudProviders.map((provider) => {
+            const localProvider = localProvidersById.get(String(provider.id || "").trim());
+            if (!localProvider) {
+                return provider;
+            }
+
+            return {
+                ...provider,
+                pricingSnapshot: provider.pricingSnapshot || localProvider.pricingSnapshot,
+                activitySummary: provider.activitySummary || localProvider.activitySummary,
+            };
+        });
     }
 
     private loadProviders(force = false): void {
@@ -4549,6 +4941,10 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
             baseUrl,
             format: 'gemini',
         });
+        const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+        if (documentedModels.length > 0) {
+            return documentedModels;
+        }
         const authMethod = runtime.authMethod as AuthMethod;
         const response = await fetch(buildGeminiModelsEndpoint(baseUrl, apiKey, authMethod), {
             headers: buildGeminiHeaders(authMethod, apiKey, runtime.headerName, runtime.authorizationValueFormat)
@@ -4796,8 +5192,12 @@ export async function autoDetectAndConfigureModels(
         baseUrl,
         format: resolvedFormat === 'gemini' ? 'gemini' : preferredFormat,
     });
+    const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+    if (documentedModels.length > 0) {
+        models = documentedModels;
+    }
 
-    if (baseUrl && runtime.pricingSupport === 'native' && runtime.strategyId !== '12ai') {
+    if (models.length === 0 && baseUrl && runtime.pricingSupport === 'native' && runtime.strategyId !== '12ai') {
         try {
             const pricingCatalog = await fetchRawPricingCatalog(baseUrl, apiKey, resolvedFormat);
             const pricingModels = extractModelIdsFromPricingData(pricingCatalog?.pricingData || []);
@@ -4843,3 +5243,7 @@ export async function autoDetectAndConfigureModels(
 }
 
 // Re-export ProxyModelConfig for convenience
+
+
+
+

@@ -53,6 +53,12 @@ type ResolvedUserRoute = {
   compatibilityMode?: 'standard' | 'chat';
 };
 
+const RESPONSE_ONLY_MODEL_PATTERNS = [
+  /^o3-pro$/i,
+  /^codex-mini-latest$/i,
+  /^o3-deep-research(?:-[\d-]+)?$/i,
+];
+
 const USER_API_SECRET_ARRAY_FIELDS = {
   slots: ['key'],
   providers: ['apiKey'],
@@ -142,6 +148,43 @@ function getBaseModelId(modelId: string): string {
 
 function getUpstreamModelId(modelId: string): string {
   return getBaseModelId(modelId).split('|')[0]?.trim() || '';
+}
+
+function modelPrefersResponsesApi(modelId: string): boolean {
+  const normalized = getUpstreamModelId(modelId).toLowerCase();
+  return RESPONSE_ONLY_MODEL_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function shouldRetryWithResponsesApi(status: number | undefined, errorText: string | undefined): boolean {
+  if (!errorText) return false;
+
+  const text = String(errorText || '').toLowerCase();
+  if (!text) return false;
+
+  if (text.includes('/v1/responses') || text.includes('use /v1/responses')) {
+    return true;
+  }
+
+  if ((text.includes('responses api') || text.includes('response api')) && !text.includes('image')) {
+    return true;
+  }
+
+  if (
+    (text.includes('chat/completions') || text.includes('/chat/completions'))
+    && (text.includes('not supported') || text.includes('unsupported') || text.includes('invalid'))
+  ) {
+    return true;
+  }
+
+  if (
+    status === 400
+    && text.includes('responses')
+    && (text.includes('model') || text.includes('endpoint'))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeClaudeBaseUrl(baseUrl: string): string {
@@ -1080,6 +1123,73 @@ function buildGoogleImageExtraBody(body: ProxyRequest): Record<string, unknown> 
   };
 }
 
+function buildResponsesRequestBody(body: ProxyRequest, modelId: string): Record<string, unknown> {
+  return {
+    model: modelId,
+    input: (body.messages || []).map((message) => ({
+      role: message.role,
+      content: [
+        {
+          type: 'input_text',
+          text: String(message.content || ''),
+        },
+      ],
+    })),
+    stream: false,
+    temperature: body.temperature ?? 0.7,
+    max_output_tokens: body.maxTokens ?? 2048,
+  };
+}
+
+function extractTextFromResponsesPayload(payload: any): string {
+  const directOutputText = String(payload?.output_text || '').trim();
+  if (directOutputText) {
+    return directOutputText;
+  }
+
+  if (!Array.isArray(payload?.output)) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  for (const item of payload.output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const block of content) {
+      const text = String(block?.text || block?.content || '').trim();
+      if (text) {
+        parts.push(text);
+      }
+    }
+  }
+
+  return parts.join('').trim();
+}
+
+function extractOpenAIUsage(payload: any): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  const promptTokens = Number(payload?.usage?.prompt_tokens ?? payload?.usage?.input_tokens ?? 0) || 0;
+  const completionTokens = Number(payload?.usage?.completion_tokens ?? payload?.usage?.output_tokens ?? 0) || 0;
+  const totalTokens = Number(payload?.usage?.total_tokens ?? (promptTokens + completionTokens)) || 0;
+
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens,
+  };
+}
+
+function is12AIGeminiBaseUrl(baseUrl: string): boolean {
+  const normalizedBaseUrl = String(baseUrl || '').trim();
+  if (!normalizedBaseUrl) return false;
+
+  try {
+    const candidate = /^https?:\/\//i.test(normalizedBaseUrl) ? normalizedBaseUrl : `https://${normalizedBaseUrl}`;
+    const host = new URL(candidate).hostname.toLowerCase();
+    return /(^|\.)12ai\.(org|xyz|io|net)$/i.test(host);
+  } catch {
+    return false;
+  }
+}
+
 async function appendOpenAIVideoReference(formData: FormData, imageSource: string): Promise<void> {
   if (!imageSource) return;
 
@@ -1127,15 +1237,20 @@ async function fetchJsonWithFallback(
   throw new Error(`Upstream error: ${lastStatus} ${lastErrorText}`);
 }
 
-async function toInlineImagePart(ref: string | { data: string; mimeType?: string }) {
+async function toInlineImagePart(ref: string | { data: string; mimeType?: string }, useSnakeCase = false) {
   if (typeof ref === 'string') {
     const match = ref.match(/^data:(.+?);base64,(.+)$/);
     if (match) {
       return {
-        inlineData: {
-          mimeType: match[1] || 'image/png',
-          data: match[2] || '',
-        },
+        [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+          ? {
+              mime_type: match[1] || 'image/png',
+              data: match[2] || '',
+            }
+          : {
+              mimeType: match[1] || 'image/png',
+              data: match[2] || '',
+            },
       };
     }
     return null;
@@ -1145,18 +1260,28 @@ async function toInlineImagePart(ref: string | { data: string; mimeType?: string
   const match = rawData.match(/^data:(.+?);base64,(.+)$/);
   if (match) {
     return {
-      inlineData: {
-        mimeType: match[1] || ref.mimeType || 'image/png',
-        data: match[2] || '',
-      },
+      [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+        ? {
+            mime_type: match[1] || ref.mimeType || 'image/png',
+            data: match[2] || '',
+          }
+        : {
+            mimeType: match[1] || ref.mimeType || 'image/png',
+            data: match[2] || '',
+          },
     };
   }
 
   return {
-    inlineData: {
-      mimeType: ref.mimeType || 'image/png',
-      data: rawData,
-    },
+    [useSnakeCase ? 'inline_data' : 'inlineData']: useSnakeCase
+      ? {
+          mime_type: ref.mimeType || 'image/png',
+          data: rawData,
+        }
+      : {
+          mimeType: ref.mimeType || 'image/png',
+          data: rawData,
+        },
   };
 }
 
@@ -1694,7 +1819,7 @@ Deno.serve(async (req) => {
 
       const { data: transactionRow, error: transactionError } = await serviceClient
         .from('credit_transactions')
-        .select('id, user_id, model_id, status')
+        .select('id, user_id, model_id, status, balance_after')
         .eq('id', taskPayload.transactionId)
         .maybeSingle();
 
@@ -1733,6 +1858,12 @@ Deno.serve(async (req) => {
       if (!selectedKey) {
         return json({ success: false, error: 'Provider key is not configured' }, 500);
       }
+      const balanceAfter = Number(transactionRow?.balance_after ?? NaN);
+      const billingResult = {
+        deducted: true,
+        ledgerId: taskPayload.transactionId,
+        balanceAfter: Number.isFinite(balanceAfter) ? balanceAfter : undefined,
+      };
 
       const refundTaskCredits = async (reason: string): Promise<{ success: boolean; message?: string }> => {
         const { data: refundRows, error: refundError } = await serviceClient.rpc('refund_credits', {
@@ -1748,13 +1879,13 @@ Deno.serve(async (req) => {
       const taskResultNotReady = (message = 'Task result is not ready yet') => (
         body.mode === 'download_task'
           ? json({ success: false, error: message }, 409)
-          : json({ success: true, status: 'pending', deducted: true })
+          : json({ success: true, status: 'pending', ...billingResult })
       );
 
       const baseUrl = String(creditModel.base_url || '').replace(/\/$/, '');
       if (body.mode === 'delete_task') {
         await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
-        return json({ success: true, status: 'deleted', deducted: true });
+        return json({ success: true, status: 'deleted', ...billingResult });
       }
 
       if (body.mode === 'cancel_task' && taskPayload.endpointType === 'gemini') {
@@ -1776,7 +1907,7 @@ Deno.serve(async (req) => {
           return json({ success: false, error: `Cancel succeeded but credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
 
-        return json({ success: true, status: 'failed', deducted: true });
+        return json({ success: true, status: 'failed', ...billingResult });
       }
 
       if (body.mode === 'cancel_task') {
@@ -1809,7 +1940,7 @@ Deno.serve(async (req) => {
           return json({ success: false, error: `Cancel succeeded but credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
 
-        return json({ success: true, status: 'failed', deducted: true });
+        return json({ success: true, status: 'failed', ...billingResult });
       }
 
       if (taskPayload.endpointType === 'gemini') {
@@ -1827,7 +1958,7 @@ Deno.serve(async (req) => {
 
         const statusData = await statusResponse.json();
         if (!statusData.done) {
-          return json({ success: true, status: 'pending', deducted: true });
+          return json({ success: true, status: 'pending', ...billingResult });
         }
 
         const taskErrorMessage = String(
@@ -1840,7 +1971,7 @@ Deno.serve(async (req) => {
           if (!refundResult.success) {
             return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
           }
-          return json({ success: true, status: 'failed', deducted: true });
+          return json({ success: true, status: 'failed', ...billingResult });
         }
 
         const videoUri =
@@ -1865,7 +1996,7 @@ Deno.serve(async (req) => {
           success: true,
           status: 'success',
           url: dataUrl,
-          deducted: true,
+          ...billingResult,
         });
       }
 
@@ -1893,13 +2024,13 @@ Deno.serve(async (req) => {
         (Array.isArray(statusData?.data?.outputs) ? statusData.data.outputs[0] : '');
 
       if (body.mode === 'download_task' && directUrl) {
-        return json({ success: true, status: 'success', url: directUrl, deducted: true });
+        return json({ success: true, status: 'success', url: directUrl, ...billingResult });
       }
 
       if (['success', 'completed', 'succeed'].includes(status)) {
         if (directUrl) {
           await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
-          return json({ success: true, status: 'success', url: directUrl, deducted: true });
+          return json({ success: true, status: 'success', url: directUrl, ...billingResult });
         }
         const contentCandidates = [
           `${openaiBase}/videos/${taskPayload.operationName}/content`,
@@ -1927,7 +2058,7 @@ Deno.serve(async (req) => {
             success: true,
             status: 'success',
             url: base64Video,
-            deducted: true,
+            ...billingResult,
           });
         }
         if (sawRetryableContent) {
@@ -1940,14 +2071,14 @@ Deno.serve(async (req) => {
         if (!refundResult.success) {
           return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
-        return json({ success: true, status: 'failed', deducted: true });
+        return json({ success: true, status: 'failed', ...billingResult });
       }
 
       if (body.mode === 'download_task') {
         return taskResultNotReady('Task content is not ready yet');
       }
 
-      return json({ success: true, status: 'pending', deducted: true });
+      return json({ success: true, status: 'pending', ...billingResult });
     }
 
     if (body.userRoute || inlineRouteConfig) {
@@ -2065,34 +2196,63 @@ Deno.serve(async (req) => {
             + Number(result?.usage?.output_tokens || 0),
         };
       } else if (body.mode === 'chat') {
-        const auth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, userRoute);
-        const chatResponse = await fetch(auth.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(auth.headers as Record<string, string>),
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: body.messages,
-            max_tokens: body.maxTokens ?? 2048,
-            temperature: body.temperature ?? 0.7,
-            stream: false,
-          }),
-        });
-
-        if (!chatResponse.ok) {
-          const errorText = await chatResponse.text();
-          return json({ success: false, error: `Upstream error: ${chatResponse.status} ${errorText}` }, 502);
-        }
-
-        const result = await chatResponse.json();
-        content = result?.choices?.[0]?.message?.content || '';
-        usage = {
-          promptTokens: Number(result?.usage?.prompt_tokens || 0),
-          completionTokens: Number(result?.usage?.completion_tokens || 0),
-          totalTokens: Number(result?.usage?.total_tokens || 0),
+        const chatAuth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, userRoute);
+        const responsesAuth = buildOpenAICompatAuth(`${baseUrl}/v1/responses`, userRoute);
+        const chatBody = {
+          model: modelId,
+          messages: body.messages,
+          max_tokens: body.maxTokens ?? 2048,
+          temperature: body.temperature ?? 0.7,
+          stream: false,
         };
+        const responsesBody = buildResponsesRequestBody(body, modelId);
+        const preferResponses = modelPrefersResponsesApi(modelId);
+
+        const invokeOpenAIJson = async (
+          auth: { url: string; headers: Record<string, string> },
+          payload: Record<string, unknown>,
+        ): Promise<any> => {
+          const response = await fetch(auth.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(auth.headers as Record<string, string>),
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Upstream error: ${response.status} ${errorText}`);
+          }
+
+          return response.json();
+        };
+
+        try {
+          const result = preferResponses
+            ? await invokeOpenAIJson(responsesAuth, responsesBody)
+            : await invokeOpenAIJson(chatAuth, chatBody);
+          content = preferResponses ? extractTextFromResponsesPayload(result) : (result?.choices?.[0]?.message?.content || '');
+          usage = extractOpenAIUsage(result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error || '');
+          const statusMatch = message.match(/Upstream error:\s*(\d+)/i);
+          const status = statusMatch?.[1] ? Number(statusMatch[1]) : undefined;
+
+          if (!preferResponses && shouldRetryWithResponsesApi(status, message)) {
+            try {
+              const result = await invokeOpenAIJson(responsesAuth, responsesBody);
+              content = extractTextFromResponsesPayload(result);
+              usage = extractOpenAIUsage(result);
+            } catch (responsesError) {
+              const finalMessage = responsesError instanceof Error ? responsesError.message : String(responsesError || '');
+              return json({ success: false, error: finalMessage }, 502);
+            }
+          } else {
+            return json({ success: false, error: message }, 502);
+          }
+        }
       } else if (body.mode === 'image' && endpointType === 'gemini') {
         const parts: any[] = [];
         for (const ref of body.referenceImages || []) {
@@ -2612,6 +2772,12 @@ Deno.serve(async (req) => {
     if (consumeError || !consumeResult?.success || !transactionId) {
       return json({ success: false, error: consumeResult?.message || consumeError?.message || 'Credit deduction failed' }, 402);
     }
+    const balanceAfter = Number(consumeResult?.new_balance ?? currentBalance - requiredCredits);
+    const billingResult = {
+      deducted: true,
+      ledgerId: transactionId,
+      balanceAfter: Number.isFinite(balanceAfter) ? balanceAfter : undefined,
+    };
 
     const refundCredits = async (reason: string): Promise<boolean> => {
       const { data: refundRows, error: refundError } = await serviceClient.rpc('refund_credits', {
@@ -2644,10 +2810,31 @@ Deno.serve(async (req) => {
     };
 
     if (body.mode === 'chat' && endpointType === 'gemini') {
-      const geminiMessages = (body.messages || []).map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content || '' }],
-      }));
+      const useSnakeCase = is12AIGeminiBaseUrl(baseUrl);
+      const systemMessages = (body.messages || [])
+        .filter((message) => message.role === 'system')
+        .map((message) => String(message.content || '').trim())
+        .filter(Boolean);
+      const geminiMessages = (body.messages || [])
+        .filter((message) => message.role !== 'system')
+        .map((message) => ({
+          role: message.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: message.content || '' }],
+        }));
+      const payload: Record<string, unknown> = {
+        contents: geminiMessages.length > 0
+          ? geminiMessages
+          : [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        generationConfig: {
+          temperature: body.temperature ?? 0.7,
+          maxOutputTokens: body.maxTokens ?? 2048,
+        },
+      };
+      if (systemMessages.length > 0) {
+        payload[useSnakeCase ? 'system_instruction' : 'systemInstruction'] = {
+          parts: systemMessages.map((text) => ({ text })),
+        };
+      }
 
       const geminiResponse = await fetch(
         `${baseUrl}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(selectedKey)}`,
@@ -2656,13 +2843,7 @@ Deno.serve(async (req) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            contents: geminiMessages,
-            generationConfig: {
-              temperature: body.temperature ?? 0.7,
-              maxOutputTokens: body.maxTokens ?? 2048,
-            },
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -2679,37 +2860,65 @@ Deno.serve(async (req) => {
         totalTokens: Number(result?.usageMetadata?.totalTokenCount || 0),
       };
     } else if (body.mode === 'chat') {
-      const chatResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${selectedKey}`,
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages: body.messages,
-          max_tokens: body.maxTokens ?? 2048,
-          temperature: body.temperature ?? 0.7,
-          stream: false,
-        }),
-      });
-
-      if (!chatResponse.ok) {
-        const errorText = await chatResponse.text();
-        return await failWithRefund(`Upstream error: ${chatResponse.status} ${errorText}`);
-      }
-
-      const result = await chatResponse.json();
-      content = result?.choices?.[0]?.message?.content || '';
-      usage = {
-        promptTokens: Number(result?.usage?.prompt_tokens || 0),
-        completionTokens: Number(result?.usage?.completion_tokens || 0),
-        totalTokens: Number(result?.usage?.total_tokens || 0),
+      const chatUrl = `${baseUrl}/v1/chat/completions`;
+      const responsesUrl = `${baseUrl}/v1/responses`;
+      const chatBody = {
+        model: modelId,
+        messages: body.messages,
+        max_tokens: body.maxTokens ?? 2048,
+        temperature: body.temperature ?? 0.7,
+        stream: false,
       };
+      const responsesBody = buildResponsesRequestBody(body, modelId);
+      const preferResponses = modelPrefersResponsesApi(modelId);
+
+      const invokeOpenAIJson = async (url: string, payload: Record<string, unknown>): Promise<any> => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${selectedKey}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Upstream error: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+      };
+
+      try {
+        const result = preferResponses
+          ? await invokeOpenAIJson(responsesUrl, responsesBody)
+          : await invokeOpenAIJson(chatUrl, chatBody);
+        content = preferResponses ? extractTextFromResponsesPayload(result) : (result?.choices?.[0]?.message?.content || '');
+        usage = extractOpenAIUsage(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error || '');
+        const statusMatch = message.match(/Upstream error:\s*(\d+)/i);
+        const status = statusMatch?.[1] ? Number(statusMatch[1]) : undefined;
+
+        if (!preferResponses && shouldRetryWithResponsesApi(status, message)) {
+          try {
+            const result = await invokeOpenAIJson(responsesUrl, responsesBody);
+            content = extractTextFromResponsesPayload(result);
+            usage = extractOpenAIUsage(result);
+          } catch (responsesError) {
+            const finalMessage = responsesError instanceof Error ? responsesError.message : String(responsesError || '');
+            return await failWithRefund(finalMessage);
+          }
+        } else {
+          return await failWithRefund(message);
+        }
+      }
     } else if (body.mode === 'image' && endpointType === 'gemini') {
+      const useSnakeCase = is12AIGeminiBaseUrl(baseUrl);
       const parts: any[] = [];
       for (const ref of body.referenceImages || []) {
-        const inlinePart = await toInlineImagePart(ref);
+        const inlinePart = await toInlineImagePart(ref, useSnakeCase);
         if (inlinePart) parts.push(inlinePart);
       }
       parts.push({ text: body.prompt || '' });
@@ -2918,8 +3127,8 @@ Deno.serve(async (req) => {
           transactionId,
           userId: user.id,
         }, taskSecret),
-        deducted: true,
         endpointType,
+        ...billingResult,
       });
     } else if (body.mode === 'video') {
       const openaiBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
@@ -3014,8 +3223,8 @@ Deno.serve(async (req) => {
             userId: user.id,
           }, taskSecret),
           url: directUrl || undefined,
-          deducted: true,
           endpointType: 'openai',
+          ...billingResult,
         });
       }
 
@@ -3024,8 +3233,8 @@ Deno.serve(async (req) => {
           success: true,
           status: 'success',
           url: directUrl,
-          deducted: true,
           endpointType: 'openai',
+          ...billingResult,
         });
       }
 
@@ -3102,7 +3311,7 @@ Deno.serve(async (req) => {
         content,
         usage,
         endpointType,
-        deducted: true,
+        ...billingResult,
       });
     }
 
@@ -3112,7 +3321,7 @@ Deno.serve(async (req) => {
         urls: imageUrls,
         usage,
         endpointType,
-        deducted: true,
+        ...billingResult,
       });
     }
 
@@ -3122,7 +3331,7 @@ Deno.serve(async (req) => {
         url: audioUrl,
         usage,
         endpointType,
-        deducted: true,
+        ...billingResult,
       });
     }
 

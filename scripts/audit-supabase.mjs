@@ -240,10 +240,12 @@ function parseEnvFile(filePath) {
 function extractBuiltinSupabaseConfig() {
   const filePath = path.join(repoRoot, "src", "lib", "supabase.ts");
   const source = fs.readFileSync(filePath, "utf8");
+  const enabledMatch = source.match(/export const isUsingBuiltinSupabaseConfig = (true|false);/);
   const urlMatch = source.match(/const BUILTIN_SUPABASE_URL = '([^']+)'/);
   const keyMatch = source.match(/const BUILTIN_SUPABASE_ANON_KEY = '([^']+)'/);
 
   return {
+    enabled: enabledMatch?.[1] !== "false",
     url: urlMatch?.[1] || "",
     key: keyMatch?.[1] || "",
   };
@@ -610,11 +612,11 @@ export async function runAudit() {
   );
   hasFailures ||= !connection.ok;
 
-  const builtinAligned = Boolean(builtin.url) && builtinRef === expectedRef;
+  const builtinAligned = !builtin.enabled || (Boolean(builtin.url) && builtinRef === expectedRef);
   logCheck(
     "Built-in client config matches project ref",
     builtinAligned,
-    builtin.url || "missing built-in config",
+    builtin.enabled ? (builtin.url || "missing built-in config") : "disabled by env-only runtime config",
   );
   hasFailures ||= !builtinAligned;
 

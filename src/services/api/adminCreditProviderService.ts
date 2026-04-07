@@ -1,4 +1,4 @@
-import { legacyWebApiClient } from './kkApiClient';
+import { kkWebApiClient } from './kkApiClient';
 import { adminModelService } from '../model/adminModelService';
 
 export interface AdminCreditProviderRpcModel {
@@ -109,7 +109,7 @@ function normalizeAdminCreditProviderGroup(row: {
 }
 
 export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpcGroup[]> {
-  const response = await legacyWebApiClient.listAdminCreditProviders();
+  const response = await kkWebApiClient.listAdminCreditProviders();
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to load admin credit providers.');
   }
@@ -118,7 +118,7 @@ export async function listAdminCreditProviders(): Promise<AdminCreditProviderRpc
 }
 
 export async function saveAdminCreditProvider(input: SaveAdminCreditProviderInput): Promise<void> {
-  const response = await legacyWebApiClient.saveAdminCreditProvider(input.providerId, {
+  const response = await kkWebApiClient.saveAdminCreditProvider(input.providerId, {
     providerName: input.providerName,
     baseUrl: input.baseUrl,
     apiKeys: input.apiKeys,
@@ -151,7 +151,7 @@ export async function saveAdminCreditProvider(input: SaveAdminCreditProviderInpu
 }
 
 export async function deleteAdminCreditProvider(providerId: string): Promise<void> {
-  const response = await legacyWebApiClient.deleteAdminCreditProvider(providerId);
+  const response = await kkWebApiClient.deleteAdminCreditProvider(providerId);
   if (!response.success) {
     throw new Error(response.error?.message || 'Failed to delete admin credit provider.');
   }

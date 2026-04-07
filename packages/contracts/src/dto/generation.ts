@@ -61,6 +61,8 @@ export interface SecureProxyTransportResultDto {
   success: boolean;
   error?: string | { message?: string; code?: string; [key: string]: unknown };
   deducted?: boolean;
+  ledgerId?: string;
+  balanceAfter?: number;
   endpointType?: SecureProxyEndpointType;
 }
 

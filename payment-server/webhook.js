@@ -82,6 +82,16 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
             return true;
         }
 
+        if (!result.success) {
+            console.error('[payment-webhook] Payment callback was rejected by compatibility bridge:', {
+                merchantOrderNo: billNo || transactionId,
+                callbackId: transactionId,
+                source: result.source || 'sidecar',
+                error: result.error || null,
+            });
+            return false;
+        }
+
         console.log('[payment-webhook] Payment settlement applied:', {
             source: result.source || 'sidecar',
             settlement: result.settlement?.result || undefined,

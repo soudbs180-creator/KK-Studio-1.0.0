@@ -17,6 +17,7 @@ import {
   extractUserApiEntriesFromPayload,
   extractUserApiProvidersFromPayload,
   extractUserApisPayloadVersion,
+  resolveSecureProxyUserRouteConfig as resolveSecureProxyUserRouteConfigFromPayload,
 } from "../infrastructure/user-api-payload.ts";
 
 function normalizeUserApisPayload(raw: unknown): {
@@ -42,6 +43,44 @@ function getPayloadDensity(raw: unknown): number {
   return normalized.slots.length + normalized.providers.length + normalized.entries.length;
 }
 
+function getPayloadSecretSummary(raw: unknown): {
+  usableSecrets: number;
+  placeholderSecrets: number;
+} {
+  const normalized = normalizeUserApisPayload(raw);
+  const records = [
+    ...normalized.slots,
+    ...normalized.providers,
+    ...normalized.entries,
+  ];
+
+  return records.reduce<{
+    usableSecrets: number;
+    placeholderSecrets: number;
+  }>((summary, record) => {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      return summary;
+    }
+
+    const candidate = record as Record<string, unknown>;
+    const secret = String(candidate.apiKey ?? candidate.key ?? "").trim();
+    if (!secret) {
+      return summary;
+    }
+
+    if (isRouteSecretPlaceholder(secret)) {
+      summary.placeholderSecrets += 1;
+      return summary;
+    }
+
+    summary.usableSecrets += 1;
+    return summary;
+  }, {
+    usableSecrets: 0,
+    placeholderSecrets: 0,
+  });
+}
+
 function clonePayloadSnapshot<T>(value: T): T {
   if (typeof structuredClone === "function") {
     return structuredClone(value);
@@ -52,6 +91,13 @@ function clonePayloadSnapshot<T>(value: T): T {
   }
 
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isRouteSecretPlaceholder(apiKey: string | undefined): boolean {
+  const normalized = String(apiKey || "").trim();
+  return !normalized
+    || normalized === "sk-readonly-0000"
+    || normalized.startsWith("__kk_redacted__:");
 }
 
 export interface AuthDataServiceOptions {
@@ -254,7 +300,41 @@ export class AuthDataService {
     accessToken?: string,
   ): Promise<SecureProxyUserRouteConfigDto | null> {
     await this.reconcileUserApisPayloadWithCloud(userId, email, accessToken);
-    return this.repository.resolveSecureProxyUserRouteConfig(userId, email, routeId);
+    const localRouteConfig = await this.repository.resolveSecureProxyUserRouteConfig(userId, email, routeId);
+    if (localRouteConfig && !isRouteSecretPlaceholder(localRouteConfig.apiKey)) {
+      return localRouteConfig;
+    }
+
+    if (!this.shouldMirrorToCloud(accessToken)) {
+      return localRouteConfig;
+    }
+
+    try {
+      const cloudPayload = await this.cloudMirror!.loadUserApisPayload(accessToken!, userId);
+      const cloudRouteConfig = resolveSecureProxyUserRouteConfigFromPayload(cloudPayload, routeId);
+      if (!cloudRouteConfig || isRouteSecretPlaceholder(cloudRouteConfig.apiKey)) {
+        return localRouteConfig || cloudRouteConfig;
+      }
+
+      try {
+        await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
+      } catch (error) {
+        this.logger.warn("Failed to refresh local auth data while healing a user-route secret placeholder.", {
+          userId,
+          routeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      return cloudRouteConfig;
+    } catch (error) {
+      this.logger.warn("Failed to resolve the user-route config from the cloud mirror after a local placeholder match.", {
+        userId,
+        routeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return localRouteConfig;
+    }
   }
 
   async replaceKeyManagerCloudState(
@@ -325,6 +405,8 @@ export class AuthDataService {
 
         const localDensity = getPayloadDensity(localPayload);
         const cloudDensity = getPayloadDensity(cloudPayload);
+        const localSecrets = getPayloadSecretSummary(localPayload);
+        const cloudSecrets = getPayloadSecretSummary(cloudPayload);
 
         if (localDensity === 0 && cloudDensity > 0) {
           await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
@@ -337,6 +419,26 @@ export class AuthDataService {
         }
 
         if (localDensity > 0 && cloudDensity > 0 && !arePayloadsEquivalent(cloudPayload, localPayload)) {
+          if (cloudSecrets.usableSecrets > localSecrets.usableSecrets) {
+            await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
+            return;
+          }
+
+          if (localSecrets.usableSecrets > cloudSecrets.usableSecrets) {
+            await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+            return;
+          }
+
+          if (cloudSecrets.placeholderSecrets < localSecrets.placeholderSecrets) {
+            await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
+            return;
+          }
+
+          if (localSecrets.placeholderSecrets < cloudSecrets.placeholderSecrets) {
+            await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+            return;
+          }
+
           if (cloudDensity > localDensity) {
             await this.repository.replaceUserApisPayload(userId, email, cloudPayload);
             return;

@@ -2,6 +2,7 @@ import { Canvas } from '../../types';
 import { logError, logInfo, logWarning } from '../system/systemLogService';
 import { supabase } from '../../lib/supabase';
 import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer';
+import { toReferenceImageDataUrl } from '../../utils/referenceImageStorage';
 
 /**
  * Service to handle Local File System Access API
@@ -69,6 +70,22 @@ function extensionFromMimeType(mimeType: string | undefined, fallback: string): 
     if (normalizedMimeType.includes('quicktime') || normalizedMimeType.includes('mov')) return 'mov';
 
     return fallback;
+}
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message || error.name;
+    }
+
+    return typeof error === 'string' ? error : String(error ?? '');
+}
+
+function isRecoverableFileSystemStateError(error: unknown): boolean {
+    const name = error instanceof Error ? error.name : '';
+    const message = getErrorMessage(error);
+
+    return name === 'InvalidStateError'
+        || /state cached in an interface object/i.test(message);
 }
 
 type BlobImageMetrics = {
@@ -1031,6 +1048,9 @@ export const fileSystemService = {
         canvasDirName?: string,
         overwriteExisting: boolean = false
     ): Promise<string> {
+        const ext = extensionFromMimeType(blob.type, isVideo ? 'mp4' : 'png');
+        const filename = `${id}.${ext}`;
+
         try {
             // @ts-ignore
             const originalsDir = await handle.getDirectoryHandle(DIRS.ORIGINALS, { create: true });
@@ -1064,9 +1084,6 @@ export const fileSystemService = {
                 return existingFileName;
             }
 
-            const ext = extensionFromMimeType(blob.type, isVideo ? 'mp4' : 'png');
-            const filename = `${id}.${ext}`;
-
             // @ts-ignore
             const fileHandle = await originalsDir.getFileHandle(filename, { create: true });
             // @ts-ignore
@@ -1081,6 +1098,14 @@ export const fileSystemService = {
             );
             return filename;
         } catch (e) {
+            if (isRecoverableFileSystemStateError(e)) {
+                logWarning(
+                    'FileSystem',
+                    `Skipped saving ${isVideo ? 'video' : 'image'} because the local file handle went stale`,
+                    `${filename}${canvasDirName ? `, source=${canvasDirName}` : ''}`
+                );
+                return filename;
+            }
             console.error('Failed to save image to handle', e);
             throw e;
         }
@@ -1126,7 +1151,7 @@ export const fileSystemService = {
             try {
                 // @ts-ignore
                 for await (const entry of currentHandle.values()) {
-                    if (entry.kind === 'file' && entry.name.includes(id)) {
+                    if (entry.kind === 'file' && matchesStoredFileId(entry.name, id)) {
                         try {
                             // @ts-ignore
                             await currentHandle.removeEntry(entry.name);
@@ -1203,7 +1228,13 @@ export const fileSystemService = {
 
             // 检查是否已存在（去重）
             // 压缩图片到 50% 质量 JPEG
-            const compressedBlob = await this.compressImage(base64Data, mimeType, 0.5);
+            const normalizedSource = toReferenceImageDataUrl(base64Data, mimeType);
+            if (!normalizedSource) {
+                logWarning('FileSystem', 'Skip saving reference image because its payload is empty', storageId);
+                return;
+            }
+
+            const compressedBlob = await this.compressImage(normalizedSource, mimeType, 0.5);
 
             // @ts-ignore
             const fileHandle = await refsDir.getFileHandle(filename, { create: true });
@@ -1290,13 +1321,8 @@ export const fileSystemService = {
                     });
                 }
 
-                // 以当前内存 state 为准合并（更新已有或添加新项）
-                const mergedMap = new Map<string, Canvas>();
-                // 先加载文档中已有的
-                existingCanvases.forEach((c: Canvas) => mergedMap.set(c.id, c));
-                // 再覆盖内存中最新的
-                finalCanvases.forEach((c: Canvas) => mergedMap.set(c.id, c));
-                finalCanvases = Array.from(mergedMap.values());
+                // 以当前内存 state 为准，避免已删除画布从磁盘残留中“复活”
+                finalCanvases = [...state.canvases];
             } catch (e) {
                 // 如果文档不存在，则直接使用传入的 canvases
                 console.log('[FileSystem] No existing project.json found, creating new one');
@@ -1380,6 +1406,12 @@ export const fileSystemService = {
      */
     async compressImage(base64Data: string, mimeType: string, quality: number): Promise<Blob> {
         return new Promise((resolve, reject) => {
+            const normalizedSource = toReferenceImageDataUrl(base64Data, mimeType);
+            if (!normalizedSource) {
+                reject(new Error('Empty image source'));
+                return;
+            }
+
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
@@ -1404,7 +1436,7 @@ export const fileSystemService = {
                 );
             };
             img.onerror = () => reject(new Error('Failed to load image'));
-            img.src = `data:${mimeType};base64,${base64Data}`;
+            img.src = normalizedSource;
         });
     },
 

@@ -1,5 +1,5 @@
-import { KeySlot } from '../auth/keyManager';
-import { LLMAdapter, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter';
+import type { KeySlot } from '../auth/keyManager.ts';
+import type { LLMAdapter, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter.ts';
 import { 
     getAudioCapability, 
     isAudioModel, 
@@ -7,7 +7,7 @@ import {
     supportsCustomLyrics,
     supportsInstrumental,
     supportsAudioContinuation 
-} from '../model/modelCapabilities';
+} from '../model/audioModelCapabilities.ts';
 
 /**
  * 音频生成适配器
@@ -49,6 +49,7 @@ export class AudioCompatibleAdapter implements LLMAdapter {
             'Authorization': `Bearer ${keySlot.key}`
         };
         if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
+            delete headers.Authorization;
             headers[keySlot.headerName] = keySlot.key;
         }
 

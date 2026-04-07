@@ -1,5 +1,10 @@
 import { supabase } from "../../lib/supabase.ts";
 import { subscribeAuthSessionChange } from "../auth/authSessionEvents.ts";
+import {
+  getLatestStartupSnapshot,
+  isStartupStageReady,
+  subscribeStartupSnapshot,
+} from "../system/appStartup.ts";
 
 const accessTokenStorageKey = "kk.api.access_token";
 const ACCESS_TOKEN_SYNC_INTERVAL_MS = 4 * 60 * 1000;
@@ -171,20 +176,55 @@ export function startKkApiAccessTokenSessionSync(): () => void {
     triggerSync();
   });
 
-  window.addEventListener("focus", handleWindowFocus);
-  if (typeof document !== "undefined") {
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-  }
+  let syncListenersAttached = false;
+  let intervalId: number | null = null;
 
-  const intervalId = window.setInterval(triggerSync, ACCESS_TOKEN_SYNC_INTERVAL_MS);
-  triggerSync();
+  const attachSyncListeners = () => {
+    if (syncListenersAttached) {
+      return;
+    }
 
-  stopAccessTokenSessionSync = () => {
-    window.clearInterval(intervalId);
+    syncListenersAttached = true;
+    window.addEventListener("focus", handleWindowFocus);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    intervalId = window.setInterval(triggerSync, ACCESS_TOKEN_SYNC_INTERVAL_MS);
+    triggerSync();
+  };
+
+  const detachSyncListeners = () => {
+    if (!syncListenersAttached) {
+      return;
+    }
+
+    syncListenersAttached = false;
+    if (intervalId !== null) {
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
     window.removeEventListener("focus", handleWindowFocus);
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     }
+  };
+
+  const unsubscribeStartup = subscribeStartupSnapshot((snapshot) => {
+    if (isStartupStageReady(snapshot.stage, "profile_ready")) {
+      attachSyncListeners();
+      return;
+    }
+
+    detachSyncListeners();
+  });
+
+  if (isStartupStageReady(getLatestStartupSnapshot().stage, "profile_ready")) {
+    attachSyncListeners();
+  }
+
+  stopAccessTokenSessionSync = () => {
+    detachSyncListeners();
+    unsubscribeStartup();
     unsubscribe();
     stopAccessTokenSessionSync = null;
   };

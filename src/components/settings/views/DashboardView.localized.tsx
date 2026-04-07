@@ -140,8 +140,8 @@ const RingRow: React.FC<{
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
-  const { balance, billingLogs, usageLogs, fetchLogs } = useBilling();
-  const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
+  const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
+  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
     [billingLogs],
@@ -229,7 +229,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     void refreshDashboard();
     const unsubscribe = keyManager.subscribe(() => void refreshDashboard());
     return unsubscribe;
-  }, [billingLogs.length, usageLogs.length]);
+  }, [billingLogs.length, usageLogs.length, billingLoading]);
 
   useEffect(() => {
     setLogs(getTodayLogs());

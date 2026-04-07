@@ -18,8 +18,10 @@ describe("api server contract", () => {
   let currentAdminPassword = "123456";
   const authenticatedTokens = new Map([
     ["contract-user-token", { userId: "contract-user-1", role: "user" }],
+    ["contract-large-body-token", { userId: "contract-large-body-user", role: "user" }],
     ["contract-admin-token", { userId: "admin-user-1", email: "admin@example.com", role: "admin" }],
     ["contract-asset-token", { userId: "asset-contract-user", role: "user" }],
+    ["profile-contract-token", { userId: "profile-contract-user", email: "profile-contract@example.com", role: "user" }],
   ]);
   const server = createApiServer(0, {
     creditAccountRepository: new InMemoryCreditAccountRepository(),
@@ -75,7 +77,42 @@ describe("api server contract", () => {
     return verifyPayload.data.adminSessionToken;
   }
 
-  test("register returns the documented auth envelope", async () => {
+  function buildLargeKeyManagerStatePayload() {
+    const supportedModels = Array.from({ length: 18_000 }, (_, index) => (
+      `large-model-${index.toString().padStart(5, "0")}-${"x".repeat(64)}`
+    ));
+
+    return {
+      version: 2,
+      slots: [
+        {
+          id: "large-contract-slot-1",
+          key: "sk-large-contract-slot-1",
+          name: "Large Contract Slot",
+          provider: "Custom",
+          type: "proxy",
+          format: "openai",
+          baseUrl: "https://provider.contract.local/v1",
+          supportedModels,
+          disabled: false,
+          createdAt: 1700000000100,
+          updatedAt: 1700000000100,
+          status: "unknown",
+          failCount: 0,
+          successCount: 0,
+          totalCost: 0,
+          budgetLimit: -1,
+          tokenLimit: -1,
+          usedTokens: 0,
+          lastUsed: null,
+          lastError: null,
+        },
+      ],
+      providers: [],
+    };
+  }
+
+  test("register returns the documented disabled auth envelope", async () => {
     const response = await fetch(`${baseUrl}/api/v1/auth/register`, {
       method: "POST",
       headers: {
@@ -89,10 +126,10 @@ describe("api server contract", () => {
       }),
     });
 
-    assert.equal(response.status, 201);
+    assert.equal(response.status, 501);
     const payload = await response.json();
-    assert.equal(payload.success, true);
-    assert.equal(payload.data.email, "contract@example.com");
+    assert.equal(payload.success, false);
+    assert.equal(payload.error.code, "AUTH_ROUTE_DISABLED");
     assert.equal(payload.meta.requestId, "req-contract-register");
   });
 
@@ -333,23 +370,7 @@ describe("api server contract", () => {
   });
 
   test("profile endpoints resolve the current session and allow patch updates", async () => {
-    const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-request-id": "req-contract-profile-login",
-      },
-      body: JSON.stringify({
-        email: "profile-contract@example.com",
-        password: "password-123",
-      }),
-    });
-
-    const loginPayload = await loginResponse.json();
-    assert.equal(loginResponse.status, 200);
-    assert.equal(loginPayload.success, true);
-
-    const authorization = `Bearer ${loginPayload.data.accessToken}`;
+    const authorization = "Bearer profile-contract-token";
 
     const profileResponse = await fetch(`${baseUrl}/api/v1/profile`, {
       headers: {
@@ -663,6 +684,47 @@ describe("api server contract", () => {
     assert.equal(getPayload.data.slots[0].id, "contract-slot-1");
     assert.equal(getPayload.data.providers[0].id, "contract-provider-1");
     assert.equal(getPayload.data.entries[0].id, "contract-entry-1");
+  });
+
+  test("profile persistence routes allow larger key-manager payloads without relaxing the global JSON limit", async () => {
+    const largePayload = buildLargeKeyManagerStatePayload();
+    const largeBody = JSON.stringify(largePayload);
+
+    assert.ok(Buffer.byteLength(largeBody, "utf8") > 1024 * 1024);
+    assert.ok(Buffer.byteLength(largeBody, "utf8") < 4 * 1024 * 1024);
+
+    const keyManagerResponse = await fetch(`${baseUrl}/api/v1/profile/key-manager-state`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer contract-large-body-token",
+        connection: "close",
+        "content-type": "application/json",
+        "x-request-id": "req-contract-key-manager-large-save",
+      },
+      body: largeBody,
+    });
+
+    assert.equal(keyManagerResponse.status, 200);
+    const keyManagerPayload = await keyManagerResponse.json();
+    assert.equal(keyManagerPayload.success, true);
+    assert.equal(keyManagerPayload.data.slots[0].id, "large-contract-slot-1");
+    assert.ok(Array.isArray(keyManagerPayload.data.slots[0].supportedModels));
+    assert.equal(keyManagerPayload.data.slots[0].supportedModels.length, 18_000);
+
+    const defaultRouteResponse = await fetch(`${baseUrl}/api/v1/generation-tasks`, {
+      method: "POST",
+      headers: {
+        connection: "close",
+        "content-type": "application/json",
+        "x-request-id": "req-contract-default-route-large-body",
+      },
+      body: largeBody,
+    });
+
+    assert.equal(defaultRouteResponse.status, 413);
+    const defaultRoutePayload = await defaultRouteResponse.json();
+    assert.equal(defaultRoutePayload.success, false);
+    assert.equal(defaultRoutePayload.error.code, "PAYLOAD_TOO_LARGE");
   });
 
   test("profile unified user-api payload endpoint enforces auth, validation, and version persistence", async () => {

@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { CreditTransactionDto } from '../../packages/contracts/src/index.ts';
-import { legacyWebApiClient } from '../services/api/kkApiClient';
 import { resolveBillingRefreshMode } from '../services/billing/billingRefreshMode';
+import { kkWebApiClient } from '../services/api/kkApiClient';
+import { isKkApiBillingPersistedInCloud } from '../services/api/kkApiServerHealth';
 import { useAuth } from './AuthContext';
+import { useAppStartup } from './AppStartupContext';
 
 export interface CreditTransactionLog {
   id: string;
@@ -48,7 +50,7 @@ interface RefreshBillingOptions {
 }
 
 const BILLING_SNAPSHOT_PREFIX = 'kk_billing_snapshot:';
-const BILLING_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
+const BILLING_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000;
 const CREDIT_TRANSACTIONS_FETCH_LIMIT = 120;
 const BILLING_SYNC_POLL_MS = 30_000;
 
@@ -157,13 +159,15 @@ function getBillingSnapshotKey(userId: string): string {
   return `${BILLING_SNAPSHOT_PREFIX}${userId}`;
 }
 
-function readBillingSnapshot(userId: string): BillingSnapshot | null {
-  if (typeof window === 'undefined' || !userId) {
-    return null;
-  }
+function readBillingSnapshotFromStorage(
+  storage: Storage,
+  userId: string,
+  removeOnExpire: boolean,
+): BillingSnapshot | null {
+  const snapshotKey = getBillingSnapshotKey(userId);
 
   try {
-    const raw = window.sessionStorage.getItem(getBillingSnapshotKey(userId));
+    const raw = storage.getItem(snapshotKey);
     if (!raw) {
       return null;
     }
@@ -175,7 +179,9 @@ function readBillingSnapshot(userId: string): BillingSnapshot | null {
 
     const updatedAt = typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0;
     if (!updatedAt || Date.now() - updatedAt > BILLING_SNAPSHOT_TTL_MS) {
-      window.sessionStorage.removeItem(getBillingSnapshotKey(userId));
+      if (removeOnExpire) {
+        storage.removeItem(snapshotKey);
+      }
       return null;
     }
 
@@ -191,9 +197,34 @@ function readBillingSnapshot(userId: string): BillingSnapshot | null {
       updatedAt,
     };
   } catch (error) {
+    if (removeOnExpire) {
+      try {
+        storage.removeItem(snapshotKey);
+      } catch {
+        // ignore cleanup failures
+      }
+    }
     console.warn('[BillingContext] Failed to restore billing snapshot:', error);
     return null;
   }
+}
+
+function peekBillingSnapshot(userId: string): BillingSnapshot | null {
+  if (typeof window === 'undefined' || !userId) {
+    return null;
+  }
+
+  return readBillingSnapshotFromStorage(window.sessionStorage, userId, false)
+    || readBillingSnapshotFromStorage(window.localStorage, userId, false);
+}
+
+function readBillingSnapshot(userId: string): BillingSnapshot | null {
+  if (typeof window === 'undefined' || !userId) {
+    return null;
+  }
+
+  return readBillingSnapshotFromStorage(window.sessionStorage, userId, true)
+    || readBillingSnapshotFromStorage(window.localStorage, userId, true);
 }
 
 function writeBillingSnapshot(userId: string, snapshot: BillingSnapshot): void {
@@ -201,14 +232,17 @@ function writeBillingSnapshot(userId: string, snapshot: BillingSnapshot): void {
     return;
   }
 
+  const payload = JSON.stringify({
+    balance: toDisplayNumber(snapshot.balance),
+    billingLogs: snapshot.billingLogs.slice(0, CREDIT_TRANSACTIONS_FETCH_LIMIT).map(cloneCreditLog),
+    usageLogs: snapshot.usageLogs.slice(0, CREDIT_TRANSACTIONS_FETCH_LIMIT).map(cloneCreditLog),
+    logsLoaded: snapshot.logsLoaded,
+    updatedAt: snapshot.updatedAt,
+  } satisfies BillingSnapshot);
+
   try {
-    window.sessionStorage.setItem(getBillingSnapshotKey(userId), JSON.stringify({
-      balance: toDisplayNumber(snapshot.balance),
-      billingLogs: snapshot.billingLogs.slice(0, CREDIT_TRANSACTIONS_FETCH_LIMIT).map(cloneCreditLog),
-      usageLogs: snapshot.usageLogs.slice(0, CREDIT_TRANSACTIONS_FETCH_LIMIT).map(cloneCreditLog),
-      logsLoaded: snapshot.logsLoaded,
-      updatedAt: snapshot.updatedAt,
-    } satisfies BillingSnapshot));
+    window.sessionStorage.setItem(getBillingSnapshotKey(userId), payload);
+    window.localStorage.setItem(getBillingSnapshotKey(userId), payload);
   } catch (error) {
     console.warn('[BillingContext] Failed to persist billing snapshot:', error);
   }
@@ -228,6 +262,7 @@ export const useBilling = () => useContext(BillingContext);
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isTempUser } = useAuth();
+  const { isStageReady } = useAppStartup();
 
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -240,14 +275,20 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const apiAccessToken = session?.access_token;
   const activeBillingUserId = !user || isTempUser ? null : user.id;
   const hasVisibleBillingSeed = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
+  const canStartBillingBootstrap = isStageReady('background_ready');
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const balanceRefreshPromiseRef = useRef<Promise<number | undefined> | null>(null);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const logsLoadedRef = useRef(false);
+  const hasVisibleBillingSeedRef = useRef(false);
 
   useEffect(() => {
     logsLoadedRef.current = logsLoaded;
   }, [logsLoaded]);
+
+  useEffect(() => {
+    hasVisibleBillingSeedRef.current = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
+  }, [activeBillingUserId, hydratedUserId]);
 
   const applyTransactionRows = useCallback((rows: CreditTransactionLog[]) => {
     const { rechargeRows, usageRows } = splitCreditLogs(rows);
@@ -261,8 +302,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return 0;
     }
 
+    if (!canStartBillingBootstrap) {
+      return undefined;
+    }
+
+    if (!(await isKkApiBillingPersistedInCloud())) {
+      return undefined;
+    }
+
     try {
-      const response = await legacyWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
+      const response = await kkWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
       if (!response.success) {
         console.error('[BillingContext] Failed to load credit balance from canonical API:', response.error);
         return undefined;
@@ -282,7 +331,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
       return undefined;
     }
-  }, [user, isTempUser, apiAccessToken]);
+  }, [user, isTempUser, apiAccessToken, canStartBillingBootstrap]);
 
   const loadCreditTransactions = useCallback(async (updateBalance = true): Promise<number | undefined> => {
     if (!user || isTempUser) {
@@ -292,8 +341,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return undefined;
     }
 
+    if (!canStartBillingBootstrap) {
+      return undefined;
+    }
+
+    if (!(await isKkApiBillingPersistedInCloud())) {
+      return undefined;
+    }
+
     try {
-      const response = await legacyWebApiClient.listCreditTransactions(
+      const response = await kkWebApiClient.listCreditTransactions(
         { limit: CREDIT_TRANSACTIONS_FETCH_LIMIT },
         buildBillingRequestOptions(apiAccessToken),
       );
@@ -323,7 +380,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
       return undefined;
     }
-  }, [user, isTempUser, apiAccessToken, applyTransactionRows]);
+  }, [user, isTempUser, apiAccessToken, applyTransactionRows, canStartBillingBootstrap]);
 
   const refreshBalanceOnly = useCallback(async (): Promise<number | undefined> => {
     if (balanceRefreshPromiseRef.current) {
@@ -349,6 +406,9 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [fetchBalance]);
 
   const refreshBilling = useCallback(async (options?: RefreshBillingOptions) => {
+    if (!canStartBillingBootstrap) {
+      return;
+    }
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
     }
@@ -366,7 +426,6 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (refreshMode.markRefreshing) {
       setRefreshing(true);
     }
-
     const refreshPromise = (includeTransactions
       ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
       : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const))
@@ -393,7 +452,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     refreshPromiseRef.current = refreshPromise;
     return refreshPromise;
-  }, [refreshBalanceOnly, loadCreditTransactions, hasVisibleBillingSeed]);
+  }, [refreshBalanceOnly, loadCreditTransactions, canStartBillingBootstrap, hasVisibleBillingSeed]);
 
   const fetchLogs = useCallback(async () => {
     if (!user || isTempUser) {
@@ -417,6 +476,10 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     realtimeRefreshTimerRef.current = window.setTimeout(() => {
       realtimeRefreshTimerRef.current = null;
+      if (!canStartBillingBootstrap) {
+        return;
+      }
+
       if (mode === 'full' && logsLoadedRef.current) {
         void refreshBilling({
           includeTransactions: true,
@@ -425,9 +488,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
-      void refreshBalanceOnly();
+      void refreshBilling({
+        includeTransactions: false,
+        silent: true,
+      });
     }, delayMs);
-  }, [user, isTempUser, refreshBalanceOnly, refreshBilling]);
+  }, [user, isTempUser, refreshBilling, canStartBillingBootstrap]);
 
   useEffect(() => {
     refreshPromiseRef.current = null;
@@ -505,13 +571,17 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
+      if (!canStartBillingBootstrap) {
+        return;
+      }
+
       const cachedSnapshot = activeBillingUserId ? readBillingSnapshot(activeBillingUserId) : null;
       if (!cachedSnapshot) {
         setLoading(true);
       }
 
       try {
-        await refreshBalanceOnly();
+        await refreshBilling({ silent: Boolean(cachedSnapshot) });
       } finally {
         if (!cancelled) {
           setHydratedUserId(activeBillingUserId);
@@ -525,16 +595,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       cancelled = true;
     };
-  }, [activeBillingUserId, user, isTempUser, refreshBalanceOnly]);
+  }, [activeBillingUserId, user, isTempUser, refreshBilling, canStartBillingBootstrap]);
 
   useEffect(() => {
     const userId = String(user?.id || '').trim();
-    if (!userId || isTempUser || typeof window === 'undefined') {
+    if (!userId || isTempUser || typeof window === 'undefined' || !canStartBillingBootstrap) {
       return;
     }
 
     const triggerRefresh = () => {
-      scheduleRealtimeRefresh(0, logsLoadedRef.current ? 'full' : 'balance');
+      scheduleRealtimeRefresh(0);
     };
 
     const handleVisibilityChange = () => {
@@ -560,7 +630,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         realtimeRefreshTimerRef.current = null;
       }
     };
-  }, [user?.id, isTempUser, scheduleRealtimeRefresh]);
+  }, [user?.id, isTempUser, scheduleRealtimeRefresh, canStartBillingBootstrap]);
 
   useEffect(() => () => {
     if (realtimeRefreshTimerRef.current !== null && typeof window !== 'undefined') {
@@ -592,7 +662,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const idempotencyKey = String(details?.idempotencyKey || buildClientRequestId('credit-debit')).trim();
 
       try {
-        const response = await legacyWebApiClient.debitCredits({
+        const response = await kkWebApiClient.debitCredits({
           businessRefType,
           businessRefId,
           creditAmount: needAmount,
@@ -652,7 +722,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       try {
-        const response = await legacyWebApiClient.refundCredits({
+        const response = await kkWebApiClient.refundCredits({
           transactionId: safeTransactionId,
           reason,
         }, buildBillingRequestOptions(apiAccessToken));
@@ -693,10 +763,21 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const hasHydratedCurrentBillingScope = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
-  const visibleBalance = hasHydratedCurrentBillingScope ? balance : 0;
-  const visibleBillingLogs = hasHydratedCurrentBillingScope ? billingLogs : [];
-  const visibleUsageLogs = hasHydratedCurrentBillingScope ? usageLogs : [];
-  const visibleLoading = activeBillingUserId ? !hasHydratedCurrentBillingScope : false;
+  const renderCachedSnapshot = !hasHydratedCurrentBillingScope && activeBillingUserId
+    ? peekBillingSnapshot(activeBillingUserId)
+    : null;
+  const visibleBalance = hasHydratedCurrentBillingScope
+    ? balance
+    : (renderCachedSnapshot?.balance ?? 0);
+  const visibleBillingLogs = hasHydratedCurrentBillingScope
+    ? billingLogs
+    : (renderCachedSnapshot?.billingLogs ?? []);
+  const visibleUsageLogs = hasHydratedCurrentBillingScope
+    ? usageLogs
+    : (renderCachedSnapshot?.usageLogs ?? []);
+  const visibleLoading = activeBillingUserId
+    ? ((!hasHydratedCurrentBillingScope && !renderCachedSnapshot) || loading || !canStartBillingBootstrap)
+    : false;
 
   return (
     <BillingContext.Provider

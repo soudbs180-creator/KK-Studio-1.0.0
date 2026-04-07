@@ -79,6 +79,8 @@ On startup, the portable launcher will:
 - update the bundle before the local services start
 - preserve `app/payment-server/.env` and `support/update-config.json`
 
+When the portable bundle is launched from the repository-local path `<project-root>/release/KK-Studio-Portable`, the launcher also checks whether `<project-root>/dist` and the portable support scripts are newer than the bundled copies. If they are, it syncs the portable bundle from the workspace first so stale local release files do not override the latest source build.
+
 ## Cloud auto-deploy
 
 The repository includes an optional GitHub Actions workflow at `.github/workflows/cloud-auto-deploy.yml`.

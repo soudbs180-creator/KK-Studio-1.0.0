@@ -77,6 +77,7 @@ function extractOpenAICompatibleImageUrls(data) {
   };
 
   pushAny(data?.data);
+  pushAny(data?.data?.data);
   pushAny(data?.data?.result);
   pushAny(data?.data?.output);
   pushAny(data?.data?.images);
@@ -84,11 +85,13 @@ function extractOpenAICompatibleImageUrls(data) {
   pushAny(data?.data?.outputs);
   pushAny(data?.images);
   pushAny(data?.result?.data);
+  pushAny(data?.result?.data?.data);
   pushAny(data?.result?.images);
   pushAny(data?.result?.result);
   pushAny(data?.result?.urls);
   pushAny(data?.result?.outputs);
   pushAny(data?.output?.data);
+  pushAny(data?.output?.data?.data);
   pushAny(data?.output?.images);
   pushAny(data?.output?.result);
   pushAny(data?.output?.urls);
@@ -120,6 +123,7 @@ function extractOpenAICompatibleImageUrls(data) {
     pushAny(item.outputs);
     pushAny(item.output);
     pushAny(item.result);
+    pushAny(item.data);
 
     addUrl(urls, item.hd_url);
     addUrl(urls, item.original_url);

@@ -19,6 +19,8 @@ import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../.
 import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { getResolvedCreditCost, isCreditBillingTarget } from '../../utils/creditBilling';
+import { resolveModelDisplayName } from '../../utils/modelDisplayName';
+import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -627,7 +629,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const creditFooterLabel = resolvedCreditCost > 0
         ? `消耗 ${resolvedCreditCost} 积分`
         : '消耗 -- 积分';
-    const modelText = image.modelLabel || image.model || image.id;
+    const modelText = resolveModelDisplayName(image.model || image.id, image.modelLabel || image.model || image.id);
     const providerText = resolveDisplayedProviderLabel(image);
     const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
     const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
@@ -869,16 +871,18 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         setRetryTick(prev => prev + 1);
     }, [imageStorageKey]);
 
-    const handleSingleDownload = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        try {
-            const { base64ToBlob, triggerDownload } = await import('../../utils/downloadUtils');
+	    const handleSingleDownload = async (e: React.MouseEvent) => {
+	        e.stopPropagation();
+	        try {
+	            const { base64ToBlob, triggerDownload } = await import('../../utils/downloadUtils');
+	            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
+	            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
 
-            // 1. 优先从 IndexedDB (受保护层) 或 磁盘恢复 获取原始未压缩数据
-            let originalData = await getStrictOriginalImage(image.id);
-            if (!originalData && image.storageId && image.storageId !== image.id) {
-                originalData = await getStrictOriginalImage(image.storageId);
-            }
+	            // 1. 优先从 IndexedDB (受保护层) 或 磁盘恢复 获取原始未压缩数据
+	            let originalData = await getStrictOriginalImage(image.id);
+	            if (!originalData && image.storageId && image.storageId !== image.id) {
+	                originalData = await getStrictOriginalImage(image.storageId);
+	            }
 
             let blob: Blob;
 
@@ -893,18 +897,21 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 } else {
                     throw new Error('Unsupported storage format');
                 }
-            } else if ((image.originalUrl || image.apiResultUrl) && (image.originalUrl || image.apiResultUrl)?.startsWith('http')) {
-                // 2. 如果本地由于特殊原因找不到，回退到云端原图
-                console.log('[ImageCard] Fetching from cloud fallback');
-                const response = await fetch(image.originalUrl || image.apiResultUrl!);
-                if (!response.ok) throw new Error('Cloud fetch failed');
-                blob = await response.blob();
-            } else {
-                // 3. 最后兜底：使用当前显示的图片数据
-                const fallbackUrl = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
-                if (!fallbackUrl) throw new Error('No image data found');
+	            } else if (image.originalUrl && image.originalUrl.startsWith('http')) {
+	                // 2. 如果本地由于特殊原因找不到，回退到云端原图
+	                console.log('[ImageCard] Fetching from cloud fallback');
+	                const response = await fetch(image.originalUrl);
+	                if (!response.ok) throw new Error('Cloud fetch failed');
+	                blob = await response.blob();
+	            } else {
+	                if (!isVideoMode && !isAudioMode) {
+	                    throw new Error('ORIGINAL_UNAVAILABLE');
+	                }
+	                // 3. 最后兜底：使用当前显示的图片数据
+	                const fallbackUrl = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
+	                if (!fallbackUrl) throw new Error('No image data found');
 
-                if (fallbackUrl.startsWith('data:')) {
+	                if (fallbackUrl.startsWith('data:')) {
                     blob = base64ToBlob(fallbackUrl);
                 } else {
                     const response = await fetch(fallbackUrl);
@@ -913,11 +920,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 }
             }
 
-            // 生成下载专用文档名 (格式: KKStudio_{类别}_{随机英数}.{后缀})
-            const { generateDownloadFilename } = await import('../../utils/downloadUtils');
-            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
-            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
-            const exportType = isAudioMode ? 'Audio' : (isVideoMode ? 'Video' : 'Image');
+	            // 生成下载专用文档名 (格式: KKStudio_{类别}_{随机英数}.{后缀})
+	            const { generateDownloadFilename } = await import('../../utils/downloadUtils');
+	            const exportType = isAudioMode ? 'Audio' : (isVideoMode ? 'Video' : 'Image');
             const exportExt = isAudioMode ? '.mp3' : (isVideoMode ? '.mp4' : '.png');
             const filename = generateDownloadFilename(exportType, exportExt);
 
@@ -1167,6 +1172,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const adaptiveSubBorderWidth = Math.max(1, 1.2 / borderScale);
     const renderPos = isDragging ? localPosRef.current : position;
     const stackZIndex = stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex);
+    const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
     const renderLeft = snapCanvasCoordinate(renderPos.x - nodeWidth / 2, zoomScale || 1);
     const renderTop = snapCanvasCoordinate(renderPos.y - cardHeight, zoomScale || 1);
     const textSoftening = getCanvasTextSofteningProfile(
@@ -1252,14 +1258,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
-                    zIndex: stackZIndex,
+                    zIndex: effectiveStackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
                     left: renderLeft - originX,
                     top: renderTop - originY,
-                    zIndex: stackZIndex,
+                    zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
@@ -1369,14 +1375,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
-                    zIndex: stackZIndex,
+                    zIndex: effectiveStackZIndex,
                     width: isChatMode ? '100%' : nodeWidth,
                     opacity: 1,
                 } : {
                     ...imageNodeContainerStyle,
                     left: renderLeft - originX,
                     top: renderTop - originY,
-                    zIndex: stackZIndex,
+                    zIndex: effectiveStackZIndex,
                     width: nodeWidth,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
@@ -1786,7 +1792,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             {/* 左侧：模型名 + 供应商（积分模型不显示供应商） */}
                                             <div className={joinClasses('min-w-0 flex items-center overflow-hidden', metaLeftGapClass)}>
                                                 {(() => {
-                                                    const modelText = image.modelLabel || image.model || image.id;
+                                                    const modelText = resolveModelDisplayName(image.model || image.id, image.modelLabel || image.model || image.id);
                                                     const providerText = resolveDisplayedProviderLabel(image);
                                                     const modelBadge = getModelBadgeInfo({
                                                         id: image.model || '',

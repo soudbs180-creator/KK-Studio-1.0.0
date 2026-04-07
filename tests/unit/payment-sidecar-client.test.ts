@@ -55,7 +55,7 @@ describe("payment sidecar client", () => {
       amount: "20.00",
       currency: "CNY",
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-payment-order-1",
       userId: "user-1",
     }, {
@@ -77,7 +77,7 @@ describe("payment sidecar client", () => {
       amount: "20.00",
       currency: "CNY",
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-payment-order-1",
       userId: "user-1",
     });

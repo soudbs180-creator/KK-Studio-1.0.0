@@ -1,5 +1,7 @@
-﻿import { legacyWebApiClient } from '../api/kkApiClient';
+﻿import { kkWebApiClient } from '../api/kkApiClient';
 
+
+import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
 
 import {
   type AdminModelQualityPricing,
@@ -135,12 +137,13 @@ class AdminModelService {
   private autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private autoRefreshInitialized = false;
   private broadcastChannel: BroadcastChannel | null = null;
+  private backgroundRefreshEnabled = false;
+  private startupStage: AppStartupStage = 'background_ready';
 
   private static readonly LOAD_RETRY_INTERVAL_MS = 15000;
 
   constructor() {
     this.initializeBroadcastRefresh();
-    this.initializeSafeAutoRefresh();
   }
 
   private requestBackgroundRefresh(force = false): void {
@@ -193,6 +196,10 @@ class AdminModelService {
     // Use the sanitized active-model RPC instead of subscribing to the raw
     // admin_credit_models table so browser clients never receive provider api_keys.
     const refreshNow = () => {
+      if (!this.backgroundRefreshEnabled) {
+        return;
+      }
+
       this.requestBackgroundRefresh(false);
     };
 
@@ -224,6 +231,32 @@ class AdminModelService {
     });
 
     reschedule(getAdminModelAutoRefreshDelay('visible'));
+  }
+
+  setBackgroundRefreshEnabled(enabled: boolean): void {
+    const nextEnabled = enabled === true;
+    this.backgroundRefreshEnabled = nextEnabled;
+
+    if (!nextEnabled) {
+      if (this.autoRefreshTimer) {
+        clearTimeout(this.autoRefreshTimer);
+        this.autoRefreshTimer = null;
+      }
+      return;
+    }
+
+    this.initializeSafeAutoRefresh();
+  }
+
+  setStartupStage(stage: AppStartupStage): void {
+    this.startupStage = stage;
+    this.setBackgroundRefreshEnabled(isStartupStageReady(stage, 'background_ready'));
+
+    if (isStartupStageReady(stage, 'background_ready')) {
+      void this.forceLoadAdminModels().catch((error) => {
+        console.warn('[AdminModelService] Deferred startup refresh failed:', error);
+      });
+    }
   }
 
   private mapLegacyProviderRows(
@@ -274,6 +307,10 @@ class AdminModelService {
   }
 
   async loadAdminModels(force = false): Promise<void> {
+    if (!isStartupStageReady(this.startupStage, 'background_ready')) {
+      return;
+    }
+
     const now = Date.now();
 
     if (this.loadingPromise) {
@@ -293,7 +330,7 @@ class AdminModelService {
   }
 
   private async readFromApi(): Promise<FlatModelRow[]> {
-    const response = await legacyWebApiClient.listActiveCreditModels();
+    const response = await kkWebApiClient.listActiveCreditModels();
     if (!response.success) {
       throw new Error(response.error?.message || 'Failed to load active credit models.');
     }

@@ -9,6 +9,13 @@ function getRequestIp(req: any): string {
   return req.ip || req.connection?.remoteAddress || "unknown";
 }
 
+function buildLegacyAuthDisabledResponse() {
+  return {
+    success: false,
+    error: "Legacy password auth routes are disabled. Use the hosted Supabase auth flow instead.",
+  };
+}
+
 export function mountLegacyAuthRoutes(
   app: LegacyApp,
   options: {
@@ -20,23 +27,21 @@ export function mountLegacyAuthRoutes(
   });
 
   app.post("/api/auth/register", async (req: any, res: any) => {
-    const result = await authService.register(req.body as RegisterRequestDto, {
-      ip: getRequestIp(req),
-    });
-    res.status(result.statusCode).json(result.body);
+    void (req.body as RegisterRequestDto);
+    void authService;
+    void getRequestIp(req);
+    res.status(410).json(buildLegacyAuthDisabledResponse());
   });
 
   app.post("/api/auth/login", async (req: any, res: any) => {
-    const result = await authService.login(req.body as LoginRequestDto, {
-      ip: getRequestIp(req),
-    });
-    res.status(result.statusCode).json(result.body);
+    void (req.body as LoginRequestDto);
+    void getRequestIp(req);
+    res.status(410).json(buildLegacyAuthDisabledResponse());
   });
 
   app.post("/api/auth/send-code", async (req: any, res: any) => {
-    const result = await authService.sendCode(req.body as SendCodeRequestDto, {
-      ip: getRequestIp(req),
-    });
-    res.status(result.statusCode).json(result.body);
+    void (req.body as SendCodeRequestDto);
+    void getRequestIp(req);
+    res.status(410).json(buildLegacyAuthDisabledResponse());
   });
 }

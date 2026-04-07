@@ -1,4 +1,4 @@
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient';
 
 export type SupportedRechargeCurrency = 'CNY' | 'USD';
 
@@ -91,7 +91,7 @@ const mergeWithInactiveFallback = (rows: CreditExchangeRate[]): Record<Supported
 
 export async function listCreditExchangeRates(): Promise<CreditExchangeRate[]> {
   try {
-    const response = await legacyWebApiClient.listCreditExchangeRates({
+    const response = await kkWebApiClient.listCreditExchangeRates({
       requestId: `exchange-rates-list-${Date.now()}`,
     });
 
@@ -113,7 +113,7 @@ export async function listCreditExchangeRates(): Promise<CreditExchangeRate[]> {
 
 export async function getCreditExchangeRateMap(): Promise<Record<SupportedRechargeCurrency, CreditExchangeRate>> {
   try {
-    const response = await legacyWebApiClient.listCreditExchangeRates({
+    const response = await kkWebApiClient.listCreditExchangeRates({
       requestId: `exchange-rates-map-${Date.now()}`,
     });
 
@@ -134,7 +134,7 @@ export async function getCreditExchangeRateMap(): Promise<Record<SupportedRechar
 }
 
 export async function upsertCreditExchangeRate(rate: CreditExchangeRate): Promise<CreditExchangeRate> {
-  const response = await legacyWebApiClient.upsertCreditExchangeRate(
+  const response = await kkWebApiClient.upsertCreditExchangeRate(
     {
       currencyCode: rate.currencyCode,
       creditsPerUnit: Math.max(0.000001, Number(rate.creditsPerUnit) || 0),
