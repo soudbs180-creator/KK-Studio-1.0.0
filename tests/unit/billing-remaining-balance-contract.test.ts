@@ -127,8 +127,8 @@ test('user api settings keep working when local API persistence degrades to memo
   const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
   const userApiCloudStorageShimSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
 
-  assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;'));
-  assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = providerActionsDisabled;'));
+  assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
+  assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;'));
   assert.ok(apiSettingsViewSource.includes('const headerPrimaryActionDisabled = activeTab === \'official\' ? userApiActionsDisabled : providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('disabled={headerPrimaryActionDisabled} onClick={activeTab === \'official\' ? beginCreateOfficial : beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));

@@ -32,6 +32,7 @@ import {
   extractKeyManagerCloudSlots,
   extractUserApiProvidersFromPayload,
 } from '../../services/api/userApiPayload';
+import { resolveUserApiViewState } from '../../services/api/userApiViewState';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import keyManager, {
@@ -792,19 +793,19 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
   const isUserApiPersistenceDegraded = isUserApiPersistenceDegradedFromHealth(apiHealth);
+  const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
+  const isAuthenticated = Boolean(authenticatedUserId);
   const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
-  const shouldUseReadonlyProfileFallback =
-    hasReadonlySnapshot
-    && runtimeOfficialSlots.length === 0
-    && runtimeThirdPartyProviders.length === 0;
-  const isHydratingRuntimeUserApis = shouldUseReadonlyProfileFallback && !isUserApiPersistenceDegraded;
-  const shouldUseReadonlySnapshotForDisplay =
-    shouldUseReadonlyProfileFallback
-    || (
-      isUserApiPersistenceDegraded
-      && runtimeOfficialSlots.length === 0
-      && runtimeThirdPartyProviders.length === 0
-    );
+  const userApiViewState = resolveUserApiViewState({
+    hasReadonlySnapshot,
+    isAuthenticated,
+    isPersistenceDegraded: isUserApiPersistenceDegraded,
+    runtimeOfficialCount: runtimeOfficialSlots.length,
+    runtimeProviderCount: runtimeThirdPartyProviders.length,
+  });
+  const shouldUseReadonlyProfileFallback = userApiViewState.shouldUseReadonlyProfileFallback;
+  const isHydratingRuntimeUserApis = userApiViewState.isHydratingRuntimeUserApis;
+  const shouldUseReadonlySnapshotForDisplay = userApiViewState.shouldUseReadonlySnapshotForDisplay;
   const officialSlots = useMemo(
     () => (shouldUseReadonlySnapshotForDisplay ? readonlyOfficialSlots : runtimeOfficialSlots),
     [readonlyOfficialSlots, runtimeOfficialSlots, shouldUseReadonlySnapshotForDisplay]
@@ -887,17 +888,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       'Local and cloud state will realign once the service recovers. The page now prioritizes keeping the cloud record intact.',
     );
   }, [apiHealth, pick]);
-  const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
-  const isAuthenticated = Boolean(authenticatedUserId);
   const snapshotHydrationHelper = pick(
     '当前先展示的是本地快照，正在同步最新云端配置。请稍候片刻后再编辑。',
     'Showing the cached snapshot while the latest cloud configuration syncs. Please wait a moment before editing.',
   );
-  const userApiActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
-  const providerActionsDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
-  const userApiEditorDisabled = !isAuthenticated || isHydratingRuntimeUserApis;
+  const userApiActionsDisabled = userApiViewState.userApiActionsDisabled;
+  const providerActionsDisabled = userApiViewState.providerActionsDisabled;
+  const userApiEditorDisabled = userApiViewState.userApiEditorDisabled;
   const userApiEditorReadOnly = userApiEditorDisabled;
-  const providerEditorReadOnly = providerActionsDisabled;
+  const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;
   const userApiActionHelper = !isAuthenticated
     ? pick(
         '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
@@ -932,7 +931,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const useCloudBackedUserApiWrites = isAuthenticated && !isTempUser && isUserApiPersistenceDegraded;
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
-  const diagnosticsActionDisabled = !isAuthenticated || isHydratingRuntimeUserApis || apiHealth?.reachable === false;
+  const diagnosticsActionDisabled = !isAuthenticated || apiHealth?.reachable === false;
   const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
         '当前页面会优先保住账号云端记录里的配置，并在本地服务恢复后重新和本地状态对齐。',
@@ -943,6 +942,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (!isAuthenticated) {
       notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
       return false;
+    }
+
+    if (hasReadonlySnapshot) {
+      return true;
     }
 
     if (isHydratingRuntimeUserApis) {
@@ -956,6 +959,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (!isAuthenticated) {
       notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper || snapshotHydrationHelper);
       return false;
+    }
+
+    if (hasReadonlySnapshot) {
+      return true;
     }
 
     if (isHydratingRuntimeUserApis) {
