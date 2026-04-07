@@ -15,6 +15,14 @@ function getSupabaseServiceRoleKey() {
   ).trim();
 }
 
+function getPaymentWebhookSettlementToken() {
+  return String(
+    process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+      || '',
+  ).trim();
+}
+
 function loadPaymentModule() {
   if (!paymentModulePromise) {
     const moduleUrl = pathToFileURL(
@@ -76,7 +84,9 @@ async function createCompatibilityPaymentService() {
   });
   const settlementWriter = new paymentModule.HttpMainApiSettlementWriter({
     baseUrl: String(process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001').trim(),
-    internalToken: String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || '').trim(),
+    internalToken: getPaymentWebhookSettlementToken(),
+    settlementToken: getPaymentWebhookSettlementToken(),
+    caller: 'payment-webhook',
   });
 
   return new paymentModule.PaymentService(repository, settlementWriter, creditAmountResolver);

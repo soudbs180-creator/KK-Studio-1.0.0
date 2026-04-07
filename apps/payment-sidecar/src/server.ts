@@ -117,6 +117,40 @@ export interface PaymentSidecarServerOptions {
 
 type RuntimeMode = "memory" | "supabase" | "http" | "custom";
 
+function isHostedRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL
+    || process.env.VERCEL_ENV
+    || (process.env.CONTEXT && process.env.CONTEXT !== "dev"),
+  );
+}
+
+function allowLegacyPaymentRoutes(): boolean {
+  if (!isHostedRuntime()) {
+    return true;
+  }
+
+  return String(process.env.ALLOW_HOSTED_LEGACY_PAYMENT_ROUTES || "").trim().toLowerCase() === "true";
+}
+
+function assertHostedPaymentSidecarReady(input: {
+  hasPersistentPaymentRepository: boolean;
+  hasSupabaseCreditAmountResolver: boolean;
+  hasSettlementWriteback: boolean;
+}) {
+  if (!isHostedRuntime()) {
+    return;
+  }
+
+  if (
+    !input.hasPersistentPaymentRepository
+    || !input.hasSupabaseCreditAmountResolver
+    || !input.hasSettlementWriteback
+  ) {
+    throw new Error("Hosted payment sidecar requires durable Supabase storage and settlement auth.");
+  }
+}
+
 function resolveRepositoryBackend(
   repository: unknown,
   inMemoryCtor: abstract new (...args: any[]) => unknown,
@@ -176,11 +210,17 @@ export function createPaymentSidecarServer(
     options.settlementWriterOptions?.internalToken
     || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
     || "";
+  const configuredSettlementToken =
+    options.settlementWriterOptions?.settlementToken
+    || process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN
+    || configuredInternalToken;
   const repository = options.paymentOrderRepository || createPaymentOrderRepository();
   const creditAmountResolver = options.creditAmountResolver || createPaymentCreditAmountResolver();
   const settlementWriter = new HttpMainApiSettlementWriter({
     baseUrl: configuredKkApiBaseUrl,
     internalToken: configuredInternalToken,
+    settlementToken: configuredSettlementToken,
+    caller: "payment-sidecar",
     fetchImpl: options.settlementWriterOptions?.fetchImpl,
   });
   const service = new PaymentService(repository, settlementWriter, creditAmountResolver);
@@ -202,13 +242,20 @@ export function createPaymentSidecarServer(
     settlementWriter:
       options.settlementWriterOptions?.fetchImpl
         ? "custom"
-        : configuredInternalToken
+        : configuredSettlementToken
           ? "http"
           : "memory",
   } as const;
   const hasPersistentPaymentRepository = repositoryModes.paymentOrders === "supabase";
   const hasSupabaseCreditAmountResolver = Boolean(!options.creditAmountResolver && supabaseUrl && serviceRoleKey);
-  const hasSettlementWriteback = Boolean(configuredKkApiBaseUrl && configuredInternalToken);
+  const hasSettlementWriteback = Boolean(configuredKkApiBaseUrl && configuredSettlementToken);
+  const legacyRoutesEnabled = allowLegacyPaymentRoutes();
+
+  assertHostedPaymentSidecarReady({
+    hasPersistentPaymentRepository,
+    hasSupabaseCreditAmountResolver,
+    hasSettlementWriteback,
+  });
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -236,6 +283,8 @@ export function createPaymentSidecarServer(
                 hasServiceRoleKey: Boolean(serviceRoleKey),
                 hasKkApiBaseUrl: Boolean(configuredKkApiBaseUrl),
                 hasInternalToken: Boolean(configuredInternalToken),
+                hasSettlementToken: Boolean(configuredSettlementToken),
+                legacyRoutesEnabled,
                 kkApiBaseUrl: configuredKkApiBaseUrl,
               },
               repositories: repositoryModes,
@@ -272,7 +321,7 @@ export function createPaymentSidecarServer(
           req.method === "POST"
           && (
             pathname === "/payment/v1/callbacks/alipay"
-            || pathname === "/api/pay/notify/alipay"
+            || (legacyRoutesEnabled && pathname === "/api/pay/notify/alipay")
           )
         ) {
           const body = await readJsonBody(req);
@@ -317,7 +366,7 @@ export function createPaymentSidecarServer(
           return;
         }
 
-        if (req.method === "GET" && pathname === "/api/pay/qrcode") {
+        if (legacyRoutesEnabled && req.method === "GET" && pathname === "/api/pay/qrcode") {
           const result = await handleLegacyCreateQrCode(service, url.searchParams, requestHeaders, origin);
           if (result.redirectTo) {
             writeRedirect(res, result.redirectTo);
@@ -328,13 +377,13 @@ export function createPaymentSidecarServer(
           return;
         }
 
-        if (req.method === "GET" && pathname === "/api/pay/status") {
+        if (legacyRoutesEnabled && req.method === "GET" && pathname === "/api/pay/status") {
           const result = await handleLegacyGetStatus(service, url.searchParams, requestHeaders);
           writeBody(res, result.statusCode, result.body ?? "", result.contentType);
           return;
         }
 
-        if (req.method === "GET" && pathname === "/api/pay") {
+        if (legacyRoutesEnabled && req.method === "GET" && pathname === "/api/pay") {
           const result = await handleLegacyRedirect(service, url.searchParams, requestHeaders, origin);
           if (result.redirectTo) {
             writeRedirect(res, result.redirectTo);

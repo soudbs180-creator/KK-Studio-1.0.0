@@ -69,11 +69,8 @@ function normalizeRateRow(row) {
   };
 }
 
-function mergeWithDefaultRates(rows) {
-  const merged = {
-    CNY: { ...DEFAULT_CREDIT_EXCHANGE_RATES.CNY },
-    USD: { ...DEFAULT_CREDIT_EXCHANGE_RATES.USD },
-  };
+function buildCanonicalRateMap(rows) {
+  const merged = {};
 
   for (const row of rows || []) {
     const normalized = normalizeRateRow(row);
@@ -81,10 +78,7 @@ function mergeWithDefaultRates(rows) {
       continue;
     }
 
-    merged[normalized.currencyCode] = {
-      ...merged[normalized.currencyCode],
-      ...normalized,
-    };
+    merged[normalized.currencyCode] = normalized;
   }
 
   return merged;
@@ -109,40 +103,45 @@ async function loadCreditExchangeRateMap(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
 
   if (!supabaseUrl || !serviceRoleKey || typeof fetchImpl !== 'function') {
-    return mergeWithDefaultRates([]);
+    throw new Error('Legacy payment settlement requires canonical credit exchange rates.');
   }
 
-  try {
-    const response = await fetchImpl(
-      `${supabaseUrl}/rest/v1/credit_exchange_rates?select=currency_code,credits_per_unit,min_amount,max_amount,is_active&currency_code=in.(CNY,USD)`,
-      {
-        method: 'GET',
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-          'Content-Type': 'application/json',
-        },
+  const response = await fetchImpl(
+    `${supabaseUrl}/rest/v1/credit_exchange_rates?select=currency_code,credits_per_unit,min_amount,max_amount,is_active&currency_code=in.(CNY,USD)`,
+    {
+      method: 'GET',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+    },
+  );
 
-    if (!response.ok) {
-      return mergeWithDefaultRates([]);
-    }
-
-    const payload = await parseJsonResponse(response);
-    if (!Array.isArray(payload)) {
-      return mergeWithDefaultRates([]);
-    }
-
-    return mergeWithDefaultRates(payload);
-  } catch {
-    return mergeWithDefaultRates([]);
+  if (!response.ok) {
+    throw new Error('Legacy payment settlement requires canonical credit exchange rates.');
   }
+
+  const payload = await parseJsonResponse(response);
+  if (!Array.isArray(payload)) {
+    throw new Error('Legacy payment settlement requires canonical credit exchange rates.');
+  }
+
+  const rateMap = buildCanonicalRateMap(payload);
+  if (Object.keys(rateMap).length === 0) {
+    throw new Error('Legacy payment settlement requires canonical credit exchange rates.');
+  }
+
+  return rateMap;
 }
 
 function calculateCreditsFromAmount(amount, currency, rateMap) {
   const currencyCode = normalizeCurrencyCode(currency);
-  const rate = rateMap[currencyCode] || DEFAULT_CREDIT_EXCHANGE_RATES[currencyCode];
+  const rate = rateMap[currencyCode];
+  if (!rate || rate.isActive === false) {
+    throw new Error('Legacy payment settlement requires canonical credit exchange rates.');
+  }
+
   return Math.max(0, Math.round(roundAmount(amount) * Math.max(1, toFiniteNumber(rate.creditsPerUnit, 1))));
 }
 
@@ -174,14 +173,15 @@ function buildLegacyPaymentSettlementRequest(input, rateMap) {
 async function writeLegacyPaymentSettlement(input, options = {}) {
   const baseUrl = String(options.baseUrl || '').trim();
   const internalToken = String(options.internalToken || '').trim();
+  const settlementToken = String(options.settlementToken || internalToken || '').trim();
   const fetchImpl = options.fetchImpl || globalThis.fetch;
 
   if (!baseUrl) {
     throw new Error('Missing KK_API_BASE_URL for payment settlement write-back.');
   }
 
-  if (!internalToken) {
-    throw new Error('Missing PAYMENT_SIDECAR_INTERNAL_TOKEN for payment settlement write-back.');
+  if (!internalToken && !settlementToken) {
+    throw new Error('Missing payment settlement token for payment settlement write-back.');
   }
 
   if (typeof fetchImpl !== 'function') {
@@ -197,6 +197,9 @@ async function writeLegacyPaymentSettlement(input, options = {}) {
       'x-request-id': String(options.requestId || `legacy-payment-${payload.callbackId}`),
       'x-client-version': String(options.clientVersion || 'payment-server-legacy'),
       'x-internal-token': internalToken,
+      'x-payment-settlement-token': settlementToken,
+      'x-internal-caller': 'payment-webhook',
+      'x-internal-service': 'payment-webhook',
     },
     body: JSON.stringify(payload),
   });
@@ -218,8 +221,8 @@ async function writeLegacyPaymentSettlement(input, options = {}) {
 module.exports = {
   DEFAULT_CREDIT_EXCHANGE_RATES,
   buildLegacyPaymentSettlementRequest,
+  buildCanonicalRateMap,
   calculateCreditsFromAmount,
   loadCreditExchangeRateMap,
-  mergeWithDefaultRates,
   writeLegacyPaymentSettlement,
 };

@@ -55,6 +55,47 @@ test("release manifest stays aligned with runtime app info", () => {
   assert.deepEqual(APP_RELEASE_NOTES, releaseManifest.releaseNotes);
 });
 
+test("workspace package governance and verification scripts cover the migration baseline", () => {
+  const rootPackage = JSON.parse(readSource("package.json")) as {
+    version: string;
+    workspaces?: string[];
+    scripts: Record<string, string>;
+  };
+  const paymentPackage = JSON.parse(readSource("payment-server/package.json")) as { version: string };
+  const contractsPackage = JSON.parse(readSource("packages/contracts/package.json")) as { version: string };
+  const domainPackage = JSON.parse(readSource("packages/domain/package.json")) as { version: string };
+  const sharedPackage = JSON.parse(readSource("packages/shared/package.json")) as { version: string };
+
+  assert.deepEqual(rootPackage.workspaces, ["packages/*"]);
+  assert.equal(rootPackage.version, releaseManifest.version);
+  assert.equal(paymentPackage.version, releaseManifest.version);
+  assert.equal(contractsPackage.version, releaseManifest.version);
+  assert.equal(domainPackage.version, releaseManifest.version);
+  assert.equal(sharedPackage.version, releaseManifest.version);
+  assert.match(rootPackage.scripts["test:integration"] || "", /tests\/integration/);
+  assert.match(rootPackage.scripts.test || "", /test:integration/);
+  assert.match(rootPackage.scripts.typecheck || "", /tsconfig\.tests\.json/);
+  assert.match(rootPackage.scripts.typecheck || "", /typecheck:payment-server/);
+  assert.match(rootPackage.scripts["verify:changes"] || "", /npm run test/);
+});
+
+test("runtime-truth docs distinguish live runtimes from target architecture", () => {
+  const readme = readSource("README.md");
+  const rootGuide = readSource("PROJECT_ROOT_GUIDE.md");
+  const projectStructure = readSource("docs/PROJECT_STRUCTURE.md");
+  const handoff = readSource("docs/development/session-handoff.md");
+
+  assert.match(readme, /Current runtime truth/i);
+  assert.match(readme, /`src\/` remains the live web runtime/i);
+  assert.match(readme, /`apps\/web\/` is the target web runtime/i);
+  assert.match(rootGuide, /`src\/`: current live web runtime/i);
+  assert.match(rootGuide, /`apps\/web\/`: target web runtime under migration/i);
+  assert.match(projectStructure, /Current runtime truth/i);
+  assert.match(projectStructure, /`payment-server\/` \| `bridge`/i);
+  assert.match(handoff, /`src\/` remains the live frontend runtime/i);
+  assert.match(handoff, /`apps\/payment-sidecar\/` is the canonical payment runtime/i);
+});
+
 test("compatibility layer registry tracks the required migration files", () => {
   const registry = JSON.parse(readSource("docs/architecture/COMPATIBILITY_LAYER_REGISTRY.json")) as {
     entries: Array<{ path: string; regressionTests: string[]; removalCondition: string }>;

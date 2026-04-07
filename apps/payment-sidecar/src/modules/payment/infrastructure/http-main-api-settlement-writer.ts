@@ -19,6 +19,8 @@ export interface PaymentSettlementWriter {
 export interface HttpMainApiSettlementWriterOptions {
   baseUrl: string;
   internalToken?: string;
+  settlementToken?: string;
+  caller?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -44,11 +46,15 @@ async function parseEnvelope(
 export class HttpMainApiSettlementWriter implements PaymentSettlementWriter {
   private readonly baseUrl: string;
   private readonly internalToken?: string;
+  private readonly settlementToken?: string;
+  private readonly caller?: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: HttpMainApiSettlementWriterOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.internalToken = options.internalToken;
+    this.settlementToken = options.settlementToken;
+    this.caller = options.caller;
     this.fetchImpl = options.fetchImpl || globalThis.fetch;
   }
 
@@ -62,16 +68,21 @@ export class HttpMainApiSettlementWriter implements PaymentSettlementWriter {
         "content-type": "application/json; charset=utf-8",
         "x-request-id": context.requestId,
         "x-client-version": context.clientVersion || "payment-sidecar",
-        "x-internal-token": this.internalToken || "",
+        "x-internal-token": this.settlementToken || this.internalToken || "",
+        "x-payment-settlement-token": this.settlementToken || "",
+        "x-internal-service": this.caller || "",
+        "x-internal-caller": this.caller || "",
       },
       body: JSON.stringify(input),
     });
 
     const payload = await parseEnvelope(response);
     if (!response.ok) {
-      const message = payload && !payload.success
-        ? payload.error.message
-        : `Settlement write failed with status ${response.status}.`;
+      const message = !payload
+        ? `Settlement write failed with status ${response.status}.`
+        : payload.success
+          ? `Settlement write failed with status ${response.status}.`
+          : payload.error.message;
       throw new Error(message);
     }
 

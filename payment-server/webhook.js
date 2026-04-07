@@ -15,6 +15,15 @@ function getSupabaseServiceRoleKey() {
     ).trim();
 }
 
+function getWebhookSettlementToken() {
+    return String(
+        process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+        || process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN
+        || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+        || ''
+    ).trim();
+}
+
 function formatKey(key, type) {
     const raw = String(key || '').trim();
     if (!raw) return '';
@@ -46,7 +55,8 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
 
     const bridgeOptions = {
         baseUrl: process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001',
-        internalToken: process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN,
+        internalToken: getWebhookSettlementToken(),
+        settlementToken: getWebhookSettlementToken(),
         supabaseUrl: process.env.SUPABASE_URL,
         serviceRoleKey: getSupabaseServiceRoleKey(),
         requestId: `payment-webhook-${payType}-${billNo || transactionId}`,

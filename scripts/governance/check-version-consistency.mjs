@@ -9,6 +9,11 @@ const expectedVersion = manifest.version;
 const expectedDisplayVersion = manifest.displayVersion;
 const expectedReleaseDate = manifest.releaseDate;
 const targets = manifest.versionTargets;
+const workspacePackageTargets = targets.workspacePackages || [
+  "packages/contracts/package.json",
+  "packages/domain/package.json",
+  "packages/shared/package.json",
+];
 
 const failures = [];
 
@@ -28,6 +33,13 @@ if (rootPackage.version !== expectedVersion) {
 const paymentPackage = JSON.parse(read(targets.paymentServerPackage));
 if (paymentPackage.version !== expectedVersion) {
   fail(`${targets.paymentServerPackage} version is ${paymentPackage.version}, expected ${expectedVersion}`);
+}
+
+for (const target of workspacePackageTargets) {
+  const pkg = JSON.parse(read(target));
+  if (pkg.version !== expectedVersion) {
+    fail(`${target} version is ${pkg.version}, expected ${expectedVersion}`);
+  }
 }
 
 const appInfoSource = read(targets.webAppInfo);

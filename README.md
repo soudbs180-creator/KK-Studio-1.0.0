@@ -1,4 +1,4 @@
-# KK Studio v1.4.0
+# KK Studio v1.4.1
 
 KK Studio is a multimodal canvas workspace for image, video, audio, and presentation workflows. It combines prompt authoring, model routing, user API management, workspace sync, and operational tooling in a single app.
 
@@ -17,6 +17,14 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 - Node.js 24.x
 - Supabase
 
+## Current runtime truth
+
+- `src/` remains the live web runtime.
+- `apps/web/` is the target web runtime under migration.
+- `apps/api/` is the canonical API runtime.
+- `apps/payment-sidecar/` is the canonical payment runtime.
+- `server/`, `api/`, and `payment-server/` remain transitional bridges.
+
 ## Local Development
 
 1. Copy `.env.example` to `.env` if you need frontend-level overrides.
@@ -34,6 +42,7 @@ npm run dev:start
 npm run dev:status
 npm run dev:stop
 npm run typecheck
+npm run test:integration
 npm run test:unit
 npm run build
 npm run check:encoding
@@ -41,12 +50,15 @@ npm run check:encoding
 
 ## Project Layout
 
-- `src/`: frontend application
-- `apps/api/`: Node API and authenticated server flows
-- `payment-server/`: payment sidecar service
+- `src/`: current live web frontend
+- `apps/web/`: target frontend runtime under migration
+- `apps/api/`: canonical Node API and authenticated server flows
+- `apps/payment-sidecar/`: canonical payment runtime
+- `payment-server/`: transitional payment bridge and webhook shell
+- `server/`, `api/`: transitional compatibility layers
 - `supabase/`: migrations and edge-function assets
 - `scripts/`: development, verification, and release scripts
-- `tests/`: unit, contract, and e2e coverage
+- `tests/`: unit, integration, contract, and e2e coverage
 - `docs/`: runbooks, reports, and implementation notes
 
 ## Notes

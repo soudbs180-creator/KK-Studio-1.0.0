@@ -161,8 +161,15 @@ export async function handleVerifyAdminPassword(
   }
 
   const result = await service.verifyAdminPassword(userId, body, requestId, clientVersion);
+  if (!result.success) {
+    return {
+      statusCode: result.error.code === "ADMIN_FORBIDDEN" ? 403 : 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success ? 200 : result.error.code === "ADMIN_FORBIDDEN" ? 403 : 409,
+    statusCode: 200,
     body: result,
   };
 }
@@ -197,12 +204,18 @@ export async function handleChangeAdminPassword(
     clientVersion,
     resolveAdminSessionToken(headers),
   );
+  if (!result.success) {
+    return {
+      statusCode:
+        result.error.code === "ADMIN_FORBIDDEN" || result.error.code === "ADMIN_ELEVATION_REQUIRED"
+          ? 403
+          : 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success
-      ? 200
-      : result.error.code === "ADMIN_FORBIDDEN" || result.error.code === "ADMIN_ELEVATION_REQUIRED"
-        ? 403
-        : 409,
+    statusCode: 200,
     body: result,
   };
 }
@@ -237,14 +250,20 @@ export async function handleSetUserRole(
     clientVersion,
     resolveAdminSessionToken(headers),
   );
+  if (!result.success) {
+    return {
+      statusCode:
+        result.error.code === "ADMIN_FORBIDDEN" || result.error.code === "ADMIN_ELEVATION_REQUIRED"
+          ? 403
+          : result.error.code === "ADMIN_TARGET_NOT_FOUND"
+            ? 404
+            : 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success
-      ? 200
-      : result.error.code === "ADMIN_FORBIDDEN" || result.error.code === "ADMIN_ELEVATION_REQUIRED"
-        ? 403
-        : result.error.code === "ADMIN_TARGET_NOT_FOUND"
-          ? 404
-          : 409,
+    statusCode: 200,
     body: result,
   };
 }

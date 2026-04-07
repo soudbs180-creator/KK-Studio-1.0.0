@@ -59,7 +59,7 @@ export class AuthService {
     }
 
     const emailCheck = validateAuthEmail(input.email);
-    if (!emailCheck.ok) {
+    if (emailCheck.ok === false) {
       return this.badRequest(emailCheck.error);
     }
 
@@ -99,7 +99,7 @@ export class AuthService {
     }
 
     const emailCheck = validateAuthEmail(input.email);
-    if (!emailCheck.ok) {
+    if (emailCheck.ok === false) {
       return this.badRequest(emailCheck.error);
     }
 
@@ -137,7 +137,7 @@ export class AuthService {
     }
 
     const emailCheck = validateAuthEmail(input.email);
-    if (!emailCheck.ok) {
+    if (emailCheck.ok === false) {
       return this.badRequest(emailCheck.error);
     }
 

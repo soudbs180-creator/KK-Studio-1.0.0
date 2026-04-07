@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+﻿import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import PromptBar from './components/layout/PromptBar';
 import ImageNode from './components/image/ImageCard';
@@ -306,6 +306,8 @@ import {
 } from './utils/pptEditable';
 import NotificationToast from './components/common/NotificationToast';
 import { useImageGeneration } from './hooks/useImageGeneration';
+import { useWorkspaceSurface } from './hooks/useWorkspaceSurface';
+import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfacePanels';
 // import { notify } from './services/system/notificationService'; // [FIX] Dynamic Import
 
 // ProjectManager imported from components
@@ -1655,50 +1657,34 @@ const AppContent: React.FC<AppContentProps> = () => {
   const lastGenerateSignatureRef = useRef<{ value: string; at: number } | null>(null);
 
   // error state removed, using notify service
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatSidebarWidth, setChatSidebarWidth] = useState(420);
-
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [workspaceSurface, setWorkspaceSurface] = useState<Extract<AppSurface, 'workspace' | 'library'>>('workspace');
-
-  const activeAppSurface: AppSurface = showSettingsPanel
-    ? 'settings'
-    : showProfileModal
-      ? 'profile'
-      : isChatOpen
-        ? 'chat'
-        : workspaceSurface;
-
-  const activeWorkspacePanel: WorkspacePanel = isChatOpen
-    ? 'chat'
-    : workspaceSurface === 'library'
-      ? 'history'
-      : null;
-
-  const currentMobileTab: MobilePrimaryTab = activeAppSurface === 'library'
-    ? 'library'
-    : activeAppSurface === 'chat'
-      ? 'chat'
-      : activeAppSurface === 'profile'
-        ? 'me'
-        : 'create';
-
-  // Use the wrapped CanvasCenter API from src/utils/canvasCenter.ts
-
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (!mobile && !isSidebarOpen) setIsSidebarOpen(true); // Auto-open on desktop if closed? Or just default?
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isSidebarOpen]);
-
-  useEffect(() => {
-    if (!isMobile) setIsSidebarOpen(true);
-  }, [isMobile]);
+  const {
+    isSidebarOpen,
+    setIsSidebarOpen,
+    isChatOpen,
+    setIsChatOpen,
+    chatSidebarWidth,
+    setChatSidebarWidth,
+    isMobile,
+    workspaceSurface,
+    setWorkspaceSurface,
+    activeAppSurface,
+    activeWorkspacePanel,
+    currentMobileTab,
+    focusWorkspace,
+    openLibrarySurface,
+    toggleChatPanel,
+    openProfileSurface,
+    openSettingsSurface,
+    handleSelectMobileTab,
+  } = useWorkspaceSurface({
+    showSettingsPanel,
+    showProfileModal,
+    handleShowMobileNav,
+    openSettingsPanel,
+    setProfileInitialView,
+    setShowProfileModal,
+    setShowUserMenu,
+  });
 
   const {
     isGenerating,
@@ -2178,36 +2164,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       ? 'error'
       : 'neutral';
 
-  const focusWorkspace = useCallback(() => {
-    setWorkspaceSurface('workspace');
-  }, []);
-
-  const openLibrarySurface = useCallback(() => {
-    setWorkspaceSurface('library');
-    setShowUserMenu(false);
-    setIsChatOpen(false);
-  }, []);
-
-  const toggleChatPanel = useCallback(() => {
-    setWorkspaceSurface('workspace');
-    setIsChatOpen(prev => !prev);
-  }, []);
-
-  const openProfileSurface = useCallback((view: UserProfileView = 'main') => {
-    setWorkspaceSurface('workspace');
-    setProfileInitialView(view);
-    setShowProfileModal(true);
-    setShowUserMenu(false);
-  }, []);
-
-  const openSettingsSurface = useCallback((
-    view: 'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs' = 'dashboard',
-    supplier: Supplier | null = null
-  ) => {
-    setWorkspaceSurface('workspace');
-    openSettingsPanel(view, supplier);
-    setShowUserMenu(false);
-  }, [openSettingsPanel]);
+  
 
   const handleCancelGeneration = useCallback(async (id?: string) => {
     // If ID provided, cancel specific
@@ -7887,29 +7844,7 @@ ${slideLayerXml.join('\n')}
     handleNavigateToNode(imageNode.position.x, imageNode.position.y, imageNode.id);
   }, [activeCanvas, handleNavigateToNode]);
 
-  const handleSelectMobileTab = useCallback((tab: MobilePrimaryTab) => {
-    handleShowMobileNav();
-
-    if (tab === 'create') {
-      focusWorkspace();
-      setIsChatOpen(false);
-      return;
-    }
-
-    if (tab === 'library') {
-      openLibrarySurface();
-      return;
-    }
-
-    if (tab === 'chat') {
-      focusWorkspace();
-      setIsChatOpen(true);
-      return;
-    }
-
-    setIsChatOpen(false);
-    openProfileSurface('main');
-  }, [focusWorkspace, handleShowMobileNav, openLibrarySurface, openProfileSurface]);
+  
 
   // [Blocking Load] Wait for Canvas Hydration to prevent "Triple Load" flash
   // Keep this after all hooks so the hook order stays stable across renders.
@@ -9044,22 +8979,22 @@ ${slideLayerXml.join('\n')}
         />
       </div>
 
-      <WorkspacePanels
+      <WorkspaceSurfacePanels
         activeSurface={activeAppSurface}
         activePanel={activeWorkspacePanel}
-        chatSidebar={(
-          <div id="chat-sidebar-wrapper">
-            <ChatSidebar
-              isOpen={isChatOpen}
-              onToggle={toggleChatPanel}
-              onClose={() => setIsChatOpen(false)}
-              isMobile={isMobile}
-              onOpenSettings={(view) => {
-                openSettingsSurface(view || 'api-management');
-              }}
-              onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
-              onWidthChange={setChatSidebarWidth}
-            />
+        isChatOpen={isChatOpen}
+        toggleChatPanel={toggleChatPanel}
+        setIsChatOpen={setIsChatOpen}
+        isMobile={isMobile}
+        openSettingsSurface={openSettingsSurface}
+        setIsSidebarHovered={setIsSidebarHovered}
+        setChatSidebarWidth={setChatSidebarWidth}
+        workspaceSurface={workspaceSurface}
+        activeCanvas={activeCanvas}
+        focusWorkspace={focusWorkspace}
+        handlePreviewFromLibrary={handlePreviewFromLibrary}
+        handleFocusLibraryImage={handleFocusLibraryImage}
+      />
           </div>
         )}
         libraryPanel={(
@@ -9513,3 +9448,7 @@ const App: React.FC = () => {
 
 export default App;
 // Force Rebuild
+
+
+
+

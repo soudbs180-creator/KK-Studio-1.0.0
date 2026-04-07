@@ -19,6 +19,7 @@ import {
 } from "../infrastructure/in-memory-admin-console-repository.ts";
 
 const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
+type AdminGuardFailure = Extract<ApiResponse<never>, { success: false }>;
 
 export class AdminConsoleService {
   private readonly repository: AdminConsoleRepository;
@@ -64,7 +65,7 @@ export class AdminConsoleService {
     clientVersion?: string,
   ): Promise<ApiResponse<VerifyAdminPasswordResponseDto>> {
     const access = await this.requireAdmin(userId, requestId, clientVersion);
-    if (!access.success) {
+    if (access !== true) {
       return access;
     }
 
@@ -117,7 +118,7 @@ export class AdminConsoleService {
       requestId,
       clientVersion,
     );
-    if (!access.success) {
+    if (access !== true) {
       return access;
     }
 
@@ -160,7 +161,7 @@ export class AdminConsoleService {
       requestId,
       clientVersion,
     );
-    if (!access.success) {
+    if (access !== true) {
       return access;
     }
 
@@ -191,10 +192,10 @@ export class AdminConsoleService {
     userId: string,
     requestId: string,
     clientVersion?: string,
-  ): Promise<ApiResponse<never> | { success: true }> {
+  ): Promise<AdminGuardFailure | true> {
     const profile = await this.repository.getUserProfile(userId);
     if (profile?.role === "admin") {
-      return { success: true };
+      return true;
     }
 
     return {
@@ -212,15 +213,15 @@ export class AdminConsoleService {
     adminSessionToken: string | undefined,
     requestId: string,
     clientVersion?: string,
-  ): Promise<ApiResponse<never> | { success: true }> {
+  ): Promise<AdminGuardFailure | true> {
     const access = await this.requireAdmin(userId, requestId, clientVersion);
-    if (!access.success) {
+    if (access !== true) {
       return access;
     }
 
     const session = await this.resolveAdminSession(userId, adminSessionToken);
     if (session.active) {
-      return { success: true };
+      return true;
     }
 
     return {
