@@ -3,8 +3,8 @@ import type { User } from '@supabase/supabase-js';
 import {
   AlertCircle,
   ChevronLeft,
-  Chrome,
   CreditCard,
+  Globe,
   Loader2,
   Lock,
   LogOut,
@@ -702,7 +702,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <Chrome size={15} className="shrink-0" />
+                    <Globe size={15} className="shrink-0" />
                     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isGoogleBound ? 'Google 已绑定' : '绑定 Google'}</span>
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>{isGoogleBound ? '已完成' : '进入'}</span>

@@ -7,13 +7,13 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Lock,
   Mail,
   QrCode,
   Sparkles,
 } from 'lucide-react';
-import { Chrome } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import { buildAuthRedirectUrl } from '../../config/authRedirect';
 import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
@@ -830,7 +830,7 @@ const LoginScreen: React.FC = () => {
                   <span>或使用以下方式登录</span>
                 </div>
                 <button type="button" className="auth-btn auth-btn-google" onClick={handleGoogleLogin} disabled={loading}>
-                  <Chrome size={18} />
+                  <Globe size={18} />
                   使用 Google 登录
                 </button>
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading}>
