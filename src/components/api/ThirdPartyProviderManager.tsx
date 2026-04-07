@@ -27,6 +27,13 @@ import {
     formatQuota, formatPrice, getChannelTypeName
 } from '../../services/billing/newApiManagementService';
 import { notify } from '../../services/system/notificationService';
+import {
+    finishProviderManagerBusy,
+    type ProviderManagerBusyAction,
+    IDLE_PROVIDER_MANAGER_BUSY_STATE,
+    isAnyProviderManagerBusy,
+    startProviderManagerBusy,
+} from '../../services/api/providerManagerBusyState';
 
 // Preset providers
 export const PRESET_PROVIDERS = [
@@ -183,7 +190,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
     const [managingProvider, setManagingProvider] = useState<ThirdPartyProvider | null>(null);
     const [managementTab, setManagementTab] = useState<ManagementTab>('overview');
     const [selectedPreset, setSelectedPreset] = useState<string>('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [busyState, setBusyState] = useState(IDLE_PROVIDER_MANAGER_BUSY_STATE);
     const [searchKeyword, setSearchKeyword] = useState('');
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? window.innerWidth < 768 : false
@@ -228,13 +235,31 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
         onProvidersChange?.(newProviders);
     };
 
-    const handleAddProvider = async () => {
+    const withBusyState = async <T,>(
+        action: ProviderManagerBusyAction,
+        task: () => Promise<T>,
+    ): Promise<T> => {
+        setBusyState((current) => startProviderManagerBusy(current, action));
+        try {
+            return await task();
+        } finally {
+            setBusyState((current) => finishProviderManagerBusy(current, action));
+        }
+    };
+
+    const isCreating = busyState.creating;
+    const isRefreshingAll = busyState.refreshingAll;
+    const isBusyForProviderRefresh = (providerId: string) =>
+        busyState.refreshingAll || busyState.refreshingProviderId === providerId;
+    const isBusyForBalanceUpdate = (providerId: string) =>
+        busyState.refreshingAll || busyState.updatingBalanceProviderId === providerId;
+    const hasBusyActions = isAnyProviderManagerBusy(busyState);
+
+    const handleAddProvider = async () => withBusyState({ type: 'create' }, async () => {
         if (!formName || !formBaseUrl || !formApiKey) {
             notify.error('请填写完整信息', '名称、地址和密钥都是必填项');
             return;
         }
-
-        setIsLoading(true);
 
         let pricing: ModelPricingInfo[] | undefined;
         let models: ProviderModel[] = [];
@@ -341,10 +366,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
         
         setIsAddModalOpen(false);
         resetForm();
-        setIsLoading(false);
         
         notify.success('添加成功', `已添加 ${formName}`);
-    };
+    });
 
     const handleDeleteProvider = (id: string) => {
         if (!confirm('确定要删除此服务商吗？')) return;
@@ -398,15 +422,13 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
             silent?: boolean;
             timeout?: number;
         }
-    ) => {
+    ) => withBusyState({ type: 'refresh-provider', providerId: provider.id }, async () => {
         if (!provider.managementConfig?.enabled || !provider.managementConfig.accessToken) {
             if (!options?.silent) {
                 notify.error('未配置管理 API', '请先配置 Access Token');
             }
             return;
         }
-
-        setIsLoading(true);
         const startTime = Date.now();
         const timeout = options?.timeout || 15000; // 默认15秒超时
         
@@ -432,7 +454,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
             };
 
             // 优先获取内核数据（渠道、分组）
-            notify.info('正在刷新...', '获取渠道和分组信息');
+            if (!options?.silent) {
+                notify.info('正在刷新...', '获取渠道和分组信息');
+            }
             
             const [channels, groups, pricing] = await Promise.all([
                 fetchWithTimeout(service.getAllChannels(), '渠道'),
@@ -441,7 +465,9 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
             ]);
 
             // 次要数据（供应商、令牌、模型）
-            notify.info('正在刷新...', '获取供应商和令牌信息');
+            if (!options?.silent) {
+                notify.info('正在刷新...', '获取供应商和令牌信息');
+            }
             
             const [suppliers, tokens, modelMetadata] = await Promise.all([
                 fetchWithTimeout(service.getAllSuppliers(), '供应商'),
@@ -482,15 +508,12 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                 notify.error('刷新失败', error.message || '无法获取管理数据');
             }
             throw error;
-        } finally {
-            setIsLoading(false);
         }
-    };
+    });
 
-    const updateChannelsBalance = async (provider: ThirdPartyProvider) => {
+    const updateChannelsBalance = async (provider: ThirdPartyProvider) => withBusyState({ type: 'update-balance', providerId: provider.id }, async () => {
         if (!provider.managementConfig?.enabled) return;
-        
-        setIsLoading(true);
+
         try {
             const service = new NewApiManagementService({
                 baseUrl: provider.managementConfig.managementUrl || provider.baseUrl,
@@ -518,10 +541,8 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
             notify.success('余额更新成功', `已更新 ${updatedChannels.length} 个渠道`);
         } catch (error: any) {
             notify.error('更新失败', error.message);
-        } finally {
-            setIsLoading(false);
         }
-    };
+    });
 
     const resetForm = () => {
         setFormName('');
@@ -559,10 +580,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                     <p className="text-sm text-white/40 mb-4">点击下方按钮获取最新数据</p>
                     <button
                         onClick={() => refreshManagementData(provider)}
-                        disabled={isLoading}
+                        disabled={isBusyForProviderRefresh(provider.id)}
                         className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                     >
-                        {isLoading ? '获取中...' : '获取数据'}
+                        {isBusyForProviderRefresh(provider.id) ? '获取中...' : '获取数据'}
                     </button>
                 </div>
             );
@@ -630,10 +651,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                         </span>
                         <button
                             onClick={() => refreshManagementData(provider)}
-                            disabled={isLoading}
+                            disabled={isBusyForProviderRefresh(provider.id)}
                             className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-colors text-xs font-medium"
                         >
-                            <RefreshCw size={12} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+                            <RefreshCw size={12} className={`shrink-0 ${isBusyForProviderRefresh(provider.id) ? 'animate-spin' : ''}`} />
                             刷新
                         </button>
                     </div>
@@ -643,7 +664,7 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                 <div className="grid grid-cols-2 gap-4">
                     <button
                         onClick={() => updateChannelsBalance(provider)}
-                        disabled={isLoading}
+                        disabled={isBusyForBalanceUpdate(provider.id)}
                         className="group flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-indigo-500/10 hover:border-indigo-500/30 transition-all text-left"
                     >
                         <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -692,10 +713,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                     </span>
                     <button
                         onClick={() => updateChannelsBalance(provider)}
-                        disabled={isLoading}
+                        disabled={isBusyForBalanceUpdate(provider.id)}
                         className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw size={12} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+                        <RefreshCw size={12} className={`shrink-0 ${isBusyForBalanceUpdate(provider.id) ? 'animate-spin' : ''}`} />
                         更新余额
                     </button>
                 </div>
@@ -999,14 +1020,12 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
     };
 
     // 刷新所有厂商的管理数据
-    const refreshAllProviders = async () => {
+    const refreshAllProviders = async () => withBusyState({ type: 'refresh-all' }, async () => {
         const managementProviders = providers.filter(p => p.managementConfig?.enabled);
         if (managementProviders.length === 0) {
             notify.info('提示', '没有配置管理 API 的厂商');
             return;
         }
-
-        setIsLoading(true);
         let successCount = 0;
         let failCount = 0;
 
@@ -1021,14 +1040,12 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
             }
         }
 
-        setIsLoading(false);
-        
         if (failCount === 0) {
             notify.success('刷新完成', `成功刷新 ${successCount} 个厂商`);
         } else {
             notify.warning('刷新完成', `成功 ${successCount} 个，失败 ${failCount} 个`);
         }
-    };
+    });
 
     return (
         <div className="space-y-4">
@@ -1054,11 +1071,11 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                     {providers.filter(p => p.managementConfig?.enabled).length > 0 && (
                         <button
                             onClick={refreshAllProviders}
-                            disabled={isLoading}
+                            disabled={isRefreshingAll}
                             className="group flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white/80 transition-all duration-200 disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                             title="刷新所有管理数据"
                         >
-                            <RefreshCw size={16} className={`shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+                            <RefreshCw size={16} className={`shrink-0 ${isRefreshingAll ? 'animate-spin' : ''}`} />
                             刷新全部
                         </button>
                     )}
@@ -1599,10 +1616,10 @@ const ThirdPartyProviderManager: React.FC<Props> = ({ onProvidersChange }) => {
                                 </button>
                                 <button
                                     onClick={handleAddProvider}
-                                    disabled={isLoading}
+                                    disabled={isCreating}
                                     className={`flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white text-sm font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 ${isMobile ? 'w-full' : ''}`}
                                 >
-                                    {isLoading ? (
+                                    {isCreating ? (
                                         <>
                                             <RefreshCw size={16} className="animate-spin" />
                                             处理中...
