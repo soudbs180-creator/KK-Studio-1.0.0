@@ -1,17 +1,29 @@
 ## Project Root Guide
 
-This repository is now organized into four simple groups so you can tell what matters at a glance.
+This repository is in a deliberate migration state, so the quickest way to stay oriented is to separate the current live runtimes from the target layout.
+
+### Runtime truth first
+
+- The current live web runtime is root `src/`.
+- The target web runtime is `apps/web/`.
+- The canonical API runtime is `apps/api/`.
+- The canonical payment runtime is `apps/payment-sidecar/`.
+- `server/`, `api/`, and `payment-server/` remain transitional until their bridge responsibilities are fully removed.
+- `billing/` remains a migration-era surface that is still referenced by selected integration tests and compatibility code.
 
 ### 1. Project source
 
-These are the folders that make up the real app and usually matter when you are developing or deploying:
+These are the folders that usually matter when you are developing or deploying:
 
-- `src/`: front-end source
+- `src/`: current live web runtime
 - `public/`: static assets
-- `api/`: serverless-style API handlers
-- `server/`: local/server routes
-- `payment-server/`: payment sidecar service
-- `billing/`: billing logic
+- `apps/web/`: target web runtime under migration
+- `apps/api/`: canonical Node API
+- `apps/payment-sidecar/`: canonical payment runtime
+- `api/`: transitional root compatibility handlers
+- `server/`: transitional server mounts
+- `payment-server/`: transitional payment bridge and webhook shell
+- `billing/`: legacy billing code still referenced by integration tests and migration bridges
 - `config/`: project config data
 - `migrations/`: database migrations
 - `supabase/`: Supabase-related project files
@@ -54,10 +66,10 @@ Anything that is not core code but still worth keeping has been grouped under:
 
 If you want to understand the app, start with:
 
-1. `src/`
-2. `public/`
-3. `api/`, `server/`, `payment-server/`
-4. `package.json`
+1. `README.md`
+2. `docs/PROJECT_STRUCTURE.md`
+3. `src/` for the current live web runtime
+4. `apps/api/` and `apps/payment-sidecar/` for canonical server runtimes
 
 If you only want to clean up local clutter later, check:
 

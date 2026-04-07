@@ -41,6 +41,22 @@ The repository still contains frozen legacy roots:
 
 These paths are transitional. Do not introduce new primary logic there.
 
+## Current runtime truth
+
+The repo is still mid-migration, so this table is the source of truth for what is live today versus what is still transitional.
+
+## Runtime truth table
+
+| Path | Runtime role | Meaning today |
+| --- | --- | --- |
+| `src/` | `current-live-web` | Current live browser app entrypoint. Root `vite.config.ts` and `tsconfig.json` still build this tree. |
+| `apps/web/` | `target-web` | Target browser shell after the web migration is complete. Do not describe it as the current runtime yet. |
+| `apps/api/` | `canonical-api` | Canonical Node API and privileged server flows. |
+| `apps/payment-sidecar/` | `canonical-payment` | Canonical payment service and settlement write-back runtime. |
+| `server/` | `transition-bridge` | Transitional server mounts kept alive during API migration. |
+| `api/` | `transition-bridge` | Root compatibility handlers and local-only edge-style entrypoints. |
+| `payment-server/` | `transition-bridge` | Legacy payment bridge and webhook shell that still exists during payment migration. |
+
 ## Web boundary
 
 - Web code must call backend behavior through typed contracts.

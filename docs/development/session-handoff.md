@@ -15,10 +15,13 @@
 
 ## 3. 当前架构
 - **Frontend**：React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS 4
+- **当前在线前端运行时**：根目录 `src/`
+- **目标前端运行时**：`apps/web/`
 - **State**：React Context + 本地状态 + IndexedDB / File System Access API
 - **Storage**：浏览器缓存、本地文件夹与工作区维护动作共存
 - **Backend / Data**：Supabase（Auth / Database / Edge Functions）+ `apps/api/` Node API
-- **Payment Sidecar**：`payment-server/` 独立维护支付与 MCP 相关能力
+- **主支付运行时**：`apps/payment-sidecar/`
+- **迁移桥接层**：`server/`、`api/`、`payment-server/`
 
 ## 4. 当前版本的事实基线
 - 版本源以 `package.json`、`src/config/appInfo.ts`、`payment-server/package.json` 为准
