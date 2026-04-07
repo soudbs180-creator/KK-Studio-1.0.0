@@ -2,6 +2,9 @@
     "name": "kk-studio",
     "private": true,
     "version": "1.4.1",
+    "workspaces": [
+        "packages/*"
+    ],
     "type": "module",
     "packageManager": "npm@11.12.1",
     "engines": {
@@ -32,11 +35,14 @@
         "governance:compat": "node scripts/governance/check-compatibility-registry.mjs",
         "governance:security": "node scripts/governance/check-sensitive-boundaries.mjs",
         "governance:check": "npm run governance:version && npm run governance:agent-docs && npm run governance:compat && npm run governance:security",
-        "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json",
+        "typecheck:tests": "node scripts/check-tests-types.mjs tsconfig.tests.json",
+        "typecheck:payment-server": "node scripts/check-payment-server.mjs",
+        "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json && node scripts/check-tests-types.mjs tsconfig.tests.json && npm run typecheck:payment-server",
         "test:unit": "node --test \"tests/unit/*.test.ts\"",
+        "test:integration": "node --test \"tests/integration/*.test.ts\"",
         "test:contract": "node --test \"tests/contract/*.test.ts\"",
         "test:e2e": "node --test \"tests/e2e/*.test.ts\"",
-        "test": "npm run test:unit && npm run test:contract && npm run test:e2e",
+        "test": "npm run test:unit && npm run test:integration && npm run test:contract && npm run test:e2e",
     "supabase:audit": "node scripts/audit-supabase.mjs",
     "supabase:functions:serve:user-route-proxy": "npx supabase functions serve user-route-proxy --env-file supabase/.env.functions.local",
     "supabase:functions:deploy:user-route-proxy": "npx supabase functions deploy user-route-proxy",
@@ -44,7 +50,7 @@
     "supabase:functions:deploy:admin-credit-models": "npx supabase functions deploy admin-credit-models --no-verify-jwt",
     "supabase:functions:deploy:secure-model-proxy": "npx supabase functions deploy secure-model-proxy",
     "supabase:functions:deploy:wechat-auth": "npx supabase functions deploy wechat-auth --no-verify-jwt",
-        "verify:changes": "npm run architecture:check && npm run governance:check && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run supabase:audit",
+        "verify:changes": "npm run architecture:check && npm run governance:check && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run supabase:audit && npm run check:encoding",
         "preview": "vite preview",
         "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
         "check:encoding": "node scripts/check-encoding.js"

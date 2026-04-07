@@ -3065,14 +3065,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
         const prefer12AIAsync = this.shouldUse12AIAsyncImageRoute(options);
         const modelMetadata = getModelMetadata(options.modelId);
-        const endpointTypes = modelMetadata && 'endpointTypes' in modelMetadata
-            ? modelMetadata.endpointTypes
-            : undefined;
         const imageSurface = resolveImageSurface({
             runtime: channelRuntime,
             modelId: options.modelId,
             compatibilityMode: keySlot.compatibilityMode,
-            endpointTypes,
+            endpointTypes: modelMetadata?.endpointTypes,
             preferAsync: prefer12AIAsync,
             isAsyncImageModel: (modelId) => this.is12AIAsyncImageModel(modelId),
         });

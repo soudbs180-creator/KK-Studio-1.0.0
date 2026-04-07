@@ -61,7 +61,7 @@ class NotificationService {
         }
 
         // 记录到系统日志 (直接调用，确保同步记录)
-        let level = LogLevel.INFO;
+        let level: (typeof LogLevel)[keyof typeof LogLevel] = LogLevel.INFO;
         if (type === 'error') level = LogLevel.ERROR;
         if (type === 'warning') level = LogLevel.WARNING;
 

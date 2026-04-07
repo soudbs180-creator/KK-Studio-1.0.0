@@ -179,18 +179,14 @@ const LoginScreen: React.FC = () => {
     root.classList.add('auth-screen-active', authThemeClass);
     body.style.background = backgroundColor;
     root.style.background = backgroundColor;
-    root.style.setProperty('color-scheme', resolvedTheme);
+    root.style.colorScheme = resolvedTheme;
 
     return () => {
       body.classList.remove('auth-screen-active', authThemeClass);
       root.classList.remove('auth-screen-active', authThemeClass);
       body.style.background = previousBodyBackground;
       root.style.background = previousRootBackground;
-      if (previousColorScheme) {
-        root.style.setProperty('color-scheme', previousColorScheme);
-      } else {
-        root.style.removeProperty('color-scheme');
-      }
+      root.style.colorScheme = previousColorScheme || '';
     };
   }, [resolvedTheme]);
 

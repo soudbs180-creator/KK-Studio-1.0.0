@@ -49,6 +49,7 @@ npm run dev:start
 npm run dev:status
 npm run dev:stop
 npm run typecheck
+npm run test:integration
 npm run test:unit
 npm run build
 npm run check:encoding
@@ -64,7 +65,7 @@ npm run check:encoding
 - `server/`, `api/`: transitional compatibility layers
 - `supabase/`: migrations and edge-function assets
 - `scripts/`: development, verification, and release scripts
-- `tests/`: unit, contract, and e2e coverage
+- `tests/`: unit, integration, contract, and e2e coverage
 - `docs/`: runbooks, reports, and implementation notes
 
 ## Notes

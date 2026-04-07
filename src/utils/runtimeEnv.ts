@@ -30,26 +30,25 @@ function readImportMetaEnv(): RuntimeEnv | undefined {
     return undefined;
   }
 
-  if (typeof import.meta.env === 'undefined') {
+  try {
+    // Vite only injects env values for direct `import.meta.env.FOO` access.
+    // Avoid dynamic `import.meta.env[name]` lookups here or the browser bundle
+    // will lose the public env values entirely.
+    return {
+      VITE_AUTH_REDIRECT_ORIGIN: import.meta.env.VITE_AUTH_REDIRECT_ORIGIN,
+      VITE_ENABLE_LOCAL_USER_ROUTE_API: import.meta.env.VITE_ENABLE_LOCAL_USER_ROUTE_API,
+      VITE_ENABLE_LEGACY_WEB_API_FALLBACK: import.meta.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK,
+      VITE_KK_API_BASE_URL: import.meta.env.VITE_KK_API_BASE_URL,
+      VITE_PAYMENT_GATEWAY_URL: import.meta.env.VITE_PAYMENT_GATEWAY_URL,
+      VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+      VITE_TURNSTILE_ENABLED: import.meta.env.VITE_TURNSTILE_ENABLED,
+      VITE_TURNSTILE_LOCAL_BYPASS: import.meta.env.VITE_TURNSTILE_LOCAL_BYPASS,
+      VITE_TURNSTILE_SITE_KEY: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+    };
+  } catch {
     return undefined;
   }
-
-  // Vite only injects env values for direct `import.meta.env.FOO` access.
-  // Avoid dynamic `import.meta.env[name]` lookups here or the browser bundle
-  // will lose the public env values entirely.
-  const hasImportMetaEnv = typeof import.meta.env !== 'undefined';
-  return {
-    VITE_AUTH_REDIRECT_ORIGIN: hasImportMetaEnv ? import.meta.env.VITE_AUTH_REDIRECT_ORIGIN : undefined,
-    VITE_ENABLE_LOCAL_USER_ROUTE_API: hasImportMetaEnv ? import.meta.env.VITE_ENABLE_LOCAL_USER_ROUTE_API : undefined,
-    VITE_ENABLE_LEGACY_WEB_API_FALLBACK: hasImportMetaEnv ? import.meta.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK : undefined,
-    VITE_KK_API_BASE_URL: hasImportMetaEnv ? import.meta.env.VITE_KK_API_BASE_URL : undefined,
-    VITE_PAYMENT_GATEWAY_URL: hasImportMetaEnv ? import.meta.env.VITE_PAYMENT_GATEWAY_URL : undefined,
-    VITE_SUPABASE_ANON_KEY: hasImportMetaEnv ? import.meta.env.VITE_SUPABASE_ANON_KEY : undefined,
-    VITE_SUPABASE_URL: hasImportMetaEnv ? import.meta.env.VITE_SUPABASE_URL : undefined,
-    VITE_TURNSTILE_ENABLED: hasImportMetaEnv ? import.meta.env.VITE_TURNSTILE_ENABLED : undefined,
-    VITE_TURNSTILE_LOCAL_BYPASS: hasImportMetaEnv ? import.meta.env.VITE_TURNSTILE_LOCAL_BYPASS : undefined,
-    VITE_TURNSTILE_SITE_KEY: hasImportMetaEnv ? import.meta.env.VITE_TURNSTILE_SITE_KEY : undefined,
-  };
 }
 
 export function readRuntimeEnv(name: string): string | undefined {

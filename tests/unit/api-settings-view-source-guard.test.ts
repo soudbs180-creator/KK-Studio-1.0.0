@@ -52,8 +52,8 @@ test('ApiSettingsView keeps its secure proxy client import and inline-create ali
 
   assert.match(
     source,
-    /import \{ kkWebApiClient,\s*legacyWebApiClient \} from '\.\.\/\.\.\/services\/api\/kkApiClient';/,
+    /import \{ kkWebApiClient \} from '\.\.\/\.\.\/services\/api\/kkApiClient';/,
   );
-  assert.match(source, /const showInlineOfficialCreate = isCreatingOfficial;/);
-  assert.match(source, /const showInlineProviderCreate = isCreatingProvider;/);
+  assert.match(source, /const showInlineOfficialCreate = activeEditorMode === null && activeTab === 'official';/);
+  assert.match(source, /const showInlineProviderCreate = activeEditorMode === null && activeTab === 'third-party';/);
 });

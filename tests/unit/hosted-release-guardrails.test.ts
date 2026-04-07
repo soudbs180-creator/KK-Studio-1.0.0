@@ -66,4 +66,8 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /4\. Smoke tests/);
   assert.match(source, /Confirm the request succeeds and the user credit balance does not decrease\./);
   assert.match(source, /Hosted `secure-model-proxy` is still on an older version without `userRoute`/);
+  assert.match(source, /Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable\./);
+  assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
+  assert.match(source, /`PAYMENT_SIDECAR_SETTLEMENT_TOKEN`/);
+  assert.match(source, /`PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`/);
 });

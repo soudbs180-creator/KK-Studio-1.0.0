@@ -67,7 +67,7 @@ function validateRegisterRequest(body: RegisterRequestDto): ApiErrorDetail[] {
     details.push({ field: "email", reason: "email is required." });
   } else {
     const result = validateAuthEmail(body.email);
-    if (!result.ok) {
+    if (result.ok === false) {
       details.push({ field: "email", reason: result.error });
     }
   }
@@ -96,7 +96,7 @@ function validateLoginRequest(body: LoginRequestDto): ApiErrorDetail[] {
     details.push({ field: "email", reason: "email is required." });
   } else {
     const result = validateAuthEmail(body.email);
-    if (!result.ok) {
+    if (result.ok === false) {
       details.push({ field: "email", reason: result.error });
     }
   }

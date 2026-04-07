@@ -102,6 +102,18 @@ describe("payment-server settlement bridge", () => {
       (requests[1].init?.headers as Record<string, string>)["x-internal-token"],
       "payment-internal-token",
     );
+    assert.equal(
+      (requests[1].init?.headers as Record<string, string>)["x-internal-service"],
+      "payment-webhook",
+    );
+    assert.equal(
+      (requests[1].init?.headers as Record<string, string>)["x-internal-caller"],
+      "payment-webhook",
+    );
+    assert.equal(
+      (requests[1].init?.headers as Record<string, string>)["x-payment-settlement-token"],
+      "payment-internal-token",
+    );
 
     const body = JSON.parse(String(requests[1].init?.body));
     assert.deepEqual(body, {
@@ -121,43 +133,42 @@ describe("payment-server settlement bridge", () => {
     assert.equal(result.result.balanceAfter, 220);
   });
 
-  test("falls back to default exchange rates when supabase lookup is unavailable", async () => {
+  test("fails closed when canonical exchange-rate lookup is unavailable", async () => {
     const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
     const fetchImpl = async (input: string | URL, init?: RequestInit) => {
       requests.push({ url: String(input), init });
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({
-          success: true,
-          data: {
-            ledgerId: "ledger-payment-2",
-            balanceAfter: 125,
-            paymentOrderId: "legacy-alipay-ORDER_3001",
-            merchantOrderNo: "ORDER_3001",
-          },
-        }),
-      } as Response;
+
+      if (String(input).includes("/rest/v1/credit_exchange_rates")) {
+        return {
+          ok: false,
+          status: 503,
+          text: async () => JSON.stringify({ message: "storage unavailable" }),
+        } as Response;
+      }
+
+      throw new Error(`Unexpected request: ${String(input)}`);
     };
 
-    await writeLegacyPaymentSettlement(
-      {
-        userId: "user-payment-3",
-        transactionId: "trade-alipay-3",
-        amount: 5,
-        currency: "CNY",
-        payType: "alipay",
-        billNo: "ORDER_3001",
-      },
-      {
-        baseUrl: "https://api.kk.local",
-        internalToken: "payment-internal-token",
-        fetchImpl,
-      },
+    await assert.rejects(
+      () => writeLegacyPaymentSettlement(
+        {
+          userId: "user-payment-3",
+          transactionId: "trade-alipay-3",
+          amount: 5,
+          currency: "CNY",
+          payType: "alipay",
+          billNo: "ORDER_3001",
+        },
+        {
+          baseUrl: "https://api.kk.local",
+          internalToken: "payment-internal-token",
+          supabaseUrl: "https://db.kk.local",
+          serviceRoleKey: "service-role-key",
+          fetchImpl,
+        },
+      ),
+      /canonical credit exchange rates/i,
     );
-
     assert.equal(requests.length, 1);
-    const body = JSON.parse(String(requests[0].init?.body));
-    assert.equal(body.creditAmount, 25);
   });
 });

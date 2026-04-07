@@ -75,9 +75,34 @@ function getSupabaseServiceRoleKey() {
   ).trim();
 }
 
+function getWebhookSettlementToken() {
+  return String(
+    process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+      || '',
+  ).trim();
+}
+
+function isHostedRuntime() {
+  return Boolean(
+    process.env.VERCEL
+      || process.env.VERCEL_ENV
+      || (process.env.CONTEXT && process.env.CONTEXT !== 'dev'),
+  );
+}
+
+function allowHostedLegacyPaymentRoutes() {
+  if (!isHostedRuntime()) {
+    return true;
+  }
+
+  return String(process.env.ALLOW_HOSTED_LEGACY_PAYMENT_ROUTES || '').trim().toLowerCase() === 'true';
+}
+
 const supabaseUrl = String(process.env.SUPABASE_URL || 'https://ovdjhdofjysanamgkfng.supabase.co').trim();
 const mainApiBaseUrl = String(process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001').trim();
-const settlementInternalToken = String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || '').trim();
+const settlementInternalToken = getWebhookSettlementToken();
 const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
 
 function buildLegacyOrigin(req) {
@@ -182,7 +207,7 @@ const alipaySdk = new AlipaySdk({
 });
 
 if (!settlementInternalToken) {
-  console.warn('[payment-server] PAYMENT_SIDECAR_INTERNAL_TOKEN is missing, so webhook settlement write-back will fail.');
+  console.warn('[payment-server] Settlement token is missing, so webhook settlement write-back will fail.');
 }
 
 if (!mainApiBaseUrl) {
@@ -254,6 +279,10 @@ app.get('/api/v1/user/nickname', async (req, res) => {
 
 app.get('/api/pay/qrcode', async (req, res) => {
   try {
+    if (!allowHostedLegacyPaymentRoutes()) {
+      return res.status(404).json({ error: 'Legacy payment routes are disabled on hosted runtimes.' });
+    }
+
     const origin = buildLegacyOrigin(req);
     const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
     const result = await handleLegacyCreateQrCodeThroughSidecar(query, req.headers, origin, {
@@ -276,6 +305,10 @@ app.get('/api/pay/qrcode', async (req, res) => {
 
 app.get('/api/pay', async (req, res) => {
   try {
+    if (!allowHostedLegacyPaymentRoutes()) {
+      return res.status(404).json({ error: 'Legacy payment routes are disabled on hosted runtimes.' });
+    }
+
     const origin = buildLegacyOrigin(req);
     const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
     const result = await handleLegacyRedirectThroughSidecar(query, req.headers, origin, {
@@ -298,6 +331,10 @@ app.get('/api/pay', async (req, res) => {
 
 app.get('/api/pay/status', async (req, res) => {
   try {
+    if (!allowHostedLegacyPaymentRoutes()) {
+      return res.status(404).json({ error: 'Legacy payment routes are disabled on hosted runtimes.' });
+    }
+
     const query = toUrlSearchParams(req.query);
     const { outTradeNo } = req.query;
     if (!outTradeNo) {

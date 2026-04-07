@@ -9,7 +9,7 @@
 - [x] 主项目版本统一为 `1.4.1`
 - [x] 画布展示版本继续以 `src/config/appInfo.ts` 集中管理
 - [x] README、开发进度、交接文档、移动端报告同步到 `v1.4.1`
-- [x] 支付子服务版本元信息同步到 `1.4.1`
+- [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.4.1`
 - [x] 修复 Node/ESM 启动链、用户路由云回退、账单 hydrate 误判与 Canvas 本地持久化问题
 - [x] 构建版本清单补充 `releaseDate / releaseNotes`，便于后续发布与更新校验
 
@@ -29,6 +29,8 @@
 - **部署一致性**：继续降低本地与线上环境差异，尤其是服务端配置与会话相关行为
 - **文档一致性**：今后所有“当前版本”说明以 `1.4.1` 为基线
 - **多供应商架构方案**：已补充独立供应商 / 多协议面 / surface 路由的分层改造方案，详见 `docs/development/multi-vendor-provider-architecture.md`
+- **验证链补强**：集成测试、支付侧静态校验与 Hosted 预检继续纳入默认回归口径
+- **运行时口径一致**：当前在线前端继续以根目录 `src/` 为准，`apps/web/` 明确保持为迁移目标，而 `payment-server/` 明确标注为过渡桥接层
 
 ## 3. 待继续项
 - [ ] 对设置中心、管理后台和登录注册链路做一轮完整回归
@@ -42,6 +44,7 @@
 - `@lobehub/icons` 与部分设置页面相关资源体积仍值得继续关注
 - 历史文档保留旧版本号仅用于追溯，不代表当前发布基线
 - 当前多供应商接入能力已覆盖大多数行业请求方法，但供应商事实、协议面和执行逻辑仍需进一步解耦
+- Hosted 发布链路已经开始收紧 fail-closed 语义，后续发布前应继续验证支付、鉴权和工作区同步不会落入危险的降级路径
 
 ## 5. 推荐回归检查
 ```bash
@@ -56,5 +59,4 @@ npm run build
 - [x] Admin model catalog auto-refresh now shares one cooldown policy across focus, visibility, timer, and broadcast triggers.
 - [x] API settings keep snapshot-backed views interactive while cloud reconciliation runs in the background.
 - [x] Third-party provider management now scopes busy states to the active action instead of locking the whole page behind one loading flag.
-
 *Report Updated: 2026-04-07*

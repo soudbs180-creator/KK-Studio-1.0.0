@@ -136,11 +136,11 @@ describe("auth-facing localization helpers", () => {
     assert.equal(localizeUserFacingText("生成失败"), "Generation failed");
     assert.equal(
       localizeUserFacingText("您的账户余额不足，请先充值积分。"),
-      "Your balance is too low. Please top up your credits first.",
+      "Your balance is too low. Please recharge credits first.",
     );
     assert.equal(
       localizeUserFacingText("已导出 3 页整屏长图"),
-      "Exported 3 full-page images",
+      "Exported 3 full-length slide images.",
     );
     assert.equal(
       localizeUserFacingText("已到账 25 积分"),
@@ -148,7 +148,7 @@ describe("auth-facing localization helpers", () => {
     );
     assert.equal(
       localizeUserFacingText("最多支持 5 张参考图"),
-      "Up to 5 reference images are supported",
+      "You can upload up to 5 reference images",
     );
     assert.equal(
       localizeUserFacingText("使用当前配置需要 20 积分，当前余额: 8， 请充值。".replace("， ", "，")),

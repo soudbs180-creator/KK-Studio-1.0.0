@@ -7,19 +7,74 @@ import {
 } from "../../../../../../packages/contracts/src/index.ts";
 import type { CreditAccountService } from "../application/credit-account-service.ts";
 
-function isInternalSettlementRequest(headers: Record<string, string>): boolean {
-  const configuredToken = String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || "").trim();
-  if (!configuredToken) {
-    return false;
+function isHostedRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL
+    || process.env.VERCEL_ENV
+    || (process.env.CONTEXT && process.env.CONTEXT !== "dev"),
+  );
+}
+
+function resolvePresentedInternalToken(headers: Record<string, string>): string {
+  const scopedHeaderToken = String(headers["x-payment-settlement-token"] || "").trim();
+  if (scopedHeaderToken) {
+    return scopedHeaderToken;
   }
 
   const headerToken = String(headers["x-internal-token"] || "").trim();
+  if (headerToken) {
+    return headerToken;
+  }
+
   const authorization = String(headers.authorization || "").trim();
-  const bearerToken = authorization.toLowerCase().startsWith("bearer ")
+  return authorization.toLowerCase().startsWith("bearer ")
     ? authorization.slice(7).trim()
     : "";
+}
 
-  return headerToken === configuredToken || bearerToken === configuredToken;
+function resolveScopedSettlementToken(service: string): string {
+  if (service === "payment-sidecar") {
+    return String(
+      process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+      || "",
+    ).trim();
+  }
+
+  if (service === "payment-webhook") {
+    return String(
+      process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+      || "",
+    ).trim();
+  }
+
+  return "";
+}
+
+function isInternalSettlementRequest(headers: Record<string, string>): boolean {
+  const caller = String(
+    headers["x-internal-service"]
+    || headers["x-internal-caller"]
+    || "",
+  ).trim().toLowerCase();
+  const presentedToken = resolvePresentedInternalToken(headers);
+  const scopedToken = resolveScopedSettlementToken(caller);
+
+  if (caller && scopedToken) {
+    return presentedToken === scopedToken;
+  }
+
+  const configuredToken = String(process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN || "").trim();
+  const hasScopedTokens = Boolean(
+    String(process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN || "").trim()
+    || String(process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN || "").trim(),
+  );
+  if (!configuredToken || (isHostedRuntime() && hasScopedTokens)) {
+    return false;
+  }
+
+  return presentedToken === configuredToken;
 }
 
 export function validateApplyPaymentSettlementRequest(body: unknown): ApiErrorDetail[] {

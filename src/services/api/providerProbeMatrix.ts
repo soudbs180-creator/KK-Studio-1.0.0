@@ -63,6 +63,7 @@ export function resolveProviderProbeMatrix(input: {
         runtime: input.runtime,
         modelId: input.modelId,
         compatibilityMode: input.compatibilityMode,
+        preferAsync: input.runtime.strategyId === '12ai' && Boolean(input.isAsyncImageModel?.(input.modelId)),
         isAsyncImageModel: input.isAsyncImageModel,
     });
 

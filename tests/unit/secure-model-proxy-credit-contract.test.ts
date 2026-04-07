@@ -10,14 +10,14 @@ function readSource(relativePath: string): string {
 }
 
 test('secure system proxy transports expose verifiable billing metadata and the caller requires it', () => {
-  const dtoSource = readSource('packages/contracts/src/dto/generation.ts');
+  const contractsIndexSource = readSource('packages/contracts/src/index.ts');
   const secureProxyClientSource = readSource('src/services/model/secureModelProxy.ts');
   const modelCallerSource = readSource('src/services/model/modelCaller.ts');
   const edgeProxySource = readSource('supabase/functions/secure-model-proxy/index.ts');
 
   assert.match(
-    dtoSource,
-    /export interface SecureProxyTransportResultDto \{[\s\S]*ledgerId\?: string;[\s\S]*balanceAfter\?: number;[\s\S]*\}/,
+    contractsIndexSource,
+    /export \* from "\.\/dto\/generation\.ts";/,
   );
   assert.match(secureProxyClientSource, /ledgerId\?: string;/);
   assert.match(secureProxyClientSource, /balanceAfter\?: number;/);

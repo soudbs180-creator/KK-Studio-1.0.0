@@ -1036,13 +1036,17 @@ const GOOGLE_CHAT_MODELS = [
     { id: 'gemini-2.5-flash-image', name: 'Nano Banana', icon: '\u{1F34C}', description: '\u7ECF\u5178 Nano Banana \u5FEB\u901F\u51FA\u56FE\u6A21\u578B' },
 ];
 
-const GOOGLE_MODEL_METADATA = new Map<string, {
+type ModelMetadata = {
     name: string;
     description?: string;
     icon?: string;
     contextLength?: number;
     pricing?: { prompt: string; completion: string; image?: string; request?: string };
-}>(
+    endpointType?: string;
+    endpointTypes?: string[];
+};
+
+const GOOGLE_MODEL_METADATA = new Map<string, ModelMetadata>(
     GOOGLE_CHAT_MODELS.map(model => [model.id, { name: model.name, description: model.description, icon: model.icon }])
 );
 
@@ -1082,7 +1086,7 @@ GOOGLE_MODEL_METADATA.set('gemini-2.5-flash-image', { name: 'Nano Banana', icon:
 GOOGLE_MODEL_METADATA.set('gemini-3.1-flash-image-preview', { name: 'Nano Banana 2', icon: '\u{1F34C}', description: 'Gemini 3.1 Flash Image Preview (Custom)' });
 GOOGLE_MODEL_METADATA.set('gemini-3-pro-image-preview', { name: 'Nano Banana Pro', icon: '\u{1F34C}', description: 'Gemini 3 Pro Image (Custom)' });
 
-export const getModelMetadata = (modelId: string) => {
+export const getModelMetadata = (modelId: string): ModelMetadata | undefined => {
     const exactId = String(modelId || '').trim();
     if (exactId) {
         const exactModel = keyManager.getGlobalModelList().find(model => model.id === exactId);

@@ -6,11 +6,18 @@
   "releaseNotes": [
     "Main app, payment sidecar, and documentation are aligned to version 1.4.1.",
     "User-route proxy startup, billing hydration, and canvas persistence regressions are fixed in this patch release.",
-    "Validation gates now cover build, tests, and env-only Supabase audits more accurately."
+    "Runtime-truth docs, package governance, and verification gates are aligned to version 1.4.1.",
+    "Integration tests and payment-server static checks now participate in the standard verification chain.",
+    "Hosted release guidance and runtime guards are tightened to reduce dangerous fallback behavior."
   ],
   "versionTargets": {
     "rootPackage": "package.json",
     "paymentServerPackage": "payment-server/package.json",
+    "workspacePackages": [
+      "packages/contracts/package.json",
+      "packages/domain/package.json",
+      "packages/shared/package.json"
+    ],
     "webAppInfo": "src/config/appInfo.ts",
     "readme": "README.md",
     "sessionHandoff": "docs/development/session-handoff.md",

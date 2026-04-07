@@ -89,7 +89,11 @@ test("model endpoint types flow from key metadata into image surface routing", (
   );
   assert.match(
     keyManagerSource,
-    /const GOOGLE_MODEL_METADATA = new Map<string, \{[\s\S]*endpointTypes\?: string\[];/,
+    /type ModelMetadata = \{[\s\S]*endpointTypes\?: string\[];/,
+  );
+  assert.match(
+    keyManagerSource,
+    /const GOOGLE_MODEL_METADATA = new Map<string, ModelMetadata>/,
   );
   assert.match(
     keyManagerSource,

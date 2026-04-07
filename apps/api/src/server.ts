@@ -681,11 +681,31 @@ function listenApiServer(server: Server, port: number): Promise<Server> {
   });
 }
 
+function isHostedRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL
+    || process.env.VERCEL_ENV
+    || (process.env.CONTEXT && process.env.CONTEXT !== "dev"),
+  );
+}
+
+function assertHostedApiRuntimeReady(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (!isHostedRuntime()) {
+    return;
+  }
+
+  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig);
+  if (!configSummary.canonicalPersistenceReady || !configSummary.hasUserApiEncryptionSecret) {
+    throw new Error("Hosted API runtime requires canonical Supabase persistence.");
+  }
+}
+
 function buildApiServer(
   port = Number(process.env.PORT || 3001),
   options: ApiServerOptions = {},
 ) {
   const serverSupabaseConfig = resolveServerSupabaseConfig();
+  assertHostedApiRuntimeReady(serverSupabaseConfig);
   const allowDegradedPersistence = options.allowDegradedPersistence ?? (port === 0);
   if (!allowDegradedPersistence) {
     assertServerSupabaseConfigConsistency(serverSupabaseConfig);
@@ -1216,9 +1236,14 @@ function buildApiServer(
         if (req.method === "POST" && pathname === "/api/v1/generation-tasks") {
           const body = await readJsonBody(req);
           const result = await handleCreateGenerationTask(generationService, body, requestHeaders);
+          const statusCode = result.success
+            ? 202
+            : result.error.code === "AUTH_REQUIRED"
+              ? 401
+              : 400;
           writeJson(
             res,
-            result.success ? 202 : result.error.code === "AUTH_REQUIRED" ? 401 : 400,
+            statusCode,
             result,
           );
           return;
@@ -1356,9 +1381,14 @@ function buildApiServer(
         const generationTaskMatch = pathname.match(/^\/api\/v1\/generation-tasks\/([^/]+)$/);
         if (req.method === "GET" && generationTaskMatch) {
           const result = await handleGetGenerationTask(generationService, generationTaskMatch[1], requestHeaders);
+          const statusCode = result.success
+            ? 200
+            : result.error.code === "AUTH_REQUIRED"
+              ? 401
+              : 404;
           writeJson(
             res,
-            result.success ? 200 : result.error.code === "AUTH_REQUIRED" ? 401 : 404,
+            statusCode,
             result,
           );
           return;
@@ -1369,14 +1399,14 @@ function buildApiServer(
           const [, workspaceId, workflowId] = workflowMatch;
           const body = await readJsonBody(req);
           const result = await handleSaveWorkflow(workflowService, workspaceId, workflowId, body, requestHeaders);
-          writeJson(res, result.success ? 200 : 400, result);
+          writeJson(res, result.success === false ? 400 : 200, result);
           return;
         }
 
         if (workflowMatch && req.method === "GET") {
           const [, workspaceId, workflowId] = workflowMatch;
           const result = await handleGetWorkflow(workflowService, workspaceId, workflowId, requestHeaders);
-          writeJson(res, result.success ? 200 : 404, result);
+          writeJson(res, result.success === false ? 404 : 200, result);
           return;
         }
 

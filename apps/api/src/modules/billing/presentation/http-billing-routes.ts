@@ -233,8 +233,15 @@ export async function handleDebitCredits(
   }
 
   const result = await service.debitCredits(userId, body, requestId, clientVersion);
+  if (result.success === false) {
+    return {
+      statusCode: 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success ? 200 : 409,
+    statusCode: 200,
     body: result,
   };
 }
@@ -269,8 +276,15 @@ export async function handleRefundCredits(
   }
 
   const result = await service.refundCredits(userId, body, requestId, clientVersion);
+  if (result.success === false) {
+    return {
+      statusCode: result.error.code === "CREDIT_TRANSACTION_NOT_FOUND" ? 404 : 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success ? 200 : result.error.code === "CREDIT_TRANSACTION_NOT_FOUND" ? 404 : 409,
+    statusCode: 200,
     body: result,
   };
 }
@@ -313,8 +327,15 @@ export async function handleAdminRechargeCredits(
   }
 
   const result = await service.adminRechargeCredits(body, userId, requestId, clientVersion);
+  if (result.success === false) {
+    return {
+      statusCode: 409,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success ? 200 : 409,
+    statusCode: 200,
     body: result,
   };
 }

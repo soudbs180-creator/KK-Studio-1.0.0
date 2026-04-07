@@ -1,0 +1,53 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "lib": [
+            "ES2020",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "types": [
+            "node",
+            "vite/client"
+        ],
+        "jsx": "react-jsx",
+        "strict": false,
+        "skipLibCheck": true,
+        "allowSyntheticDefaultImports": true,
+        "noEmit": true
+    },
+    "include": [
+        "tests/integration/**/*.ts",
+        "tests/unit/governance-contract.test.ts",
+        "tests/unit/hosted-release-guardrails.test.ts",
+        "tests/unit/runtime-governance-upgrade.test.ts",
+        "tests/unit/payment-sidecar-service.test.ts",
+        "tests/unit/payment-server-settlement-bridge.test.ts",
+        "tests/unit/payment-settlement-auth.test.ts",
+        "tests/unit/payment-settlement-hardening.test.ts",
+        "tests/unit/payment-runtime-hardening.test.ts"
+    ],
+    "exclude": [
+        "dist",
+        "node_modules",
+        "tests/contract/**/*.ts",
+        "tests/e2e/**/*.ts",
+        "tests/unit/admin-console-routes.test.ts",
+        "tests/unit/admin-console-state.test.ts",
+        "tests/unit/auth-data-routes.test.ts",
+        "tests/unit/billing-http-routes.test.ts",
+        "tests/unit/kk-api-client.test.ts",
+        "tests/unit/local-env-contract.test.ts",
+        "tests/unit/password-sign-in-fallback.test.ts",
+        "tests/unit/supabase-audit-contract.test.ts",
+        "tests/unit/user-api-cloud-storage.test.ts",
+        "tests/unit/user-api-profile-storage-runtime-fallback.test.ts",
+        "tests/unit/user-api-runtime-fallback.test.ts",
+        "tests/unit/user-route-diagnostics-routes.test.ts",
+        "tests/unit/wechat-auth-service.test.ts"
+    ]
+}

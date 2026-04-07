@@ -8,6 +8,8 @@ Make the hosted Vercel frontend and the Supabase backend behave like the local S
 - Admin-managed credit models must stay server-side only and must not expose provider `base_url` or `api_keys`.
 - Hosted builds must not fall back to the legacy Web API unless that fallback is intentionally deployed and configured.
 - Hosted browser password login must stay on the Supabase-first path and must not silently depend on `api/auth-password-login.ts`.
+- Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable.
+- Legacy `/api/pay*` payment routes stay local-only by default.
 
 ## Release Order
 
@@ -31,6 +33,8 @@ Keep the local runtime split explicit:
 - Optional local API JSON body-size overrides also live in `apps/api/.env.local`:
   `KK_API_MAX_JSON_BODY_BYTES`, `KK_API_PROFILE_MAX_JSON_BODY_BYTES`, and `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES`.
 - `server/.env` is legacy-only and is ignored by the current local API startup and diagnostics.
+- Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable.
+- Legacy `/api/pay*` payment routes stay local-only by default unless an explicit compatibility override is enabled for a tightly controlled migration window.
 
 Before shipping, verify both local and hosted assumptions explicitly:
 
@@ -119,6 +123,12 @@ For `user-route-proxy`, keep these server-side secrets available:
 - `SYSTEM_PROXY_TASK_SECRET`
 - optional: `USER_ROUTE_PROXY_TASK_SECRET`
 
+For payment settlement, keep these server-side secrets available:
+
+- `PAYMENT_SIDECAR_SETTLEMENT_TOKEN`
+- `PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`
+- `PAYMENT_SIDECAR_CALLBACK_TOKEN`
+
 ## Preflight Checklist
 
 ### 1. Local machine access
@@ -152,6 +162,8 @@ What must be true before release:
 - No hosted-required env shows as missing or placeholder in the local snapshot
 - `VITE_KK_API_BASE_URL` is not present in the hosted env plan
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` is not present in the hosted env plan
+- Hosted payment runtimes cannot boot in memory-only settlement mode
+- Hosted payment runtimes fail closed instead of booting with in-memory payment storage or missing settlement auth.
 - Build passes
 - The current repo contains the latest `user-route-proxy`, `secure-model-proxy`, and `wechat-auth` code
 
@@ -291,6 +303,11 @@ Confirm these hosted paths still work:
 - guest login
 - workspace layout sync
 - cloud cleanup
+
+Confirm these hosted paths stay disabled unless you intentionally re-enable them:
+
+- legacy `/api/pay*` payment routes
+- manual payment checkout pages
 
 ## Known Failure Patterns
 

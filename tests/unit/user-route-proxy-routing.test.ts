@@ -61,7 +61,7 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
   assert.match(proxySource, /const \{ data, error \} = await supabase\.auth\.getUser\(accessToken\);/);
   assert.match(proxySource, /Local Supabase session state after Invalid JWT/);
   assert.match(proxySource, /if \(localSessionState === 'valid'\) \{/);
-  assert.match(proxySource, /if \(localSessionState !== 'valid' \|\| !shouldUseLegacyWebApiFallback\(\)\) \{/);
+  assert.match(proxySource, /if \(localSessionState !== 'valid' \|\| !shouldUseLocalUserRouteApi\(\)\) \{/);
   assert.match(proxySource, /requestAuthSessionInvalidation\(`\$\{feature\}: user-route-proxy returned Invalid JWT`\);/);
   assert.match(proxySource, /if \(!shouldForceRefresh\) \{\s*const storedAccessToken = await resolveStoredCloudAccessToken\(false\);/);
   assert.match(proxySource, /const fallbackResult = await tryLocalUserRouteApiFallback\(/);

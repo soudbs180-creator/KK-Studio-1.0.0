@@ -87,7 +87,7 @@ const EXACT_TRANSLATION_PAIRS: Array<[string, string]> = [
   ['History restored', '恢复历史结果'],
   ['Generation complete', '生成完成'],
   ['Retry failed', '重试失败'],
-  ['No pages to export', '无可导出页面'],
+  ['No pages available to export', '无可导出页面'],
   ['Page not found', '页面不存在'],
   ['Single-page redraw complete', '单页重绘完成'],
   ['Single-page redraw failed', '单页重绘失败'],
@@ -144,6 +144,16 @@ const EXACT_TRANSLATION_PAIRS: Array<[string, string]> = [
   ['Top-up successful', '充值成功'],
   ['Top-up unavailable', '充值暂不可用'],
   ['Failed to create top-up order', '创建充值订单失败'],
+  ['Unable to save settings.', '无法保存设置'],
+  ['Browser unsupported', '浏览器不支持'],
+  ['Your browser does not support the File System Access API. Please use the latest Chrome, Edge, or another supported browser.', '您的浏览器不支持文档系统访问API。请使用最新版Chrome、Edge或支持的浏览器。'],
+  ['WeChat Pay is under maintenance', '微信支付维护中'],
+  ['International payments are under maintenance', '国际支付维护中'],
+  ['Order created', '订单已创建'],
+  ['Scan the QR code or open the payment link to finish payment. Your balance will refresh automatically after settlement.', '请扫码或打开支付链接完成支付，到账后会自动刷新余额。'],
+  ['Online payment is currently unavailable. Please contact an administrator.', '当前暂未开放在线支付，请联系管理员处理。'],
+  ['Credits have been synced to your balance.', '积分已同步到余额。'],
+  ['Export successful', '导出成功'],
   ['Delete successful', '删除成功'],
   ['Refresh successful', '刷新成功'],
   ['Refresh failed', '刷新失败'],
@@ -151,7 +161,7 @@ const EXACT_TRANSLATION_PAIRS: Array<[string, string]> = [
   ['Added successfully', '添加成功'],
   ['Sign-in successful', '登录成功'],
   ['Sign-in failed', '登录失败'],
-  ['Your balance is too low. Please top up your credits first.', '您的账户余额不足，请先充值积分。'],
+  ['Your balance is too low. Please recharge credits first.', '您的账户余额不足，请先充值积分。'],
   ['Checking your sign-in status. Please try again in a moment.', '正在校验登录状态，请稍后再试。'],
   ['Refreshing your balance. Please try again shortly.', '正在刷新账户余额，请稍后重试。'],
   ['Credit-based models require a signed-in full account.', '积分模型需要登录正式账号后使用。'],
@@ -164,7 +174,7 @@ const EXACT_TRANSLATION_PAIRS: Array<[string, string]> = [
   ['Incorrect email or password.', '请检查账号和密码。'],
   ['Network error. Please try again later.', '网络异常，请稍后重试。'],
   ['Unknown error', '未知错误'],
-  ['Your balance has been updated with synced credits.', '积分已同步到余额。'],
+  ['Credits have been synced to your balance.', '积分已同步到余额。'],
   ['Sign in before creating a top-up order.', '登录后才能发起充值。'],
   ['No enabled top-up currency is available right now. Please try again later or contact an administrator.', '当前没有启用中的充值币种，请稍后重试或联系管理员。'],
   ['Provider name cannot be empty.', '供应商名称不能为空。'],
@@ -244,6 +254,19 @@ const EXACT_TRANSLATION_PAIRS: Array<[string, string]> = [
   ['The original image could not be found.', '找不到原图'],
   ['The original image has been downloaded locally.', '原图已下载到本地'],
   ['Original images will be saved to the local documents folder.', '原图将保存到本地文档夹'],
+  ['Original images will be saved in the browser.', '原图将保存在浏览器中'],
+  ['Folder selection failed', '文档夹选择失败'],
+  ['Unable to access the selected folder.', '无法获取文档夹访问权限'],
+  ['Reference image limit', '参考图数量限制'],
+  ['Reference attachments added', '已添加参考附件'],
+  ['Reference images adjusted', '参考图已调整'],
+  ['PPT outline applied', 'PPT页纲已应用'],
+  ['Image generation failed', '图片生成失败'],
+  ['AI generation failed', 'AI 生成失败'],
+  ['No editable previous prompt found', '未找到可编辑的上一条提问'],
+  ['Branch session created', '已创建分支会话'],
+  ['No sessions available to import', '没有可导入会话'],
+  ['Admin-configured credit models require a signed-in account before they can spend credits to chat.', '管理员配置的积分模型需要登录账号后使用积分才能进行对话。'],
   ['An error occurred while merging storage.', '合并存储时发生错误'],
 ];
 
@@ -269,7 +292,7 @@ const REGEX_TRANSLATIONS_TO_ZH: Array<{ pattern: RegExp; replace: (...args: stri
 const REGEX_TRANSLATIONS_TO_EN: Array<{ pattern: RegExp; replace: (...args: string[]) => string }> = [
   {
     pattern: /^已导出 (\d+) 页整屏长图$/,
-    replace: (count) => `Exported ${count} full-page images`,
+    replace: (count) => `Exported ${count} full-length slide images.`,
   },
   {
     pattern: /^第 (\d+) 页已同步到主卡设置$/,
@@ -321,7 +344,35 @@ const REGEX_TRANSLATIONS_TO_EN: Array<{ pattern: RegExp; replace: (...args: stri
   },
   {
     pattern: /^最多支持 (\d+) 张参考图$/,
-    replace: (count) => `Up to ${count} reference images are supported`,
+    replace: (count) => `You can upload up to ${count} reference images`,
+  },
+  {
+    pattern: /^最多只能上传 (\d+) 张参考图$/,
+    replace: (count) => `You can upload up to ${count} reference images`,
+  },
+  {
+    pattern: /^最多只能上传 (\d+) 张参考图，已自动忽略 (\d+) 张$/,
+    replace: (limit, ignored) => `You can upload up to ${limit} reference images. ${ignored} were ignored automatically.`,
+  },
+  {
+    pattern: /^已成功导出 (\d+) 张原图，失败 (\d+) 张$/,
+    replace: (successCount, failedCount) => `Successfully exported ${successCount} original images; ${failedCount} failed.`,
+  },
+  {
+    pattern: /^正在导出 (\d+) 张原图\.\.\.$/,
+    replace: (count) => `Exporting ${count} original images...`,
+  },
+  {
+    pattern: /^覆盖导入 (\d+) 个会话$/,
+    replace: (count) => `Replaced with ${count} imported sessions`,
+  },
+  {
+    pattern: /^追加导入 (\d+) 个会话$/,
+    replace: (count) => `Appended ${count} imported sessions`,
+  },
+  {
+    pattern: /^智能合并后保留 (\d+) 个会话$/,
+    replace: (count) => `Kept ${count} sessions after smart merge`,
   },
   {
     pattern: /^已导出 (\d+) 页与 pages\/outline\/meta 目录$/,
@@ -386,6 +437,18 @@ const REGEX_TRANSLATIONS_TO_EN: Array<{ pattern: RegExp; replace: (...args: stri
   {
     pattern: /^使用当前配置需要 (\d+) 积分，当前余额: (.+)，请充值。$/,
     replace: (credits, balance) => `This configuration needs ${credits} credits. Current balance: ${balance}. Please top up.`,
+  },
+  {
+    pattern: /^粘贴导入 (\d+) 个文档$/,
+    replace: (count) => `Imported ${count} documents from paste`,
+  },
+  {
+    pattern: /^拖拽导入 (\d+) 个文档$/,
+    replace: (count) => `Imported ${count} documents from drag and drop`,
+  },
+  {
+    pattern: /^使用当前管理员模型进行对话需要 (\d+) 积分，当前余额: (.+)，请充值。$/,
+    replace: (credits, balance) => `Using the current admin model to chat requires ${credits} credits. Current balance: ${balance}. Please top up.`,
   },
 ];
 

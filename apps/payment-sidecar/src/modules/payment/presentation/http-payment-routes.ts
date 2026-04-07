@@ -30,6 +30,23 @@ export interface PaymentRouteOptions {
   }) => string | Promise<string>;
 }
 
+function isHostedRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL
+    || process.env.VERCEL_ENV
+    || (process.env.CONTEXT && process.env.CONTEXT !== "dev"),
+  );
+}
+
+function areLegacyRoutesEnabled(): boolean {
+  return !isHostedRuntime()
+    || String(
+      process.env.PAYMENT_SIDECAR_ALLOW_LEGACY_ROUTES
+      || process.env.ALLOW_HOSTED_LEGACY_PAYMENT_ROUTES
+      || "",
+    ).trim().toLowerCase() === "true";
+}
+
 function getAuthenticatedUserId(headers: Record<string, string>): string | undefined {
   return resolveAuthenticatedUserId(headers);
 }
@@ -149,7 +166,8 @@ function sanitizeLegacyOverrideUrl(candidate: string | null, fallback: string): 
 }
 
 function isManualCheckoutEnabled(): boolean {
-  return String(process.env.PAYMENT_SIDECAR_ALLOW_MANUAL_CHECKOUT || "").trim().toLowerCase() === "true";
+  return !isHostedRuntime()
+    && String(process.env.PAYMENT_SIDECAR_ALLOW_MANUAL_CHECKOUT || "").trim().toLowerCase() === "true";
 }
 
 function isLoopbackHost(host: string | undefined): boolean {
@@ -324,8 +342,15 @@ export async function handleAlipayCallback(
     clientVersion,
   });
 
+  if (result.success === false) {
+    return {
+      statusCode: result.error.code === "PAYMENT_ORDER_NOT_FOUND" ? 404 : 502,
+      body: result,
+    };
+  }
+
   return {
-    statusCode: result.success ? 200 : result.error.code === "PAYMENT_ORDER_NOT_FOUND" ? 404 : 502,
+    statusCode: 200,
     body: result,
   };
 }
@@ -339,6 +364,17 @@ export async function handleLegacyCreateQrCode(
 ): Promise<HttpRouteResult> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
+
+  if (!areLegacyRoutesEnabled()) {
+    return buildErrorResult(
+      requestId,
+      clientVersion,
+      403,
+      "LEGACY_PAYMENT_ROUTE_DISABLED",
+      "Legacy payment routes are local-only by default.",
+    );
+  }
+
   const method = String(query.get("method") || "").trim().toLowerCase();
   const queryUserId = String(query.get("userId") || "").trim();
   const authenticatedUserId = getAuthenticatedUserId(headers);
@@ -404,7 +440,7 @@ export async function handleLegacyCreateQrCode(
     paymentUrlFactory: options.paymentUrlFactory || ((input) => buildCheckoutUrl(origin, input.merchantOrderNo)),
   });
 
-  if (!result.success) {
+  if (result.success === false) {
     return {
       statusCode: 400,
       body: result,
@@ -428,6 +464,17 @@ export async function handleLegacyGetStatus(
 ): Promise<HttpRouteResult> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
+
+  if (!areLegacyRoutesEnabled()) {
+    return buildErrorResult(
+      requestId,
+      clientVersion,
+      403,
+      "LEGACY_PAYMENT_ROUTE_DISABLED",
+      "Legacy payment routes are local-only by default.",
+    );
+  }
+
   const authenticatedUserId = getAuthenticatedUserId(headers);
   const internalRequest = isInternalRequestAuthorized(headers);
 
@@ -658,7 +705,7 @@ export async function handleCheckoutComplete(
     clientVersion,
   });
 
-  if (!result.success) {
+  if (result.success === false) {
     return {
       statusCode: 502,
       contentType: "text/html; charset=utf-8",

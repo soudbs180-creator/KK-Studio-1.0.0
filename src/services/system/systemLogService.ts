@@ -3,12 +3,14 @@
  * 仅在本地保存当日日志，用于故障排查与导出。
  */
 
-export enum LogLevel {
-  INFO = 'INFO',
-  WARNING = 'WARNING',
-  ERROR = 'ERROR',
-  CRITICAL = 'CRITICAL',
-}
+export const LogLevel = {
+  INFO: 'INFO',
+  WARNING: 'WARNING',
+  ERROR: 'ERROR',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export type LogLevel = (typeof LogLevel)[keyof typeof LogLevel];
 
 export interface SystemLogEntry {
   id: string;
