@@ -177,8 +177,10 @@ test('KeyManager clears prior in-memory user state before hydrating the next acc
 test('BillingContext clears balance and transaction state immediately when the user scope changes', () => {
   const source = readSource('src/context/BillingContext.tsx');
 
+  assert.match(source, /const \[refreshing, setRefreshing\] = useState\(false\);/);
   assert.match(source, /const \[hydratedUserId, setHydratedUserId\] = useState<string \| null>\(null\);/);
   assert.match(source, /const activeBillingUserId = !user \|\| isTempUser \? null : user\.id;/);
+  assert.match(source, /const hasVisibleBillingSeed = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
   assert.match(source, /useEffect\(\(\) => \{\s*refreshPromiseRef\.current = null;/);
   assert.match(source, /window\.clearTimeout\(realtimeRefreshTimerRef\.current\);/);
   assert.match(source, /setHydratedUserId\(null\);/);
@@ -191,7 +193,8 @@ test('BillingContext clears balance and transaction state immediately when the u
   assert.match(source, /const visibleBalance = hasHydratedCurrentBillingScope \? balance : 0;/);
   assert.match(source, /const visibleBillingLogs = hasHydratedCurrentBillingScope \? billingLogs : \[\];/);
   assert.match(source, /const visibleUsageLogs = hasHydratedCurrentBillingScope \? usageLogs : \[\];/);
-  assert.match(source, /const visibleLoading = activeBillingUserId \? \(loading \|\| !hasHydratedCurrentBillingScope\) : false;/);
+  assert.match(source, /const visibleLoading = activeBillingUserId \? !hasHydratedCurrentBillingScope : false;/);
+  assert.match(source, /refreshing,/);
 });
 
 test('OpenAIVideoService fails closed instead of calling third-party providers from the browser', () => {

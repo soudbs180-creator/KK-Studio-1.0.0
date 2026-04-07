@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 
 import type { CreditTransactionDto } from '../../packages/contracts/src/index.ts';
 import { legacyWebApiClient } from '../services/api/kkApiClient';
+import { resolveBillingRefreshMode } from '../services/billing/billingRefreshMode';
 import { useAuth } from './AuthContext';
 
 export interface CreditTransactionLog {
@@ -41,6 +42,11 @@ interface BillingSnapshot {
   updatedAt: number;
 }
 
+interface RefreshBillingOptions {
+  includeTransactions?: boolean;
+  silent?: boolean;
+}
+
 const BILLING_SNAPSHOT_PREFIX = 'kk_billing_snapshot:';
 const BILLING_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 const CREDIT_TRANSACTIONS_FETCH_LIMIT = 120;
@@ -49,12 +55,13 @@ const BILLING_SYNC_POLL_MS = 30_000;
 interface BillingContextType {
   balance: number;
   loading: boolean;
+  refreshing: boolean;
   recharge: (amount: number, currency: 'CNY' | 'USD') => Promise<void>;
   consumeCredits: (modelId: string, count: number, details?: any) => Promise<boolean>;
   consumeCreditsDetailed: (modelId: string, count: number, details?: any) => Promise<CreditConsumeResult>;
   refundCredits: (amount: number, reason: string) => Promise<boolean>;
   refundCreditsByTransaction: (transactionId: string, reason: string) => Promise<CreditRefundResult>;
-  refreshBilling: () => Promise<void>;
+  refreshBilling: (options?: RefreshBillingOptions) => Promise<void>;
   adjustBalanceOptimistically: (delta: number) => void;
   billingLogs: CreditTransactionLog[];
   usageLogs: CreditTransactionLog[];
@@ -66,6 +73,7 @@ interface BillingContextType {
 const BillingContext = createContext<BillingContextType>({
   balance: 0,
   loading: true,
+  refreshing: false,
   recharge: async () => {},
   consumeCredits: async () => false,
   consumeCreditsDetailed: async () => ({ success: false, message: 'Billing context not ready' }),
@@ -223,6 +231,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [billingLogs, setBillingLogs] = useState<CreditTransactionLog[]>([]);
   const [usageLogs, setUsageLogs] = useState<CreditTransactionLog[]>([]);
@@ -230,6 +239,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const apiAccessToken = session?.access_token;
   const activeBillingUserId = !user || isTempUser ? null : user.id;
+  const hasVisibleBillingSeed = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const balanceRefreshPromiseRef = useRef<Promise<number | undefined> | null>(null);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
@@ -338,13 +348,28 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return balancePromise;
   }, [fetchBalance]);
 
-  const refreshBilling = useCallback(async () => {
+  const refreshBilling = useCallback(async (options?: RefreshBillingOptions) => {
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
     }
 
-    setLoading(true);
-    const refreshPromise = Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
+    const includeTransactions = options?.includeTransactions !== false;
+    const refreshMode = resolveBillingRefreshMode({
+      silent: options?.silent === true,
+      hasVisibleBillingSeed,
+    });
+
+    if (refreshMode.showBlockingLoading) {
+      setLoading(true);
+    }
+
+    if (refreshMode.markRefreshing) {
+      setRefreshing(true);
+    }
+
+    const refreshPromise = (includeTransactions
+      ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
+      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const))
       .then(([canonicalBalance, latestBalanceAfter]) => {
         const resolvedBalance = typeof canonicalBalance === 'number'
           ? canonicalBalance
@@ -358,12 +383,17 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (refreshPromiseRef.current === refreshPromise) {
           refreshPromiseRef.current = null;
         }
-        setLoading(false);
+        if (refreshMode.showBlockingLoading) {
+          setLoading(false);
+        }
+        if (refreshMode.markRefreshing) {
+          setRefreshing(false);
+        }
       });
 
     refreshPromiseRef.current = refreshPromise;
     return refreshPromise;
-  }, [refreshBalanceOnly, loadCreditTransactions]);
+  }, [refreshBalanceOnly, loadCreditTransactions, hasVisibleBillingSeed]);
 
   const fetchLogs = useCallback(async () => {
     if (!user || isTempUser) {
@@ -373,7 +403,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    await refreshBilling();
+    await refreshBilling({ includeTransactions: true });
   }, [user, isTempUser, refreshBilling]);
 
   const scheduleRealtimeRefresh = useCallback((delayMs = 120, mode: 'balance' | 'full' = 'balance') => {
@@ -388,7 +418,10 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     realtimeRefreshTimerRef.current = window.setTimeout(() => {
       realtimeRefreshTimerRef.current = null;
       if (mode === 'full' && logsLoadedRef.current) {
-        void refreshBilling();
+        void refreshBilling({
+          includeTransactions: true,
+          silent: true,
+        });
         return;
       }
 
@@ -403,6 +436,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       window.clearTimeout(realtimeRefreshTimerRef.current);
       realtimeRefreshTimerRef.current = null;
     }
+    setRefreshing(false);
     setShowRechargeModal(false);
 
     if (!activeBillingUserId) {
@@ -467,6 +501,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setUsageLogs([]);
         setLogsLoaded(false);
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -661,13 +696,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const visibleBalance = hasHydratedCurrentBillingScope ? balance : 0;
   const visibleBillingLogs = hasHydratedCurrentBillingScope ? billingLogs : [];
   const visibleUsageLogs = hasHydratedCurrentBillingScope ? usageLogs : [];
-  const visibleLoading = activeBillingUserId ? (loading || !hasHydratedCurrentBillingScope) : false;
+  const visibleLoading = activeBillingUserId ? !hasHydratedCurrentBillingScope : false;
 
   return (
     <BillingContext.Provider
       value={{
         balance: visibleBalance,
         loading: visibleLoading,
+        refreshing,
         recharge,
         consumeCredits,
         consumeCreditsDetailed,

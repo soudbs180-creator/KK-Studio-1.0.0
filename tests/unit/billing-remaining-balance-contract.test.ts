@@ -18,6 +18,10 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
+    /import \{ resolveBillingRefreshMode \} from '\.\.\/services\/billing\/billingRefreshMode';/,
+  );
+  assert.match(
+    billingContextSource,
     /function sortCreditLogs\(rows: CreditTransactionLog\[\]\): CreditTransactionLog\[\] \{\s*return \[\.\.\.rows\]\.sort\(\(left, right\) => Date\.parse\(right\.created_at\) - Date\.parse\(left\.created_at\)\);\s*\}/,
   );
   assert.match(
@@ -35,7 +39,15 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /const refreshPromise = Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
+    /const includeTransactions = options\?\.includeTransactions !== false;/,
+  );
+  assert.match(
+    billingContextSource,
+    /const refreshMode = resolveBillingRefreshMode\(\{\s*silent: options\?\.silent === true,\s*hasVisibleBillingSeed,\s*\}\);/,
+  );
+  assert.match(
+    billingContextSource,
+    /const refreshPromise = \(includeTransactions\s*\?\s*Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*:\s*refreshBalanceOnly\(\)\.then\(\(canonicalBalance\) => \[canonicalBalance, undefined\] as const\)\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
   );
   assert.match(
     billingContextSource,
@@ -44,6 +56,10 @@ test('billing balance refresh still resolves remaining balance from canonical so
   assert.match(
     billingContextSource,
     /const response = await legacyWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*buildBillingRequestOptions\(apiAccessToken\),\s*\);/,
+  );
+  assert.match(
+    billingContextSource,
+    /void refreshBilling\(\{\s*includeTransactions: true,\s*silent: true,\s*\}\);/,
   );
   assert.match(
     billingContextSource,
