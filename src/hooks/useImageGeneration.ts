@@ -14,8 +14,9 @@ import { llmService } from '../services/llm/LLMService';
 import { generateImage, cancelGeneration } from '../services/llm/geminiService';
 import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
+import { useAppStartup } from '../context/AppStartupContext';
 import { calculateCost, resolveImageCost } from '../services/billing/costService';
-import { saveImage, saveOriginalImage, getImage } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { keyManager, getModelMetadata } from '../services/auth/keyManager';
 import { isCreditBasedModel } from '../services/model/modelPricing';
@@ -39,6 +40,8 @@ import {
 } from '../utils/imageResultPersistence';
 import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
+import { normalizeModelId } from '../utils/modelIdNormalization';
+import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import {
   isSecureProxyGuestModeError,
   isSecureProxySessionReauthError,
@@ -217,6 +220,8 @@ export const useImageGeneration = (options: {
   } = useCanvas();
   
   const { refundCreditsByTransaction, refreshBilling } = useBilling();
+  const { isStageReady } = useAppStartup();
+  const canStartBackgroundRecovery = isStageReady('background_ready');
   const [isGenerating, setIsGenerating] = useState(false);
   
   const activeCanvasRef = useRef(activeCanvas);
@@ -503,7 +508,10 @@ export const useImageGeneration = (options: {
             runtimeStrategyId: runtimeSnapshot.runtimeStrategyId,
             taskProviderType: runtimeSnapshot.taskProviderType,
             model: item.model || fallback.model,
-            modelLabel: item.modelName || item.modelLabel || fallback.modelLabel,
+            modelLabel: resolveModelDisplayName(
+              item.model || fallback.model,
+              item.modelName || item.modelLabel || fallback.modelLabel,
+            ),
             costSource: item.costSource,
           },
           urlToIndex: new Map<string, number>(),
@@ -839,7 +847,7 @@ export const useImageGeneration = (options: {
         url,
       }));
       const recoveredUsage = resolveUsageMetrics({
-        model: latestNode.model,
+        model: normalizeModelId(latestNode.model),
         imageSize: latestNode.imageSize,
         prompt: pendingRequest.prompt || latestNode.prompt,
         imageCount: uniqueRecoveredUrls.length || bridgeResult.urls.length,
@@ -849,6 +857,8 @@ export const useImageGeneration = (options: {
         providerLabel: latestNode.providerLabel,
       });
       const recoveredGenerationTime = resolveSyncBridgeDurationMs(bridgeResult, pendingRequest.startedAt);
+      const recoveredModelId = normalizeModelId(latestNode.model);
+      const recoveredModelLabel = resolveModelDisplayName(recoveredModelId, latestNode.modelLabel);
       const { completedTasks, preparedItems } = prepareCompletedTaskResults(nodeId, uniqueRecoveredUrls.map((url, index) => ({
         requestId: pendingRequest.requestId,
         url,
@@ -856,8 +866,8 @@ export const useImageGeneration = (options: {
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
         provider: latestNode.provider,
         providerName: latestNode.providerLabel,
-        model: latestNode.model,
-        modelName: latestNode.modelLabel,
+        model: recoveredModelId,
+        modelName: recoveredModelLabel,
         cost: splitMetricAcrossItems(recoveredUsage.cost, bridgeResult.urls.length),
         costSource: recoveredUsage.costSource,
         tokens: splitMetricAcrossItems(recoveredUsage.tokens, bridgeResult.urls.length),
@@ -865,8 +875,8 @@ export const useImageGeneration = (options: {
         keySlotId: pendingRequest.keySlotId || latestNode.keySlotId,
         provider: latestNode.provider,
         providerLabel: latestNode.providerLabel,
-        model: latestNode.model,
-        modelLabel: latestNode.modelLabel,
+        model: recoveredModelId,
+        modelLabel: recoveredModelLabel,
         batchKey: pendingRequest.requestId,
       });
       const recoveredResults = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, index) => {
@@ -879,8 +889,8 @@ export const useImageGeneration = (options: {
           originalUrl: item.originalUrl,
           apiResultUrl,
           prompt: pendingRequest.prompt || latestNode.prompt,
-          model: latestNode.model,
-          modelLabel: latestNode.modelLabel,
+          model: recoveredModelId,
+          modelLabel: recoveredModelLabel,
           modelColorStart: latestNode.modelColorStart,
           modelColorEnd: latestNode.modelColorEnd,
           modelColorSecondary: latestNode.modelColorSecondary,
@@ -1170,7 +1180,10 @@ export const useImageGeneration = (options: {
               provider: (result as any).provider || latestNode.provider,
               providerName: (result as any).providerName || latestNode.providerLabel,
               model: (result as any).model || latestNode.model,
-              modelName: (result as any).modelName || latestNode.modelLabel,
+              modelName: resolveModelDisplayName(
+                (result as any).model || latestNode.model,
+                (result as any).modelName || latestNode.modelLabel,
+              ),
               cost: splitMetricAcrossItems(recoveredUsage.cost, uniqueImageUrls.length || imageUrls.length),
               costSource: recoveredUsage.costSource,
               tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
@@ -1179,7 +1192,10 @@ export const useImageGeneration = (options: {
               provider: (result as any).provider || latestNode.provider,
               providerLabel: (result as any).providerName || latestNode.providerLabel,
               model: (result as any).model || latestNode.model,
-              modelLabel: (result as any).modelName || latestNode.modelLabel,
+              modelLabel: resolveModelDisplayName(
+                (result as any).model || latestNode.model,
+                (result as any).modelName || latestNode.modelLabel,
+              ),
               batchKey: targetTaskId,
             });
 
@@ -1196,7 +1212,10 @@ export const useImageGeneration = (options: {
                 originalUrl: item.originalUrl,
                 apiResultUrl,
                 prompt: latestNode.prompt, model: (result as any).model || latestNode.model,
-                modelLabel: (result as any).modelName || latestNode.modelLabel,
+                modelLabel: resolveModelDisplayName(
+                  (result as any).model || latestNode.model,
+                  (result as any).modelName || latestNode.modelLabel,
+                ),
                 modelColorStart: latestNode.modelColorStart,
                 modelColorEnd: latestNode.modelColorEnd,
                 modelColorSecondary: latestNode.modelColorSecondary,
@@ -1346,7 +1365,7 @@ export const useImageGeneration = (options: {
     }
   }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
-  useTaskRecovery(activeCanvas, pollTaskStatus);
+  useTaskRecovery(activeCanvas, pollTaskStatus, canStartBackgroundRecovery);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1525,8 +1544,8 @@ export const useImageGeneration = (options: {
             resolvedResultKeySlotId = audioResult.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = audioResult.provider || resolvedProvider;
             resolvedProviderName = audioResult.providerName || resolvedProviderName;
-            resolvedModelName = audioResult.modelName || resolvedModelName;
             resolvedModelId = audioResult.model || resolvedModelId;
+            resolvedModelName = resolveModelDisplayName(resolvedModelId, audioResult.modelName || resolvedModelName);
             resolvedCost = toFiniteNumber(audioResult.usage?.cost);
             resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(audioResult.usage?.totalTokens);
@@ -1550,8 +1569,8 @@ export const useImageGeneration = (options: {
             resolvedResultKeySlotId = videoResult.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = videoResult.provider || resolvedProvider;
             resolvedProviderName = videoResult.providerName || resolvedProviderName;
-            resolvedModelName = videoResult.modelName || resolvedModelName;
             resolvedModelId = videoResult.model || resolvedModelId;
+            resolvedModelName = resolveModelDisplayName(resolvedModelId, videoResult.modelName || resolvedModelName);
             resolvedCost = toFiniteNumber(videoResult.usage?.cost);
             resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
             resolvedTokens = toFiniteNumber(videoResult.usage?.totalTokens);
@@ -1585,8 +1604,8 @@ export const useImageGeneration = (options: {
             resolvedResultKeySlotId = result.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = result.provider || resolvedProvider;
             resolvedProviderName = result.providerName || resolvedProviderName;
-            resolvedModelName = result.modelName || resolvedModelName;
             resolvedModelId = result.effectiveModel || resolvedModelId;
+            resolvedModelName = resolveModelDisplayName(resolvedModelId, result.modelName || resolvedModelName);
             resolvedImageSize = result.effectiveSize || result.imageSize || resolvedImageSize;
             resolvedAspectRatio = result.aspectRatio || resolvedAspectRatio;
             resolvedExactDimensions = result.dimensions;
@@ -1613,7 +1632,14 @@ export const useImageGeneration = (options: {
           }
 
           return { 
-            index, url: isVideo || isAudio ? videoUrl : generatedBase64, originalUrl: isVideo || isAudio ? videoUrl : generatedBase64, 
+            index,
+            url: isVideo || isAudio ? videoUrl : generatedBase64,
+            originalUrl: isVideo || isAudio
+              ? videoUrl
+              : (generatedBase64.startsWith('data:') ? generatedBase64 : undefined),
+            apiResultUrl: !isVideo && !isAudio && /^https?:\/\//i.test(generatedBase64)
+              ? generatedBase64
+              : undefined,
             generationTime: clampGenerationDurationMs(Date.now() - startTime), base64: generatedBase64, mode, 
             taskId: taskIdForRecovery, taskPrompt, keySlotId: resolvedResultKeySlotId, requestId: currentRequestId,
             provider: resolvedProvider, providerName: resolvedProviderName, modelName: resolvedModelName, model: resolvedModelId,
@@ -1684,7 +1710,7 @@ export const useImageGeneration = (options: {
           provider: item.provider || executionNode.provider,
           providerName: item.providerName || executionNode.providerLabel,
           model: item.model || executionNode.model,
-          modelName: item.modelName || executionNode.modelLabel,
+          modelName: resolveModelDisplayName(item.model || executionNode.model, item.modelName || executionNode.modelLabel),
           cost: item.cost,
           costSource: item.costSource,
           tokens: item.tokens,
@@ -1693,7 +1719,7 @@ export const useImageGeneration = (options: {
           provider: executionNode.provider,
           providerLabel: executionNode.providerLabel,
           model: executionNode.model,
-          modelLabel: executionNode.modelLabel,
+          modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel),
           batchKey: `${promptNodeId}:${Date.now()}`,
         });
         const generatedPositions = buildGeneratedImageBatchPositions({
@@ -1716,7 +1742,13 @@ export const useImageGeneration = (options: {
             layoutIndex,
             acceptedImageData.length
           );
-          if (item.base64?.startsWith('data:')) saveOriginalImage(uniqueId, item.base64, mode === GenerationMode.VIDEO).catch(() => {});
+          const eagerOriginalSource = normalizePersistableMediaSource(
+            item.originalUrl || item.base64 || item.url,
+            'image/png'
+          );
+          if (eagerOriginalSource && mode !== GenerationMode.VIDEO && mode !== GenerationMode.AUDIO) {
+            saveOriginalImage(uniqueId, eagerOriginalSource, false).catch(() => {});
+          }
           
           return {
             id: uniqueId,
@@ -1726,7 +1758,7 @@ export const useImageGeneration = (options: {
             apiResultUrl,
             prompt: item.taskPrompt || promptToUse, aspectRatio: item.aspectRatio || executionNode.aspectRatio, imageSize: item.imageSize || executionNode.imageSize,
             timestamp: Date.now(), model: item.model || executionNode.model, canvasId: activeCanvasRef.current?.id || 'default',
-            modelLabel: item.modelName || executionNode.modelLabel,
+            modelLabel: resolveModelDisplayName(item.model || executionNode.model, item.modelName || executionNode.modelLabel),
             modelColorStart: executionNode.modelColorStart,
             modelColorEnd: executionNode.modelColorEnd,
             modelColorSecondary: executionNode.modelColorSecondary,
@@ -1790,7 +1822,7 @@ export const useImageGeneration = (options: {
           keySlotId: firstSuccess?.keySlotId || executionNode.keySlotId,
           provider: resolvedSuccessDisplay.provider || executionNode.provider,
           providerLabel: resolvedSuccessDisplay.providerLabel || executionNode.providerLabel,
-          modelLabel: firstSuccess?.modelName || executionNode.modelLabel,
+          modelLabel: resolveModelDisplayName(firstSuccess?.model || executionNode.model, firstSuccess?.modelName || executionNode.modelLabel),
         }, finalizedCompletedTasks);
 
         urgentUpdatePromptNode(persistedPromptState);

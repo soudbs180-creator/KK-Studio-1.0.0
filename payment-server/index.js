@@ -113,19 +113,15 @@ function toUrlSearchParams(query = {}) {
 }
 
 function applyLegacyPaymentDefaults(params) {
-  if (!params.get('returnUrl')) {
-    params.set(
-      'returnUrl',
-      process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success',
-    );
-  }
+  params.set(
+    'returnUrl',
+    process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success',
+  );
 
-  if (!params.get('notifyUrl')) {
-    params.set(
-      'notifyUrl',
-      process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay',
-    );
-  }
+  params.set(
+    'notifyUrl',
+    process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay',
+  );
 
   if (!params.get('currency')) {
     params.set('currency', 'CNY');
@@ -308,48 +304,9 @@ app.get('/api/pay/status', async (req, res) => {
       return res.status(400).json({ error: 'Missing outTradeNo.' });
     }
 
-    let sidecarStatus;
-    try {
-      const sidecarResult = await handleLegacyGetStatusThroughSidecar(query, req.headers);
-      if (
-        sidecarResult.statusCode === 200
-        && sidecarResult.body
-        && typeof sidecarResult.body === 'object'
-      ) {
-        sidecarStatus = sidecarResult.body;
-        if (sidecarStatus.tradeStatus && sidecarStatus.tradeStatus !== 'WAITING') {
-          return res.json({ ...sidecarStatus, source: 'sidecar-runtime' });
-        }
-      }
-    } catch (sidecarError) {
-      console.warn('[payment-server] Failed to read sidecar payment status:', outTradeNo, sidecarError);
-    }
-
-    if (!alipaySdk) {
-      if (sidecarStatus) {
-        return res.json({ ...sidecarStatus, source: 'sidecar-runtime' });
-      }
-
-      return res.status(500).json({ error: 'No payment status provider is configured.' });
-    }
-
-    const queryParams = {
-      bizContent: { outTradeNo },
-    };
-    if (appAuthToken) {
-      queryParams.appAuthToken = appAuthToken;
-    }
-
-    const result = await alipaySdk.exec('alipay.trade.query', queryParams);
-
-    let tradeStatus = 'WAITING';
-    if (result.tradeStatus === 'TRADE_SUCCESS' || result.tradeStatus === 'TRADE_FINISHED') {
-      tradeStatus = 'TRADE_SUCCESS';
-    } else if (result.tradeStatus === 'TRADE_CLOSED') {
-      tradeStatus = 'TRADE_CLOSED';
-    }
-
-    return res.json({ tradeStatus, details: result });
+    const sidecarResult = await handleLegacyGetStatusThroughSidecar(query, req.headers);
+    sendRouteResult(res, sidecarResult);
+    return;
   } catch (error) {
     console.error('[payment-server] query status failed:', error);
     return res.status(500).json({ error: error?.message || String(error) });

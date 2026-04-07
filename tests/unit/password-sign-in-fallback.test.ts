@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import authPasswordLoginHandler from '../../api/auth-password-login.ts';
 import { supabase } from '../../src/lib/supabase.ts';
-import { signInWithPasswordWithFallback } from '../../src/services/auth/passwordSignIn.ts';
+import {
+  HOSTED_PASSWORD_PROXY_DISABLED_CODE,
+  signInWithPasswordWithFallback,
+} from '../../src/services/auth/passwordSignIn.ts';
 
 describe('password sign-in fallback', () => {
   const auth = supabase.auth as typeof supabase.auth & {
@@ -15,12 +18,27 @@ describe('password sign-in fallback', () => {
   const originalFetch = globalThis.fetch;
   const locationLike = globalThis as { location?: { origin?: string } };
   const originalLocation = locationLike.location;
+  const windowLike = globalThis as typeof globalThis & { window?: { location?: { origin?: string } } };
+  const originalWindow = windowLike.window;
+  const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
+  const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 
   beforeEach(() => {
     auth.signInWithPassword = originalSignInWithPassword;
     auth.setSession = originalSetSession;
     globalThis.fetch = originalFetch;
     locationLike.location = originalLocation;
+    windowLike.window = originalWindow;
+    if (typeof originalBaseUrl === 'string') {
+      process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
+    } else {
+      delete process.env.VITE_KK_API_BASE_URL;
+    }
+    if (typeof originalLegacyFallback === 'string') {
+      process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+    } else {
+      delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    }
   });
 
   afterEach(() => {
@@ -28,10 +46,24 @@ describe('password sign-in fallback', () => {
     auth.setSession = originalSetSession;
     globalThis.fetch = originalFetch;
     locationLike.location = originalLocation;
+    windowLike.window = originalWindow;
+    if (typeof originalBaseUrl === 'string') {
+      process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
+    } else {
+      delete process.env.VITE_KK_API_BASE_URL;
+    }
+    if (typeof originalLegacyFallback === 'string') {
+      process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = originalLegacyFallback;
+    } else {
+      delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
+    }
   });
 
-  test('falls back to the hosted proxy after a browser network failure', async () => {
+  test('keeps hosted password-proxy fallback disabled by default after a browser network failure', async () => {
     locationLike.location = { origin: 'https://kkai.plus' };
+    windowLike.window = { location: { origin: 'https://kkai.plus' } };
+    delete process.env.VITE_KK_API_BASE_URL;
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 
     auth.signInWithPassword = async () => {
       throw new TypeError('Load failed');
@@ -75,6 +107,50 @@ describe('password sign-in fallback', () => {
       captchaToken: 'turnstile-token',
     });
 
+    assert.equal(result.usedProxy, false);
+    assert.equal(proxyCallCount, 0);
+    assert.equal(sessionWasSet, false);
+    assert.match(result.error?.message || '', new RegExp(HOSTED_PASSWORD_PROXY_DISABLED_CODE));
+  });
+
+  test('allows the hosted password proxy only when legacy runtime fallback is explicitly enabled', async () => {
+    locationLike.location = { origin: 'https://kkai.plus' };
+    windowLike.window = { location: { origin: 'https://kkai.plus' } };
+    process.env.VITE_KK_API_BASE_URL = 'https://api.example.com';
+    process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+
+    auth.signInWithPassword = async () => {
+      throw new TypeError('Load failed');
+    };
+
+    let sessionWasSet = false;
+    auth.setSession = async ({ access_token, refresh_token }) => {
+      sessionWasSet = true;
+      assert.equal(access_token, 'access-token-1');
+      assert.equal(refresh_token, 'refresh-token-1');
+      return { data: { session: null, user: null }, error: null };
+    };
+
+    let proxyCallCount = 0;
+    globalThis.fetch = async () => {
+      proxyCallCount += 1;
+      return new Response(JSON.stringify({
+        access_token: 'access-token-1',
+        refresh_token: 'refresh-token-1',
+      }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+    };
+
+    const result = await signInWithPasswordWithFallback({
+      email: 'user@example.com',
+      password: 'secret-123',
+      captchaToken: 'turnstile-token',
+    });
+
     assert.equal(result.error, null);
     assert.equal(result.usedProxy, true);
     assert.equal(proxyCallCount, 1);
@@ -83,6 +159,7 @@ describe('password sign-in fallback', () => {
 
   test('keeps auth errors on the direct path without using the proxy', async () => {
     locationLike.location = { origin: 'https://kkai.plus' };
+    windowLike.window = { location: { origin: 'https://kkai.plus' } };
 
     auth.signInWithPassword = async () => ({
       data: { user: null, session: null },
@@ -104,6 +181,9 @@ describe('password sign-in fallback', () => {
 
   test('uses the same-origin proxy on loopback origins during local development', async () => {
     locationLike.location = { origin: 'http://127.0.0.1:3000' };
+    windowLike.window = { location: { origin: 'http://127.0.0.1:3000' } };
+    delete process.env.VITE_KK_API_BASE_URL;
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 
     auth.signInWithPassword = async () => {
       throw new TypeError('Failed to fetch');
@@ -138,6 +218,9 @@ describe('password sign-in fallback', () => {
 
   test('uses the same-origin proxy on private LAN origins during local development', async () => {
     locationLike.location = { origin: 'https://192.168.1.25:3000' };
+    windowLike.window = { location: { origin: 'https://192.168.1.25:3000' } };
+    delete process.env.VITE_KK_API_BASE_URL;
+    delete process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 
     auth.signInWithPassword = async () => {
       throw new TypeError('Failed to fetch');

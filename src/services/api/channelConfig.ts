@@ -1,5 +1,6 @@
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat, AuthMethod } from './apiConfig';
+import type { ChannelSurfaceView } from './providerSurfaceTypes.ts';
 
 export type ProviderFamily =
   | 'google-official'
@@ -54,6 +55,7 @@ export interface ChannelConfig {
   pricingSupport: ChannelPricingSupport;
   managementSupport: ChannelManagementSupport;
   supportedModels: string[];
+  surfaces: ChannelSurfaceView;
   group?: string;
   compatibilityMode?: 'standard' | 'chat';
   source?: 'user-slot' | 'provider' | 'admin' | 'system';

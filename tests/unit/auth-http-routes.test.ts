@@ -10,7 +10,7 @@ import {
 } from "../../apps/api/src/modules/auth/presentation/http-auth-routes.ts";
 
 describe("auth http routes", () => {
-  test("returns an OpenAPI-shaped envelope for register", async () => {
+  test("returns an OpenAPI-shaped disabled envelope for register", async () => {
     const authService = new AuthService({
       verifyTurnstileToken: async () => ({ success: true }),
     });
@@ -24,11 +24,11 @@ describe("auth http routes", () => {
       "x-client-version": "test-suite",
     }, "127.0.0.1");
 
-    assert.equal(result.statusCode, 201);
-    assert.equal(result.body.success, true);
-    if (result.body.success) {
-      assert.equal(result.body.data.email, "user@example.com");
-      assert.equal(result.body.data.status, "verification_pending");
+    assert.equal(result.statusCode, 501);
+    assert.equal(result.body.success, false);
+    if (!result.body.success) {
+      assert.equal(result.body.error.code, "AUTH_ROUTE_DISABLED");
+      assert.match(result.body.error.message, /hosted Supabase auth flow/);
       assert.equal(result.body.meta.requestId, "req-register-1");
     }
   });
@@ -46,13 +46,10 @@ describe("auth http routes", () => {
       "x-request-id": "req-login-1",
     }, "127.0.0.1");
 
-    assert.equal(result.statusCode, 200);
-    assert.equal(result.body.success, true);
-    if (result.body.success) {
-      assert.ok(result.body.data.accessToken.startsWith("stub-access-"));
-      assert.ok(result.body.data.refreshToken.startsWith("stub-refresh-"));
-      assert.equal(result.body.data.profile.email, "user@example.com");
-      assert.equal(result.body.data.expiresIn, 3600);
+    assert.equal(result.statusCode, 501);
+    assert.equal(result.body.success, false);
+    if (!result.body.success) {
+      assert.equal(result.body.error.code, "AUTH_ROUTE_DISABLED");
     }
   });
 
@@ -61,20 +58,10 @@ describe("auth http routes", () => {
       verifyTurnstileToken: async () => ({ success: true }),
     });
 
-    const login = await handleVersionedLogin(authService, {
-      email: "profile@example.com",
-      password: "password-123",
-    }, {
-      "x-request-id": "req-profile-login",
-    }, "127.0.0.1");
-
-    assert.equal(login.body.success, true);
-    if (!login.body.success) {
-      return;
-    }
+    const login = authService.issueLoginSession("profile@example.com");
 
     const profile = await handleGetProfile(authService, {
-      authorization: `Bearer ${login.body.data.accessToken}`,
+      authorization: `Bearer ${login.accessToken}`,
       "x-request-id": "req-profile-get",
     });
 
@@ -88,7 +75,7 @@ describe("auth http routes", () => {
     const updated = await handleUpdateProfile(authService, {
       nickname: "KK Architect",
     }, {
-      authorization: `Bearer ${login.body.data.accessToken}`,
+      authorization: `Bearer ${login.accessToken}`,
       "x-request-id": "req-profile-patch",
     });
 

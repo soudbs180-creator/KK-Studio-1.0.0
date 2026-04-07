@@ -7,6 +7,7 @@ Make the hosted Vercel frontend and the Supabase backend behave like the local S
 - User-owned API routes must use `userRoute` and must not consume credits.
 - Admin-managed credit models must stay server-side only and must not expose provider `base_url` or `api_keys`.
 - Hosted builds must not fall back to the legacy Web API unless that fallback is intentionally deployed and configured.
+- Hosted browser password login must stay on the Supabase-first path and must not silently depend on `api/auth-password-login.ts`.
 
 ## Release Order
 
@@ -27,6 +28,8 @@ Keep the local runtime split explicit:
 
 - Root `.env` / `.env.local` are for frontend public env such as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and local-only `VITE_KK_API_BASE_URL`.
 - `apps/api/.env.local` is the authoritative local API source for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `USER_API_ENCRYPTION_SECRET`.
+- Optional local API JSON body-size overrides also live in `apps/api/.env.local`:
+  `KK_API_MAX_JSON_BODY_BYTES`, `KK_API_PROFILE_MAX_JSON_BODY_BYTES`, and `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES`.
 - `server/.env` is legacy-only and is ignored by the current local API startup and diagnostics.
 
 Before shipping, verify both local and hosted assumptions explicitly:
@@ -35,6 +38,12 @@ Before shipping, verify both local and hosted assumptions explicitly:
 npm run api:diagnose
 npm run release:hosted:check
 ```
+
+Local default body-size behavior:
+
+- Standard routes stay at `1048576` bytes unless `KK_API_MAX_JSON_BODY_BYTES` overrides them.
+- Profile persistence routes default to `4194304` bytes unless `KK_API_PROFILE_MAX_JSON_BODY_BYTES`
+  or `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES` overrides them.
 
 ### Vercel frontend
 
@@ -62,6 +71,17 @@ Why:
 
 - Hosted builds should stay on the Supabase-first runtime by default.
 - A compatible public KK API now requires both `VITE_KK_API_BASE_URL` and `VITE_ENABLE_LEGACY_WEB_API_FALLBACK=true` to re-enable legacy fallback intentionally.
+- `api/auth-password-login.ts` is a local-only escape hatch. If hosted auth ever depends on it, treat that as a migration regression and fix the Supabase-first path instead of normalizing the proxy.
+
+### Runtime ownership map
+
+Hosted release reviews should use this ownership map:
+
+- `apps/api/`: canonical Hosted business API / BFF
+- `apps/payment-sidecar/`: canonical Hosted payment runtime
+- `server/`: bridge only, never a Hosted primary
+- `payment-server/`: bridge only, never a Hosted primary
+- `api/auth-password-login.ts`: local-only password proxy, disabled by default in Hosted
 
 ### Supabase Edge Function secrets
 
@@ -297,6 +317,7 @@ Most likely causes:
 - `VITE_AUTH_REDIRECT_ORIGIN` mismatch
 - Turnstile site key missing in Vercel
 - Supabase auth URL configuration missing the deployed origin
+- A migration-only password proxy or legacy fallback path is masking a Supabase-first auth regression locally
 
 ## Database Access Note
 

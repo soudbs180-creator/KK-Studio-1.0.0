@@ -134,12 +134,17 @@ function normalizeHealthPayload(payload: unknown): KkApiServerHealth {
   };
 }
 
-async function fetchKkApiServerHealth(): Promise<KkApiServerHealth> {
+async function fetchKkApiServerHealth(
+  options?: { forceRefresh?: boolean },
+): Promise<KkApiServerHealth> {
   const baseUrl = resolveKkApiBaseUrl();
-  const healthUrl = new URL('/healthz', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`).toString();
+  const healthUrl = new URL('/healthz', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+  if (options?.forceRefresh) {
+    healthUrl.searchParams.set('probe', '1');
+  }
 
   try {
-    const response = await fetch(healthUrl, {
+    const response = await fetch(healthUrl.toString(), {
       method: 'GET',
       headers: {
         accept: 'application/json',
@@ -171,7 +176,7 @@ export async function getKkApiServerHealth(options?: { forceRefresh?: boolean })
     return inFlightHealthRequest;
   }
 
-  inFlightHealthRequest = fetchKkApiServerHealth()
+  inFlightHealthRequest = fetchKkApiServerHealth(options)
     .then((health) => {
       cachedHealth = health;
       cachedHealthAt = Date.now();
@@ -208,8 +213,61 @@ export function isKkApiPersistenceUnavailableError(
   );
 }
 
+export function isKkApiUserDataPersistedInCloudFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && health.repositories.authData === 'supabase'
+    && health.persistence.userApiKeys
+    && health.persistence.keyManager
+    && health.config.hasUserApiEncryptionSecret,
+  );
+}
+
+export function isKkApiBillingPersistedInCloudFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && health.repositories.creditAccounts === 'supabase'
+    && health.persistence.credits,
+  );
+}
+
+export function isKkApiCreditProviderCatalogPersistedInCloudFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && health.repositories.creditProviders === 'supabase'
+    && health.persistence.creditProviders,
+  );
+}
+
+export function isKkApiCanonicalCloudReadyFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && health.status === 'ok'
+    && health.config.hasSupabaseUrl
+    && health.config.hasServiceRoleKey
+    && isKkApiBillingPersistedInCloudFromHealth(health)
+    && isKkApiCreditProviderCatalogPersistedInCloudFromHealth(health),
+  );
+}
+
 export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> {
-  const health = await getKkApiServerHealth();
+  const health = await getKkApiServerHealth({ forceRefresh: true });
 
   if (!health.reachable) {
     throw new KkApiPersistenceUnavailableError(
@@ -247,7 +305,19 @@ export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> 
   return health;
 }
 
+export async function isKkApiUserDataPersistedInCloud(
+  options?: { forceRefresh?: boolean },
+): Promise<boolean> {
+  const health = await getKkApiServerHealth(options);
+  return isKkApiUserDataPersistedInCloudFromHealth(health);
+}
+
 export async function isKkApiBillingPersistedInCloud(): Promise<boolean> {
   const health = await getKkApiServerHealth();
-  return health.reachable && health.verified && health.repositories.creditAccounts === 'supabase' && health.persistence.credits;
+  return isKkApiBillingPersistedInCloudFromHealth(health);
+}
+
+export async function isKkApiCreditProviderCatalogPersistedInCloud(): Promise<boolean> {
+  const health = await getKkApiServerHealth();
+  return isKkApiCreditProviderCatalogPersistedInCloudFromHealth(health);
 }

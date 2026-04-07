@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { ADMIN_SESSION_CHANGE_EVENT } from '../services/api/adminSession';
-import { legacyWebApiClient } from '../services/api/kkApiClient';
+import { kkWebApiClient } from '../services/api/kkApiClient';
 import {
   type AppAccountRole,
   isAdminAccountRole,
@@ -123,7 +123,7 @@ export const useAdminRole = (): UseAdminRoleResult => {
       setCheckingAdmin(true);
 
       try {
-        const response = await legacyWebApiClient
+        const response = await kkWebApiClient
           .getAdminAccess(buildAdminRequestOptions())
           .catch(() => undefined);
 

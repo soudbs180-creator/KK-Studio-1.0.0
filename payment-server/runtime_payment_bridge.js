@@ -368,6 +368,53 @@ function reportRuntimeWarning(options, message, error) {
   }
 }
 
+function buildRuntimeStoreRequiredFailure() {
+  return {
+    success: false,
+    error: {
+      code: 'PAYMENT_RUNTIME_STORE_REQUIRED',
+      message: 'Legacy runtime payment fallback requires the canonical runtime payment store and will not settle callbacks without it.',
+    },
+  };
+}
+
+function buildPaymentOrderNotFoundFailure(merchantOrderNo) {
+  const normalizedMerchantOrderNo = String(merchantOrderNo || '').trim();
+  return {
+    success: false,
+    error: {
+      code: 'PAYMENT_ORDER_NOT_FOUND',
+      message: 'The payment order could not be found in the canonical runtime payment store. Legacy callbacks must not auto-create or settle missing orders.',
+      details: normalizedMerchantOrderNo
+        ? [{
+          field: 'merchantOrderNo',
+          reason: `No payment order matches ${normalizedMerchantOrderNo}.`,
+        }]
+        : [{
+          field: 'merchantOrderNo',
+          reason: 'No payment order matches the provided merchantOrderNo.',
+        }],
+    },
+  };
+}
+
+function buildRuntimeStoreUnavailableFailure(merchantOrderNo) {
+  const normalizedMerchantOrderNo = String(merchantOrderNo || '').trim();
+  return {
+    success: false,
+    error: {
+      code: 'PAYMENT_RUNTIME_STORE_UNAVAILABLE',
+      message: 'The canonical runtime payment store could not be queried, so the legacy callback was rejected.',
+      details: normalizedMerchantOrderNo
+        ? [{
+          field: 'merchantOrderNo',
+          reason: `Failed to query the payment order store for ${normalizedMerchantOrderNo}.`,
+        }]
+        : undefined,
+    },
+  };
+}
+
 async function handleLegacySuccessfulPaymentCallback(input, options = {}) {
   const now = new Date().toISOString();
   const merchantOrderNo = String(input.merchantOrderNo || '').trim();
@@ -377,87 +424,73 @@ async function handleLegacySuccessfulPaymentCallback(input, options = {}) {
   const runtimeEnabled = canUseRuntimePaymentStore(options);
   let order = undefined;
 
-  if (runtimeEnabled) {
-    try {
-      order = await findLegacyPaymentOrder(merchantOrderNo, options);
+  if (!runtimeEnabled) {
+    return buildRuntimeStoreRequiredFailure();
+  }
 
-      if (!order && input.userId) {
-        const created = await persistLegacyPaymentOrder({
-          merchantOrderNo,
-          userId: input.userId,
-          providerCode,
-          amount: input.amount,
-          currency,
-          paymentUrl: input.paymentUrl || '',
-          returnUrl: input.returnUrl || process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success',
-          notifyUrl: input.notifyUrl || process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay',
-          idempotencyKey: input.idempotencyKey || `legacy-${merchantOrderNo}`,
-          creditAmount: input.creditAmount,
-          createdAt: now,
-        }, options);
-        order = created.order;
-      }
-
-      if (order) {
-        const existingCallback = await findLegacyPaymentCallback(callbackId, options);
-        if (existingCallback && existingCallback.payment_order_id === order.id) {
-          return {
-            success: true,
-            duplicated: true,
-            order,
-            callback: existingCallback,
-            runtimeStatus: buildRuntimePaymentStatusView(order),
-          };
-        }
-
-        if (order.settlement_applied_at) {
-          await persistLegacyPaymentCallback({
-            paymentOrderId: order.id,
-            providerCode,
-            callbackId,
-            verified: input.verified !== false,
-            tradeStatus: String(input.tradeStatus || 'TRADE_SUCCESS').trim(),
-            payload: input.payload || {},
-            settlementStatus: 'ignored',
-            receivedAt: now,
-            processedAt: now,
-          }, options);
-
-          await updateLegacyPaymentOrder(merchantOrderNo, {
-            status: 'paid',
-            updated_at: now,
-            last_callback_id: callbackId,
-          }, options);
-
-          const settledOrder = await findLegacyPaymentOrder(merchantOrderNo, options);
-          return {
-            success: true,
-            settlementSkipped: true,
-            duplicated: false,
-            order: settledOrder || order,
-            runtimeStatus: buildRuntimePaymentStatusView(settledOrder || order),
-          };
-        }
-
-        await persistLegacyPaymentCallback({
-          paymentOrderId: order.id,
-          providerCode,
-          callbackId,
-          verified: input.verified !== false,
-          tradeStatus: String(input.tradeStatus || 'TRADE_SUCCESS').trim(),
-          payload: input.payload || {},
-          settlementStatus: 'pending',
-          receivedAt: now,
-        }, options);
-      }
-    } catch (error) {
-      reportRuntimeWarning(
-        options,
-        `Failed to persist runtime payment callback audit for ${merchantOrderNo}.`,
-        error,
-      );
-      order = undefined;
+  try {
+    order = await findLegacyPaymentOrder(merchantOrderNo, options);
+    if (!order) {
+      return buildPaymentOrderNotFoundFailure(merchantOrderNo);
     }
+
+    const existingCallback = await findLegacyPaymentCallback(callbackId, options);
+    if (existingCallback && existingCallback.payment_order_id === order.id) {
+      return {
+        success: true,
+        duplicated: true,
+        order,
+        callback: existingCallback,
+        runtimeStatus: buildRuntimePaymentStatusView(order),
+      };
+    }
+
+    if (order.settlement_applied_at) {
+      await persistLegacyPaymentCallback({
+        paymentOrderId: order.id,
+        providerCode,
+        callbackId,
+        verified: input.verified !== false,
+        tradeStatus: String(input.tradeStatus || 'TRADE_SUCCESS').trim(),
+        payload: input.payload || {},
+        settlementStatus: 'ignored',
+        receivedAt: now,
+        processedAt: now,
+      }, options);
+
+      await updateLegacyPaymentOrder(merchantOrderNo, {
+        status: 'paid',
+        updated_at: now,
+        last_callback_id: callbackId,
+      }, options);
+
+      const settledOrder = await findLegacyPaymentOrder(merchantOrderNo, options);
+      return {
+        success: true,
+        settlementSkipped: true,
+        duplicated: false,
+        order: settledOrder || order,
+        runtimeStatus: buildRuntimePaymentStatusView(settledOrder || order),
+      };
+    }
+
+    await persistLegacyPaymentCallback({
+      paymentOrderId: order.id,
+      providerCode,
+      callbackId,
+      verified: input.verified !== false,
+      tradeStatus: String(input.tradeStatus || 'TRADE_SUCCESS').trim(),
+      payload: input.payload || {},
+      settlementStatus: 'pending',
+      receivedAt: now,
+    }, options);
+  } catch (error) {
+    reportRuntimeWarning(
+      options,
+      `Failed to persist runtime payment callback audit for ${merchantOrderNo}.`,
+      error,
+    );
+    return buildRuntimeStoreUnavailableFailure(merchantOrderNo);
   }
 
   const settlement = await writeLegacyPaymentSettlement({

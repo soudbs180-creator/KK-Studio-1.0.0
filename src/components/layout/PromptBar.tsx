@@ -310,6 +310,7 @@ interface CreditSendButtonProps {
     isCreditModel: boolean;
     creditCost: number;
     balance: number;
+    balanceLoading?: boolean;
     hasPrompt: boolean;
     colorStart?: string;
     colorEnd?: string;
@@ -321,6 +322,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     isCreditModel,
     creditCost,
     balance,
+    balanceLoading = false,
     hasPrompt,
     colorStart,
     colorEnd,
@@ -328,7 +330,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     onClick
 }) => {
     // 判断积分是否不足
-    const isInsufficient = isCreditModel && creditCost > 0 && balance < creditCost;
+    const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
 
     // 计算是否禁用
     const isDisabled = !hasPrompt;
@@ -796,6 +798,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     // Track composition state so IME input is not interrupted by background sync.
     const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    const [isModelMenuLoading, setIsModelMenuLoading] = useState(false);
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
@@ -894,7 +897,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const uploadingSkeletonCount = Math.max(0, uploadingCount - pendingReferenceUploads);
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
-    const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
+    const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const canAccessSystemCreditModels = !!user && !isTempUser;
     const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
 
@@ -925,6 +928,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const modelDropdownRef = useRef<HTMLDivElement>(null); // Model dropdown ref
     const modelListScrollRef = useRef<HTMLDivElement>(null); // Model list scroll container ref
     const modelListScrollPos = useRef<number>(0); // Save scroll position
+    const modelMenuRequestRef = useRef(0);
+    const previousActiveMenuRef = useRef<string | null>(null);
+    const previousModeRef = useRef<GenerationMode>(config.mode);
 
     const transitionConfigUpdate = useCallback((updater: React.SetStateAction<GenerationConfig>) => {
         startTransition(() => {
@@ -1056,6 +1062,21 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         };
     }, [onUiBusyChange]);
 
+    const closeModelLibraryMenu = useCallback(() => {
+        modelMenuRequestRef.current += 1;
+        setIsModelMenuLoading(false);
+        setActiveMenu(null);
+    }, []);
+
+    useEffect(() => {
+        if (previousActiveMenuRef.current === 'model' && activeMenu !== 'model') {
+            modelMenuRequestRef.current += 1;
+            setIsModelMenuLoading(false);
+        }
+
+        previousActiveMenuRef.current = activeMenu;
+    }, [activeMenu]);
+
     // [NEW] Click outside to close model dropdown
     useEffect(() => {
         if (activeMenu !== 'model') return;
@@ -1069,7 +1090,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     // Click was on trigger button, let onClick handle it
                     return;
                 }
-                setActiveMenu(null);
+                closeModelLibraryMenu();
             }
         };
 
@@ -1091,7 +1112,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             clearTimeout(timer);
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [activeMenu]);
+    }, [activeMenu, closeModelLibraryMenu]);
 
     useEffect(() => {
         if (config.mode !== GenerationMode.PPT) {
@@ -1318,29 +1339,31 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
         const currentModelValid = sortedAvailableModels.find(m => m.id === config.model);
         const firstModelId = sortedAvailableModels[0].id;
+        const modeChanged = previousModeRef.current !== config.mode;
+        previousModeRef.current = config.mode;
 
         // 仅在以下情况重置为第一个模型：
         // 1. 当前模型完全失效
-        // 2. 当前是刚进入当前模式，且用户没有手动锁定选择
-        const isInitialSelectInMode = !isModelManuallyLocked && config.model !== firstModelId;
-        const shouldResetToFirst = !currentModelValid || isInitialSelectInMode;
-
-        if (shouldResetToFirst) {
-            setConfig(prev => {
-                const newModel = firstModelId;
-                // 🚀 [Fix] 智能参数保持：获取新模型支持的参数
-                const newModelCaps = getModelCapabilities(newModel);
-                const supportedSizes = newModelCaps?.supportedSizes?.length ? newModelCaps.supportedSizes : Object.values(ImageSize);
-                const supportedRatios = newModelCaps?.supportedRatios?.length ? newModelCaps.supportedRatios : Object.values(AspectRatio);
-
-                // 检查当前参数是否被新模型支持，支持则保持，不支持则回退到默认值
-                const newImageSize = supportedSizes.includes(prev.imageSize) ? prev.imageSize : getDefaultImageSizeForModel(newModel);
-                const newAspectRatio = supportedRatios.includes(prev.aspectRatio) ? prev.aspectRatio : getDefaultAspectForModel(newModel);
-
-                return { ...prev, model: newModel, imageSize: newImageSize, aspectRatio: newAspectRatio };
-            });
+        // 2. 模式刚发生变化，且用户没有手动锁定选择
+        const shouldResetToFirst = !currentModelValid || (modeChanged && !isModelManuallyLocked);
+        if (!shouldResetToFirst || config.model === firstModelId) {
+            return;
         }
-    }, [config.mode, sortedAvailableModels, setConfig, getDefaultImageSizeForModel, getDefaultAspectForModel]); // 移除了 isModelManuallyLocked 和 config.model 依赖，避免选中后重复触发
+
+        setConfig(prev => {
+            const newModel = firstModelId;
+            // 🚀 [Fix] 智能参数保持：获取新模型支持的参数
+            const newModelCaps = getModelCapabilities(newModel);
+            const supportedSizes = newModelCaps?.supportedSizes?.length ? newModelCaps.supportedSizes : Object.values(ImageSize);
+            const supportedRatios = newModelCaps?.supportedRatios?.length ? newModelCaps.supportedRatios : Object.values(AspectRatio);
+
+            // 检查当前参数是否被新模型支持，支持则保持，不支持则回退到默认值
+            const newImageSize = supportedSizes.includes(prev.imageSize) ? prev.imageSize : getDefaultImageSizeForModel(newModel);
+            const newAspectRatio = supportedRatios.includes(prev.aspectRatio) ? prev.aspectRatio : getDefaultAspectForModel(newModel);
+
+            return { ...prev, model: newModel, imageSize: newImageSize, aspectRatio: newAspectRatio };
+        });
+    }, [config.mode, config.model, isModelManuallyLocked, sortedAvailableModels, setConfig, getDefaultImageSizeForModel, getDefaultAspectForModel]);
 
     // Get available ratios and sizes based on model capabilities
     const modelCaps = useMemo(() => {
@@ -1640,21 +1663,23 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         setShowOptionsPanel(false);
 
         if (activeMenu === 'model') {
-            setActiveMenu(null);
+            closeModelLibraryMenu();
             return;
         }
 
-        if (availableModels.length > 0) {
-            refreshModelLibraryDataInBackground();
-            setGlobalModels(keyManager.getGlobalModelList());
-            setActiveMenu('model');
-            return;
-        }
+        const requestId = modelMenuRequestRef.current + 1;
+        modelMenuRequestRef.current = requestId;
+        setActiveMenu('model');
+        setIsModelMenuLoading(true);
 
         try {
-            await refreshModelLibraryData({ force: true });
+            await refreshModelLibraryData({ force: availableModels.length === 0 });
         } catch (error) {
             console.warn('[PromptBar] Model library refresh failed before empty-state open:', error);
+        }
+
+        if (modelMenuRequestRef.current !== requestId) {
+            return;
         }
 
         const refreshedGlobalModels = keyManager.getGlobalModelList();
@@ -1668,15 +1693,18 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         setGlobalModels(refreshedGlobalModels);
 
         if (refreshedAvailableModels.length === 0) {
+            setIsModelMenuLoading(false);
+            setActiveMenu(null);
             onOpenSettings?.('api-management');
             return;
         }
 
-        setActiveMenu('model');
+        setIsModelMenuLoading(false);
     }, [
         activeMenu,
         availableModels.length,
         canBrowseSystemCreditModels,
+        closeModelLibraryMenu,
         config.imageSize,
         config.mode,
         onOpenSettings,
@@ -3197,7 +3225,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             <div className={`relative inline-flex min-w-0 ${isMobile ? 'col-span-2' : 'flex-shrink-0'}`}>
                                 <button
                                     id="models-dropdown-trigger"
-                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full max-w-full justify-center' : 'w-auto max-w-[calc(12ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full max-w-full justify-center' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed border-[var(--border-light)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3240,7 +3268,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     </span>
                                                 ) : null}
                                                 <span
-                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[12ch] text-sm'}`}
+                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[15ch] text-sm'}`}
                                                     style={{ color: currentModel?.isSystemInternal ? currentModelTextColor : 'var(--text-primary)' }}
                                                     title={currentModelName}
                                                 >
@@ -3281,7 +3309,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 </button>
 
                                 {/* Dropdown Menu */}
-                                {!isModelListEmpty && activeMenu === 'model' && (
+                                {activeMenu === 'model' && (!isModelListEmpty || isModelMenuLoading) && (
                                     <div
                                         ref={modelDropdownRef}
                                         className={isMobile ? 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-scaleIn origin-bottom overflow-hidden' : 'absolute bottom-full mb-3 z-50 animate-scaleIn origin-bottom'}
@@ -3290,7 +3318,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             : { left: '50%', transform: 'translateX(-50%)' }}
                                     >
                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                        {filteredDisplayModels.length > 1 && (
+                                        {!isModelMenuLoading && filteredDisplayModels.length > 1 && (
                                             <div className="mb-2 p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-medium)] rounded-2xl shadow-xl animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
                                                 <div className="relative flex items-center">
                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3333,7 +3361,22 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                 setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
                                             }}
                                         >
-                                            {(() => {
+                                            {isModelMenuLoading ? (
+                                                <div className="py-6">
+                                                    <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                        <Loader2 size={14} className="animate-spin" />
+                                                        <span>正在同步最新模型库...</span>
+                                                    </div>
+                                                    <div className="mt-4 space-y-2">
+                                                        {Array.from({ length: 5 }).map((_, index) => (
+                                                            <div
+                                                                key={`prompt-bar-model-loading-${index}`}
+                                                                className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (() => {
                                                 const visibleModels = modelListViewport.items;
                                                 const topSpacerHeight = modelListViewport.shouldWindow
                                                     ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
@@ -3704,6 +3747,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                 isCreditModel={isSystemCreditModel}
                                 creditCost={totalCreditCost}
                                 balance={balance}
+                                balanceLoading={billingLoading}
                                 hasPrompt={!!promptDraft.trim()}
                                 colorStart={currentModel?.colorStart}
                                 colorEnd={currentModel?.colorEnd}

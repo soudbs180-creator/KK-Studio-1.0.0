@@ -15,18 +15,18 @@ test('model pickers force a refresh before redirecting from an empty library', (
 
   assert.match(
     promptBarSource,
-    /if \(availableModels\.length > 0\) \{\s*refreshModelLibraryDataInBackground\(\);[\s\S]*await refreshModelLibraryData\(\{ force: true \}\);/,
+    /await refreshModelLibraryData\(\{ force: availableModels\.length === 0 \}\);/,
   );
   assert.match(
     promptBarSource,
-    /if \(refreshedAvailableModels\.length === 0\) \{\s*onOpenSettings\?\.\('api-management'\);/,
+    /if \(refreshedAvailableModels\.length === 0\) \{\s*setIsModelMenuLoading\(false\);\s*setActiveMenu\(null\);\s*onOpenSettings\?\.\('api-management'\);/,
   );
   assert.match(
     chatSidebarSource,
-    /if \(nextAvailableModels\.length > 0\) \{\s*refreshModelLibraryDataInBackground\(\);[\s\S]*await refreshModelLibraryData\(\{ force: true \}\);/,
+    /await refreshModelLibraryData\(\{ force: nextAvailableModels\.length === 0 \}\);/,
   );
   assert.match(
     chatSidebarSource,
-    /if \(nextAvailableModels\.length === 0\) \{\s*onOpenSettings\?\.\('api-management'\);/,
+    /if \(nextAvailableModels\.length === 0\) \{\s*setIsModelMenuLoading\(false\);\s*setShowModelMenu\(false\);\s*onOpenSettings\?\.\('api-management'\);/,
   );
 });

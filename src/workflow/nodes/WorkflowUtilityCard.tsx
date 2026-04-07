@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { WorkflowNode } from '../../types';
 import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
+import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
 
@@ -151,6 +152,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
     () => infoRows.filter((row): row is string => typeof row === 'string' && row.trim().length > 0).slice(0, 3),
     [infoRows],
   );
+  const stackZIndex = elevateCanvasStackZIndex(getWorkflowCardStackZIndex(node, isSelected), isDragging);
 
   return (
     <div
@@ -160,7 +162,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
         top: node.position.y - height,
         width,
         minHeight: height,
-        zIndex: getWorkflowCardStackZIndex(node, isSelected),
+        zIndex: stackZIndex,
         background: 'linear-gradient(180deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.86) 100%)',
         borderColor: isSelected ? 'rgba(96, 165, 250, 0.72)' : 'rgba(148, 163, 184, 0.18)',
         boxShadow: isSelected

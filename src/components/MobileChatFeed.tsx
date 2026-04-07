@@ -3,11 +3,11 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { ChevronRight, Download, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { GeneratedImage, GenerationMode, ImageSize, PromptNode } from '../types';
-import { getModelDisplayName } from '../services/model/modelCapabilities';
 import { resolveImageCost } from '../services/billing/costService';
 import { notify } from '../services/system/notificationService';
 import { generateTagColor } from '../utils/colorUtils';
 import { getResolvedCreditCost, isCreditBillingTarget } from '../utils/creditBilling';
+import { resolveModelDisplayName } from '../utils/modelDisplayName';
 
 interface MobileCardGroup {
   id: string;
@@ -214,7 +214,7 @@ const getImageParameterLabel = (image: GeneratedImage): string => {
 };
 
 const getImageModelLabel = (image: GeneratedImage): string =>
-  truncateText(image.model || image.modelLabel || getModelDisplayName(image.model || '') || image.id, 24);
+  truncateText(resolveModelDisplayName(image.model || image.id, image.modelLabel || image.model || image.id), 24);
 
 const getPromptStatus = (prompt: PromptNode | null, imageCount: number): string => {
   if (prompt?.isGenerating) {

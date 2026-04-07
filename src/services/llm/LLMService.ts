@@ -23,6 +23,8 @@ import {
     callSecureSystemProxyAudio,
     checkLocalUserRouteProxyTaskStatus,
     checkSecureSystemProxyTaskStatus,
+    getSecureProxyGuestModeMessage,
+    getSecureProxySessionReauthMessage,
     isLocalUserRouteProxyFallbackError,
     isSecureProxyGuestModeError,
     isSecureProxySessionReauthError,
@@ -32,6 +34,7 @@ import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '
 import { resolveProviderIdentity } from '../../utils/providerDisplay';
 import { getModelPricing } from '../model/modelPricing';
 import { isSystemModelRoute } from '../model/modelRoute';
+import { resolveAdapterKind } from './providerAdapterRouter';
 
 export class LLMService {
     private static instance: LLMService;
@@ -67,12 +70,13 @@ export class LLMService {
             compatibilityMode: keySlot.compatibilityMode,
             modelId,
         });
+        const adapterKind = resolveAdapterKind(runtime);
 
-        if (runtime.protocolFamily === 'claude-native') {
+        if (adapterKind === 'claude-native') {
             return this.claudeNativeAdapter;
         }
 
-        if (runtime.protocolFamily === 'gemini-native') {
+        if (adapterKind === 'gemini-native') {
             return this.geminiNativeAdapter;
         }
 
@@ -120,8 +124,25 @@ export class LLMService {
     private shouldFallbackToCloudUserRouteAfterLocalProxy(
         error: unknown,
     ): boolean {
-        void error;
-        return false;
+        if (!error) {
+            return true;
+        }
+
+        if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
+            return false;
+        }
+
+        if (!isLocalUserRouteProxyFallbackError(error)) {
+            return false;
+        }
+
+        const message = String(
+            typeof error === 'object' && error && 'message' in error
+                ? (error as { message?: unknown }).message || ''
+                : error
+        ).toLowerCase();
+
+        return !message.includes('browser direct provider calls are disabled');
     }
 
     private createCloudFallbackNotice(action: string, keySlot: Pick<KeySlot, 'name' | 'provider'>): string {
@@ -154,6 +175,46 @@ export class LLMService {
         error.cause = cloudError;
         error.localCause = localError;
         error.cloudCause = cloudError;
+        return error;
+    }
+
+    private normalizeUserRouteProxyError(error: unknown): unknown {
+        const boundaryError = error as {
+            code?: string;
+            status?: number;
+            responseBody?: string;
+            feature?: string;
+        };
+        const existingMessage = error instanceof Error ? error.message : '';
+
+        if (isSecureProxySessionReauthError(error)) {
+            const normalized = new Error(existingMessage || getSecureProxySessionReauthMessage('user-route')) as Error & {
+                code?: string;
+                status?: number;
+                responseBody?: string;
+                feature?: string;
+            };
+            normalized.code = boundaryError.code;
+            normalized.status = boundaryError.status;
+            normalized.responseBody = boundaryError.responseBody;
+            normalized.feature = boundaryError.feature;
+            return normalized;
+        }
+
+        if (isSecureProxyGuestModeError(error)) {
+            const normalized = new Error(existingMessage || getSecureProxyGuestModeMessage('user-route')) as Error & {
+                code?: string;
+                status?: number;
+                responseBody?: string;
+                feature?: string;
+            };
+            normalized.code = boundaryError.code;
+            normalized.status = boundaryError.status;
+            normalized.responseBody = boundaryError.responseBody;
+            normalized.feature = boundaryError.feature;
+            return normalized;
+        }
+
         return error;
     }
 
@@ -281,7 +342,7 @@ export class LLMService {
     }
 
     public getProviderProfiles(): ProviderCapabilityProfile[] {
-        const providers: Provider[] = ['Google', 'OpenAI', 'Anthropic', 'Aliyun', 'Tencent', 'Volcengine', 'SiliconFlow', 'Custom'];
+        const providers: Provider[] = ['Google', 'OpenAI', 'Anthropic', 'Aliyun', 'Tencent', 'Volcengine', 'SiliconFlow', '12AI', 'Flow2API', 'Custom'];
         return providers
             .map(item => getProviderCapability(item))
             .filter((item): item is ProviderCapabilityProfile => !!item);
@@ -337,11 +398,12 @@ export class LLMService {
                             stream: false,
                         });
                     } catch (error) {
-                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
-                            throw error;
+                        const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
+                            throw normalizedUserRouteError;
                         }
 
-                        console.warn(this.createCloudFallbackNotice('chat routing', keySlot), error);
+                        console.warn(this.createCloudFallbackNotice('chat routing', keySlot), normalizedUserRouteError);
                         try {
                             response = await callSecureSystemProxyChat({
                                 modelId: options.modelId,
@@ -352,7 +414,7 @@ export class LLMService {
                                 stream: false,
                             });
                         } catch (cloudError) {
-                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                            throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
                         }
                     }
 
@@ -447,11 +509,12 @@ export class LLMService {
                             referenceImages: options.referenceImages,
                         });
                     } catch (error) {
-                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
-                            throw error;
+                        const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
+                            throw normalizedUserRouteError;
                         }
 
-                        console.warn(this.createCloudFallbackNotice('image routing', keySlot), error);
+                        console.warn(this.createCloudFallbackNotice('image routing', keySlot), normalizedUserRouteError);
                         try {
                             proxyResponse = await callSecureSystemProxyImage({
                                 modelId: options.modelId,
@@ -463,7 +526,7 @@ export class LLMService {
                                 referenceImages: options.referenceImages,
                             });
                         } catch (cloudError) {
-                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                            throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
                         }
                     }
 
@@ -656,11 +719,12 @@ export class LLMService {
                             imageTailUrl: options.imageTailUrl,
                         });
                     } catch (error) {
-                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
-                            throw error;
+                        const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
+                            throw normalizedUserRouteError;
                         }
 
-                        console.warn(this.createCloudFallbackNotice('video routing', keySlot), error);
+                        console.warn(this.createCloudFallbackNotice('video routing', keySlot), normalizedUserRouteError);
                         try {
                             response = await callSecureSystemProxyVideo({
                                 modelId: options.modelId,
@@ -674,7 +738,7 @@ export class LLMService {
                                 imageTailUrl: options.imageTailUrl,
                             });
                         } catch (cloudError) {
-                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                            throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
                         }
                     }
 
@@ -759,11 +823,12 @@ export class LLMService {
                             prompt: options.prompt,
                         });
                     } catch (error) {
-                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(error)) {
-                            throw error;
+                        const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
+                        if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
+                            throw normalizedUserRouteError;
                         }
 
-                        console.warn(this.createCloudFallbackNotice('audio routing', keySlot), error);
+                        console.warn(this.createCloudFallbackNotice('audio routing', keySlot), normalizedUserRouteError);
                         try {
                             response = await callSecureSystemProxyAudio({
                                 modelId: options.modelId,
@@ -771,7 +836,7 @@ export class LLMService {
                                 prompt: options.prompt,
                             });
                         } catch (cloudError) {
-                            throw this.buildUserRouteFallbackFailureError(keySlot, error, cloudError);
+                            throw this.buildUserRouteFallbackFailureError(keySlot, normalizedUserRouteError, cloudError);
                         }
                     }
 

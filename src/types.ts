@@ -166,6 +166,7 @@ export type Provider =
   | 'Tencent'    // 腾讯云
   | 'SiliconFlow'// 硅基流动
   | '12AI'        // 12AI 专属
+  | 'Flow2API'    // Flow2API 自托管媒体网关
   | 'Custom'      // 自定义
   | 'SystemProxy'; // 系统代理（积分模型）
 

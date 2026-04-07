@@ -1,8 +1,13 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
-import { waitForAuthSessionChange } from '../auth/authSessionEvents';
+import {
+  getLatestAuthSessionChange,
+  requestAuthSessionInvalidation,
+  waitForAuthSessionChange,
+} from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { resolveKkApiBaseUrl, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
+import { readRuntimeBooleanEnv } from '../../utils/runtimeEnv';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -30,9 +35,14 @@ export interface SecureProxyChatRequest {
   userRoute?: SecureProxyUserRoute;
 }
 
-export interface SecureProxyChatResponse {
-  content: string;
+export interface SecureProxyBillingMetadata {
   deducted?: boolean;
+  ledgerId?: string;
+  balanceAfter?: number;
+}
+
+export interface SecureProxyChatResponse extends SecureProxyBillingMetadata {
+  content: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -51,9 +61,8 @@ export interface SecureProxyImageRequest {
   userRoute?: SecureProxyUserRoute;
 }
 
-export interface SecureProxyImageResponse {
+export interface SecureProxyImageResponse extends SecureProxyBillingMetadata {
   urls: string[];
-  deducted?: boolean;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
@@ -75,11 +84,10 @@ export interface SecureProxyVideoRequest {
   userRoute?: SecureProxyUserRoute;
 }
 
-export interface SecureProxyVideoResponse {
+export interface SecureProxyVideoResponse extends SecureProxyBillingMetadata {
   taskId: string;
   status: 'pending' | 'success' | 'failed';
   url?: string;
-  deducted?: boolean;
   endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
@@ -89,9 +97,8 @@ export interface SecureProxyAudioRequest {
   userRoute?: SecureProxyUserRoute;
 }
 
-export interface SecureProxyAudioResponse {
+export interface SecureProxyAudioResponse extends SecureProxyBillingMetadata {
   url: string;
-  deducted?: boolean;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
@@ -101,20 +108,23 @@ export interface SecureProxyAudioResponse {
   endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
-export interface SecureProxyTaskStatusResponse {
+export interface SecureProxyTaskStatusResponse extends SecureProxyBillingMetadata {
   status: 'pending' | 'success' | 'failed';
   url?: string;
-  deducted?: boolean;
 }
 
 export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
 export const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
 export const LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE = 'LOCAL_USER_ROUTE_PROXY_UNAVAILABLE';
 export const LOCAL_USER_ROUTE_NOT_FOUND_CODE = 'USER_ROUTE_NOT_FOUND';
+export const LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR_CODE = 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR';
+export const LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE = 'USER_ROUTE_SECRET_REQUIRED';
+export const LOCAL_USER_ROUTE_INVALID_REQUEST_CODE = 'INVALID_REQUEST';
+export const LOCAL_USER_ROUTE_UNSUPPORTED_ROUTE_CODE = 'UNSUPPORTED_ROUTE';
 export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
 export const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
 
-type SecureProxyRouteKind = 'system' | 'user-route';
+export type SecureProxyRouteKind = 'system' | 'user-route';
 
 type SecureProxyInvokeResult = {
   data: any;
@@ -126,6 +136,8 @@ type CloudSessionResolution = {
   accessToken: string;
 };
 
+type InvalidJwtLocalSessionState = 'no-session' | 'invalid' | 'valid' | 'unknown';
+
 type ResolveCloudSessionOptions = {
   forceRefresh?: boolean;
   routeKind?: SecureProxyRouteKind;
@@ -135,7 +147,11 @@ type SecureProxyBoundaryErrorCode =
   | typeof SECURE_PROXY_SESSION_REAUTH_CODE
   | typeof SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE
   | typeof LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE
-  | typeof LOCAL_USER_ROUTE_NOT_FOUND_CODE;
+  | typeof LOCAL_USER_ROUTE_NOT_FOUND_CODE
+  | typeof LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR_CODE
+  | typeof LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE
+  | typeof LOCAL_USER_ROUTE_INVALID_REQUEST_CODE
+  | typeof LOCAL_USER_ROUTE_UNSUPPORTED_ROUTE_CODE;
 
 type SecureProxyBoundaryError = Error & {
   code?: SecureProxyBoundaryErrorCode;
@@ -160,12 +176,20 @@ function getLocalUserRouteProxyEndpoint(): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/user-route-proxy`;
 }
 
+function getLocalUserRouteApiEndpoint(): string {
+  return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/user`;
+}
+
 function getLocalSystemProxyEndpoint(): string {
   return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/system`;
 }
 
 function shouldUseLocalSystemProxy(): boolean {
   return shouldUseLegacyWebApiFallback();
+}
+
+function shouldUseLocalUserRouteApi(): boolean {
+  return shouldUseLegacyWebApiFallback() && readRuntimeBooleanEnv('VITE_ENABLE_LOCAL_USER_ROUTE_API', false);
 }
 
 function isRetryableProxyFetchError(error: unknown): boolean {
@@ -272,6 +296,19 @@ export function isSecureProxyGuestModeError(error: unknown): error is SecureProx
 }
 
 export function isLocalUserRouteProxyFallbackError(error: unknown): error is SecureProxyBoundaryError {
+  const boundaryCode = error && typeof error === 'object'
+    ? (error as SecureProxyBoundaryError).code
+    : undefined;
+
+  if (
+    boundaryCode === LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR_CODE
+    || boundaryCode === LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE
+    || boundaryCode === LOCAL_USER_ROUTE_INVALID_REQUEST_CODE
+    || boundaryCode === LOCAL_USER_ROUTE_UNSUPPORTED_ROUTE_CODE
+  ) {
+    return false;
+  }
+
   return Boolean(
     error
     && typeof error === 'object'
@@ -286,9 +323,18 @@ export function isLocalUserRouteProxyFallbackError(error: unknown): error is Sec
 function buildSessionReauthError(
   feature: string,
   responseBody = '',
-  routeKind: SecureProxyRouteKind = 'system',
+  routeKind: SecureProxyRouteKind = 'user-route',
+  localSessionState: InvalidJwtLocalSessionState = 'unknown',
 ): SecureProxyBoundaryError {
-  return buildSecureProxyBoundaryError(getSessionReauthMessage(routeKind), {
+  const message = routeKind === 'user-route'
+    ? (
+      isInvalidJwtResponse(responseBody, null)
+        ? getSecureProxyUserRouteInvalidJwtDiagnosticMessage(responseBody, localSessionState)
+        : getSecureProxyUserRouteAuthRejectedMessage(responseBody)
+    )
+    : getSecureProxySessionReauthMessage(routeKind);
+
+  return buildSecureProxyBoundaryError(message, {
     code: SECURE_PROXY_SESSION_REAUTH_CODE,
     status: 401,
     responseBody,
@@ -298,24 +344,24 @@ function buildSessionReauthError(
 
 function buildCloudSessionError(
   feature: string,
-  routeKind: SecureProxyRouteKind = 'system',
+  routeKind: SecureProxyRouteKind = 'user-route',
 ): SecureProxyBoundaryError {
   if (tempUserService.getCachedTempUser()) {
-    return buildSecureProxyBoundaryError(getGuestModeMessage(routeKind), {
+    return buildSecureProxyBoundaryError(getSecureProxyGuestModeMessage(routeKind), {
       code: SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE,
       status: 403,
       feature,
     });
   }
 
-  return buildSecureProxyBoundaryError(getSessionReauthMessage(routeKind), {
+  return buildSecureProxyBoundaryError(getSecureProxySessionReauthMessage(routeKind), {
     code: SECURE_PROXY_SESSION_REAUTH_CODE,
     status: 401,
     feature,
   });
 }
 
-function getSessionReauthMessage(routeKind: SecureProxyRouteKind): string {
+export function getSecureProxySessionReauthMessage(routeKind: SecureProxyRouteKind): string {
   if (routeKind === 'user-route') {
     return '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u7ee7\u7eed\u4f7f\u7528\u4f60\u914d\u7f6e\u7684 API \u8def\u7531\u3002';
   }
@@ -323,12 +369,135 @@ function getSessionReauthMessage(routeKind: SecureProxyRouteKind): string {
   return '\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u7ee7\u7eed\u4f7f\u7528\u7cfb\u7edf\u79ef\u5206\u6a21\u578b\u3002';
 }
 
-function getGuestModeMessage(routeKind: SecureProxyRouteKind): string {
+export function getSecureProxyGuestModeMessage(routeKind: SecureProxyRouteKind): string {
   if (routeKind === 'user-route') {
     return '\u6e38\u5ba2\u6a21\u5f0f\u4e0d\u652f\u6301\u4e91\u540c\u6b65\u548c\u4f60\u914d\u7f6e\u7684 API \u8def\u7531\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
   }
 
   return '\u6e38\u5ba2\u6a21\u5f0f\u4e0d\u652f\u6301\u4e91\u540c\u6b65\u548c\u7cfb\u7edf\u79ef\u5206\u6a21\u578b\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
+}
+
+function extractProxyErrorMessage(responseBody = ''): string {
+  const rawBody = String(responseBody || '').trim();
+  if (!rawBody) {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody) as {
+      error?: string | { message?: string };
+      message?: string;
+    };
+    const parsedError = parsed?.error;
+
+    if (typeof parsedError === 'string' && parsedError.trim()) {
+      return parsedError.trim();
+    }
+
+    if (
+      parsedError
+      && typeof parsedError === 'object'
+      && typeof parsedError.message === 'string'
+      && parsedError.message.trim()
+    ) {
+      return parsedError.message.trim();
+    }
+
+    if (typeof parsed?.message === 'string' && parsed.message.trim()) {
+      return parsed.message.trim();
+    }
+  } catch {
+    // Ignore JSON parse failures and fall back to the raw body below.
+  }
+
+  return rawBody;
+}
+
+function getSecureProxyUserRouteAuthRejectedMessage(responseBody = ''): string {
+  const upstreamMessage = extractProxyErrorMessage(responseBody);
+  if (
+    upstreamMessage
+    && !/unauthorized/i.test(upstreamMessage)
+    && !/invalid jwt/i.test(upstreamMessage)
+  ) {
+    return `\u7528\u6237 API \u8def\u7531\u9274\u6743\u5931\u8d25\uff1a${upstreamMessage}`;
+  }
+
+  return '\u5f53\u524d\u767b\u5f55\u6001\u672a\u88ab user-route-proxy \u63a5\u53d7\u3002\u8bf7\u5148\u91cd\u65b0\u767b\u5f55\u540e\u91cd\u8bd5\uff1b\u5982\u679c\u91cd\u65b0\u767b\u5f55\u540e\u4ecd\u7136\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5 Supabase Edge Function user-route-proxy \u662f\u5426\u90e8\u7f72\u5728\u4e0e\u524d\u7aef\u76f8\u540c\u7684 Supabase \u9879\u76ee\u3002';
+}
+
+function getSecureProxyUserRouteInvalidJwtDiagnosticMessage(
+  responseBody = '',
+  localSessionState: InvalidJwtLocalSessionState = 'unknown',
+): string {
+  const upstreamMessage = extractProxyErrorMessage(responseBody);
+
+  if (
+    upstreamMessage
+    && !/unauthorized/i.test(upstreamMessage)
+    && !/invalid jwt/i.test(upstreamMessage)
+  ) {
+    return `\u7528\u6237 API \u8def\u7531\u9274\u6743\u5931\u8d25\uff1a${upstreamMessage}`;
+  }
+
+  if (localSessionState === 'valid') {
+    return '\u5f53\u524d Supabase \u767b\u5f55\u6001\u5728\u672c\u5730\u4ecd\u7136\u6709\u6548\uff0c\u4f46\u8fdc\u7aef user-route-proxy \u8fd4\u56de\u4e86 Invalid JWT\u3002\u8fd9\u901a\u5e38\u610f\u5473\u7740 user-route-proxy \u6ca1\u6709\u90e8\u7f72\u5728\u4e0e\u524d\u7aef\u76f8\u540c\u7684 Supabase \u9879\u76ee\uff0c\u6216\u5176 SUPABASE_URL / SUPABASE_ANON_KEY secrets \u5df2\u6f02\u79fb\u3002';
+  }
+
+  if (localSessionState === 'invalid' || localSessionState === 'no-session') {
+    return '\u5f53\u524d\u672c\u5730 Supabase \u767b\u5f55\u6001\u4e5f\u5df2\u65e0\u6548\uff0c\u5e76\u4e14 user-route-proxy \u8fd4\u56de\u4e86 Invalid JWT\u3002\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
+  }
+
+  return getSecureProxyUserRouteAuthRejectedMessage(responseBody);
+}
+
+async function restoreCloudSessionFromAuthEvent(
+  feature: string,
+  routeKind: SecureProxyRouteKind,
+  forceRefresh = false,
+): Promise<CloudSessionResolution | null> {
+  const latestAuthSession = getLatestAuthSessionChange();
+  if (!latestAuthSession?.hasSession || latestAuthSession.isTempUser) {
+    return null;
+  }
+
+  const cachedAccessToken = String(latestAuthSession.accessToken || '').trim();
+  const cachedRefreshToken = String(latestAuthSession.refreshToken || '').trim();
+
+  if (!cachedAccessToken || !cachedRefreshToken) {
+    return !forceRefresh && cachedAccessToken
+      ? { accessToken: cachedAccessToken }
+      : null;
+  }
+
+  try {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: cachedAccessToken,
+      refresh_token: cachedRefreshToken,
+    });
+
+    if (error) {
+      console.warn(
+        `[secureModelProxy] Failed to restore auth event session during ${feature} (${routeKind}):`,
+        error,
+      );
+    }
+
+    if (data.session?.access_token) {
+      return {
+        accessToken: data.session.access_token,
+      };
+    }
+  } catch (error) {
+    console.warn(
+      `[secureModelProxy] Restoring auth event session failed during ${feature} (${routeKind}):`,
+      error,
+    );
+  }
+
+  return !forceRefresh && cachedAccessToken
+    ? { accessToken: cachedAccessToken }
+    : null;
 }
 
 async function resolveStoredCloudAccessToken(forceRefresh = false): Promise<string | null> {
@@ -357,10 +526,17 @@ function hasUsableCloudSession(session: Awaited<ReturnType<typeof readCloudSessi
     ? session.expires_at * 1000
     : 0;
 
-  return Boolean(
+  const isUsable = Boolean(
     session?.access_token
     && (expiresAtMs <= 0 || expiresAtMs > Date.now() + 60_000),
   );
+
+  if (!isUsable && session?.access_token) {
+    const remainingMs = expiresAtMs - Date.now();
+    console.warn(`[secureModelProxy] Session not usable. Expires in ${remainingMs}ms, expires_at: ${session.expires_at}`);
+  }
+
+  return isUsable;
 }
 
 async function recoverCloudSession(feature: string): Promise<CloudSessionResolution | null> {
@@ -419,7 +595,7 @@ async function resolveCloudSession(
   options: ResolveCloudSessionOptions = {},
 ): Promise<CloudSessionResolution> {
   const shouldForceRefresh = options.forceRefresh === true;
-  const routeKind = options.routeKind || 'system';
+  const routeKind = options.routeKind || 'user-route';
   let session: Awaited<ReturnType<typeof readCloudSession>> | null = null;
   let sessionReadError: unknown = null;
 
@@ -441,11 +617,22 @@ async function resolveCloudSession(
     return resolvedSession;
   }
 
-  const storedAccessToken = await resolveStoredCloudAccessToken(shouldForceRefresh);
-  if (storedAccessToken) {
-    return {
-      accessToken: storedAccessToken,
-    };
+  const restoredAuthEventSession = await restoreCloudSessionFromAuthEvent(
+    feature,
+    routeKind,
+    shouldForceRefresh,
+  );
+  if (restoredAuthEventSession?.accessToken) {
+    return restoredAuthEventSession;
+  }
+
+  if (!shouldForceRefresh) {
+    const storedAccessToken = await resolveStoredCloudAccessToken(false);
+    if (storedAccessToken) {
+      return {
+        accessToken: storedAccessToken,
+      };
+    }
   }
 
   if (!shouldForceRefresh && session?.access_token) {
@@ -652,6 +839,23 @@ type LocalSystemProxyHttpResult = {
   responseBody: string;
 };
 
+type LocalUserRouteTransportTarget = {
+  endpointName: 'user-route-proxy' | 'local-user-route-api';
+  failureLabel: string;
+  invoke: (
+    accessToken: string,
+    body: Record<string, unknown>,
+  ) => Promise<LocalUserRouteProxyHttpResult>;
+};
+
+function extractSecureProxyBillingMetadata(data: any): SecureProxyBillingMetadata {
+  return {
+    deducted: Boolean(data.deducted),
+    ledgerId: typeof data.ledgerId === 'string' ? data.ledgerId : undefined,
+    balanceAfter: typeof data.balanceAfter === 'number' ? data.balanceAfter : undefined,
+  };
+}
+
 function isInvalidJwtResponse(responseBody: string, payload: any): boolean {
   const joinedMessage = [
     payload?.error?.message,
@@ -663,6 +867,97 @@ function isInvalidJwtResponse(responseBody: string, payload: any): boolean {
     .join('\n');
 
   return joinedMessage.includes('invalid jwt');
+}
+
+async function inspectLocalSessionForInvalidJwt(): Promise<InvalidJwtLocalSessionState> {
+  const latestAuthSession = getLatestAuthSessionChange();
+  if (!latestAuthSession?.hasSession || latestAuthSession.isTempUser) {
+    return 'no-session';
+  }
+
+  const accessToken = String(latestAuthSession.accessToken || '').trim();
+  if (!accessToken) {
+    return 'no-session';
+  }
+
+  try {
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    return error || !data.user ? 'invalid' : 'valid';
+  } catch (error) {
+    console.warn('[secureModelProxy] Failed to verify current Supabase user after Invalid JWT:', error);
+    return 'unknown';
+  }
+}
+
+async function handleInvalidJwtSessionState(feature: string): Promise<InvalidJwtLocalSessionState> {
+  const localSessionState = await inspectLocalSessionForInvalidJwt();
+  console.warn(
+    `[secureModelProxy] Local Supabase session state after Invalid JWT during ${feature}: ${localSessionState}`,
+  );
+
+  if (localSessionState === 'invalid' || localSessionState === 'no-session') {
+    requestAuthSessionInvalidation(`${feature}: user-route-proxy returned Invalid JWT`);
+  }
+
+  return localSessionState;
+}
+
+async function resolveLatestLocalFallbackAccessToken(
+  activeAccessToken: string,
+): Promise<string | null> {
+  const authEventAccessToken = String(getLatestAuthSessionChange()?.accessToken || '').trim();
+  if (authEventAccessToken) {
+    if (authEventAccessToken !== activeAccessToken) {
+      console.warn(
+        '[secureModelProxy] Switching local user-route fallback to the freshest browser Supabase access token.',
+      );
+    }
+    return authEventAccessToken;
+  }
+
+  try {
+    const currentSession = await readCloudSession('local user-route fallback');
+    const currentSessionAccessToken = String(currentSession?.access_token || '').trim();
+    if (currentSessionAccessToken) {
+      if (currentSessionAccessToken !== activeAccessToken) {
+        console.warn(
+          '[secureModelProxy] Switching local user-route fallback to the current Supabase session access token.',
+        );
+      }
+      return currentSessionAccessToken;
+    }
+  } catch (error) {
+    console.warn('[secureModelProxy] Failed to read current session for local user-route fallback:', error);
+  }
+
+  return String(activeAccessToken || '').trim() || null;
+}
+
+async function tryLocalUserRouteApiFallback(
+  feature: string,
+  accessToken: string,
+  body: Record<string, unknown>,
+  localSessionState: InvalidJwtLocalSessionState,
+): Promise<LocalUserRouteProxyHttpResult | null> {
+  if (localSessionState !== 'valid' || !shouldUseLocalUserRouteApi()) {
+    return null;
+  }
+
+  const fallbackAccessToken = await resolveLatestLocalFallbackAccessToken(accessToken);
+  if (!fallbackAccessToken) {
+    return null;
+  }
+
+  console.warn(
+    `[secureModelProxy] ${feature} will retry via local KK API user-route proxy because the local Supabase session is still valid.`,
+  );
+
+  try {
+    return await invokeLocalUserRouteApiHttp(fallbackAccessToken, body);
+  } catch (error) {
+    console.warn('[secureModelProxy] Local KK API user-route fallback failed:', error);
+    return null;
+  }
 }
 
 async function invokeLocalUserRouteProxyHttp(
@@ -678,6 +973,35 @@ async function invokeLocalUserRouteProxyHttp(
     },
     body: JSON.stringify(body),
   }, 'user-route-proxy');
+
+  let payload: any = null;
+  let responseBody = '';
+  try {
+    responseBody = await response.clone().text();
+    payload = responseBody ? JSON.parse(responseBody) : null;
+  } catch {
+    payload = null;
+  }
+
+  return {
+    response,
+    payload,
+    responseBody,
+  };
+}
+
+async function invokeLocalUserRouteApiHttp(
+  accessToken: string,
+  body: Record<string, unknown>,
+): Promise<LocalUserRouteProxyHttpResult> {
+  const response = await fetchWithTransientProxyRetry(getLocalUserRouteApiEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  }, 'local-user-route-api');
 
   let payload: any = null;
   let responseBody = '';
@@ -724,20 +1048,38 @@ async function invokeLocalSystemProxyHttp(
   };
 }
 
+function resolveLocalUserRouteTransportTarget(): LocalUserRouteTransportTarget {
+  if (shouldUseLocalUserRouteApi()) {
+    return {
+      endpointName: 'local-user-route-api',
+      failureLabel: 'local KK API user-route proxy',
+      invoke: invokeLocalUserRouteApiHttp,
+    };
+  }
+
+  return {
+    endpointName: 'user-route-proxy',
+    failureLabel: 'user-route proxy',
+    invoke: invokeLocalUserRouteProxyHttp,
+  };
+}
+
 async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
   const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
+  let activeAccessToken = session.accessToken;
+  const routeTarget = resolveLocalUserRouteTransportTarget();
 
   let result: LocalUserRouteProxyHttpResult;
   try {
-    result = await invokeLocalUserRouteProxyHttp(session.accessToken, body);
+    result = await routeTarget.invoke(activeAccessToken, body);
   } catch (error: any) {
     throw buildSecureProxyBoundaryError(
       isRetryableProxyFetchError(error)
-        ? 'User-route proxy is temporarily unavailable. Please try again.'
-        : error?.message || 'Failed to reach the user-route proxy.',
+        ? `${routeTarget.failureLabel} is temporarily unavailable. Please try again.`
+        : error?.message || `Failed to reach the ${routeTarget.failureLabel}.`,
       {
         code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
         status: 502,
@@ -752,15 +1094,42 @@ async function invokeLocalUserRouteProxy(
   );
 
   if (shouldRetryWithFreshSession) {
+    console.warn(
+      `[secureModelProxy] ${routeTarget.failureLabel} returned 401/Invalid JWT, forcing session refresh before retry`,
+    );
     try {
-      console.warn('[secureModelProxy] User-route proxy returned 401/Invalid JWT, forcing session refresh before retry');
       const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'user-route' });
       if (recoveredSession.accessToken) {
-        result = await invokeLocalUserRouteProxyHttp(recoveredSession.accessToken, body);
+        console.log('[secureModelProxy] Session refreshed successfully, retrying request...');
+        activeAccessToken = recoveredSession.accessToken;
+        result = await routeTarget.invoke(activeAccessToken, body);
+      } else {
+        console.warn('[secureModelProxy] Failed to recover session - no access token');
       }
     } catch (error) {
       console.warn('[secureModelProxy] Cloud session recovery failed after user-route proxy 401:', error);
-      if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
+      if (isSecureProxySessionReauthError(error)) {
+        if (isInvalidJwtResponse(result.responseBody, result.payload)) {
+          const localSessionState = await handleInvalidJwtSessionState(feature);
+          if (routeTarget.endpointName !== 'local-user-route-api') {
+            const fallbackResult = await tryLocalUserRouteApiFallback(
+              feature,
+              activeAccessToken,
+              body,
+              localSessionState,
+            );
+            if (fallbackResult) {
+              result = fallbackResult;
+              if (result.response?.ok && result.payload?.success) {
+                return result.payload.data;
+              }
+            }
+          }
+          throw buildSessionReauthError(feature, result.responseBody, 'user-route', localSessionState);
+        }
+        throw buildSessionReauthError(feature, result.responseBody, 'user-route');
+      }
+      if (isSecureProxyGuestModeError(error)) {
         throw error;
       }
     }
@@ -777,16 +1146,42 @@ async function invokeLocalUserRouteProxy(
       result.response?.status === 401
       || isInvalidJwtResponse(result.responseBody, result.payload)
     ) {
-      // Preserve the current local session for the same reason as the secure
-      // system proxy path above: a backend-side auth mismatch should not kick
-      // the user back to the login screen while their browser session still exists.
+      if (isInvalidJwtResponse(result.responseBody, result.payload)) {
+        const localSessionState = await handleInvalidJwtSessionState(feature);
+        if (routeTarget.endpointName !== 'local-user-route-api') {
+          const fallbackResult = await tryLocalUserRouteApiFallback(
+            feature,
+            activeAccessToken,
+            body,
+            localSessionState,
+          );
+          if (fallbackResult) {
+            result = fallbackResult;
+            if (result.response?.ok && result.payload?.success) {
+              return result.payload.data;
+            }
+          }
+        }
+        throw buildSessionReauthError(feature, result.responseBody, 'user-route', localSessionState);
+      }
+      // Keep the local session only when the browser's own Supabase client can
+      // still validate it. If the local client also rejects the JWT, request a
+      // clean local sign-out via AuthContext to break the stale-token loop.
       throw buildSessionReauthError(feature, result.responseBody, 'user-route');
     }
 
     throw buildSecureProxyBoundaryError(errorMessage, {
       code: errorCode === LOCAL_USER_ROUTE_NOT_FOUND_CODE
         ? LOCAL_USER_ROUTE_NOT_FOUND_CODE
-        : LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+        : errorCode === LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR_CODE
+          ? LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR_CODE
+          : errorCode === LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE
+            ? LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE
+            : errorCode === LOCAL_USER_ROUTE_INVALID_REQUEST_CODE
+              ? LOCAL_USER_ROUTE_INVALID_REQUEST_CODE
+              : errorCode === LOCAL_USER_ROUTE_UNSUPPORTED_ROUTE_CODE
+                ? LOCAL_USER_ROUTE_UNSUPPORTED_ROUTE_CODE
+                : LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
       status: result.response?.status,
       responseBody: result.responseBody,
       feature,
@@ -985,7 +1380,7 @@ export async function callSecureSystemProxyChat(
 
   return {
     content: data.content || '',
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1011,7 +1406,7 @@ export async function callLocalUserRouteProxyChat(
 
   return {
     content: data.content || '',
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1050,7 +1445,7 @@ export async function callSecureSystemProxyImage(
 
   return {
     urls: Array.isArray(data.urls) ? data.urls : [],
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1072,7 +1467,7 @@ export async function callLocalUserRouteProxyImage(
 
   return {
     urls: Array.isArray(data.urls) ? data.urls : [],
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1117,7 +1512,7 @@ export async function callSecureSystemProxyVideo(
     taskId: data.taskId || '',
     status: data.status || 'pending',
     url: data.url,
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
   };
 }
@@ -1142,7 +1537,7 @@ export async function callLocalUserRouteProxyVideo(
     taskId: data.taskId || '',
     status: data.status || 'pending',
     url: data.url,
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
   };
 }
@@ -1172,7 +1567,7 @@ export async function callSecureSystemProxyAudio(
 
   return {
     url: data.url || '',
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1190,7 +1585,7 @@ export async function callLocalUserRouteProxyAudio(
 
   return {
     url: data.url || '',
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
     endpointType: data.endpointType,
   };
@@ -1210,7 +1605,7 @@ export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<
   return {
     status: data.status || 'pending',
     url: data.url,
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
   };
 }
 
@@ -1225,6 +1620,6 @@ export async function checkLocalUserRouteProxyTaskStatus(
   return {
     status: data.status || 'pending',
     url: data.url,
-    deducted: Boolean(data.deducted),
+    ...extractSecureProxyBillingMetadata(data),
   };
 }

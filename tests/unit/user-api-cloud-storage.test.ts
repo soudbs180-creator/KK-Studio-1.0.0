@@ -13,7 +13,10 @@ import {
   upsertUserApiProviderToCloudRecord,
   upsertUserApiSlotToCloudRecord,
 } from '../../src/services/api/userApiCloudRecordStorage.ts';
-import { mergeUserApisPayload } from '../../src/services/api/userApiPayload.ts';
+import {
+  compactUserApisPayloadForTransport,
+  mergeUserApisPayload,
+} from '../../src/services/api/userApiPayload.ts';
 
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
@@ -400,6 +403,130 @@ describe('user api cloud storage helpers', () => {
     );
   });
 
+  test('strips provider pricing snapshots from user API transport payloads', () => {
+    const compacted = compactUserApisPayloadForTransport({
+      version: 2,
+      slots: [
+        {
+          id: 'slot-1',
+          key: 'slot-secret',
+          provider: 'Custom',
+          recentCalls: [
+            {
+              timestamp: 1700000000000,
+              success: true,
+            },
+          ],
+        },
+      ],
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'Oversized Provider',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'provider-secret',
+          format: 'openai',
+          isActive: true,
+          models: ['model-a'],
+          usage: {
+            totalTokens: 1,
+            totalCost: 2,
+            dailyTokens: 3,
+            dailyCost: 4,
+            lastReset: 5,
+          },
+          pricingSnapshot: {
+            fetchedAt: 1700000000000,
+            modelPrices: {
+              'model-a': 0.12,
+            },
+            rows: Array.from({ length: 1400 }, (_, index) => ({
+              model: `model-${index}`,
+              providerLabel: 'Large Provider',
+              endpointUrl: `https://provider.example.com/v1/images/${index}`,
+              description: 'x'.repeat(900),
+            })),
+            modelMeta: {
+              'model-a': {
+                providerLabel: 'Large Provider',
+              },
+            },
+            _rawData: [
+              {
+                debug: 'y'.repeat(900),
+              },
+            ],
+          },
+        },
+      ],
+      entries: [
+        {
+          ...createEntry('entry-1'),
+          debugOnly: 'drop-me',
+        },
+      ],
+    });
+
+    const compactedSlot = compacted.slots[0] as Record<string, unknown>;
+    const compactedProvider = compacted.providers[0] as Record<string, unknown>;
+    const compactedEntry = compacted.entries[0] as Record<string, unknown>;
+
+    assert.equal('recentCalls' in compactedSlot, false);
+    assert.equal('pricingSnapshot' in compactedProvider, false);
+    assert.equal('debugOnly' in compactedEntry, false);
+  });
+
+  test('trims oversized model lists until the transport payload fits within the safe budget', () => {
+    const hugeModelList = Array.from({ length: 12000 }, (_, index) => (
+      `very-large-model-${index.toString().padStart(5, '0')}-${'x'.repeat(32)}`
+    ));
+
+    const compacted = compactUserApisPayloadForTransport({
+      version: 2,
+      slots: [
+        {
+          id: 'slot-1',
+          key: 'slot-secret',
+          name: 'Large Slot',
+          provider: 'Custom',
+          type: 'proxy',
+          format: 'openai',
+          supportedModels: hugeModelList,
+        },
+      ],
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'Large Provider',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'provider-secret',
+          format: 'openai',
+          isActive: true,
+          models: hugeModelList,
+        },
+      ],
+      entries: [
+        {
+          ...createEntry('entry-1'),
+          supportedModels: hugeModelList,
+        },
+      ],
+    });
+
+    const payloadSize = Buffer.byteLength(JSON.stringify(compacted), 'utf8');
+    const compactedSlot = compacted.slots[0] as Record<string, unknown>;
+    const compactedProvider = compacted.providers[0] as Record<string, unknown>;
+    const compactedEntry = compacted.entries[0] as Record<string, unknown>;
+
+    assert.ok(payloadSize <= 900 * 1024);
+    assert.ok(Array.isArray(compactedSlot.supportedModels));
+    assert.ok(Array.isArray(compactedProvider.models));
+    assert.ok(Array.isArray(compactedEntry.supportedModels));
+    assert.ok((compactedSlot.supportedModels as unknown[]).length < hugeModelList.length);
+    assert.ok((compactedProvider.models as unknown[]).length < hugeModelList.length);
+    assert.ok((compactedEntry.supportedModels as unknown[]).length < hugeModelList.length);
+  });
+
   test('loads the combined typed API payload when cloud state and user-api entries are split across endpoints', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
@@ -776,6 +903,12 @@ describe('user api cloud storage helpers', () => {
       format: 'gemini',
       isActive: true,
     });
+
+    const unifiedRequest = api.unifiedReplaceCalls[0] as MutableEnvelope;
+    assert.equal(
+      String((unifiedRequest.providers[0] as Record<string, unknown>).apiKey || ''),
+      buildRedactedSecret('provider-1', 'apiKey'),
+    );
 
     const savedProvider = api.getCurrentPayload().providers[0];
     assert.equal(savedProvider.name, 'Updated Provider');

@@ -2,6 +2,7 @@ import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages
 import { supabase } from '../../lib/supabase.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
 import {
+  compactUserApisPayloadForTransport,
   extractKeyManagerCloudSlots,
   extractUserApiEntriesFromPayload,
   extractUserApiProvidersFromPayload,
@@ -538,21 +539,25 @@ async function persistUserApisPayloadViaApi(
   const existingPayload = normalizeEnvelope(
     existingPayloadInput ?? await loadUserApisPayloadRaw(context.userId),
   );
+  const compactExistingPayload = compactUserApisPayloadForTransport(existingPayload, {
+    maxBytes: Number.POSITIVE_INFINITY,
+  });
+  const compactNextPayload = compactUserApisPayloadForTransport(payload);
   const persistablePayload: UserApisEnvelope = {
-    version: payload.version,
-    slots: mergeRecordArrayWithPersistedSecret(existingPayload.slots, payload.slots, 'key'),
-    providers: mergeRecordArrayWithPersistedSecret(existingPayload.providers, payload.providers, 'apiKey'),
-    entries: mergeRecordArrayWithPersistedSecret(existingPayload.entries, payload.entries, 'key'),
+    version: compactNextPayload.version,
+    slots: mergeRecordArrayWithPersistedSecret(compactExistingPayload.slots, compactNextPayload.slots, 'key'),
+    providers: mergeRecordArrayWithPersistedSecret(compactExistingPayload.providers, compactNextPayload.providers, 'apiKey'),
+    entries: mergeRecordArrayWithPersistedSecret(compactExistingPayload.entries, compactNextPayload.entries, 'key'),
   };
 
   const slotsChanged =
-    persistablePayload.version !== existingPayload.version
-    || !arraysEqual(persistablePayload.slots, existingPayload.slots)
-    || !arraysEqual(persistablePayload.providers, existingPayload.providers);
-  const entriesChanged = !arraysEqual(persistablePayload.entries, existingPayload.entries);
+    persistablePayload.version !== compactExistingPayload.version
+    || !arraysEqual(persistablePayload.slots, compactExistingPayload.slots)
+    || !arraysEqual(persistablePayload.providers, compactExistingPayload.providers);
+  const entriesChanged = !arraysEqual(persistablePayload.entries, compactExistingPayload.entries);
 
   if (!slotsChanged && !entriesChanged) {
-    return setCachedUserApisPayload(context.userId, existingPayload) || existingPayload;
+    return setCachedUserApisPayload(context.userId, compactExistingPayload) || normalizeEnvelope(compactExistingPayload);
   }
 
   invalidateCachedUserApisPayload(context.userId);

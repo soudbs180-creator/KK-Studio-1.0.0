@@ -323,9 +323,9 @@ export function resolveServerSupabaseConfig(): ServerSupabaseConfig {
   const resolvedSupabaseUrl = explicitSupabaseUrl || publicSupabaseUrl;
   const serviceRoleKey = resolveServiceRoleKey();
   const authKey =
-    serviceRoleKey.value
-    || normalizeOptionalEnvValue(env.get("SUPABASE_ANON_KEY"))
-    || normalizeOptionalEnvValue(env.get("VITE_SUPABASE_ANON_KEY"));
+    normalizeOptionalEnvValue(env.get("SUPABASE_ANON_KEY"))
+    || normalizeOptionalEnvValue(env.get("VITE_SUPABASE_ANON_KEY"))
+    || serviceRoleKey.value;
   const userApiEncryptionSecret =
     normalizeOptionalEnvValue(env.get("USER_API_ENCRYPTION_SECRET"))
     || normalizeOptionalEnvValue(env.get("PROFILE_USER_APIS_ENCRYPTION_SECRET"));
@@ -490,10 +490,12 @@ export function summarizeServerSupabaseConfig(
   } = {},
 ) {
   const probe = options.persistenceProbe;
-  const blockers = dedupeStrings([
-    ...(Array.isArray(config.blockers) && config.blockers.length > 0
+  const structuralBlockers =
+    Array.isArray(config.blockers) && config.blockers.length > 0
       ? [...config.blockers]
-      : resolveBlockers(config)),
+      : resolveBlockers(config);
+  const blockers = dedupeStrings([
+    ...structuralBlockers,
     ...(probe?.blockers || []),
   ]);
 
@@ -511,6 +513,12 @@ export function summarizeServerSupabaseConfig(
     publicSupabaseProjectRef: config.publicSupabaseProjectRef,
     projectRefMatches: config.projectRefMatches,
     persistenceProbeCheckedAt: probe?.checkedAt,
+    canonicalConfigReady: Boolean(
+      config.supabaseUrl
+      && config.serviceRoleKey
+      && config.serviceRoleKeyStatus === "valid"
+      && config.projectRefMatches !== false
+    ),
     canonicalPersistenceReady: Boolean(
       config.supabaseUrl
       && config.serviceRoleKey
@@ -518,6 +526,7 @@ export function summarizeServerSupabaseConfig(
       && config.projectRefMatches !== false
       && (!probe || probe.blockers.length === 0)
     ),
+    structuralBlockers,
     blockers,
   };
 }

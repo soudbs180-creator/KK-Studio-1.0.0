@@ -18,6 +18,9 @@ test("run-api-dev only uses primary env files and fails fast on missing canonica
   assert.match(bootstrapSource, /looks like a database password copied from the connection string/);
   assert.match(bootstrapSource, /apps\/api\/\.env\.local\.example/);
   assert.match(bootstrapSource, /Point both to the same Supabase project/);
+  assert.match(bootstrapSource, /KK_API_PROFILE_MAX_JSON_BODY_BYTES/);
+  assert.match(bootstrapSource, /KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES/);
+  assert.match(bootstrapSource, /applyLocalApiBodyLimitDefaults\(\)/);
   assert.doesNotMatch(bootstrapSource, /server", "\.env/);
 
   assert.match(cliSource, /from "\.\/lib\/local-api-bootstrap\.mjs"/);

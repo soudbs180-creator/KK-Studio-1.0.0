@@ -3,9 +3,13 @@
 此目录用于存放 **KK Studio 项目级 AI 修改规则**，目标是让任何代理或代码助手在修改本项目时，都能优先遵循统一的工程、UI、版本与验证规范。
 
 ## 当前项目基线
-- **项目版本**：`1.4.0`
-- **最后更新**：`2026-03-24`
+- **项目版本**：`1.4.1`
+- **最后更新**：`2026-04-07`
+- **仓库级入口**：`AGENTS.md`
+- **AI 快速入口**：`.agent/AGENT-QUICKSTART.md`
 - **规则主文件**：`.agent/rules/skills/SKILL.md`
+- **Cadence 专项补充**：`.agent/rules/skills/cadence-skill/SKILL.md`
+- **供应商路由专项补充**：`.agent/rules/skills/vendor-routing/SKILL.md`
 
 ## 规则作用
 - 统一 UI / 交互 / 文案风格
@@ -39,6 +43,17 @@ npm run build
 
 ## 说明
 `SKILL.md` 是详细规则总纲；本 README 负责说明当前基线版本和“修改时必须同步什么”。
+- 对支持仓库级入口约定的 AI 代理，优先从 `AGENTS.md` 进入。
+- 对需要更快定位规则的代理，优先读 `.agent/AGENT-QUICKSTART.md`。
+- 涉及 Cadence Virtuoso / CIW / OA 数据库相关的 `SKILL` 脚本时，优先同时参考 `.agent/rules/skills/cadence-skill/SKILL.md`。
+
+## 规则拆分
+- 总纲：`.agent/rules/skills/SKILL.md`
+- Cadence SKILL 专项规则：`.agent/rules/skills/cadence-skill/SKILL.md`
+- 供应商路由专项规则：`.agent/rules/skills/vendor-routing/SKILL.md`
+- 当任务明确要求输出 Cadence Virtuoso / CIW / OA 数据库脚本时，优先遵循专项规则，再回到总纲查看通用要求。
+- Cadence 专项规则已内置常用模板与任务型模板，可直接参考选择集处理、几何创建、对象清理、CIW 调试，以及批量移动 / 按图层删除 / 批量加 label / 从 selection 生成图形的脚本骨架。
+- 当任务涉及 `12AI`、`GPT Best`、`New Suxi AI`、多协议代理、模型探测或协议回退时，优先遵循供应商路由专项规则，再回到总纲查看通用要求。
 
 ## Gemini 开发补充
 - 涉及 Gemini 官方通道、Gemini 原生协议、OpenAI 兼容代理、Imagen、Veo 时，优先参考 `docs/development/gemini-agent-guide.md`

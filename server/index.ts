@@ -11,14 +11,13 @@ try {
     const bodyParser = require('body-parser')
     app.use(bodyParser.json())
   } catch {
-    // 允许在极简环境下继续跑
+    // 允许缺少 body-parser 时退回 express 内置 JSON 解析
+    app.use(express.json())
   }
-} catch {
-  app = {
-    post: (_path: string, _handler: Function) => {},
-    use: () => {},
-    listen: (_port: number, _cb?: Function) => _cb?.(),
-  }
+} catch (error) {
+  throw new Error(
+    `Legacy server cannot start because express is unavailable: ${error instanceof Error ? error.message : String(error)}`
+  )
 }
 import { mountBillingRoutes } from './billing_routes.ts'
 import { mountTurnstileRoutes } from './turnstile_routes.ts'

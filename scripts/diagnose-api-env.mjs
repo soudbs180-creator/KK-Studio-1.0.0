@@ -10,6 +10,8 @@ import {
 } from "./lib/env-contract.mjs";
 
 const rootPath = resolveRepoRoot(import.meta.url);
+const DEFAULT_JSON_BODY_MAX_BYTES = 1024 * 1024;
+const DEFAULT_PROFILE_JSON_BODY_MAX_BYTES = 4 * 1024 * 1024;
 
 function printKeyStatus(label, record) {
   if (!record) {
@@ -18,6 +20,11 @@ function printKeyStatus(label, record) {
   }
 
   console.log(`- ${label}: ${summarizeValue(record.value)} from ${record.source}`);
+}
+
+function parsePositiveInteger(rawValue, fallback) {
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 async function fetchHealth() {
@@ -48,6 +55,9 @@ async function run() {
     "SUPABASE_SECRET_KEY",
     "SUPABASE_ANON_KEY",
     "USER_API_ENCRYPTION_SECRET",
+    "KK_API_MAX_JSON_BODY_BYTES",
+    "KK_API_PROFILE_MAX_JSON_BODY_BYTES",
+    "KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES",
   ];
   const misplacedRootServerEnv = findSnapshotEntries(snapshots.frontendSnapshots, apiServerKeys);
 
@@ -75,6 +85,17 @@ async function run() {
   apiServerKeys.forEach((key) => {
     printKeyStatus(key, getEffectiveValue(snapshots.apiSnapshots, key));
   });
+  const configuredGlobalBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_MAX_JSON_BODY_BYTES")?.value;
+  const configuredProfileBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_PROFILE_MAX_JSON_BODY_BYTES")?.value;
+  const configuredKeyManagerBodyLimit = getEffectiveValue(snapshots.apiSnapshots, "KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES")?.value;
+  const effectiveGlobalBodyLimit = parsePositiveInteger(configuredGlobalBodyLimit, DEFAULT_JSON_BODY_MAX_BYTES);
+  const effectiveProfileBodyLimit = parsePositiveInteger(
+    configuredProfileBodyLimit || configuredKeyManagerBodyLimit,
+    Math.max(effectiveGlobalBodyLimit, DEFAULT_PROFILE_JSON_BODY_MAX_BYTES),
+  );
+  console.log("[diagnose-api-env] Local API JSON body limits:");
+  console.log(`- default routes: ${effectiveGlobalBodyLimit} bytes`);
+  console.log(`- profile persistence routes: ${effectiveProfileBodyLimit} bytes`);
   const serverKey =
     getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SERVICE_ROLE_KEY")?.value
     || getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SECRET_KEY")?.value;

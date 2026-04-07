@@ -3,7 +3,6 @@ import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata } fro
 import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
-import { getModelDisplayName } from '../../services/model/modelCapabilities';
 import { notify } from '../../services/system/notificationService';
 import { getImage } from '../../services/storage/imageStorage';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
@@ -15,6 +14,8 @@ import { resolveDisplayedProviderLabel } from '../../utils/providerDisplay';
 import { isCreditBillingTarget } from '../../utils/creditBilling';
 import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { pickByDocumentLanguage } from '../../utils/localeText';
+import { resolveModelDisplayName } from '../../utils/modelDisplayName';
+import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -731,6 +732,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     ).trim();
     const shellReferenceImages = node.referenceImages?.slice(0, isThumbnailShell ? 1 : 2) || [];
     const stackZIndex = stackZIndexOverride ?? getPromptStackZIndex(node, isSelected, groupLayerZIndex);
+    const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
     const cardSurfaceZIndex = (node.isGenerating || showError)
         ? stackZIndex + 120
         : stackZIndex;
@@ -934,13 +936,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         <div
             ref={containerRef}
             className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
-                style={isChatMode ? {
-                    opacity: 1,
-                } : {
-                    left: renderLeft - originX,
-                    top: renderTop - originY,
-                    opacity: 1,
-                    cursor: isDragging ? 'grabbing' : 'grab',
+            style={isChatMode ? {
+                opacity: 1,
+            } : {
+                left: renderLeft - originX,
+                top: renderTop - originY,
+                zIndex: effectiveStackZIndex,
+                opacity: 1,
+                cursor: isDragging ? 'grabbing' : 'grab',
                 willChange: isDragging ? 'transform, left, top' : 'auto', // 🚀 [性能优化] 拖拽时启用GPU加速
                 transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                 pointerEvents: 'auto',
@@ -1660,7 +1663,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                     >
                                                         {(() => {
                                                             const modelId = node.model || '';
-                                                            const modelText = node.modelLabel || getModelDisplayName(modelId);
+                                                            const modelText = resolveModelDisplayName(modelId, node.modelLabel);
                                                             const providerText = resolveDisplayedProviderLabel(node) || (modelId.includes('@') ? modelId.split('@')[1] : 'Google');
                                                             const modelBadge = getModelBadgeInfo({
                                                                 id: modelId,

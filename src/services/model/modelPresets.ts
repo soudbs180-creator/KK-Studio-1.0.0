@@ -10,7 +10,7 @@ export const MODEL_PRESETS: ModelPreset[] = [
     // ============================================
     // Gemini image models
     // ============================================
-    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image', provider: 'Google', type: 'image', description: 'Fast official Google image generation model.' },
+    { id: 'gemini-2.5-flash-image', label: 'Nano Banana', provider: 'Google', type: 'image', description: 'Classic fast Google image generation model.' },
     { id: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2', provider: 'Google', type: 'image', description: 'Preview image model with stronger reference-image support.' },
     { id: 'gemini-3-pro-image-preview', label: 'Nano Banana Pro', provider: 'Google', type: 'image', description: 'Higher quality Google image generation preview model.' },
 

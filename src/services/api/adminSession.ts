@@ -9,7 +9,7 @@ interface StoredAdminSession {
 }
 
 function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 }
 
 function emitAdminSessionChange() {
@@ -58,7 +58,7 @@ function readStoredAdminSession(): StoredAdminSession | undefined {
     return undefined;
   }
 
-  const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
   if (!raw) {
     return undefined;
   }
@@ -66,13 +66,13 @@ function readStoredAdminSession(): StoredAdminSession | undefined {
   try {
     const parsed = normalizeStoredAdminSession(JSON.parse(raw));
     if (!parsed || hasSessionExpired(parsed.expiresAt)) {
-      window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
       return undefined;
     }
 
     return parsed;
   } catch {
-    window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
     return undefined;
   }
 }
@@ -105,12 +105,12 @@ export function setStoredAdminSession(token?: string, expiresAt?: string, userId
     expiresAt: String(expiresAt || "").trim() || undefined,
     userId: String(userId || "").trim() || undefined,
   });
-  const previousValue = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+  const previousValue = window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
   if (previousValue === nextValue) {
     return;
   }
 
-  window.localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, nextValue);
+  window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, nextValue);
   emitAdminSessionChange();
 }
 
@@ -119,10 +119,10 @@ export function clearStoredAdminSession() {
     return;
   }
 
-  if (!window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY)) {
+  if (!window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY)) {
     return;
   }
 
-  window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
   emitAdminSessionChange();
 }

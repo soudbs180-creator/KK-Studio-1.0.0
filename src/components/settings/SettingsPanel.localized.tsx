@@ -21,6 +21,10 @@ import { useAdminRole } from '../../hooks/useAdminRole';
 import { SettingsSkeletonDashboard, SettingsSkeletonNav } from './views/SettingsSkeleton';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
 import { type AppLanguage, pickByLanguage, useLocale } from '../../context/LocaleContext';
+import {
+  deriveApiManagementListStateFromPath,
+  isApiManagementEditorRoute,
+} from './apiManagementRouteState';
 
 const DashboardView = lazy(() => import('./views/DashboardView.localized.tsx'));
 const ApiSettingsView = lazy(() => import('./ApiSettingsView'));
@@ -731,11 +735,26 @@ const SettingsMobileShell: React.FC<{
   navQuery: string;
   onQueryChange: (value: string) => void;
   onNavigate: (view: CanonicalSettingsViewId) => void;
+  onBackToApiManagement: () => void;
   onClose: () => void;
   initialSupplier: Supplier | null;
   showNav: boolean;
   setShowNav: (value: boolean) => void;
-}> = ({ sections, items, activeView, navQuery, onQueryChange, onNavigate, onClose, initialSupplier, showNav, setShowNav }) => {
+  isApiManagementEditorRoute: boolean;
+}> = ({
+  sections,
+  items,
+  activeView,
+  navQuery,
+  onQueryChange,
+  onNavigate,
+  onBackToApiManagement,
+  onClose,
+  initialSupplier,
+  showNav,
+  setShowNav,
+  isApiManagementEditorRoute,
+}) => {
   const { pick } = useLocale();
   const fallbackNavItem: NavItem = {
     id: 'dashboard',
@@ -753,13 +772,27 @@ const SettingsMobileShell: React.FC<{
     setShowNav(false);
   };
 
+  const handleLeadingAction = () => {
+    if (showNav) {
+      onClose();
+      return;
+    }
+
+    if (isApiManagementEditorRoute) {
+      onBackToApiManagement();
+      return;
+    }
+
+    setShowNav(true);
+  };
+
   return (
     <div className="settings-shell-mobile" onClick={(event) => event.stopPropagation()}>
       <div className="settings-shell-mobile__topbar">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <button
             type="button"
-            onClick={() => (showNav ? onClose() : setShowNav(true))}
+            onClick={handleLeadingAction}
             className="apple-icon-button h-11 w-11 shrink-0 rounded-2xl"
             aria-label={showNav ? pick('关闭设置', 'Close settings') : pick('返回设置导航', 'Back to settings navigation')}
           >
@@ -838,6 +871,11 @@ const SettingsRouterShell: React.FC<{
   const [showNav, setShowNav] = useState(resolveViewId(initialView) === 'dashboard');
   const [refreshKey, setRefreshKey] = useState(0);
   const canAccessAdmin = !authLoading && !checkingAdmin && isAdmin;
+  const nestedApiEditorRoute = isApiManagementEditorRoute(location.pathname);
+  const nestedApiListState = useMemo(
+    () => deriveApiManagementListStateFromPath(location.pathname),
+    [location.pathname],
+  );
   const navItems = useMemo(() => getNavItems(language), [language]);
   const navSections = useMemo(() => getNavSections(language), [language]);
   const visibleNavItems = useMemo(
@@ -883,6 +921,13 @@ const SettingsRouterShell: React.FC<{
     setRefreshKey((current) => current + 1);
   };
 
+  const handleBackToApiManagement = () => {
+    navigate('/settings/api-management', {
+      state: nestedApiListState || undefined,
+    });
+    setShowNav(false);
+  };
+
   return isMobile ? (
     <SettingsMobileShell
       sections={visibleNavSections}
@@ -891,10 +936,12 @@ const SettingsRouterShell: React.FC<{
       navQuery={navQuery}
       onQueryChange={setNavQuery}
       onNavigate={handleNavigate}
+      onBackToApiManagement={handleBackToApiManagement}
       onClose={onClose}
       initialSupplier={initialSupplier}
       showNav={showNav}
       setShowNav={setShowNav}
+      isApiManagementEditorRoute={nestedApiEditorRoute}
     />
   ) : (
     <SettingsDesktopShell

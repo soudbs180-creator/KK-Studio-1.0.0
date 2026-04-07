@@ -25,6 +25,7 @@ import {
   DEFAULT_CREDITS_PER_USD,
   buildAdminModelCreditSuggestion,
 } from '../../services/model/adminModelAdvisor';
+import { refreshAdminModelCatalogSafely } from '../../services/model/adminModelCatalogRefresh';
 import { adminModelService } from '../../services/model/adminModelService';
 import { getModelCapabilities } from '../../services/model/modelCapabilities';
 import { unifiedModelService } from '../../services/model/unifiedModelService';
@@ -632,10 +633,12 @@ const CreditModelSettings: React.FC = () => {
     void load();
   }, []);
 
-  const refreshAdminModelSync = async () => {
-    await adminModelService.forceLoadAdminModels();
-    await unifiedModelService.refreshModels();
-  };
+  const refreshAdminModelSync = async () => (
+    refreshAdminModelCatalogSafely({
+      forceLoadAdminModels: () => adminModelService.forceLoadAdminModels(),
+      refreshUnifiedModels: () => unifiedModelService.refreshModels(),
+    })
+  );
 
   useEffect(() => {
     if (!selectedProviderId) return;
@@ -916,7 +919,13 @@ const CreditModelSettings: React.FC = () => {
       );
       await load();
       setSelectedProviderId(providerId);
-      await refreshAdminModelSync();
+      const refreshResult = await refreshAdminModelSync();
+      if (!refreshResult.ok) {
+        notify.warning(
+          '保存已完成，目录待刷新',
+          `供应商配置已经保存，但模型目录刷新失败：${refreshResult.message || '请稍后手动刷新。'}`
+        );
+      }
     } catch (error: any) {
       notify.error('保存失败', error.message || '请检查 Supabase 权限和 RPC');
     } finally {
@@ -931,6 +940,13 @@ const CreditModelSettings: React.FC = () => {
       notify.success('删除成功', '供应商积分模型已删除');
       if (selectedProviderId === providerId) resetForm();
       await load();
+      const refreshResult = await refreshAdminModelSync();
+      if (!refreshResult.ok) {
+        notify.warning(
+          '删除已完成，目录待刷新',
+          `供应商已删除，但模型目录刷新失败：${refreshResult.message || '请稍后手动刷新。'}`
+        );
+      }
     } catch (error: any) {
       notify.error('删除失败', error.message || '请使用正确权限后重试');
     }

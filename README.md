@@ -1,4 +1,4 @@
-# KK Studio v1.4.0
+# KK Studio v1.4.1
 
 KK Studio is a multimodal canvas workspace for image, video, audio, and presentation workflows. It combines prompt authoring, model routing, user API management, workspace sync, and operational tooling in a single app.
 
@@ -26,6 +26,13 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 5. Start the local stack with `npm run dev:start`.
 
 The local API startup is now strict: it only reads root `.env` / `.env.local` and `apps/api/.env` / `apps/api/.env.local`, and it intentionally ignores legacy `server/.env` files.
+
+For local API JSON body limits, the default startup behavior is:
+
+- `KK_API_MAX_JSON_BODY_BYTES=1048576` for standard routes.
+- `KK_API_PROFILE_MAX_JSON_BODY_BYTES=4194304` for `/api/v1/profile/user-apis`, `/api/v1/profile/user-apis/payload`, and `/api/v1/profile/key-manager-state`.
+
+If you need to inspect the currently effective values, run `npm run api:diagnose`.
 
 ## Common Commands
 

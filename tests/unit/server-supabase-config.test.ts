@@ -73,6 +73,20 @@ test("server supabase config summarizes aligned canonical persistence", () => {
   assert.deepEqual(summary.blockers, []);
 });
 
+test("server supabase config prefers the anon auth key for user-scoped auth checks", () => {
+  resetEnv({
+    VITE_SUPABASE_URL: "https://aligned-ref.supabase.co",
+    SUPABASE_URL: "https://aligned-ref.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test_key",
+    SUPABASE_ANON_KEY: "anon-key",
+    VITE_SUPABASE_ANON_KEY: "publishable-anon",
+  });
+
+  const config = resolveServerSupabaseConfig();
+
+  assert.equal(config.authKey, "anon-key");
+});
+
 test("server supabase config detects project ref mismatch and throws a readable error", () => {
   resetEnv({
     VITE_SUPABASE_URL: "https://frontend-ref.supabase.co",

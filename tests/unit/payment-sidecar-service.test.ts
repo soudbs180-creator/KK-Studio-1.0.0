@@ -66,7 +66,7 @@ describe("payment sidecar service", () => {
       currency: "CNY",
       creditAmount: 125,
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-sidecar-1",
     }, {
       requestId: "req-sidecar-create-1",
@@ -80,7 +80,7 @@ describe("payment sidecar service", () => {
       currency: "CNY",
       creditAmount: 125,
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-sidecar-1",
     }, {
       requestId: "req-sidecar-create-2",
@@ -111,7 +111,7 @@ describe("payment sidecar service", () => {
       currency: "CNY",
       creditAmount: 8000,
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-sidecar-credit-resolve-1",
     }, {
       requestId: "req-sidecar-credit-resolve-1",
@@ -139,7 +139,7 @@ describe("payment sidecar service", () => {
       amount: "6.00",
       currency: "CNY",
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-sidecar-credit-omitted-1",
     }, {
       requestId: "req-sidecar-credit-omitted-1",
@@ -168,7 +168,7 @@ describe("payment sidecar service", () => {
       currency: "CNY",
       creditAmount: 25,
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-sidecar-paid-1",
     }, {
       requestId: "req-sidecar-paid-create",
@@ -234,7 +234,7 @@ describe("payment sidecar legacy routes", () => {
       amount: "8.00",
       currency: "CNY",
       returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       idempotencyKey: "idem-missing-auth",
     }, {
       "x-request-id": "req-sidecar-auth-missing",
@@ -299,7 +299,7 @@ describe("payment sidecar legacy routes", () => {
         userId: "legacy-user-bridge-1",
         amount: "12",
         returnUrl: "https://kkai.plus/pay/success",
-        notifyUrl: "https://payment.kkai.plus/payment/v1/callbacks/alipay",
+        notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
       }),
       {
         [AUTHENTICATED_USER_ID_HEADER]: "legacy-user-bridge-1",

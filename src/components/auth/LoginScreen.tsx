@@ -7,24 +7,27 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Lock,
   Mail,
   QrCode,
   Sparkles,
 } from 'lucide-react';
-import { Chrome } from 'lucide-react';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
 import { buildAuthRedirectUrl } from '../../config/authRedirect';
 import { TURNSTILE_ENABLED, TURNSTILE_HAS_SITE_KEY } from '../../config/turnstile';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useLocale } from '../../context/LocaleContext';
 import { useTheme } from '../../context/ThemeContext';
 import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
 import { startWechatLogin } from '../../services/auth/wechatAuth';
 import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
+import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
+import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import './LoginScreen.css';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
@@ -49,10 +52,6 @@ type IdleSchedulerWindow = Window & typeof globalThis & {
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DeferredAuthShaderBackground = lazy(() => import('@/components/ui/animated-shader-background'));
-const TURNSTILE_MISSING_SITE_KEY_MESSAGE =
-  '当前部署未配置 Turnstile 前端 Site Key，请在 Vercel 项目环境变量中添加 VITE_TURNSTILE_SITE_KEY 后重新部署。';
-const TURNSTILE_DISABLED_MESSAGE =
-  '当前部署已禁用 Turnstile，但服务端仍要求验证码，请检查 VITE_TURNSTILE_ENABLED 与登录风控配置。';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -73,56 +72,36 @@ function isCaptchaError(error: unknown): boolean {
   );
 }
 
-function mapAuthError(error: unknown, view: AuthView): string {
-  const message = String((error as { message?: string }).message || '');
-
-  if (isCaptchaError(error)) {
-    return '当前请求需要先完成人机验证，请等待 Turnstile 组件验证完成后再试。';
-  }
-  if (view === 'register' && (message.includes('User already registered') || message.includes('already registered'))) {
-    return '该邮箱已注册，请直接登录。';
-  }
-  if (view === 'register' && message.includes('Database error saving new user')) {
-    return '注册服务当前配置异常，用户资料初始化失败，请联系管理员执行最新的 Supabase 迁移。';
-  }
-  if (message.includes('Invalid login credentials')) {
-    return '邮箱或密码错误。';
-  }
-  if (message.includes('Email not confirmed')) {
-    return '请先完成邮箱验证后再登录。';
-  }
-  if (message.includes('Password should be at least')) {
-    return '密码长度至少 6 位。';
-  }
-  if (message.includes('For security purposes')) {
-    return '操作过于频繁，请稍后再试。';
-  }
-  return message || '操作失败，请重试。';
-}
-
-function validateFields(view: AuthView, email: string, password: string, confirmPassword: string): FieldErrors {
+function validateFields(
+  view: AuthView,
+  email: string,
+  password: string,
+  confirmPassword: string,
+  language: ResolvedLanguage,
+): FieldErrors {
   const errors: FieldErrors = {};
   const emailValue = email.trim();
+  const pickText = <T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en);
 
   if (!emailValue) {
-    errors.email = '请输入邮箱地址。';
+    errors.email = pickText('请输入邮箱地址。', 'Enter your email address.');
   } else if (!EMAIL_RE.test(emailValue)) {
-    errors.email = '邮箱格式不正确。';
+    errors.email = pickText('邮箱格式不正确。', 'Enter a valid email address.');
   }
 
   if (view !== 'forgot-password') {
     if (!password) {
-      errors.password = '请输入登录密码。';
+      errors.password = pickText('请输入登录密码。', 'Enter your password.');
     } else if (password.length < 6) {
-      errors.password = '密码长度至少 6 位。';
+      errors.password = pickText('密码长度至少 6 位。', 'Password must be at least 6 characters.');
     }
   }
 
   if (view === 'register') {
     if (!confirmPassword) {
-      errors.confirmPassword = '请再次输入密码。';
+      errors.confirmPassword = pickText('请再次输入密码。', 'Enter your password again.');
     } else if (confirmPassword !== password) {
-      errors.confirmPassword = '两次输入的密码不一致。';
+      errors.confirmPassword = pickText('两次输入的密码不一致。', 'The two passwords do not match.');
     }
   }
 
@@ -131,6 +110,7 @@ function validateFields(view: AuthView, email: string, password: string, confirm
 
 const LoginScreen: React.FC = () => {
   const { loginAsTempUser } = useAuth();
+  const { language } = useLocale();
   const { resolvedTheme } = useTheme();
   const turnstileAvailable = canUseTurnstile();
   const turnstileMissingSiteKey = TURNSTILE_ENABLED && !TURNSTILE_HAS_SITE_KEY;
@@ -142,7 +122,7 @@ const LoginScreen: React.FC = () => {
     handleError,
     handleExpire,
     reset: resetTurnstile,
-  } = useTurnstile();
+  } = useTurnstile(language);
 
   const [view, setView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
@@ -167,22 +147,23 @@ const LoginScreen: React.FC = () => {
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
   const [showShaderBackground, setShowShaderBackground] = useState(false);
+  const t = useCallback(<T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en), [language]);
 
   const resolveAuthErrorMessage = useCallback(
     (authError: unknown, targetView: AuthView) => {
       if (isCaptchaError(authError)) {
         if (turnstileMissingSiteKey) {
-          return TURNSTILE_MISSING_SITE_KEY_MESSAGE;
+          return getTurnstileMissingSiteKeyMessage(language);
         }
 
         if (!TURNSTILE_ENABLED) {
-          return TURNSTILE_DISABLED_MESSAGE;
+          return getTurnstileDisabledMessage(language);
         }
       }
 
-      return mapAuthError(authError, targetView);
+      return mapAuthErrorMessage(language, authError, targetView);
     },
-    [turnstileMissingSiteKey]
+    [language, turnstileMissingSiteKey]
   );
 
   useEffect(() => {
@@ -198,14 +179,18 @@ const LoginScreen: React.FC = () => {
     root.classList.add('auth-screen-active', authThemeClass);
     body.style.background = backgroundColor;
     root.style.background = backgroundColor;
-    root.style.colorScheme = resolvedTheme;
+    root.style.setProperty('color-scheme', resolvedTheme);
 
     return () => {
       body.classList.remove('auth-screen-active', authThemeClass);
       root.classList.remove('auth-screen-active', authThemeClass);
       body.style.background = previousBodyBackground;
       root.style.background = previousRootBackground;
-      root.style.colorScheme = previousColorScheme;
+      if (previousColorScheme) {
+        root.style.setProperty('color-scheme', previousColorScheme);
+      } else {
+        root.style.removeProperty('color-scheme');
+      }
     };
   }, [resolvedTheme]);
 
@@ -214,10 +199,10 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
-    void ensureTurnstileScript().catch(() => {
+    void ensureTurnstileScript(language).catch(() => {
       // Widget 内部会显示更具体的错误信息
     });
-  }, [turnstileAvailable]);
+  }, [language, turnstileAvailable]);
 
   useEffect(() => {
     const idleWindow = window as IdleSchedulerWindow;
@@ -256,7 +241,7 @@ const LoginScreen: React.FC = () => {
     if (turnstileAvailable && window.turnstile?.render) {
       scheduleShaderReveal();
     } else if (turnstileAvailable) {
-      void ensureTurnstileScript()
+      void ensureTurnstileScript(language)
         .catch(() => {
           // Widget internals surface the actual loading error.
         })
@@ -289,11 +274,11 @@ const LoginScreen: React.FC = () => {
         window.clearTimeout(fallbackHandle);
       }
     };
-  }, [turnstileAvailable]);
+  }, [language, turnstileAvailable]);
 
   const localErrors = useMemo(
-    () => validateFields(view, email, password, confirmPassword),
-    [view, email, password, confirmPassword]
+    () => validateFields(view, email, password, confirmPassword, language),
+    [view, email, password, confirmPassword, language]
   );
 
   const stars = useMemo<StarPoint[]>(
@@ -312,14 +297,23 @@ const LoginScreen: React.FC = () => {
 
   const turnstileAction = view === 'forgot-password' ? 'reset-password' : view;
   const turnstileHint = turnstileMissingSiteKey
-    ? TURNSTILE_MISSING_SITE_KEY_MESSAGE
+    ? getTurnstileMissingSiteKeyMessage(language)
     : turnstileError
       ? turnstileError
     : captchaRequiredByBackend && !turnstileToken
-      ? '当前请求需要先完成人机验证，验证通过后再提交。'
+      ? t(
+        '当前请求需要先完成人机验证，验证通过后再提交。',
+        'Complete the CAPTCHA verification before submitting this request.',
+      )
       : turnstileToken
-        ? '安全验证已完成，提交时会自动携带 captchaToken。'
-        : '页面打开后会自动加载 Turnstile，用于防机器人校验。';
+        ? t(
+          '安全验证已完成，提交时会自动携带 captchaToken。',
+          'Security verification is complete. The submission will automatically include the captcha token.',
+        )
+        : t(
+          '页面打开后会自动加载 Turnstile，用于防机器人校验。',
+          'Turnstile loads automatically when the page opens to help block bots.',
+        );
 
   useEffect(() => {
     setError(null);
@@ -407,7 +401,7 @@ const LoginScreen: React.FC = () => {
     const emailValue = email.trim();
 
     if (view === 'register') {
-      const displayName = emailValue.split('@')[0] || 'New User';
+      const displayName = emailValue.split('@')[0] || t('新用户', 'New User');
       const defaultAvatarId = getDefaultPresetAvatarId(emailValue);
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: emailValue,
@@ -424,9 +418,14 @@ const LoginScreen: React.FC = () => {
       if (signUpError) throw signUpError;
 
       if (data.session) {
-        setMessage('注册成功，正在进入系统...');
+        setMessage(t('注册成功，正在进入系统...', 'Sign-up succeeded. Entering the app...'));
       } else {
-        setMessage('注册成功，请前往邮箱查收验证邮件，验证后即可登录。');
+        setMessage(
+          t(
+            '注册成功，请前往邮箱查收验证邮件，验证后即可登录。',
+            'Sign-up succeeded. Check your inbox for the verification email, then sign in after confirming it.',
+          )
+        );
         setTimeout(() => setView('login'), 2200);
       }
       return;
@@ -447,7 +446,7 @@ const LoginScreen: React.FC = () => {
       ...(captchaToken ? { captchaToken } : {}),
     });
     if (resetError) throw resetError;
-    setMessage('重置密码邮件已发送，请检查邮箱。');
+    setMessage(t('重置密码邮件已发送，请检查邮箱。', 'Password reset email sent. Check your inbox.'));
   };
 
   const handleAuth = async (event: React.FormEvent) => {
@@ -463,13 +462,19 @@ const LoginScreen: React.FC = () => {
     setFieldErrors(localErrors);
 
     if (Object.keys(localErrors).length > 0) {
-      setError('请先修正表单错误后再提交。');
+      setError(t('请先修正表单错误后再提交。', 'Fix the form errors before submitting.'));
       return;
     }
 
     if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
-      setError(turnstileError || '安全验证尚未完成，请等待 Turnstile 加载完成后再试。');
+      setError(
+        turnstileError
+        || t(
+          '安全验证尚未完成，请等待 Turnstile 加载完成后再试。',
+          'Security verification is not finished yet. Wait for Turnstile to finish loading and try again.',
+        )
+      );
       return;
     }
 
@@ -492,7 +497,12 @@ const LoginScreen: React.FC = () => {
         }
 
         if (isNetworkError(authError) && index < MAX_RETRY - 1) {
-          setError(`网络连接不稳定，正在重试（${index + 1}/${MAX_RETRY}）...`);
+          setError(
+            t(
+              `网络连接不稳定，正在重试（${index + 1}/${MAX_RETRY}）...`,
+              `Network looks unstable. Retrying (${index + 1}/${MAX_RETRY})...`,
+            )
+          );
           await sleep(900);
           continue;
         }
@@ -501,7 +511,12 @@ const LoginScreen: React.FC = () => {
     }
 
     if (isNetworkError(lastError)) {
-      setError(`网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录，继续体验本地功能。`);
+      setError(
+        t(
+          `网络连接失败（已重试 ${MAX_RETRY} 次）。你可以先使用临时用户登录，继续体验本地功能。`,
+          `Network request failed after ${MAX_RETRY} attempts. You can continue with a temporary account for local-only access.`,
+        )
+      );
     } else {
       setError(resolveAuthErrorMessage(lastError, view));
       if (turnstileAvailable) {
@@ -516,7 +531,13 @@ const LoginScreen: React.FC = () => {
 
     if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
-      setError(turnstileError || '请先等待人机验证完成后再使用 Google 登录。');
+      setError(
+        turnstileError
+        || t(
+          '请先等待人机验证完成后再使用 Google 登录。',
+          'Wait for CAPTCHA verification to finish before signing in with Google.',
+        )
+      );
       return;
     }
 
@@ -546,7 +567,13 @@ const LoginScreen: React.FC = () => {
 
     if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
-      setError(turnstileError || '请先完成人机验证后再使用微信扫码登录。');
+      setError(
+        turnstileError
+        || t(
+          '请先完成人机验证后再使用微信扫码登录。',
+          'Complete CAPTCHA verification before signing in with WeChat QR.',
+        )
+      );
       return;
     }
 
@@ -583,8 +610,12 @@ const LoginScreen: React.FC = () => {
     <div className={`auth-page auth-page--${resolvedTheme}`}>
       <WechatQrModal
         isOpen={wechatModalOpen}
-        title="使用微信扫码登录"
-        description="扫码确认后会自动回到 KK Studio，并继续沿用当前 Supabase 会话体系。"
+        language={language}
+        title={t('使用微信扫码登录', 'Sign in with WeChat QR')}
+        description={t(
+          '扫码确认后会自动回到 KK Studio，并继续沿用当前 Supabase 会话体系。',
+          'After you confirm on WeChat, you will return to KK Studio and continue with the current Supabase session flow.',
+        )}
         authorizationUrl={wechatAuthorizationUrl}
         expiresAt={wechatExpiresAt}
         loading={wechatLoading}
@@ -599,15 +630,20 @@ const LoginScreen: React.FC = () => {
             <div className="auth-modal-icon">
               <Clock size={24} />
             </div>
-            <h3>临时用户登录</h3>
-            <p>无需注册即可体验本地功能，账号有效期 24 小时。</p>
-            <p>临时账号不支持云同步、充值和管理员配置的积分模型，到期后会自动清理本地数据，请勿存放重要内容。</p>
+            <h3>{t('临时用户登录', 'Temporary account sign-in')}</h3>
+            <p>{t('无需注册即可体验本地功能，账号有效期 24 小时。', 'Try local features without registering. The account stays active for 24 hours.')}</p>
+            <p>
+              {t(
+                '临时账号不支持云同步、充值和管理员配置的积分模型，到期后会自动清理本地数据，请勿存放重要内容。',
+                'Temporary accounts do not support cloud sync, top-ups, or admin-configured credit models. Local data is cleared automatically after expiry, so do not keep important content there.',
+              )}
+            </p>
             <div className="auth-modal-actions">
               <button type="button" className="auth-btn auth-btn-ghost" onClick={() => setShowTempUserWarning(false)}>
-                取消
+                {t('取消', 'Cancel')}
               </button>
               <button type="button" className="auth-btn auth-btn-main" onClick={confirmTempUserLogin}>
-                确认登录
+                {t('确认登录', 'Continue')}
               </button>
             </div>
           </div>
@@ -651,11 +687,11 @@ const LoginScreen: React.FC = () => {
           <div className="auth-brand-icon">
             <Sparkles size={30} />
           </div>
-          <h1>KK 创作平台</h1>
-          <p>下一代智能创作工作台</p>
+          <h1>{t('KK 创作平台', 'KK Creative Platform')}</h1>
+          <p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p>
         </div>
 
-        <p className="auth-side-note">登录后自动同步你的模型、积分与生成记录。</p>
+        <p className="auth-side-note">{t('登录后自动同步你的模型、积分与生成记录。', 'Sign in to sync your models, credits, and generation history automatically.')}</p>
       </section>
 
       <section className="auth-side-form">
@@ -663,20 +699,20 @@ const LoginScreen: React.FC = () => {
           {view !== 'login' && (
             <button type="button" className="auth-link-back" onClick={() => setView('login')}>
               <ChevronLeft size={16} />
-              返回登录
+              {t('返回登录', 'Back to sign in')}
             </button>
           )}
 
           <header className="auth-header">
             <h2>
-              {view === 'login' && '欢迎回来'}
-              {view === 'register' && '创建账号'}
-              {view === 'forgot-password' && '找回密码'}
+              {view === 'login' && t('欢迎回来', 'Welcome back')}
+              {view === 'register' && t('创建账号', 'Create your account')}
+              {view === 'forgot-password' && t('找回密码', 'Reset your password')}
             </h2>
             <p>
-              {view === 'login' && '请登录后继续使用 KK 创作平台。'}
-              {view === 'register' && '创建新账户后即可开启完整功能。'}
-              {view === 'forgot-password' && '输入邮箱后我们会发送重置链接。'}
+              {view === 'login' && t('请登录后继续使用 KK 创作平台。', 'Sign in to continue using KK Creative Platform.')}
+              {view === 'register' && t('创建新账户后即可开启完整功能。', 'Create a new account to unlock the full experience.')}
+              {view === 'forgot-password' && t('输入邮箱后我们会发送重置链接。', 'Enter your email and we will send a reset link.')}
             </p>
           </header>
 
@@ -695,7 +731,7 @@ const LoginScreen: React.FC = () => {
             )}
 
             <label className="auth-field">
-              <span>邮箱地址</span>
+              <span>{t('邮箱地址', 'Email')}</span>
               <div className={`auth-input-wrap ${showFieldError('email') ? 'auth-input-error' : ''}`}>
                 <Mail size={18} />
                 <input
@@ -706,7 +742,7 @@ const LoginScreen: React.FC = () => {
                     if (submitted || fieldTouched.email) syncFieldErrors();
                   }}
                   onBlur={() => markTouched('email')}
-                  placeholder="请输入邮箱地址"
+                  placeholder={t('请输入邮箱地址', 'Enter your email')}
                   required
                   autoComplete="email"
                 />
@@ -719,7 +755,7 @@ const LoginScreen: React.FC = () => {
             {view !== 'forgot-password' && (
               <label className="auth-field">
                 <div className="auth-field-row">
-                  <span>登录密码</span>
+                  <span>{t('登录密码', 'Password')}</span>
                 </div>
                 <div className={`auth-input-wrap ${showFieldError('password') ? 'auth-input-error' : ''}`}>
                   <Lock size={18} />
@@ -731,7 +767,7 @@ const LoginScreen: React.FC = () => {
                       if (submitted || fieldTouched.password || fieldTouched.confirmPassword) syncFieldErrors();
                     }}
                     onBlur={() => markTouched('password')}
-                    placeholder="请输入登录密码"
+                    placeholder={t('请输入登录密码', 'Enter your password')}
                     required
                     minLength={6}
                     autoComplete={view === 'register' ? 'new-password' : 'current-password'}
@@ -740,7 +776,7 @@ const LoginScreen: React.FC = () => {
                     type="button"
                     className="auth-eye-btn"
                     onClick={() => setShowPassword((current) => !current)}
-                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -749,7 +785,7 @@ const LoginScreen: React.FC = () => {
                   {showFieldError('password') ? (
                     <span className="auth-field-error">{fieldErrors.password}</span>
                   ) : (
-                    <span>{view === 'register' ? '密码至少 6 位，建议包含字母和数字。' : '　'}</span>
+                    <span>{view === 'register' ? t('密码至少 6 位，建议包含字母和数字。', 'Use at least 6 characters, ideally with letters and numbers.') : '　'}</span>
                   )}
                 </div>
               </label>
@@ -757,7 +793,7 @@ const LoginScreen: React.FC = () => {
 
             {view === 'register' && (
               <label className="auth-field">
-                <span>确认密码</span>
+                <span>{t('确认密码', 'Confirm password')}</span>
                 <div className={`auth-input-wrap ${showFieldError('confirmPassword') ? 'auth-input-error' : ''}`}>
                   <Lock size={18} />
                   <input
@@ -768,7 +804,7 @@ const LoginScreen: React.FC = () => {
                       if (submitted || fieldTouched.confirmPassword || fieldTouched.password) syncFieldErrors();
                     }}
                     onBlur={() => markTouched('confirmPassword')}
-                    placeholder="请再次输入密码"
+                    placeholder={t('请再次输入密码', 'Enter your password again')}
                     required
                     minLength={6}
                     autoComplete="new-password"
@@ -783,9 +819,9 @@ const LoginScreen: React.FC = () => {
             {showTurnstileBlock && (
               <div className="auth-turnstile-block">
                 <div className="auth-turnstile-head">
-                  <span>安全验证</span>
+                  <span>{t('安全验证', 'Security check')}</span>
                   <span className={`auth-turnstile-badge ${turnstileToken ? 'is-ready' : 'is-pending'}`}>
-                    {turnstileToken ? '已就绪' : '加载中'}
+                    {turnstileToken ? t('已就绪', 'Ready') : t('加载中', 'Loading')}
                   </span>
                 </div>
                 {turnstileAvailable ? (
@@ -796,13 +832,14 @@ const LoginScreen: React.FC = () => {
                       onExpire={handleTurnstileExpire}
                       appearance="always"
                       action={turnstileAction}
+                      language={language}
                       className="auth-turnstile-shell"
                     />
                     <div className="auth-turnstile-help">{turnstileHint}</div>
                   </>
                 ) : (
                   <div className="auth-turnstile-inline-error" role="alert">
-                    {TURNSTILE_MISSING_SITE_KEY_MESSAGE}
+                    {getTurnstileMissingSiteKeyMessage(language)}
                   </div>
                 )}
               </div>
@@ -812,13 +849,13 @@ const LoginScreen: React.FC = () => {
               {loading ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  处理中...
+                  {t('处理中...', 'Processing...')}
                 </>
               ) : (
                 <>
-                  {view === 'login' && '登录'}
-                  {view === 'register' && '注册'}
-                  {view === 'forgot-password' && '发送重置邮件'}
+                  {view === 'login' && t('登录', 'Sign in')}
+                  {view === 'register' && t('注册', 'Sign up')}
+                  {view === 'forgot-password' && t('发送重置邮件', 'Send reset email')}
                   <ArrowRight size={16} />
                 </>
               )}
@@ -827,18 +864,18 @@ const LoginScreen: React.FC = () => {
             {view === 'login' && (
               <>
                 <div className="auth-divider">
-                  <span>或使用以下方式登录</span>
+                  <span>{t('或使用以下方式登录', 'Or continue with')}</span>
                 </div>
                 <button type="button" className="auth-btn auth-btn-google" onClick={handleGoogleLogin} disabled={loading}>
-                  <Chrome size={18} />
-                  使用 Google 登录
+                  <Globe size={18} />
+                  {t('使用 Google 登录', 'Continue with Google')}
                 </button>
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading}>
                   <QrCode size={18} />
-                  使用微信扫码登录
+                  {t('使用微信扫码登录', 'Continue with WeChat QR')}
                 </button>
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={() => setShowTempUserWarning(true)} disabled={loading}>
-                  临时用户登录
+                  {t('临时用户登录', 'Use a temporary account')}
                 </button>
               </>
             )}
@@ -847,28 +884,28 @@ const LoginScreen: React.FC = () => {
               {view === 'login' && (
                 <>
                   <button type="button" className="auth-text-btn" onClick={() => setView('register')}>
-                    没有账号？立即注册
+                    {t('没有账号？立即注册', "Don't have an account? Sign up")}
                   </button>
                   <button type="button" className="auth-btn-forgot" onClick={() => setView('forgot-password')}>
-                    忘记密码？
+                    {t('忘记密码？', 'Forgot your password?')}
                   </button>
                 </>
               )}
               {view === 'register' && (
                 <button type="button" className="auth-text-btn" onClick={() => setView('login')}>
-                  已有账号？返回登录
+                  {t('已有账号？返回登录', 'Already have an account? Sign in')}
                 </button>
               )}
               {view === 'forgot-password' && (
                 <button type="button" className="auth-text-btn" onClick={() => setView('login')}>
-                  想起来了？返回登录
+                  {t('想起来了？返回登录', 'Remembered it? Back to sign in')}
                 </button>
               )}
             </div>
           </form>
         </div>
       </section>
-      <div className="auth-version-badge" aria-label={`App version ${APP_DISPLAY_VERSION}`}>
+      <div className="auth-version-badge" aria-label={t(`应用版本 ${APP_DISPLAY_VERSION}`, `App version ${APP_DISPLAY_VERSION}`)}>
         {APP_DISPLAY_VERSION}
       </div>
     </div>

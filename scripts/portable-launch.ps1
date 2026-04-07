@@ -5,6 +5,7 @@ $RunDir = Join-Path $ReleaseRoot 'run'
 $LogDir = Join-Path $ReleaseRoot 'logs'
 $NodeExe = Join-Path $ReleaseRoot 'runtime\node.exe'
 $AppDir = Join-Path $ReleaseRoot 'app'
+$PortableDistDir = Join-Path $AppDir 'dist'
 $WebScript = Join-Path $AppDir 'portable-app-server.cjs'
 $UpdateScript = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
 $UpdateConfig = Join-Path $ReleaseRoot 'support\update-config.json'
@@ -17,6 +18,186 @@ $PaymentPidFile = Join-Path $RunDir 'payment.pid'
 
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+function Get-JsonFile {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    $raw = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        return $null
+    }
+
+    return $raw | ConvertFrom-Json
+}
+
+function Convert-ToVersion {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    try {
+        return [version]$Value
+    } catch {
+        return $null
+    }
+}
+
+function Get-ManifestFingerprint {
+    param($Manifest)
+
+    if ($null -eq $Manifest) {
+        return ''
+    }
+
+    return @(
+        [string]$Manifest.version,
+        [string]$Manifest.buildTime,
+        [string]$Manifest.releaseDate,
+        [string]$Manifest.channel,
+        [string]$Manifest.deploymentTarget,
+        [string]$Manifest.commitSha
+    ) -join '|'
+}
+
+function Get-FileSha256 {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Resolve-WorkspaceRoot {
+    $releaseParent = Split-Path -Parent $ReleaseRoot
+    if ([string]::IsNullOrWhiteSpace($releaseParent)) {
+        return $null
+    }
+
+    $candidate = Split-Path -Parent $releaseParent
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        return $null
+    }
+
+    $requiredPaths = @(
+        (Join-Path $candidate 'package.json'),
+        (Join-Path $candidate 'dist\app-version.json'),
+        (Join-Path $candidate 'scripts\portable-app-server.cjs'),
+        (Join-Path $candidate 'scripts\portable-stop.ps1'),
+        (Join-Path $candidate 'scripts\portable-self-update.ps1')
+    )
+
+    foreach ($requiredPath in $requiredPaths) {
+        if (-not (Test-Path -LiteralPath $requiredPath)) {
+            return $null
+        }
+    }
+
+    return $candidate
+}
+
+function Get-WorkspacePortableSyncPlan {
+    param([string]$WorkspaceRoot)
+
+    if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
+        return $null
+    }
+
+    $workspaceManifestPath = Join-Path $WorkspaceRoot 'dist\app-version.json'
+    $portableManifestPath = Join-Path $PortableDistDir 'app-version.json'
+    $workspaceManifest = Get-JsonFile -Path $workspaceManifestPath
+    $portableManifest = Get-JsonFile -Path $portableManifestPath
+
+    if ($null -eq $workspaceManifest) {
+        return $null
+    }
+
+    $reasons = New-Object System.Collections.Generic.List[string]
+    $workspaceVersion = Convert-ToVersion -Value ([string]$workspaceManifest.version)
+    $portableVersion = Convert-ToVersion -Value ([string]$portableManifest.version)
+
+    if ($portableVersion -and $workspaceVersion) {
+        if ($workspaceVersion -gt $portableVersion) {
+            $reasons.Add("workspace version $($workspaceManifest.version) is newer than portable version $($portableManifest.version)")
+        } elseif ($workspaceVersion -eq $portableVersion -and (Get-ManifestFingerprint -Manifest $workspaceManifest) -ne (Get-ManifestFingerprint -Manifest $portableManifest)) {
+            $reasons.Add('workspace build manifest differs from the packaged portable manifest')
+        }
+    } elseif ((Get-ManifestFingerprint -Manifest $workspaceManifest) -ne (Get-ManifestFingerprint -Manifest $portableManifest)) {
+        $reasons.Add('workspace build manifest differs from the packaged portable manifest')
+    }
+
+    $filesToCompare = @(
+        @{
+            Source = Join-Path $WorkspaceRoot 'scripts\portable-app-server.cjs'
+            Target = Join-Path $AppDir 'portable-app-server.cjs'
+            Label = 'portable app server'
+        },
+        @{
+            Source = Join-Path $WorkspaceRoot 'scripts\portable-stop.ps1'
+            Target = Join-Path $ReleaseRoot 'support\portable-stop.ps1'
+            Label = 'portable stop script'
+        },
+        @{
+            Source = Join-Path $WorkspaceRoot 'scripts\portable-self-update.ps1'
+            Target = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
+            Label = 'portable self-update script'
+        }
+    )
+
+    foreach ($filePair in $filesToCompare) {
+        if ((Get-FileSha256 -Path $filePair.Source) -ne (Get-FileSha256 -Path $filePair.Target)) {
+            $reasons.Add("$($filePair.Label) differs from the workspace copy")
+        }
+    }
+
+    return [pscustomobject]@{
+        WorkspaceRoot = $WorkspaceRoot
+        WorkspaceManifest = $workspaceManifest
+        PortableManifest = $portableManifest
+        Reasons = @($reasons)
+        Required = $reasons.Count -gt 0
+    }
+}
+
+function Sync-PortableBundleFromWorkspace {
+    $workspaceRoot = Resolve-WorkspaceRoot
+    if ([string]::IsNullOrWhiteSpace($workspaceRoot)) {
+        return $false
+    }
+
+    $plan = Get-WorkspacePortableSyncPlan -WorkspaceRoot $workspaceRoot
+    if ($null -eq $plan -or -not $plan.Required) {
+        return $false
+    }
+
+    $reasonText = $plan.Reasons -join '; '
+    Write-Host "Detected newer workspace files. Syncing portable bundle before launch..."
+    Write-Host "Reasons: $reasonText"
+
+    $workspaceDistDir = Join-Path $workspaceRoot 'dist'
+    if (Test-Path -LiteralPath $PortableDistDir) {
+        Remove-Item -LiteralPath $PortableDistDir -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $PortableDistDir | Out-Null
+    Copy-Item -Path (Join-Path $workspaceDistDir '*') -Destination $PortableDistDir -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\portable-app-server.cjs') -Destination (Join-Path $AppDir 'portable-app-server.cjs') -Force
+    Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\portable-stop.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-stop.ps1') -Force
+    Copy-Item -LiteralPath (Join-Path $workspaceRoot 'scripts\portable-self-update.ps1') -Destination (Join-Path $ReleaseRoot 'support\portable-self-update.ps1') -Force
+
+    $syncedManifest = Get-JsonFile -Path (Join-Path $PortableDistDir 'app-version.json')
+    Write-Host "Portable bundle is now aligned to workspace build $([string]$syncedManifest.version) ($([string]$syncedManifest.buildTime))."
+    return $true
+}
+
+Sync-PortableBundleFromWorkspace | Out-Null
 
 if (Test-Path -LiteralPath $UpdateScript) {
     try {

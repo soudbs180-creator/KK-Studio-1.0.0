@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { localizeUserFacingText } from '../../utils/localeText';
+import { getDocumentLanguage, normalizeLanguage, pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
 import {
   TURNSTILE_ENABLED,
   TURNSTILE_HAS_ENV_SITE_KEY,
   TURNSTILE_SITE_KEY,
-  TURNSTILE_USING_FALLBACK_SITE_KEY,
 } from '../../config/turnstile';
+import { getTurnstileStatusMessage, mapTurnstileErrorMessage } from './authLocalization';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TURNSTILE_TIMEOUT_MS = 12000;
@@ -83,58 +83,31 @@ function getResolvedSiteKey(): string {
   return debugState.sitekey || TURNSTILE_SITE_KEY;
 }
 
-function getSiteKeySourceLabel(debugSiteKey?: string): string {
-  if (debugSiteKey) return 'URL 参数';
-  return TURNSTILE_HAS_ENV_SITE_KEY ? '环境变量' : '内置默认值';
+function resolveTurnstileLanguage(language?: string): ResolvedLanguage {
+  return language ? normalizeLanguage(language) : getDocumentLanguage();
 }
 
-function previewSiteKey(sitekey: string): string {
-  if (!sitekey) return '未设置';
+function getWidgetLanguageCode(language: ResolvedLanguage): string {
+  return language === 'en-US' ? 'en' : 'zh-CN';
+}
+
+function getSiteKeySourceLabel(language: ResolvedLanguage, debugSiteKey?: string): string {
+  if (debugSiteKey) return pickByResolvedLanguage(language, 'URL 参数', 'URL parameter');
+  return TURNSTILE_HAS_ENV_SITE_KEY
+    ? pickByResolvedLanguage(language, '环境变量', 'Environment variable')
+    : pickByResolvedLanguage(language, '内置默认值', 'Built-in default');
+}
+
+function previewSiteKey(sitekey: string, language: ResolvedLanguage): string {
+  if (!sitekey) return pickByResolvedLanguage(language, '未设置', 'Not set');
   if (sitekey.length <= 10) return sitekey;
   return `${sitekey.slice(0, 6)}...${sitekey.slice(-4)}`;
 }
 
-function extractErrorCode(error: unknown): string | null {
-  if (typeof error === 'string' && error.trim()) {
-    return error.trim();
-  }
-
-  if (Array.isArray(error)) {
-    const first = error.find((item) => typeof item === 'string' && item.trim());
-    return typeof first === 'string' ? first.trim() : null;
-  }
-
-  return null;
-}
-
-function mapTurnstileError(error: unknown): string {
-  const code = extractErrorCode(error);
-  const normalized = code?.toLowerCase();
-
-  if (normalized?.includes('failed to load turnstile script') || normalized?.includes('timed out while waiting')) {
-    return 'Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。';
-  }
-
-  switch (code) {
-    case '400020':
-      if (TURNSTILE_USING_FALLBACK_SITE_KEY) {
-        return 'Cloudflare 返回 Invalid sitekey。当前部署没有注入 VITE_TURNSTILE_SITE_KEY，应用正在使用内置回退 key。请确认 Cloudflare widget 仍是 kkai.plus 当前这只 widget，或在 Vercel 中显式设置最新的 VITE_TURNSTILE_SITE_KEY 后重新部署。';
-      }
-      return 'Cloudflare 返回 Invalid sitekey，请检查前端 VITE_TURNSTILE_SITE_KEY 是否与当前 widget 的 site key 一致。';
-    case '400070':
-      return '当前 Turnstile site key 已被禁用，请到 Cloudflare 后台检查 widget 状态。';
-    case '110200':
-      return '当前域名不在 Turnstile widget 的允许列表里，请把 localhost、127.0.0.1 或正式域名加入 Cloudflare 域名白名单。';
-    case '200500':
-      return 'Turnstile iframe 加载失败，请检查浏览器、代理或安全软件是否拦截了 challenges.cloudflare.com。';
-    default:
-      return code
-        ? `Turnstile 加载失败（错误码：${code}）。`
-        : 'Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。';
-  }
-}
-
-async function waitForTurnstile(timeoutMs = TURNSTILE_TIMEOUT_MS): Promise<void> {
+async function waitForTurnstile(
+  timeoutMs = TURNSTILE_TIMEOUT_MS,
+  language: ResolvedLanguage = getDocumentLanguage(),
+): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeoutMs) {
@@ -145,10 +118,10 @@ async function waitForTurnstile(timeoutMs = TURNSTILE_TIMEOUT_MS): Promise<void>
     await new Promise((resolve) => window.setTimeout(resolve, 50));
   }
 
-    throw new Error(localizeUserFacingText('Timed out while waiting for Turnstile') || 'Timed out while waiting for Turnstile');
+  throw new Error(mapTurnstileErrorMessage(language, 'Timed out while waiting for Turnstile'));
 }
 
-export async function ensureTurnstileScript(): Promise<void> {
+export async function ensureTurnstileScript(language: ResolvedLanguage = getDocumentLanguage()): Promise<void> {
   if (typeof window === 'undefined') {
     return;
   }
@@ -165,7 +138,7 @@ export async function ensureTurnstileScript(): Promise<void> {
     const existingScript = document.querySelector<HTMLScriptElement>(TURNSTILE_SCRIPT_SELECTOR);
 
     if (existingScript) {
-      waitForTurnstile().then(resolve).catch(reject);
+      waitForTurnstile(TURNSTILE_TIMEOUT_MS, language).then(resolve).catch(reject);
       return;
     }
 
@@ -178,11 +151,11 @@ export async function ensureTurnstileScript(): Promise<void> {
       script.fetchPriority = 'high';
     }
     script.onload = () => {
-      waitForTurnstile().then(resolve).catch(reject);
+      waitForTurnstile(TURNSTILE_TIMEOUT_MS, language).then(resolve).catch(reject);
     };
     script.onerror = () => {
       turnstileScriptPromise = null;
-          reject(new Error(localizeUserFacingText('Failed to load Turnstile script') || 'Failed to load Turnstile script'));
+      reject(new Error(mapTurnstileErrorMessage(language, 'Failed to load Turnstile script')));
     };
 
     document.head.appendChild(script);
@@ -218,10 +191,11 @@ export function canUseTurnstile(): boolean {
   return TURNSTILE_ENABLED && Boolean(getResolvedSiteKey());
 }
 
-export function useTurnstile() {
-  const [token, setToken] = React.useState<string | null>(null);
-  const [isVerified, setIsVerified] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+export function useTurnstile(language?: string) {
+  const [token, setToken] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const resolveLanguage = useCallback(() => resolveTurnstileLanguage(language), [language]);
 
   const handleVerify = useCallback((newToken: string) => {
     setToken(newToken);
@@ -238,8 +212,14 @@ export function useTurnstile() {
   const handleExpire = useCallback(() => {
     setToken(null);
     setIsVerified(false);
-    setError('人机验证已过期，请重新完成验证。');
-  }, []);
+    setError(
+      pickByResolvedLanguage(
+        resolveLanguage(),
+        '人机验证已过期，请重新完成验证。',
+        'CAPTCHA verification expired. Please complete it again.',
+      )
+    );
+  }, [resolveLanguage]);
 
   const reset = useCallback(() => {
     setToken(null);
@@ -264,7 +244,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onError,
   onExpire,
   theme = 'auto',
-  language = 'zh-CN',
+  language,
   className = '',
   appearance = 'always',
   action = 'login',
@@ -272,8 +252,10 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const resolvedLanguage = useMemo(() => resolveTurnstileLanguage(language), [language]);
+  const widgetLanguage = useMemo(() => getWidgetLanguageCode(resolvedLanguage), [resolvedLanguage]);
   const [status, setStatus] = useState<TurnstileStatus>('idle');
-  const [message, setMessage] = useState<string>('等待加载 Turnstile');
+  const [message, setMessage] = useState<string>(() => getTurnstileStatusMessage(resolvedLanguage, 'waiting'));
 
   const debugState = useMemo(() => getDebugState(), []);
   const siteKey = useMemo(() => getResolvedSiteKey(), []);
@@ -300,8 +282,8 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   useEffect(() => {
     if (!shouldRender) {
       const nextMessage = TURNSTILE_ENABLED
-        ? 'Turnstile 未配置，请检查 VITE_TURNSTILE_SITE_KEY。'
-        : 'Turnstile 已被本地环境变量禁用。';
+        ? getTurnstileStatusMessage(resolvedLanguage, 'missingConfig')
+        : getTurnstileStatusMessage(resolvedLanguage, 'disabled');
       setStatus('error');
       setMessage(nextMessage);
       onError?.(nextMessage);
@@ -313,8 +295,8 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
     const renderWidget = async () => {
       try {
         setStatus('loading');
-        setMessage('正在加载 Turnstile 脚本');
-        await ensureTurnstileScript();
+        setMessage(getTurnstileStatusMessage(resolvedLanguage, 'loadingScript'));
+        await ensureTurnstileScript(resolvedLanguage);
 
         if (disposed || !containerRef.current || !window.turnstile) {
           return;
@@ -322,24 +304,24 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
 
         destroyWidget();
         setStatus('rendering');
-        setMessage('正在渲染 Turnstile 组件');
+        setMessage(getTurnstileStatusMessage(resolvedLanguage, 'rendering'));
 
         const widgetId = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme,
-          language,
+          language: widgetLanguage,
           appearance: resolvedAppearance,
           action,
           size,
           callback: (token: string) => {
             if (disposed) return;
             setStatus('verified');
-            setMessage('Turnstile 验证通过');
+            setMessage(getTurnstileStatusMessage(resolvedLanguage, 'verified'));
             onVerify(token);
           },
           'error-callback': (error?: string) => {
             if (disposed) return;
-            const nextMessage = mapTurnstileError(error);
+            const nextMessage = mapTurnstileErrorMessage(resolvedLanguage, error);
             setStatus('error');
             setMessage(nextMessage);
             onError?.(nextMessage);
@@ -347,7 +329,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           'expired-callback': () => {
             if (disposed) return;
             setStatus('rendered');
-            setMessage('Turnstile 已过期，正在等待重新验证');
+            setMessage(getTurnstileStatusMessage(resolvedLanguage, 'expired'));
             onExpire?.();
           },
         });
@@ -356,10 +338,10 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         activeWidgetIds.add(widgetId);
         containerRef.current.dataset.turnstileId = widgetId;
         setStatus('rendered');
-        setMessage('Turnstile 组件已加载');
+        setMessage(getTurnstileStatusMessage(resolvedLanguage, 'loaded'));
       } catch (error) {
         if (disposed) return;
-        const nextMessage = mapTurnstileError(error instanceof Error ? error.message : error);
+        const nextMessage = mapTurnstileErrorMessage(resolvedLanguage, error instanceof Error ? error.message : error);
         setStatus('error');
         setMessage(nextMessage);
         onError?.(nextMessage);
@@ -372,7 +354,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
       disposed = true;
       destroyWidget();
     };
-  }, [action, destroyWidget, language, onError, onExpire, onVerify, resolvedAppearance, shouldRender, siteKey, size, theme]);
+  }, [action, destroyWidget, onError, onExpire, onVerify, resolvedAppearance, resolvedLanguage, shouldRender, siteKey, size, theme, widgetLanguage]);
 
   return (
     <div className={className}>
@@ -386,13 +368,13 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
 
       {debugState.enabled && (
         <div className="auth-turnstile-debug" role="status">
-          <strong>Turnstile 调试状态</strong>
-          <span>状态：{status}</span>
-          <span>site key 来源：{getSiteKeySourceLabel(debugState.sitekey)}</span>
-          <span>site key 预览：{previewSiteKey(siteKey)}</span>
+          <strong>{pickByResolvedLanguage(resolvedLanguage, 'Turnstile 调试状态', 'Turnstile debug status')}</strong>
+          <span>{pickByResolvedLanguage(resolvedLanguage, `状态：${status}`, `Status: ${status}`)}</span>
+          <span>{pickByResolvedLanguage(resolvedLanguage, `site key 来源：${getSiteKeySourceLabel(resolvedLanguage, debugState.sitekey)}`, `Site key source: ${getSiteKeySourceLabel(resolvedLanguage, debugState.sitekey)}`)}</span>
+          <span>{pickByResolvedLanguage(resolvedLanguage, `site key 预览：${previewSiteKey(siteKey, resolvedLanguage)}`, `Site key preview: ${previewSiteKey(siteKey, resolvedLanguage)}`)}</span>
           <span>appearance：{resolvedAppearance}</span>
           <span>action：{action}</span>
-          <span>消息：{message}</span>
+          <span>{pickByResolvedLanguage(resolvedLanguage, `消息：${message}`, `Message: ${message}`)}</span>
         </div>
       )}
     </div>

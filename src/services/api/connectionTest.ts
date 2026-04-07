@@ -27,12 +27,13 @@ import {
   buildResponsesPayload,
   extractOpenAITextPayload,
   isResponsesPayload,
-  modelPrefersResponsesApi,
   shouldRetryWithResponsesApi,
 } from './openaiResponses';
 import { resolveProviderRuntime } from './providerStrategy';
+import { resolveProviderProbeMatrix } from './providerProbeMatrix.ts';
+import { resolveChatSurface } from './providerSurfaceRouter.ts';
 import { fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
-import keyManager from '../auth/keyManager';
+import keyManager, { getDocumentedStaticModelsForProvider } from '../auth/keyManager';
 
 export interface TestResult {
   success: boolean;
@@ -90,6 +91,20 @@ function resolveConnectionRuntime(config: ConnectionConfig, cleanBase: string) {
     compatibilityMode: resolved.compatibilityMode,
     modelId: getModelId(resolved),
   });
+}
+
+function get12AIProbeModel(
+  runtime: ReturnType<typeof resolveConnectionRuntime>,
+  config: ConnectionConfig,
+): string {
+  const requested = String(config.model || '').trim();
+  if (runtime.protocolFamily === 'claude-native') {
+    return requested || 'claude-4-sonnet';
+  }
+  if (runtime.protocolFamily === 'gemini-native') {
+    return requested || 'gemini-2.5-flash';
+  }
+  return requested || 'gpt-5.1';
 }
 
 function isVideoModel(modelId: string): boolean {
@@ -200,7 +215,10 @@ async function runOpenAIChatTest(cleanBase: string, config: ConnectionConfig): P
     stream: false,
   });
 
-  const preferResponses = modelPrefersResponsesApi(modelId);
+  const preferResponses = resolveChatSurface({
+    runtime,
+    modelId,
+  }) === 'openai-responses';
   if (preferResponses) {
     const response = await fetch(responsesUrl, {
       method: 'POST',
@@ -282,9 +300,20 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
     const runtime = resolveConnectionRuntime(resolved, cleanBase);
     const nativeGemini = runtime.protocolFamily === 'gemini-native';
     const nativeClaude = runtime.protocolFamily === 'claude-native';
+    const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+    const probeMatrix = resolveProviderProbeMatrix({
+      runtime,
+      modelId,
+      compatibilityMode: resolved.compatibilityMode,
+      documentedModels,
+      isVideoModel: isVideoModel(modelId),
+      isImageOnlyNativeModel: nativeGemini && isImageOnlyNativeModel(modelId),
+      isAsyncImageModel: (candidate) => runtime.strategyId === '12ai'
+        && /gemini-2\.5-flash-image|gemini-3\.1-flash-image-preview|gemini-3-pro-image-preview/i.test(String(candidate || '')),
+    });
     const responseTime = () => Date.now() - startTime;
 
-    if (isVideoModel(modelId)) {
+    if (probeMatrix.skipReason === 'video-billing-risk') {
       const listTest = await testModelsList(resolved);
       return {
         ...listTest,
@@ -295,13 +324,16 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
           ? {
               model: modelId,
               responseFormat: 'models',
+              selectedSurface: probeMatrix.protocolProbeSurface,
+              availableSurfaces: probeMatrix.availableSurfaces,
+              modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
             }
           : listTest.details,
         responseTime: responseTime(),
       };
     }
 
-    if (nativeGemini && isImageOnlyNativeModel(modelId)) {
+    if (probeMatrix.skipReason === 'native-image-billing-risk') {
       const listTest = await testModelsList(resolved);
       return {
         ...listTest,
@@ -312,13 +344,16 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
           ? {
               model: modelId,
               responseFormat: 'native-models',
+              selectedSurface: probeMatrix.protocolProbeSurface,
+              availableSurfaces: probeMatrix.availableSurfaces,
+              modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
             }
           : listTest.details,
         responseTime: responseTime(),
       };
     }
 
-    if (!nativeGemini && !nativeClaude && resolved.compatibilityMode === 'standard') {
+    if (probeMatrix.skipReason === 'standard-mode-billing-risk') {
       const listTest = await testModelsList(resolved);
       return {
         ...listTest,
@@ -329,6 +364,9 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
           ? {
               model: modelId,
               responseFormat: 'models',
+              selectedSurface: probeMatrix.protocolProbeSurface,
+              availableSurfaces: probeMatrix.availableSurfaces,
+              modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
             }
           : listTest.details,
         responseTime: responseTime(),
@@ -372,6 +410,9 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
         details: {
           model: modelId,
           responseFormat: 'generate-content',
+          selectedSurface: probeMatrix.protocolProbeSurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
           responsePreview: textPreview ? `${textPreview}...` : 'Native generateContent responded successfully.',
         },
         responseTime: elapsed,
@@ -392,6 +433,9 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
         details: {
           model: modelId,
           responseFormat: 'claude-messages',
+          selectedSurface: probeMatrix.protocolProbeSurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
           responsePreview: preview ? `${preview}...` : 'Claude messages responded successfully.',
         },
         responseTime: elapsed,
@@ -407,6 +451,9 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
         details: {
           model: modelId,
           responseFormat: 'chat-completions',
+          selectedSurface: probeMatrix.protocolProbeSurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
           responsePreview: `${String(result.choices[0].message?.content || '').slice(0, 100)}...`,
         },
         responseTime: elapsed,
@@ -420,6 +467,9 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
         details: {
           model: modelId,
           responseFormat: 'responses',
+          selectedSurface: probeMatrix.protocolProbeSurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
           responsePreview: openAIText ? `${openAIText.slice(0, 100)}...` : 'Responses API responded successfully.',
         },
         responseTime: elapsed,
@@ -451,6 +501,13 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
     const resolved = resolveConfig(config);
     const cleanBase = getCleanBaseUrl(resolved.baseUrl);
     const runtime = resolveConnectionRuntime(resolved, cleanBase);
+    const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
+    const probeMatrix = resolveProviderProbeMatrix({
+      runtime,
+      modelId: getModelId(resolved),
+      compatibilityMode: resolved.compatibilityMode,
+      documentedModels,
+    });
     if (runtime.strategyId === 'wuyinkeji') {
       const pricingCatalog = selectWuyinCatalogModels(
         cleanBase || resolved.baseUrl,
@@ -464,26 +521,82 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
           modelCount: pricingCatalog.length,
           models: pricingCatalog.slice(0, 5).map((item) => item.modelId || item.modelName),
           source: 'wuyin-catalog',
+          selectedSurface: probeMatrix.modelDiscoverySurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
         },
         responseTime: Date.now() - startTime,
       };
     }
     const nativeGemini = runtime.protocolFamily === 'gemini-native';
     const nativeClaude = runtime.protocolFamily === 'claude-native';
-    const listUrl = nativeGemini
-      ? buildGeminiModelsEndpoint(cleanBase, resolved.apiKey, runtime.authMethod as AuthMethod, resolved.provider)
-      : nativeClaude
-        ? buildClaudeEndpoint(cleanBase || 'https://api.anthropic.com', '/models')
-      : applyOpenAICompatAuthToUrl(
+    if (documentedModels.length > 0) {
+      const probeConfig: ConnectionConfig = {
+        ...resolved,
+        model: get12AIProbeModel(runtime, resolved),
+      };
+      const probeResponse = nativeGemini
+        ? await runGeminiGenerateContentTest(cleanBase, probeConfig)
+        : nativeClaude
+          ? await runClaudeMessagesTest(cleanBase, probeConfig)
+          : (await runOpenAIChatTest(cleanBase, probeConfig)).response;
+
+      if (!probeResponse.ok) {
+        const responseText = await probeResponse.text().catch(() => '');
+        const failure = classifyApiFailure({
+          status: probeResponse.status,
+          responseText,
+          fallbackMessage: `HTTP ${probeResponse.status}`,
+        });
+        return {
+          success: false,
+          message: `无法获取模型列表: ${buildUserFacingApiErrorMessage(failure)}`,
+          details: {
+            status: probeResponse.status,
+            detail: failure.detail,
+            kind: failure.kind,
+          },
+          responseTime: Date.now() - startTime,
+        };
+      }
+
+      return {
+        success: true,
+        message: `成功获取 ${documentedModels.length} 个模型`,
+        details: {
+          modelCount: documentedModels.length,
+          models: documentedModels.slice(0, 5),
+          source: '12ai-doc-preset',
+          selectedSurface: probeMatrix.modelDiscoverySurface,
+          availableSurfaces: probeMatrix.availableSurfaces,
+          modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
+        },
+        responseTime: Date.now() - startTime,
+      };
+    }
+    const usesOpenAIStyleModelList = runtime.providerFamily === 'newapi-family';
+    const listUrl = usesOpenAIStyleModelList
+      ? applyOpenAICompatAuthToUrl(
           buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models'),
           runtime.authMethod as AuthMethod,
           resolved.apiKey,
-        );
-    const headers = nativeGemini
-      ? buildGeminiHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, runtime.authorizationValueFormat)
-      : nativeClaude
-        ? buildClaudeHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, runtime.authorizationValueFormat)
-        : buildProxyHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat);
+        )
+      : nativeGemini
+        ? buildGeminiModelsEndpoint(cleanBase, resolved.apiKey, runtime.authMethod as AuthMethod, resolved.provider)
+        : nativeClaude
+          ? buildClaudeEndpoint(cleanBase || 'https://api.anthropic.com', '/models')
+          : applyOpenAICompatAuthToUrl(
+              buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models'),
+              runtime.authMethod as AuthMethod,
+              resolved.apiKey,
+            );
+    const headers = usesOpenAIStyleModelList
+      ? buildProxyHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat)
+      : nativeGemini
+        ? buildGeminiHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, runtime.authorizationValueFormat)
+        : nativeClaude
+          ? buildClaudeHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, runtime.authorizationValueFormat)
+          : buildProxyHeaders(runtime.authMethod as AuthMethod, resolved.apiKey, runtime.headerName, undefined, runtime.authorizationValueFormat);
 
     const response = await fetch(listUrl, {
       method: 'GET',
@@ -527,6 +640,9 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
       details: {
         modelCount: models.length,
         models: models.slice(0, 5).map((model: any) => model.id || model.name || model.model || String(model)),
+        selectedSurface: probeMatrix.modelDiscoverySurface,
+        availableSurfaces: probeMatrix.availableSurfaces,
+        modelDiscoverySurface: probeMatrix.modelDiscoverySurface,
       },
       responseTime,
     };

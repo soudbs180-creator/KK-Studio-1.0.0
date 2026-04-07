@@ -15,7 +15,7 @@ import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
 import { modelCaller } from './services/model/modelCaller';
 import { getModelPricing, isCreditBasedModel, getModelCredits } from './services/model/modelPricing';
-import { keyManager, getModelMetadata } from './services/auth/keyManager';
+import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { getModelCapabilities } from './services/model/modelCapabilities';
@@ -27,6 +27,7 @@ import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout'
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
+import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
 import {
@@ -272,6 +273,8 @@ const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
 // Lucide icons replaced with SVGs
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
+import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
 import ConnectionDot from './components/canvas/ConnectionDot';
 import LoginScreen from './components/auth/LoginScreen';
 import AuthCallback from './pages/AuthCallback';
@@ -285,7 +288,7 @@ import { formatRemainingCredits } from './services/billing/remainingBalance';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 // import { syncService } from './services/system/syncService'; // [FIX] Dynamic Import
-import { saveImage, saveOriginalImage } from './services/storage/imageStorage';
+import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
@@ -304,7 +307,6 @@ import {
   sortPptLayers,
   syncPptSlidesFromEditablePages,
 } from './utils/pptEditable';
-import NotificationToast from './components/common/NotificationToast';
 import { useImageGeneration } from './hooks/useImageGeneration';
 // import { notify } from './services/system/notificationService'; // [FIX] Dynamic Import
 
@@ -357,7 +359,6 @@ const MigrateModal = lazy(async () => {
 });
 const PptDeckEditorModal = lazy(() => import('./components/image/PptDeckEditorModal'));
 const RechargeModal = lazy(() => import('./components/modals/RechargeModal'));
-const CostEstimation = lazy(() => import('./pages/CostEstimation'));
 
 interface AppContentProps {
 }
@@ -369,6 +370,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isTempUser,
     signOut
   } = useAuth();
+  const { advanceTo, stage } = useAppStartup();
   const [showTutorial, setShowTutorial] = useState(false);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
@@ -425,7 +427,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const {
     balance,
-    loading: balanceLoading,
+    loading: billingLoading,
     showRechargeModal,
     setShowRechargeModal,
     consumeCreditsDetailed,
@@ -433,7 +435,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     refreshBilling,
     adjustBalanceOptimistically
   } = useBilling();
-  const remainingBalanceDisplay = formatRemainingCredits(balance, 'zh-CN');
+  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
 
   // Canvas Ref for Zoom/Pan Controls
   const canvasRef = useRef<InfiniteCanvasHandle>(null);
@@ -455,6 +457,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     selectedNodeIdsRef.current = selectedNodeIds;
   }, [selectedNodeIds]);
+
+  useEffect(() => {
+    keyManager.setStartupStage(stage);
+    adminModelService.setStartupStage(stage);
+  }, [stage]);
 
   const resolveProviderDisplay = useCallback((keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
     return resolveProviderIdentity({
@@ -551,6 +558,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       return { success: false as const };
     }
 
+    if (billingLoading) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
+      });
+      return { success: false as const };
+    }
+
     if (balance < params.requiredCredits) {
       import('./services/system/notificationService').then(({ notify }) => {
         notify.error('生成失败', '您的账户余额不足，请先充值积分。');
@@ -634,12 +648,12 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-  // [鏂板姛鑳絔 鍏ㄥ眬鐏状态(閽堝图片娴忚)
+  // [新功能] 全局灯箱状态（针对图片浏览）
   const [previewImages, setPreviewImages] = useState<GeneratedImage[] | null>(null);
   const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
   const [pptStackPreview, setPptStackPreview] = useState<{ images: GeneratedImage[]; initialIndex: number } | null>(null);
   const [pptDeckEditor, setPptDeckEditor] = useState<{ nodeId: string; initialIndex: number } | null>(null);
-  const [showMigrateModal, setShowMigrateModal] = useState(false); // 🎯 杩佺Щ寮圭獥状态
+  const [showMigrateModal, setShowMigrateModal] = useState(false); // 🎯 迁移弹窗状态
 
   const handleOpenPreview = useCallback((imageId: string) => {
     const canvas = activeCanvasRef.current;
@@ -947,9 +961,13 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (authLoading) return;
     let active = true;
+    let backgroundReadyTimer: number | null = null;
 
     const init = async () => {
-      // 0. Initialize Unified Model Service (loads admin configured models)
+      advanceTo('session_ready');
+
+      // 0. Initialize the local model surface first. Hosted catalog refreshes
+      // stay deferred until the startup coordinator reaches background_ready.
       await unifiedModelService.initialize();
       if (!active) return;
 
@@ -975,6 +993,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         await keyManager.setUserId(keyManagerUserId);
         if (!active) return;
       }
+
+      advanceTo('profile_ready');
 
       // 2. Check for Returning User (Smart Skip)
       const hasLoggedInBefore = localStorage.getItem('kk_has_logged_in');
@@ -1030,14 +1050,26 @@ const AppContent: React.FC<AppContentProps> = () => {
           localStorage.setItem('kk_tutorial_seen', 'true'); // Silently mark as seen
         }
       }
+
+      advanceTo('workspace_ready');
+
+      backgroundReadyTimer = window.setTimeout(() => {
+        if (!active) {
+          return;
+        }
+        advanceTo('background_ready');
+      }, 0);
     };
 
     init();
 
     return () => {
       active = false;
+      if (backgroundReadyTimer !== null) {
+        window.clearTimeout(backgroundReadyTimer);
+      }
     };
-  }, [user, isTempUser, authLoading]);
+  }, [advanceTo, authLoading, isTempUser, user]);
 
   // Generation config state
   // Generation config state with Persistence
@@ -1047,6 +1079,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       const saved = localStorage.getItem('kk_generation_config');
       if (saved) {
         const parsed = JSON.parse(saved);
+        const normalizedSavedModel = normalizeModelId(parsed.model || KnownModel.IMAGEN_4);
         // Merge with defaults to ensure all fields exist
         return {
           prompt: parsed.prompt || '', // Restore the persisted prompt
@@ -1062,7 +1095,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             ...img,
             data: undefined // Binary data is hydrated from IndexedDB, not localStorage
           }))) || [],
-          model: parsed.model || KnownModel.IMAGEN_4,
+          model: normalizedSavedModel,
           enableGrounding: parsed.enableGrounding || false,
           enableImageSearch: parsed.enableImageSearch || false,
           thinkingMode: (parsed.thinkingMode === 'high' || parsed.thinkingMode === 'deep') ? 'high' : 'minimal',
@@ -1791,10 +1824,36 @@ const AppContent: React.FC<AppContentProps> = () => {
         const node = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
         if (node) {
           const nextSourceImageId = activeSourceImage || undefined;
+          const draftModelMeta = keyManager.getGlobalModelList().find((model) => model.id === config.model);
+          const draftSystemDisplay = draftModelMeta?.isSystemInternal
+            ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
+            : null;
+          const draftRouteState = resolveNodeRouteState({
+            model: config.model,
+            keySlotId: node.keySlotId,
+            provider: node.provider,
+            providerLabel: node.providerLabel,
+          });
+          const nextDraftModelLabel = draftSystemDisplay?.displayName || resolveModelDisplayName(
+            config.model,
+            draftModelMeta?.name || getModelMetadata(config.model)?.name || config.model,
+          );
+          const nextDraftColorStart = draftSystemDisplay?.colorStart || draftModelMeta?.colorStart;
+          const nextDraftColorEnd = draftSystemDisplay?.colorEnd || draftModelMeta?.colorEnd;
+          const nextDraftColorSecondary = draftSystemDisplay?.colorSecondary || draftModelMeta?.colorSecondary;
+          const nextDraftTextColor = draftSystemDisplay?.textColor || draftModelMeta?.textColor;
           const referenceImagesChanged = node.referenceImages !== config.referenceImages;
           // Detect changes to avoid loop
           const hasChanged = node.prompt !== config.prompt ||
             node.model !== config.model ||
+            node.modelLabel !== nextDraftModelLabel ||
+            node.provider !== draftRouteState.provider ||
+            node.providerLabel !== draftRouteState.providerLabel ||
+            node.keySlotId !== draftRouteState.keySlotId ||
+            node.modelColorStart !== nextDraftColorStart ||
+            node.modelColorEnd !== nextDraftColorEnd ||
+            node.modelColorSecondary !== nextDraftColorSecondary ||
+            node.modelTextColor !== nextDraftTextColor ||
             node.aspectRatio !== config.aspectRatio ||
             node.imageSize !== config.imageSize ||
             (node.thinkingMode || 'minimal') !== (config.thinkingMode || 'minimal') ||
@@ -1826,6 +1885,14 @@ const AppContent: React.FC<AppContentProps> = () => {
                 aspectRatio: config.aspectRatio,
                 imageSize: config.imageSize,
                 model: config.model,
+                modelLabel: nextDraftModelLabel,
+                modelColorStart: nextDraftColorStart,
+                modelColorEnd: nextDraftColorEnd,
+                modelColorSecondary: nextDraftColorSecondary,
+                modelTextColor: nextDraftTextColor,
+                keySlotId: draftRouteState.keySlotId,
+                provider: draftRouteState.provider,
+                providerLabel: draftRouteState.providerLabel,
                 thinkingMode: config.thinkingMode || 'minimal',
                 enableGrounding: !!config.enableGrounding,
                 enableImageSearch: !!config.enableImageSearch,
@@ -1870,6 +1937,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isChatOpen,
     isMobile,
     isSidebarOpen,
+    resolveNodeRouteState,
     updatePromptNode,
   ]);
 
@@ -1988,7 +2056,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         )
       );
 
-      // 计算閫変腑鑺傜偣鐨勪腑蹇冧綅缃?
+      // 计算选中节点的中心位置
       const allPositions = [
         ...selectedPrompts.map(p => p.position),
         ...selectedImages.map(img => img.position),
@@ -2038,7 +2106,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [activeCanvas, handleNavigateToNode, selectedNodeIds]);
 
-  // 处理鎷栧叆图片创建瀛ょ嫭鍓崱
+  // 处理拖入图片并创建孤独副卡
   const handleImageDrop = useCallback(async (file: File, canvasPosition: { x: number; y: number }) => {
     if (!activeCanvas) return;
 
@@ -2049,7 +2117,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const dataUrl = e.target?.result as string;
         if (!dataUrl) return;
 
-        // 鑾峰彇图片尺寸
+        // 获取图片尺寸
         const img = new Image();
         img.onload = async () => {
           const calc = await import('./utils/imageUtils');
@@ -2061,7 +2129,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             console.error("Failed to save dropped image", err)
           );
 
-          // 计算瀹介珮姣?
+          // 计算宽高比
           const calcAspect = (w: number, h: number): AspectRatio => {
             const ratio = w / h;
             if (Math.abs(ratio - 1) < 0.1) return AspectRatio.SQUARE;
@@ -2069,7 +2137,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             return AspectRatio.LANDSCAPE_4_3;
           };
 
-          // 创建瀛ょ嫭鍓崱
+          // 创建孤独副卡
           const newImage: GeneratedImage = {
             id: Date.now().toString(),
             storageId,
@@ -2079,10 +2147,10 @@ const AppContent: React.FC<AppContentProps> = () => {
             timestamp: Date.now(),
             model: 'uploaded',
             canvasId: activeCanvas.id,
-            parentPromptId: '', // 瀛ょ嫭鍗＄墖鏃犵埗鑺傜偣
+            parentPromptId: '', // 孤独卡片无父节点
             position: canvasPosition,
-            dimensions: `${img.width}脳${img.height}`,
-            orphaned: true, // 标记涓哄鐙崱鐗?
+            dimensions: `${img.width}×${img.height}`,
+            orphaned: true, // 标记为孤独副卡
             fileName: file.name,
             fileSize: file.size
           };
@@ -3009,6 +3077,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         requiredCredits = perImageCreditCost || 1;
       }
 
+      if (requiredCredits > 0 && billingLoading) {
+        import('./services/system/notificationService').then(({ notify }) => {
+          notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
+        });
+        return;
+      }
       if (requiredCredits > 0 && balance < requiredCredits) {
         import('./services/system/notificationService').then(({ notify }) => {
           notify.error('生成失败', '您的账户余额不足，请先充值积分。');
@@ -3262,7 +3336,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       const previewSystemDisplay = previewModelMeta?.isSystemInternal
         ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
         : null;
-      const previewModelLabel = previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview;
+      const previewModelLabel = previewSystemDisplay?.displayName || resolveModelDisplayName(
+        config.model,
+        previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview,
+      );
       const selectedKey = useServerSideCreditSettlement
         ? null
         : selectedKeyForBilling;
@@ -3593,9 +3670,15 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
-    const resolvedRoute = resolveNodeRouteState(node);
-    let executionNode: PromptNode = {
+    const normalizedRetryModel = normalizeModelId(node.model);
+    const normalizedRetryNode: PromptNode = {
       ...node,
+      model: normalizedRetryModel,
+      modelLabel: resolveModelDisplayName(normalizedRetryModel, node.modelLabel || node.model),
+    };
+    const resolvedRoute = resolveNodeRouteState(normalizedRetryNode);
+    let executionNode: PromptNode = {
+      ...normalizedRetryNode,
       ...resolvedRoute,
     };
 
@@ -3635,7 +3718,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       : 0;
     const retryChargeAttempt = await ensureCreditAttemptCharged({
       modelId: executionNode.model,
-      modelLabel: executionNode.modelLabel || executionNode.model,
+      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
       providerId: retryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
       provider: executionNode.provider,
       requiredCredits: retryRequiredCredits,
@@ -3660,6 +3743,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     // 1. Reset state to generating
     updatePromptNode({
       ...executionNode,
+      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
       isGenerating: true,
       error: undefined,
       errorDetails: undefined,
@@ -3799,8 +3883,8 @@ const AppContent: React.FC<AppContentProps> = () => {
             actualKeySlotId = result.keySlotId || actualKeySlotId;
             actualProvider = result.provider || actualProvider;
             actualProviderLabel = result.providerName || actualProviderLabel;
-            actualModelLabel = result.modelName || actualModelLabel;
             actualModel = result.effectiveModel || actualModel;
+            actualModelLabel = resolveModelDisplayName(actualModel, result.modelName || actualModelLabel);
             actualCost = typeof result.cost === 'number' && Number.isFinite(result.cost)
               ? result.cost
               : undefined;
@@ -3822,10 +3906,11 @@ const AppContent: React.FC<AppContentProps> = () => {
           // Upload (non-blocking for latency)
           let url = b64;
           let originalUrl = '';
+          let apiResultUrl: string | undefined = undefined;
 
           if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT) {
-            originalUrl = b64;
             if (b64.startsWith('data:')) {
+              originalUrl = b64;
               import('./services/system/syncService').then(async ({ syncService }) => {
                 try {
                   const res = await fetch(b64);
@@ -3836,6 +3921,8 @@ const AppContent: React.FC<AppContentProps> = () => {
                   console.warn('Cloud image sync skipped because no real upload backend is configured yet.', e);
                 }
               }).catch(() => { });
+            } else if (/^https?:\/\//i.test(b64)) {
+              apiResultUrl = b64;
             }
           } else {
             // For video, assume URL is remote or data URI
@@ -3848,7 +3935,17 @@ const AppContent: React.FC<AppContentProps> = () => {
             : (Date.now() - startTime));
 
           // Calculate Hash/StorageID
-          const storageId = await calculateImageHash(url);
+          const normalizedOriginalSource = normalizePersistableMediaSource(
+            originalUrl || url,
+            currentMode === GenerationMode.VIDEO ? 'video/mp4' : 'image/png'
+          );
+          const storageId = await calculateImageHash(normalizedOriginalSource || url);
+
+          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT) {
+            if (normalizedOriginalSource) {
+              void saveOriginalImage(storageId, normalizedOriginalSource).catch(() => undefined);
+            }
+          }
 
           // 🎯 [Fair Billing] Detect ACTUAL dimensions from the blob/image
           // This ensures we bill for what was received (e.g. 1K), not what was requested (e.g. 4K)
@@ -3910,6 +4007,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             index,
             url,
             originalUrl,
+            apiResultUrl,
             prompt: taskPrompt,
             width: actualWidth,
             height: actualHeight,
@@ -4090,7 +4188,10 @@ const AppContent: React.FC<AppContentProps> = () => {
           keySlotId: alignedImageNodes[0]?.keySlotId || executionNode.keySlotId,
           provider: alignedImageNodes[0]?.provider || executionNode.provider,
           providerLabel: alignedImageNodes[0]?.providerLabel || executionNode.providerLabel,
-          modelLabel: alignedImageNodes[0]?.modelLabel || executionNode.modelLabel
+          modelLabel: resolveModelDisplayName(
+            alignedImageNodes[0]?.model || executionNode.model,
+            alignedImageNodes[0]?.modelLabel || executionNode.modelLabel,
+          )
         }
       });
 
@@ -4275,9 +4376,15 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleRetryPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
     if (!activeCanvas) return;
     if (node.mode !== GenerationMode.PPT) return;
-    const resolvedRoute = resolveNodeRouteState(node);
-    let executionNode: PromptNode = {
+    const normalizedRetryModel = normalizeModelId(node.model);
+    const normalizedRetryNode: PromptNode = {
       ...node,
+      model: normalizedRetryModel,
+      modelLabel: resolveModelDisplayName(normalizedRetryModel, node.modelLabel || node.model),
+    };
+    const resolvedRoute = resolveNodeRouteState(normalizedRetryNode);
+    let executionNode: PromptNode = {
+      ...normalizedRetryNode,
       ...resolvedRoute,
     };
 
@@ -4322,7 +4429,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       : 0;
     const pageRetryChargeAttempt = await ensureCreditAttemptCharged({
       modelId: executionNode.model,
-      modelLabel: executionNode.modelLabel || executionNode.model,
+      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
       providerId: pageRetryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
       provider: executionNode.provider,
       requiredCredits: pageRetryRequiredCredits,
@@ -4376,7 +4483,9 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     updateImageNode(target.id, {
       isGenerating: true,
-      error: undefined
+      error: undefined,
+      model: executionNode.model,
+      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
     });
 
     if (pageRetryUseServerSideCreditSettlement && pageRetryRequiredCredits > 0) {
@@ -4403,11 +4512,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       );
 
       let storageId = target.storageId;
-      if (result.url.startsWith('data:')) {
+      const persistableResultSource = normalizePersistableMediaSource(
+        result.url,
+        target.mimeType || 'image/png'
+      );
+      if (persistableResultSource) {
         try {
-          const hash = await calculateImageHash(result.url);
+          const hash = await calculateImageHash(persistableResultSource);
           storageId = hash;
-          await saveOriginalImage(hash, result.url);
+          await saveOriginalImage(hash, persistableResultSource);
         } catch {
           // ignore storage failures, keep in-memory preview
         }
@@ -4416,12 +4529,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       updateImageNode(target.id, {
         ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, result.providerName || target.providerLabel, result.provider || target.provider),
         url: result.url,
-        originalUrl: result.url,
+        originalUrl: result.url.startsWith('data:') ? result.url : undefined,
+        apiResultUrl: /^https?:\/\//i.test(result.url) ? result.url : undefined,
         prompt: taskPrompt,
         timestamp: Date.now(),
         generationTime: clampGenerationDurationMs(Date.now() - startTime),
         model: result.model || executionNode.model,
-        modelLabel: result.modelName || target.modelLabel,
+        modelLabel: resolveModelDisplayName(result.model || executionNode.model, result.modelName || target.modelLabel),
         modelColorStart: target.modelColorStart,
         modelColorEnd: target.modelColorEnd,
         modelColorSecondary: target.modelColorSecondary,
@@ -5290,7 +5404,7 @@ ${slideLayerXml.join('\n')}
       prompt: textToCopy,
       aspectRatio: clickedNode.aspectRatio,
       imageSize: clickedNode.imageSize,
-      model: clickedNode.model,
+      model: normalizeModelId(clickedNode.model),
       referenceImages: referenceImages,
       mode: clickedNode.mode || GenerationMode.IMAGE // 🎯 Sync Mode (Image/Video)
     }));
@@ -5305,7 +5419,7 @@ ${slideLayerXml.join('\n')}
   }, [setConfig]);
 
   const handleImageClick = useCallback((imageId: string) => {
-    // 🎯 Shift=切换(鍚戝悗鍏煎), 鏃犱慨楗伴敭=替换
+    // 🎯 Shift=切换（向后兼容），无修饰键=替换
     const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
     // Keep the parent prompt group focused so the subcard frame stays visible after click.
     setFocusedGroupId(sourceImage?.parentPromptId || null);
@@ -5355,7 +5469,8 @@ ${slideLayerXml.join('\n')}
         position: draftPos,
         aspectRatio: config.aspectRatio,
         imageSize: config.imageSize,
-        model: config.model,
+        model: normalizeModelId(config.model),
+        modelLabel: resolveModelDisplayName(config.model, getModelMetadata(config.model)?.name || config.model),
         childImageIds: [],
         referenceImages: [],  // The source image will be attached automatically in handleGenerate
         timestamp: Date.now(),
@@ -5510,6 +5625,15 @@ ${slideLayerXml.join('\n')}
         return;
       }
 
+      const lockedBounds = lockedGroupBoundsById[promptNode.id];
+      if (lockedBounds) {
+        // Rule: once a prompt-group drag starts, overlap detection keeps using the
+        // pre-drag expanded footprint until the drag ends, preventing focus/stack
+        // state from thrashing while subcards visually collapse.
+        boundsMap.set(promptNode.id, lockedBounds);
+        return;
+      }
+
       const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
       let minX = Infinity;
       let minY = Infinity;
@@ -5523,10 +5647,12 @@ ${slideLayerXml.join('\n')}
         maxY = Math.max(maxY, y);
       };
 
-      addRect(promptNode.position.x, promptNode.position.y, 380, promptNode.height || 200);
+      const livePromptPosition = liveNodePositionById[promptNode.id] ?? promptNode.position;
+      addRect(livePromptPosition.x, livePromptPosition.y, 380, promptNode.height || 200);
       childImages.forEach((imageNode) => {
         const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);
-        addRect(imageNode.position.x, imageNode.position.y, width, totalHeight);
+        const liveImagePosition = liveNodePositionById[imageNode.id] ?? imageNode.position;
+        addRect(liveImagePosition.x, liveImagePosition.y, width, totalHeight);
       });
 
       if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
@@ -5542,7 +5668,7 @@ ${slideLayerXml.join('\n')}
     });
 
     return boundsMap;
-  }, [activeCanvas, resolveCurrentPromptChildImages]);
+  }, [activeCanvas, lockedGroupBoundsById, liveNodePositionById, resolveCurrentPromptChildImages]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -5931,6 +6057,7 @@ ${slideLayerXml.join('\n')}
       setFocusedGroupId(null);
       liveNodePositionByIdRef.current = {};
       liveDerivedNodeIdsByOwnerRef.current = {};
+      promptDragOriginByIdRef.current = {};
       setLiveNodePositionById({});
       setLockedGroupBoundsById({});
       return;
@@ -5948,6 +6075,7 @@ ${slideLayerXml.join('\n')}
 
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
+  const promptDragOriginByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const syncLiveNodePositionState = useCallback(() => {
     const next = liveNodePositionByIdRef.current;
     setLiveNodePositionById((prev) => {
@@ -6045,9 +6173,17 @@ ${slideLayerXml.join('\n')}
   }, [resolveCanvasNodePositionForLiveDrag, syncLiveNodePositionState]);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
-    const groupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId)
+    const promptNode = activeCanvas?.promptNodes.find((candidate) => candidate.id === nodeId) ?? null;
+    const groupId = promptNode
       ? nodeId
       : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId)?.parentPromptId ?? null);
+
+    if (promptNode && position && !promptDragOriginByIdRef.current[nodeId]) {
+      promptDragOriginByIdRef.current = {
+        ...promptDragOriginByIdRef.current,
+        [nodeId]: promptNode.position,
+      };
+    }
 
     let nextLivePositions = liveNodePositionByIdRef.current;
     let hasLivePositionChanged = false;
@@ -6077,6 +6213,12 @@ ${slideLayerXml.join('\n')}
         const nextDerivedNodeIdsByOwner = { ...liveDerivedNodeIdsByOwnerRef.current };
         delete nextDerivedNodeIdsByOwner[nodeId];
         liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
+      }
+
+      if (promptNode && nodeId in promptDragOriginByIdRef.current) {
+        const nextPromptDragOrigins = { ...promptDragOriginByIdRef.current };
+        delete nextPromptDragOrigins[nodeId];
+        promptDragOriginByIdRef.current = nextPromptDragOrigins;
       }
     } else {
       const previous = nextLivePositions[nodeId];
@@ -7229,6 +7371,7 @@ ${slideLayerXml.join('\n')}
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
     const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
     const isGeneratingGroup = generatingGroupIds.includes(node.id);
+    const isPromptDragActive = Boolean(liveNodePositionById[node.id]);
     const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
     const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
     const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
@@ -7250,14 +7393,23 @@ ${slideLayerXml.join('\n')}
       : 320;
     // Tuck both connector ends slightly underneath the cards so the card surfaces
     // visually cover the dashed line instead of letting it float over the edges.
-    const promptConnectorDockInset = Math.max(2, Math.min(6, 4 / groupConnectorZoom));
-    const childConnectorDockInset = Math.max(2, Math.min(6, 4 / groupConnectorZoom));
+    const promptConnectorDockInset = 0;
+    const childConnectorDockInset = 0;
     const connectorOccluderInset = Math.max(4, Math.min(12, 8 / groupConnectorZoom));
     const connectorOccluderRadius = Math.max(18, Math.min(26, 22 / groupConnectorZoom));
     const connectorMaskId = `prompt-group-mask-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const connectorCanvasPadding = 128;
-    const groupConnectorNodes = groupView.childImages.map((childNode) => {
-      const childConnectorPosition = resolveLiveImagePosition(childNode) ?? childNode.position;
+    const collapsedChildGapX = 20;
+    const collapsedChildGapY = 28;
+    const promptDragOrigin = promptDragOriginByIdRef.current[node.id];
+    const promptDragDistance = (isPromptDragActive && promptDragOrigin)
+      ? Math.hypot(
+        promptConnectorPosition.x - promptDragOrigin.x,
+        promptConnectorPosition.y - promptDragOrigin.y,
+      )
+      : 0;
+    const childVisualLayoutsBase = groupView.childImages.map((childNode, childIndex) => {
+      const livePosition = resolveLiveImagePosition(childNode) ?? childNode.position;
       const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
       let imageHeight = theoreticalHeight;
 
@@ -7276,12 +7428,55 @@ ${slideLayerXml.join('\n')}
       const resolvedImageHeight = imageCardHeightById[childNode.id] ?? imageHeight;
 
       return {
-        key: `${node.id}-${childNode.id}`,
-        childConnectorPosition,
+        childNode,
+        childIndex,
         renderedWidth,
         resolvedImageHeight,
+        livePosition,
       };
     });
+    const childVisualLayouts = (() => {
+      if (!isPromptDragActive || !promptDragOrigin || childVisualLayoutsBase.length === 0) {
+        return childVisualLayoutsBase.map((layout) => ({
+          ...layout,
+          visualPosition: layout.livePosition,
+        }));
+      }
+
+      const totalRowWidth = childVisualLayoutsBase.reduce((sum, layout) => sum + layout.renderedWidth, 0)
+        + (Math.max(0, childVisualLayoutsBase.length - 1) * collapsedChildGapX);
+      let currentX = promptConnectorPosition.x - (totalRowWidth / 2);
+
+      return childVisualLayoutsBase.map((layout) => {
+        // Rule: dragging a main card does not hide subcards. Instead, every subcard
+        // converges toward a centered horizontal row under the prompt, and the
+        // connector path uses that exact same visual position.
+        const collapseTargetPosition = {
+          x: currentX + (layout.renderedWidth / 2),
+          y: promptConnectorPosition.y + collapsedChildGapY + layout.resolvedImageHeight,
+        };
+        currentX += layout.renderedWidth + collapsedChildGapX;
+        const collapseThreshold = 32 + (layout.childIndex * 24);
+        const collapseProgress = Math.max(0, Math.min(1, promptDragDistance / collapseThreshold));
+        const easedProgress = 1 - Math.pow(1 - collapseProgress, 2);
+        const visualPosition = {
+          x: layout.livePosition.x + ((collapseTargetPosition.x - layout.livePosition.x) * easedProgress),
+          y: layout.livePosition.y + ((collapseTargetPosition.y - layout.livePosition.y) * easedProgress),
+        };
+
+        return {
+          ...layout,
+          visualPosition,
+        };
+      });
+    })();
+    const groupConnectorNodes = childVisualLayouts.map((layout) => ({
+      key: `${node.id}-${layout.childNode.id}`,
+      childNode: layout.childNode,
+      childConnectorPosition: layout.visualPosition,
+      renderedWidth: layout.renderedWidth,
+      resolvedImageHeight: layout.resolvedImageHeight,
+    }));
     const promptCardLeft = promptConnectorPosition.x - (promptCardWidth / 2);
     const promptCardRight = promptConnectorPosition.x + (promptCardWidth / 2);
     const promptCardTop = promptConnectorPosition.y - promptCardHeight;
@@ -7475,32 +7670,32 @@ ${slideLayerXml.join('\n')}
           onDragStateChange={handleCanvasNodeDragStateChange}
         />
 
-        {groupView.childImages.map((childNode, childIndex) => (
-          <React.Fragment key={childNode.id}>
+        {groupConnectorNodes.map((childLayout, childIndex) => (
+          <React.Fragment key={childLayout.childNode.id}>
             <ImageNode
-              image={childNode}
+              image={childLayout.childNode}
               detailLevel="full"
               loadPriority={1200}
               loadBand={0}
-              groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
+              groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
               stackZIndexOverride={promptCardZIndex + 10 + childIndex}
               shadowBoost={shadowBoost}
-              position={resolveLiveImagePosition(childNode) ?? childNode.position}
+              position={childLayout.childConnectorPosition}
               onPositionChange={updateImageNodePosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}
-              highlighted={highlightedId === childNode.id || isGroupFocused}
+              highlighted={highlightedId === childLayout.childNode.id || isGroupFocused}
               onDimensionsUpdate={updateImageNodeDisplayMeta}
               onUpdate={updateImageNode}
               onDelete={deleteImageNode}
               onConnectEnd={handleConnectEnd}
               onClick={handleImageClick}
               onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-              isActive={childNode.id === activeSourceImage}
-              isSelected={selectedNodeIds.includes(childNode.id)}
+              isActive={childLayout.childNode.id === activeSourceImage}
+              isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
               onSelect={() => {
                 setFocusedGroupId(node.id);
-                handleCanvasNodeSelect(childNode.id);
+                handleCanvasNodeSelect(childLayout.childNode.id);
               }}
               zoomScale={canvasTransform.scale}
               isMobile={isMobile}
@@ -7508,7 +7703,7 @@ ${slideLayerXml.join('\n')}
               onPreviewPptStack={handleOpenPptStackPreview}
               onDownloadPptComposite={handleDownloadPptComposite}
               isCanvasTransforming={isCanvasTransforming}
-              isNew={(nowTimestamp || Date.now()) - (childNode.timestamp || 0) < 10000}
+              isNew={(nowTimestamp || Date.now()) - (childLayout.childNode.timestamp || 0) < 10000}
               canvasTransform={canvasTransform}
               onDragStateChange={handleCanvasNodeDragStateChange}
               onDragDelta={(delta, sourceNodeId) => {
@@ -7933,7 +8128,7 @@ ${slideLayerXml.join('\n')}
             onBillingClick={() => openProfileSurface('billing')}
             onRechargeClick={() => setShowRechargeModal(true)}
             balance={balance}
-            balanceLoading={balanceLoading}
+            balanceLoading={billingLoading}
             title="KK Studio"
             userName={derivedMobileUserName}
             userAvatarUrl={derivedMobileUserAvatarUrl}
@@ -8004,9 +8199,7 @@ ${slideLayerXml.join('\n')}
               <Sparkles size={18} fill="currentColor" className="text-blue-500" />
               <div className="flex items-center select-none gap-1">
                 <span className="text-[18px] font-mono font-bold leading-none min-w-[20px] drop-shadow-sm" style={{ color: 'var(--text-primary)' }}>
-                  {balanceLoading ? (
-                    <Loader2 size={16} className="animate-spin opacity-40 text-blue-400" />
-                  ) : remainingBalanceDisplay}
+                  {remainingBalanceDisplay}
                 </span>
                 <span className="text-[14px] font-bold leading-none text-blue-400">积分</span>
               </div>
@@ -8045,7 +8238,7 @@ ${slideLayerXml.join('\n')}
               setShowRechargeModal(true);
             }}
             balance={balance}
-            balanceLoading={balanceLoading}
+            balanceLoading={billingLoading}
             title="KK Studio"
             userName={derivedMobileUserName}
             userAvatarUrl={derivedMobileUserAvatarUrl}
@@ -8780,7 +8973,7 @@ ${slideLayerXml.join('\n')}
           />
         ))}
 
-        {/* 3. 鎸佷箙鍖栨彁绀鸿瘝鑺傜偣 */}
+        {/* 3. 持久化提示词节点 */}
         {renderedVisibleGroups}
         {renderedCanvasItems}
         {false && visiblePromptNodes.map(node => (
@@ -9257,8 +9450,11 @@ ${slideLayerXml.join('\n')}
                 position: nodePos,
                 aspectRatio: sourceImage.aspectRatio || config.aspectRatio,
                 imageSize: sourceImage.imageSize || config.imageSize,
-                model: sourceImage.model || config.model,
-                modelLabel: sourceImage.modelLabel || undefined,
+                model: normalizeModelId(sourceImage.model || config.model),
+                modelLabel: resolveModelDisplayName(
+                  sourceImage.model || config.model,
+                  sourceImage.modelLabel || getModelMetadata(sourceImage.model || config.model)?.name,
+                ) || undefined,
                 provider: sourceImage.provider || undefined,
                 providerLabel: sourceImage.providerLabel || undefined,
                 childImageIds: [],
@@ -9388,7 +9584,7 @@ ${slideLayerXml.join('\n')}
         </button>
       </div>}
 
-      {/* 🎯 杩佺Щ寮圭獥 */}
+      {/* 🎯 迁移弹窗 */}
       {showMigrateModal && (
         <Suspense fallback={null}>
           <MigrateModal
@@ -9447,17 +9643,19 @@ const App: React.FC = () => {
 
   const [showCostEstimation, setShowCostEstimation] = useState(false);
 
+  useEffect(() => {
+    if (!user) {
+      keyManager.setStartupStage('signed_out');
+      adminModelService.setStartupStage('signed_out');
+    }
+  }, [user]);
+
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {
     // Dynamic Import for Update Check
     import('./services/system/updateCheck').then(({ initUpdateCheck }) => {
       initUpdateCheck();
     });
-  }, []);
-
-  // 🎯 Pre-load admin models for credit-based model display
-  useEffect(() => {
-    adminModelService.loadAdminModels();
   }, []);
 
   if (loading) {
@@ -9485,28 +9683,19 @@ const App: React.FC = () => {
     );
   }
 
-  if (showCostEstimation) {
-    return (
-      <ThemeProvider>
-        <Suspense fallback={null}>
-          <CostEstimation
-            onBack={() => setShowCostEstimation(false)}
-          />
-        </Suspense>
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider>
-      <BillingProvider>
-        <CanvasProvider>
-          <NotificationToast />
-          {/* <UpdateNotification /> moved to InfiniteCanvas */}
-          <AppContent
-          />
-        </CanvasProvider>
-      </BillingProvider>
+      <AppStartupProvider>
+        <BillingProvider>
+          <CanvasProvider>
+            <AuthenticatedAppShell
+              showCostEstimation={showCostEstimation}
+              onExitCostEstimation={() => setShowCostEstimation(false)}
+              AppContentComponent={AppContent}
+            />
+          </CanvasProvider>
+        </BillingProvider>
+      </AppStartupProvider>
     </ThemeProvider>
   );
 };

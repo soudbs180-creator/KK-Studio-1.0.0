@@ -227,8 +227,8 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   embedded = false,
 }) => {
   const { pick, locale } = useLocale();
-  const { balance, usageLogs, refreshBilling, fetchLogs } = useBilling();
-  const remainingBalanceDisplay = formatRemainingCredits(balance, locale);
+  const { balance, loading: billingLoading, usageLogs, refreshBilling, fetchLogs } = useBilling();
+  const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
 
   const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
   const [summaryRows, setSummaryRows] = useState<CostBreakdownItem[]>([]);

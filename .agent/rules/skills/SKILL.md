@@ -3,7 +3,7 @@ trigger: glob
 description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码标准
 ---
 
-# KK Studio 设计系统 v2.2
+# KK Studio 设计系统 v2.9
 
 本文档定义 KK Studio 的完整设计规范，所有 AI 代码助手在修改 UI 时必须严格遵循。
 
@@ -11,7 +11,7 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 
 ## 🚨 当前项目基线（强制）
 
-- **当前项目版本**：`1.4.0`
+- **当前项目版本**：`1.4.1`
 - **版本源文件**：`package.json` + `src/config/appInfo.ts`
 - **文档基线文件**：`README.md`、`docs/development/session-handoff.md`、`docs/development/progress.md`
 - **规则基线文件**：`.agent/README.md` + 本文件
@@ -51,175 +51,20 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 
 ---
 
-## 🛰️ 多渠道 API 调用规范（新增）
+## 🛰️ 供应商 API 路由规范（新增）
 
-目标：输入地址+密钥后自动获取模型、探测能力，并在 UI 里只展示可用参数，避免互相串扰。
+- **专属规则文件**：详见 [vendor-routing/SKILL.md](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agent/rules/skills/vendor-routing/SKILL.md)
+- **适用范围**：当任务涉及 `12AI`、`GPT Best`、`New Suxi AI`、多协议代理、模型探测或协议回退时，优先参考专项文件。
 
-### 渠道拆分
-- 谷歌官方（无需填写地址）
-  - baseUrl 固定 `https://generativelanguage.googleapis.com`
-  - 鉴权：`?key=<API_KEY>`（或 header `x-goog-api-key`）
-  - 列表：`GET /v1beta/models`
-  - 调用：`/{v1|v1beta}/models/{model}:generateContent`；Imagen/Veo 用 `:predict`
-  - 仅在此渠道发送：`responseModalities["TEXT","IMAGE"]`、`generationConfig.imageConfig`
-
-- Gemini API CN（示例）
-  - baseUrl `https://gemini-api.cn`
-  - 鉴权：Header `Authorization: Bearer <KEY>`
-  - 端点：`/v1/chat/completions`（图片走 image_url）；若有 `/v1/images/generations` 再补
-  - 不发送谷歌专有字段
-
-- 其他 OpenAI 兼容/代理（OpenRouter/NewAPI/自建等）
-  - 统一用 header `Authorization: Bearer <KEY>`（如有特殊 header 放 extraHeaders）
-  - 端点：`/v1/chat/completions` / `/v1/images/generations`
-  - 模型名保持原样，不做跨渠道映射
-
-### 能力探测流程
-1) 选择渠道 + 填密钥（谷歌不用填地址）。
-2) 拉取模型列表：谷歌用 `/v1beta/models`；其他尝试 `/v1/models`，失败则用内置清单+探针。
-3) 轻量探针：
-   - 文本：最小 prompt
-   - 图片：小 prompt + 最小尺寸；尝试常见 aspectRatio/imageSize，失败即标记不支持
-4) UI 动态表单：只显示模型支持的参数；不支持项隐藏/禁用；调用前做参数校验。
-5) 缓存模型与探测结果（按渠道+key）；提供“重新探测”按钮。
-
-### 路由规则
-- 按 providerId 选择配置，模型映射仅在当前渠道生效。
-- 只有谷歌渠道做 v1/v1beta 选择和 imageConfig/responseModalities；其他渠道不做版本猜测、不发谷歌专有字段。
-- OpenRouter 额外头：`HTTP-Referer`、`X-Title`。
-- 签名渠道（如 volc/aliyun）在 auth.signer 钩子里做签名，不影响其他渠道。
-
-### 预设（代码侧已补）
-- `keyManager` 已新增 `gemini-api-cn` 预设：
-  - baseUrl `https://gemini-api.cn`
-  - format `openai`
-  - 默认模型示例：`gemini-2.5-flash-image`, `gemini-3-pro-image-preview`, `gemini-2.5-flash`, `gemini-3-flash-preview`
-
-- `keyManager` 已新增 `antigravity` 预设（本地代理）：
-  - baseUrl `http://127.0.0.1:8045`
-  - format `openai`
-  - 本地代理服务，支持 Gemini 和 OpenAI 协议
-  - 默认模型：`gemini-3-pro-image`, `gemini-3-flash`, `gemini-2.5-flash-image`, `gemini-2.5-flash`
-  - ⚠️ **推荐使用 Gemini 协议模式**（避免 OpenAI 模式的路径叠加 bug：/v1/chat/completions/responses）
-  - 使用方法：填入 Base URL 后，在协议选择处选 Gemini
-
----
-
-### 图片生成：Google Imagen 3（使用示例）
-- 端点：`POST https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=API_KEY`
-- Header：`Content-Type: application/json`
-- 请求体示例：
-  ```json
-  {
-    "instances": [{ "prompt": "a calm lake at sunrise" }],
-    "parameters": {
-      "sampleCount": 1,
-      "aspectRatio": "16:9"
-    }
-  }
-  ```
-- 仅在 Google 官方渠道使用；其他代理走各自的 images/chat-completions 兼容端点，不发送 predict/imageConfig。参考开源实现: https://github.com/lbjlaq/Antigravity-Manager
-
----
-
-### 供应商图片生成调用方法（4种方式）
-
-#### 方式一：OpenAI Images API (推荐)
-```python
-import openai
-
-client = openai.OpenAI(
-    api_key="sk-antigravity",
-    base_url="http://127.0.0.1:8045/v1"
-)
-
-# 生成图片
-response = client.images.generate(
-    model="gemini-3-pro-image",
-    prompt="一座未来主义风格的城市，赛博朋克，霓虹灯",
-    size="1920x1080",      # 支持任意 WIDTHxHEIGHT 格式，自动计算宽高比
-    quality="hd",          # "standard" | "hd" | "medium"
-    n=1,
-    response_format="b64_json"
-)
-
-# 保存图片
-import base64
-image_data = base64.b64decode(response.data[0].b64_json)
-with open("output.png", "wb") as f:
-    f.write(image_data)
-```
-
-**支持的参数：**
-- `size`: 任意 WIDTHxHEIGHT 格式（如 1280x720, 1024x1024, 1920x1080），自动计算并映射到标准宽高比（21:9, 16:9, 9:16, 4:3, 3:4, 1:1）
-- `quality`:
-  - `"hd"` → 4K 分辨率（高质量）
-  - `"medium"` → 2K 分辨率（中等质量）
-  - `"standard"` → 默认分辨率（标准质量）
-- `n`: 生成图片数量（1-10）
-- `response_format`: `"b64_json"` 或 `"url"`（Data URI）
-
----
-
-#### 方式二：Chat API + 参数设置 (✨ 新增)
-所有协议（OpenAI、Claude）的 Chat API 现在都支持直接传递 size 和 quality 参数：
-
-```python
-# OpenAI Chat API
-response = client.chat.completions.create(
-    model="gemini-3-pro-image",
-    size="1920x1080",      # ✅ 支持任意 WIDTHxHEIGHT 格式
-    quality="hd",          # ✅ "standard" | "hd" | "medium"
-    messages=[{"role": "user", "content": "一座未来主义风格的城市"}]
-)
-```
-
-```bash
-# Claude Messages API
-curl -X POST http://127.0.0.1:8045/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sk-antigravity" \
-  -d '{
-    "model": "gemini-3-pro-image",
-    "size": "1280x720",
-    "quality": "hd",
-    "messages": [{"role": "user", "content": "一只可爱的猫咪"}]
-  }'
-```
-
-**参数优先级:** 请求体参数 > 模型后缀
-
----
-
-#### 方式三：Chat 接口 + 模型后缀
-```python
-response = client.chat.completions.create(
-    model="gemini-3-pro-image-16-9-4k",  # 格式：gemini-3-pro-image-[比例]-[质量]
-    messages=[{"role": "user", "content": "一座未来主义风格的城市"}]
-)
-```
-
-**模型后缀说明：**
-- **宽高比**: `-16-9`, `-9-16`, `-4-3`, `-3-4`, `-21-9`, `-1-1`
-- **质量**: `-4k` (4K), `-2k` (2K), 不加后缀（标准）
-- **示例**: `gemini-3-pro-image-16-9-4k` → 16:9 比例 + 4K 分辨率
-
----
-
-#### 方式四：Cherry Studio 等客户端设置
-在支持 OpenAI 协议的客户端（如 Cherry Studio）中，可以通过模型设置页面配置图片生成参数：
-
-1. **进入模型设置**：选择 gemini-3-pro-image 模型
-2. **配置参数**：
-   - **Size (尺寸)**: 输入任意 WIDTHxHEIGHT 格式（如 1920x1080, 1024x1024）
-   - **Quality (质量)**: 选择 standard / hd / medium
-   - **Number (数量)**: 设置生成图片数量（1-10）
-3. **发送请求**：直接在对话框中输入图片描述即可
-
-**参数映射规则：**
-- `size`: "1920x1080" → 自动计算为 16:9 宽高比
-- `quality`: "hd" → 映射为 4K 分辨率
-- `quality`: "medium" → 映射为 2K 分辨率
+### 总体硬约束
+- 先识别供应商，再决定协议面；不要把供应商事实降级成 generic OpenAI-compatible 默认行为。
+- 不得因为模型名相似就跨供应商复用请求格式。
+- 供应商专属图片 / 视频 / 异步任务链路优先于泛化的 `/v1/images/generations` 假设。
+- 涉及供应商路由时，必须同时交叉检查：
+  - `src/services/api/providerStrategy.ts`
+  - `src/services/api/connectionTest.ts`
+  - `src/services/llm/OpenAICompatibleAdapter.ts`
+- 供应商识别、协议面、能力探测、回退规则和已知 drift 统一维护在专项文件中，不再继续堆进总纲。
 
 ---
 
@@ -1166,7 +1011,20 @@ function getTagColor(tagName: string): TagColor {
 
 ## 💻 代码规范 (Code Standards)
 
-### 1. 中文优先
+### 1. Cadence SKILL 代码规范与严格要求
+
+- **适用范围**：当任务要求输出 Cadence Virtuoso / CIW / OA 数据库相关的 `SKILL` 脚本时，本节规则优先于后续 TypeScript / React 规范。
+- **专属规则文件**：详见 [cadence-skill/SKILL.md](C:/Users/Administrator/Downloads/KK-Studio-1.0.0/.agent/rules/skills/cadence-skill/SKILL.md)。
+- **最低要求**：
+  - 必须使用纯正 Cadence SKILL 语法，不得混入 Python / C / Shell / Common Lisp 风格
+  - 所有局部变量必须纳入 `let( ... )` 作用域
+  - 必须使用准确的 Cadence GE / DB API
+  - 必须加入 `cellView`、选择集、关键参数、返回值的容错判断
+  - 必须加入详尽中文注释
+  - 必须在脚本后补充 CIW `load(...)` 与运行说明
+- **输出策略**：如果需求描述与 Cadence SKILL 实际 API 不一致，优先修正为可运行的 Cadence 写法，不输出伪代码。
+
+### 2. 中文优先（Web / TypeScript / React）
 
 ```typescript
 /**
@@ -1182,24 +1040,24 @@ export function calculateFitZoom(bounds: BoundingBox): number {
 }
 ```
 
-### 2. TypeScript 规范
+### 3. TypeScript 规范
 
 - **禁止 `any`** - 使用具体类型或 `unknown`
 - **显式返回类型** - 函数必须声明返回类型
 - **接口优于类型别名** - 优先使用 `interface`
 
-### 3. React 组件规范
+### 4. React 组件规范
 
 - **仅函数组件** - 禁止 Class Component
 - **Custom Hooks 封装** - 复杂逻辑提取到 Hook
 - **useMemo/useCallback** - 优化传递给子组件的值和函数
 
-### 4. 文件长度
+### 5. 文件长度
 
 - **限制 500 行** - 单个组件/Service
 - **最大 800 行** - 超过必须重构拆分
 
-### 5. 代码注释规范（中文强制）
+### 6. 代码注释规范（中文强制）
 
 ```typescript
 /**
@@ -1865,13 +1723,50 @@ describe('useImageLoader', () => {
 
 ---
 
-**KK Studio Design System v2.3**
-Last updated: 2026-03-24
+**KK Studio Design System v2.9**
+Last updated: 2026-04-07
 
 ## 📋 变更日志
 
+### v2.9 (2026-04-03)
+- 新增 `.agent/rules/skills/vendor-routing/SKILL.md` 作为供应商路由专项规则文件
+- 将总纲中的 `12AI`、`GPT Best`、`New Suxi AI` 大段路由细节下沉到专项文件
+- 保持总纲只保留供应商路由入口与硬约束，便于继续控制文档体积
+
+### v2.8 (2026-04-03)
+- 继续整理 Cadence 专项规则文件，移除重复模板段落，统一为“常用模板库 + 按任务类型输出模板”结构
+- 在 Cadence 专项文件中新增按任务类型输出模板，覆盖批量移动、按图层筛选删除、批量加 label、从 selection 生成 path / rect
+- 保持总纲只负责入口和硬约束，任务型脚本骨架继续下沉到 Cadence 专项文件
+
+### v2.7 (2026-04-03)
+- 新增 `.agent/rules/skills/cadence-skill/SKILL.md` 作为 Cadence SKILL 专项补充文件
+- 在专项文件中补充可复用模板库，覆盖选择集处理、几何创建、对象清理、CIW 调试与加载
+- 保持总纲只负责入口和硬约束，模板细节下沉到专项规则文件
+
+### v2.6 (2026-04-03)
+- 重新整理 `Cadence SKILL 代码规范与严格要求`，将约束改为更严格的硬性表述
+- 明确要求所有局部变量必须进入 `let( (...) ... )` 作用域，禁止隐式全局变量污染
+- 强化“纯正 Cadence SKILL 语法”要求，明确禁止混成 Python / C / Common Lisp 风格
+- 强化 Cadence GE / DB API 准确性、基础容错判断、中文注释与 CIW 加载运行说明
+- 将后续 `中文优先` 小节标注为 `Web / TypeScript / React` 适用域，避免与 Cadence SKILL 规则冲突
+
+### v2.5 (2026-04-03)
+- 在代码规范中新增 `Cadence SKILL 代码规范与严格要求`
+- 明确要求使用纯正 Cadence SKILL 语法，禁止混入 Python / C / Common Lisp 风格
+- 强化 `let` 局部变量作用域、Cadence API 准确性、基础容错判断与中文注释要求
+- 增加脚本交付后必须补充 CIW `load(...)` 与运行说明的约束
+
+### v2.4 (2026-04-03)
+- 重写供应商 API 路由规范，改为按 `12AI`、`GPT Best`、`New Suxi AI` 分节
+- 删除旧的“谷歌官方 / Gemini API CN / 其他 OpenAI 兼容”泛化拆分
+- 删除不准确的通用图片调用四分法，改为供应商专属协议面与任务链路
+- 补充 `12AI` 的 Gemini Native、Claude Messages 与 Async Image 规则
+- 补充 `GPT Best` 的 Bearer 鉴权、`/v1/models` 与 `supported_endpoint_types` 约束
+- 补充 `New Suxi AI` 的 Chat / Responses / Claude Native / Gemini Banana / OpenAI-format Banana Image 五个协议面
+- 标记本仓库当前与 live docs 的已知 drift，避免把本地适配经验误写成供应商事实
+
 ### v2.3 (2026-03-24)
-- 同步当前项目版本为 `1.4.0`
+- 同步当前项目版本为 `1.4.1`
 - 更新文档基线时间，并保持 README / progress / handoff 口径一致
 - 延续版本同步源文件与 `<project-root>` 路径规范
 - 补充当前阶段以设置中心、后台链路与鉴权稳态为主要关注方向

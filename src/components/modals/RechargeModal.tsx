@@ -157,7 +157,7 @@ const RechargeModal: React.FC = () => {
         if (response.data.paymentOrderStatus === 'paid' && response.data.settlementApplied) {
           setPaymentStatus('success');
           setPaymentMessage('支付成功，积分已经同步到当前余额。');
-          await refreshBilling();
+          await refreshBilling({ includeTransactions: true });
           notify.success('充值成功', pendingCredits ? `已到账 ${pendingCredits} 积分` : '积分已同步到余额。');
           return;
         }
@@ -356,7 +356,8 @@ const RechargeModal: React.FC = () => {
         amount: amount.toFixed(2),
         currency,
         returnUrl: buildReturnUrl(),
-        notifyUrl: buildPaymentSidecarAbsoluteUrl('/payment/v1/callbacks/alipay'),
+        // Use the legacy verified webhook path until the sidecar exposes a real third-party callback endpoint.
+        notifyUrl: buildPaymentSidecarAbsoluteUrl('/api/pay/notify/alipay'),
         idempotencyKey: `recharge-${user.id}-${currency}-${amount}-${Date.now()}`,
         userId: user.id,
       }, {

@@ -158,6 +158,71 @@
         "tests/unit/payment-server-settlement-bridge.test.ts"
       ],
       "removalCondition": "Delete once settlement write-back only occurs through the typed internal payment-settlement contract."
+    },
+    {
+      "path": "server/index.ts",
+      "role": "compatibility-layer",
+      "runtimeStatus": "bridge",
+      "currentPurpose": "Legacy Express shell that keeps old route mounts alive while forwarding auth and billing traffic into migrated apps/api modules.",
+      "upstreamCanonicalSource": "apps/api/src/server.ts",
+      "downstreamDependents": [
+        "server/auth_routes.ts",
+        "server/billing_routes.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/runtime-legacy-fallback-guards.test.ts",
+        "tests/unit/hosted-release-guardrails.test.ts"
+      ],
+      "removalCondition": "Delete once all local and hosted callers stop booting the legacy server shell and only apps/api remains as the business API entrypoint."
+    },
+    {
+      "path": "server/auth_routes.ts",
+      "role": "compatibility-layer",
+      "runtimeStatus": "bridge",
+      "currentPurpose": "Bridge mount that preserves legacy auth route paths while delegating behavior into the migrated apps/api auth module.",
+      "upstreamCanonicalSource": "apps/api/src/modules/auth",
+      "downstreamDependents": [
+        "server/index.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/auth-http-routes.test.ts",
+        "tests/unit/runtime-legacy-fallback-guards.test.ts"
+      ],
+      "removalCondition": "Delete once no caller depends on the legacy server auth route mount and hosted/browser auth stays on the Supabase-first path only."
+    },
+    {
+      "path": "server/billing_routes.ts",
+      "role": "compatibility-layer",
+      "runtimeStatus": "bridge",
+      "currentPurpose": "Bridge mount that preserves legacy billing route paths while delegating behavior into the migrated apps/api billing module.",
+      "upstreamCanonicalSource": "apps/api/src/modules/billing",
+      "downstreamDependents": [
+        "server/index.ts"
+      ],
+      "riskLevel": "high",
+      "regressionTests": [
+        "tests/unit/billing-http-routes.test.ts",
+        "tests/unit/runtime-legacy-fallback-guards.test.ts"
+      ],
+      "removalCondition": "Delete once local and hosted runtimes stop exposing the legacy billing mount and only the typed /api/v1/billing surface remains."
+    },
+    {
+      "path": "api/auth-password-login.ts",
+      "role": "compatibility-layer",
+      "runtimeStatus": "local-only",
+      "currentPurpose": "Local-only same-origin password proxy that can bridge browser network failures into Supabase auth during explicitly allowed fallback scenarios.",
+      "upstreamCanonicalSource": "supabase.auth.signInWithPassword",
+      "downstreamDependents": [
+        "src/services/auth/passwordSignIn.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/password-sign-in-fallback.test.ts",
+        "tests/unit/hosted-release-guardrails.test.ts"
+      ],
+      "removalCondition": "Delete once hosted and local password login flows no longer require a same-origin proxy fallback and Supabase-first auth is stable everywhere."
     }
   ]
 }

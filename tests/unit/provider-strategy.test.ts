@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import {
+  detectGptBestEvidence,
   resolveProviderKeyType,
   resolveProviderModelCompatibilityIssue,
   resolveProviderRuntime,
+  shouldBypassChatCompatibilityForImages,
 } from "../../src/services/api/providerStrategy.ts";
 
 describe("provider strategy", () => {
@@ -51,14 +53,14 @@ describe("provider strategy", () => {
     );
   });
 
-  test("blocks 12AI routes from advertising unsupported Gemini image preview models", () => {
+  test("keeps 12AI async-image preview models available", () => {
     assert.equal(
       resolveProviderModelCompatibilityIssue({
         provider: "12AI",
         baseUrl: "https://cdn.12ai.org",
         modelId: "gemini-3.1-flash-image-preview",
       }),
-      "12AI 图片路由当前只支持 gemini-2.5-flash-image 和 gemini-3-pro-image-preview，当前模型 gemini-3.1-flash-image-preview 不在 12AI 文档支持列表中。",
+      null,
     );
   });
 
@@ -82,14 +84,122 @@ describe("provider strategy", () => {
     );
   });
 
-  test("forces GPT Best routes onto query auth even when legacy header auth is stored", () => {
+  test("still blocks unknown 12AI image models", () => {
+    assert.equal(
+      resolveProviderModelCompatibilityIssue({
+        provider: "12AI",
+        baseUrl: "https://cdn.12ai.org",
+        modelId: "gemini-4-flash-image-preview",
+      }),
+      "12AI 图片路由当前只支持 gemini-2.5-flash-image、gemini-3.1-flash-image-preview 和 gemini-3-pro-image-preview，当前模型 gemini-4-flash-image-preview 不在 12AI 文档支持列表中。",
+    );
+  });
+
+  test("keeps GPT Best on bearer-header auth even when legacy query auth is stored", () => {
     const runtime = resolveProviderRuntime({
       provider: "GPT Best",
       baseUrl: "https://gpt-best.apifox.cn",
       format: "openai",
-      authMethod: "header",
+      authMethod: "query",
     });
 
-    assert.equal(runtime.authMethod, "query");
+    assert.equal(runtime.authMethod, "header");
+    assert.equal(runtime.headerName, "Authorization");
+    assert.equal(runtime.authorizationValueFormat, "bearer");
+  });
+
+  test("recognizes GPT Best provider aliases with spaces", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "gpt best",
+      format: "openai",
+    });
+
+    assert.equal(runtime.strategyId, "gpt-best");
+    assert.equal(runtime.authMethod, "header");
+  });
+
+  test("marks GPT Best llms.txt as provider evidence but not an API base", () => {
+    const evidence = detectGptBestEvidence({
+      baseUrl: "https://gpt-best.apifox.cn/llms.txt",
+    });
+
+    assert.equal(evidence.providerId, "gpt-best");
+    assert.equal(evidence.sourceType, "docs-url");
+    assert.equal(evidence.isDocumentationUrl, true);
+    assert.equal(evidence.canUseAsApiBaseUrl, false);
+  });
+
+  test("keeps GPT Best explicit provider aliases usable with non-doc API hosts", () => {
+    const evidence = detectGptBestEvidence({
+      provider: "GPT Best",
+      baseUrl: "https://gateway.example.com/v1",
+    });
+
+    assert.equal(evidence.providerId, "gpt-best");
+    assert.equal(evidence.sourceType, "explicit-provider");
+    assert.equal(evidence.isDocumentationUrl, false);
+    assert.equal(evidence.canUseAsApiBaseUrl, true);
+  });
+
+  test("recognizes New Suxi aliases and claude-native routing", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "New Suxi AI",
+      baseUrl: "https://new.suxi.ai",
+      format: "claude",
+    });
+
+    assert.equal(runtime.strategyId, "suxi");
+    assert.equal(runtime.protocolFamily, "claude-native");
+    assert.equal(runtime.authMethod, "header");
+    assert.equal(runtime.headerName, "Authorization");
+    assert.equal(runtime.authorizationValueFormat, "bearer");
+  });
+
+  test("keeps New Suxi image traffic on dedicated surfaces even when chat compatibility is stored", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "New Suxi AI",
+      baseUrl: "https://new.suxi.ai",
+      compatibilityMode: "chat",
+    });
+
+    assert.equal(runtime.imageRoutingPolicy, "surface-first");
+    assert.equal(shouldBypassChatCompatibilityForImages(runtime), true);
+  });
+
+  test("keeps generic custom providers on chat-first image routing by default", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Custom",
+      baseUrl: "https://example.com/v1",
+      compatibilityMode: "chat",
+    });
+
+    assert.equal(runtime.imageRoutingPolicy, "chat-first");
+    assert.equal(shouldBypassChatCompatibilityForImages(runtime), false);
+  });
+
+  test("recognizes Flow2API and defaults it to chat-first OpenAI compatibility", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Flow2API",
+      baseUrl: "http://127.0.0.1:8000",
+      format: "openai",
+    });
+
+    assert.equal(runtime.strategyId, "flow2api");
+    assert.equal(runtime.protocolFamily, "openai-compatible");
+    assert.equal(runtime.compatibilityMode, "chat");
+    assert.equal(runtime.imageRoutingPolicy, "chat-first");
+    assert.equal(runtime.authMethod, "header");
+    assert.equal(runtime.headerName, "Authorization");
+  });
+
+  test("blocks Flow2API video models until KK-Studio task polling is adapted", () => {
+    assert.match(
+      String(resolveProviderModelCompatibilityIssue({
+        provider: "Flow2API",
+        baseUrl: "http://127.0.0.1:8000",
+        modelId: "veo_3_1_t2v_fast_landscape",
+      }) || ""),
+      /Flow2API/,
+    );
   });
 });

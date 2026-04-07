@@ -3,8 +3,6 @@
  * 安全原则：密钥只存在于后端，前端只获取 token
  */
 
-import axios from 'axios'
-
 // 从环境变量读取（不要硬编码！）
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || ''
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
@@ -37,22 +35,26 @@ export async function verifyTurnstileToken(
   }
 
   try {
-    const response = await axios.post<TurnstileResponse>(
+    const response = await fetch(
       TURNSTILE_VERIFY_URL,
-      new URLSearchParams({
+      {
+        method: 'POST',
+        body: new URLSearchParams({
         secret: TURNSTILE_SECRET_KEY,
         response: token,
         ...(ip && { remoteip: ip }),
-      }),
-      {
+        }),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        timeout: 5000,
       }
     )
 
-    const data = response.data
+    if (!response.ok) {
+      return { success: false, error: '验证服务暂时不可用' }
+    }
+
+    const data = await response.json() as TurnstileResponse
 
     if (data.success) {
       console.log('[Turnstile] 验证成功:', data.hostname)

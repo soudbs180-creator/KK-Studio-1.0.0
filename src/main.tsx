@@ -7,16 +7,65 @@ import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
 import { initializeThemeOnBoot } from './context/ThemeContext';
 import { disableVercelToolbar } from './utils/disableVercelToolbar';
+import {
+  DEFAULT_LANGUAGE,
+  LANGUAGE_STORAGE_KEY,
+  type ResolvedLanguage,
+  localizeUserFacingText,
+  normalizeLanguage,
+  pickByResolvedLanguage,
+} from './utils/localeText';
 
 type FatalError = {
   message: string;
   details?: string;
 };
 
+function getStoredStartupLanguage(): ResolvedLanguage {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LANGUAGE;
+  }
+
+  try {
+    return normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
+  } catch {
+    return DEFAULT_LANGUAGE;
+  }
+}
+
+function applyStartupLanguage(language: ResolvedLanguage) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.documentElement.lang = language;
+  document.documentElement.dataset.language = language;
+}
+
+function syncStartupLanguage() {
+  const language = getStoredStartupLanguage();
+  applyStartupLanguage(language);
+  return language;
+}
+
+function pickStartupText<T>(zh: T, en: T): T {
+  return pickByResolvedLanguage(getStoredStartupLanguage(), zh, en);
+}
+
+function localizeStartupErrorText(value?: string) {
+  if (!value) {
+    return value;
+  }
+
+  return localizeUserFacingText(value) || value;
+}
+
+syncStartupLanguage();
+
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error('找不到根节点 #root，应用无法挂载。');
+  throw new Error(pickStartupText('找不到根节点 #root，应用无法挂载。', 'Could not find root element to mount to.'));
 }
 
 const root = createRoot(rootElement);
@@ -28,7 +77,7 @@ initializeThemeOnBoot();
 function normalizeError(error: unknown): FatalError {
   if (error instanceof Error) {
     return {
-      message: error.message || '应用启动失败',
+      message: error.message || pickStartupText('应用启动失败', 'App failed to start'),
       details: error.stack || error.toString(),
     };
   }
@@ -39,11 +88,11 @@ function normalizeError(error: unknown): FatalError {
 
   try {
     return {
-      message: '应用启动失败',
+      message: pickStartupText('应用启动失败', 'App failed to start'),
       details: JSON.stringify(error, null, 2),
     };
   } catch {
-    return { message: '应用启动失败' };
+    return { message: pickStartupText('应用启动失败', 'App failed to start') };
   }
 }
 
@@ -51,17 +100,18 @@ function getDeploymentHints(): string[] {
   const hints: string[] = [];
 
   if (!import.meta.env.VITE_SUPABASE_URL) {
-    hints.push('缺少 `VITE_SUPABASE_URL` 环境变量');
+    hints.push(pickStartupText('缺少 `VITE_SUPABASE_URL` 环境变量', 'Missing `VITE_SUPABASE_URL` environment variable'));
   }
 
   if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
-    hints.push('缺少 `VITE_SUPABASE_ANON_KEY` 环境变量');
+    hints.push(pickStartupText('缺少 `VITE_SUPABASE_ANON_KEY` 环境变量', 'Missing `VITE_SUPABASE_ANON_KEY` environment variable'));
   }
 
   return hints;
 }
 
 function FatalScreen({ error }: { error: FatalError }) {
+  const language = syncStartupLanguage();
   const hints = getDeploymentHints();
 
   return (
@@ -89,8 +139,12 @@ function FatalScreen({ error }: { error: FatalError }) {
         }}
       >
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>KK Studio 启动诊断</div>
-          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: '#f87171', margin: 0 }}>应用启动失败，已拦截白屏</h1>
+          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>
+            {pickByResolvedLanguage(language, 'KK Studio 启动诊断', 'KK Studio Startup Diagnostics')}
+          </div>
+          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: '#f87171', margin: 0 }}>
+            {pickByResolvedLanguage(language, '应用启动失败，已拦截白屏', 'The app failed to start and the blank screen was blocked')}
+          </h1>
         </div>
 
         <div
@@ -102,8 +156,12 @@ function FatalScreen({ error }: { error: FatalError }) {
             marginBottom: '16px',
           }}
         >
-          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '6px' }}>错误信息</div>
-          <div style={{ fontSize: '16px', color: '#fafafa', fontWeight: 600, marginBottom: '10px' }}>{error.message}</div>
+          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '6px' }}>
+            {pickByResolvedLanguage(language, '错误信息', 'Error details')}
+          </div>
+          <div style={{ fontSize: '16px', color: '#fafafa', fontWeight: 600, marginBottom: '10px' }}>
+            {localizeStartupErrorText(error.message)}
+          </div>
           {error.details && (
             <pre
               style={{
@@ -132,7 +190,9 @@ function FatalScreen({ error }: { error: FatalError }) {
               marginBottom: '16px',
             }}
           >
-            <div style={{ fontSize: '14px', color: '#fbbf24', marginBottom: '8px', fontWeight: 600 }}>部署检查项</div>
+            <div style={{ fontSize: '14px', color: '#fbbf24', marginBottom: '8px', fontWeight: 600 }}>
+              {pickByResolvedLanguage(language, '部署检查项', 'Deployment checks')}
+            </div>
             <ul style={{ margin: 0, paddingLeft: '18px', color: '#fde68a', lineHeight: 1.7 }}>
               {hints.map((hint) => (
                 <li key={hint}>{hint}</li>
@@ -153,7 +213,7 @@ function FatalScreen({ error }: { error: FatalError }) {
               cursor: 'pointer',
             }}
           >
-            重新加载
+            {pickByResolvedLanguage(language, '重新加载', 'Reload')}
           </button>
           <button
             onClick={() => {
@@ -170,7 +230,7 @@ function FatalScreen({ error }: { error: FatalError }) {
               cursor: 'pointer',
             }}
           >
-            清理本地缓存后重试
+            {pickByResolvedLanguage(language, '清理本地缓存后重试', 'Clear local cache and retry')}
           </button>
         </div>
       </div>

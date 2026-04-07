@@ -126,15 +126,57 @@ function buildErrorResult(
 }
 
 function buildLegacyNotifyUrl(origin: string): string {
-  return buildAbsoluteUrl(origin, "/payment/v1/callbacks/alipay");
+  return String(process.env.PAYMENT_NOTIFY_URL || buildAbsoluteUrl(origin, "/api/pay/notify/alipay"));
 }
 
 function buildLegacyReturnUrl(origin: string): string {
   return String(process.env.PAYMENT_RETURN_URL || buildAbsoluteUrl(origin, "/pay/success"));
 }
 
+function sanitizeLegacyOverrideUrl(candidate: string | null, fallback: string): string {
+  const normalized = String(candidate || "").trim();
+  if (!normalized || !isAbsoluteUrl(normalized)) {
+    return fallback;
+  }
+
+  try {
+    const fallbackUrl = new URL(fallback);
+    const candidateUrl = new URL(normalized);
+    return candidateUrl.origin === fallbackUrl.origin ? candidateUrl.toString() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function isManualCheckoutEnabled(): boolean {
   return String(process.env.PAYMENT_SIDECAR_ALLOW_MANUAL_CHECKOUT || "").trim().toLowerCase() === "true";
+}
+
+function isLoopbackHost(host: string | undefined): boolean {
+  const normalized = String(host || "").trim().toLowerCase();
+  if (!normalized) return false;
+
+  try {
+    const candidate = normalized.includes("://") ? new URL(normalized).hostname : normalized.replace(/:\d+$/, "");
+    return candidate === "localhost" || candidate === "127.0.0.1" || candidate === "::1" || candidate === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackRemoteAddress(remoteAddress: string | undefined): boolean {
+  const normalized = String(remoteAddress || "").trim().toLowerCase();
+  return normalized === "127.0.0.1"
+    || normalized === "::1"
+    || normalized === "[::1]"
+    || normalized === "::ffff:127.0.0.1";
+}
+
+function isManualCheckoutRequestTrusted(
+  headers: Record<string, string>,
+  remoteAddress?: string,
+): boolean {
+  return isLoopbackRemoteAddress(remoteAddress) || isInternalRequestAuthorized(headers);
 }
 
 export function validateCreatePaymentOrderRequest(body: unknown): ApiErrorDetail[] {
@@ -349,8 +391,8 @@ export async function handleLegacyCreateQrCode(
     providerCode: "alipay",
     amount: amount.toFixed(2),
     currency,
-    returnUrl: String(query.get("returnUrl") || buildLegacyReturnUrl(origin)),
-    notifyUrl: String(query.get("notifyUrl") || buildLegacyNotifyUrl(origin)),
+    returnUrl: sanitizeLegacyOverrideUrl(query.get("returnUrl"), buildLegacyReturnUrl(origin)),
+    notifyUrl: sanitizeLegacyOverrideUrl(query.get("notifyUrl"), buildLegacyNotifyUrl(origin)),
     idempotencyKey: `legacy-${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     userId,
   };
@@ -500,7 +542,17 @@ export async function handleLegacyRedirect(
 export async function handleCheckoutPage(
   service: PaymentService,
   merchantOrderNo: string,
+  headers: Record<string, string> = {},
+  remoteAddress?: string,
 ): Promise<HttpRouteResult> {
+  if (!isManualCheckoutRequestTrusted(headers, remoteAddress)) {
+    return {
+      statusCode: 403,
+      contentType: "text/html; charset=utf-8",
+      body: "<html><body><h1>Checkout Forbidden</h1><p>This checkout view is restricted to trusted local verification requests.</p></body></html>",
+    };
+  }
+
   const order = await service.getOrder(merchantOrderNo);
   if (!order) {
     return {
@@ -565,12 +617,21 @@ export async function handleCheckoutComplete(
   service: PaymentService,
   merchantOrderNo: string,
   headers: Record<string, string>,
+  remoteAddress?: string,
 ): Promise<HttpRouteResult> {
   if (!isManualCheckoutEnabled()) {
     return {
       statusCode: 403,
       contentType: "text/html; charset=utf-8",
       body: "<html><body><h1>Manual Checkout Disabled</h1><p>Enable PAYMENT_SIDECAR_ALLOW_MANUAL_CHECKOUT=true for local verification.</p></body></html>",
+    };
+  }
+
+  if (!isManualCheckoutRequestTrusted(headers, remoteAddress)) {
+    return {
+      statusCode: 403,
+      contentType: "text/html; charset=utf-8",
+      body: "<html><body><h1>Manual Checkout Forbidden</h1><p>This endpoint is restricted to trusted local verification requests.</p></body></html>",
     };
   }
 

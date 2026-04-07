@@ -104,7 +104,7 @@ describe("payment sidecar contract", () => {
         currency: "CNY",
         creditAmount: 25,
         returnUrl: "https://kkai.plus/pay/success",
-        notifyUrl: `${sidecarBaseUrl}/payment/v1/callbacks/alipay`,
+        notifyUrl: `${sidecarBaseUrl}/api/pay/notify/alipay`,
         idempotencyKey: "idem-contract-payment-1",
       }),
     });
@@ -145,7 +145,7 @@ describe("payment sidecar contract", () => {
     const initialStatusPayload = await initialStatus.json();
     assert.equal(initialStatusPayload.tradeStatus, "WAITING");
 
-    const callbackResponse = await fetch(`${sidecarBaseUrl}/payment/v1/callbacks/alipay`, {
+    const callbackResponse = await fetch(`${sidecarBaseUrl}/internal/v1/payment-callbacks/alipay`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -167,7 +167,7 @@ describe("payment sidecar contract", () => {
     assert.equal(callbackPayload.success, true);
     assert.equal(callbackPayload.data.paymentOrderStatus, "paid");
 
-    const duplicateCallbackResponse = await fetch(`${sidecarBaseUrl}/payment/v1/callbacks/alipay`, {
+    const duplicateCallbackResponse = await fetch(`${sidecarBaseUrl}/internal/v1/payment-callbacks/alipay`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -228,5 +228,26 @@ describe("payment sidecar contract", () => {
     assert.equal(typedStatusAfterPayload.success, true);
     assert.equal(typedStatusAfterPayload.data.paymentOrderStatus, "paid");
     assert.equal(typedStatusAfterPayload.data.settlementApplied, true);
+  });
+
+  test("rejects the deprecated public callback route with a migration hint", async () => {
+    const response = await fetch(`${sidecarBaseUrl}/payment/v1/callbacks/alipay`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-contract-payment-callback-deprecated",
+      },
+      body: JSON.stringify({
+        callbackId: "callback-deprecated",
+        merchantOrderNo: "ORDER_DOES_NOT_MATTER",
+        tradeStatus: "TRADE_SUCCESS",
+        payload: {},
+      }),
+    });
+
+    assert.equal(response.status, 410);
+    const payload = await response.json();
+    assert.equal(payload.success, false);
+    assert.equal(payload.error.code, "PUBLIC_CALLBACK_ROUTE_DISABLED");
   });
 });

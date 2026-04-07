@@ -13,6 +13,32 @@
 
 import { fileSystemService } from './fileSystemService';
 
+const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/=\r\n]+$/;
+
+export function normalizePersistableMediaSource(source?: string | null, fallbackMimeType: string = 'image/png'): string {
+    const raw = typeof source === 'string' ? source.trim() : '';
+    if (!raw) return '';
+
+    if (
+        raw.startsWith('data:')
+        || raw.startsWith('blob:')
+        || raw.startsWith('file:')
+        || raw.startsWith('http://')
+        || raw.startsWith('https://')
+    ) {
+        return raw;
+    }
+
+    const cleaned = raw.replace(/[\r\n\s]+/g, '');
+    if (!cleaned) return '';
+
+    if (!BASE64_LIKE_PATTERN.test(cleaned) || cleaned.length < 64) {
+        return raw;
+    }
+
+    return `data:${fallbackMimeType};base64,${cleaned}`;
+}
+
 const DB_NAME = 'kk_studio_db';
 const DB_VERSION = 1;
 const IMAGES_STORE = 'images';
@@ -114,23 +140,24 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 // 修改 toBlobFromAnyUrl: 增加 CORS Fallback 重试
 async function toBlobFromAnyUrl(dataURL: string): Promise<Blob | null> {
     try {
-        if (!dataURL) return null;
+        const normalizedSource = normalizePersistableMediaSource(dataURL);
+        if (!normalizedSource) return null;
 
-        if (dataURL.startsWith('data:')) {
+        if (normalizedSource.startsWith('data:')) {
             const { dataURLToBlob } = await import('./blobUtils');
-            const blob = await dataURLToBlob(dataURL);
+            const blob = await dataURLToBlob(normalizedSource);
             return blob?.size && blob.size > 0 ? blob : null;
         }
 
-        if (dataURL.startsWith('blob:') || dataURL.startsWith('http://') || dataURL.startsWith('https://')) {
+        if (normalizedSource.startsWith('blob:') || normalizedSource.startsWith('http://') || normalizedSource.startsWith('https://')) {
             let res;
             try {
-                res = await fetch(dataURL);
+                res = await fetch(normalizedSource);
             } catch (fetchErr) {
                 // 如果是直接 fetch 遇到网络截断(CORS)，尝试使用 corsproxy.io 进行最后挣扎
-                if (dataURL.startsWith('http')) {
+                if (normalizedSource.startsWith('http')) {
                     console.warn(`[ImageStorage] 直接下载失败，尝试使用 CORS 代理下载: ${dataURL.substring(0, 50)}...`, fetchErr);
-                    res = await fetch(`https://corsproxy.io/?${encodeURIComponent(dataURL)}`);
+                    res = await fetch(`https://corsproxy.io/?${encodeURIComponent(normalizedSource)}`);
                 } else {
                     throw fetchErr;
                 }
@@ -145,7 +172,7 @@ async function toBlobFromAnyUrl(dataURL: string): Promise<Blob | null> {
         return null;
     } catch (err) {
         // 如果两次 fetch 都抛出异常，继续按原来的回退逻辑传递给上层
-        if (dataURL.startsWith('http')) {
+        if (normalizePersistableMediaSource(dataURL).startsWith('http')) {
             throw new Error('FETCH_FAILED');
         }
         return null;
@@ -327,25 +354,28 @@ export function generateImageId(): string {
  */
 export async function saveImage(id: string, dataURL: string): Promise<void> {
     try {
+        const normalizedSource = normalizePersistableMediaSource(dataURL);
         let saveObject: StoredImageRecord = {
             id,
             timestamp: Date.now()
         };
 
         try {
-            const blob = await toBlobFromAnyUrl(dataURL);
+            const blob = await toBlobFromAnyUrl(normalizedSource);
 
             if (blob) {
                 saveObject.blob = blob;
             } else {
                 console.debug(`[ImageStorage] Cannot save ${id}: invalid or expired URL`);
-                memoryCache.set(id, dataURL);
+                if (normalizedSource) {
+                    memoryCache.set(id, normalizedSource);
+                }
                 return;
             }
         } catch (err: any) {
             if (err.message === 'FETCH_FAILED') {
                 console.log(`[ImageStorage] Cannot convert ${id} to Blob due to CORS, saving raw URL instead`);
-                saveObject.url = dataURL;
+                saveObject.url = normalizedSource;
             } else {
                 throw err;
             }
@@ -868,9 +898,22 @@ export async function deleteImageAllQualities(id: string): Promise<void> {
  */
 export async function saveOriginalImage(id: string, dataURL: string, isVideo: boolean = false): Promise<void> {
     const MAX_RETRIES = 3;
+    const normalizedSource = normalizePersistableMediaSource(
+        dataURL,
+        isVideo ? 'video/mp4' : 'image/png'
+    );
+    const isTransientBlobSource = normalizedSource.startsWith('blob:');
 
     for (let i = 0; i < MAX_RETRIES; i++) {
         try {
+            const existingRecord = await getStoredImageRecord(id);
+            const hasProtectedOriginal = !!existingRecord && (
+                existingRecord.protected === true || existingRecord.quality === 'original'
+            );
+            if (hasProtectedOriginal && isTransientBlobSource) {
+                console.debug(`[ImageStorage] Skip re-saving protected original ${id} from transient blob URL`);
+                return;
+            }
             let saveObject: StoredImageRecord = {
                 id,
                 quality: 'original',
@@ -880,7 +923,7 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
             let candidateMetrics: ImageMetrics | null = null;
 
             try {
-                const blob = await toBlobFromAnyUrl(dataURL);
+                const blob = await toBlobFromAnyUrl(normalizedSource);
 
                 if (blob) {
                     saveObject.blob = blob;
@@ -893,13 +936,17 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
                         }
                     }
                 } else {
-                    console.warn(`[ImageStorage] Cannot save original ${id}: invalid or expired URL`);
+                    if (isTransientBlobSource) {
+                        console.debug(`[ImageStorage] Skip original save for transient blob ${id}: source is no longer available`);
+                    } else {
+                        console.warn(`[ImageStorage] Cannot save original ${id}: invalid or expired URL`);
+                    }
                     return;
                 }
             } catch (err: any) {
                 if (err.message === 'FETCH_FAILED') {
                     console.log(`[ImageStorage] Cannot convert original ${id} to Blob due to CORS, saving raw URL instead`);
-                    saveObject.url = dataURL;
+                    saveObject.url = normalizedSource;
                 } else {
                     throw err;
                 }
@@ -908,11 +955,6 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
             // 1. 🚀【重要变更】此处原有的自动备份到本地文档系统 (globalHandle) 逻辑已被移除！
             // 原因：为了支持项目独立文档夹架构，本地落盘由 CanvasContext.addImageNodes 等上层控制流
             // 精确地携带着画布项目名去写入对应的子文档夹，此处底层拦截保存会导致重复写入且落入错误层级。
-
-            const existingRecord = await getStoredImageRecord(id);
-            const hasProtectedOriginal = !!existingRecord && (
-                existingRecord.protected === true || existingRecord.quality === 'original'
-            );
 
             if (!isVideo && hasProtectedOriginal) {
                 const existingMetrics = await resolveStoredImageMetrics(existingRecord);

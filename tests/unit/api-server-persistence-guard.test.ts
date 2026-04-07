@@ -210,7 +210,7 @@ describe("api server live Supabase probe guards", () => {
   });
 
   test("healthz reports degraded persistence when the service-role probe fails", async () => {
-    const response = await fetch(`${baseUrl}/healthz`);
+    const response = await fetch(`${baseUrl}/healthz?probe=1`);
     assert.equal(response.status, 200);
 
     const payload = await response.json();
@@ -245,5 +245,168 @@ describe("api server live Supabase probe guards", () => {
     const authDataPayload = await authDataResponse.json();
     assert.equal(authDataPayload.success, false);
     assert.equal(authDataPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
+  });
+});
+
+describe("api server capability-scoped persistence guards", () => {
+  restoreTrackedEnv();
+  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
+  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
+  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
+  process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_capability_probe";
+  process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
+  delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
+
+  const scopedProbe: ServerSupabasePersistenceProbe = {
+    checkedAt: "2026-04-01T00:00:00.000Z",
+    serviceRoleKeyValid: true,
+    blockers: ["SUPABASE_TEMP_USERS_PROBE_FAILED"],
+    checks: {
+      authData: { ready: true },
+      guestSessions: { ready: false, blocker: "SUPABASE_TEMP_USERS_PROBE_FAILED", message: "temp_users timed out" },
+      billing: { ready: true },
+      creditProviders: { ready: true },
+      workspaceLayout: { ready: true },
+    },
+  };
+
+  const server = createApiServer(0, {
+    allowDegradedPersistence: false,
+    probeServerSupabasePersistence: async () => scopedProbe,
+    resolveAccessToken: (accessToken) => (
+      accessToken === "guard-user-token"
+        ? { userId: "guard-user-1", role: "user" }
+        : undefined
+    ),
+    verifyTurnstileToken: async () => ({ success: true }),
+  });
+
+  let baseUrl = "";
+
+  before(async () => {
+    if (!server.listening) {
+      await new Promise<void>((resolve) => {
+        server.once("listening", resolve);
+      });
+    }
+
+    baseUrl = getBaseUrl(server);
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
+    restoreTrackedEnv();
+  });
+
+  test("healthz keeps unrelated capabilities ready when only guest sessions probe fails", async () => {
+    const response = await fetch(`${baseUrl}/healthz?probe=1`);
+    assert.equal(response.status, 200);
+
+    const payload = await response.json();
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.status, "degraded");
+    assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
+    assert.equal(payload.data.runtime.criticalPersistence.authData.ready, true);
+    assert.equal(payload.data.runtime.criticalPersistence.billing.ready, true);
+    assert.equal(payload.data.runtime.criticalPersistence.creditProviders.ready, true);
+    assert.deepEqual(
+      payload.data.runtime.criticalPersistence.billing.blockers,
+      [],
+    );
+    assert.deepEqual(
+      payload.data.runtime.criticalPersistence.creditProviders.blockers,
+      [],
+    );
+  });
+});
+
+describe("api server healthz fast path", () => {
+  restoreTrackedEnv();
+  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
+  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
+  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
+  process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_fast_health";
+  process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
+  delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
+
+  let probeCallCount = 0;
+  const forcedProbe: ServerSupabasePersistenceProbe = {
+    checkedAt: "2026-04-01T00:00:00.000Z",
+    serviceRoleKeyValid: false,
+    blockers: ["SUPABASE_SERVICE_ROLE_KEY_INVALID"],
+    checks: {
+      authData: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      guestSessions: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      billing: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      creditProviders: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      workspaceLayout: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+    },
+  };
+
+  const server = createApiServer(0, {
+    allowDegradedPersistence: false,
+    probeServerSupabasePersistence: async () => {
+      probeCallCount += 1;
+      return forcedProbe;
+    },
+    verifyTurnstileToken: async () => ({ success: true }),
+  });
+
+  let baseUrl = "";
+
+  before(async () => {
+    if (!server.listening) {
+      await new Promise<void>((resolve) => {
+        server.once("listening", resolve);
+      });
+    }
+
+    baseUrl = getBaseUrl(server);
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
+    restoreTrackedEnv();
+  });
+
+  test("plain healthz skips the live Supabase probe until explicitly requested", async () => {
+    const fastResponse = await fetch(`${baseUrl}/healthz`);
+    assert.equal(fastResponse.status, 200);
+
+    const fastPayload = await fastResponse.json();
+    assert.equal(fastPayload.success, true);
+    assert.equal(probeCallCount, 0);
+    assert.equal(fastPayload.data.config.persistenceProbeCheckedAt, undefined);
+
+    const forcedResponse = await fetch(`${baseUrl}/healthz?probe=1`);
+    assert.equal(forcedResponse.status, 200);
+
+    const forcedPayload = await forcedResponse.json();
+    assert.equal(forcedPayload.success, true);
+    assert.equal(probeCallCount, 1);
+    assert.equal(forcedPayload.data.config.persistenceProbeCheckedAt, forcedProbe.checkedAt);
+    assert.equal(forcedPayload.data.status, "degraded");
   });
 });

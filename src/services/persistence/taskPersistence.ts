@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { GenerationMode, TaskProviderType } from '../../types';
+import { getLatestAuthSessionChange } from '../auth/authSessionEvents';
 import { tempUserService } from '../auth/tempUserService';
 
 export type TaskType = 'image' | 'video' | 'audio';
@@ -33,19 +34,91 @@ export interface PersistedTask {
 
 const TASK_STORAGE_PREFIX = 'kk_studio_generation_tasks';
 const DEFAULT_TASK_LIMIT = 50;
+let cachedUserTasks: { userId: string; tasks: PersistedTask[] } | null = null;
+let cachedResolvedStorageUserId: string | null = null;
+let pendingStorageUserIdPromise: Promise<string | null> | null = null;
+
+function normalizeStorageUserId(userId: unknown): string | null {
+  if (typeof userId !== 'string') return null;
+  const normalized = userId.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function setCachedResolvedStorageUserId(userId: string | null): string | null {
+  cachedResolvedStorageUserId = normalizeStorageUserId(userId);
+  return cachedResolvedStorageUserId;
+}
+
+export function setTaskPersistenceStorageUserId(userId: string | null): void {
+  setCachedResolvedStorageUserId(userId);
+}
+
+function isSupabaseAuthLockError(error: unknown): boolean {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  return name === 'NavigatorLockAcquireTimeoutError'
+    || /NavigatorLockAcquireTimeoutError/i.test(message)
+    || /lock:sb-/i.test(message);
+}
 
 function buildTaskRecordId(taskId: string): string {
   return `task_${taskId}`;
 }
 
 async function resolveStorageUserId(): Promise<string | null> {
-  const tempUser = tempUserService.getCachedTempUser();
-  if (tempUser?.user?.id) {
-    return tempUser.user.id;
+  const tempUserId = normalizeStorageUserId(tempUserService.getCachedTempUser()?.user?.id);
+  if (tempUserId) {
+    return setCachedResolvedStorageUserId(tempUserId);
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || null;
+  const latestAuthState = getLatestAuthSessionChange();
+  const latestAuthUserId = normalizeStorageUserId(latestAuthState?.userId);
+  if (latestAuthUserId) {
+    return setCachedResolvedStorageUserId(latestAuthUserId);
+  }
+
+  const authStateExplicitlyCleared = !!latestAuthState
+    && latestAuthState.hasSession !== true
+    && latestAuthState.isTempUser !== true;
+  if (authStateExplicitlyCleared) {
+    return setCachedResolvedStorageUserId(null);
+  }
+
+  if (cachedResolvedStorageUserId) {
+    return cachedResolvedStorageUserId;
+  }
+
+  if (!pendingStorageUserIdPromise) {
+    pendingStorageUserIdPromise = (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const sessionUserId = normalizeStorageUserId(session?.user?.id);
+        if (sessionUserId) {
+          return setCachedResolvedStorageUserId(sessionUserId);
+        }
+      } catch (error) {
+        if (!isSupabaseAuthLockError(error)) {
+          console.warn('[TaskPersistence] Failed to resolve storage user from Supabase session:', error);
+        }
+      }
+
+      if (authStateExplicitlyCleared) {
+        return setCachedResolvedStorageUserId(null);
+      }
+
+      const fallbackUserId = normalizeStorageUserId(cachedUserTasks?.userId);
+      if (fallbackUserId) {
+        return setCachedResolvedStorageUserId(fallbackUserId);
+      }
+
+      return null;
+    })().finally(() => {
+      pendingStorageUserIdPromise = null;
+    });
+  }
+
+  return pendingStorageUserIdPromise;
 }
 
 function buildStorageKey(userId: string): string {
@@ -106,27 +179,71 @@ function normalizeTask(raw: Partial<PersistedTask>): PersistedTask {
   };
 }
 
+function cloneTask(task: PersistedTask): PersistedTask {
+  return {
+    ...task,
+    resultUrls: Array.isArray(task.resultUrls) ? [...task.resultUrls] : [],
+    resultStorageIds: task.resultStorageIds ? { ...task.resultStorageIds } : undefined,
+  };
+}
+
+function cloneTasks(tasks: PersistedTask[]): PersistedTask[] {
+  return tasks.map(cloneTask);
+}
+
+function setCachedTasks(userId: string, tasks: PersistedTask[]): void {
+  const normalizedUserId = normalizeStorageUserId(userId);
+  if (!normalizedUserId) {
+    cachedUserTasks = null;
+    setCachedResolvedStorageUserId(null);
+    return;
+  }
+
+  cachedUserTasks = {
+    userId: normalizedUserId,
+    tasks: cloneTasks(tasks),
+  };
+  setCachedResolvedStorageUserId(normalizedUserId);
+}
+
 function loadTasksForUser(userId: string): PersistedTask[] {
+  if (cachedUserTasks?.userId === userId) {
+    return cloneTasks(cachedUserTasks.tasks);
+  }
+
   try {
     const stored = localStorage.getItem(buildStorageKey(userId));
-    if (!stored) return [];
+    if (!stored) {
+      setCachedTasks(userId, []);
+      return [];
+    }
 
     const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      setCachedTasks(userId, []);
+      return [];
+    }
 
-    return parsed
+    const tasks = parsed
       .filter((task): task is Partial<PersistedTask> => Boolean(task) && typeof task === 'object')
       .map((task) => normalizeTask(task))
       .filter((task) => Boolean(task.taskId));
+    setCachedTasks(userId, tasks);
+    return cloneTasks(tasks);
   } catch (error) {
     console.error('[TaskPersistence] Failed to load local tasks:', error);
+    if (cachedUserTasks?.userId === userId) {
+      cachedUserTasks = null;
+    }
     return [];
   }
 }
 
 function saveTasksForUser(userId: string, tasks: PersistedTask[]): void {
+  const normalizedTasks = tasks.map((task) => normalizeTask(task));
   try {
-    localStorage.setItem(buildStorageKey(userId), JSON.stringify(tasks));
+    localStorage.setItem(buildStorageKey(userId), JSON.stringify(normalizedTasks));
+    setCachedTasks(userId, normalizedTasks);
   } catch (error) {
     console.error('[TaskPersistence] Failed to save local tasks:', error);
   }

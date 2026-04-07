@@ -1,5 +1,5 @@
 import type { Canvas } from '../../types';
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient';
 
 function unwrapOrThrow<T>(
   response: {
@@ -57,7 +57,7 @@ export const syncService = {
         throw new Error('Cloud workspace sync is disabled for canvases that still depend on local-only media.');
       }
 
-      const response = await legacyWebApiClient.saveWorkspaceLayout({
+      const response = await kkWebApiClient.saveWorkspaceLayout({
         canvases: canvases as unknown as Record<string, unknown>[],
       });
 
@@ -75,7 +75,7 @@ export const syncService = {
 
   async loadLayout(): Promise<Canvas[]> {
     try {
-      const response = await legacyWebApiClient.getWorkspaceLayout();
+      const response = await kkWebApiClient.getWorkspaceLayout();
       if (isUnauthorizedResponse(response)) {
         return [];
       }
@@ -96,7 +96,7 @@ export const syncService = {
 
   async cleanupAllCloudImages(): Promise<{ count: number; success: boolean }> {
     try {
-      const response = await legacyWebApiClient.cleanupCloudImages();
+      const response = await kkWebApiClient.cleanupCloudImages();
       if (isUnauthorizedResponse(response)) {
         throw new Error('Authenticated KK API session is required to clean up cloud images.');
       }

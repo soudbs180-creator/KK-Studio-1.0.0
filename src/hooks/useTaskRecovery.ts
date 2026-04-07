@@ -50,7 +50,8 @@ const detectTaskProviderType = (model?: string, runtimeStrategyId?: string): Tas
  */
 export function useTaskRecovery(
   activeCanvas: TaskRecoveryCanvasSnapshot,
-  pollTaskFn: (node: PromptNode, taskId: string) => Promise<void>
+  pollTaskFn: (node: PromptNode, taskId: string) => Promise<void>,
+  enabled = true,
 ) {
   const [state, setState] = useState<TaskRecoveryState>({
     isLoading: false,
@@ -153,7 +154,7 @@ export function useTaskRecovery(
    * 监听页面可见性和网络变化，自动恢复任务
    */
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !enabled) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -174,7 +175,7 @@ export function useTaskRecovery(
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
     };
-  }, [recoverTasks]);
+  }, [recoverTasks, enabled]);
 
   return {
     ...state,

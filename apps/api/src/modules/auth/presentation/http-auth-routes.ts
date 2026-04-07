@@ -36,9 +36,11 @@ function buildErrorEnvelope<T>(
       ? "AUTH_CONFLICT"
       : statusCode === 401
         ? "AUTH_REQUIRED"
-    : statusCode === 403
-      ? "TURNSTILE_FAILED"
-      : "AUTH_INVALID_REQUEST";
+        : statusCode === 501 || statusCode === 410
+          ? "AUTH_ROUTE_DISABLED"
+          : statusCode === 403
+            ? "TURNSTILE_FAILED"
+            : "AUTH_INVALID_REQUEST";
 
   return {
     statusCode,
@@ -157,23 +159,12 @@ export async function handleVersionedRegister(
     return buildErrorEnvelope(requestId, clientVersion, result.statusCode, result.body.error || "Register failed.");
   }
 
-  const registration = service.registerProfile(body.email);
-  if (!registration.created) {
-    return buildErrorEnvelope(requestId, clientVersion, 409, "Email is already registered.");
-  }
-
-  return {
-    statusCode: 201,
-    body: {
-      success: true,
-      data: {
-        userId: registration.profile.id,
-        email: registration.profile.email,
-        status: "verification_pending",
-      },
-      meta: buildRequestMeta(requestId, clientVersion),
-    },
-  };
+  return buildErrorEnvelope(
+    requestId,
+    clientVersion,
+    501,
+    "Password registration is not available on /api/v1/auth/register. Use the hosted Supabase auth flow instead.",
+  );
 }
 
 export async function handleVersionedLogin(
@@ -194,15 +185,12 @@ export async function handleVersionedLogin(
     return buildErrorEnvelope(requestId, clientVersion, result.statusCode, result.body.error || "Login failed.");
   }
 
-  const session = service.issueLoginSession(body.email);
-  return {
-    statusCode: 200,
-    body: {
-      success: true,
-      data: session,
-      meta: buildRequestMeta(requestId, clientVersion),
-    },
-  };
+  return buildErrorEnvelope(
+    requestId,
+    clientVersion,
+    501,
+    "Password login is not available on /api/v1/auth/login. Use the hosted Supabase auth flow instead.",
+  );
 }
 
 export async function handleGetProfile(

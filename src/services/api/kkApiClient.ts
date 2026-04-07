@@ -16,6 +16,20 @@ import { getStoredAdminSessionToken } from "./adminSession.ts";
 
 const TEMP_USER_STORAGE_KEY = "temp_user_session_v1";
 
+export type LegacyWebApiFallbackReason =
+  | "local-loopback"
+  | "local-private-network"
+  | "explicit-opt-in"
+  | "hosted-default"
+  | "not-configured";
+
+export interface LegacyWebApiFallbackState {
+  enabled: boolean;
+  reason: LegacyWebApiFallbackReason;
+  configuredBaseUrl?: string;
+  runtimeOrigin?: string;
+}
+
 function readStoredTempUserId(): string | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -51,6 +65,13 @@ export function isLoopbackHostname(hostname: string): boolean {
     || normalized.startsWith("127.");
 }
 
+export function isPrivateNetworkHostname(hostname: string): boolean {
+  const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return /^10\./.test(normalized)
+    || /^192\.168\./.test(normalized)
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
+}
+
 function resolveOriginHostname(origin?: string): string | undefined {
   const normalizedOrigin = String(origin || "").trim();
   if (!normalizedOrigin) {
@@ -78,9 +99,9 @@ function shouldPreferRuntimeOriginForLocalApi(
     const configuredPort = configuredUrl.port || (configuredUrl.protocol === "https:" ? "443" : "80");
     const runtimePort = runtimeUrl.port || (runtimeUrl.protocol === "https:" ? "443" : "80");
 
-    return isLoopbackHostname(configuredUrl.hostname)
+    return (isLoopbackHostname(configuredUrl.hostname) || isPrivateNetworkHostname(configuredUrl.hostname))
       && configuredPort === "3001"
-      && isLoopbackHostname(runtimeUrl.hostname)
+      && (isLoopbackHostname(runtimeUrl.hostname) || isPrivateNetworkHostname(runtimeUrl.hostname))
       && runtimePort === "3000";
   } catch {
     return false;
@@ -94,6 +115,51 @@ function isExplicitLegacyWebApiFallbackEnabled(): boolean {
     || normalized === "true"
     || normalized === "yes"
     || normalized === "on";
+}
+
+export function getLegacyWebApiFallbackState(): LegacyWebApiFallbackState {
+  const configuredBaseUrl = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
+  const runtimeOrigin = readRuntimeOrigin();
+  const runtimeHostname = resolveOriginHostname(runtimeOrigin);
+
+  if (runtimeHostname && isLoopbackHostname(runtimeHostname)) {
+    return {
+      enabled: true,
+      reason: "local-loopback",
+      configuredBaseUrl: configuredBaseUrl || undefined,
+      runtimeOrigin,
+    };
+  }
+
+  if (runtimeHostname && isPrivateNetworkHostname(runtimeHostname)) {
+    return {
+      enabled: true,
+      reason: "local-private-network",
+      configuredBaseUrl: configuredBaseUrl || undefined,
+      runtimeOrigin,
+    };
+  }
+
+  if (Boolean(configuredBaseUrl) && isExplicitLegacyWebApiFallbackEnabled()) {
+    return {
+      enabled: true,
+      reason: "explicit-opt-in",
+      configuredBaseUrl,
+      runtimeOrigin,
+    };
+  }
+
+  return {
+    enabled: false,
+    reason: configuredBaseUrl ? "hosted-default" : "not-configured",
+    configuredBaseUrl: configuredBaseUrl || undefined,
+    runtimeOrigin,
+  };
+}
+
+export function isHostedRuntime(): boolean {
+  const hostname = resolveOriginHostname(readRuntimeOrigin()) || "";
+  return !isLoopbackHostname(hostname) && !isPrivateNetworkHostname(hostname);
 }
 
 export function resolveKkApiBaseUrl(): string {
@@ -114,21 +180,14 @@ export function resolveKkApiBaseUrl(): string {
 }
 
 export function shouldUseLegacyWebApiFallback(): boolean {
-  const configuredBaseUrl = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
-  const runtimeOrigin = readRuntimeOrigin();
-  const runtimeHostname = resolveOriginHostname(runtimeOrigin);
-  if (runtimeHostname && isLoopbackHostname(runtimeHostname)) {
-    return true;
-  }
-
-  return Boolean(configuredBaseUrl) && isExplicitLegacyWebApiFallbackEnabled();
+  return getLegacyWebApiFallbackState().enabled;
 }
 
 export function setKkApiAccessToken(token?: string) {
   setStoredKkApiAccessToken(token);
 }
 
-export function createLegacyWebApiClient(): KkApiClient {
+export function createKkWebApiClient(): KkApiClient {
   return createKkApiClient({
     baseUrl: resolveKkApiBaseUrl(),
     getAccessToken: getPreferredKkApiAccessToken,
@@ -141,4 +200,9 @@ export function createLegacyWebApiClient(): KkApiClient {
   });
 }
 
-export const legacyWebApiClient = createLegacyWebApiClient();
+export function createLegacyWebApiClient(): KkApiClient {
+  return createKkWebApiClient();
+}
+
+export const kkWebApiClient = createKkWebApiClient();
+export const legacyWebApiClient = kkWebApiClient;

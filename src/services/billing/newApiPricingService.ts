@@ -5,7 +5,7 @@
  * Reference: https://docs.newapi.pro/en/docs/api/management/auth
  */
 
-import { legacyWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient';
 import {
     applyOpenAICompatAuthToUrl,
     buildGeminiHeaders,
@@ -1020,7 +1020,7 @@ export async function cacheProviderPricing(
     pricing: ModelPricingInfo[]
 ): Promise<void> {
     try {
-        const response = await legacyWebApiClient.upsertAdminCreditProviderPricingCache(
+        const response = await kkWebApiClient.upsertAdminCreditProviderPricingCache(
             providerId,
             {
                 pricing: pricing.map((item) => toCachedPricingItemDto(item)),
@@ -1048,7 +1048,7 @@ export async function cacheProviderPricingByBaseUrl(
     }
 
     try {
-        const response = await legacyWebApiClient.upsertSharedProviderPricingCache(
+        const response = await kkWebApiClient.upsertSharedProviderPricingCache(
             normalizedBaseUrl,
             {
                 pricing: pricing.map((item) => toCachedPricingItemDto(item)),
@@ -1073,7 +1073,7 @@ export async function getCachedPricing(
     providerId: string
 ): Promise<ModelPricingInfo[] | null> {
     try {
-        const response = await legacyWebApiClient.getAdminCreditProviderPricingCache(
+        const response = await kkWebApiClient.getAdminCreditProviderPricingCache(
             providerId,
             {
                 requestId: `provider-pricing-cache-get-${providerId}-${Date.now()}`,
@@ -1098,7 +1098,7 @@ export async function getCachedPricingByBaseUrl(
     }
 
     try {
-        const response = await legacyWebApiClient.getSharedProviderPricingCache(
+        const response = await kkWebApiClient.getSharedProviderPricingCache(
             normalizedBaseUrl,
             {
                 requestId: `shared-provider-pricing-cache-get-${Date.now()}`,

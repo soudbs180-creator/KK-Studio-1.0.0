@@ -1,7 +1,7 @@
-import { KeySlot } from '../auth/keyManager';
-import { formatAuthorizationHeaderValue } from '../api/apiConfig';
-import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy';
-import { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter';
+import type { KeySlot } from '../auth/keyManager.ts';
+import { formatAuthorizationHeaderValue } from '../api/apiConfig.ts';
+import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy.ts';
+import type { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter.ts';
 
 export class VideoCompatibleAdapter implements LLMAdapter {
     id = 'video-compatible-adapter';

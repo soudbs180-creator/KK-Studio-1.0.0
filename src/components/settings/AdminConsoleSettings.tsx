@@ -9,7 +9,7 @@ import {
   loadScopedAdminConsoleState,
   saveScopedAdminConsoleState,
 } from '../../services/admin/adminConsoleState';
-import { legacyWebApiClient } from '../../services/api/kkApiClient';
+import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { notify } from '../../services/system/notificationService';
 import {
   MetricCard,
@@ -184,7 +184,7 @@ const AdminConsoleSettings: React.FC = () => {
 
     setChangingPassword(true);
     try {
-      const response = await legacyWebApiClient.changeAdminPassword(
+      const response = await kkWebApiClient.changeAdminPassword(
         {
           oldPassword,
           newPassword,
@@ -243,7 +243,7 @@ const AdminConsoleSettings: React.FC = () => {
 
     setRecharging(true);
     try {
-      const response = await legacyWebApiClient.adminRechargeCredits(
+      const response = await kkWebApiClient.adminRechargeCredits(
         {
           identity: identity.trim(),
           creditAmount: rechargeAmount,
@@ -292,7 +292,7 @@ const AdminConsoleSettings: React.FC = () => {
     setSettingAdmin(true);
     try {
       const normalizedIdentity = newAdminIdentity.trim();
-      const response = await legacyWebApiClient.setUserRole(
+      const response = await kkWebApiClient.setUserRole(
         {
           identity: normalizedIdentity,
           role: 'admin',

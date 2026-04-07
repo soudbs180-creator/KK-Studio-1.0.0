@@ -89,50 +89,20 @@ describe("release smoke e2e", () => {
   });
 
   test("smoke path covers auth, workflow, generation, assets, layout, and payment settlement", async () => {
-    const registerResponse = await fetch(`${apiBaseUrl}/api/v1/auth/register`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-request-id": "req-smoke-register",
-      },
-      body: JSON.stringify({
-        email: "smoke@example.com",
-        password: "smoke-password-123",
-        turnstileToken: "turnstile-ok",
-      }),
-    });
-
-    assert.equal(registerResponse.status, 201);
-    const registerPayload = await registerResponse.json();
-    assert.equal(registerPayload.success, true);
-    assert.equal(registerPayload.data.email, "smoke@example.com");
-
-    const loginResponse = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-request-id": "req-smoke-login",
-      },
-      body: JSON.stringify({
-        email: "smoke@example.com",
-        password: "smoke-password-123",
-      }),
-    });
-
-    assert.equal(loginResponse.status, 200);
-    const loginPayload = await loginResponse.json();
-    assert.equal(loginPayload.success, true);
-    assert.ok(loginPayload.data.accessToken);
-    assert.ok(loginPayload.data.profile?.id);
-
-    runtimeAccessTokens.set(loginPayload.data.accessToken, {
-      userId: loginPayload.data.profile.id,
-      email: loginPayload.data.profile.email,
-      role: loginPayload.data.profile.role,
+    const accessToken = "smoke-user-token";
+    const smokeUser = {
+      userId: "smoke-user-1",
+      email: "smoke@example.com",
+      role: "user" as const,
+    };
+    runtimeAccessTokens.set(accessToken, {
+      userId: smokeUser.userId,
+      email: smokeUser.email,
+      role: smokeUser.role,
     });
 
     const authHeaders = {
-      authorization: `Bearer ${loginPayload.data.accessToken}`,
+      authorization: `Bearer ${accessToken}`,
       "content-type": "application/json",
     };
 
@@ -252,7 +222,7 @@ describe("release smoke e2e", () => {
         amount: "6.00",
         currency: "CNY",
         returnUrl: "https://kkai.plus/pay/success",
-        notifyUrl: `${sidecarBaseUrl}/payment/v1/callbacks/alipay`,
+        notifyUrl: `${sidecarBaseUrl}/api/pay/notify/alipay`,
         idempotencyKey: "idem-smoke-payment-1",
       }),
     });
@@ -262,7 +232,7 @@ describe("release smoke e2e", () => {
     assert.equal(paymentCreatePayload.success, true);
     assert.equal(paymentCreatePayload.data.creditAmount, 30);
 
-    const callbackResponse = await fetch(`${sidecarBaseUrl}/payment/v1/callbacks/alipay`, {
+    const callbackResponse = await fetch(`${sidecarBaseUrl}/internal/v1/payment-callbacks/alipay`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

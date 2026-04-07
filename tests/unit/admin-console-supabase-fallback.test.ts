@@ -13,7 +13,7 @@ test('admin console actions use the typed API path for role grants without Supab
   const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
   const adminRoleSource = readSource('src/services/admin/adminAccountRole.ts');
 
-  assert.match(adminConsoleSource, /legacyWebApiClient\.setUserRole/);
+  assert.match(adminConsoleSource, /kkWebApiClient\.setUserRole/);
   assert.doesNotMatch(adminConsoleSource, /setUserRoleViaSupabase/);
   assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
   assert.doesNotMatch(adminRoleSource, /supabase\.rpc\(/);
