@@ -29,6 +29,10 @@ function readImportMetaEnv(): RuntimeEnv | undefined {
     return undefined;
   }
 
+  if (typeof import.meta.env === 'undefined') {
+    return undefined;
+  }
+
   // Vite only injects env values for direct `import.meta.env.FOO` access.
   // Avoid dynamic `import.meta.env[name]` lookups here or the browser bundle
   // will lose the public env values entirely.
