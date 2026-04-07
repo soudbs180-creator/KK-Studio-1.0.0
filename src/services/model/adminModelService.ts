@@ -7,6 +7,10 @@ import {
   isAdminQualityEnabled,
   normalizeAdminQualityPricing,
 } from './adminModelQuality';
+import {
+  getAdminModelAutoRefreshDelay,
+  shouldStartAdminModelRefresh,
+} from './adminModelRefreshPolicy';
 
 function darkenColor(hex: string, percent: number): string {
   const hslMatch = hex.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/i);
@@ -133,12 +137,28 @@ class AdminModelService {
   private broadcastChannel: BroadcastChannel | null = null;
 
   private static readonly LOAD_RETRY_INTERVAL_MS = 15000;
-  private static readonly AUTO_REFRESH_INTERVAL_MS = 10000;
-  private static readonly AUTO_REFRESH_HIDDEN_INTERVAL_MS = 60000;
 
   constructor() {
     this.initializeBroadcastRefresh();
     this.initializeSafeAutoRefresh();
+  }
+
+  private requestBackgroundRefresh(force = false): void {
+    const shouldStart = shouldStartAdminModelRefresh({
+      force,
+      hasInflightRequest: Boolean(this.loadingPromise),
+      lastAttemptAt: this.lastLoadAttemptAt,
+      now: Date.now(),
+      cooldownMs: AdminModelService.LOAD_RETRY_INTERVAL_MS,
+    });
+
+    if (!shouldStart) {
+      return;
+    }
+
+    void this.loadAdminModels(force).catch((error) => {
+      console.warn('[AdminModelService] Background refresh failed:', error);
+    });
   }
 
   private initializeBroadcastRefresh(): void {
@@ -157,9 +177,7 @@ class AdminModelService {
         return;
       }
 
-      void this.forceLoadAdminModels().catch((error) => {
-        console.warn('[AdminModelService] Broadcast refresh failed:', error);
-      });
+      this.requestBackgroundRefresh(false);
     });
 
     this.broadcastChannel = channel;
@@ -175,9 +193,7 @@ class AdminModelService {
     // Use the sanitized active-model RPC instead of subscribing to the raw
     // admin_credit_models table so browser clients never receive provider api_keys.
     const refreshNow = () => {
-      void this.forceLoadAdminModels().catch((error) => {
-        console.warn('[AdminModelService] Auto refresh failed:', error);
-      });
+      this.requestBackgroundRefresh(false);
     };
 
     const reschedule = (delayMs?: number) => {
@@ -185,10 +201,8 @@ class AdminModelService {
         clearTimeout(this.autoRefreshTimer);
       }
 
-      const nextDelay = delayMs ?? (
-        document.visibilityState === 'visible'
-          ? AdminModelService.AUTO_REFRESH_INTERVAL_MS
-          : AdminModelService.AUTO_REFRESH_HIDDEN_INTERVAL_MS
+      const nextDelay = delayMs ?? getAdminModelAutoRefreshDelay(
+        document.visibilityState === 'visible' ? 'visible' : 'hidden',
       );
 
       this.autoRefreshTimer = setTimeout(() => {
@@ -199,7 +213,7 @@ class AdminModelService {
 
     window.addEventListener('focus', () => {
       refreshNow();
-      reschedule(AdminModelService.AUTO_REFRESH_INTERVAL_MS);
+      reschedule(getAdminModelAutoRefreshDelay('visible'));
     });
 
     document.addEventListener('visibilitychange', () => {
@@ -209,7 +223,7 @@ class AdminModelService {
       reschedule();
     });
 
-    reschedule(AdminModelService.AUTO_REFRESH_INTERVAL_MS);
+    reschedule(getAdminModelAutoRefreshDelay('visible'));
   }
 
   private mapLegacyProviderRows(
