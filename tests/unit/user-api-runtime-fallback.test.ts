@@ -3,9 +3,13 @@ import { afterEach, test } from 'node:test';
 
 import { supabase } from '../../src/lib/supabase.ts';
 import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
-import { loadUserApisPayloadFromCloudRecord } from '../../src/services/api/userApiCloudRecordStorage.ts';
+import {
+  loadUserApisPayloadFromCloudRecord,
+  resetUserApisPayloadCacheForTests,
+} from '../../src/services/api/userApiCloudRecordStorage.ts';
 import {
   loadUserApiEntries,
+  resetUserApiProfileStorageStateForTests,
   saveUserApiEntries,
 } from '../../src/services/api/userApiProfileStorage.ts';
 
@@ -52,7 +56,7 @@ function setProductionRuntime() {
   };
 }
 
-function mockAuthenticatedUser() {
+function mockAuthenticatedUser(userId: string = 'user-1', email: string = `${userId}@example.com`) {
   supabase.auth.getSession = async () =>
     ({
       data: {
@@ -65,9 +69,27 @@ function mockAuthenticatedUser() {
     ({
       data: {
         user: {
-          id: 'user-1',
-          email: 'user-1@example.com',
+          id: userId,
+          email,
         },
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetUser>>;
+}
+
+function mockMissingAuthenticatedUser() {
+  supabase.auth.getSession = async () =>
+    ({
+      data: {
+        session: null,
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetSession>>;
+
+  supabase.auth.getUser = async () =>
+    ({
+      data: {
+        user: null,
       },
       error: null,
     }) as Awaited<ReturnType<typeof originalGetUser>>;
@@ -95,6 +117,8 @@ afterEach(() => {
   }
 
   locationLike.location = originalLocation;
+  resetUserApisPayloadCacheForTests();
+  resetUserApiProfileStorageStateForTests();
 });
 
 test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local runtimes', async () => {
@@ -311,13 +335,90 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
   assert.equal(replaceUserApiPayloadCalls, 1);
 });
 
+test('saveUserApiEntries writes through the local typed API without a Supabase session on local runtimes', async () => {
+  process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
+  process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+  locationLike.location = {
+    origin: 'http://localhost:5173',
+  };
+  mockMissingAuthenticatedUser();
+
+  let keyManagerCalls = 0;
+  let getUserApiCalls = 0;
+  let replaceUserApiPayloadCalls = 0;
+  let persistedEntries: Array<Record<string, unknown>> = [];
+
+  legacyWebApiClient.getKeyManagerCloudState = async () => {
+    keyManagerCalls += 1;
+    return {
+      success: true,
+      data: {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      },
+    };
+  };
+  legacyWebApiClient.getUserApiEntries = async () => {
+    getUserApiCalls += 1;
+    return {
+      success: true,
+      data: {
+        entries: persistedEntries,
+      },
+    };
+  };
+  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+    throw new Error('key-manager state should stay unchanged when only entry rows change');
+  };
+  legacyWebApiClient.replaceUserApiEntries = async () => {
+    throw new Error('split entry writes should stay unused when the unified payload route is available');
+  };
+  legacyWebApiClient.replaceUserApisPayload = async (input) => {
+    replaceUserApiPayloadCalls += 1;
+    persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
+      ...entry,
+      key: `__kk_redacted__:key:${String(entry.id || '')}`,
+    }));
+
+    return {
+      success: true,
+      data: {
+        version: Number(input.version || 2),
+        slots: input.slots || [],
+        providers: input.providers || [],
+        entries: persistedEntries,
+      },
+    };
+  };
+
+  await saveUserApiEntries([createEntry('entry-local-no-auth')]);
+
+  assert.equal(keyManagerCalls, 1);
+  assert.equal(getUserApiCalls, 1);
+  assert.equal(replaceUserApiPayloadCalls, 1);
+  assert.deepEqual(
+    persistedEntries.map((entry) => ({
+      id: entry.id,
+      key: entry.key,
+    })),
+    [
+      {
+        id: 'entry-local-no-auth',
+        key: '__kk_redacted__:key:entry-local-no-auth',
+      },
+    ],
+  );
+});
+
 test('loadUserApiEntries keeps canonical cloud fields when the local compatibility copy has the same revision', async () => {
   process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
   process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
   locationLike.location = {
     origin: 'http://localhost:5173',
   };
-  mockAuthenticatedUser();
+  mockAuthenticatedUser('user-merge-1', 'user-merge-1@example.com');
 
   let userApiReads = 0;
   const replacePayloads: Array<Array<Record<string, unknown>>> = [];
@@ -383,3 +484,4 @@ test('loadUserApiEntries keeps canonical cloud fields when the local compatibili
     ),
   );
 });
+

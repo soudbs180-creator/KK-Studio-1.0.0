@@ -240,6 +240,10 @@ function areEntrySetsEquivalent(
 
 let lastSeededLegacyEntries: StoredUserApiEntry[] | null = null;
 
+export function resetUserApiProfileStorageStateForTests(): void {
+  lastSeededLegacyEntries = null;
+}
+
 function cloneEntries(entries: StoredUserApiEntry[]): StoredUserApiEntry[] {
   return entries.map((entry) => ({
     ...entry,

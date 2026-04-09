@@ -1,6 +1,10 @@
 import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
 import { supabase } from '../../lib/supabase.ts';
-import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
+import {
+  getLegacyWebApiFallbackState,
+  legacyWebApiClient,
+  shouldUseLegacyWebApiFallback,
+} from './kkApiClient.ts';
 import {
   compactUserApisPayloadForTransport,
   extractKeyManagerCloudSlots,
@@ -27,12 +31,18 @@ type JsonRecord = Record<string, unknown>;
 const USER_APIS_PAYLOAD_CACHE_TTL_MS = 15_000;
 const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
+const LOCAL_RUNTIME_FALLBACK_USER_ID = 'local-user';
 
 const userApisPayloadCache = new Map<string, {
   payload: UserApisEnvelope | null;
   expiresAt: number;
 }>();
 const userApisPayloadInFlight = new Map<string, Promise<UserApisEnvelope | null>>();
+
+export function resetUserApisPayloadCacheForTests(): void {
+  userApisPayloadCache.clear();
+  userApisPayloadInFlight.clear();
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error && 'message' in error) {
@@ -437,9 +447,31 @@ function arraysEqual(left: unknown[], right: unknown[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function createLegacyFallbackProfileContext(
+  expectedUserId?: string,
+): AuthenticatedProfileContext {
+  return {
+    userId: String(expectedUserId || LOCAL_RUNTIME_FALLBACK_USER_ID).trim() || LOCAL_RUNTIME_FALLBACK_USER_ID,
+    email: null,
+  };
+}
+
+function shouldPreferSessionlessLegacyContext(): boolean {
+  const legacyFallbackState = getLegacyWebApiFallbackState();
+  return legacyFallbackState.enabled
+    && (
+      legacyFallbackState.reason === 'local-loopback'
+      || legacyFallbackState.reason === 'local-private-network'
+    );
+}
+
 async function getAuthenticatedProfileContext(
   expectedUserId?: string,
 ): Promise<AuthenticatedProfileContext | null> {
+  if (shouldPreferSessionlessLegacyContext()) {
+    return createLegacyFallbackProfileContext(expectedUserId);
+  }
+
   const sessionResult = await supabase.auth.getSession();
   if (sessionResult.error) {
     throw new Error(getErrorMessage(sessionResult.error, 'Failed to resolve authenticated user session.'));
@@ -461,6 +493,9 @@ async function getAuthenticatedProfileContext(
   })();
   const userId = String(resolvedUser?.id || '').trim();
   if (!userId) {
+    if (shouldUseLegacyWebApiFallback()) {
+      return createLegacyFallbackProfileContext(expectedUserId);
+    }
     return null;
   }
 

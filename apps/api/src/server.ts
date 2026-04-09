@@ -399,6 +399,7 @@ export interface ApiServerOptions {
   adminConsoleRepository?: AdminConsoleRepository;
   authDataRepository?: AuthDataRepository;
   creditAccountRepository?: CreditAccountRepository;
+  localOnlyUser?: AuthenticatedRequestContext;
   requestAuthenticator?: RequestAuthenticator;
   resolveAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined;
   verifyTurnstileToken?: TurnstileVerifier;
@@ -410,6 +411,23 @@ export interface ApiServerOptions {
 
 type RepositoryBackend = "memory" | "supabase" | "local-file" | "custom";
 const tempUserRateLimitRule = { max: 10, windowMs: 60 * 60 * 1000 } as const;
+
+function normalizeAuthenticatedRequestContext(
+  context: AuthenticatedRequestContext | undefined,
+): AuthenticatedRequestContext | undefined {
+  const userId = String(context?.userId || "").trim();
+  if (!userId) {
+    return undefined;
+  }
+
+  const email = String(context?.email || "").trim() || undefined;
+  const role = String(context?.role || "").trim() || undefined;
+  return {
+    userId,
+    ...(email ? { email } : {}),
+    ...(role ? { role } : {}),
+  };
+}
 
 function resolveRepositoryBackend(
   repository: unknown,
@@ -707,6 +725,7 @@ function buildApiServer(
   const serverSupabaseConfig = resolveServerSupabaseConfig();
   assertHostedApiRuntimeReady(serverSupabaseConfig);
   const allowDegradedPersistence = options.allowDegradedPersistence ?? (port === 0);
+  const localOnlyUser = normalizeAuthenticatedRequestContext(options.localOnlyUser);
   if (!allowDegradedPersistence) {
     assertServerSupabaseConfigConsistency(serverSupabaseConfig);
   }
@@ -935,7 +954,7 @@ function buildApiServer(
               email: tempUserSession.email || undefined,
               role: undefined,
             }
-            : undefined
+            : localOnlyUser
         );
         let requestHeaders = headers;
         if (effectiveAuthenticatedUser) {
