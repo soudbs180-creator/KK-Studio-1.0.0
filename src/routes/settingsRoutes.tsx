@@ -6,28 +6,24 @@ import {
   KeyRound,
   LayoutDashboard,
   ScrollText,
-  Shield,
 } from 'lucide-react';
+
+import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 
 const DashboardView = lazy(() => import('../components/settings/views/DashboardView.localized.tsx'));
 const ApiSettingsView = lazy(() => import('../components/settings/ApiSettingsView'));
 const CostEstimation = lazy(() => import('../pages/CostEstimation'));
 const StorageSettingsView = lazy(() => import('../components/settings/views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazy(() => import('../components/settings/views/SystemLogsView.localized.tsx'));
-const AdminSystem = lazy(() => import('../components/settings/AdminSystem'));
 
 export type SettingsViewId =
   | 'dashboard'
   | 'api-management'
   | 'consumption-records'
   | 'storage-settings'
-  | 'system-logs'
-  | 'admin-console'
-  | 'credit-models'
-  | 'exchange-rates'
-  | 'admin-system';
+  | 'system-logs';
 
-type NavSectionId = 'workspace' | 'system' | 'admin';
+type NavSectionId = 'workspace' | 'system';
 
 export interface SettingsNavItem {
   id: SettingsViewId;
@@ -41,34 +37,35 @@ export interface SettingsNavItem {
 export const settingsNavSections: Array<{ id: NavSectionId; label: string }> = [
   { id: 'workspace', label: '工作台' },
   { id: 'system', label: '系统维护' },
-  { id: 'admin', label: '后台管理' },
 ];
 
 export const settingsNavItems: SettingsNavItem[] = [
   {
     id: 'dashboard',
     label: '总览',
-    description: '查看链路状态、消费概况和待处理事项。',
+    description: '查看链路状态、运行概况和待处理事项。',
     icon: LayoutDashboard,
     section: 'workspace',
     path: '',
   },
   {
     id: 'api-management',
-    label: 'API 管理',
-    description: '统一管理官方接口、供应商和预算策略。',
+    label: 'API 绠＄悊',
+    description: '统一管理官方接口、供应商和本地路由策略。',
     icon: KeyRound,
     section: 'workspace',
     path: 'api-management',
   },
-  {
-    id: 'consumption-records',
-    label: '消费记录',
-    description: '查看消费、充值和账单明细。',
-    icon: Coins,
-    section: 'workspace',
-    path: 'consumption-records',
-  },
+  ...(KKAI_FEATURE_FLAGS.billing ? [
+    {
+      id: 'consumption-records' as const,
+      label: '消费记录',
+      description: '查看消费、充值和账单明细。',
+      icon: Coins,
+      section: 'workspace' as const,
+      path: 'consumption-records',
+    },
+  ] : []),
   {
     id: 'storage-settings',
     label: '存储设置',
@@ -84,14 +81,6 @@ export const settingsNavItems: SettingsNavItem[] = [
     icon: ScrollText,
     section: 'system',
     path: 'system-logs',
-  },
-  {
-    id: 'admin-console',
-    label: '管理员后台',
-    description: '处理积分模型、汇率规则和后台权限。',
-    icon: Shield,
-    section: 'admin',
-    path: 'admin-console',
   },
 ];
 
@@ -125,10 +114,12 @@ export const settingsRoutes: RouteObject[] = [
     path: 'api-management/:supplierId',
     element: <ApiSettingsView />,
   },
-  {
-    path: 'consumption-records',
-    element: <CostEstimation embedded />,
-  },
+  ...(KKAI_FEATURE_FLAGS.billing ? [
+    {
+      path: 'consumption-records',
+      element: <CostEstimation embedded />,
+    } satisfies RouteObject,
+  ] : []),
   {
     path: 'storage-settings',
     element: <StorageSettingsView />,
@@ -137,32 +128,12 @@ export const settingsRoutes: RouteObject[] = [
     path: 'system-logs',
     element: <SystemLogsView />,
   },
-  {
-    path: 'credit-models',
-    element: <AdminSystem initialTab="credit-models" />,
-  },
-  {
-    path: 'exchange-rates',
-    element: <AdminSystem initialTab="exchange-rates" />,
-  },
-  {
-    path: 'admin-console',
-    element: <AdminSystem initialTab="admin-console" />,
-  },
-  {
-    path: 'admin-system',
-    element: <AdminSystem initialTab="credit-models" />,
-  },
 ];
 
 export const getNavItemByPath = (path: string): SettingsNavItem | undefined =>
-  path === 'credit-models' || path === 'exchange-rates' || path === 'admin-system'
-    ? settingsNavItems.find((item) => item.id === 'admin-console')
-    : path.startsWith('api-management')
-      ? settingsNavItems.find((item) => item.id === 'api-management')
+  path.startsWith('api-management')
+    ? settingsNavItems.find((item) => item.id === 'api-management')
     : settingsNavItems.find((item) => item.path === path);
 
 export const getNavItemById = (id: SettingsViewId): SettingsNavItem | undefined =>
-  id === 'credit-models' || id === 'exchange-rates' || id === 'admin-system'
-    ? settingsNavItems.find((item) => item.id === 'admin-console')
-    : settingsNavItems.find((item) => item.id === id);
+  settingsNavItems.find((item) => item.id === id);

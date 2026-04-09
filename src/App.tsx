@@ -276,6 +276,7 @@ import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
+import { KKAI_FEATURE_FLAGS } from './app/kkaiFeatureFlags';
 import { createAppRootMode } from './context/kkaiRuntimeContext';
 import ConnectionDot from './components/canvas/ConnectionDot';
 import type { UserProfileView } from './components/modals/UserProfileModal';
@@ -365,6 +366,7 @@ interface AppContentProps {
 }
 
 const AppContent: React.FC<AppContentProps> = () => {
+  const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     user,
     loading: authLoading,
@@ -8059,10 +8061,10 @@ ${slideLayerXml.join('\n')}
             onDashboardClick={() => openSettingsSurface('dashboard')}
             onSettingsClick={() => openSettingsSurface('api-management')}
             onUserClick={() => openProfileSurface('main')}
-            onBillingClick={() => openProfileSurface('billing')}
-            onRechargeClick={() => setShowRechargeModal(true)}
-            balance={balance}
-            balanceLoading={billingLoading}
+            onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
+            onRechargeClick={billingUiEnabled ? () => setShowRechargeModal(true) : undefined}
+            balance={billingUiEnabled ? balance : 0}
+            balanceLoading={billingUiEnabled ? billingLoading : false}
             title="KK Studio"
             userName={derivedMobileUserName}
             userAvatarUrl={derivedMobileUserAvatarUrl}
@@ -8117,7 +8119,7 @@ ${slideLayerXml.join('\n')}
       />
 
       {/* Top Left Credits Display */}
-      {!isMobile && (
+      {!isMobile && billingUiEnabled && (
         <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
           <div
             className="flex items-center gap-3 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-md transition-all hover:border-[var(--border-medium)] group"
@@ -9548,7 +9550,7 @@ ${slideLayerXml.join('\n')}
       )}
 
       {/* Global recharge modal */}
-      {showRechargeModal && (
+      {billingUiEnabled && showRechargeModal && (
         <Suspense fallback={null}>
           <RechargeModal />
         </Suspense>
@@ -9560,6 +9562,7 @@ ${slideLayerXml.join('\n')}
 
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
+  const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
 
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {
