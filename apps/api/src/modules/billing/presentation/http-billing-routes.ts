@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  type AdminCreditAccountLookupDto,
   type AdminRechargeCreditsRequestDto,
   buildRequestMeta,
   type ApiErrorDetail,
@@ -181,6 +182,33 @@ export async function handleGetCreditBalance(
   return {
     statusCode: 200,
     body: await service.getBalance(userId, requestId, clientVersion),
+  };
+}
+
+export async function handleGetAdminCreditAccount(
+  service: CreditAccountService,
+  identity: string,
+  headers: Record<string, string>,
+): Promise<HttpBillingRouteResult<AdminCreditAccountLookupDto>> {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  if (!isAdminRequest(headers)) {
+    return buildAdminForbiddenResult(requestId, clientVersion);
+  }
+
+  if (!hasElevatedAdminSession(headers)) {
+    return buildAdminElevationRequiredResult(requestId, clientVersion);
+  }
+
+  return {
+    statusCode: 200,
+    body: await service.adminGetAccountByIdentity(identity, requestId, clientVersion),
   };
 }
 

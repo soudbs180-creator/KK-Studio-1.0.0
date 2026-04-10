@@ -2,7 +2,7 @@ import type {
   AdminCreditProviderDto,
   AdminCreditProviderModelDto,
   SaveAdminCreditProviderRequestDto,
-} from '../../../../../../packages/contracts/src/index.ts';
+} from '../../../../../packages/contracts/src/index.ts';
 
 export interface ProviderEditorState {
   id: string;
@@ -38,7 +38,7 @@ export function createProviderEditorState(input: AdminCreditProviderDto): Provid
     id: input.providerId,
     providerName: input.providerName,
     baseUrl: input.baseUrl,
-    retainApiKeyFingerprints: (input.apiKeyEntries || []).map((entry) => entry.fingerprint),
+    retainApiKeyFingerprints: (input.apiKeyEntries || []).map((entry: { fingerprint: string }) => entry.fingerprint),
     models: input.models,
   };
 }

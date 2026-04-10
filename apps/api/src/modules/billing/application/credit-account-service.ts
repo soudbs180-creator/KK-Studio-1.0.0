@@ -1,4 +1,5 @@
 import {
+  type AdminCreditAccountLookupDto,
   type AdminRechargeCreditsRequestDto,
   type AdminRechargeCreditsResponseDto,
   type ApplyPaymentSettlementRequestDto,
@@ -221,6 +222,20 @@ export class CreditAccountService {
       creditedAmount: input.creditAmount,
       balanceAfter: result.balanceAfter,
     });
+
+    return {
+      success: true,
+      data: result,
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async adminGetAccountByIdentity(
+    identity: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<AdminCreditAccountLookupDto>> {
+    const result = await this.repository.adminGetAccountByIdentity(identity, 50);
 
     return {
       success: true,

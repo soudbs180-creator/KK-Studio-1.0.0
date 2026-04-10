@@ -1,4 +1,4 @@
-import type { CreditExchangeRateDto, UpsertCreditExchangeRateRequestDto } from '../../../../../../packages/contracts/src/index.ts';
+import type { CreditExchangeRateDto, UpsertCreditExchangeRateRequestDto } from '../../../../../packages/contracts/src/index.ts';
 
 export function createEditableExchangeRateRows(rows: CreditExchangeRateDto[]) {
   return [...rows].sort((left, right) => left.currencyCode.localeCompare(right.currencyCode));

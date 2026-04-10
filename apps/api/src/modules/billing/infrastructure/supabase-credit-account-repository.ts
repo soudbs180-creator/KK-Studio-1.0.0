@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  type AdminCreditAccountLookupDto,
   CreditTransactionType,
   type AdminRechargeCreditsResponseDto,
   type CreditBalanceDto,
@@ -512,6 +513,29 @@ export class SupabaseCreditAccountRepository implements CreditAccountRepository 
       balanceAfter: nextBalance,
       creditedAmount: creditAmount,
       subjectEmail: resolvedUser.email,
+    };
+  }
+
+  async adminGetAccountByIdentity(
+    identity: string,
+    limit = 50,
+  ): Promise<AdminCreditAccountLookupDto> {
+    const trimmedIdentity = String(identity || "").trim();
+    const resolvedUser = await this.resolveUserByIdentity(trimmedIdentity);
+    if (!resolvedUser) {
+      throw new Error("The requested credit account could not be resolved.");
+    }
+
+    const account = await this.getOrCreate(resolvedUser.subjectId);
+    const transactions = await this.listTransactions(resolvedUser.subjectId, { limit });
+
+    return {
+      identity: trimmedIdentity,
+      subjectId: resolvedUser.subjectId,
+      subjectEmail: resolvedUser.email,
+      balance: account.balance,
+      frozenBalance: account.frozenBalance,
+      transactions,
     };
   }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  type AdminCreditAccountLookupDto,
   CreditTransactionType,
   type AdminRechargeCreditsResponseDto,
   type CreditBalanceDto,
@@ -78,6 +79,10 @@ export interface CreditAccountRepository {
     creditAmount: number,
     description?: string,
   ): Promise<AdminRechargeCreditsResponseDto>;
+  adminGetAccountByIdentity(
+    identity: string,
+    limit?: number,
+  ): Promise<AdminCreditAccountLookupDto>;
 }
 
 export class InMemoryCreditAccountRepository implements CreditAccountRepository {
@@ -284,6 +289,23 @@ export class InMemoryCreditAccountRepository implements CreditAccountRepository 
       subjectId: identity,
       balanceAfter: updatedAccount.balance,
       creditedAmount: creditAmount,
+    };
+  }
+
+  async adminGetAccountByIdentity(
+    identity: string,
+    limit = 50,
+  ): Promise<AdminCreditAccountLookupDto> {
+    const trimmedIdentity = String(identity || '').trim();
+    const account = await this.getOrCreate(trimmedIdentity);
+    const transactions = await this.listTransactions(trimmedIdentity, { limit });
+
+    return {
+      identity: trimmedIdentity,
+      subjectId: trimmedIdentity,
+      balance: account.balance,
+      frozenBalance: account.frozenBalance,
+      transactions,
     };
   }
 
