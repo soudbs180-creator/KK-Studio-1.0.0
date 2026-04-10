@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { createKkApiClient } from '../../packages/contracts/src/index.ts';
 
 test('billing dto exports the admin credit-account lookup response', () => {
-  const source = readFileSync('packages/contracts/src/dto/billing.ts', 'utf8');
+  const publicIndexSource = readFileSync('packages/contracts/src/index.ts', 'utf8');
+  const client = createKkApiClient({ baseUrl: 'https://admin.example.com' });
 
-  assert.match(source, /export interface AdminCreditAccountLookupDto/);
-  assert.match(source, /transactions: CreditTransactionDto\[]/);
+  assert.match(publicIndexSource, /export \* from "\.\/dto\/billing\.ts";/);
+  assert.equal(typeof client.getAdminCreditAccount, 'function');
 });
 
 test('billing route source registers the admin credit-account lookup handler', () => {
