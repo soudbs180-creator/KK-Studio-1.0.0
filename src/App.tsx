@@ -325,7 +325,6 @@ import {
   GlobalModals,
   WorkspaceActionBar,
   WorkspaceActionButton,
-  WorkspacePanels,
   WorkspaceShell,
 } from './components/workspace';
 import {
