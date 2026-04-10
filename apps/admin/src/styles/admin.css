@@ -1,0 +1,17 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", sans-serif;
+  background: #f3f6fb;
+  color: #102038;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.admin-app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}

@@ -343,7 +343,7 @@ export function createPaymentSidecarServer(
           return;
         }
 
-        if (req.method === "POST" && pathname === "/payment/v1/callbacks/alipay") {
+        if (req.method === "POST" && pathname === "/internal/v1/payment-callbacks/alipay") {
           const body = await readJsonBody(req);
           const result = await handleAlipayCallback(service, body, requestHeaders);
           if (result.redirectTo) {
@@ -352,6 +352,11 @@ export function createPaymentSidecarServer(
           }
 
           writeBody(res, result.statusCode, result.body ?? "", result.contentType);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/payment/v1/callbacks/alipay") {
+          writeBody(res, 410, buildDeprecatedCallbackRoutePayload(requestId, clientVersion));
           return;
         }
 

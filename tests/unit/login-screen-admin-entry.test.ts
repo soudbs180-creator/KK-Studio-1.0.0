@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+import { buildAdminLoginUrl } from '../../src/services/admin/adminEntry.ts';
+
+test('buildAdminLoginUrl keeps the admin app external and lands on /login', () => {
+  assert.equal(
+    buildAdminLoginUrl({
+      configuredBaseUrl: 'https://admin.example.com/',
+      currentUrl: 'https://kk.example.com/login',
+    }),
+    'https://admin.example.com/login?from=https%3A%2F%2Fkk.example.com%2Flogin',
+  );
+});
+
+test('LoginScreen source contains a dedicated administrator redirect button', () => {
+  const source = readFileSync('src/components/auth/LoginScreen.tsx', 'utf8');
+
+  assert.match(source, /buildAdminLoginUrl/);
+  assert.match(source, /window\.location\.assign/);
+});

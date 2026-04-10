@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
 import { useTheme } from '../../context/ThemeContext';
+import { buildAdminLoginUrl } from '../../services/admin/adminEntry';
 import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
@@ -597,6 +598,22 @@ const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleAdminRedirect = useCallback(() => {
+    try {
+      const nextUrl = buildAdminLoginUrl({
+        configuredBaseUrl: import.meta.env.VITE_KK_ADMIN_URL,
+        currentUrl: window.location.href,
+      });
+      window.location.assign(nextUrl);
+    } catch (redirectError) {
+      setError(
+        redirectError instanceof Error
+          ? redirectError.message
+          : t('管理员后台入口暂不可用。', 'The admin entry is not available right now.')
+      );
+    }
+  }, [t]);
+
   const handleOpenWechatInNewPage = useCallback(() => {
     if (!wechatAuthorizationUrl) return;
     window.open(wechatAuthorizationUrl, '_blank', 'noopener,noreferrer');
@@ -869,6 +886,12 @@ const LoginScreen: React.FC = () => {
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading}>
                   <QrCode size={18} />
                   {t('使用微信扫码登录', 'Continue with WeChat QR')}
+                </button>
+                <button type="button" className="auth-btn auth-btn-ghost" onClick={handleAdminRedirect} disabled={loading}>
+                  {t('管理员登录', 'Admin Login')}
+                </button>
+                <button type="button" className="auth-btn auth-btn-ghost" onClick={handleAdminRedirect} disabled={loading}>
+                  {t('管理员登录', 'Admin Login')}
                 </button>
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={() => setShowTempUserWarning(true)} disabled={loading}>
                   {t('临时用户登录', 'Use a temporary account')}
