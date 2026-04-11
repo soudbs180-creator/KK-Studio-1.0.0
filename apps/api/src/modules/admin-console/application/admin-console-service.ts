@@ -17,15 +17,24 @@ import {
   type AdminConsoleRepository,
   AdminConsolePasswordInvalidError,
 } from "../infrastructure/in-memory-admin-console-repository.ts";
+import {
+  resolveAdminAccess,
+  type PrimaryAdminAccessOptions,
+} from "./primary-admin-access.ts";
 
 const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
 type AdminGuardFailure = Extract<ApiResponse<never>, { success: false }>;
 
 export class AdminConsoleService {
   private readonly repository: AdminConsoleRepository;
+  private readonly primaryAdminUserId?: string;
 
-  constructor(repository: AdminConsoleRepository) {
+  constructor(
+    repository: AdminConsoleRepository,
+    options: PrimaryAdminAccessOptions = {},
+  ) {
     this.repository = repository;
+    this.primaryAdminUserId = options.primaryAdminUserId;
   }
 
   async getAccess(
@@ -35,12 +44,13 @@ export class AdminConsoleService {
     adminSessionToken?: string,
   ): Promise<ApiResponse<AdminAccessDto>> {
     const profile = await this.repository.getUserProfile(userId);
-    const role = profile?.role || "user";
-    const isAdmin = role === "admin";
-    const passwordState = isAdmin
+    const access = resolveAdminAccess(userId, profile, {
+      primaryAdminUserId: this.primaryAdminUserId,
+    });
+    const passwordState = access.isAdmin
       ? await this.repository.getAdminPasswordState()
       : { requiresPasswordChange: false };
-    const adminSession = isAdmin
+    const adminSession = access.isAdmin
       ? await this.resolveAdminSession(userId, adminSessionToken)
       : { active: false };
 
@@ -48,8 +58,8 @@ export class AdminConsoleService {
       success: true,
       data: {
         userId,
-        role,
-        isAdmin,
+        role: access.role,
+        isAdmin: access.isAdmin,
         requiresPasswordChange: passwordState.requiresPasswordChange,
         adminSessionActive: adminSession.active,
         adminSessionExpiresAt: adminSession.expiresAt,
