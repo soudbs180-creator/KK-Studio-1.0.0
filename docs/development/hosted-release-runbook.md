@@ -29,7 +29,7 @@ Do not deploy the frontend first when the Edge Functions are still on an older r
 Keep the local runtime split explicit:
 
 - Root `.env` / `.env.local` are for frontend public env such as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and local-only `VITE_KK_API_BASE_URL`.
-- `apps/api/.env.local` is the authoritative local API source for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `USER_API_ENCRYPTION_SECRET`.
+- `apps/api/.env.local` is the authoritative local API source for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `USER_API_ENCRYPTION_SECRET`, and `KK_PRIMARY_ADMIN_USER_ID`.
 - Optional local API JSON body-size overrides also live in `apps/api/.env.local`:
   `KK_API_MAX_JSON_BODY_BYTES`, `KK_API_PROFILE_MAX_JSON_BODY_BYTES`, and `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES`.
 - `server/.env` is legacy-only and is ignored by the current local API startup and diagnostics.
@@ -76,6 +76,17 @@ Why:
 - Hosted builds should stay on the Supabase-first runtime by default.
 - A compatible public KK API now requires both `VITE_KK_API_BASE_URL` and `VITE_ENABLE_LEGACY_WEB_API_FALLBACK=true` to re-enable legacy fallback intentionally.
 - `api/auth-password-login.ts` is a local-only escape hatch. If hosted auth ever depends on it, treat that as a migration regression and fix the Supabase-first path instead of normalizing the proxy.
+
+### Hosted API owner-admin config
+
+Required:
+
+- `KK_PRIMARY_ADMIN_USER_ID`
+
+Why:
+
+- Hosted admin access defaults to one owner Supabase user ID.
+- Delegated `profiles.role = 'admin'` users remain supported, but the owner admin must be configured explicitly.
 
 ### Runtime ownership map
 
