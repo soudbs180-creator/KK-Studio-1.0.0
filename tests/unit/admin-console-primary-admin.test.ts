@@ -74,3 +74,32 @@ test('non-admin users stay non-admin when they are neither the owner nor a deleg
   assert.equal(result.data.isAdmin, false);
   assert.equal(result.data.requiresPasswordChange, false);
 });
+
+test('primary admin user id can verify the admin password even when the stored profile role is user', async () => {
+  const repository = new InMemoryAdminConsoleRepository([
+    {
+      id: 'owner-user-1',
+      email: 'owner@example.com',
+      role: 'user',
+    },
+  ]);
+  const service = new AdminConsoleService(repository, {
+    primaryAdminUserId: 'owner-user-1',
+  });
+
+  const result = await service.verifyAdminPassword(
+    'owner-user-1',
+    {
+      password: '123456',
+    },
+    'req-owner-admin-verify',
+  );
+
+  assert.equal(result.success, true);
+  if (!result.success) {
+    return;
+  }
+
+  assert.equal(result.data.verified, true);
+  assert.match(result.data.adminSessionToken, /^adm_/);
+});

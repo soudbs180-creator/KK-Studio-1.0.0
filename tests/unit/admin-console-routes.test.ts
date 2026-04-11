@@ -90,8 +90,8 @@ describe("admin console routes", () => {
     assert.equal(verifyNew.body.data.requiresPasswordChange, false);
   });
 
-  test("only admins can update another user's role", async () => {
-    const service = new AdminConsoleService(new InMemoryAdminConsoleRepository());
+test("only admins can update another user's role", async () => {
+  const service = new AdminConsoleService(new InMemoryAdminConsoleRepository());
 
     const unauthorized = await handleSetUserRole(service, {
       identity: "user-1@example.com",
@@ -145,8 +145,46 @@ describe("admin console routes", () => {
       return;
     }
 
-    assert.equal(success.body.data.identity, "user-1@example.com");
-    assert.equal(success.body.data.role, "admin");
-    assert.equal(success.body.data.subjectId, "user-1");
+  assert.equal(success.body.data.identity, "user-1@example.com");
+  assert.equal(success.body.data.role, "admin");
+  assert.equal(success.body.data.subjectId, "user-1");
+});
+
+test('owner admin cannot be demoted through the delegated role mutation route', async () => {
+  const service = new AdminConsoleService(new InMemoryAdminConsoleRepository(), {
+    primaryAdminUserId: 'admin-user-1',
   });
+
+  const verify = await handleVerifyAdminPassword(service, {
+    password: '123456',
+  }, {
+    [AUTHENTICATED_USER_ID_HEADER]: 'admin-user-1',
+    [AUTHENTICATED_USER_ROLE_HEADER]: 'admin',
+    'x-request-id': 'req-owner-demotion-verify',
+  });
+
+  assert.equal(verify.statusCode, 200);
+  assert.equal(verify.body.success, true);
+  if (!verify.body.success) {
+    return;
+  }
+
+  const demotion = await handleSetUserRole(service, {
+    identity: 'admin-user-1',
+    role: 'user',
+  }, {
+    [AUTHENTICATED_USER_ID_HEADER]: 'admin-user-1',
+    [AUTHENTICATED_USER_ROLE_HEADER]: 'admin',
+    [ADMIN_SESSION_TOKEN_HEADER]: verify.body.data.adminSessionToken,
+    'x-request-id': 'req-owner-demotion',
+  });
+
+  assert.equal(demotion.statusCode, 409);
+  assert.equal(demotion.body.success, false);
+  if (demotion.body.success) {
+    return;
+  }
+
+  assert.equal(demotion.body.error.code, 'PRIMARY_ADMIN_ROLE_PROTECTED');
+});
 });

@@ -24,6 +24,7 @@ import {
 
 const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
 type AdminGuardFailure = Extract<ApiResponse<never>, { success: false }>;
+const PRIMARY_ADMIN_ROLE_PROTECTED_CODE = "PRIMARY_ADMIN_ROLE_PROTECTED";
 
 export class AdminConsoleService {
   private readonly repository: AdminConsoleRepository;
@@ -176,6 +177,33 @@ export class AdminConsoleService {
     }
 
     try {
+      const target = await this.repository.findUserProfileByIdentity(input.identity);
+      if (!target) {
+        return {
+          success: false,
+          error: {
+            code: "ADMIN_TARGET_NOT_FOUND",
+            message: "The target profile could not be found.",
+          },
+          meta: buildRequestMeta(requestId, clientVersion),
+        };
+      }
+
+      if (
+        input.role === "user"
+        && this.primaryAdminUserId
+        && target.id === this.primaryAdminUserId
+      ) {
+        return {
+          success: false,
+          error: {
+            code: PRIMARY_ADMIN_ROLE_PROTECTED_CODE,
+            message: "The primary admin account cannot be demoted.",
+          },
+          meta: buildRequestMeta(requestId, clientVersion),
+        };
+      }
+
       const updated = await this.repository.setUserRole(input.identity, input.role);
       return {
         success: true,
@@ -204,7 +232,10 @@ export class AdminConsoleService {
     clientVersion?: string,
   ): Promise<AdminGuardFailure | true> {
     const profile = await this.repository.getUserProfile(userId);
-    if (profile?.role === "admin") {
+    const access = resolveAdminAccess(userId, profile, {
+      primaryAdminUserId: this.primaryAdminUserId,
+    });
+    if (access.isAdmin) {
       return true;
     }
 

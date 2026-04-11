@@ -85,6 +85,19 @@ export class SupabaseAdminConsoleRepository implements AdminConsoleRepository {
     };
   }
 
+  async findUserProfileByIdentity(identity: string): Promise<AdminProfileRecord | undefined> {
+    const target = await this.findTargetProfile(identity);
+    if (!target) {
+      return undefined;
+    }
+
+    return {
+      id: target.id,
+      email: target.email || undefined,
+      role: normalizeRole(target.role),
+    };
+  }
+
   async verifyAdminPassword(password: string): Promise<boolean> {
     const adminAuth = await this.getAdminAuthRow();
     return verifyAdminPasswordHash(password, adminAuth.password_hash);
