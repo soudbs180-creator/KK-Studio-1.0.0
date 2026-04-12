@@ -17,6 +17,7 @@ import {
   type AuthenticatedRequestContext,
   type RequestAuthenticator,
 } from "./lib/request-authenticator.ts";
+import { shouldAttemptBearerAuthentication } from "./lib/request-auth-scope.ts";
 import {
   assertServerSupabaseConfigConsistency,
   probeServerSupabasePersistence,
@@ -26,6 +27,10 @@ import {
   type ServerSupabasePersistenceProbe,
   type ServerSupabaseProbeCheck,
 } from "./lib/server-supabase-config.ts";
+import {
+  resolveServerAdminConfig,
+  summarizeServerAdminConfig,
+} from "./lib/server-admin-config.ts";
 import {
   AdminConsoleService,
   type AdminConsoleRepository,
@@ -82,10 +87,16 @@ import {
   CreditAccountService,
   type CreditAccountRepository,
   type CreditExchangeRateRepository,
+  FileBackedCreditAccountRepository,
+  FileBackedCreditExchangeRateRepository,
+  FileBackedRechargeSubmissionRepository,
   InMemoryCreditAccountRepository,
   InMemoryCreditExchangeRateRepository,
+  InMemoryRechargeSubmissionRepository,
+  StaticRechargeService,
   handleAdminRechargeCredits,
   handleListCreditExchangeRates,
+  handleSubmitRecharge,
   handleUpsertCreditExchangeRate,
   SupabaseCreditAccountRepository,
   SupabaseCreditExchangeRateRepository,
@@ -133,6 +144,31 @@ import {
   handleGetWorkspaceCanvas,
   handleSaveWorkspaceLayout,
 } from "./modules/workspace-canvas/index.ts";
+
+const emittedStartupModeLogKeys = new Set<string>();
+
+export function resetStartupModeLogDedupForTests(): void {
+  emittedStartupModeLogKeys.clear();
+}
+
+function logStartupMode(
+  level: "info" | "warn",
+  message: string,
+  context?: Record<string, unknown>,
+): void {
+  const logKey = `${level}:${message}:${JSON.stringify(context || {})}`;
+  if (emittedStartupModeLogKeys.has(logKey)) {
+    return;
+  }
+
+  emittedStartupModeLogKeys.add(logKey);
+  if (level === "warn") {
+    apiLogger.warn(message, context);
+    return;
+  }
+
+  apiLogger.info(message, context);
+}
 
 class JsonBodyParseError extends Error {
   readonly code = "INVALID_JSON_BODY";
@@ -275,16 +311,26 @@ interface RuntimePersistenceState {
   runtimeBlockers: string[];
 }
 
+interface CriticalPersistenceOptions {
+  configReady?: boolean;
+  readyBackends?: Partial<Record<string, RepositoryBackend[]>>;
+  structuralBlockers?: string[];
+}
+
 function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-function isTruthyQueryValue(value: string | null): boolean {
+function isTruthyValue(value: string | null | undefined): boolean {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === "1"
     || normalized === "true"
     || normalized === "yes"
     || normalized === "on";
+}
+
+function isKkaiLocalOnlyRuntime(): boolean {
+  return !isHostedRuntime() && isTruthyValue(process.env.KKAI_LOCAL_ONLY);
 }
 
 function buildCriticalPersistenceState(
@@ -294,7 +340,13 @@ function buildCriticalPersistenceState(
   repositoryBlockers: Record<string, string>,
   probeChecks: Array<ServerSupabaseProbeCheck | undefined> = [],
   extraBlockers: string[] = [],
+  options: CriticalPersistenceOptions = {},
 ): CriticalPersistenceState {
+  const readyBackends = options.readyBackends || {};
+  const isRepositoryReady = ([key, repository]: [string, RepositoryBackend]) => {
+    const acceptedBackends = readyBackends[key] || ["supabase"];
+    return acceptedBackends.includes(repository);
+  };
   const probeBlockers = probeChecks
     .filter((check): check is ServerSupabaseProbeCheck => {
       if (check == null) {
@@ -305,9 +357,9 @@ function buildCriticalPersistenceState(
     })
     .flatMap((check) => String(check.blocker || "").split(",").map((value) => value.trim()).filter(Boolean));
   const blockers = [
-    ...(Array.isArray(configSummary.structuralBlockers) ? configSummary.structuralBlockers : []),
+    ...(options.structuralBlockers ?? (Array.isArray(configSummary.structuralBlockers) ? configSummary.structuralBlockers : [])),
     ...Object.entries(repositories)
-      .filter(([, repository]) => repository !== "supabase")
+      .filter((entry) => !isRepositoryReady(entry))
       .map(([key]) => repositoryBlockers[key])
       .filter(Boolean),
     ...probeBlockers,
@@ -317,8 +369,8 @@ function buildCriticalPersistenceState(
   return {
     label,
     ready:
-      Boolean(configSummary.canonicalConfigReady ?? configSummary.canonicalPersistenceReady)
-      && Object.values(repositories).every((repository) => repository === "supabase")
+      (options.configReady ?? Boolean(configSummary.canonicalConfigReady ?? configSummary.canonicalPersistenceReady))
+      && Object.entries(repositories).every((entry) => isRepositoryReady(entry))
       && probeBlockers.length === 0
       && extraBlockers.length === 0,
     repositories,
@@ -351,13 +403,16 @@ function buildServerConfigErrorResponse(
 
 function resolveCriticalPersistenceCapability(
   pathname: string,
+  options: {
+    localOnly?: boolean;
+  } = {},
 ): CriticalPersistenceCapability | undefined {
   if (
     pathname === "/api/v1/profile/user-apis"
     || pathname === "/api/v1/profile/user-apis/payload"
     || pathname === "/api/v1/profile/key-manager-state"
   ) {
-    return "authData";
+    return options.localOnly ? undefined : "authData";
   }
 
   if (pathname === "/api/v1/auth/temp-users") {
@@ -375,6 +430,7 @@ function resolveCriticalPersistenceCapability(
     pathname === "/api/v1/billing/credits/balance"
     || pathname === "/api/v1/billing/credits/transactions"
     || pathname === "/api/v1/billing/exchange-rates"
+    || pathname === "/api/v1/billing/submit-recharge"
     || pathname === "/api/v1/billing/credits/debit"
     || pathname === "/api/v1/billing/credits/refunds"
     || pathname === "/api/v1/admin/billing/exchange-rates"
@@ -385,7 +441,8 @@ function resolveCriticalPersistenceCapability(
   }
 
   if (
-    pathname === "/api/v1/model-catalog/active-credit-models"
+    pathname === "/api/v1/model-catalog/active"
+    || pathname === "/api/v1/model-catalog/active-credit-models"
     || pathname === "/api/v1/provider-pricing-cache"
     || pathname === "/api/v1/admin/credit-providers"
     || /^\/api\/v1\/admin\/credit-providers\/[^/]+(?:\/pricing-cache)?$/.test(pathname)
@@ -434,8 +491,15 @@ function resolveRepositoryBackend(
 }
 
 function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig): AdminConsoleRepository {
+  if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using in-memory admin console repository for KKAI local-only runtime", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new InMemoryAdminConsoleRepository();
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase admin console repository", {
+    logStartupMode("info", "Using Supabase admin console repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseAdminConsoleRepository({
@@ -444,15 +508,22 @@ function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig
     });
   }
 
-  apiLogger.warn("Falling back to in-memory admin console repository", {
+  logStartupMode("warn", "Falling back to in-memory admin console repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryAdminConsoleRepository();
 }
 
 function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfig): CreditAccountRepository {
+  if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using file-backed credit account repository for KKAI local-only runtime", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new FileBackedCreditAccountRepository();
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase credit account repository", {
+    logStartupMode("info", "Using Supabase credit account repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseCreditAccountRepository({
@@ -461,7 +532,7 @@ function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfi
     });
   }
 
-  apiLogger.warn("Falling back to in-memory credit account repository", {
+  logStartupMode("warn", "Falling back to in-memory credit account repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryCreditAccountRepository();
@@ -470,8 +541,15 @@ function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfi
 function createCreditExchangeRateRepository(
   serverSupabaseConfig: ServerSupabaseConfig,
 ): CreditExchangeRateRepository {
+  if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using file-backed credit exchange-rate repository for KKAI local-only runtime", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new FileBackedCreditExchangeRateRepository();
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase credit exchange-rate repository", {
+    logStartupMode("info", "Using Supabase credit exchange-rate repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseCreditExchangeRateRepository({
@@ -480,15 +558,22 @@ function createCreditExchangeRateRepository(
     });
   }
 
-  apiLogger.warn("Falling back to in-memory credit exchange-rate repository", {
+  logStartupMode("warn", "Falling back to in-memory credit exchange-rate repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryCreditExchangeRateRepository();
 }
 
 function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using in-memory credit provider repository for KKAI local-only runtime", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new InMemoryCreditProviderRepository();
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase credit provider repository", {
+    logStartupMode("info", "Using Supabase credit provider repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseCreditProviderRepository({
@@ -497,15 +582,23 @@ function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConf
     });
   }
 
-  apiLogger.warn("Falling back to in-memory credit provider repository", {
+  logStartupMode("warn", "Falling back to in-memory credit provider repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryCreditProviderRepository();
 }
 
+function createRechargeSubmissionRepository() {
+  if (isKkaiLocalOnlyRuntime()) {
+    return new FileBackedRechargeSubmissionRepository();
+  }
+
+  return new InMemoryRechargeSubmissionRepository();
+}
+
 function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase auth data repository", {
+    logStartupMode("info", "Using Supabase auth data repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseAuthDataRepository({
@@ -515,7 +608,7 @@ function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
     });
   }
 
-  apiLogger.warn("Falling back to file-backed local auth data repository", {
+  logStartupMode("warn", "Falling back to file-backed local auth data repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new FileBackedAuthDataRepository({
@@ -525,7 +618,7 @@ function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
 
 function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseConfig) {
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.info("Using Supabase workspace layout repository", {
+    logStartupMode("info", "Using Supabase workspace layout repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new SupabaseWorkspaceLayoutRepository({
@@ -534,7 +627,7 @@ function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseCon
     });
   }
 
-  apiLogger.warn("Falling back to in-memory workspace layout repository", {
+  logStartupMode("warn", "Falling back to in-memory workspace layout repository", {
     ...summarizeServerSupabaseConfig(serverSupabaseConfig),
   });
   return new InMemoryWorkspaceLayoutRepository();
@@ -551,14 +644,14 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
     .filter(Boolean);
 
   if (!serverSupabaseConfig.supabaseUrl || !serverSupabaseConfig.serviceRoleKey) {
-    apiLogger.warn("WeChat auth service is disabled because Supabase admin config is unavailable.", {
+    logStartupMode("warn", "WeChat auth service is disabled because Supabase admin config is unavailable.", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return undefined;
   }
 
   if (!providerAppId || !providerSecret || !callbackUrl || !stateSigningSecret) {
-    apiLogger.warn("WeChat auth service is disabled because WeChat env vars are incomplete.", {
+    logStartupMode("warn", "WeChat auth service is disabled because WeChat env vars are incomplete.", {
       hasProviderAppId: Boolean(providerAppId),
       hasProviderSecret: Boolean(providerSecret),
       hasCallbackUrl: Boolean(callbackUrl),
@@ -596,6 +689,13 @@ function buildRuntimePersistenceState(
       { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
       [persistenceProbe?.checks.authData],
       configSummary.hasUserApiEncryptionSecret ? [] : ["USER_API_ENCRYPTION_SECRET_MISSING"],
+      {
+        configReady: configSummary.hasUserApiEncryptionSecret,
+        readyBackends: {
+          authData: ["supabase", "local-file"],
+        },
+        structuralBlockers: [],
+      },
     ),
     guestSessions: buildCriticalPersistenceState(
       "Guest temp sessions",
@@ -603,6 +703,14 @@ function buildRuntimePersistenceState(
       configSummary,
       { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
       [persistenceProbe?.checks.guestSessions],
+      [],
+      {
+        configReady: true,
+        readyBackends: {
+          authData: ["supabase", "local-file"],
+        },
+        structuralBlockers: [],
+      },
     ),
     workspaceLayout: buildCriticalPersistenceState(
       "Workspace layout sync",
@@ -623,6 +731,15 @@ function buildRuntimePersistenceState(
         creditExchangeRates: "CREDIT_EXCHANGE_RATE_REPOSITORY_DEGRADED",
       },
       [persistenceProbe?.checks.billing],
+      [],
+      {
+        configReady: true,
+        readyBackends: {
+          creditAccounts: ["supabase", "local-file"],
+          creditExchangeRates: ["supabase", "local-file"],
+        },
+        structuralBlockers: [],
+      },
     ),
     creditProviders: buildCriticalPersistenceState(
       "Credit provider catalog",
@@ -706,14 +823,22 @@ function buildApiServer(
   options: ApiServerOptions = {},
 ) {
   const serverSupabaseConfig = resolveServerSupabaseConfig();
+  const serverAdminConfig = resolveServerAdminConfig();
+  const serverAdminSummary = summarizeServerAdminConfig(serverAdminConfig);
   assertHostedApiRuntimeReady(serverSupabaseConfig);
+  const kkaiLocalOnly = isKkaiLocalOnlyRuntime();
   const allowDegradedPersistence = options.allowDegradedPersistence ?? (port === 0);
-  if (!allowDegradedPersistence) {
+  if (!allowDegradedPersistence && !kkaiLocalOnly) {
     assertServerSupabaseConfigConsistency(serverSupabaseConfig);
   }
   const authDataRepository = options.authDataRepository || createAuthDataRepository(serverSupabaseConfig);
   const adminConsoleRepository =
     options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
+  if (!serverAdminSummary.primaryAdminUserIdConfigured) {
+    logStartupMode("warn", "Owner admin identity is not configured. Set KK_PRIMARY_ADMIN_USER_ID to lock the default administrator.", {
+      blockers: serverAdminSummary.blockers,
+    });
+  }
   const creditAccountRepository =
     options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig);
   const creditExchangeRateRepository = createCreditExchangeRateRepository(serverSupabaseConfig);
@@ -723,7 +848,8 @@ function buildApiServer(
     verifyTurnstileToken: options.verifyTurnstileToken || defaultTurnstileVerifier,
   });
   const authDataCloudMirror =
-    !serverSupabaseConfig.serviceRoleKey
+    !kkaiLocalOnly
+    && !serverSupabaseConfig.serviceRoleKey
     && serverSupabaseConfig.supabaseUrl
     && serverSupabaseConfig.authKey
     && serverSupabaseConfig.userApiEncryptionSecret
@@ -735,14 +861,22 @@ function buildApiServer(
       : undefined;
   const authDataService = new AuthDataService(authDataRepository, {
     cloudMirror: authDataCloudMirror,
+    localOnly: kkaiLocalOnly,
   });
   const userRouteDiagnosticsService = new UserRouteDiagnosticsService(authDataService);
   const localSystemProxyService = new LocalSystemProxyService(serverSupabaseConfig);
   const localUserRouteProxyService = new LocalUserRouteProxyService(authDataService, serverSupabaseConfig);
-  const adminConsoleService = new AdminConsoleService(adminConsoleRepository);
+  const adminConsoleService = new AdminConsoleService(adminConsoleRepository, {
+    primaryAdminUserId: serverAdminConfig.primaryAdminUserId,
+  });
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
   const creditAccountService = new CreditAccountService(creditAccountRepository);
   const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
+  const staticRechargeService = new StaticRechargeService({
+    submissionRepository: createRechargeSubmissionRepository(),
+    exchangeRateRepository: creditExchangeRateRepository,
+    creditAccountService,
+  });
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: (accessToken) => {
       const resolvedOverride = options.resolveAccessToken?.(accessToken);
@@ -761,8 +895,12 @@ function buildApiServer(
         role: profile.role,
       };
     },
-    supabaseUrl: serverSupabaseConfig.supabaseUrl,
-    supabaseAuthKey: serverSupabaseConfig.authKey,
+    ...(kkaiLocalOnly
+      ? {}
+      : {
+          supabaseUrl: serverSupabaseConfig.supabaseUrl,
+          supabaseAuthKey: serverSupabaseConfig.authKey,
+        }),
   });
   const tempUserRateLimiter = new InMemoryRateLimiter();
   const generationService = new GenerationService(new InMemoryGenerationTaskRepository());
@@ -848,9 +986,9 @@ function buildApiServer(
 
       try {
         const requiredCapability = !allowDegradedPersistence
-          ? resolveCriticalPersistenceCapability(pathname)
+          ? resolveCriticalPersistenceCapability(pathname, { localOnly: kkaiLocalOnly })
           : undefined;
-        const forceHealthProbe = pathname === "/healthz" && isTruthyQueryValue(url.searchParams.get("probe"));
+        const forceHealthProbe = pathname === "/healthz" && isTruthyValue(url.searchParams.get("probe"));
         const shouldProbePersistence = forceHealthProbe || Boolean(requiredCapability);
         const persistenceProbe = shouldProbePersistence
           ? await getPersistenceProbe()
@@ -873,12 +1011,8 @@ function buildApiServer(
               config: configSummary,
               repositories: repositoryModes,
               persistence: {
-                userApiKeys:
-                  repositoryModes.authData === "supabase"
-                  && configSummary.hasUserApiEncryptionSecret,
-                keyManager:
-                  repositoryModes.authData === "supabase"
-                  && configSummary.hasUserApiEncryptionSecret,
+                userApiKeys: criticalPersistence.authData.ready,
+                keyManager: criticalPersistence.authData.ready,
                 authData: criticalPersistence.authData.ready,
                 tempUsers: criticalPersistence.guestSessions.ready,
                 credits: criticalPersistence.billing.ready,
@@ -924,7 +1058,9 @@ function buildApiServer(
           }
         }
 
-        const authenticatedUser = await requestAuthenticator.authenticate(headers);
+        const authenticatedUser = shouldAttemptBearerAuthentication(pathname, headers)
+          ? await requestAuthenticator.authenticate(headers)
+          : undefined;
         const tempUserId = String(resolveTempUserId(headers) || "").trim();
         const tempUserSession = !authenticatedUser && tempUserId
           ? await authDataService.resolveTempUserSession(tempUserId)
@@ -1063,6 +1199,18 @@ function buildApiServer(
           const body = await readJsonBody(req);
           const result = await handleUpdateProfile(authService, body, requestHeaders);
           writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/profile/password") {
+          writeJson(res, 501, {
+            success: false,
+            error: {
+              code: "AUTH_ROUTE_DISABLED",
+              message: "Password change is not available on the local API runtime yet.",
+            },
+            meta: buildErrorMeta(requestId, clientVersion),
+          });
           return;
         }
 
@@ -1207,6 +1355,13 @@ function buildApiServer(
           return;
         }
 
+        if (req.method === "POST" && pathname === "/api/v1/billing/submit-recharge") {
+          const body = await readJsonBody(req);
+          const result = await handleSubmitRecharge(staticRechargeService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/api/v1/assets") {
           const result = await handleListAssets(assetLibraryService, {
               kind: url.searchParams.get("kind") || undefined,
@@ -1267,7 +1422,10 @@ function buildApiServer(
           return;
         }
 
-        if (req.method === "GET" && pathname === "/api/v1/model-catalog/active-credit-models") {
+        if (
+          req.method === "GET"
+          && (pathname === "/api/v1/model-catalog/active" || pathname === "/api/v1/model-catalog/active-credit-models")
+        ) {
           const result = await handleListActiveCreditModels(creditProviderService, requestHeaders);
           writeJson(res, result.statusCode, result.body);
           return;

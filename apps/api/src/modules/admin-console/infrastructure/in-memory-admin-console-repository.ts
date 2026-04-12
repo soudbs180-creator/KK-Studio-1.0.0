@@ -61,6 +61,7 @@ export class AdminConsoleTargetNotFoundError extends Error {
 
 export interface AdminConsoleRepository {
   getUserProfile(userId: string): Promise<AdminProfileRecord | undefined>;
+  findUserProfileByIdentity(identity: string): Promise<AdminProfileRecord | undefined>;
   verifyAdminPassword(password: string): Promise<boolean>;
   getAdminPasswordState(): Promise<AdminPasswordState>;
   getActiveAdminSession(
@@ -106,6 +107,16 @@ export class InMemoryAdminConsoleRepository implements AdminConsoleRepository {
   async getUserProfile(userId: string): Promise<AdminProfileRecord | undefined> {
     const profile = this.profiles.get(userId);
     return profile ? { ...profile } : undefined;
+  }
+
+  async findUserProfileByIdentity(identity: string): Promise<AdminProfileRecord | undefined> {
+    const normalizedIdentity = String(identity || "").trim();
+    const target = Array.from(this.profiles.values()).find((profile) => (
+      profile.id === normalizedIdentity
+      || String(profile.email || "").trim().toLowerCase() === normalizedIdentity.toLowerCase()
+    ));
+
+    return target ? { ...target } : undefined;
   }
 
   async verifyAdminPassword(password: string): Promise<boolean> {
