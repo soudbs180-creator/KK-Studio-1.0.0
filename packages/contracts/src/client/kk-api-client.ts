@@ -29,6 +29,7 @@ import type {
   WechatAuthStartResponseDto,
 } from "../dto/auth.ts";
 import type {
+  AdminCreditAccountLookupDto,
   AdminRechargeCreditsRequestDto,
   AdminRechargeCreditsResponseDto,
   CreditTransactionListDto,
@@ -198,6 +199,10 @@ export interface KkApiClient {
     input: AdminRechargeCreditsRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminRechargeCreditsResponseDto>>;
+  getAdminCreditAccount(
+    identity: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AdminCreditAccountLookupDto>>;
   listCreditExchangeRates(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<CreditExchangeRateListDto>>;
@@ -846,6 +851,17 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         {
           method: "POST",
           body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    getAdminCreditAccount(identity, options) {
+      return requestJson<AdminCreditAccountLookupDto>(
+        config,
+        `api/v1/admin/billing/accounts/${encodeURIComponent(identity)}`,
+        {
+          method: "GET",
         },
         options,
       );

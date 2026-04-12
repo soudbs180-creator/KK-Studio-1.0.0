@@ -90,6 +90,7 @@ import {
   SupabaseCreditAccountRepository,
   SupabaseCreditExchangeRateRepository,
   handleDebitCredits,
+  handleGetAdminCreditAccount,
   handleGetCreditBalance,
   handleListCreditTransactions,
   handleRefundCredits,
@@ -1175,6 +1176,17 @@ function buildApiServer(
 
         if (req.method === "GET" && pathname === "/api/v1/billing/credits/balance") {
           const result = await handleGetCreditBalance(creditAccountService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const adminCreditAccountPrefix = "/api/v1/admin/billing/accounts/";
+        if (pathname.startsWith(adminCreditAccountPrefix) && req.method === "GET") {
+          const result = await handleGetAdminCreditAccount(
+            creditAccountService,
+            decodeURIComponent(pathname.slice(adminCreditAccountPrefix.length)),
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }

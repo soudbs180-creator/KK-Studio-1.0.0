@@ -145,6 +145,15 @@ export interface AdminRechargeCreditsResponseDto {
   subjectEmail?: string;
 }
 
+export interface AdminCreditAccountLookupDto {
+  identity: string;
+  subjectId: EntityId;
+  subjectEmail?: string;
+  balance: number;
+  frozenBalance: number;
+  transactions: CreditTransactionDto[];
+}
+
 export type SupportedRechargeCurrencyDto = "CNY" | "USD";
 
 export interface CreditExchangeRateDto {
