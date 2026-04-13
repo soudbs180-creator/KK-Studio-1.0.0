@@ -35,8 +35,7 @@ test('kkai app root bypasses login and callback routes and mounts a local runtim
   const authContextSource = readSource('src/context/AuthContext.tsx');
   const startupSource = readSource('src/context/AppStartupContext.tsx');
 
-  assert.match(mainSource, /import \{ BrowserRouter \} from 'react-router-dom';/);
-  assert.match(mainSource, /<AuthProvider>[\s\S]*<BrowserRouter>[\s\S]*<App \/>[\s\S]*<\/BrowserRouter>[\s\S]*<\/AuthProvider>/);
+  assert.match(mainSource, /<AuthProvider>[\s\S]*<App \/>[\s\S]*<\/AuthProvider>/);
   assert.doesNotMatch(appSource, /<LoginScreen \/>/);
   assert.doesNotMatch(appSource, /<AuthCallback \/>/);
   assert.doesNotMatch(appSource, /if \(!user\)/);

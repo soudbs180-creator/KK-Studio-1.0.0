@@ -1,12 +1,12 @@
 type GroupKey = 'main' | 'aplus';
 
-interface GroupSlotPlan {
+export interface GroupSlotPlan {
   slotId: string;
   sourceKey: string;
   position: { x: number; y: number };
 }
 
-interface GroupPlan {
+export interface GroupPlan {
   groupKey: GroupKey;
   label: string;
   exportLabel: string;

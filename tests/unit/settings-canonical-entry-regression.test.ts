@@ -40,3 +40,10 @@ test('settings routing metadata is owned by a shared registry instead of duplica
   assert.doesNotMatch(routesSource, /const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = \{/);
   assert.doesNotMatch(routesSource, /export const settingsNavItems: SettingsNavItem\[] = \[/);
 });
+
+test('settings workbench relies on the app router instead of nesting a MemoryRouter', () => {
+  const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+
+  assert.doesNotMatch(localizedShellSource, /import \{ MemoryRouter,/);
+  assert.doesNotMatch(localizedShellSource, /<MemoryRouter[\s\S]*<\/MemoryRouter>/);
+});

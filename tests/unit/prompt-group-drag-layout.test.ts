@@ -51,3 +51,13 @@ test("child-card drag clears regroup presentation state so connectors follow liv
 
   assert.ok((appSource.match(/clearPromptGroupRegroup\(node\.id\);/g)?.length ?? 0) >= 4);
 });
+
+test("viewport position resolver is declared after the live node ref is initialized", () => {
+  const appSource = readSource("src/App.tsx");
+  const refIndex = appSource.indexOf("const liveNodePositionByIdRef = useRef");
+  const resolverIndex = appSource.indexOf("const resolveViewportNodePosition =");
+
+  assert.notEqual(refIndex, -1);
+  assert.notEqual(resolverIndex, -1);
+  assert.ok(refIndex < resolverIndex);
+});

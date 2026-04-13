@@ -2479,6 +2479,239 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     // Desktop floating style handling is used for both now
     // 宽度策略：给底部工具区留出一点安全余量，并允许局部按钮在极限宽度下优雅收缩
+    const topControlsNode = (
+        <PromptBarTopRow isMobile={isMobile}>
+            <div data-mobile-composer-section="mode-strip" className="min-w-0">
+                <DesktopComposerModeSwitcher
+                    isMobile={isMobile}
+                    activeMode={activeModeOption.mode}
+                    modeOptions={modeOptions}
+                    onSelectMode={handleSelectPromptBarMode}
+                />
+            </div>
+
+            {!isEmbeddedMobileComposer && (
+                <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
+                    <DesktopComposerPromptTools
+                        isMobile={isMobile}
+                        config={config}
+                        showPptOutlinePanel={showPptOutlinePanel}
+                        onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                        onTogglePromptOptimization={handleTogglePromptOptimization}
+                    />
+
+                    {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
+                        <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
+                                <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <button
+                                    className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-sky-500/40 bg-sky-500/10 text-sky-300' : 'border-[var(--border-light)] text-[var(--text-secondary)]'}`}
+                                    onClick={() => setConfig(prev => ({ ...prev, pptStyleLocked: !(prev.pptStyleLocked !== false) }))}
+                                    title="锁定整套PPT视觉风格一致性"
+                                >
+                                    风格锁定 {config.pptStyleLocked !== false ? 'ON' : 'OFF'}
+                                </button>
+                                <div className="text-[10px] text-[var(--text-tertiary)]">ON 更偏向整套视觉一致，OFF 允许单页变化</div>
+                            </div>
+                            <div className="flex items-center gap-1 mb-2">
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
+                            </div>
+                            <textarea
+                                value={pptOutlineDraft}
+                                onChange={(e) => setPptOutlineDraft(e.target.value)}
+                                className="w-full h-44 rounded-lg border p-2 text-xs outline-none resize-none"
+                                style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                                placeholder="示例：\n封面：AI产品季度汇报\n市场洞察\n产品路线图\n关键案例\n总结与下一步"
+                            />
+                            {parsePptSlides(pptOutlineDraft).length > 0 && (
+                                <div className="mt-2 max-h-36 overflow-y-auto space-y-1 pr-1">
+                                    {parsePptSlides(pptOutlineDraft).map((line, idx) => (
+                                        <div
+                                            key={`${idx}-${line}`}
+                                            className="relative flex items-center gap-1 rounded-md border px-2 py-1"
+                                            style={{
+                                                borderColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
+                                                    ? 'rgba(56,189,248,0.45)'
+                                                    : 'var(--border-light)',
+                                                backgroundColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
+                                                    ? 'rgba(14,165,233,0.12)'
+                                                    : 'var(--bg-tertiary)',
+                                                opacity: pptDragIndex === idx ? 0.65 : 1
+                                            }}
+                                            draggable
+                                            onDragStart={() => {
+                                                setPptDragIndex(idx);
+                                                setPptDropIndex(idx);
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                setPptDropIndex(idx);
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                setPptDropIndex(idx);
+                                                setTimeout(() => dropPptSlide(), 0);
+                                            }}
+                                            onDragEnd={() => {
+                                                setPptDragIndex(null);
+                                                setPptDropIndex(null);
+                                            }}
+                                        >
+                                            {(pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx) && (
+                                                <div className="absolute left-1 right-1 -top-[1px] h-[2px] rounded-full bg-sky-400/80 pointer-events-none" />
+                                            )}
+                                            <span className="text-[10px] w-4 shrink-0 text-[var(--text-tertiary)] cursor-grab">⋮</span>
+                                            <span className="text-[10px] text-sky-400 w-8 shrink-0">图{idx + 1}</span>
+                                            <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1" title={line}>{line}</span>
+                                            <button
+                                                className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                onClick={() => movePptSlide(idx, -1)}
+                                                title="上移"
+                                            >↑</button>
+                                            <button
+                                                className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                onClick={() => movePptSlide(idx, 1)}
+                                                title="下移"
+                                            >↓</button>
+                                            <button
+                                                className="text-[10px] px-1 py-0.5 rounded border border-red-500/30"
+                                                style={{ color: '#fca5a5' }}
+                                                onClick={() => removePptSlide(idx)}
+                                                title="删除此页"
+                                            >删</button>
+                                            <button
+                                                className="text-[10px] px-1 py-0.5 rounded border border-sky-500/30"
+                                                style={{ color: '#7dd3fc' }}
+                                                onClick={() => insertPptSlideAfter(idx)}
+                                                title="在后方插入新页"
+                                            >+</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1 mt-2">
+                                <button
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    onClick={generatePptOutlineByTopic}
+                                >
+                                    按主题拆页
+                                </button>
+                                <button
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    onClick={exportPptOutlineJson}
+                                >
+                                    导出JSON
+                                </button>
+                                <button
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    onClick={() => setPptOutlineDraft('')}
+                                >
+                                    清空
+                                </button>
+                                <button
+                                    className="ml-auto px-2 py-1 rounded-md text-[11px] border border-sky-400/40 bg-sky-500/10"
+                                    style={{ color: '#38bdf8' }}
+                                    onClick={applyPptOutlineDraft}
+                                >
+                                    应用页纲
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </PromptBarTopRow>
+    );
+
+    const ecommercePanelNode = (
+        <DesktopComposerEcommercePanel
+            config={config}
+            requirementFileName={ecommerceRequirementFileName}
+            productFileCount={ecommerceProductFileCount}
+            extraReferenceCount={ecommerceExtraReferenceCount}
+            ecommerceAnalysis={ecommerceAnalysis}
+            ecommerceSelection={ecommerceSelection}
+            taskStates={ecommerceTaskStates}
+            activeTaskState={ecommerceActiveTaskState}
+            ecommerceAnalyzing={ecommerceAnalyzing}
+            onPickRequirementFile={onPickEcommerceRequirementFile}
+            onPickProductFiles={onPickEcommerceProductFiles}
+            onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+            onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+            onResetAnalysis={onResetEcommerceAnalysis}
+            onConfirmAnalysis={onConfirmEcommerceAnalysis}
+            onToggleSelection={onToggleEcommerceSelection}
+            onTaskStateChange={onChangeEcommerceTaskState}
+        />
+    );
+
+    const inputAreaNode = (
+        <div
+            data-mobile-composer-section="primary-input"
+            className={[
+                shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
+                isEmbeddedMobileComposer
+                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-white/8 bg-black/15 px-3 py-2.5'
+                    : '',
+            ].filter(Boolean).join(' ')}
+        >
+            {shouldRenderInlineMobileUploadButton && (
+                <button
+                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-white/5 hover:opacity-100"
+                    style={{
+                        color: 'var(--text-secondary)',
+                        borderColor: 'var(--border-light)',
+                        backgroundColor: 'var(--bg-tertiary)'
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    title="上传参考图"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                </button>
+            )}
+            <textarea
+                ref={textareaRef}
+                value={promptDraft}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onFocus={() => {
+                    setActiveMenu(null);
+                    onFocus?.();
+                }}
+                onBlur={() => {
+                    flushPromptDraftToConfig();
+                    onBlur?.();
+                }}
+                onCompositionStart={() => { isComposingRef.current = true; }}
+                onCompositionEnd={handleCompositionEnd}
+                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
+                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
+                style={{
+                    color: 'var(--text-primary)',
+                    minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
+                    maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
+                    lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
+                }}
+                rows={PROMPT_TEXTAREA_MIN_ROWS}
+            />
+        </div>
+    );
 
     return (
         <>

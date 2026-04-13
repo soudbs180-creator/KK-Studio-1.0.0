@@ -1,6 +1,5 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 // import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css';
 import App from './App';
@@ -290,9 +289,7 @@ function bootstrap() {
       <ErrorBoundary>
         <LocaleProvider>
           <AuthProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
+            <App />
             {/* <SpeedInsights /> */}
           </AuthProvider>
         </LocaleProvider>
