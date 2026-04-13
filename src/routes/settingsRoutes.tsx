@@ -1,36 +1,41 @@
 import React, { lazy } from 'react';
-import type { RouteObject } from 'react-router-dom';
+import { Navigate, type RouteObject } from 'react-router-dom';
 import {
   Coins,
   HardDrive,
   KeyRound,
   LayoutDashboard,
   ScrollText,
-  Shield,
 } from 'lucide-react';
+
+import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 
 const DashboardView = lazy(() => import('../components/settings/views/DashboardView.localized.tsx'));
 const ApiSettingsView = lazy(() => import('../components/settings/ApiSettingsView'));
 const CostEstimation = lazy(() => import('../pages/CostEstimation'));
 const StorageSettingsView = lazy(() => import('../components/settings/views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazy(() => import('../components/settings/views/SystemLogsView.localized.tsx'));
-const AdminSystem = lazy(() => import('../components/settings/AdminSystem'));
 
-export type SettingsViewId =
+type CanonicalSettingsViewId =
   | 'dashboard'
   | 'api-management'
   | 'consumption-records'
   | 'storage-settings'
-  | 'system-logs'
+  | 'system-logs';
+
+type LegacySettingsViewId =
   | 'admin-console'
   | 'credit-models'
   | 'exchange-rates'
-  | 'admin-system';
+  | 'admin-system'
+  | 'cost-estimation';
 
-type NavSectionId = 'workspace' | 'system' | 'admin';
+export type SettingsViewId = CanonicalSettingsViewId | LegacySettingsViewId;
+
+type NavSectionId = 'workspace' | 'system';
 
 export interface SettingsNavItem {
-  id: SettingsViewId;
+  id: CanonicalSettingsViewId;
   label: string;
   description: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -41,8 +46,32 @@ export interface SettingsNavItem {
 export const settingsNavSections: Array<{ id: NavSectionId; label: string }> = [
   { id: 'workspace', label: '工作台' },
   { id: 'system', label: '系统维护' },
-  { id: 'admin', label: '后台管理' },
 ];
+
+const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
+  dashboard: '',
+  'api-management': 'api-management',
+  'consumption-records': 'consumption-records',
+  'storage-settings': 'storage-settings',
+  'system-logs': 'system-logs',
+};
+
+const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
+  'admin-console': 'api-management',
+  'credit-models': 'api-management',
+  'exchange-rates': 'api-management',
+  'admin-system': 'api-management',
+  'cost-estimation': 'consumption-records',
+};
+
+const consumptionRecordsNavItem: SettingsNavItem = {
+  id: 'consumption-records',
+  label: '消耗账单',
+  description: '查看积分消耗、充值和账单明细。',
+  icon: Coins,
+  section: 'workspace',
+  path: SETTINGS_PATHS['consumption-records'],
+};
 
 export const settingsNavItems: SettingsNavItem[] = [
   {
@@ -51,7 +80,7 @@ export const settingsNavItems: SettingsNavItem[] = [
     description: '查看链路状态、消费概况和待处理事项。',
     icon: LayoutDashboard,
     section: 'workspace',
-    path: '',
+    path: SETTINGS_PATHS.dashboard,
   },
   {
     id: 'api-management',
@@ -59,41 +88,48 @@ export const settingsNavItems: SettingsNavItem[] = [
     description: '统一管理官方接口、供应商和预算策略。',
     icon: KeyRound,
     section: 'workspace',
-    path: 'api-management',
+    path: SETTINGS_PATHS['api-management'],
   },
-  {
-    id: 'consumption-records',
-    label: '消费记录',
-    description: '查看消费、充值和账单明细。',
-    icon: Coins,
-    section: 'workspace',
-    path: 'consumption-records',
-  },
+  ...(KKAI_FEATURE_FLAGS.billing ? [consumptionRecordsNavItem] : []),
   {
     id: 'storage-settings',
     label: '存储设置',
     description: '管理本地存储、缓存清理和项目整理。',
     icon: HardDrive,
     section: 'system',
-    path: 'storage-settings',
+    path: SETTINGS_PATHS['storage-settings'],
   },
   {
     id: 'system-logs',
-    label: '系统日志',
-    description: '集中查看警告、错误与运行风险。',
+    label: '系统错误日志',
+    description: '排查运行异常、错误和警告。',
     icon: ScrollText,
     section: 'system',
-    path: 'system-logs',
-  },
-  {
-    id: 'admin-console',
-    label: '管理员后台',
-    description: '处理积分模型、汇率规则和后台权限。',
-    icon: Shield,
-    section: 'admin',
-    path: 'admin-console',
+    path: SETTINGS_PATHS['system-logs'],
   },
 ];
+
+const buildSettingsPath = (view: CanonicalSettingsViewId) =>
+  SETTINGS_PATHS[view] ? `/settings/${SETTINGS_PATHS[view]}` : '/settings';
+
+const billingSettingsRouteElement = KKAI_FEATURE_FLAGS.billing ? <CostEstimation embedded /> : <Navigate to="/settings" replace />;
+
+const LEGACY_SETTINGS_ROUTE_REDIRECTS: Array<{
+  path: string;
+  target: CanonicalSettingsViewId;
+}> = [
+  { path: 'cost-estimation', target: 'consumption-records' },
+  { path: 'credit-models', target: 'api-management' },
+  { path: 'exchange-rates', target: 'api-management' },
+  { path: 'admin-console', target: 'api-management' },
+  { path: 'admin-system/*', target: 'api-management' },
+];
+
+const resolveCanonicalSettingsViewId = (view: SettingsViewId): CanonicalSettingsViewId =>
+  LEGACY_SETTINGS_VIEW_ALIASES[view as LegacySettingsViewId] ?? view;
+
+const getTopLevelSettingsPath = (path: string) =>
+  path.replace(/^\/settings\/?/, '').split('/')[0] || '';
 
 export const settingsRoutes: RouteObject[] = [
   {
@@ -127,7 +163,7 @@ export const settingsRoutes: RouteObject[] = [
   },
   {
     path: 'consumption-records',
-    element: <CostEstimation embedded />,
+    element: billingSettingsRouteElement,
   },
   {
     path: 'storage-settings',
@@ -137,32 +173,31 @@ export const settingsRoutes: RouteObject[] = [
     path: 'system-logs',
     element: <SystemLogsView />,
   },
-  {
-    path: 'credit-models',
-    element: <AdminSystem initialTab="credit-models" />,
-  },
-  {
-    path: 'exchange-rates',
-    element: <AdminSystem initialTab="exchange-rates" />,
-  },
-  {
-    path: 'admin-console',
-    element: <AdminSystem initialTab="admin-console" />,
-  },
-  {
-    path: 'admin-system',
-    element: <AdminSystem initialTab="credit-models" />,
-  },
+  ...LEGACY_SETTINGS_ROUTE_REDIRECTS.map(({ path, target }) => ({
+    path,
+    element: <Navigate to={buildSettingsPath(target)} replace />,
+  })),
 ];
 
-export const getNavItemByPath = (path: string): SettingsNavItem | undefined =>
-  path === 'credit-models' || path === 'exchange-rates' || path === 'admin-system'
-    ? settingsNavItems.find((item) => item.id === 'admin-console')
-    : path.startsWith('api-management')
-      ? settingsNavItems.find((item) => item.id === 'api-management')
-    : settingsNavItems.find((item) => item.path === path);
+export const getNavItemByPath = (path: string): SettingsNavItem | undefined => {
+  const topLevelPath = getTopLevelSettingsPath(path);
+
+  if (!topLevelPath) {
+    return settingsNavItems.find((item) => item.id === 'dashboard');
+  }
+
+  if (topLevelPath === 'api-management') {
+    return settingsNavItems.find((item) => item.id === 'api-management');
+  }
+
+  if (topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
+    return settingsNavItems.find(
+      (item) => item.id === LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId],
+    );
+  }
+
+  return settingsNavItems.find((item) => item.path === topLevelPath);
+};
 
 export const getNavItemById = (id: SettingsViewId): SettingsNavItem | undefined =>
-  id === 'credit-models' || id === 'exchange-rates' || id === 'admin-system'
-    ? settingsNavItems.find((item) => item.id === 'admin-console')
-    : settingsNavItems.find((item) => item.id === id);
+  settingsNavItems.find((item) => item.id === resolveCanonicalSettingsViewId(id));

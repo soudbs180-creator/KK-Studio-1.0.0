@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 
 import { AUTHENTICATED_USER_ID_HEADER } from "../../packages/shared/src/index.ts";
 import { PaymentService } from "../../apps/payment-sidecar/src/modules/payment/application/payment-service.ts";
@@ -18,6 +18,18 @@ import {
   handleLegacyGetStatus,
 } from "../../apps/payment-sidecar/src/modules/payment/presentation/http-payment-routes.ts";
 import type { ApplyPaymentSettlementRequestDto } from "../../packages/contracts/src/index.ts";
+
+const originalConsoleWarn = console.warn;
+
+async function withMutedConsoleWarnAsync<T>(callback: () => Promise<T>): Promise<T> {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return await callback();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
 
 class StubSettlementWriter implements PaymentSettlementWriter {
   readonly calls: ApplyPaymentSettlementRequestDto[] = [];
@@ -51,6 +63,14 @@ class StubCreditAmountResolver implements PaymentCreditAmountResolver {
     return this.resolveFn(input);
   }
 }
+
+beforeEach(() => {
+  console.warn = () => undefined;
+});
+
+afterEach(() => {
+  console.warn = originalConsoleWarn;
+});
 
 describe("payment sidecar service", () => {
   test("creates idempotent payment orders for the same user and idempotency key", async () => {
@@ -98,32 +118,34 @@ describe("payment sidecar service", () => {
   });
 
   test("resolves credit amounts server-side instead of trusting the client payload", async () => {
-    const resolver = new StubCreditAmountResolver(() => 40);
-    const service = new PaymentService(
-      new InMemoryPaymentOrderRepository(),
-      new StubSettlementWriter(),
-      resolver,
-    );
+    await withMutedConsoleWarnAsync(async () => {
+      const resolver = new StubCreditAmountResolver(() => 40);
+      const service = new PaymentService(
+        new InMemoryPaymentOrderRepository(),
+        new StubSettlementWriter(),
+        resolver,
+      );
 
-    const created = await service.createOrder({
-      providerCode: "alipay",
-      amount: "8.00",
-      currency: "CNY",
-      creditAmount: 8000,
-      returnUrl: "https://kkai.plus/pay/success",
-      notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
-      idempotencyKey: "idem-sidecar-credit-resolve-1",
-    }, {
-      requestId: "req-sidecar-credit-resolve-1",
-      userId: "user-sidecar-credit-1",
-      paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
+      const created = await service.createOrder({
+        providerCode: "alipay",
+        amount: "8.00",
+        currency: "CNY",
+        creditAmount: 8000,
+        returnUrl: "https://kkai.plus/pay/success",
+        notifyUrl: "https://payment.kkai.plus/api/pay/notify/alipay",
+        idempotencyKey: "idem-sidecar-credit-resolve-1",
+      }, {
+        requestId: "req-sidecar-credit-resolve-1",
+        userId: "user-sidecar-credit-1",
+        paymentUrlFactory: (input) => `https://payment.kkai.plus/payment/v1/orders/${input.merchantOrderNo}/checkout`,
+      });
+
+      assert.equal(created.success, true);
+      assert.equal(resolver.calls.length, 1);
+      if (created.success) {
+        assert.equal(created.data.creditAmount, 40);
+      }
     });
-
-    assert.equal(created.success, true);
-    assert.equal(resolver.calls.length, 1);
-    if (created.success) {
-      assert.equal(created.data.creditAmount, 40);
-    }
   });
 
   test("creates payment orders when legacy clients omit creditAmount", async () => {

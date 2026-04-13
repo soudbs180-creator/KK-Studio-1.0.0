@@ -8,6 +8,7 @@ const scanRoots = [
   'billing',
   'config',
   'docs',
+  '.agent',
   'packages',
   'payment-server',
   'scripts',

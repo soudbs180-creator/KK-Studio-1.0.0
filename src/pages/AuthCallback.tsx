@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
-import { supabase } from '@/lib/supabase';
+import { setStoredKkApiAccessToken } from '@/services/api/authAccessToken';
+import { kkWebApiClient } from '@/services/api/kkApiClient';
+import { emitAuthSessionChange } from '@/services/auth/authSessionEvents';
 import {
   resolveBindCallbackProvider,
   resolveBindFailureMessage,
   resolveBindSuccessMessage,
 } from '@/services/auth/identityLinking';
+import {
+  updateRuntimeAuthStateFromProfile,
+  updateRuntimeUserMetadata,
+} from '@/services/auth/runtimeAuthState';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
-
-const SESSION_FALLBACK_POLL_INTERVAL_MS = 1200;
-const SESSION_FALLBACK_POLL_ATTEMPTS = 4;
-const SESSION_WAIT_TIMEOUT_MS = 6500;
 
 function parseHashParams(): URLSearchParams {
   const hash = window.location.hash.startsWith('#')
@@ -22,96 +24,32 @@ function parseHashParams(): URLSearchParams {
   return new URLSearchParams(hash);
 }
 
-function hasSessionHints(searchParams: URLSearchParams, hashParams: URLSearchParams): boolean {
-  return (
-    Boolean(searchParams.get('code')) ||
-    Boolean(searchParams.get('token_hash')) ||
-    Boolean(searchParams.get('type')) ||
-    Boolean(hashParams.get('access_token')) ||
-    Boolean(hashParams.get('refresh_token')) ||
-    Boolean(hashParams.get('token_hash')) ||
-    Boolean(hashParams.get('type'))
-  );
-}
+async function hydrateRuntimeProfileFromHash(hashParams: URLSearchParams): Promise<boolean> {
+  const accessToken = String(hashParams.get('access_token') || '').trim();
+  if (!accessToken) {
+    return false;
+  }
 
-async function waitForSession(): Promise<boolean> {
-  return await new Promise<boolean>((resolve, reject) => {
-    let settled = false;
-    let fallbackAttempts = 0;
-    let fallbackTimer: number | undefined;
-    let timeoutTimer: number | undefined;
+  setStoredKkApiAccessToken(accessToken);
+  const response = await kkWebApiClient.getProfile({ accessToken });
+  if (!response.success) {
+    return false;
+  }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        finish(true);
-      }
-    });
-
-    function cleanup() {
-      subscription.unsubscribe();
-      if (typeof fallbackTimer === 'number') {
-        window.clearTimeout(fallbackTimer);
-      }
-      if (typeof timeoutTimer === 'number') {
-        window.clearTimeout(timeoutTimer);
-      }
-    }
-
-    function finish(result: boolean) {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(result);
-    }
-
-    function fail(error: unknown) {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(error);
-    }
-
-    const pollForSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
-          fail(error);
-          return;
-        }
-
-        if (session) {
-          finish(true);
-          return;
-        }
-
-        fallbackAttempts += 1;
-        if (fallbackAttempts < SESSION_FALLBACK_POLL_ATTEMPTS) {
-          fallbackTimer = window.setTimeout(() => {
-            void pollForSession();
-          }, SESSION_FALLBACK_POLL_INTERVAL_MS);
-        }
-      } catch (error) {
-        fail(error);
-      }
-    };
-
-    timeoutTimer = window.setTimeout(() => {
-      finish(false);
-    }, SESSION_WAIT_TIMEOUT_MS);
-
-    fallbackTimer = window.setTimeout(() => {
-      void pollForSession();
-    }, SESSION_FALLBACK_POLL_INTERVAL_MS);
+  updateRuntimeAuthStateFromProfile(response.data);
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: response.data.id,
+    accessToken,
+    refreshToken: undefined,
+    isTempUser: false,
   });
+  return true;
 }
 
 export default function AuthCallback() {
   const [status, setStatus] = useState<CallbackStatus>('processing');
-  const [message, setMessage] = useState('正在处理登录...');
+  const [message, setMessage] = useState('正在处理认证回调...');
 
   useEffect(() => {
     let active = true;
@@ -143,6 +81,7 @@ export default function AuthCallback() {
 
       try {
         if (searchParams.get('wechat_bind') === 'success') {
+          updateRuntimeUserMetadata({ authProvider: 'wechat', addProvider: 'wechat' });
           finishWithRedirect('success', resolveBindSuccessMessage(bindProvider), 1200);
           return;
         }
@@ -154,59 +93,45 @@ export default function AuthCallback() {
         if (error) {
           finishWithRedirect(
             'error',
-            errorDescription || (bindFlow ? resolveBindFailureMessage(bindProvider) : '登录失败，请稍后重试。'),
+            errorDescription || (bindFlow ? resolveBindFailureMessage(bindProvider) : '认证回调失败，请稍后重试。'),
             3000,
           );
           return;
         }
 
-        const {
-          data: { session: immediateSession },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (immediateSession) {
+        const hydratedFromHash = await hydrateRuntimeProfileFromHash(hashParams);
+        if (hydratedFromHash) {
           finishWithRedirect(
             'success',
-            bindFlow ? resolveBindSuccessMessage(bindProvider) : '登录成功。',
-            900,
+            bindFlow ? resolveBindSuccessMessage(bindProvider) : '认证回调已完成，已切换到 KK API 本地运行时会话。',
+            1200,
           );
           return;
         }
 
-        if (!hasSessionHints(searchParams, hashParams)) {
+        if (searchParams.get('code')) {
           finishWithRedirect(
             'error',
-            bindFlow ? resolveBindFailureMessage(bindProvider) : '无效的登录回调链接。',
-            3000,
-          );
-          return;
-        }
-
-        const didResolveSession = await waitForSession();
-        if (!didResolveSession) {
-          finishWithRedirect(
-            'error',
-            bindFlow ? resolveBindFailureMessage(bindProvider) : '登录会话创建失败，请稍后重试。',
-            3000,
+            bindFlow
+              ? resolveBindFailureMessage(bindProvider)
+              : '认证回调已收到，但当前本地运行时不会在浏览器里直接完成旧的 Supabase code 交换。',
+            3200,
           );
           return;
         }
 
         finishWithRedirect(
           'success',
-          bindFlow ? resolveBindSuccessMessage(bindProvider) : '登录成功。',
-          900,
+          bindFlow
+            ? resolveBindSuccessMessage(bindProvider)
+            : '当前回调没有携带可继续处理的会话信息，已返回工作区。',
+          1200,
         );
       } catch (error) {
         console.error('Auth callback error:', error);
         finishWithRedirect(
           'error',
-          bindFlow ? resolveBindFailureMessage(bindProvider) : '登录处理出错，请稍后重试。',
+          bindFlow ? resolveBindFailureMessage(bindProvider) : '认证回调处理出错，请稍后重试。',
           3000,
         );
       }

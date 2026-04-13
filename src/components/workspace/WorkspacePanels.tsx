@@ -4,21 +4,21 @@ import type { AppSurface, WorkspacePanel } from '../../types';
 interface WorkspacePanelsProps {
   activeSurface: AppSurface;
   activePanel: WorkspacePanel;
-  chatSidebar?: ReactNode;
-  libraryPanel?: ReactNode;
+  renderChatSidebar?: () => ReactNode;
+  renderLibraryPanel?: () => ReactNode;
   auxiliaryPanels?: ReactNode;
 }
 
 const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   activeSurface,
   activePanel,
-  chatSidebar,
-  libraryPanel,
+  renderChatSidebar,
+  renderLibraryPanel,
   auxiliaryPanels,
 }) => (
   <>
-    {activePanel === 'chat' ? chatSidebar : null}
-    {activeSurface === 'library' ? libraryPanel : null}
+    {activePanel === 'chat' ? renderChatSidebar?.() : null}
+    {activeSurface === 'library' ? renderLibraryPanel?.() : null}
     {auxiliaryPanels}
   </>
 );

@@ -38,7 +38,7 @@
         "typecheck:tests": "node scripts/check-tests-types.mjs tsconfig.tests.json",
         "typecheck:payment-server": "node scripts/check-payment-server.mjs",
         "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json && node scripts/check-tests-types.mjs tsconfig.tests.json && npm run typecheck:payment-server",
-        "test:unit": "node --test \"tests/unit/*.test.ts\"",
+        "test:unit": "node --import ./scripts/test/set-log-level.mjs --test \"tests/unit/*.test.ts\"",
         "test:integration": "node --test \"tests/integration/*.test.ts\"",
         "test:contract": "node --test \"tests/contract/*.test.ts\"",
         "test:e2e": "node --test \"tests/e2e/*.test.ts\"",

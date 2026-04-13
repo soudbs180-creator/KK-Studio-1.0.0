@@ -1,9 +1,9 @@
-import {
-    getDefaultPromptOptimizerTemplateId,
-    getPromptOptimizerTemplate,
-} from '../../config/promptOptimizerTemplates';
-import type { PromptOptimizationMode, PromptOptimizerResult } from '../../types';
+import type { PromptOptimizerResult } from '../../types';
 import { keyManager } from '../auth/keyManager';
+import {
+    buildAutomaticOptimizationInstruction,
+    resolveAutomaticOptimizationRoute,
+} from './promptOptimizerAutoroute.ts';
 import { llmService } from './LLMService';
 
 type ReferenceImageInput = {
@@ -17,15 +17,15 @@ type PromptOptimizationOptions = {
     imageSize?: string;
     mode?: string;
     referenceImages?: ReferenceImageInput[];
-    optimizationMode?: PromptOptimizationMode;
-    optimizationTemplateId?: string;
-    optimizationTemplateTitle?: string;
-    optimizationPrompt?: string;
     supportsThinking?: boolean;
     thinkingMode?: 'minimal' | 'high';
 };
 
 type PromptOptimizationStrategy = 'reasoning-native' | 'structure-first';
+type PromptOptimizerRouteMeta = PromptOptimizerResult['meta'] & {
+    route_id?: string;
+    route_title?: string;
+};
 
 type OptimizerCacheEntry = {
     result: PromptOptimizationResult;
@@ -48,6 +48,11 @@ const DEFAULT_TABS: PromptOptimizerResult['ui_payload']['tabs'] = [
     { id: 'opt', label_zh: '已优化', label_en: 'Optimized' },
 ];
 
+const HUMAN_DEFAULT_TABS: PromptOptimizerResult['ui_payload']['tabs'] = [
+    { id: 'raw', label_zh: '未优化', label_en: 'Raw' },
+    { id: 'opt', label_zh: '已优化', label_en: 'Optimized' },
+];
+
 const DEFAULT_NEGATIVE_CONSTRAINTS = [
     'Avoid adding extra subjects that change the original idea.',
     'Avoid clutter, weak focal hierarchy, and muddy lighting.',
@@ -66,8 +71,8 @@ You will receive:
 - the user prompt
 - target model context
 - whether the target model has native thinking
-- template instructions
-- optional custom optimization guidance
+- automatic route guidance
+- route-aware optimization constraints
 
 Your task:
 1. clarify the goal, constraints, missing details, and likely failure modes
@@ -176,7 +181,105 @@ const writeOptimizerCache = (cache: Record<string, OptimizerCacheEntry>) => {
     }
 };
 
-const detectMissingInputs = (input: string, mode?: string): string[] => {
+const collectReadableGenericMissingInputs = (
+    input: string,
+    mode?: string,
+): string[] => {
+    const lowerInput = input.toLowerCase();
+    const genericMissingInputs: string[] = [];
+
+    if (input.trim().length < 18) {
+        genericMissingInputs.push('核心主体或关键对象');
+    }
+    if (!/(cinematic|minimal|photoreal|vector|3d|flat|watercolor|插画|写实|扁平|电影感|海报|ui|dashboard|logo|图标|产品|product)/i.test(lowerInput)) {
+        genericMissingInputs.push('风格或表现方式');
+    }
+    if (!/(light|lighting|studio|rim light|sunset|golden hour|夜景|逆光|柔光|棚拍|光线)/i.test(lowerInput)) {
+        genericMissingInputs.push('光线或场景环境');
+    }
+    if (
+        mode !== 'ppt'
+        && !/(close-up|wide shot|macro|top view|composition|layout|淇媿|鐗瑰啓|鏋勫浘|闀滃ご|鐗堝紡)/i.test(lowerInput)
+    ) {
+        genericMissingInputs.push('鏋勫浘銆侀暅澶存垨鐗堝紡閲嶇偣');
+    }
+
+    return genericMissingInputs;
+};
+
+const detectReadableMissingInputs = (
+    input: string,
+    route: { missingInputHints: string[] },
+    mode?: string,
+): string[] => {
+    const genericMissingInputs = collectReadableGenericMissingInputs(input, mode);
+    if (input.trim().length >= 18) {
+        return normalizeTextList(genericMissingInputs, 4);
+    }
+
+    const prioritizedMissingInputs = [
+        ...route.missingInputHints,
+        ...genericMissingInputs,
+    ];
+
+    return normalizeTextList(prioritizedMissingInputs, 4);
+    /*
+    const lowerInput = input.toLowerCase();
+    const missing: string[] = [];
+
+    if (input.trim().length < 18) {
+        missing.push('核心主体或关键对象');
+    }
+    if (!/(cinematic|minimal|photoreal|vector|3d|flat|watercolor|插画|写实|扁平|电影感|海报|ui|dashboard|logo|图标|产品|product)/i.test(lowerInput)) {
+        missing.push('风格或表现方式');
+    }
+    if (!/(light|lighting|studio|rim light|sunset|golden hour|夜景|逆光|柔光|棚拍|光线)/i.test(lowerInput)) {
+        missing.push('光线或场景环境');
+    }
+    if (
+        mode !== 'ppt'
+        && !/(close-up|wide shot|macro|top view|composition|layout|俯拍|特写|构图|镜头|版式)/i.test(lowerInput)
+    ) {
+        missing.push('构图、镜头或版式重点');
+    }
+
+    if (input.trim().length < 18) {
+        missing.push(...route.missingInputHints);
+    }
+
+    return normalizeTextList(missing, 4);
+    */
+};
+
+const getReadableFallbackOptimizedZh = (strategy: PromptOptimizationStrategy): string => (
+    strategy === 'reasoning-native'
+        ? '已按支持思考的模型优化为“目标 + 约束 + 结果导向”的精简提示词。'
+        : '已按不带思考能力的模型优化为更显式的结构化提示词。'
+);
+
+const buildOptimizerMeta = ({
+    version,
+    timestamp,
+    route,
+    strategy,
+    validationStatus,
+}: {
+    version: string;
+    timestamp: string;
+    route: { strategyId: string; strategyTitle: string };
+    strategy: PromptOptimizationStrategy;
+    validationStatus: 'ready' | 'needs-review';
+}): PromptOptimizerRouteMeta => ({
+    version,
+    timestamp,
+    optimization_mode: 'auto',
+    route_id: route.strategyId,
+    route_title: route.strategyTitle,
+    strategy,
+    validation_status: validationStatus,
+});
+
+/* legacy missing-input helper removed during autoroute migration
     const lowerInput = input.toLowerCase();
     const missing: string[] = [];
 
@@ -197,7 +300,7 @@ const detectMissingInputs = (input: string, mode?: string): string[] => {
     }
 
     return normalizeTextList(missing, 4);
-};
+}; */
 
 const inferTaskType = (
     input: string,
@@ -296,7 +399,11 @@ const buildHeuristicPrompt = (
 ): string => {
     const taskType = inferTaskType(input, options?.mode);
     const defaults = getTaskDefaults(taskType, options?.mode);
-    const extraInstruction = truncateText(cleanText(options?.optimizationPrompt), 220);
+    const extraInstruction = truncateText(buildAutomaticOptimizationInstruction(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    }), 220);
 
     if (strategy === 'reasoning-native') {
         return truncateText([
@@ -327,25 +434,32 @@ const buildFallbackResult = (
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
 ): PromptOptimizerResult => {
-    const template = getPromptOptimizerTemplate(
-        options?.optimizationTemplateId || getDefaultPromptOptimizerTemplateId(options?.mode as any),
-        options?.mode as any,
-    );
-    const taskType = inferTaskType(input, options?.mode);
+    const autoroute = resolveAutomaticOptimizationRoute(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    });
+    const taskType = autoroute.taskType === 'other'
+        ? inferTaskType(input, options?.mode)
+        : autoroute.taskType;
     const defaults = getTaskDefaults(taskType, options?.mode);
-    const missingInputs = detectMissingInputs(input, options?.mode);
+    const missingInputs = detectReadableMissingInputs(input, autoroute, options?.mode);
+    const readableOptimizedZh = getReadableFallbackOptimizedZh(strategy);
     const confidence: PromptOptimizerResult['confidence'] =
         missingInputs.length >= 3 ? 'low' : missingInputs.length > 0 ? 'medium' : 'high';
 
     return {
         raw_prompt_original: input,
         optimized_prompt_en: buildHeuristicPrompt(input, strategy, options),
-        optimized_prompt_zh_display: strategy === 'reasoning-native'
+        /*
+        legacy_optimized_prompt_zh_display: strategy === 'reasoning-native'
             ? '已按支持思考的模型优化为“目标 + 约束 + 结果导向”的精简提示词。'
             : '已按不带思考能力的模型优化为更显式的结构化提示词。',
+        */
+        optimized_prompt_zh_display: readableOptimizedZh,
         negative_constraints: [...DEFAULT_NEGATIVE_CONSTRAINTS],
         assumptions: normalizeTextList([
-            template?.title ? `Applied template: ${template.title}` : 'Applied default template',
+            `Automatic route: ${autoroute.strategyTitle}`,
             strategy === 'reasoning-native'
                 ? 'Lean into the target model’s native reasoning instead of over-scripting it.'
                 : 'Expanded the prompt structure because the target model benefits from explicit guidance.',
@@ -366,18 +480,16 @@ const buildFallbackResult = (
             aspect_ratio: options?.aspectRatio || '1:1',
         },
         ui_payload: {
-            tabs: DEFAULT_TABS,
+            tabs: HUMAN_DEFAULT_TABS,
             default_tab: 'opt',
         },
-        meta: {
+        meta: buildOptimizerMeta({
             version: 'prompt-optimizer-fallback-v4',
             timestamp: new Date().toISOString(),
-            optimization_mode: options?.optimizationMode || 'auto',
-            template_id: template?.id,
-            template_title: template?.title,
+            route: autoroute,
             strategy,
-            validation_status: missingInputs.length > 0 ? 'needs-review' : 'ready',
-        },
+            validationStatus: missingInputs.length > 0 ? 'needs-review' : 'ready',
+        }),
     };
 };
 
@@ -416,6 +528,11 @@ const buildOptimizerCacheKey = (
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
 ) => {
+    const autoroute = resolveAutomaticOptimizationRoute(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    });
     const refSign = (options?.referenceImages || [])
         .map((ref) => `${cleanText(ref.mimeType).toLowerCase()}:${cleanText(ref.data).slice(0, 32)}`)
         .join('|');
@@ -425,9 +542,7 @@ const buildOptimizerCacheKey = (
         cleanText(options?.aspectRatio).toLowerCase(),
         cleanText(options?.imageSize).toLowerCase(),
         cleanText(options?.mode).toLowerCase(),
-        cleanText(options?.optimizationMode || 'auto').toLowerCase(),
-        cleanText(options?.optimizationTemplateId).toLowerCase(),
-        cleanText(options?.optimizationPrompt),
+        autoroute.strategyId,
         strategy,
         input.trim(),
         cleanText(options?.thinkingMode).toLowerCase(),
@@ -489,11 +604,17 @@ const buildOptimizationUserMessage = (
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
 ): string => {
-    const template = getPromptOptimizerTemplate(
-        options?.optimizationTemplateId || getDefaultPromptOptimizerTemplateId(options?.mode as any),
-        options?.mode as any,
-    );
-    const missingInputs = detectMissingInputs(input, options?.mode);
+    const autoroute = resolveAutomaticOptimizationRoute(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    });
+    const missingInputs = detectReadableMissingInputs(input, autoroute, options?.mode);
+    const autoInstruction = buildAutomaticOptimizationInstruction(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    });
 
     return [
         `Raw prompt: "${input}"`,
@@ -506,10 +627,9 @@ const buildOptimizationUserMessage = (
         `Image size: ${options?.imageSize || 'default'}`,
         `Mode: ${options?.mode || 'image'}`,
         `Reference images attached: ${options?.referenceImages?.length || 0}`,
-        template ? `Template: ${template.title} - ${template.description}` : 'Template: auto',
-        options?.optimizationPrompt
-            ? `Additional optimization instructions: ${truncateText(cleanText(options.optimizationPrompt), 320)}`
-            : 'Additional optimization instructions: none',
+        `Automatic route: ${autoroute.strategyTitle}`,
+        `Route task type: ${autoroute.taskType}`,
+        `Additional optimization instructions: ${truncateText(autoInstruction, 320)}`,
         missingInputs.length > 0
             ? `Likely underspecified areas: ${missingInputs.join(', ')}`
             : 'Likely underspecified areas: none detected',
@@ -524,6 +644,11 @@ const sanitizePromptOptimizerResult = (
     options?: PromptOptimizationOptions,
 ): PromptOptimizerResult => {
     const fallback = buildFallbackResult(input, strategy, options);
+    const autoroute = resolveAutomaticOptimizationRoute(input, {
+        mode: options?.mode,
+        aspectRatio: options?.aspectRatio,
+        referenceImageCount: options?.referenceImages?.length || 0,
+    });
     const params = typeof parsed?.params === 'object' && parsed.params ? parsed.params : {};
     const missingInputs = normalizeTextList(parsed?.missing_inputs, 6);
     const normalizedMissingInputs = missingInputs.length > 0
@@ -571,18 +696,16 @@ const sanitizePromptOptimizerResult = (
             aspect_ratio: cleanText(params.aspect_ratio, fallback.params.aspect_ratio),
         },
         ui_payload: {
-            tabs: DEFAULT_TABS,
+            tabs: HUMAN_DEFAULT_TABS,
             default_tab: 'opt',
         },
-        meta: {
+        meta: buildOptimizerMeta({
             version: cleanText(parsed?.meta?.version, 'prompt-optimizer-v4'),
             timestamp: cleanText(parsed?.meta?.timestamp, new Date().toISOString()),
-            optimization_mode: options?.optimizationMode || fallback.meta.optimization_mode,
-            template_id: cleanText(options?.optimizationTemplateId, fallback.meta.template_id),
-            template_title: cleanText(options?.optimizationTemplateTitle, fallback.meta.template_title),
+            route: autoroute,
             strategy,
-            validation_status: normalizedMissingInputs.length > 0 ? 'needs-review' : 'ready',
-        },
+            validationStatus: normalizedMissingInputs.length > 0 ? 'needs-review' : 'ready',
+        }),
     };
 };
 
@@ -594,17 +717,7 @@ export const optimizePromptForImage = async (
     if (!input) throw new Error('Prompt is empty');
 
     const strategy = resolveStrategy(options);
-    const template = getPromptOptimizerTemplate(
-        options?.optimizationTemplateId || getDefaultPromptOptimizerTemplateId(options?.mode as any),
-        options?.mode as any,
-    );
-
-    const resolvedOptions: PromptOptimizationOptions = {
-        ...options,
-        optimizationTemplateId: template?.id || options?.optimizationTemplateId,
-        optimizationTemplateTitle: options?.optimizationTemplateTitle || template?.title,
-        optimizationPrompt: cleanText(options?.optimizationPrompt, template?.instruction || ''),
-    };
+    const resolvedOptions: PromptOptimizationOptions = { ...options };
 
     const cacheKey = buildOptimizerCacheKey(input, strategy, resolvedOptions);
     const cache = readOptimizerCache();

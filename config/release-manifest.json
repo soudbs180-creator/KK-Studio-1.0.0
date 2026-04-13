@@ -11,6 +11,7 @@
     "Hosted release guidance and runtime guards are tightened to reduce dangerous fallback behavior."
   ],
   "versionTargets": {
+    "releaseManifest": "config/release-manifest.json",
     "rootPackage": "package.json",
     "paymentServerPackage": "payment-server/package.json",
     "workspacePackages": [
@@ -18,9 +19,11 @@
       "packages/domain/package.json",
       "packages/shared/package.json"
     ],
-    "webAppInfo": "src/config/appInfo.ts",
+    "runtimeAppInfo": "src/config/appInfo.ts",
     "readme": "README.md",
+    "agentReadme": ".agent/README.md",
     "sessionHandoff": "docs/development/session-handoff.md",
-    "progressReport": "docs/development/progress.md"
+    "progressReport": "docs/development/progress.md",
+    "stablePortableManifest": "release/publish/stable/manifest.json"
   }
 }

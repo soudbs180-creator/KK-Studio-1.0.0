@@ -4,6 +4,7 @@ export * from "./application/user-route-diagnostics-service.ts";
 export * from "./application/wechat-auth-service.ts";
 export * from "./domain/email-policy.ts";
 export * from "./infrastructure/file-auth-data-repository.ts";
+export * from "./infrastructure/file-auth-identity-store.ts";
 export * from "./infrastructure/in-memory-auth-data-repository.ts";
 export * from "./infrastructure/in-memory-auth-identity-store.ts";
 export * from "./infrastructure/supabase-auth-data-repository.ts";

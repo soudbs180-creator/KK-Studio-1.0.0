@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { GeneratedImage, GenerationMode } from '../../types';
+import { GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
-import { InpaintModal } from './InpaintModal';
+import { PartialRedrawModal } from './PartialRedrawModal';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
@@ -16,7 +16,7 @@ interface GlobalLightboxProps {
     onClose: () => void;
     onEditText?: (image: GeneratedImage) => void;
     onEditPptDeck?: (image: GeneratedImage) => void;
-    onInpaint?: (image: GeneratedImage, maskBase64: string, prompt?: string) => void;
+    onPartialRedraw?: (image: GeneratedImage, request: PartialRedrawRequest) => void;
     onDownloadPptComposite?: (imageId: string) => void;
 }
 
@@ -27,12 +27,12 @@ interface GlobalLightboxProps {
  * @param initialIndex Initially active item index.
  * @param onClose Close handler.
  */
-export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onInpaint, onDownloadPptComposite }) => {
+export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDownloadPptComposite }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
-    const [showInpaint, setShowInpaint] = useState(false);
+    const [showPartialRedraw, setShowPartialRedraw] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? window.innerWidth < 768 : false
@@ -741,11 +741,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     </div>
 
                     {/* Partial redraw actions for images only */}
-                    {onInpaint && !isVideo && !isAudio && displaySrc && (
+                    {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setShowInpaint(true);
+                                setShowPartialRedraw(true);
                             }}
                             className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
                             title="局部重绘"
@@ -830,15 +830,16 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 </div>
             </div>
 
-            {/* Inpaint modal for partial redraw */}
-            {showInpaint && displaySrc && (
-                <InpaintModal
+            {/* Partial redraw modal */}
+            {showPartialRedraw && displaySrc && (
+                <PartialRedrawModal
+                    image={image}
                     imageUrl={displaySrc}
-                    onCancel={() => setShowInpaint(false)}
-                    onSave={(maskBase64, prompt) => {
-                        setShowInpaint(false);
-                        if (onInpaint) {
-                            onInpaint(image, maskBase64, prompt);
+                    onCancel={() => setShowPartialRedraw(false)}
+                    onSubmit={(request) => {
+                        setShowPartialRedraw(false);
+                        if (onPartialRedraw) {
+                            onPartialRedraw(image, request);
                         }
                         onClose();
                     }}

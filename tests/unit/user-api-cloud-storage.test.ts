@@ -22,6 +22,7 @@ const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
 const originalGetSession = supabase.auth.getSession;
 const originalGetUser = supabase.auth.getUser;
+const originalSupabaseFrom = supabase.from.bind(supabase);
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
@@ -252,9 +253,16 @@ function mockApiState(initialPayload: unknown) {
   };
 }
 
+function forbidSupabaseProfileFallback() {
+  (supabase as unknown as { from: typeof supabase.from }).from = (() => {
+    throw new Error('Supabase profile fallback should stay unused.');
+  }) as typeof supabase.from;
+}
+
 afterEach(() => {
   supabase.auth.getSession = originalGetSession;
   supabase.auth.getUser = originalGetUser;
+  (supabase as unknown as { from: typeof supabase.from }).from = originalSupabaseFrom;
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
   legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
@@ -554,7 +562,12 @@ describe('user api cloud storage helpers', () => {
       version: 2,
       slots: [{ id: 'slot-1' }],
       providers: [{ id: 'provider-1' }],
-      entries: [createEntry('entry-1')],
+      entries: [
+        {
+          ...createEntry('entry-1'),
+          key: 'sk-readonly-0000',
+        },
+      ],
     });
   });
 
@@ -625,23 +638,26 @@ describe('user api cloud storage helpers', () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
     mockAuthenticatedUser();
+    forbidSupabaseProfileFallback();
 
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: false,
       error: {
-        message: 'key manager unavailable',
+        code: 'NETWORK_ERROR',
+        message: 'fetch failed',
       },
     });
     legacyWebApiClient.getUserApiEntries = async () => ({
       success: false,
       error: {
-        message: 'user api unavailable',
+        code: 'NETWORK_ERROR',
+        message: 'network request failed',
       },
     });
 
     await assert.rejects(
       () => loadUserApisPayloadFromCloudRecord(),
-      /key manager unavailable|user api unavailable/,
+      /fetch failed|network request failed/,
     );
   });
 
@@ -957,6 +973,60 @@ describe('user api cloud storage helpers', () => {
     assert.deepEqual(
       api.getCurrentPayload().providers.map((provider) => provider.id),
       ['provider-2'],
+    );
+  });
+
+  test('does not bypass typed auth write failures through a Supabase profile fallback', async () => {
+    delete process.env.VITE_KK_API_BASE_URL;
+    locationLike.location = { origin: 'https://kk-studio.vercel.app' };
+    mockAuthenticatedUser();
+    forbidSupabaseProfileFallback();
+
+    legacyWebApiClient.getKeyManagerCloudState = async () => ({
+      success: true,
+      data: {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      },
+    });
+    legacyWebApiClient.getUserApiEntries = async () => ({
+      success: true,
+      data: {
+        entries: [],
+      },
+    });
+
+    legacyWebApiClient.replaceUserApisPayload = async () => ({
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: 'fetch failed',
+      },
+    });
+
+    await assert.rejects(
+      () => upsertUserApiProviderToCloudRecord({
+        id: 'provider-1',
+        name: 'Direct Owner Provider',
+        baseUrl: 'https://provider.example.com/v1',
+        apiKey: 'provider-secret',
+        format: 'openai',
+        isActive: true,
+        models: ['model-a'],
+        usage: {
+          totalTokens: 0,
+          totalCost: 0,
+          dailyTokens: 0,
+          dailyCost: 0,
+          lastReset: 1700000000000,
+        },
+        status: 'checking',
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000,
+      }),
+      /fetch failed/,
     );
   });
 });

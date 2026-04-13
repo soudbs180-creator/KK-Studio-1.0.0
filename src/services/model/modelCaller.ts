@@ -8,9 +8,9 @@
  */
 
 import { type ChatMessage } from '../api/AI12APIService';
+import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { keyManager, parseModelString, resolveEffectiveProviderModels } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';
-import { supabase } from '../../lib/supabase';
 import { adminModelService } from './adminModelService';
 import {
   buildSecureProxyUserRouteFromSlotId,
@@ -171,11 +171,12 @@ class ModelCaller {
   }
 
   private async callCreditModel(options: CallModelOptions, creditCost: number): Promise<CallResult> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const accessToken = await getPreferredKkApiAccessToken();
+    const userId = keyManager.getUserId();
+    const hasAuthenticatedSession = Boolean(String(accessToken || '').trim());
+    const hasSignedInUser = Boolean(userId);
 
-    if (!user) {
+    if (!hasAuthenticatedSession && !hasSignedInUser) {
       return { success: false, error: 'Please sign in with a full account before using credit-based models.' };
     }
 
@@ -195,7 +196,8 @@ class ModelCaller {
           {
             modelId: options.modelId,
             expectedCredits: Math.max(1, Math.ceil(Number(creditCost || 0))),
-            userId: user.id,
+            hasSignedInUser,
+            hasAuthenticatedSession,
           },
         );
 
@@ -211,7 +213,8 @@ class ModelCaller {
           {
             modelId: options.modelId,
             expectedCredits: Math.max(1, Math.ceil(Number(creditCost || 0))),
-            userId: user.id,
+            hasSignedInUser,
+            hasAuthenticatedSession,
             ledgerId: response.ledgerId,
             balanceAfter: response.balanceAfter,
           },

@@ -345,6 +345,20 @@ body.auth-screen-active.auth-screen-active--light #root {
   border-color: #ccc;
 }
 
+.auth-aux-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.auth-btn-compact {
+  min-height: 40px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 14px;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;

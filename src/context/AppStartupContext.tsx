@@ -1,5 +1,6 @@
 import React, { createContext, startTransition, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import {
   getKkApiServerHealth,
   isKkApiCanonicalCloudReadyFromHealth,
@@ -63,6 +64,10 @@ function hasReachedStage(stage: AppStartupStage, target: AppStartupStage): boole
 
 export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isTempUser } = useAuth();
+  const localOnlyRuntime = !KKAI_FEATURE_FLAGS.billing
+    && !KKAI_FEATURE_FLAGS.admin
+    && !KKAI_FEATURE_FLAGS.workspaceCloudSync
+    && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
   const legacyFallbackState = useMemo(() => getLegacyWebApiFallbackState(), []);
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const [stage, setStage] = useState<AppStartupStage>(user ? 'session_ready' : 'signed_out');
@@ -131,7 +136,10 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setStage('session_ready');
     applyServiceStage('session_ready');
 
-    if (!isTempUser) {
+    if (localOnlyRuntime) {
+      setHealthState('ready');
+      setLastStartupWarning(null);
+    } else if (!isTempUser) {
       setHealthState('checking');
       void getKkApiServerHealth({ forceRefresh: true }).then((health) => {
         if (cancelled || startupRunIdRef.current !== startupRunId) {
@@ -166,6 +174,9 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setHealthState('ready');
         setLastStartupWarning(error instanceof Error ? error.message : 'KK API health preflight failed.');
       });
+    } else {
+      setHealthState('ready');
+      setLastStartupWarning(null);
     }
 
     profileTimer = window.setTimeout(() => {
@@ -180,7 +191,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cancelled = true;
       clearScheduledWork();
     };
-  }, [isTempUser, session?.access_token, user?.id]);
+  }, [isTempUser, localOnlyRuntime, session?.access_token, user?.id]);
 
   const advanceTo = React.useCallback((nextStage: AppStartupStage) => {
     startTransition(() => {
@@ -206,7 +217,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const value = useMemo<AppStartupContextValue>(() => ({
     stage,
-    isAuthenticatedUser: Boolean(user && !isTempUser),
+    isAuthenticatedUser: Boolean(user && !isTempUser && !localOnlyRuntime),
     isHostedRuntime: hostedRuntime,
     legacyFallbackEnabled: legacyFallbackState.enabled,
     legacyFallbackReason: legacyFallbackState.reason,
@@ -229,6 +240,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     hostedRuntime,
     isStageReady,
     isTempUser,
+    localOnlyRuntime,
     lastStartupWarning,
     legacyFallbackState.enabled,
     legacyFallbackState.reason,

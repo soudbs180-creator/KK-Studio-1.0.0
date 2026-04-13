@@ -72,10 +72,12 @@ export const KnownModel = {
 export enum GenerationMode {
   IMAGE = 'image',
   VIDEO = 'video',
+  ECOMMERCE = 'ecommerce',
   AUDIO = 'audio',  // 🎯 Audio Generation Mode
   PPT = 'ppt',      // 🎯 PPT Batch Image Mode
   EDIT = 'edit',    // 🎯 General Edit Mode (Recraft style transfer, Ideogram text editing)
-  INPAINT = 'inpaint' // 🎯 Specific Mask-based Inpaint Mode
+  INPAINT = 'inpaint', // 🎯 Specific Mask-based Inpaint Mode
+  REDRAW = 'redraw', // 🎯 Crop-based partial redraw mode
 }
 
 // ============================================
@@ -99,6 +101,35 @@ export interface ReferenceImage {
   data: string; // Base64 or URL
   mimeType: string;
   url?: string; // Optional URL for thumbnail/reference
+}
+
+export interface NormalizedRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PartialRedrawMetadata {
+  sourceImageId: string;
+  sourceImageStorageId?: string;
+  sourcePromptId?: string;
+  sourceImageDimensions: { width: number; height: number };
+  selectionRect: NormalizedRect;
+  generationRect: NormalizedRect;
+  targetAspectRatio: AspectRatio;
+  extraReferenceImageIds: string[];
+  compositeVersion: 1;
+}
+
+export interface PartialRedrawRequest {
+  model: ModelType;
+  aspectRatio: AspectRatio;
+  prompt: string;
+  selectionRect: NormalizedRect;
+  generationRect: NormalizedRect;
+  sourceImageDimensions: { width: number; height: number };
+  referenceImages: ReferenceImage[];
 }
 
 export interface GeneratedImage {
@@ -132,6 +163,7 @@ export interface GeneratedImage {
   billingMode?: 'credits' | 'currency';
   creditCost?: number;
   orphaned?: boolean; // 孤立副卡（无父节点）
+  userMoved?: boolean; // 是否被用户手动移动过（用于保留副卡自定义布局）
   fileName?: string; // 原始文档名
   fileSize?: number; // 文档大小（字节）
   alias?: string; // 🎯 [New] 用户自定义备注名
@@ -152,6 +184,7 @@ export interface GeneratedImage {
   optimizedPromptZh?: string; // 🎯 [New] 存储优化后的中文解释
   // 🎯 [New] 完整的提示词优化结果对象
   promptOptimizerResult?: PromptOptimizerResult;
+  partialRedraw?: PartialRedrawMetadata;
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
@@ -197,15 +230,13 @@ export interface PromptOptimizerResult {
   meta: {
     version: string;
     timestamp: string;
-    optimization_mode?: PromptOptimizationMode;
+    optimization_mode?: 'auto';
     template_id?: string;
     template_title?: string;
     strategy?: 'reasoning-native' | 'structure-first';
     validation_status?: 'ready' | 'needs-review';
   };
 }
-
-export type PromptOptimizationMode = 'auto' | 'custom';
 
 export type PptEditableLayerType = 'image' | 'text';
 
@@ -296,6 +327,66 @@ export interface PromptGenerationMetadata {
   [key: string]: unknown;
 }
 
+export type EcommercePromptKind = 'main-image' | 'a-plus-group' | 'a-plus-module';
+
+export type EcommerceSizePolicy = 'main-default' | 'sheet-native' | 'desktop-then-mobile';
+
+export type EcommercePromptStage =
+  | 'analysis_pending'
+  | 'analysis_ready'
+  | 'ready'
+  | 'generating'
+  | 'generated'
+  | 'failed';
+
+export type EcommerceModuleStage =
+  | 'not_applicable'
+  | 'locked'
+  | 'pending'
+  | 'generating'
+  | 'generated'
+  | 'confirmed'
+  | 'failed';
+
+export interface EcommerceImageRef {
+  id: string;
+  storageId?: string;
+  label: string;
+  mimeType?: string;
+  url?: string;
+}
+
+export interface EcommerceReferenceBinding {
+  assetId: string;
+  label: string;
+  mentionTokens?: string[];
+  notes?: string;
+}
+
+export interface EcommercePromptState {
+  kind: EcommercePromptKind;
+  sourceSheet: '主图' | 'A+';
+  sourceRowKey: string;
+  groupId?: string;
+  selectedForGeneration?: boolean;
+  productImageRef?: EcommerceImageRef;
+  referenceBindings?: EcommerceReferenceBinding[];
+  copyText?: string;
+  designRequirements?: string;
+  theme?: string;
+  sizePolicy?: EcommerceSizePolicy;
+  allowedAspectRatios?: AspectRatio[];
+  currentAspectRatio?: AspectRatio;
+  stage?: EcommercePromptStage;
+  desktopStage?: 'not_applicable' | 'pending' | 'generating' | 'generated' | 'confirmed' | 'failed';
+  mobileStage?: 'not_applicable' | 'locked' | 'pending' | 'generating' | 'generated' | 'failed';
+  declaredSizeText?: string;
+  desktopAspectRatio?: AspectRatio;
+  mobileAspectRatio?: AspectRatio;
+  needsReview?: boolean;
+  reviewWarnings?: string[];
+}
+
 export interface PromptNode {
   id: string;
   prompt: string;
@@ -326,6 +417,7 @@ export interface PromptNode {
   referenceImages?: ReferenceImage[];
   timestamp: number;
   sourceImageId?: string;
+  partialRedraw?: PartialRedrawMetadata;
   isGenerating?: boolean;
   parallelCount?: number; // Number of images being generated
   error?: string;
@@ -342,7 +434,9 @@ export interface PromptNode {
   // 🎯 [添加] 积分退款状态，用于显示“生成失败，积分已退回”
   refundStatus?: 'pending' | 'success' | 'failed';
   creditSettlement?: 'client' | 'server';
+  billingAttemptId?: string;
   paymentTransactionId?: string;
+  balanceAfter?: number;
 
   mode?: GenerationMode; // New
   width?: number; // Dynamic width for layout calculation
@@ -379,6 +473,7 @@ export interface PromptNode {
   jobId?: string; // 任务 ID（用于异步轮询和刷新状态）
   isNew?: boolean; // 🎯 [New] 是否为新生成的节点（用于触发飞出动画）
   generationMetadata?: PromptGenerationMetadata; // 生成上下文元数据
+  ecommerce?: EcommercePromptState;
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
@@ -524,9 +619,6 @@ export const VIDEO_RESOLUTION_DURATION_MAP = {
 export interface GenerationConfig {
   prompt: string;
   enablePromptOptimization?: boolean;
-  promptOptimizationMode?: PromptOptimizationMode;
-  promptOptimizationTemplateId?: string;
-  promptOptimizationCustomPrompt?: string;
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
   referenceImages: ReferenceImage[];

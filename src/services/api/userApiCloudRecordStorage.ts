@@ -58,7 +58,7 @@ function unwrapOrUndefined<T>(
 function getApiFailureMessage(
   response: {
     success: boolean;
-    error?: { message?: string | null };
+    error?: { code?: string | null; message?: string | null };
   },
 ): string | undefined {
   if (response.success) {
@@ -146,6 +146,10 @@ function isRedactedSecretPlaceholder(value: unknown): boolean {
 
 function toClientVisibleSecret(value: unknown): unknown {
   if (isEncryptedSecretEnvelope(value) || isRedactedSecretPlaceholder(value)) {
+    return CLIENT_VISIBLE_SECRET_PLACEHOLDER;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
     return CLIENT_VISIBLE_SECRET_PLACEHOLDER;
   }
 

@@ -1,8 +1,9 @@
-import type { User } from '@supabase/supabase-js';
-import { resolveAuthRedirectOrigin } from '../../config/authRedirect.ts';
-import { supabase } from '../../lib/supabase.ts';
+import type { User } from "@supabase/supabase-js";
 
-export type BindableAuthProvider = 'google' | 'wechat';
+import { resolveAuthRedirectOrigin } from "../../config/authRedirect.ts";
+import { getLatestRuntimeAuthState } from "./runtimeAuthState.ts";
+
+export type BindableAuthProvider = "google" | "wechat";
 export type BindCallbackMode = `${BindableAuthProvider}-bind`;
 
 type IdentityLike = {
@@ -14,7 +15,7 @@ function resolveBrowserOrigin(): string {
 }
 
 function normalizeProviderName(provider: unknown): string | undefined {
-  if (typeof provider !== 'string') {
+  if (typeof provider !== "string") {
     return undefined;
   }
 
@@ -26,13 +27,13 @@ export function buildBindCallbackUrl(
   provider: BindableAuthProvider,
   origin = resolveBrowserOrigin(),
 ): string {
-  const callbackUrl = new URL('/auth/callback', origin);
-  callbackUrl.searchParams.set('mode', `${provider}-bind`);
+  const callbackUrl = new URL("/auth/callback", origin);
+  callbackUrl.searchParams.set("mode", `${provider}-bind`);
   return callbackUrl.toString();
 }
 
 export function collectLinkedAuthProviders(
-  user?: Pick<User, 'app_metadata' | 'identities'> | null,
+  user?: Pick<User, "app_metadata" | "identities"> | null,
   identities?: IdentityLike[] | null,
 ): string[] {
   const providers = [
@@ -50,17 +51,17 @@ export function collectLinkedAuthProviders(
 export function resolveBindCallbackProvider(
   searchParams: URLSearchParams,
 ): BindableAuthProvider | undefined {
-  if (searchParams.get('wechat_bind') === 'success') {
-    return 'wechat';
+  if (searchParams.get("wechat_bind") === "success") {
+    return "wechat";
   }
 
-  const mode = searchParams.get('mode');
-  if (mode === 'google-bind') {
-    return 'google';
+  const mode = searchParams.get("mode");
+  if (mode === "google-bind") {
+    return "google";
   }
 
-  if (mode === 'wechat-bind') {
-    return 'wechat';
+  if (mode === "wechat-bind") {
+    return "wechat";
   }
 
   return undefined;
@@ -69,57 +70,36 @@ export function resolveBindCallbackProvider(
 export function resolveBindSuccessMessage(
   provider?: BindableAuthProvider,
 ): string {
-  if (provider === 'google') {
-    return 'Google 绑定成功。';
+  if (provider === "google") {
+    return "Google 绑定成功。";
   }
 
-  if (provider === 'wechat') {
-    return '微信绑定成功。';
+  if (provider === "wechat") {
+    return "微信绑定成功。";
   }
 
-  return '账号绑定成功。';
+  return "账号绑定成功。";
 }
 
 export function resolveBindFailureMessage(
   provider?: BindableAuthProvider,
 ): string {
-  if (provider === 'google') {
-    return 'Google 绑定失败，请稍后重试。';
+  if (provider === "google") {
+    return "Google 绑定失败，请稍后重试。";
   }
 
-  if (provider === 'wechat') {
-    return '微信绑定失败，请稍后重试。';
+  if (provider === "wechat") {
+    return "微信绑定失败，请稍后重试。";
   }
 
-  return '账号绑定失败，请稍后重试。';
+  return "账号绑定失败，请稍后重试。";
 }
 
 export async function startGoogleBind(): Promise<string> {
-  const { data, error } = await supabase.auth.linkIdentity({
-    provider: 'google',
-    options: {
-      redirectTo: buildBindCallbackUrl('google'),
-      skipBrowserRedirect: true,
-    },
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data?.url || typeof data.url !== 'string') {
-    throw new Error('Google 绑定未返回授权地址，请稍后重试。');
-  }
-
-  return data.url;
+  throw new Error("当前本地运行时暂不支持 Google 绑定。");
 }
 
 export async function listLinkedAuthProviders(): Promise<string[]> {
-  const { data, error } = await supabase.auth.getUserIdentities();
-
-  if (error) {
-    throw error;
-  }
-
-  return collectLinkedAuthProviders(undefined, data?.identities || []);
+  const runtimeState = getLatestRuntimeAuthState();
+  return collectLinkedAuthProviders(runtimeState.user);
 }

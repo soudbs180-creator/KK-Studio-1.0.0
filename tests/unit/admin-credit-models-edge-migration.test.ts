@@ -42,17 +42,10 @@ test('admin credit model edge function uses service-role auth and keeps active-l
 });
 
 test('frontend services route admin credit providers and active models through the shared web API client', () => {
-  const providerServiceSource = readSource('src/services/api/adminCreditProviderService.ts');
   const adminModelServiceSource = readSource('src/services/model/adminModelService.ts');
 
-  assert.match(providerServiceSource, /import \{ kkWebApiClient \} from '\.\/kkApiClient';/);
-  assert.match(providerServiceSource, /kkWebApiClient\.listAdminCreditProviders\(\)/);
-  assert.match(providerServiceSource, /kkWebApiClient\.saveAdminCreditProvider\(input\.providerId,/);
-  assert.match(providerServiceSource, /kkWebApiClient\.deleteAdminCreditProvider\(providerId\)/);
-  assert.doesNotMatch(providerServiceSource, /listAdminCreditProvidersViaEdgeFunction/);
-  assert.doesNotMatch(providerServiceSource, /saveAdminCreditProviderViaEdgeFunction/);
-  assert.doesNotMatch(providerServiceSource, /deleteAdminCreditProviderViaEdgeFunction/);
-  assert.match(adminModelServiceSource, /kkWebApiClient\.listActiveCreditModels\(\)/);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'src/services/api/adminCreditProviderService.ts')), false);
+  assert.match(adminModelServiceSource, /kkWebApiClient\.listActiveCreditModels\(\{\s*accessToken:\s*''\s*\}\)/);
   assert.doesNotMatch(adminModelServiceSource, /listActiveCreditModelsViaEdgeFunction/);
   assert.doesNotMatch(adminModelServiceSource, /listActiveCreditModelsViaSupabase/);
   assert.doesNotMatch(adminModelServiceSource, /shouldUseLegacyWebApiFallback/);

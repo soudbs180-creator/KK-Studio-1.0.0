@@ -26,7 +26,13 @@ import {
   subscribeToLogs,
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
-import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
+import {
+  SettingsActionButton,
+  SettingsBadge,
+  SettingsHero,
+  SettingsSection,
+  SettingsViewShell,
+} from '../SettingsScaffold';
 import { EmptyState, ProgressBar, StatusBadge } from '../ui/index';
 
 interface DashboardViewProps {
@@ -112,6 +118,32 @@ const MetricTile: React.FC<{ label: string; value: string; helper: string }> = (
     <div className="settings-reference-mini-metric__value">{value}</div>
     <div className="settings-reference-mini-metric__helper">{helper}</div>
   </div>
+);
+
+const QuickActionCard: React.FC<{
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}> = ({ title, description, icon, onClick }) => (
+  <button type="button" className="settings-reference-list-item w-full text-left" onClick={onClick}>
+    <div className="flex min-w-0 items-start gap-3">
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px]"
+        style={{
+          border: '1px solid var(--settings-border-subtle)',
+          background: 'var(--settings-surface-overlay)',
+          color: 'var(--text-primary)',
+        }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="settings-reference-list-item__title">{title}</div>
+        <div className="settings-reference-list-item__meta">{description}</div>
+      </div>
+    </div>
+  </button>
 );
 
 const RingRow: React.FC<{
@@ -377,27 +409,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">{pick('高级设置', 'Advanced Settings')}</div>
-            <h2>{pick('总览', 'Dashboard')}</h2>
-            <p>
-              {pick(
-                '这里集中展示链路、消耗、告警和存储状态，帮助你先看全局，再进入具体设置页处理问题。',
-                'A live control view for routes, spend, alerts, and storage so you can diagnose the workspace at a glance.'
-              )}
-            </p>
-          </div>
-          <div className="settings-reference-actions">
+        <SettingsHero
+          eyebrow={pick('高级设置', 'Advanced Settings')}
+          title={pick('总览', 'Dashboard')}
+          description={pick(
+            '这里集中展示链路、消耗、告警和存储状态，帮助你先看全局，再进入具体设置页处理问题。',
+            'A calmer overview for routes, spend, alerts, and storage before you open a detailed settings page.',
+          )}
+          badge={(
             <SettingsBadge tone={statusTone}>
-              {hasCriticalLogs ? pick('需要处理', 'Needs Attention') : hasAvailableRoute ? pick('系统运行中', 'System Active') : pick('等待配置', 'Setup Required')}
+              {hasCriticalLogs
+                ? pick('需要处理', 'Needs Attention')
+                : hasAvailableRoute
+                  ? pick('系统运行中', 'System Active')
+                  : pick('等待配置', 'Setup Required')}
             </SettingsBadge>
+          )}
+          actions={(
             <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate('api-management')}>
               {pick('打开 API 管理', 'Open API Management')}
             </SettingsActionButton>
-          </div>
-        </div>
+          )}
+        />
 
+        <SettingsSection
+          title={pick('快捷操作', 'Quick actions')}
+          eyebrow={pick('常用入口', 'Frequent actions')}
+          description={pick(
+            '把最常用的管理入口提前，减少在设置里来回切换的成本。',
+            'Bring common routes forward so desktop management feels quicker and calmer.',
+          )}
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <QuickActionCard
+              title={pick('API 路由', 'API routes')}
+              description={pick('检查连通性、预算和模型可用性。', 'Review connectivity, budgets, and model availability.')}
+              icon={<KeyRound size={18} />}
+              onClick={() => onNavigate('api-management')}
+            />
+            <QuickActionCard
+              title={pick('账单与余额', 'Billing & balance')}
+              description={pick('查看今日消耗、充值和剩余积分。', 'Review spend, recharges, and remaining credits.')}
+              icon={<Coins size={18} />}
+              onClick={() => onNavigate('consumption-records')}
+            />
+            <QuickActionCard
+              title={pick('系统日志', 'System logs')}
+              description={pick('优先排查错误、警告和异常来源。', 'Investigate errors, warnings, and unusual signals.')}
+              icon={<ScrollText size={18} />}
+              onClick={() => onNavigate('system-logs')}
+            />
+            <QuickActionCard
+              title={pick('存储设置', 'Storage settings')}
+              description={pick('检查缓存体积、模式和落盘目标。', 'Inspect cache footprint, mode, and persistence target.')}
+              icon={<HardDrive size={18} />}
+              onClick={() => onNavigate('storage-settings')}
+            />
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title={pick('系统概览', 'System overview')}
+          eyebrow={pick('核心状态', 'Core signals')}
+          description={pick(
+            '保留最重要的两个概览指标：今日请求与今日消耗，作为进入详细排查前的第一视图。',
+            'Keep only the two top-level signals you most often need before opening a detailed page.',
+          )}
+        >
         <div className="settings-reference-grid-2">
           <section className="settings-reference-card">
             <div className="settings-reference-card__header">
@@ -460,6 +538,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </div>
           </section>
         </div>
+        </SettingsSection>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
           <section className="settings-reference-card">

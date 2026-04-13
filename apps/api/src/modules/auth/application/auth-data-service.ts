@@ -100,8 +100,17 @@ function isRouteSecretPlaceholder(apiKey: string | undefined): boolean {
     || normalized.startsWith("__kk_redacted__:");
 }
 
+function isLocalOnlyEnvEnabled(): boolean {
+  const normalized = String(process.env.KKAI_LOCAL_ONLY || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
 export interface AuthDataServiceOptions {
   cloudMirror?: UserScopedAuthDataMirror;
+  localOnly?: boolean;
 }
 
 const USER_APIS_RECONCILE_TTL_MS = 15_000;
@@ -110,16 +119,18 @@ export class AuthDataService {
   private readonly logger = consoleLogger.child({ module: "auth-data" });
   private readonly repository: AuthDataRepository;
   private readonly cloudMirror?: UserScopedAuthDataMirror;
+  private readonly localOnly: boolean;
   private readonly reconcileCompletedAt = new Map<string, number>();
   private readonly reconcileInFlight = new Map<string, Promise<void>>();
 
   constructor(repository: AuthDataRepository, options: AuthDataServiceOptions = {}) {
     this.repository = repository;
     this.cloudMirror = options.cloudMirror;
+    this.localOnly = options.localOnly ?? isLocalOnlyEnvEnabled();
   }
 
   private shouldMirrorToCloud(accessToken?: string): boolean {
-    return Boolean(this.cloudMirror && accessToken);
+    return !this.localOnly && Boolean(this.cloudMirror && accessToken);
   }
 
   private async captureRollbackPayload(
@@ -381,7 +392,12 @@ export class AuthDataService {
     email: string | undefined,
     accessToken?: string,
   ): Promise<void> {
-    if (!this.cloudMirror || !accessToken) {
+    if (!this.shouldMirrorToCloud(accessToken)) {
+      return;
+    }
+
+    const resolvedAccessToken = String(accessToken || "").trim();
+    if (!resolvedAccessToken) {
       return;
     }
 
@@ -400,7 +416,7 @@ export class AuthDataService {
       try {
         const [localPayload, cloudPayload] = await Promise.all([
           this.repository.getUserApisPayload(userId, email),
-          this.cloudMirror!.loadUserApisPayload(accessToken, userId),
+          this.cloudMirror!.loadUserApisPayload(resolvedAccessToken, userId),
         ]);
 
         const localDensity = getPayloadDensity(localPayload);
@@ -414,7 +430,7 @@ export class AuthDataService {
         }
 
         if (cloudDensity === 0 && localDensity > 0) {
-          await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+          await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
           return;
         }
 
@@ -425,7 +441,7 @@ export class AuthDataService {
           }
 
           if (localSecrets.usableSecrets > cloudSecrets.usableSecrets) {
-            await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+            await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
             return;
           }
 
@@ -435,7 +451,7 @@ export class AuthDataService {
           }
 
           if (localSecrets.placeholderSecrets < cloudSecrets.placeholderSecrets) {
-            await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+            await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
             return;
           }
 
@@ -444,7 +460,7 @@ export class AuthDataService {
             return;
           }
 
-          await this.cloudMirror!.saveUserApisPayload(accessToken, userId, email, localPayload);
+          await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
         }
       } catch (error) {
         this.logger.warn("Failed to reconcile local auth data with the user-scoped Supabase mirror.", {
@@ -466,12 +482,17 @@ export class AuthDataService {
     email: string | undefined,
     accessToken?: string,
   ): Promise<void> {
-    if (!this.cloudMirror || !accessToken) {
+    if (!this.shouldMirrorToCloud(accessToken)) {
+      return;
+    }
+
+    const resolvedAccessToken = String(accessToken || "").trim();
+    if (!resolvedAccessToken) {
       return;
     }
 
     const localPayload = await this.repository.getUserApisPayload(userId, email);
-    await this.cloudMirror.saveUserApisPayload(accessToken, userId, email, localPayload);
+    await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
     this.reconcileCompletedAt.set(userId, Date.now());
   }
 

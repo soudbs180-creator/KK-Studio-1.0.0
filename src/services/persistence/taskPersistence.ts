@@ -388,21 +388,29 @@ export async function deleteTask(taskId: string): Promise<boolean> {
   }, false);
 }
 
-export async function cleanupCompletedTasks(): Promise<number> {
+export async function cleanupCompletedTasksOlderThan(days: number): Promise<number> {
+  if (!Number.isFinite(days) || days <= 0) {
+    throw new Error('INVALID_TASK_RETENTION_RANGE');
+  }
+
   return withUserTasks((userId, tasks) => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     const nextTasks = tasks.filter((task) => {
       if (task.status !== 'completed' && task.status !== 'failed') {
         return true;
       }
 
       const createdAt = Date.parse(task.createdAt);
-      return Number.isFinite(createdAt) && createdAt >= thirtyDaysAgo;
+      return Number.isFinite(createdAt) && createdAt >= cutoff;
     });
 
     saveTasksForUser(userId, nextTasks);
     return tasks.length - nextTasks.length;
   }, 0);
+}
+
+export async function cleanupCompletedTasks(): Promise<number> {
+  return cleanupCompletedTasksOlderThan(30);
 }
 
 export function modeToTaskType(mode: GenerationMode): TaskType {

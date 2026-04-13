@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, before, describe, test } from "node:test";
+import { after, before, beforeEach, afterEach, describe, test } from "node:test";
 
 import { createApiServer } from "../../apps/api/src/server.ts";
 import type { ServerSupabasePersistenceProbe } from "../../apps/api/src/lib/server-supabase-config.ts";
@@ -25,6 +25,7 @@ const trackedEnvKeys = [
 ];
 
 const originalEnv = new Map(trackedEnvKeys.map((key) => [key, process.env[key]]));
+const originalConsoleWarn = console.warn;
 
 function restoreTrackedEnv() {
   trackedEnvKeys.forEach((key) => {
@@ -35,6 +36,24 @@ function restoreTrackedEnv() {
       delete process.env[key];
     }
   });
+}
+
+beforeEach(() => {
+  console.warn = () => undefined;
+});
+
+afterEach(() => {
+  console.warn = originalConsoleWarn;
+});
+
+function withMutedConsoleWarn<T>(callback: () => T): T {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return callback();
+  } finally {
+    console.warn = originalWarn;
+  }
 }
 
 describe("api server persistence guards", () => {
@@ -48,7 +67,7 @@ describe("api server persistence guards", () => {
   delete process.env.USER_API_ENCRYPTION_SECRET;
   delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
-  const server = createApiServer(0, {
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
     resolveAccessToken: (accessToken) => (
       accessToken === "guard-user-token"
@@ -56,7 +75,7 @@ describe("api server persistence guards", () => {
         : undefined
     ),
     verifyTurnstileToken: async () => ({ success: true }),
-  });
+  }));
 
   let baseUrl = "";
 
@@ -96,7 +115,7 @@ describe("api server persistence guards", () => {
     assert.equal(payload.data.config.projectRefMatches, true);
     assert.equal(payload.data.runtime.allowDegradedPersistence, false);
     assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
-    assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
+    assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, true);
     assert.equal(payload.data.runtime.criticalPersistence.workspaceLayout.ready, false);
     assert.match(
       payload.data.runtime.blockers.join(","),
@@ -145,6 +164,26 @@ describe("api server persistence guards", () => {
     const authDataPayload = await authDataResponse.json();
     assert.equal(authDataPayload.success, false);
     assert.equal(authDataPayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
+
+    const rechargeResponse = await fetch(`${baseUrl}/api/v1/billing/submit-recharge`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer guard-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-guard-recharge-submit",
+      },
+      body: JSON.stringify({
+        amount: 20,
+        currencyCode: "CNY",
+        paymentChannel: "manual",
+        transferReferenceLast4: "1234",
+        note: "guarded submit",
+      }),
+    });
+    assert.equal(rechargeResponse.status, 503);
+    const rechargePayload = await rechargeResponse.json();
+    assert.equal(rechargePayload.success, false);
+    assert.equal(rechargePayload.error.code, "SERVER_PERSISTENCE_REQUIRED");
   });
 });
 
@@ -171,7 +210,7 @@ describe("api server live Supabase probe guards", () => {
     },
   };
 
-  const server = createApiServer(0, {
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
     probeServerSupabasePersistence: async () => invalidProbe,
     resolveAccessToken: (accessToken) => (
@@ -180,7 +219,7 @@ describe("api server live Supabase probe guards", () => {
         : undefined
     ),
     verifyTurnstileToken: async () => ({ success: true }),
-  });
+  }));
 
   let baseUrl = "";
 
@@ -271,7 +310,7 @@ describe("api server capability-scoped persistence guards", () => {
     },
   };
 
-  const server = createApiServer(0, {
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
     probeServerSupabasePersistence: async () => scopedProbe,
     resolveAccessToken: (accessToken) => (
@@ -280,7 +319,7 @@ describe("api server capability-scoped persistence guards", () => {
         : undefined
     ),
     verifyTurnstileToken: async () => ({ success: true }),
-  });
+  }));
 
   let baseUrl = "";
 
@@ -355,14 +394,14 @@ describe("api server healthz fast path", () => {
     },
   };
 
-  const server = createApiServer(0, {
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
     probeServerSupabasePersistence: async () => {
       probeCallCount += 1;
       return forcedProbe;
     },
     verifyTurnstileToken: async () => ({ success: true }),
-  });
+  }));
 
   let baseUrl = "";
 

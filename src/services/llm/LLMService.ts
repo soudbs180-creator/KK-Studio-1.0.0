@@ -121,6 +121,16 @@ export class LLMService {
         return buildSecureProxyUserRouteFromSlotId(keySlot.id).id;
     }
 
+    private deriveAttemptId(requestId?: string): string | undefined {
+        const normalizedRequestId = String(requestId || '').trim();
+        if (!normalizedRequestId) {
+            return undefined;
+        }
+
+        const match = /^(.*):\d+$/.exec(normalizedRequestId);
+        return (match?.[1] || normalizedRequestId).trim() || undefined;
+    }
+
     private shouldFallbackToCloudUserRouteAfterLocalProxy(
         error: unknown,
     ): boolean {
@@ -473,6 +483,8 @@ export class LLMService {
                     const response = await callSecureSystemProxyImage({
                         modelId: options.modelId,
                         prompt: options.prompt,
+                        requestId: options.requestId,
+                        attemptId: this.deriveAttemptId(options.requestId),
                         aspectRatio: options.aspectRatio,
                         imageSize: options.imageSize,
                         imageCount: options.imageCount,
@@ -483,6 +495,9 @@ export class LLMService {
                     return {
                         urls: response.urls,
                         usage: response.usage,
+                        deducted: response.deducted,
+                        ledgerId: response.ledgerId,
+                        balanceAfter: response.balanceAfter,
                         provider: 'SystemProxy',
                         providerName: '系统积分模型',
                         modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
@@ -503,6 +518,8 @@ export class LLMService {
                             routeId,
                             modelId: options.modelId,
                             prompt: options.prompt,
+                            requestId: options.requestId,
+                            attemptId: this.deriveAttemptId(options.requestId),
                             aspectRatio: options.aspectRatio,
                             imageSize: options.imageSize,
                             imageCount: options.imageCount,
@@ -520,6 +537,8 @@ export class LLMService {
                                 modelId: options.modelId,
                                 userRoute: buildSecureProxyUserRouteFromSlotId(routeId),
                                 prompt: options.prompt,
+                                requestId: options.requestId,
+                                attemptId: this.deriveAttemptId(options.requestId),
                                 aspectRatio: options.aspectRatio,
                                 imageSize: options.imageSize,
                                 imageCount: options.imageCount,
@@ -532,6 +551,8 @@ export class LLMService {
 
                     result = {
                         urls: proxyResponse.urls,
+                        ledgerId: proxyResponse.ledgerId,
+                        balanceAfter: proxyResponse.balanceAfter,
                         usage: proxyResponse.usage,
                         provider: keySlot.provider,
                         providerName: keySlot.name,

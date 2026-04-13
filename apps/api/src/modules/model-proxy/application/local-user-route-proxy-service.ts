@@ -38,6 +38,8 @@ export interface LocalUserRouteProxyRequest {
   routeId?: string;
   localTaskId?: string;
   taskId?: string;
+  requestId?: string;
+  attemptId?: string;
   modelId?: string;
   messages?: SecureModelProxyChatRequestDto["messages"];
   temperature?: number;
@@ -68,6 +70,8 @@ type LocalTaskPayload = {
   userId: string;
   routeId: string;
   taskId: string;
+  requestId?: string;
+  attemptId?: string;
 };
 
 type GeminiNativeImageResponse = {
@@ -1136,12 +1140,16 @@ export class LocalUserRouteProxyService {
     const effectiveMode = input.mode;
     let routeId = String(input.routeId || "").trim();
     let upstreamTaskId = String(input.taskId || "").trim();
+    let decodedTask: LocalTaskPayload | undefined;
 
     if (effectiveMode === "task_status" || effectiveMode === "cancel_task" || effectiveMode === "delete_task" || effectiveMode === "download_task") {
-      const decodedTask = this.decodeLocalTaskToken(String(input.localTaskId || "").trim(), userId);
+      decodedTask = this.decodeLocalTaskToken(String(input.localTaskId || "").trim(), userId);
       routeId = decodedTask.routeId;
       upstreamTaskId = decodedTask.taskId;
     }
+
+    const requestId = String(input.requestId || decodedTask?.requestId || "").trim() || undefined;
+    const attemptId = String(input.attemptId || decodedTask?.attemptId || "").trim() || undefined;
 
     if (!routeId) {
       throw new LocalUserRouteProxyError("routeId is required for local user-route proxy calls.", {
@@ -1205,6 +1213,14 @@ export class LocalUserRouteProxyService {
       payload.prompt = String(input.prompt || "");
     } else {
       payload.taskId = upstreamTaskId;
+    }
+
+    if (requestId) {
+      payload.requestId = requestId;
+    }
+
+    if (attemptId) {
+      payload.attemptId = attemptId;
     }
 
     let response: LocalUserRouteProxyTransport;
@@ -1278,9 +1294,37 @@ export class LocalUserRouteProxyService {
             userId,
             routeId,
             taskId: videoResponse.taskId,
+            requestId: videoResponse.requestId || requestId,
+            attemptId: videoResponse.attemptId || attemptId,
           }),
+          requestId: videoResponse.requestId || requestId,
+          attemptId: videoResponse.attemptId || attemptId,
         } satisfies SecureModelProxyVideoTransportDto;
       }
+
+      return {
+        ...videoResponse,
+        requestId: videoResponse.requestId || requestId,
+        attemptId: videoResponse.attemptId || attemptId,
+      } satisfies SecureModelProxyVideoTransportDto;
+    }
+
+    if (effectiveMode === "task_status" || effectiveMode === "cancel_task" || effectiveMode === "delete_task") {
+      const taskResponse = response as SecureModelProxyTaskTransportDto;
+      return {
+        ...taskResponse,
+        requestId: taskResponse.requestId || requestId,
+        attemptId: taskResponse.attemptId || attemptId,
+      } satisfies SecureModelProxyTaskTransportDto;
+    }
+
+    if (effectiveMode === "download_task") {
+      const downloadResponse = response as SecureModelProxyDownloadTransportDto;
+      return {
+        ...downloadResponse,
+        requestId: downloadResponse.requestId || requestId,
+        attemptId: downloadResponse.attemptId || attemptId,
+      } satisfies SecureModelProxyDownloadTransportDto;
     }
 
     return response;
@@ -1590,6 +1634,8 @@ export class LocalUserRouteProxyService {
       taskId: result.status === "success" && result.url
         ? undefined
         : String(result.taskId || "").trim() || undefined,
+      requestId: input.requestId,
+      attemptId: input.attemptId,
     };
   }
 

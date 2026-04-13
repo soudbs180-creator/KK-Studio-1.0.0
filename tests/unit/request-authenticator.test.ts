@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   createRequestAuthenticator,
+  resolveSupabaseAuthLookupTimeoutMs,
   type AuthenticatedRequestContext,
 } from "../../apps/api/src/lib/request-authenticator.ts";
 
@@ -72,4 +73,20 @@ test("request authenticator suppresses transient Supabase lookup failures", asyn
   });
 
   assert.equal(result, undefined);
+});
+
+test("request authenticator timeout is configurable via env", () => {
+  const originalTimeout = process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS;
+
+  process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = "9000";
+  assert.equal(resolveSupabaseAuthLookupTimeoutMs(), 9000);
+
+  process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = "invalid";
+  assert.equal(resolveSupabaseAuthLookupTimeoutMs(), 4000);
+
+  if (typeof originalTimeout === "string") {
+    process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = originalTimeout;
+  } else {
+    delete process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS;
+  }
 });

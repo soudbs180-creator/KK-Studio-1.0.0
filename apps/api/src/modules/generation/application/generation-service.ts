@@ -34,7 +34,10 @@ export class GenerationService {
       };
     }
 
-    const task = createGenerationTask(input, { requesterId });
+    const task = createGenerationTask(input, {
+      requesterId,
+      requestId,
+    });
     await this.repository.save(task);
 
     this.logger.info("Generation task created by migrated module", {

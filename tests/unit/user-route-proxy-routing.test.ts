@@ -9,26 +9,28 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
 
-test("user-owned API traffic is routed through the dedicated Supabase user-route proxy", () => {
+test("user-owned API traffic defaults to the local KK API user-route endpoint", () => {
   const proxySource = readSource("src/services/model/secureModelProxy.ts");
   const callerSource = readSource("src/services/model/modelCaller.ts");
-  const functionSource = readSource("supabase/functions/user-route-proxy/index.ts");
 
-  assert.match(proxySource, /functions\/v1\/user-route-proxy/);
-  assert.match(proxySource, /function shouldUseLocalUserRouteApi\(\): boolean \{/);
-  assert.match(proxySource, /function resolveLocalUserRouteTransportTarget\(\): LocalUserRouteTransportTarget \{/);
-  assert.match(proxySource, /endpointName: 'local-user-route-api'/);
-  assert.match(proxySource, /invoke: invokeLocalUserRouteApiHttp/);
-  assert.match(proxySource, /endpointName: 'user-route-proxy'/);
-  assert.match(proxySource, /const routeTarget = resolveLocalUserRouteTransportTarget\(\);/);
-  assert.match(proxySource, /apikey: supabaseAnonKey/);
+  assert.match(proxySource, /function shouldUseLocalSystemProxy\(\): boolean \{\s*return true;\s*\}/);
+  assert.match(proxySource, /function shouldUseLocalUserRouteApi\(\): boolean \{\s*return true;\s*\}/);
+  assert.match(proxySource, /\/api\/v1\/model-proxy\/user/);
+  assert.doesNotMatch(proxySource, /function getSecureProxyEndpoint\(/);
+  assert.doesNotMatch(proxySource, /async function invokeSecureProxy\(/);
+  assert.doesNotMatch(proxySource, /supabaseAnonKey/);
+  assert.doesNotMatch(proxySource, /functions\/v1\/user-route-proxy/);
+  assert.doesNotMatch(proxySource, /function getLocalUserRouteProxyEndpoint\(/);
+  assert.doesNotMatch(proxySource, /function resolveLocalUserRouteTransportTarget\(/);
+  assert.doesNotMatch(proxySource, /async function invokeLocalUserRouteProxyHttp\(/);
+  assert.doesNotMatch(proxySource, /routeTarget\./);
+  assert.doesNotMatch(proxySource, /shouldUseLegacyWebApiFallback/);
+  assert.doesNotMatch(proxySource, /VITE_ENABLE_LOCAL_USER_ROUTE_API/);
+  assert.doesNotMatch(proxySource, /apikey: supabaseAnonKey/);
   assert.match(proxySource, /startsWith\('local_proxy:'\)/);
   assert.match(callerSource, /callLocalUserRouteProxyChat/);
   assert.match(callerSource, /routeId: config\.route\.id/);
   assert.doesNotMatch(callerSource, /callSecureSystemProxyChat\(\{[\s\S]*userRoute:/);
-  assert.match(functionSource, /from\('profiles'\)\s*\.select\('user_apis'\)/);
-  assert.match(functionSource, /deducted: false/);
-  assert.match(functionSource, /LOCAL_PROXY_TASK_PREFIX = 'local_proxy:'/);
 });
 
 test("LLM service no longer retries user-owned API calls through the credit-model proxy", () => {
@@ -50,29 +52,28 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
 
   assert.match(proxySource, /function getSecureProxyUserRouteAuthRejectedMessage\(responseBody = ''\): string \{/);
   assert.match(proxySource, /function getSecureProxyUserRouteInvalidJwtDiagnosticMessage\(/);
-  assert.match(proxySource, /Supabase Edge Function user-route-proxy/);
+  assert.match(proxySource, /KK API user-route/);
+  assert.doesNotMatch(proxySource, /Supabase Edge Function user-route-proxy/);
   assert.match(proxySource, /function getLocalUserRouteApiEndpoint\(\): string \{/);
   assert.match(proxySource, /\/api\/v1\/model-proxy\/user/);
   assert.match(proxySource, /type InvalidJwtLocalSessionState = 'no-session' \| 'invalid' \| 'valid' \| 'unknown';/);
   assert.match(proxySource, /async function inspectLocalSessionForInvalidJwt\(\): Promise<InvalidJwtLocalSessionState> \{/);
-  assert.match(proxySource, /async function tryLocalUserRouteApiFallback\(/);
-  assert.match(proxySource, /async function resolveLatestLocalFallbackAccessToken\(/);
-  assert.match(proxySource, /Switching local user-route fallback to the freshest browser Supabase access token/);
   assert.match(proxySource, /const \{ data, error \} = await supabase\.auth\.getUser\(accessToken\);/);
   assert.match(proxySource, /Local Supabase session state after Invalid JWT/);
-  assert.match(proxySource, /if \(localSessionState === 'valid'\) \{/);
-  assert.match(proxySource, /if \(localSessionState !== 'valid' \|\| !shouldUseLocalUserRouteApi\(\)\) \{/);
-  assert.match(proxySource, /requestAuthSessionInvalidation\(`\$\{feature\}: user-route-proxy returned Invalid JWT`\);/);
+  assert.doesNotMatch(proxySource, /async function tryLocalUserRouteApiFallback\(/);
+  assert.doesNotMatch(proxySource, /async function resolveLatestLocalFallbackAccessToken\(/);
+  assert.doesNotMatch(proxySource, /Switching local user-route fallback to the freshest browser Supabase access token/);
+  assert.doesNotMatch(proxySource, /const fallbackResult = await tryLocalUserRouteApiFallback\(/);
+  assert.match(proxySource, /requestAuthSessionInvalidation\(`\$\{feature\}: local-user-route-api returned Invalid JWT`\);/);
   assert.match(proxySource, /if \(!shouldForceRefresh\) \{\s*const storedAccessToken = await resolveStoredCloudAccessToken\(false\);/);
-  assert.match(proxySource, /const fallbackResult = await tryLocalUserRouteApiFallback\(/);
-  assert.match(proxySource, /const fallbackAccessToken = await resolveLatestLocalFallbackAccessToken\(accessToken\);/);
   assert.match(proxySource, /throw buildSessionReauthError\(feature, result\.responseBody, 'user-route', localSessionState\);/);
   assert.match(llmSource, /const existingMessage = error instanceof Error \? error\.message : '';/);
   assert.match(llmSource, /new Error\(existingMessage \|\| getSecureProxySessionReauthMessage\('user-route'\)\)/);
   assert.match(authEventsSource, /export const AUTH_SESSION_INVALIDATION_REQUEST_EVENT = 'kk-auth-session-invalidation-request';/);
   assert.match(authEventsSource, /export function requestAuthSessionInvalidation\(reason: string\): void \{/);
-  assert.match(authContextSource, /subscribeAuthSessionInvalidationRequest\(\(reason\) => \{/);
-  assert.match(authContextSource, /void invalidateStaleAuthState\(reason \|\| 'external session invalidation request'\);/);
+  assert.match(authContextSource, /subscribeAuthSessionInvalidationRequest\(\(\) => \{/);
+  assert.match(authContextSource, /tempUserService\.clearCachedTempUser\(\);/);
+  assert.match(authContextSource, /setStoredKkApiAccessToken\(undefined\);/);
   assert.match(
     localProxySource,
     /function isHostedSecureProxyTransportFailure\(error: unknown\): boolean \{[\s\S]*if \(error instanceof LocalUserRouteProxyError\) \{[\s\S]*return error\.statusCode === 401 \|\| error\.statusCode >= 500;[\s\S]*\}/,

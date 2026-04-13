@@ -14,9 +14,24 @@ const request: CreateGenerationTaskRequestDto = {
   taskType: "image",
   prompt: "Generate a poster",
   idempotencyKey: "idem-shared",
+  attemptId: "attempt-shared-1",
 };
 
 describe("generation service", () => {
+  test("persists request trace metadata on the created generation task", async () => {
+    const service = new GenerationService(new InMemoryGenerationTaskRepository());
+
+    const created = await service.createTask(request, "owner-user", "req-trace-1");
+    assert.equal(created.success, true);
+    if (!created.success) {
+      throw new Error("Expected successful task creation.");
+    }
+
+    assert.equal(created.data.requesterId, "owner-user");
+    assert.equal(created.data.requestId, "req-trace-1");
+    assert.equal(created.data.attemptId, "attempt-shared-1");
+  });
+
   test("scopes idempotency keys by requester", async () => {
     const service = new GenerationService(new InMemoryGenerationTaskRepository());
 
@@ -47,5 +62,23 @@ describe("generation service", () => {
     if (!otherRequesterResult.success) {
       assert.equal(otherRequesterResult.error.code, "GENERATION_TASK_NOT_FOUND");
     }
+  });
+
+  test("reuses the original request trace on idempotent replays for the same requester", async () => {
+    const service = new GenerationService(new InMemoryGenerationTaskRepository());
+
+    const first = await service.createTask(request, "owner-user", "req-trace-original");
+    const second = await service.createTask(request, "owner-user", "req-trace-replay");
+
+    assert.equal(first.success, true);
+    assert.equal(second.success, true);
+    if (!first.success || !second.success) {
+      throw new Error("Expected successful task creation.");
+    }
+
+    assert.equal(second.data.id, first.data.id);
+    assert.equal(second.data.requesterId, "owner-user");
+    assert.equal(second.data.requestId, "req-trace-original");
+    assert.equal(second.data.attemptId, "attempt-shared-1");
   });
 });

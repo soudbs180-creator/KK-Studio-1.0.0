@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
@@ -55,11 +55,11 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /const response = await kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\);/,
+    /const response = await kkWebApiClient\.getCreditBalance\(\);/,
   );
   assert.match(
     billingContextSource,
-    /const response = await kkWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*buildBillingRequestOptions\(apiAccessToken\),\s*\);/,
+    /const response = await kkWebApiClient\.listCreditTransactions\(\s*\{ limit: CREDIT_TRANSACTIONS_FETCH_LIMIT \},\s*\);/,
   );
   assert.match(
     billingContextSource,
@@ -90,17 +90,17 @@ test('billing credit mutations stay on the shared web API surface', () => {
   assert.doesNotMatch(billingContextSource, /supabase\.rpc\('refund_credits', \{/);
 });
 
-test('recharge modal success path refreshes canonical billing balance and transaction logs', () => {
+test('recharge modal submission success path refreshes canonical billing balance and transaction logs', () => {
   const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
 
   assert.match(rechargeModalSource, /const \{ showRechargeModal, setShowRechargeModal, refreshBilling \} = useBilling\(\);/);
   assert.match(
     rechargeModalSource,
-    /if \(response\.data\.paymentOrderStatus === 'paid' && response\.data\.settlementApplied\) \{\s*setPaymentStatus\('success'\);\s*setPaymentMessage\('支付成功，积分已经同步到当前余额。'\);\s*await refreshBilling\(\{ includeTransactions: true \}\);/,
+    /const nextStatus = response\.data\.submission\.status;\s*setSubmissionStatus\(nextStatus\);\s*setSubmissionMessage\(`申请已提交，当前状态：\$\{getRechargeSubmissionStatusLabel\(nextStatus\)\}。`\);[\s\S]*await refreshBilling\(\{ includeTransactions: true \}\);/,
   );
   assert.doesNotMatch(
     rechargeModalSource,
-    /if \(response\.data\.paymentOrderStatus === 'paid' && response\.data\.settlementApplied\) \{\s*setPaymentStatus\('success'\);\s*setPaymentMessage\('支付成功，积分已经同步到当前余额。'\);\s*await refreshBilling\(\);/,
+    /paymentOrderStatus === 'paid'/,
   );
 });
 
@@ -147,7 +147,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 test('user api settings keep working when local API persistence degrades to memory mode', () => {
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
-  const userApiCloudStorageShimSource = readSource('src/services/api/supabaseUserApiCloudStorage.ts');
+  const shimPath = path.join(ROOT_DIR, 'src/services/api/supabaseUserApiCloudStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;'));
@@ -169,8 +169,7 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(userApiCloudRecordStorageSource.includes('export async function removeUserApiProviderFromCloudRecord('));
   assert.ok(userApiCloudRecordStorageSource.includes('export async function mergeUserApisPayloadToCloudRecord('));
   assert.doesNotMatch(userApiCloudRecordStorageSource, /ViaSupabase/);
-  assert.ok(userApiCloudStorageShimSource.includes('loadUserApisPayloadMetadataFromCloudRecord as loadUserApisPayloadMetadataViaSupabase'));
-  assert.ok(userApiCloudStorageShimSource.includes('mergeUserApisPayloadToCloudRecord as mergeUserApisPayloadViaSupabase'));
+  assert.equal(existsSync(shimPath), false);
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApisPayload({'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceKeyManagerCloudState({'));
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));

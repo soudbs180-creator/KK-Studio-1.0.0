@@ -1,5 +1,6 @@
 import type { ApiResponse } from '../../../packages/contracts/src/index.ts';
 import type { ApiProtocolFormat } from './apiConfig.ts';
+import { getStoredKkApiAccessToken } from './authAccessToken.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
 import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth.ts';
 import { extractUserApiEntriesFromPayload } from './userApiPayload.ts';
@@ -163,6 +164,24 @@ function unwrapOrThrow<T>(response: ApiResponse<T>, fallback: string): T {
   throw new Error(response.error?.message || fallback);
 }
 
+function getErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error && 'message' in error) {
+    return String((error as { message?: unknown }).message || '').trim();
+  }
+
+  return '';
+}
+
+function isSkippedUserApiCloudConvergenceError(error: unknown): boolean {
+  if (isKkApiPersistenceUnavailableError(error)) {
+    return true;
+  }
+
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes('authenticated session is required to save user api data')
+    || message.includes('authentication is required for profile user api storage');
+}
+
 function isUsableStoredSecret(value: unknown): boolean {
   const normalized = String(value || '').trim();
   return Boolean(
@@ -183,6 +202,7 @@ function resolveEntryRevision(entry: StoredUserApiEntry): number {
 function mergeUserApiEntrySets(
   localEntries: StoredUserApiEntry[],
   cloudEntries: StoredUserApiEntry[],
+  preferredSourceOnEqualRevision: 'local' | 'cloud' = 'cloud',
 ): StoredUserApiEntry[] {
   const mergedById = new Map<string, StoredUserApiEntry>();
 
@@ -200,11 +220,12 @@ function mergeUserApiEntrySets(
 
     const existingRevision = resolveEntryRevision(existing);
     const candidateRevision = resolveEntryRevision(candidate);
-    // Cloud remains canonical on revision ties so a stale compatibility mirror
-    // cannot overwrite hosted metadata. Secret preservation is handled below.
+    // The caller decides which source wins equal revisions so hosted runtimes
+    // can keep cloud metadata canonical while local runtimes can honor the
+    // compatibility bridge as the source of truth.
     const preferCandidate =
       candidateRevision > existingRevision
-      || (candidateRevision === existingRevision && source === 'cloud');
+      || (candidateRevision === existingRevision && source === preferredSourceOnEqualRevision);
 
     const newer = preferCandidate ? candidate : existing;
     const older = preferCandidate ? existing : candidate;
@@ -263,6 +284,10 @@ function scheduleLegacyEntrySeed(entries: StoredUserApiEntry[]): void {
   });
 }
 
+function canAttemptBackgroundCloudConvergence(): boolean {
+  return Boolean(String(getStoredKkApiAccessToken() || '').trim());
+}
+
 async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
   if (!shouldUseLegacyWebApiFallback()) {
     return [];
@@ -289,16 +314,6 @@ async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Pro
 
 export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
   const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
-  let cloudEntries: StoredUserApiEntry[] = [];
-  let cloudError: unknown = null;
-
-  try {
-    const cloudPayload = await loadUserApisPayloadFromCloudRecord();
-    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(cloudPayload));
-  } catch (error) {
-    cloudError = error;
-  }
-
   let localEntries: StoredUserApiEntry[] = [];
   let localError: unknown = null;
 
@@ -310,18 +325,30 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     }
   }
 
-  if (cloudEntries.length > 0) {
-    const mergedEntries = localEntries.length > 0
-      ? mergeUserApiEntrySets(localEntries, cloudEntries)
-      : cloudEntries;
+  let cloudEntries: StoredUserApiEntry[] = [];
+  let cloudError: unknown = null;
 
-    scheduleLegacyEntrySeed(mergedEntries);
+  try {
+    const cloudPayload = await loadUserApisPayloadFromCloudRecord();
+    cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(cloudPayload));
+  } catch (error) {
+    cloudError = error;
+  }
 
-    if (localEntries.length > 0 && !areEntrySetsEquivalent(mergedEntries, cloudEntries)) {
+  if (localEntries.length > 0) {
+    const mergedEntries = cloudEntries.length > 0
+      ? mergeUserApiEntrySets(localEntries, cloudEntries, 'local')
+      : localEntries;
+
+    if (
+      cloudEntries.length > 0
+      && !areEntrySetsEquivalent(mergedEntries, cloudEntries)
+      && canAttemptBackgroundCloudConvergence()
+    ) {
       void mergeUserApisPayloadToCloudRecord({
         entries: mergedEntries,
       }).catch((error) => {
-        if (!isKkApiPersistenceUnavailableError(error)) {
+        if (!isSkippedUserApiCloudConvergenceError(error)) {
           console.warn('[userApiProfileStorage] Failed to converge merged user API payload to cloud:', error);
         }
       });
@@ -330,19 +357,12 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
     return mergedEntries;
   }
 
-  if (localEntries.length > 0) {
-    const mergedEntries = mergeUserApiEntrySets(localEntries, cloudEntries);
-    if (mergedEntries.length > 0) {
-      void mergeUserApisPayloadToCloudRecord({
-        entries: mergedEntries,
-      }).catch((error) => {
-        if (!isKkApiPersistenceUnavailableError(error)) {
-          console.warn('[userApiProfileStorage] Failed to sync merged user API payload to cloud:', error);
-        }
-      });
-    }
+  if (cloudEntries.length > 0) {
+    const mergedEntries = cloudEntries;
 
-    return localEntries;
+    scheduleLegacyEntrySeed(mergedEntries);
+
+    return mergedEntries;
   }
 
   const fallbackError = (canUseLegacyWebApi ? localError : null) || cloudError;
@@ -366,27 +386,13 @@ export async function saveUserApiEntries(entries: StoredUserApiEntry[]): Promise
   );
 
   const canUseLegacyWebApi = shouldUseLegacyWebApiFallback();
-  let cloudPayload: unknown = null;
+  if (canUseLegacyWebApi) {
+    await saveLocalUserApiEntriesViaApi(normalizedEntries);
+  }
 
-  cloudPayload = await mergeUserApisPayloadToCloudRecord({
+  await mergeUserApisPayloadToCloudRecord({
     entries: normalizedEntries,
   });
-
-  if (!canUseLegacyWebApi) {
-    return;
-  }
-
-  try {
-    await saveLocalUserApiEntriesViaApi(
-      normalizeEntries(
-        extractUserApiEntriesFromPayload(cloudPayload),
-      ),
-    );
-  } catch (error) {
-    if (!isKkApiPersistenceUnavailableError(error)) {
-      console.warn('[userApiProfileStorage] Cloud save succeeded, but local bridge sync failed:', error);
-    }
-  }
 }
 
 export async function mutateUserApiEntries(

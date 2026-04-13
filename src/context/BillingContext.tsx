@@ -1,9 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { CreditTransactionDto } from '../../packages/contracts/src/index.ts';
+import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
+import { isBillingAuthFailure } from '../services/billing/billingApiAuth';
+import { buildGenerationAttemptIdempotencyKey } from '../services/billing/generationBillingCoordinator';
 import { resolveBillingRefreshMode } from '../services/billing/billingRefreshMode';
 import { kkWebApiClient } from '../services/api/kkApiClient';
-import { isKkApiBillingPersistedInCloud } from '../services/api/kkApiServerHealth';
+import { isKkApiBillingAvailable } from '../services/api/kkApiServerHealth';
 import { useAuth } from './AuthContext';
 import { useAppStartup } from './AppStartupContext';
 
@@ -58,6 +61,7 @@ interface BillingContextType {
   balance: number;
   loading: boolean;
   refreshing: boolean;
+  applyAuthoritativeBalance: (nextBalance: number) => void;
   recharge: (amount: number, currency: 'CNY' | 'USD') => Promise<void>;
   consumeCredits: (modelId: string, count: number, details?: any) => Promise<boolean>;
   consumeCreditsDetailed: (modelId: string, count: number, details?: any) => Promise<CreditConsumeResult>;
@@ -76,6 +80,7 @@ const BillingContext = createContext<BillingContextType>({
   balance: 0,
   loading: true,
   refreshing: false,
+  applyAuthoritativeBalance: () => {},
   recharge: async () => {},
   consumeCredits: async () => false,
   consumeCreditsDetailed: async () => ({ success: false, message: 'Billing context not ready' }),
@@ -263,6 +268,7 @@ export const useBilling = () => useContext(BillingContext);
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isTempUser } = useAuth();
   const { isStageReady } = useAppStartup();
+  const billingFeatureEnabled = KKAI_FEATURE_FLAGS.billing;
 
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -271,7 +277,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [billingLogs, setBillingLogs] = useState<CreditTransactionLog[]>([]);
   const [usageLogs, setUsageLogs] = useState<CreditTransactionLog[]>([]);
   const [logsLoaded, setLogsLoaded] = useState(false);
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [showRechargeModal, setShowRechargeModalState] = useState(false);
   const apiAccessToken = session?.access_token;
   const activeBillingUserId = !user || isTempUser ? null : user.id;
   const hasVisibleBillingSeed = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
@@ -297,6 +303,20 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLogsLoaded(true);
   }, []);
 
+  const setShowRechargeModal = useCallback((show: boolean) => {
+    if (!billingFeatureEnabled && show) {
+      return;
+    }
+
+    setShowRechargeModalState(show);
+  }, [billingFeatureEnabled]);
+
+  useEffect(() => {
+    if (!billingFeatureEnabled) {
+      setShowRechargeModalState(false);
+    }
+  }, [billingFeatureEnabled]);
+
   const fetchBalance = useCallback(async (): Promise<number | undefined> => {
     if (!user || isTempUser) {
       return 0;
@@ -306,13 +326,16 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return undefined;
     }
 
-    if (!(await isKkApiBillingPersistedInCloud())) {
+    if (!(await isKkApiBillingAvailable())) {
       return undefined;
     }
 
     try {
-      const response = await kkWebApiClient.getCreditBalance(buildBillingRequestOptions(apiAccessToken));
+      const response = await kkWebApiClient.getCreditBalance();
       if (!response.success) {
+        if (isBillingAuthFailure(response)) {
+          return undefined;
+        }
         console.error('[BillingContext] Failed to load credit balance from canonical API:', response.error);
         return undefined;
       }
@@ -331,7 +354,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
       return undefined;
     }
-  }, [user, isTempUser, apiAccessToken, canStartBillingBootstrap]);
+  }, [user, isTempUser, canStartBillingBootstrap]);
 
   const loadCreditTransactions = useCallback(async (updateBalance = true): Promise<number | undefined> => {
     if (!user || isTempUser) {
@@ -345,17 +368,19 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return undefined;
     }
 
-    if (!(await isKkApiBillingPersistedInCloud())) {
+    if (!(await isKkApiBillingAvailable())) {
       return undefined;
     }
 
     try {
       const response = await kkWebApiClient.listCreditTransactions(
         { limit: CREDIT_TRANSACTIONS_FETCH_LIMIT },
-        buildBillingRequestOptions(apiAccessToken),
       );
 
       if (!response.success) {
+        if (isBillingAuthFailure(response)) {
+          return undefined;
+        }
         console.error('[BillingContext] Failed to load credit transactions from canonical API:', response.error);
         return undefined;
       }
@@ -380,7 +405,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
       return undefined;
     }
-  }, [user, isTempUser, apiAccessToken, applyTransactionRows, canStartBillingBootstrap]);
+  }, [user, isTempUser, applyTransactionRows, canStartBillingBootstrap]);
 
   const refreshBalanceOnly = useCallback(async (): Promise<number | undefined> => {
     if (balanceRefreshPromiseRef.current) {
@@ -650,16 +675,21 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: true, message: 'No credits required' };
       }
 
+      const attemptId = String(details?.attemptId || '').trim();
       const businessRefType = String(details?.businessRefType || 'generation_task').trim() || 'generation_task';
       const businessRefId = String(
         details?.businessRefId
+          || attemptId
           || details?.requestId
           || details?.taskId
           || details?.generationId
           || modelId,
       ).trim() || modelId;
       const modelCode = String(details?.modelId || modelId || '').trim() || undefined;
-      const idempotencyKey = String(details?.idempotencyKey || buildClientRequestId('credit-debit')).trim();
+      const idempotencyKey = String(
+        details?.idempotencyKey
+          || (attemptId ? buildGenerationAttemptIdempotencyKey(attemptId) : buildClientRequestId('credit-debit')),
+      ).trim();
 
       try {
         const response = await kkWebApiClient.debitCredits({
@@ -757,10 +787,14 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     async (amount: number, currency: 'CNY' | 'USD') => {
       void amount;
       void currency;
-      throw new Error('Direct client-side recharge is disabled. Use the payment gateway flow instead.');
+      throw new Error('Direct client-side recharge is disabled. Use the recharge submission flow instead.');
     },
     [],
   );
+
+  const applyAuthoritativeBalance = useCallback((nextBalance: number) => {
+    setBalance(toDisplayNumber(nextBalance));
+  }, []);
 
   const hasHydratedCurrentBillingScope = Boolean(activeBillingUserId) && hydratedUserId === activeBillingUserId;
   const renderCachedSnapshot = !hasHydratedCurrentBillingScope && activeBillingUserId
@@ -785,6 +819,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         balance: visibleBalance,
         loading: visibleLoading,
         refreshing,
+        applyAuthoritativeBalance,
         recharge,
         consumeCredits,
         consumeCreditsDetailed,

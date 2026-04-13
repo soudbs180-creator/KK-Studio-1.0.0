@@ -9,7 +9,32 @@ export interface Logger {
   child(context: LogContext): Logger;
 }
 
-function write(level: "INFO" | "WARN" | "ERROR", message: string, context?: LogContext) {
+type LoggerLevel = "INFO" | "WARN" | "ERROR";
+
+const loggerLevelPriority: Record<LoggerLevel, number> = {
+  INFO: 0,
+  WARN: 1,
+  ERROR: 2,
+};
+
+function resolveMinimumLoggerLevel(): LoggerLevel {
+  const configuredLevel = String(process.env.KK_LOG_LEVEL || "").trim().toUpperCase();
+  if (configuredLevel === "INFO" || configuredLevel === "WARN" || configuredLevel === "ERROR") {
+    return configuredLevel;
+  }
+
+  return "INFO";
+}
+
+function shouldWrite(level: LoggerLevel): boolean {
+  return loggerLevelPriority[level] >= loggerLevelPriority[resolveMinimumLoggerLevel()];
+}
+
+function write(level: LoggerLevel, message: string, context?: LogContext) {
+  if (!shouldWrite(level)) {
+    return;
+  }
+
   const payload = {
     level,
     message,

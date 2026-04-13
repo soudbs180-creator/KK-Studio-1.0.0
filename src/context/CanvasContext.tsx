@@ -1,6 +1,7 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
+import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
 import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
@@ -1253,8 +1254,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0);
     };
 
-    const canLoadCloudLayout = Boolean(user && session && !isTempUser && isStageReady('profile_ready'));
-    const canSaveCloudLayout = Boolean(user && session && !isTempUser && isStageReady('workspace_ready'));
+    const canLoadCloudLayout = Boolean(
+        shouldEnableWorkspaceCloudSync()
+        && user
+        && session
+        && !isTempUser
+        && isStageReady('profile_ready')
+    );
+    const canSaveCloudLayout = Boolean(
+        shouldEnableWorkspaceCloudSync()
+        && user
+        && session
+        && !isTempUser
+        && isStageReady('workspace_ready')
+    );
 
     const isCanvasEffectivelyEmpty = (canvas?: Canvas | null): boolean => getCanvasCardCount(canvas) === 0;
 
@@ -4681,8 +4694,14 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
 
             const newImageNodes = currentCanvas.imageNodes.map(n => {
-                if (selectedSet.has(n.id) || (n.parentPromptId && movedPromptIds.has(n.parentPromptId))) {
-                    return { ...n, position: { x: n.position.x + delta.x, y: n.position.y + delta.y } };
+                const isDirectlyMovedImage = selectedSet.has(n.id);
+                const isMovingWithPromptGroup = Boolean(n.parentPromptId && movedPromptIds.has(n.parentPromptId));
+                if (isDirectlyMovedImage || isMovingWithPromptGroup) {
+                    return {
+                        ...n,
+                        position: { x: n.position.x + delta.x, y: n.position.y + delta.y },
+                        userMoved: selectedSet.has(n.id) ? true : n.userMoved,
+                    };
                 }
                 return n;
             });

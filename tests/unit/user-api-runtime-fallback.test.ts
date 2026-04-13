@@ -16,6 +16,7 @@ const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
+const originalConsoleWarn = console.warn;
 const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 const locationLike = globalThis as { location?: { origin?: string } };
@@ -81,6 +82,7 @@ afterEach(() => {
   legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
   legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
+  console.warn = originalConsoleWarn;
 
   if (typeof originalBaseUrl === 'string') {
     process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
@@ -131,7 +133,12 @@ test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local ru
     version: 2,
     slots: [{ id: 'slot-1' }],
     providers: [{ id: 'provider-1' }],
-    entries: [createEntry('entry-1')],
+    entries: [
+      {
+        ...createEntry('entry-1'),
+        key: 'sk-readonly-0000',
+      },
+    ],
   });
   assert.equal(keyManagerCalls, 1);
   assert.equal(userApiCalls, 1);
@@ -252,7 +259,7 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
   );
 });
 
-test('saveUserApiEntries does not report success or seed the compatibility bridge when the cloud write fails', async () => {
+test('saveUserApiEntries writes locally first and still surfaces cloud sync failures on local runtimes', async () => {
   process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
   process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
   locationLike.location = {
@@ -263,6 +270,7 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
   let replaceUserApiPayloadCalls = 0;
+  let replaceUserApiEntriesCalls = 0;
 
   legacyWebApiClient.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
@@ -289,7 +297,13 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
     throw new Error('key-manager state should stay unchanged when only entry rows change');
   };
   legacyWebApiClient.replaceUserApiEntries = async () => {
-    throw new Error('split entry writes should stay unused when the unified payload route fails');
+    replaceUserApiEntriesCalls += 1;
+    return {
+      success: true,
+      data: {
+        entries: [createEntry('entry-fail')],
+      },
+    };
   };
   legacyWebApiClient.replaceUserApisPayload = async () => {
     replaceUserApiPayloadCalls += 1;
@@ -308,10 +322,11 @@ test('saveUserApiEntries does not report success or seed the compatibility bridg
 
   assert.equal(keyManagerCalls, 1);
   assert.equal(getUserApiCalls, 1);
+  assert.equal(replaceUserApiEntriesCalls, 1);
   assert.equal(replaceUserApiPayloadCalls, 1);
 });
 
-test('loadUserApiEntries keeps canonical cloud fields when the local compatibility copy has the same revision', async () => {
+test('loadUserApiEntries keeps canonical cloud fields stable when equal-revision bridge data is replayed', async () => {
   process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
   process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
   locationLike.location = {
@@ -321,6 +336,12 @@ test('loadUserApiEntries keeps canonical cloud fields when the local compatibili
 
   let userApiReads = 0;
   const replacePayloads: Array<Array<Record<string, unknown>>> = [];
+  let replaceUserApisPayloadCalls = 0;
+  const warnings: string[] = [];
+
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((value) => String(value)).join(' '));
+  };
 
   legacyWebApiClient.getKeyManagerCloudState = async () => ({
     success: true,
@@ -355,6 +376,10 @@ test('loadUserApiEntries keeps canonical cloud fields when the local compatibili
   legacyWebApiClient.replaceKeyManagerCloudState = async () => {
     throw new Error('key-manager state should stay unchanged when only entry rows differ');
   };
+  legacyWebApiClient.replaceUserApisPayload = async () => {
+    replaceUserApisPayloadCalls += 1;
+    throw new Error('background cloud convergence should stay disabled without a KK API access token');
+  };
   legacyWebApiClient.replaceUserApiEntries = async (input) => {
     replacePayloads.push(
       (input.entries as Array<Record<string, unknown>>).map((entry) => ({ ...entry })),
@@ -371,15 +396,14 @@ test('loadUserApiEntries keeps canonical cloud fields when the local compatibili
 
   assert.equal(entries.length, 1);
   assert.equal(entries[0].name, 'Cloud Entry');
-  assert.equal(entries[0].key, 'sk-local-entry-3');
+  assert.equal(entries[0].key, '__kk_redacted__:key:entry-3');
 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.ok(
-    replacePayloads.some(
-      (payload) => payload.length === 1
-        && payload[0].name === 'Cloud Entry'
-        && payload[0].key === 'sk-local-entry-3',
-    ),
+  assert.equal(replacePayloads.length, 0);
+  assert.equal(
+    warnings.some((warning) => warning.includes('Failed to converge merged user API payload to cloud')),
+    false,
   );
+  assert.equal(replaceUserApisPayloadCalls, 0);
 });

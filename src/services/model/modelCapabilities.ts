@@ -741,6 +741,16 @@ export function getAvailableRatios(
         : Object.values(AspectRatio);
 }
 
+export function getPartialRedrawSupportedRatios(modelId: string): AspectRatio[] {
+    return getAvailableRatios(modelId).filter((ratio) => ratio !== AspectRatio.AUTO);
+}
+
+export function modelSupportsPartialRedraw(modelId: string): boolean {
+    const concreteRatios = getPartialRedrawSupportedRatios(modelId);
+    const maxRefImages = getMaxRefImages(modelId);
+    return concreteRatios.length > 0 && maxRefImages > 0;
+}
+
 /**
  * Get available sizes for a model
  */

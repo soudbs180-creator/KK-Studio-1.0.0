@@ -8,7 +8,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type AgentWorkflowNode, type AppSurface, type MobilePrimaryTab, type PreviewWorkflowNode, type SaveWorkflowNode, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type AppSurface, type MobilePrimaryTab, type PreviewWorkflowNode, type SaveWorkflowNode, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -20,6 +20,11 @@ import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { getModelCapabilities } from './services/model/modelCapabilities';
 import { isSystemModelRoute } from './services/model/modelRoute';
+import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
+import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
+import { resolveEcommercePromptNodeMetadata } from './services/ecommerce/ecommercePromptNodeMetadata.ts';
+import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAspectPolicy } from './services/ecommerce/ecommerceModelPolicy.ts';
+import type { EcommerceAnalysisAsset, EcommerceAnalysisAPlusModule, EcommerceAnalysisMainImageItem, EcommerceAnalysisResult } from './services/ecommerce/types.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
@@ -30,6 +35,7 @@ import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
+import { base64ToBlob } from './utils/downloadUtils';
 import {
   getReferenceImageLookupIds,
   normalizeReferenceImagesStorage,
@@ -39,6 +45,15 @@ import {
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
 const GENERATE_TIMEOUT_MS = 600000;
+
+type EcommerceRuntimeState = {
+  requirementFile: File | null;
+  productFiles: File[];
+  extraReferenceFiles: File[];
+  analysis: EcommerceAnalysisResult | null;
+  selectedItems: Record<string, boolean>;
+  isAnalyzing: boolean;
+};
 
 const boundsIntersect = (
   left: { x: number; y: number; width: number; height: number },
@@ -275,14 +290,18 @@ import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
+import { createAppRootMode } from './context/kkaiRuntimeContext';
 import ConnectionDot from './components/canvas/ConnectionDot';
-import LoginScreen from './components/auth/LoginScreen';
-import AuthCallback from './pages/AuthCallback';
 import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
 import { formatRemainingCredits } from './services/billing/remainingBalance';
+import {
+  buildGenerationBillingAttempt,
+  buildGenerationAttemptRequestId,
+  resolveGenerationAttemptFailureState,
+} from './services/billing/generationBillingCoordinator';
 
 
 import { saveAs } from 'file-saver';
@@ -293,10 +312,6 @@ import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
 import { optimizePromptForImage } from './services/llm/promptOptimizerService';
-import {
-  getDefaultPromptOptimizerTemplateId,
-  getPromptOptimizerTemplate,
-} from './config/promptOptimizerTemplates';
 import { normalizePptSlidesForCount, buildAutoPptSlides } from './utils/pptUtils';
 import {
   PPT_EDITABLE_CANVAS,
@@ -317,15 +332,10 @@ import ProjectManager from './components/settings/ProjectManager';
 import { Search } from 'lucide-react'; // Import Search icon
 import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
-import { apiKeyModalService } from './services/api/apiKeyModalService';
-import { MobileChatFeed, MobileHeader, MobileTabBar, MobileWorkspaceQuickBar } from './components/mobile';
+import { MobileAppShell, MobileHeader, MobileResultFeed, MobileTabBar, MobileWorkspaceQuickBar } from './components/mobile';
 import { resolveAvatarUrl } from './utils/presetAvatars';
 import {
-  AssetLibraryPanel,
   GlobalModals,
-  WorkspaceActionBar,
-  WorkspaceActionButton,
-  WorkspacePanels,
   WorkspaceShell,
 } from './components/workspace';
 import {
@@ -432,6 +442,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     loading: billingLoading,
     showRechargeModal,
     setShowRechargeModal,
+    applyAuthoritativeBalance,
     consumeCreditsDetailed,
     refundCreditsByTransaction,
     refreshBilling,
@@ -541,6 +552,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     provider?: string;
     requiredCredits: number;
     useServerSideCreditSettlement: boolean;
+    billingAttempt?: {
+      attemptId: string;
+      businessRefId: string;
+      idempotencyKey: string;
+    };
   }) => {
     if (params.requiredCredits <= 0) {
       return { success: true as const, transactionId: undefined as string | undefined };
@@ -585,6 +601,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       providerId: params.providerId || params.provider || 'managed',
       provider: params.provider,
       keySlotId: params.providerId,
+      attemptId: params.billingAttempt?.attemptId,
+      businessRefId: params.billingAttempt?.businessRefId,
+      idempotencyKey: params.billingAttempt?.idempotencyKey,
     });
 
     if (!chargeResult.success) {
@@ -604,45 +623,21 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [authLoading, user, isTempUser, balance, setShowRechargeModal, consumeCreditsDetailed]);
 
   const resolveFailedCreditAttempt = useCallback(async (node: Pick<PromptNode, 'id' | 'billingMode' | 'creditSettlement' | 'isPaymentProcessed' | 'paymentTransactionId' | 'refundStatus' | 'cost'>) => {
-    const refundableTransactionId = String(node.paymentTransactionId || '').trim();
-    const shouldRefundCurrentAttempt =
-      node.billingMode === 'credits'
-      && node.creditSettlement === 'client'
-      && node.isPaymentProcessed === true
-      && refundableTransactionId.length > 0;
-    const shouldRefreshServerSideAttempt =
-      node.billingMode === 'credits'
+    const failureState = await resolveGenerationAttemptFailureState(node, {
+      refundCreditsByTransaction,
+      refreshBilling,
+    });
+
+    if (
+      failureState.refundStatus === 'failed'
+      && node.billingMode === 'credits'
       && node.creditSettlement === 'server'
-      && (node.cost || 0) > 0;
-
-    let refundStatus = node.refundStatus;
-    let isPaymentProcessed = node.isPaymentProcessed;
-    let paymentTransactionId = node.paymentTransactionId;
-
-    if (shouldRefundCurrentAttempt) {
-      const refundResult = await refundCreditsByTransaction(refundableTransactionId, `退款 ${node.id}`);
-      refundStatus = refundResult.success ? 'success' : 'failed';
-      if (refundResult.success) {
-        isPaymentProcessed = false;
-        paymentTransactionId = undefined;
-      }
+      && (node.cost || 0) > 0
+    ) {
+      console.error('[resolveFailedCreditAttempt] Failed to refresh billing after server-side credit failure:', node.id);
     }
 
-    if (shouldRefreshServerSideAttempt) {
-      try {
-        await refreshBilling();
-        refundStatus = 'success';
-      } catch (error) {
-        console.error('[resolveFailedCreditAttempt] Failed to refresh billing after server-side credit failure:', error);
-        refundStatus = 'failed';
-      }
-    }
-
-    return {
-      refundStatus,
-      isPaymentProcessed,
-      paymentTransactionId,
-    };
+    return failureState;
   }, [refundCreditsByTransaction, refreshBilling]);
 
   // Track reserved regions for rapid-fire generation to prevent overlaps (before React update reflects)
@@ -772,20 +767,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     setSettingsInitialView(view);
     setShowSettingsPanel(true);
   }, []);
-
-  useEffect(() => {
-    const openApiManagement = (supplier?: Supplier) => {
-      openSettingsPanel('api-management', supplier || null);
-    };
-
-    (window as any).openApiKeyModal = openApiManagement;
-    apiKeyModalService.setOpenCallback(openApiManagement);
-
-    return () => {
-      delete (window as any).openApiKeyModal;
-      apiKeyModalService.setOpenCallback(() => {});
-    };
-  }, [openSettingsPanel]);
 
   useEffect(() => {
     const unsubscribe = keyManager.subscribe(() => {
@@ -1086,9 +1067,6 @@ const AppContent: React.FC<AppContentProps> = () => {
         return {
           prompt: parsed.prompt || '', // Restore the persisted prompt
           enablePromptOptimization: parsed.enablePromptOptimization || false,
-          promptOptimizationMode: parsed.promptOptimizationMode === 'custom' ? 'custom' : 'auto',
-          promptOptimizationTemplateId: parsed.promptOptimizationTemplateId || getDefaultPromptOptimizerTemplateId(parsed.mode || GenerationMode.IMAGE),
-          promptOptimizationCustomPrompt: typeof parsed.promptOptimizationCustomPrompt === 'string' ? parsed.promptOptimizationCustomPrompt : '',
           aspectRatio: AspectRatio.AUTO, // [Default: Auto]
           imageSize: ImageSize.SIZE_1K,
           parallelCount: parsed.parallelCount || 1,
@@ -1113,9 +1091,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     return {
       prompt: '',
       enablePromptOptimization: false,
-      promptOptimizationMode: 'auto',
-      promptOptimizationTemplateId: getDefaultPromptOptimizerTemplateId(GenerationMode.IMAGE),
-      promptOptimizationCustomPrompt: '',
       aspectRatio: AspectRatio.AUTO, // [Default: Auto]
       imageSize: ImageSize.SIZE_1K,
       parallelCount: 1,
@@ -1129,6 +1104,22 @@ const AppContent: React.FC<AppContentProps> = () => {
       pptStyleLocked: true
     };
   });
+
+  const [ecommerceState, setEcommerceState] = useState<EcommerceRuntimeState>({
+    requirementFile: null,
+    productFiles: [],
+    extraReferenceFiles: [],
+    analysis: null,
+    selectedItems: {},
+    isAnalyzing: false,
+  });
+  const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
+
+  useEffect(() => {
+    if (config.mode !== GenerationMode.ECOMMERCE) {
+      setEcommerceRatioOverride(undefined);
+    }
+  }, [config.mode]);
 
   const [modePreferredKeyMap, setModePreferredKeyMap] = useState<Partial<Record<GenerationMode, string>>>(() => {
     try {
@@ -1241,9 +1232,6 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     const toSave = {
       enablePromptOptimization: config.enablePromptOptimization || false,
-      promptOptimizationMode: config.promptOptimizationMode || 'auto',
-      promptOptimizationTemplateId: config.promptOptimizationTemplateId || getDefaultPromptOptimizerTemplateId(config.mode),
-      promptOptimizationCustomPrompt: config.promptOptimizationCustomPrompt || '',
       aspectRatio: config.aspectRatio,
       imageSize: config.imageSize,
       parallelCount: config.parallelCount,
@@ -1274,9 +1262,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     localStorage.setItem('kk_generation_config', JSON.stringify(toSave));
   }, [
     config.enablePromptOptimization,
-    config.promptOptimizationMode,
-    config.promptOptimizationTemplateId,
-    config.promptOptimizationCustomPrompt,
     config.aspectRatio, config.imageSize, config.parallelCount,
     config.model, config.enableGrounding, config.enableImageSearch, config.thinkingMode, config.mode, config.pptSlides, config.pptStyleLocked,
     config.referenceImages, // Add referenceImages to dep array
@@ -1704,7 +1689,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     activeWorkspacePanel,
     currentMobileTab,
     focusWorkspace,
-    openLibrarySurface,
     toggleChatPanel,
     openProfileSurface,
     openSettingsSurface,
@@ -1730,6 +1714,310 @@ const AppContent: React.FC<AppContentProps> = () => {
     getCardDimensions,
     rememberPreferredKeyForMode
   });
+
+  const createEphemeralId = useCallback((prefix: string) => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }, []);
+
+  const readBlobAsDataUrl = useCallback((blob: Blob) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('FILE_READ_FAILED'));
+    reader.readAsDataURL(blob);
+  }), []);
+
+  const createReferenceImageFromFile = useCallback(async (file: File, labelPrefix: string): Promise<ReferenceImage> => {
+    const dataUrl = await readBlobAsDataUrl(file);
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    return {
+      id: createEphemeralId(labelPrefix),
+      data: match?.[2] || '',
+      mimeType: match?.[1] || file.type || 'image/png',
+      url: dataUrl,
+    };
+  }, [createEphemeralId, readBlobAsDataUrl]);
+
+  const createReferenceImageFromAsset = useCallback((asset: EcommerceAnalysisAsset): ReferenceImage | null => {
+    if (!asset.previewUrl) return null;
+    const match = asset.previewUrl.match(/^data:([^;]+);base64,(.+)$/);
+    return {
+      id: createEphemeralId(asset.assetId),
+      data: match?.[2] || '',
+      mimeType: match?.[1] || asset.mimeType || 'image/png',
+      url: asset.previewUrl,
+    };
+  }, [createEphemeralId]);
+
+  const buildEcommercePrompt = useCallback((basePrompt: string) => {
+    const extraPrompt = String(config.prompt || '').trim();
+    return [basePrompt, extraPrompt ? `额外要求：${extraPrompt}` : ''].filter(Boolean).join('\n');
+  }, [config.prompt]);
+
+  const handlePickEcommerceRequirementFile = useCallback((files: FileList | File[]) => {
+    const [file] = Array.from(files);
+    if (!file) return;
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      requirementFile: file,
+      analysis: null,
+      selectedItems: {},
+    }));
+  }, []);
+
+  const handlePickEcommerceProductFiles = useCallback((files: FileList | File[]) => {
+    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (nextFiles.length === 0) return;
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      productFiles: [...previousState.productFiles, ...nextFiles],
+      analysis: previousState.analysis,
+    }));
+  }, []);
+
+  const handlePickEcommerceExtraReferenceFiles = useCallback((files: FileList | File[]) => {
+    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (nextFiles.length === 0) return;
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      extraReferenceFiles: [...previousState.extraReferenceFiles, ...nextFiles],
+    }));
+  }, []);
+
+  const handleResetEcommerceAnalysis = useCallback(() => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      analysis: null,
+      selectedItems: {},
+      isAnalyzing: false,
+    }));
+  }, []);
+
+  const handleToggleEcommerceAnalysisSelection = useCallback((id: string, selected: boolean) => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      selectedItems: {
+        ...previousState.selectedItems,
+        [id]: selected,
+      },
+    }));
+  }, []);
+
+  const handleAnalyzeEcommerceRequirement = useCallback(async () => {
+    if (!ecommerceState.requirementFile) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.warning('缺少需求单', '请先上传运营需求文件。');
+      });
+      return;
+    }
+
+    setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: true }));
+    try {
+      const analysis = await analyzeEcommerceRequirementFile(ecommerceState.requirementFile);
+      const selectedItems: Record<string, boolean> = {};
+      analysis.mainImageItems.forEach((item) => {
+        selectedItems[item.itemId] = true;
+      });
+      analysis.aPlusGroup.modules.forEach((module) => {
+        selectedItems[module.moduleId] = true;
+      });
+      setEcommerceState((previousState) => ({
+        ...previousState,
+        analysis,
+        selectedItems,
+        isAnalyzing: false,
+      }));
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.success('分析完成', `已解析主图 ${analysis.mainImageItems.length} 条，A+ ${analysis.aPlusGroup.modules.length} 条。`);
+      });
+    } catch (error: any) {
+      setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: false }));
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.error('分析失败', error?.message || '请稍后重试。');
+      });
+    }
+  }, [ecommerceState.requirementFile]);
+
+  const buildEcommerceGroupNode = useCallback((productName: string, position: { x: number; y: number }): PromptNode => ({
+    id: createEphemeralId('ecom-group'),
+    prompt: `${productName || '电商'} A+ 组卡`,
+    originalPrompt: `${productName || '电商'} A+ 组卡`,
+    position,
+    aspectRatio: AspectRatio.LANDSCAPE_16_9,
+    imageSize: ImageSize.SIZE_1K,
+    model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
+    childImageIds: [],
+    timestamp: Date.now(),
+    mode: GenerationMode.ECOMMERCE,
+    parallelCount: 1,
+    ecommerce: {
+      kind: 'a-plus-group',
+      sourceSheet: 'A+',
+      sourceRowKey: 'aplus-group',
+      selectedForGeneration: false,
+      stage: 'analysis_ready',
+      theme: `${productName || '电商'} A+ 组卡`,
+      sizePolicy: 'sheet-native',
+      allowedAspectRatios: [AspectRatio.LANDSCAPE_16_9],
+      currentAspectRatio: AspectRatio.LANDSCAPE_16_9,
+      desktopStage: 'pending',
+      mobileStage: 'locked',
+    },
+  }), [config.model, createEphemeralId]);
+
+  const buildEcommercePromptNode = useCallback(async (params: ({
+    item: EcommerceAnalysisMainImageItem;
+    kind: 'main-image';
+    position: { x: number; y: number };
+    groupId?: string;
+    selected: boolean;
+    analysis: EcommerceAnalysisResult;
+  } | {
+    item: EcommerceAnalysisAPlusModule;
+    kind: 'a-plus-module';
+    position: { x: number; y: number };
+    groupId?: string;
+    selected: boolean;
+    analysis: EcommerceAnalysisResult;
+  })): Promise<PromptNode> => {
+    const modelId = normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview';
+    const policy = resolveEcommerceAspectPolicy({
+      kind: params.kind,
+      modelId,
+      declaredDimensions: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
+      designRequirements: params.item.designRequirements,
+      copyText: params.item.copyText,
+    });
+    const rowAssets = params.analysis.assets.referenceAssets.filter((asset) => params.item.referenceAssetIds.includes(asset.assetId));
+    const productReferences = await Promise.all(ecommerceState.productFiles.map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)));
+    const rowReferences = rowAssets.map(createReferenceImageFromAsset).filter((item): item is ReferenceImage => Boolean(item));
+    const extraReferences = await Promise.all(ecommerceState.extraReferenceFiles.map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)));
+    const referenceImages = [...rowReferences, ...productReferences, ...extraReferences];
+    const basePrompt = buildEcommercePrompt(params.item.promptDraft);
+    const sourceMetadata = params.kind === 'main-image'
+      ? resolveEcommercePromptNodeMetadata({
+          kind: 'main-image',
+          item: params.item,
+        })
+      : resolveEcommercePromptNodeMetadata({
+          kind: 'a-plus-module',
+          item: params.item,
+        });
+    return {
+      id: createEphemeralId(params.kind === 'main-image' ? 'ecom-main' : 'ecom-module'),
+      prompt: basePrompt,
+      originalPrompt: basePrompt,
+      position: params.position,
+      aspectRatio: policy.defaultAspectRatio as AspectRatio,
+      imageSize: ImageSize.SIZE_1K,
+      model: modelId,
+      childImageIds: [],
+      referenceImages,
+      timestamp: Date.now(),
+      mode: GenerationMode.ECOMMERCE,
+      parallelCount: 1,
+      ecommerce: {
+        kind: params.kind,
+        sourceSheet: sourceMetadata.sourceSheet,
+        sourceRowKey: sourceMetadata.sourceRowKey,
+        groupId: params.groupId,
+        selectedForGeneration: params.selected,
+        productImageRef: productReferences[0] ? {
+          id: productReferences[0].id,
+          storageId: productReferences[0].storageId,
+          label: '产品图1',
+          mimeType: productReferences[0].mimeType,
+          url: productReferences[0].url,
+        } : undefined,
+        referenceBindings: params.item.referenceMentions,
+        copyText: params.item.copyText,
+        designRequirements: params.item.designRequirements,
+        theme: sourceMetadata.theme,
+        sizePolicy: policy.sizePolicy,
+        allowedAspectRatios: policy.allowedAspectRatios as AspectRatio[],
+        currentAspectRatio: policy.defaultAspectRatio as AspectRatio,
+        stage: 'analysis_ready',
+        desktopStage: policy.sizePolicy === 'desktop-then-mobile' ? 'pending' : 'not_applicable',
+        mobileStage: policy.sizePolicy === 'desktop-then-mobile' ? 'locked' : 'not_applicable',
+        declaredSizeText: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
+        desktopAspectRatio: policy.sizePolicy === 'desktop-then-mobile' ? AspectRatio.LANDSCAPE_21_9 : undefined,
+        mobileAspectRatio: policy.mobileAspectRatio as AspectRatio | undefined,
+        needsReview: params.item.needsReview,
+        reviewWarnings: params.item.reviewWarnings,
+      },
+    };
+  }, [buildEcommercePrompt, config.model, createEphemeralId, createReferenceImageFromAsset, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles]);
+
+  const handleConfirmEcommerceAnalysis = useCallback(async () => {
+    if (!ecommerceState.analysis) return;
+    if (ecommerceState.productFiles.length === 0) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.warning('缺少产品图', '请先上传至少一张产品图，再确认建卡。');
+      });
+      return;
+    }
+
+    const basePosition = findNextGroupPosition();
+    const createdNodeIds: string[] = [];
+
+    const mainItems = ecommerceState.analysis.mainImageItems;
+    for (let index = 0; index < mainItems.length; index += 1) {
+      const item = mainItems[index];
+      const node = await buildEcommercePromptNode({
+        item,
+        kind: 'main-image',
+        position: {
+          x: basePosition.x + (index % 2) * 420,
+          y: basePosition.y + Math.floor(index / 2) * 220,
+        },
+        selected: ecommerceState.selectedItems[item.itemId] !== false,
+        analysis: ecommerceState.analysis,
+      });
+      await addPromptNode(node);
+      createdNodeIds.push(node.id);
+    }
+
+    const groupNode = buildEcommerceGroupNode(ecommerceState.analysis.projectMeta.productName, {
+      x: basePosition.x + 940,
+      y: basePosition.y,
+    });
+    await addPromptNode(groupNode);
+    createdNodeIds.push(groupNode.id);
+
+    for (let index = 0; index < ecommerceState.analysis.aPlusGroup.modules.length; index += 1) {
+      const item = ecommerceState.analysis.aPlusGroup.modules[index];
+      const node = await buildEcommercePromptNode({
+        item,
+        kind: 'a-plus-module',
+        groupId: groupNode.id,
+        position: {
+          x: basePosition.x + 940,
+          y: basePosition.y + 180 + index * 220,
+        },
+        selected: ecommerceState.selectedItems[item.moduleId] !== false,
+        analysis: ecommerceState.analysis,
+      });
+      await addPromptNode(node);
+      createdNodeIds.push(node.id);
+    }
+
+    bringNodesToFront(createdNodeIds);
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      analysis: null,
+      selectedItems: {},
+    }));
+    setConfig((previousConfig) => ({
+      ...previousConfig,
+      prompt: '',
+      referenceImages: [],
+    }));
+    import('./services/system/notificationService').then(({ notify }) => {
+      notify.success('建卡完成', `已创建 ${createdNodeIds.length} 张电商相关卡片。`);
+    });
+  }, [addPromptNode, bringNodesToFront, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.productFiles.length, ecommerceState.selectedItems, findNextGroupPosition]);
 
   useEffect(() => {
     return () => {
@@ -2588,7 +2876,6 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const resolvePptImageBlob = useCallback(async (image: GeneratedImage): Promise<Blob> => {
     const { getStrictOriginalImage } = await import('./services/storage/imageStorage');
-    const { base64ToBlob } = await import('./utils/downloadUtils');
 
     let source = await getStrictOriginalImage(image.id);
     if (!source && image.storageId && image.storageId !== image.id) {
@@ -2952,6 +3239,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     const promptText = promptOverride ?? config.prompt;
     const trimmedPrompt = promptText.trim();
+    if (config.mode === GenerationMode.ECOMMERCE) {
+      if (!ecommerceState.analysis) {
+        await handleAnalyzeEcommerceRequirement();
+        return;
+      }
+      await handleConfirmEcommerceAnalysis();
+      return;
+    }
     if (!trimmedPrompt) return;
     const submitSignature = JSON.stringify({
       prompt: trimmedPrompt,
@@ -3008,9 +3303,23 @@ const AppContent: React.FC<AppContentProps> = () => {
       mode: config.mode
     });
 
+    const isFollowUp = !!activeSourceImage;
+    const existingPromptDraftId = String(draftNodeId || '').trim();
+    const existingPromptDraft = existingPromptDraftId
+      ? activeCanvasRef.current?.promptNodes.find((node) => node.id === existingPromptDraftId)
+      : null;
+    const hasReusablePromptDraft = Boolean(isFollowUp && existingPromptDraft);
+    let promptNodeId = hasReusablePromptDraft
+      ? existingPromptDraftId
+      : `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+
     let requiredCredits = 0;
     let perImageCreditCost = 0;
     let paymentTransactionId: string | undefined = undefined;
+    const billingAttempt = buildGenerationBillingAttempt({
+      nodeId: promptNodeId,
+      phase: 'initial',
+    });
     const useServerSideCreditSettlement = isCreditModel && isSystemModelRoute(config.model);
     if (isCreditModel) {
       if (authLoading) {
@@ -3050,22 +3359,21 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       // Non-system routed credit models still use the legacy client-side pre-charge flow
       if (requiredCredits > 0 && !useServerSideCreditSettlement) {
-        console.log('[handleGenerate] 准备扣费:', { model: config.model, requiredCredits });
-        const chargeResult = await consumeCreditsDetailed(config.model, requiredCredits, {
-          feature: `模型调用：${config.model}`,
-          modelName: config.model,
-          providerId: provider || 'managed',
+        const chargeAttempt = await ensureCreditAttemptCharged({
+          modelId: config.model,
+          modelLabel: config.model,
+          providerId: provider || selectedKeyForBilling?.id || 'managed',
           provider,
+          requiredCredits,
+          useServerSideCreditSettlement,
+          billingAttempt,
         });
-        console.log('[handleGenerate] 扣费结果:', { chargeResult });
-        if (!chargeResult.success) {
-          import('./services/system/notificationService').then(({ notify }) => {
-            notify.error('生成失败', '您的账户余额不足，请先充值积分。');
-          });
-          setShowRechargeModal(true); // Automatically open the recharge modal
+
+        if (!chargeAttempt.success) {
           return;
         }
-        paymentTransactionId = chargeResult.transactionId;
+
+        paymentTransactionId = chargeAttempt.transactionId;
       }
     }
     // setIsGenerating(true); // Removed, handled by hook
@@ -3073,7 +3381,6 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       // 4. Calculate Position
       // Normal mode uses the current viewport center; follow-up mode keeps the existing linked placement flow.
-      const isFollowUp = !!activeSourceImage;
       const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
       const viewportRect = canvasRef.current?.getCanvasRect() || null;
       const viewportOffsets = getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth);
@@ -3085,15 +3392,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       // [Draft Logic] Use existing draft only for follow-up mode.
       // Normal mode must always lock to the current viewport center.
       const canvasNow = activeCanvasRef.current;
-      let promptNodeId = draftNodeId;
       let isReusingDraft = false;
 
       if (!isFollowUp) {
-        promptNodeId = `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
         currentPos = { ...liveCenter };
         isReusingDraft = false;
         console.log('[handleGenerate] Normal mode - locked to current viewport center:', currentPos);
-      } else if (promptNodeId) {
+      } else if (hasReusablePromptDraft) {
         // We have a draft. Use it.
         const draft = canvasNow?.promptNodes.find(n => n.id === promptNodeId);
         if (draft) {
@@ -3185,7 +3490,6 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       } else {
         // Follow-up mode but no draft id: create a new node at computed center/path
-        promptNodeId = `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
         console.log('[handleGenerate] Follow-up mode without draft, using computed center:', currentPos);
       }
 
@@ -3243,23 +3547,11 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       if ((config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) && config.enablePromptOptimization && rawPrompt) {
         try {
-          const selectedOptimizerTemplate = getPromptOptimizerTemplate(config.promptOptimizationTemplateId, config.mode);
-          const optimizationMode = config.promptOptimizationMode || 'auto';
-          const optimizationPrompt = [
-            selectedOptimizerTemplate?.instruction || '',
-            optimizationMode === 'custom' ? (config.promptOptimizationCustomPrompt || '').trim() : ''
-          ]
-            .filter(Boolean)
-            .join('\n');
           const optimized = await optimizePromptForImage(rawPrompt, {
             preferredModelId: config.model,
             aspectRatio: config.aspectRatio,
             imageSize: config.imageSize,
             mode: config.mode,
-            optimizationMode,
-            optimizationTemplateId: selectedOptimizerTemplate?.id,
-            optimizationTemplateTitle: selectedOptimizerTemplate?.title,
-            optimizationPrompt,
             supportsThinking: !!getModelCapabilities(config.model)?.supportsThinking,
             thinkingMode: config.thinkingMode || 'minimal',
             referenceImages: finalReferenceImages
@@ -3348,6 +3640,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         errorDetails: undefined,
         refundStatus: undefined,
         creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
+        billingAttemptId: billingAttempt.attemptId,
         paymentTransactionId,
         isNew: isNewAnim, // Mark the node as newly created so the launch animation can run.
         parallelCount: pptCount,
@@ -3669,10 +3962,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
       : 0;
     const retryRequiredCredits = retryIsCreditModel
-      ? ((executionNode.mode === GenerationMode.IMAGE || executionNode.mode === GenerationMode.PPT)
+      ? ((executionNode.mode === GenerationMode.IMAGE || executionNode.mode === GenerationMode.PPT || executionNode.mode === GenerationMode.ECOMMERCE)
         ? count * retryPerImageCreditCost
         : (retryPerImageCreditCost || 1))
       : 0;
+    const retryBillingAttempt = buildGenerationBillingAttempt({
+      nodeId: currentNodeId,
+      phase: 'retry',
+    });
     const retryChargeAttempt = await ensureCreditAttemptCharged({
       modelId: executionNode.model,
       modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
@@ -3680,6 +3977,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       provider: executionNode.provider,
       requiredCredits: retryRequiredCredits,
       useServerSideCreditSettlement: retryUseServerSideCreditSettlement,
+      billingAttempt: retryBillingAttempt,
     });
 
     if (!retryChargeAttempt.success) {
@@ -3692,6 +3990,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       billingMode: retryIsCreditModel ? 'credits' : 'currency',
       creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
       creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
+      billingAttemptId: retryBillingAttempt.attemptId,
       cost: retryRequiredCredits,
       isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
       paymentTransactionId: retryChargeAttempt.transactionId,
@@ -3708,6 +4007,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       billingMode: retryIsCreditModel ? 'credits' : 'currency',
       creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
       creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
+      billingAttemptId: retryBillingAttempt.attemptId,
       cost: retryRequiredCredits,
       isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
       paymentTransactionId: retryChargeAttempt.transactionId,
@@ -3722,7 +4022,10 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     try {
       const results = await Promise.all(Array.from({ length: count }).map(async (_, index) => {
-        const requestId = `${currentNodeId}-${index}`;
+        const requestId = buildGenerationAttemptRequestId(
+          executionNode.billingAttemptId || currentNodeId,
+          index,
+        );
 
         let isFinished = false;
         const timer = setTimeout(() => {
@@ -3855,6 +4158,9 @@ const AppContent: React.FC<AppContentProps> = () => {
               ? result.completionTokens
               : undefined;
             actualCostSource = actualCost !== undefined ? 'explicit' : 'none';
+            if (typeof result.balanceAfter === 'number') {
+              applyAuthoritativeBalance(result.balanceAfter);
+            }
           }
 
           isFinished = true;
@@ -3865,7 +4171,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           let originalUrl = '';
           let apiResultUrl: string | undefined = undefined;
 
-          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT) {
+          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
             if (b64.startsWith('data:')) {
               originalUrl = b64;
               import('./services/system/syncService').then(async ({ syncService }) => {
@@ -3898,7 +4204,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           );
           const storageId = await calculateImageHash(normalizedOriginalSource || url);
 
-          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT) {
+          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
             if (normalizedOriginalSource) {
               void saveOriginalImage(storageId, normalizedOriginalSource).catch(() => undefined);
             }
@@ -4384,6 +4690,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     const pageRetryRequiredCredits = pageRetryIsCreditModel
       ? (pageRetryPerImageCreditCost || 1)
       : 0;
+    const pageRetryBillingAttempt = buildGenerationBillingAttempt({
+      nodeId: node.id,
+      phase: 'ppt-single',
+      pageIndex,
+    });
     const pageRetryChargeAttempt = await ensureCreditAttemptCharged({
       modelId: executionNode.model,
       modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
@@ -4391,6 +4702,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       provider: executionNode.provider,
       requiredCredits: pageRetryRequiredCredits,
       useServerSideCreditSettlement: pageRetryUseServerSideCreditSettlement,
+      billingAttempt: pageRetryBillingAttempt,
     });
 
     if (!pageRetryChargeAttempt.success) {
@@ -4403,6 +4715,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       billingMode: pageRetryIsCreditModel ? 'credits' : 'currency',
       creditCost: pageRetryIsCreditModel ? pageRetryPerImageCreditCost : undefined,
       creditSettlement: pageRetryUseServerSideCreditSettlement ? 'server' : 'client',
+      billingAttemptId: pageRetryBillingAttempt.attemptId,
       cost: pageRetryRequiredCredits,
       isPaymentProcessed: Boolean(pageRetryChargeAttempt.transactionId),
       paymentTransactionId: pageRetryChargeAttempt.transactionId,
@@ -4458,7 +4771,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         executionNode.referenceImages || [],
         executionNode.model,
         '',
-        `${node.id}-ppt-single-${pageIndex}`,
+        buildGenerationAttemptRequestId(pageRetryBillingAttempt.attemptId, 0),
         !!executionNode.enableGrounding || !!executionNode.enableImageSearch,
         {
           preferredKeyId: executionNode.keySlotId,
@@ -4467,6 +4780,10 @@ const AppContent: React.FC<AppContentProps> = () => {
           thinkingMode: executionNode.thinkingMode || 'minimal'
         }
       );
+
+      if (typeof result.balanceAfter === 'number') {
+        applyAuthoritativeBalance(result.balanceAfter);
+      }
 
       let storageId = target.storageId;
       const persistableResultSource = normalizePersistableMediaSource(
@@ -4544,6 +4861,130 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
     }
   }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay, ensureCreditAttemptCharged, resolveCreditCostForModel, adjustBalanceOptimistically, updatePromptNode, resolveFailedCreditAttempt]);
+
+  const updateEcommerceNodeState = useCallback((nodeId: string, patch: Partial<NonNullable<PromptNode['ecommerce']>>, nodePatch: Partial<PromptNode> = {}) => {
+    const latestNode = activeCanvasRef.current?.promptNodes.find((node) => node.id === nodeId);
+    if (!latestNode?.ecommerce) return;
+    updatePromptNode({
+      ...latestNode,
+      ...nodePatch,
+      ecommerce: {
+        ...latestNode.ecommerce,
+        ...patch,
+      },
+    });
+  }, [updatePromptNode]);
+
+  const runEcommerceNodeGeneration = useCallback(async (
+    node: PromptNode,
+    options?: {
+      aspectRatio?: AspectRatio;
+      promptSuffix?: string;
+      stagePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
+      successPatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
+      failurePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
+    },
+  ) => {
+    const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
+    if (!latestNode.ecommerce) return;
+
+    const basePrompt = latestNode.originalPrompt || latestNode.prompt;
+    const nextPrompt = [basePrompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
+    const nextAspectRatio = options?.aspectRatio || latestNode.aspectRatio || AspectRatio.SQUARE;
+    const executionNode: PromptNode = {
+      ...latestNode,
+      prompt: nextPrompt,
+      mode: GenerationMode.ECOMMERCE,
+      aspectRatio: nextAspectRatio,
+      ecommerce: {
+        ...latestNode.ecommerce,
+        currentAspectRatio: nextAspectRatio,
+        stage: 'generating',
+        ...options?.stagePatch,
+      },
+    };
+
+    await handleRetryNode(executionNode);
+
+    const finalizedNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || executionNode;
+    const succeeded = !finalizedNode.error && (finalizedNode.childImageIds?.length || 0) > 0;
+    updateEcommerceNodeState(node.id, succeeded ? {
+      stage: 'generated',
+      ...options?.successPatch,
+    } : {
+      stage: 'failed',
+      ...options?.failurePatch,
+    });
+  }, [handleRetryNode, updateEcommerceNodeState]);
+
+  const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean) => {
+    if (!node.ecommerce) return;
+    updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
+  }, [updateEcommerceNodeState]);
+
+  const handleGenerateEcommerceNode = useCallback(async (node: PromptNode) => {
+    if (!node.ecommerce) return;
+    if (node.ecommerce.kind === 'main-image') {
+      await runEcommerceNodeGeneration(node, {
+        aspectRatio: (node.ecommerce.currentAspectRatio || node.ecommerce.allowedAspectRatios?.[0] || AspectRatio.SQUARE) as AspectRatio,
+      });
+      return;
+    }
+
+    if (node.ecommerce.kind === 'a-plus-module') {
+      const isDesktopThenMobile = node.ecommerce.sizePolicy === 'desktop-then-mobile';
+      await runEcommerceNodeGeneration(node, {
+        aspectRatio: (isDesktopThenMobile ? (node.ecommerce.desktopAspectRatio || AspectRatio.LANDSCAPE_21_9) : (node.ecommerce.currentAspectRatio || AspectRatio.LANDSCAPE_16_9)) as AspectRatio,
+        promptSuffix: isDesktopThenMobile ? '先生成桌面端 21:9 电商横幅版本。' : undefined,
+        stagePatch: isDesktopThenMobile ? { desktopStage: 'generating' } : undefined,
+        successPatch: isDesktopThenMobile ? { desktopStage: 'generated', mobileStage: 'locked' } : undefined,
+        failurePatch: isDesktopThenMobile ? { desktopStage: 'failed' } : undefined,
+      });
+    }
+  }, [runEcommerceNodeGeneration]);
+
+  const handleConfirmEcommerceDesktop = useCallback((node: PromptNode) => {
+    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-module' || node.ecommerce.desktopStage !== 'generated') return;
+    updateEcommerceNodeState(node.id, {
+      desktopStage: 'confirmed',
+      mobileStage: 'pending',
+      stage: 'ready',
+    });
+  }, [updateEcommerceNodeState]);
+
+  const handleRetryEcommerceModule = useCallback(async (node: PromptNode) => {
+    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-module' || node.ecommerce.desktopStage !== 'confirmed') return;
+    await runEcommerceNodeGeneration(node, {
+      aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
+      promptSuffix: '继续生成手机端 4:3 版本，保持主体、文案与参考图逻辑一致。',
+      stagePatch: { mobileStage: 'generating' },
+      successPatch: { mobileStage: 'generated' },
+      failurePatch: { mobileStage: 'failed' },
+    });
+  }, [runEcommerceNodeGeneration]);
+
+  const handleGenerateEcommerceGroup = useCallback(async (node: PromptNode, phase: 'desktop' | 'mobile') => {
+    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-group') return;
+    const moduleNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
+      item.ecommerce?.kind === 'a-plus-module'
+      && item.ecommerce.groupId === node.id
+      && item.ecommerce.selectedForGeneration !== false
+    ));
+
+    const targetModules = moduleNodes.filter((item) => {
+      if (phase === 'desktop') {
+        return item.ecommerce?.sizePolicy === 'desktop-then-mobile'
+          ? item.ecommerce.desktopStage === 'pending' || item.ecommerce.desktopStage === 'failed'
+          : item.ecommerce?.stage !== 'generated';
+      }
+      return item.ecommerce?.desktopStage === 'confirmed'
+        && (item.ecommerce.mobileStage === 'pending' || item.ecommerce.mobileStage === 'failed' || item.ecommerce.mobileStage === 'locked');
+    });
+
+    await Promise.allSettled(targetModules.map((item) => (
+      phase === 'desktop' ? handleGenerateEcommerceNode(item) : handleRetryEcommerceModule(item)
+    )));
+  }, [handleGenerateEcommerceNode, handleRetryEcommerceModule]);
 
   const handleExportPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
     if (!activeCanvas) return;
@@ -5365,6 +5806,7 @@ ${slideLayerXml.join('\n')}
       referenceImages: referenceImages,
       mode: clickedNode.mode || GenerationMode.IMAGE // 🎯 Sync Mode (Image/Video)
     }));
+    setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
 
     // [Draft Logic] Resume Draft if clicked on a draft node
     if (clickedNode.isDraft) {
@@ -5384,6 +5826,7 @@ ${slideLayerXml.join('\n')}
 
     // Set this image as source for continuing conversation
     setActiveSourceImage(imageId);
+    setEcommerceRatioOverride(undefined);
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
@@ -5439,6 +5882,90 @@ ${slideLayerXml.join('\n')}
       setDraftNodeId(newId);
     }
   }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, getCardDimensions]);
+
+  const handleMobileUseImageAsSource = useCallback((imageId: string) => {
+    handleImageClick(imageId);
+  }, [handleImageClick]);
+
+  const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: PartialRedrawRequest) => {
+    void (async () => {
+      try {
+        const finalPrompt = (request.prompt || '局部重绘').trim();
+        const canvas = activeCanvasRef.current;
+        const sourceImage = canvas?.imageNodes.find((img) => img.id === image.id) || image;
+        const parentPromptId = sourceImage.parentPromptId;
+        const parentPrompt = canvas?.promptNodes.find((promptNode) => promptNode.id === parentPromptId);
+        const sourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
+
+        const croppedSourceReference = await buildPartialRedrawReferenceImage(
+          sourceImageUrl,
+          request.generationRect,
+          request.sourceImageDimensions,
+        );
+
+        let nodePos = { x: sourceImage.position.x, y: sourceImage.position.y + 80 };
+        if (parentPrompt && canvas) {
+          const siblingImages = canvas.imageNodes.filter((img) => img.parentPromptId === parentPromptId);
+          const maxY = siblingImages.reduce((acc, img) => Math.max(acc, img.position.y), parentPrompt.position.y);
+          nodePos = { x: sourceImage.position.x, y: maxY + 80 };
+        }
+
+        const promptNodeId = `${Date.now()}_redraw_prompt`;
+
+        const redrawNode: PromptNode = {
+          id: promptNodeId,
+          prompt: finalPrompt,
+          originalPrompt: finalPrompt,
+          position: nodePos,
+          aspectRatio: request.aspectRatio || sourceImage.aspectRatio || config.aspectRatio,
+          imageSize: sourceImage.imageSize || config.imageSize,
+          model: normalizeModelId(request.model || sourceImage.model || config.model),
+          modelLabel: resolveModelDisplayName(
+            request.model || sourceImage.model || config.model,
+            sourceImage.modelLabel || getModelMetadata(request.model || sourceImage.model || config.model)?.name,
+          ) || undefined,
+          provider: sourceImage.provider || undefined,
+          providerLabel: sourceImage.providerLabel || undefined,
+          childImageIds: [],
+          referenceImages: [croppedSourceReference, ...request.referenceImages],
+          timestamp: Date.now(),
+          sourceImageId: sourceImage.id,
+          isGenerating: true,
+          mode: GenerationMode.REDRAW,
+          partialRedraw: {
+            sourceImageId: sourceImage.id,
+            sourceImageStorageId: sourceImage.storageId,
+            sourcePromptId: parentPrompt?.id,
+            sourceImageDimensions: request.sourceImageDimensions,
+            selectionRect: request.selectionRect,
+            generationRect: request.generationRect,
+            targetAspectRatio: request.aspectRatio,
+            extraReferenceImageIds: request.referenceImages.map((ref) => ref.storageId || ref.id),
+            compositeVersion: 1,
+          },
+          tags: [],
+        };
+
+        await addPromptNode(redrawNode);
+        await executeGeneration(redrawNode);
+
+        const latestRedrawResultId = activeCanvasRef.current?.promptNodes
+          .find((promptNode) => promptNode.id === redrawNode.id)
+          ?.childImageIds?.[0];
+
+        if (latestRedrawResultId) {
+          handleOpenPreview(latestRedrawResultId);
+        } else {
+          setPreviewImages(null);
+        }
+      } catch (error: any) {
+        console.error('[partial-redraw] Failed to prepare redraw request', error);
+        import('./services/system/notificationService').then(({ notify }) => {
+          notify.error('重绘准备失败', error?.message || '请稍后重试');
+        });
+      }
+    })();
+  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, handleOpenPreview]);
 
   // Dynamic Group Bounds Calculation
   const getComputedGroupBounds = useCallback((group: CanvasGroup) => {
@@ -5586,7 +6113,7 @@ ${slideLayerXml.join('\n')}
       if (lockedBounds) {
         // Rule: once a prompt-group drag starts, overlap detection keeps using the
         // pre-drag expanded footprint until the drag ends, preventing focus/stack
-        // state from thrashing while subcards visually collapse.
+        // state from thrashing while the whole group moves as one unit.
         boundsMap.set(promptNode.id, lockedBounds);
         return;
       }
@@ -6014,7 +6541,6 @@ ${slideLayerXml.join('\n')}
       setFocusedGroupId(null);
       liveNodePositionByIdRef.current = {};
       liveDerivedNodeIdsByOwnerRef.current = {};
-      promptDragOriginByIdRef.current = {};
       setLiveNodePositionById({});
       setLockedGroupBoundsById({});
       return;
@@ -6032,7 +6558,6 @@ ${slideLayerXml.join('\n')}
 
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
-  const promptDragOriginByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const syncLiveNodePositionState = useCallback(() => {
     const next = liveNodePositionByIdRef.current;
     setLiveNodePositionById((prev) => {
@@ -6135,13 +6660,6 @@ ${slideLayerXml.join('\n')}
       ? nodeId
       : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId)?.parentPromptId ?? null);
 
-    if (promptNode && position && !promptDragOriginByIdRef.current[nodeId]) {
-      promptDragOriginByIdRef.current = {
-        ...promptDragOriginByIdRef.current,
-        [nodeId]: promptNode.position,
-      };
-    }
-
     let nextLivePositions = liveNodePositionByIdRef.current;
     let hasLivePositionChanged = false;
 
@@ -6172,11 +6690,6 @@ ${slideLayerXml.join('\n')}
         liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
       }
 
-      if (promptNode && nodeId in promptDragOriginByIdRef.current) {
-        const nextPromptDragOrigins = { ...promptDragOriginByIdRef.current };
-        delete nextPromptDragOrigins[nodeId];
-        promptDragOriginByIdRef.current = nextPromptDragOrigins;
-      }
     } else {
       const previous = nextLivePositions[nodeId];
       if (!previous || previous.x !== position.x || previous.y !== position.y) {
@@ -6354,6 +6867,13 @@ ${slideLayerXml.join('\n')}
       const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
       if (childImages.length === 0) return;
 
+      const hasLiveDragInGroup = Boolean(liveNodePositionById[promptNode.id])
+        || childImages.some((imageNode) => Boolean(liveNodePositionById[imageNode.id]));
+      const hasManualLayoutOverride = Boolean(promptNode.userMoved)
+        || childImages.some((imageNode) => Boolean(imageNode.userMoved));
+
+      if (hasLiveDragInGroup || hasManualLayoutOverride) return;
+
       const repairKey = [
         activeCanvasId,
         promptNode.id,
@@ -6393,7 +6913,7 @@ ${slideLayerXml.join('\n')}
         updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
       });
     });
-  }, [activeCanvas, actualChildImagesByPromptId, isMobile, parseImageDimensions, updateImageNodePosition]);
+  }, [activeCanvas, actualChildImagesByPromptId, isMobile, liveNodePositionById, parseImageDimensions, updateImageNodePosition]);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -7328,7 +7848,6 @@ ${slideLayerXml.join('\n')}
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
     const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
     const isGeneratingGroup = generatingGroupIds.includes(node.id);
-    const isPromptDragActive = Boolean(liveNodePositionById[node.id]);
     const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
     const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
     const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
@@ -7356,16 +7875,7 @@ ${slideLayerXml.join('\n')}
     const connectorOccluderRadius = Math.max(18, Math.min(26, 22 / groupConnectorZoom));
     const connectorMaskId = `prompt-group-mask-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const connectorCanvasPadding = 128;
-    const collapsedChildGapX = 20;
-    const collapsedChildGapY = 28;
-    const promptDragOrigin = promptDragOriginByIdRef.current[node.id];
-    const promptDragDistance = (isPromptDragActive && promptDragOrigin)
-      ? Math.hypot(
-        promptConnectorPosition.x - promptDragOrigin.x,
-        promptConnectorPosition.y - promptDragOrigin.y,
-      )
-      : 0;
-    const childVisualLayoutsBase = groupView.childImages.map((childNode, childIndex) => {
+    const childVisualLayouts = groupView.childImages.map((childNode) => {
       const livePosition = resolveLiveImagePosition(childNode) ?? childNode.position;
       const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
       let imageHeight = theoreticalHeight;
@@ -7386,47 +7896,12 @@ ${slideLayerXml.join('\n')}
 
       return {
         childNode,
-        childIndex,
         renderedWidth,
         resolvedImageHeight,
         livePosition,
+        visualPosition: livePosition,
       };
     });
-    const childVisualLayouts = (() => {
-      if (!isPromptDragActive || !promptDragOrigin || childVisualLayoutsBase.length === 0) {
-        return childVisualLayoutsBase.map((layout) => ({
-          ...layout,
-          visualPosition: layout.livePosition,
-        }));
-      }
-
-      const totalRowWidth = childVisualLayoutsBase.reduce((sum, layout) => sum + layout.renderedWidth, 0)
-        + (Math.max(0, childVisualLayoutsBase.length - 1) * collapsedChildGapX);
-      let currentX = promptConnectorPosition.x - (totalRowWidth / 2);
-
-      return childVisualLayoutsBase.map((layout) => {
-        // Rule: dragging a main card does not hide subcards. Instead, every subcard
-        // converges toward a centered horizontal row under the prompt, and the
-        // connector path uses that exact same visual position.
-        const collapseTargetPosition = {
-          x: currentX + (layout.renderedWidth / 2),
-          y: promptConnectorPosition.y + collapsedChildGapY + layout.resolvedImageHeight,
-        };
-        currentX += layout.renderedWidth + collapsedChildGapX;
-        const collapseThreshold = 32 + (layout.childIndex * 24);
-        const collapseProgress = Math.max(0, Math.min(1, promptDragDistance / collapseThreshold));
-        const easedProgress = 1 - Math.pow(1 - collapseProgress, 2);
-        const visualPosition = {
-          x: layout.livePosition.x + ((collapseTargetPosition.x - layout.livePosition.x) * easedProgress),
-          y: layout.livePosition.y + ((collapseTargetPosition.y - layout.livePosition.y) * easedProgress),
-        };
-
-        return {
-          ...layout,
-          visualPosition,
-        };
-      });
-    })();
     const groupConnectorNodes = childVisualLayouts.map((layout) => ({
       key: `${node.id}-${layout.childNode.id}`,
       childNode: layout.childNode,
@@ -7589,6 +8064,11 @@ ${slideLayerXml.join('\n')}
           onExportPptx={handleExportPptxEditable}
           onRetryPptPage={handleRetryPptSinglePage}
           onExportPptPage={handleExportPptSinglePage}
+          onToggleEcommerceSelected={handleToggleEcommerceSelected}
+          onGenerateEcommerceNode={handleGenerateEcommerceNode}
+          onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
+          onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
+          onRetryEcommerceModule={handleRetryEcommerceModule}
           ioTrace={getNodeIoTrace(node.id)}
           onOpenStorageSettings={() => {
             setShowSettingsPanel(true);
@@ -8051,54 +8531,127 @@ ${slideLayerXml.join('\n')}
     );
   }
 
-  const workspaceChrome = (
-    <>
-      {isMobile ? (
-        <>
-          <MobileHeader
-            onMenuClick={() => setIsSidebarOpen(true)}
-            onDashboardClick={() => openSettingsSurface('dashboard')}
-            onSettingsClick={() => openSettingsSurface('api-management')}
-            onUserClick={() => openProfileSurface('main')}
-            onBillingClick={() => openProfileSurface('billing')}
-            onRechargeClick={() => setShowRechargeModal(true)}
-            balance={balance}
-            balanceLoading={billingLoading}
-            title="KK Studio"
-            userName={derivedMobileUserName}
-            userAvatarUrl={derivedMobileUserAvatarUrl}
-          />
-          <MobileWorkspaceQuickBar
-            onSearch={() => {
-              focusWorkspace();
-              setIsSearchOpen(true);
-            }}
-            onOpenPromptLibrary={() => {
-              window.dispatchEvent(new CustomEvent('kk-mobile-open-prompt-library'));
-            }}
-            onTogglePromptOptimization={() => {
-              if (config.mode !== GenerationMode.IMAGE && config.mode !== GenerationMode.PPT) {
+  const workspaceChrome = null;
+
+  const mobileHeader = isMobile ? (
+    <div className="space-y-3">
+      <MobileHeader
+        onMenuClick={() => setIsSidebarOpen(true)}
+        onDashboardClick={() => openSettingsSurface('dashboard')}
+        onSettingsClick={() => openSettingsSurface('api-management')}
+        onUserClick={() => openProfileSurface('main')}
+        onBillingClick={() => openProfileSurface('billing')}
+        onRechargeClick={() => setShowRechargeModal(true)}
+        balance={balance}
+        balanceLoading={billingLoading}
+        title="KK Studio"
+        userName={derivedMobileUserName}
+        userAvatarUrl={derivedMobileUserAvatarUrl}
+      />
+      <MobileWorkspaceQuickBar
+        onSearch={() => {
+          focusWorkspace();
+          setIsSearchOpen(true);
+        }}
+        onTogglePromptOptimization={() => {
+              if (config.mode !== GenerationMode.IMAGE && config.mode !== GenerationMode.PPT && config.mode !== GenerationMode.ECOMMERCE) {
                 return;
               }
 
-              setConfig(prev => ({
-                ...prev,
-                enablePromptOptimization: !prev.enablePromptOptimization,
-              }));
-            }}
-            promptOptimizationEnabled={!!config.enablePromptOptimization}
-            promptOptimizationSupported={config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT}
-          />
-          <MobileTabBar
-            currentMode={config.mode}
-            currentTab={currentMobileTab}
-            onSelectTab={handleSelectMobileTab}
-            isVisible={true}
-            onInteract={handleShowMobileNav}
-          />
-        </>
-      ) : null}
-    </>
+          setConfig((prev) => ({
+            ...prev,
+            enablePromptOptimization: !prev.enablePromptOptimization,
+          }));
+        }}
+        promptOptimizationEnabled={!!config.enablePromptOptimization}
+            promptOptimizationSupported={config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE}
+      />
+    </div>
+  ) : null;
+
+  const mobileFeed = isMobile ? (
+    <div className="h-full min-h-0 overflow-y-auto pb-2">
+      <MobileResultFeed
+        promptNodes={activeCanvas?.promptNodes || []}
+        imageNodes={activeCanvas?.imageNodes || []}
+        onImageDelete={deleteImageNode}
+        onImageSelect={(id) => selectNodes([id], 'replace')}
+        onImagePreview={handleOpenPreview}
+        onUseAsSource={handleMobileUseImageAsSource}
+        onPartialRedraw={handlePartialRedrawRequest}
+        activeSourceImage={activeSourceImage}
+        highlightedId={highlightedId}
+      />
+    </div>
+  ) : null;
+
+  const mobileComposer = isMobile ? (
+    <PromptBar
+      config={config}
+      setConfig={setConfig}
+      isGenerating={isGenerating}
+      onUiBusyChange={setPromptBarUiBusy}
+      onGenerate={handleGenerate}
+      onCancel={handleCancelGeneration}
+      onFilesDrop={handleFilesDrop}
+      activeSourceImage={activeSourceImage ?
+        (activeCanvas?.imageNodes.find((node) => node.id === activeSourceImage) ? {
+          id: activeSourceImage,
+          url: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.url,
+          prompt: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.prompt,
+        } : null) : null
+      }
+      onClearSource={handleClearSource}
+      isMobile={isMobile}
+      mobileShellMode="embedded"
+      onOpenSettings={(view) => {
+        openSettingsSurface(view || 'api-management');
+        handleHideMobileNav();
+      }}
+      onInteract={handleShowMobileNav}
+      onFocus={() => {
+        console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
+        setIsPromptFocused(true);
+      }}
+      onBlur={() => {
+        console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
+        setIsPromptFocused(false);
+        setTimeout(() => handleShowMobileNav(), 0);
+      }}
+      ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
+      ecommerceProductFileCount={ecommerceState.productFiles.length}
+      ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
+      ecommerceAnalysis={ecommerceState.analysis}
+      ecommerceSelection={ecommerceState.selectedItems}
+      ecommerceAnalyzing={ecommerceState.isAnalyzing}
+      onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
+      onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
+      onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
+      onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
+      onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
+      onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+      ecommerceRatioOverride={ecommerceRatioOverride}
+      onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
+    />
+  ) : null;
+
+  const workspacePanels = (
+    <WorkspaceSurfacePanels
+      activeSurface={activeAppSurface}
+      activePanel={activeWorkspacePanel}
+      isChatOpen={isChatOpen}
+      toggleChatPanel={toggleChatPanel}
+      setIsChatOpen={setIsChatOpen}
+      isMobile={isMobile}
+      openSettingsSurface={openSettingsSurface}
+      setIsSidebarHovered={setIsSidebarHovered}
+      setChatSidebarWidth={setChatSidebarWidth}
+      workspaceSurface={workspaceSurface}
+      activeCanvas={activeCanvas}
+      focusWorkspace={focusWorkspace}
+      handlePreviewFromLibrary={handlePreviewFromLibrary}
+      handleFocusLibraryImage={handleFocusLibraryImage}
+    />
   );
 
 
@@ -8148,42 +8701,6 @@ ${slideLayerXml.join('\n')}
             </button>
           </div>
         </div>
-      )}
-
-      {/* [NEW] Mobile Header & Navigation */}
-      {false && isMobile && (
-        <>
-          <MobileHeader
-            onMenuClick={() => setIsSidebarOpen(true)}
-            onDashboardClick={() => {
-              openSettingsPanel('dashboard');
-            }}
-            onSettingsClick={() => {
-              openSettingsPanel('api-management');
-            }}
-            onUserClick={() => {
-              setProfileInitialView('main');
-              setShowProfileModal(true);
-            }}
-            onBillingClick={() => {
-              setProfileInitialView('billing');
-              setShowProfileModal(true);
-            }}
-            onRechargeClick={() => {
-              setShowRechargeModal(true);
-            }}
-            balance={balance}
-            balanceLoading={billingLoading}
-            title="KK Studio"
-            userName={derivedMobileUserName}
-            userAvatarUrl={derivedMobileUserAvatarUrl}
-          />
-          <MobileTabBar
-            currentMode={config.mode}
-            currentTab={currentMobileTab}
-            onSelectTab={handleSelectMobileTab}
-          />
-        </>
       )}
 
       {/* Chat Sidebar (Left) */}
@@ -8464,47 +8981,12 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* 🚀 [Mobile] 手机端聊天流式界面 - 替代无限画布 */}
       {isMobile && (
-        <MobileChatFeed
-          promptNodes={activeCanvas?.promptNodes || []}
-          imageNodes={activeCanvas?.imageNodes || []}
-          onPromptPositionChange={updatePromptNodePosition}
-          onPromptSelect={(nodeId) => selectNodes([nodeId], 'replace')}
-          onPromptClick={handlePromptClick}
-          onPromptCancel={handleCancelGeneration}
-          onPromptRetry={handleRetryNode}
-          onPromptDelete={deletePromptNode}
-          onPromptDisconnect={handleDisconnectPrompt}
-          onPromptUpdate={updatePromptNode}
-          onPromptHeightChange={(id, height) => {
-            const node = activeCanvas?.promptNodes.find(n => n.id === id);
-            if (node && node.height !== height) updatePromptNode({ ...node, height });
-          }}
-          onPromptPin={handlePinDraft}
-          onPromptRemoveTag={(id, tag) => {
-            const node = activeCanvas?.promptNodes.find(n => n.id === id);
-            if (node && node.tags) updatePromptNode({ ...node, tags: node.tags.filter(t => t !== tag) });
-          }}
-          onPromptEditPptDeck={handleOpenPptDeckEditor}
-          onPromptExportPpt={handleExportPptPackageEditable}
-          onPromptExportPptx={handleExportPptxEditable}
-          onPromptRetryPptPage={handleRetryPptSinglePage}
-          onPromptExportPptPage={handleExportPptSinglePage}
-          onOpenStorageSettings={() => { setShowSettingsPanel(true); setSettingsInitialView('storage-settings'); }}
-          selectedNodeIds={selectedNodeIds}
-          actualChildImagesByPromptId={actualChildImagesByPromptId}
-          getNodeIoTrace={getNodeIoTrace}
-          onImagePositionChange={updateImageNodePosition}
-          onImageDelete={deleteImageNode}
-          onImageClick={handleImageClick}
-          onImageSelect={(id) => selectNodes([id], 'replace')}
-          onImageUpdate={updateImageNode}
-          onImageDimensionsUpdate={updateImageNodeDisplayMeta}
-          onImagePreview={handleOpenPreview}
-          activeSourceImage={activeSourceImage}
-          highlightedId={highlightedId}
-          nowTimestamp={nowTimestamp || Date.now()}
+        <MobileAppShell
+          header={mobileHeader}
+          feed={mobileFeed}
+          composer={mobileComposer}
+          overlays={workspacePanels}
         />
       )}
 
@@ -8694,8 +9176,9 @@ ${slideLayerXml.join('\n')}
             const { x: btnX, y: btnY } = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
 
             /* Follow-up connector colors mirror the active generation mode. */
-            const baseColor = pn.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
-            const hoverClass = pn.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
+            const isRedrawMode = pn.mode === GenerationMode.REDRAW || pn.mode === GenerationMode.INPAINT;
+            const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
+            const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
             return (
               <g key={`followup-${pn.id}`} className={showConnectorButtons ? 'group' : undefined}>
@@ -8777,8 +9260,9 @@ ${slideLayerXml.join('\n')}
             const { x: btnX, y: btnY } = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
 
             /* Pending connection colors follow the active generation mode. */
-            const baseColor = config.mode === GenerationMode.INPAINT ? '#22c55e' : '#eab308';
-            const hoverClass = config.mode === GenerationMode.INPAINT ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
+            const isRedrawMode = config.mode === GenerationMode.REDRAW || config.mode === GenerationMode.INPAINT;
+            const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
+            const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
             return (
               <g key="pending-connection" className={showConnectorButtons ? 'group' : undefined}>
@@ -8947,6 +9431,11 @@ ${slideLayerXml.join('\n')}
               onExportPptx={handleExportPptxEditable}
               onRetryPptPage={handleRetryPptSinglePage}
               onExportPptPage={handleExportPptSinglePage}
+              onToggleEcommerceSelected={handleToggleEcommerceSelected}
+              onGenerateEcommerceNode={handleGenerateEcommerceNode}
+              onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
+              onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
+              onRetryEcommerceModule={handleRetryEcommerceModule}
               ioTrace={getNodeIoTrace(node.id)}
               onOpenStorageSettings={() => {
                 setShowSettingsPanel(true);
@@ -9135,59 +9624,58 @@ ${slideLayerXml.join('\n')}
 
 
 
-      {/* Prompt Bar */}
-      <div className="contents">
-        <PromptBar
-          config={config}
-          setConfig={setConfig}
-          isGenerating={isGenerating}
-          onUiBusyChange={setPromptBarUiBusy}
-          onGenerate={handleGenerate}
-          onCancel={handleCancelGeneration}
-          onFilesDrop={handleFilesDrop}
-          activeSourceImage={activeSourceImage ?
-            (activeCanvas?.imageNodes.find(n => n.id === activeSourceImage) ? {
-              id: activeSourceImage,
-              url: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.url,
-              prompt: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.prompt
-            } : null) : null
-          }
-          onClearSource={handleClearSource}
-          isMobile={isMobile}
-          onOpenSettings={(view) => {
-            openSettingsSurface(view || 'api-management');
-            handleHideMobileNav(); // Hide nav when opening settings (optional, but requested behavior implies consistent handling)
-          }}
-          onInteract={handleShowMobileNav}
-          onFocus={() => {
-            console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
-            setIsPromptFocused(true);
-          }}
-          onBlur={() => {
-            console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
-            setIsPromptFocused(false);
-            // When focus leaves the prompt, restart the 5-second auto-hide timer immediately
-            setTimeout(() => handleShowMobileNav(), 0);
-          }}
-        />
-      </div>
+      {!isMobile && (
+        <div className="contents">
+          <PromptBar
+            config={config}
+            setConfig={setConfig}
+            isGenerating={isGenerating}
+            onUiBusyChange={setPromptBarUiBusy}
+            onGenerate={handleGenerate}
+            onCancel={handleCancelGeneration}
+            onFilesDrop={handleFilesDrop}
+            activeSourceImage={activeSourceImage ?
+              (activeCanvas?.imageNodes.find(n => n.id === activeSourceImage) ? {
+                id: activeSourceImage,
+                url: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.url,
+                prompt: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.prompt
+              } : null) : null
+            }
+            onClearSource={handleClearSource}
+            isMobile={isMobile}
+            onOpenSettings={(view) => {
+              openSettingsSurface(view || 'api-management');
+              handleHideMobileNav();
+            }}
+            onInteract={handleShowMobileNav}
+            onFocus={() => {
+              console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
+              setIsPromptFocused(true);
+            }}
+            onBlur={() => {
+              console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
+              setIsPromptFocused(false);
+              setTimeout(() => handleShowMobileNav(), 0);
+            }}
+            ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
+            ecommerceProductFileCount={ecommerceState.productFiles.length}
+            ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
+            ecommerceAnalysis={ecommerceState.analysis}
+            ecommerceSelection={ecommerceState.selectedItems}
+            ecommerceAnalyzing={ecommerceState.isAnalyzing}
+            onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
+            onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
+            onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
+            onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
+            onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
+            onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+            ecommerceRatioOverride={ecommerceRatioOverride}
+            onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
+          />
+        </div>
+      )}
 
-      <WorkspaceSurfacePanels
-        activeSurface={activeAppSurface}
-        activePanel={activeWorkspacePanel}
-        isChatOpen={isChatOpen}
-        toggleChatPanel={toggleChatPanel}
-        setIsChatOpen={setIsChatOpen}
-        isMobile={isMobile}
-        openSettingsSurface={openSettingsSurface}
-        setIsSidebarHovered={setIsSidebarHovered}
-        setChatSidebarWidth={setChatSidebarWidth}
-        workspaceSurface={workspaceSurface}
-        activeCanvas={activeCanvas}
-        focusWorkspace={focusWorkspace}
-        handlePreviewFromLibrary={handlePreviewFromLibrary}
-        handleFocusLibraryImage={handleFocusLibraryImage}
-      />
+      {!isMobile && workspacePanels}
 
       <GlobalModals>
       {/* Legacy KeyManagerModal removed - integrated into UserProfileModal */}
@@ -9343,60 +9831,7 @@ ${slideLayerXml.join('\n')}
             onEditPptDeck={handleOpenPptDeckEditorFromImage}
             onEditText={handleEditPptTextFromLightbox}
             onDownloadPptComposite={handleDownloadPptComposite}
-            onInpaint={(image, maskBase64, prompt) => {
-              const userPrompt = (prompt || '局部重绘').trim();
-              // Keep this prompt light: it will be sent through the optimizer, so we do not need heavy hard-coded instructions here
-              // Just state the core intent: masked edits should stay inside the mask, while full-image references should guide a remix
-              const finalPrompt = maskBase64
-                ? `${userPrompt} (change masked area only)`
-                : `${userPrompt} (remix based on image)`;
-
-              const sourceImage = activeCanvas?.imageNodes.find(img => img.id === image.id) || image;
-              const parentPromptId = sourceImage.parentPromptId;
-              const parentPrompt = activeCanvas?.promptNodes.find(p => p.id === parentPromptId);
-
-              let nodePos = { x: sourceImage.position.x, y: sourceImage.position.y + 80 };
-              if (parentPrompt && activeCanvas) {
-                const siblingImages = activeCanvas.imageNodes.filter(img => img.parentPromptId === parentPromptId);
-                const maxY = siblingImages.reduce((acc, img) => Math.max(acc, img.position.y), parentPrompt.position.y);
-                nodePos = { x: sourceImage.position.x, y: maxY + 80 };
-              }
-
-              const promptNodeId = `${Date.now()}_inpaint_prompt`;
-
-              const inpaintNode: PromptNode = {
-                id: promptNodeId,
-                prompt: finalPrompt,
-                originalPrompt: finalPrompt,
-                position: nodePos,
-                aspectRatio: sourceImage.aspectRatio || config.aspectRatio,
-                imageSize: sourceImage.imageSize || config.imageSize,
-                model: normalizeModelId(sourceImage.model || config.model),
-                modelLabel: resolveModelDisplayName(
-                  sourceImage.model || config.model,
-                  sourceImage.modelLabel || getModelMetadata(sourceImage.model || config.model)?.name,
-                ) || undefined,
-                provider: sourceImage.provider || undefined,
-                providerLabel: sourceImage.providerLabel || undefined,
-                childImageIds: [],
-                referenceImages: [{
-                  id: sourceImage.id,
-                  storageId: sourceImage.storageId || sourceImage.id,
-                  data: sourceImage.originalUrl || sourceImage.url,
-                  mimeType: 'image/png'
-                }],
-                timestamp: Date.now(),
-                sourceImageId: sourceImage.id,
-                isGenerating: true,
-                maskUrl: maskBase64,
-                mode: GenerationMode.INPAINT,
-                tags: []
-              };
-
-              addPromptNode(inpaintNode);
-              executeGeneration(inpaintNode);
-              setPreviewImages(null);
-            }}
+            onPartialRedraw={handlePartialRedrawRequest}
           />
         </Suspense>
       )}
@@ -9560,16 +9995,7 @@ ${slideLayerXml.join('\n')}
 };
 
 const App: React.FC = () => {
-  const { user, loading } = useAuth();
-
   const [showCostEstimation, setShowCostEstimation] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      keyManager.setStartupStage('signed_out');
-      adminModelService.setStartupStage('signed_out');
-    }
-  }, [user]);
 
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {
@@ -9579,29 +10005,8 @@ const App: React.FC = () => {
     });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
-        <Loader2 className="animate-spin text-indigo-500" size={32} />
-      </div>
-    );
-  }
-
-  // OAuth 回调页面（无需登录状态）
-  if (window.location.pathname === '/auth/callback') {
-    return (
-      <ThemeProvider>
-        <AuthCallback />
-      </ThemeProvider>
-    );
-  }
-
-  if (!user) {
-    return (
-      <ThemeProvider>
-        <LoginScreen />
-      </ThemeProvider>
-    );
+  if (createAppRootMode({ pathname: window.location.pathname }) !== 'workspace') {
+    return null;
   }
 
   return (

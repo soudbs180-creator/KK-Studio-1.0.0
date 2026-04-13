@@ -112,7 +112,8 @@ describe("api server contract", () => {
     };
   }
 
-  test("register returns the documented disabled auth envelope", async () => {
+  test("register honors the documented success envelope", async () => {
+    const email = `contract-${Date.now()}@example.com`;
     const response = await fetch(`${baseUrl}/api/v1/auth/register`, {
       method: "POST",
       headers: {
@@ -120,16 +121,17 @@ describe("api server contract", () => {
         "x-request-id": "req-contract-register",
       },
       body: JSON.stringify({
-        email: "contract@example.com",
+        email,
         password: "password-123",
         turnstileToken: "turnstile-ok",
       }),
     });
 
-    assert.equal(response.status, 501);
+    assert.equal(response.status, 201);
     const payload = await response.json();
-    assert.equal(payload.success, false);
-    assert.equal(payload.error.code, "AUTH_ROUTE_DISABLED");
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.email, email);
+    assert.equal(payload.data.status, "registered");
     assert.equal(payload.meta.requestId, "req-contract-register");
   });
 
@@ -147,6 +149,34 @@ describe("api server contract", () => {
     const payload = await response.json();
     assert.equal(payload.success, false);
     assert.equal(payload.error.code, "INVALID_JSON_BODY");
+  });
+
+  test("generation task routes preserve requester ownership and request trace metadata", async () => {
+    const response = await fetch(`${baseUrl}/api/v1/generation-tasks`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer contract-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-contract-generation-create",
+      },
+      body: JSON.stringify({
+        workspaceId: "workspace-contract-1",
+        workflowId: "workflow-contract-1",
+        modelCode: "gemini-2.5-flash-image",
+        taskType: "image",
+        prompt: "Contract task prompt",
+        idempotencyKey: "idem-contract-generation-1",
+        attemptId: "attempt-contract-generation-1",
+      }),
+    });
+
+    assert.equal(response.status, 202);
+    const payload = await response.json();
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.requesterId, "contract-user-1");
+    assert.equal(payload.data.requestId, "req-contract-generation-create");
+    assert.equal(payload.data.attemptId, "attempt-contract-generation-1");
+    assert.equal(payload.data.status, "queued");
   });
 
   test("billing routes expose authenticated balance and idempotent debit", async () => {

@@ -226,30 +226,9 @@ test("auth access token compatibility storage is session-scoped and clears legac
 });
 
 test("sensitive UI and payment webhook logs avoid raw secret-bearing payloads", () => {
-  const apiChannelsSource = readSource("src/components/api/ApiChannelsView.tsx");
-  const supplierModalSource = readSource("src/components/api/SupplierModal.tsx");
   const paymentWebhookSource = readSource("payment-server/webhook.js");
-  const apiSaveLogMatch = apiChannelsSource.match(
-    /console\.log\('\[ApiChannelsView\] 保存前的数据:', \{[\s\S]*?\n\s*\}\);/,
-  );
-  assert.ok(apiSaveLogMatch, "missing the API channel save summary log");
-  const apiSaveLog = apiSaveLogMatch[0];
-
-  assert.doesNotMatch(apiSaveLog, /\bkeyData\b/);
-  assert.doesNotMatch(apiSaveLog, /\bformKey\b/);
-  assert.match(apiSaveLog, /hasKey:\s*hasFormKey/);
-
-  const supplierSubmitLogMatch = supplierModalSource.match(
-    /console\.log\('\[SupplierModal\] Submitting form:', \{[\s\S]*?\n\s*\}\);/,
-  );
-  assert.ok(supplierSubmitLogMatch, "missing the supplier submit summary log");
-  const supplierSubmitLog = supplierSubmitLogMatch[0];
-
-  assert.doesNotMatch(supplierSubmitLog, /\bapiKey\b\s*:/);
-  assert.doesNotMatch(supplierSubmitLog, /\bsystemToken\b\s*:/);
-  assert.doesNotMatch(supplierModalSource, /console\.log\('\[SupplierModal\] Submitting form:',\s*formData\)/);
-  assert.match(supplierSubmitLog, /hasPrimaryCredential/);
-  assert.match(supplierSubmitLog, /hasCatalogAccess/);
+  assert.equal(existsSync(path.join(ROOT_DIR, "src/components/api/ApiChannelsView.tsx")), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, "src/components/api/SupplierModal.tsx")), false);
 
   const alipayNotifyLogMatch = paymentWebhookSource.match(
     /console\.log\('\[payment-webhook\] Received Alipay notify:', \{[\s\S]*?\n\s*\}\);/,
@@ -307,7 +286,7 @@ test("payment-server legacy shell delegates order creation through the sidecar c
   assert.match(paymentWebhookSource, /handleLegacyPaymentCallbackThroughSidecar/);
   assert.doesNotMatch(paymentWebhookSource, /require\('\.\/runtime_payment_bridge'\)/);
   assert.match(billingContextSource, /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
-  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(\)/);
   assert.match(billingContextSource, /kkWebApiClient\.debitCredits\(\{/);
   assert.match(billingContextSource, /kkWebApiClient\.refundCredits\(\{/);
   assert.doesNotMatch(billingContextSource, /import \{ supabase \} from '\.\.\/lib\/supabase';/);

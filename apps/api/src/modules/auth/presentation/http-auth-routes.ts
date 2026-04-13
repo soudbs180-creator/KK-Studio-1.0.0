@@ -23,6 +23,22 @@ function toRequestContext(ip: string): AuthRequestContext {
   return { ip };
 }
 
+function buildSuccessEnvelope<T>(
+  requestId: string,
+  clientVersion: string | undefined,
+  statusCode: number,
+  data: T,
+): HttpAuthRouteResult<T> {
+  return {
+    statusCode,
+    body: {
+      success: true,
+      data,
+      meta: buildRequestMeta(requestId, clientVersion),
+    },
+  };
+}
+
 function buildErrorEnvelope<T>(
   requestId: string,
   clientVersion: string | undefined,
@@ -159,11 +175,11 @@ export async function handleVersionedRegister(
     return buildErrorEnvelope(requestId, clientVersion, result.statusCode, result.body.error || "Register failed.");
   }
 
-  return buildErrorEnvelope(
+  return buildSuccessEnvelope(
     requestId,
     clientVersion,
-    501,
-    "Password registration is not available on /api/v1/auth/register. Use the hosted Supabase auth flow instead.",
+    result.statusCode,
+    result.body.data as RegisterResponseDto,
   );
 }
 
@@ -185,11 +201,11 @@ export async function handleVersionedLogin(
     return buildErrorEnvelope(requestId, clientVersion, result.statusCode, result.body.error || "Login failed.");
   }
 
-  return buildErrorEnvelope(
+  return buildSuccessEnvelope(
     requestId,
     clientVersion,
-    501,
-    "Password login is not available on /api/v1/auth/login. Use the hosted Supabase auth flow instead.",
+    result.statusCode,
+    result.body.data as LoginResponseDto,
   );
 }
 

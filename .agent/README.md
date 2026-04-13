@@ -18,15 +18,18 @@
 - 统一提交前验证动作
 - 统一 Gemini 多协议开发时的判断方式，避免把 Google 官方协议与兼容协议混写
 
-## 修改时必须同步的版本源
+## 修改时必须同步的版本口径文件
 当项目版本发生变化时，优先同步以下文件：
+- `config/release-manifest.json`（版本真相）
 - `package.json`
-- `src/config/appInfo.ts`
+- `src/config/appInfo.ts`（运行时只读导出，必须继续派生自 `config/release-manifest.json`）
 - `README.md`
+- `.agent/README.md`
 - `docs/development/session-handoff.md`
 - `docs/development/progress.md`
+- `release/publish/stable/manifest.json`（portable stable 发布清单）
 - `payment-server/package.json`
-- `payment-server/mcpClient.js`
+- `packages/*/package.json`
 
 ## 修改时必须遵守的原则
 1. **不要手写分散版本号**：UI 中展示版本时应优先读取统一常量。
@@ -36,6 +39,8 @@
 
 ## 推荐验证
 ```bash
+npm run governance:version
+npm run governance:agent-docs
 npm run typecheck
 npm run check:encoding
 npm run build

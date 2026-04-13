@@ -32,7 +32,7 @@ export const SegmentedControl: React.FC<{
 }> = ({ options, value, onChange }) => {
   return (
     <div
-      className="grid grid-cols-2 gap-2 rounded-[22px] border p-2"
+      className="grid grid-cols-2 gap-2 rounded-[16px] border p-2"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         borderColor: 'var(--settings-segment-shell-border)',
@@ -46,7 +46,7 @@ export const SegmentedControl: React.FC<{
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className="min-w-0 overflow-hidden rounded-2xl border px-3 py-3 text-ellipsis whitespace-nowrap text-sm font-medium transition-all duration-200 active:scale-95"
+            className="min-w-0 overflow-hidden rounded-[16px] border px-3 py-2.5 text-ellipsis whitespace-nowrap text-sm font-medium transition-all duration-200 active:scale-95"
             style={{
               background: isActive
                 ? 'var(--settings-segment-active-bg)'
@@ -79,7 +79,7 @@ export const SegmentedControlMulti: React.FC<{
 
   return (
     <div 
-      className="relative flex overflow-hidden rounded-[20px] p-1"
+      className="relative flex overflow-hidden rounded-[16px] p-1"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         border: '1px solid var(--settings-segment-shell-border)',
@@ -128,7 +128,7 @@ export const IconGrid: React.FC<{
 }> = ({ options, value, onChange, columns = 5 }) => {
   return (
     <div 
-      className="flex gap-1.5 overflow-hidden rounded-[22px] p-2"
+      className="flex gap-1.5 overflow-hidden rounded-[16px] p-2"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         border: '1px solid var(--settings-segment-shell-border)',
@@ -148,7 +148,7 @@ export const IconGrid: React.FC<{
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className="flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[18px] transition-all duration-200 active:scale-95"
+              className="flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[16px] transition-all duration-200 active:scale-95"
               style={{
                 height: '52px',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -193,7 +193,7 @@ export const SettingInput: React.FC<{
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-[16px] border px-4 py-2.5 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           borderColor: 'var(--settings-input-border)',
           background: 'var(--settings-input-bg)',
@@ -274,7 +274,7 @@ export const SettingSelect: React.FC<{
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full rounded-[20px] border px-4 py-3 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-[16px] border px-4 py-2.5 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           borderColor: 'var(--settings-input-border)',
           background: 'var(--settings-input-bg)',
@@ -316,7 +316,7 @@ export const PrimaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'transparent',
         background: 'var(--settings-button-primary-bg)',
@@ -342,7 +342,7 @@ export const SecondaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
         background: 'var(--settings-button-secondary-bg)',
@@ -365,7 +365,7 @@ export const DangerButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[18px] border px-4 py-3 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
         background: 'var(--settings-button-danger-bg)',

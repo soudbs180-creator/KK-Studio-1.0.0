@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 
 import { AUTHENTICATED_USER_ID_HEADER } from "../../packages/shared/src/index.ts";
 import { createApiServer } from "../../apps/api/src/server.ts";
@@ -57,6 +57,17 @@ const trackedEnvKeys = [
 ];
 
 const originalEnv = new Map(trackedEnvKeys.map((key) => [key, process.env[key]]));
+const originalConsoleWarn = console.warn;
+
+function withMutedConsoleWarn<T>(callback: () => T): T {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return callback();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
 
 function restoreTrackedEnv() {
   for (const key of trackedEnvKeys) {
@@ -72,6 +83,11 @@ function restoreTrackedEnv() {
 
 afterEach(() => {
   restoreTrackedEnv();
+  console.warn = originalConsoleWarn;
+});
+
+beforeEach(() => {
+  console.warn = () => undefined;
 });
 
 describe("hosted runtime hardening", () => {
@@ -88,10 +104,10 @@ describe("hosted runtime hardening", () => {
 
     let server: ReturnType<typeof createApiServer> | undefined;
     try {
-      server = createApiServer(0, {
+      server = withMutedConsoleWarn(() => createApiServer(0, {
         allowDegradedPersistence: false,
         verifyTurnstileToken: async () => ({ success: true }),
-      });
+      }));
       assert.fail("Expected hosted API startup to throw without canonical persistence.");
     } catch (error) {
       assert.match(String(error), /Hosted API runtime requires canonical Supabase persistence/);
@@ -121,7 +137,7 @@ describe("hosted runtime hardening", () => {
 
     let server: ReturnType<typeof createPaymentSidecarServer> | undefined;
     try {
-      server = createPaymentSidecarServer(0);
+      server = withMutedConsoleWarn(() => createPaymentSidecarServer(0));
       assert.fail("Expected hosted payment sidecar startup to throw without durable dependencies.");
     } catch (error) {
       assert.match(String(error), /Hosted payment sidecar requires durable Supabase storage and settlement auth/);

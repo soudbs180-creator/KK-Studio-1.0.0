@@ -63,6 +63,8 @@ export interface SecureProxyTransportResultDto {
   deducted?: boolean;
   ledgerId?: string;
   balanceAfter?: number;
+  refundApplied?: boolean;
+  refundBalanceAfter?: number;
   endpointType?: SecureProxyEndpointType;
 }
 
@@ -72,6 +74,8 @@ export interface SecureProxyChatRequestDto extends SecureProxyRouteSelectionDto 
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyChatTransportDto extends SecureProxyTransportResultDto {
@@ -90,6 +94,8 @@ export interface SecureProxyImageRequestDto extends SecureProxyRouteSelectionDto
   imageSize?: string;
   imageCount?: number;
   referenceImages?: SecureProxyImageReferenceDto[];
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyImageTransportDto extends SecureProxyTransportResultDto {
@@ -106,17 +112,23 @@ export interface SecureProxyVideoRequestDto extends SecureProxyRouteSelectionDto
   videoDuration?: string;
   imageUrl?: string;
   imageTailUrl?: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyVideoTransportDto extends SecureProxyTransportResultDto {
   taskId?: string;
   status?: SecureProxyTaskStatus;
   url?: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyAudioRequestDto extends SecureProxyRouteSelectionDto {
   modelId: string;
   prompt: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyAudioTransportDto extends SecureProxyTransportResultDto {
@@ -132,10 +144,14 @@ export interface SecureProxyTaskTransportDto extends SecureProxyTransportResultD
   taskId?: string;
   status?: SecureProxyTaskStatus;
   url?: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyDownloadTransportDto extends SecureProxyTransportResultDto {
   url?: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface CreateGenerationTaskRequestDto extends IdempotentRequestDto {
@@ -144,6 +160,7 @@ export interface CreateGenerationTaskRequestDto extends IdempotentRequestDto {
   modelCode: string;
   taskType: GenerationTaskType;
   prompt: string;
+  attemptId?: string;
   references?: EntityId[];
 }
 
@@ -164,6 +181,8 @@ export interface GenerationTaskDto {
   workspaceId: EntityId;
   workflowId: EntityId;
   requesterId: EntityId;
+  requestId?: string;
+  attemptId?: string;
   modelCode: string;
   taskType: GenerationTaskType;
   status: GenerationTaskStatus;

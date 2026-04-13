@@ -16,6 +16,10 @@ import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
 import { useAppStartup } from '../context/AppStartupContext';
 import { calculateCost, resolveImageCost } from '../services/billing/costService';
+import {
+  buildGenerationAttemptRequestId,
+  resolveGenerationAttemptFailureState,
+} from '../services/billing/generationBillingCoordinator';
 import { saveImage, saveOriginalImage, getImage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { keyManager, getModelMetadata } from '../services/auth/keyManager';
@@ -42,6 +46,7 @@ import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
 import { normalizeModelId } from '../utils/modelIdNormalization';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
+import { compositePartialRedrawResult } from '../services/image/partialRedraw';
 import {
   isSecureProxyGuestModeError,
   isSecureProxySessionReauthError,
@@ -219,7 +224,7 @@ export const useImageGeneration = (options: {
     updateImageNodePosition
   } = useCanvas();
   
-  const { refundCreditsByTransaction, refreshBilling } = useBilling();
+  const { refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance } = useBilling();
   const { isStageReady } = useAppStartup();
   const canStartBackgroundRecovery = isStageReady('background_ready');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -239,44 +244,20 @@ export const useImageGeneration = (options: {
     target: Pick<PromptNode, 'id' | 'billingMode' | 'creditSettlement' | 'isPaymentProcessed' | 'paymentTransactionId' | 'refundStatus' | 'cost'>,
     options?: { forceServerRefundFailure?: boolean }
   ) => {
-    const refundableTransactionId = String(target.paymentTransactionId || '').trim();
-    const shouldRefundCurrentAttempt =
-      target.billingMode === 'credits'
-      && target.creditSettlement === 'client'
-      && target.isPaymentProcessed === true
-      && refundableTransactionId.length > 0;
-    const shouldRefreshServerSideAttempt = shouldRefreshServerBillingState(target);
+    const failureState = await resolveGenerationAttemptFailureState(target, {
+      refundCreditsByTransaction,
+      refreshBilling,
+    }, options);
 
-    let refundStatus = target.refundStatus;
-    let isPaymentProcessed = target.isPaymentProcessed;
-    let paymentTransactionId = target.paymentTransactionId;
-
-    if (shouldRefundCurrentAttempt) {
-      const refundResult = await refundCreditsByTransaction(refundableTransactionId, `退款 ${target.id}`);
-      refundStatus = refundResult.success ? 'success' : 'failed';
-      if (refundResult.success) {
-        isPaymentProcessed = false;
-        paymentTransactionId = undefined;
-      }
-    } else if (shouldRefreshServerSideAttempt) {
-      if (options?.forceServerRefundFailure) {
-        refundStatus = 'failed';
-      } else {
-        try {
-          await refreshBilling();
-          refundStatus = 'success';
-        } catch (error) {
-          console.error('[useImageGeneration] Failed to refresh billing after server-side credit failure:', error);
-          refundStatus = 'failed';
-        }
-      }
+    if (
+      failureState.refundStatus === 'failed'
+      && shouldRefreshServerBillingState(target)
+      && !options?.forceServerRefundFailure
+    ) {
+      console.error('[useImageGeneration] Failed to refresh billing after server-side credit failure:', target.id);
     }
 
-    return {
-      refundStatus,
-      isPaymentProcessed,
-      paymentTransactionId,
-    };
+    return failureState;
   }, [refundCreditsByTransaction, refreshBilling, shouldRefreshServerBillingState]);
 
   // --- Helpers ---
@@ -1415,6 +1396,7 @@ export const useImageGeneration = (options: {
     const { id: promptNodeId, prompt: promptToUse, parallelCount: count = 1, mode, referenceImages: initialFiles = [] } = node;
     const isVideo = mode === GenerationMode.VIDEO;
     const isAudio = mode === GenerationMode.AUDIO;
+    const isEcommerce = mode === GenerationMode.ECOMMERCE;
     const isPpt = mode === GenerationMode.PPT;
     const requestedCount = Math.max(1, Number(count) || 1);
     const actualCount = isPpt ? Math.min(20, requestedCount) : requestedCount;
@@ -1517,13 +1499,16 @@ export const useImageGeneration = (options: {
 
       const buildTask = (index: number) => async () => {
         const startTime = Date.now();
-        const currentRequestId = `${promptNodeId}-${index}`;
+        const currentRequestId = buildGenerationAttemptRequestId(
+          executionNode.billingAttemptId || promptNodeId,
+          index,
+        );
         let taskIdForRecovery: string | undefined = undefined;
 
         try {
           let generatedBase64 = '';
           let videoUrl = '';
-          const taskPrompt = isPpt ? buildPptPagePrompt(promptToUse, index, actualCount) : promptToUse;
+          const taskPrompt = isPpt ? buildPptPagePrompt(promptToUse, index, actualCount) : (isEcommerce ? promptToUse : promptToUse);
           let resolvedResultKeySlotId: string | undefined = executionNode.keySlotId;
           let resolvedProvider = executionNode.provider;
           let resolvedProviderName = executionNode.providerLabel;
@@ -1537,6 +1522,9 @@ export const useImageGeneration = (options: {
           let resolvedImageSize: ImageSize | undefined = executionNode.imageSize;
           let resolvedAspectRatio: AspectRatio = executionNode.aspectRatio;
           let resolvedExactDimensions: { width: number; height: number } | undefined = undefined;
+          let resolvedDeducted: boolean | undefined = undefined;
+          let resolvedLedgerId: string | undefined = undefined;
+          let resolvedBalanceAfter: number | undefined = undefined;
           
           if (isAudio) {
             const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
@@ -1578,7 +1566,8 @@ export const useImageGeneration = (options: {
             resolvedCompletionTokens = toFiniteNumber((videoResult as any).usage?.completionTokens);
           } else {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
-              maskUrl: executionNode.maskUrl, editMode: executionNode.mode === GenerationMode.INPAINT ? 'inpaint' : (executionNode.mode === GenerationMode.EDIT ? 'edit' : undefined),
+              maskUrl: executionNode.mode === GenerationMode.REDRAW ? undefined : executionNode.maskUrl,
+              editMode: executionNode.mode === GenerationMode.INPAINT ? 'inpaint' : (executionNode.mode === GenerationMode.EDIT ? 'edit' : undefined),
               preferredKeyId: executionNode.keySlotId, 
               onTaskId: (taskId) => {
                 taskIdForRecovery = taskId;
@@ -1609,6 +1598,12 @@ export const useImageGeneration = (options: {
             resolvedImageSize = result.effectiveSize || result.imageSize || resolvedImageSize;
             resolvedAspectRatio = result.aspectRatio || resolvedAspectRatio;
             resolvedExactDimensions = result.dimensions;
+            resolvedDeducted = result.deducted;
+            resolvedLedgerId = result.ledgerId;
+            resolvedBalanceAfter = result.balanceAfter;
+            if (typeof result.balanceAfter === 'number') {
+              applyAuthoritativeBalance(result.balanceAfter);
+            }
 
             const resolvedUsage = resolveUsageMetrics({
               model: resolvedModelId,
@@ -1644,6 +1639,9 @@ export const useImageGeneration = (options: {
             taskId: taskIdForRecovery, taskPrompt, keySlotId: resolvedResultKeySlotId, requestId: currentRequestId,
             provider: resolvedProvider, providerName: resolvedProviderName, modelName: resolvedModelName, model: resolvedModelId,
             imageSize: resolvedImageSize, aspectRatio: resolvedAspectRatio, dimensions: resolvedExactDimensions, tokens: resolvedTokens, promptTokens: resolvedPromptTokens, completionTokens: resolvedCompletionTokens, cost: resolvedCost, costSource: resolvedCostSource,
+            deducted: resolvedDeducted,
+            ledgerId: resolvedLedgerId,
+            balanceAfter: resolvedBalanceAfter,
           };
         } catch (error: any) {
           return {
@@ -1732,7 +1730,11 @@ export const useImageGeneration = (options: {
           isMobile,
         });
 
-        const results = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
+        const partialRedrawSourceImage = executionNode.partialRedraw?.sourceImageId
+          ? activeCanvasRef.current?.imageNodes.find((imageNode) => imageNode.id === executionNode.partialRedraw?.sourceImageId)
+          : undefined;
+
+        const results = await Promise.all(preparedItems.map(async ({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
           const idx = item.index;
           const uniqueId = `${Date.now()}_${idx}_${Math.random()}`;
           const layoutPosition = generatedPositions[layoutIndex] || getGeneratedImagePosition(
@@ -1742,8 +1744,26 @@ export const useImageGeneration = (options: {
             layoutIndex,
             acceptedImageData.length
           );
+          let finalUrl = item.url;
+          let finalOriginalUrl = item.originalUrl;
+          let finalApiResultUrl = apiResultUrl;
+
+          if (
+            executionNode.mode === GenerationMode.REDRAW
+            && executionNode.partialRedraw
+            && partialRedrawSourceImage
+          ) {
+            finalUrl = await compositePartialRedrawResult({
+              originalImageUrl: partialRedrawSourceImage.originalUrl || partialRedrawSourceImage.apiResultUrl || partialRedrawSourceImage.url,
+              generatedCropUrl: item.originalUrl || item.url,
+              partialRedraw: executionNode.partialRedraw,
+            });
+            finalOriginalUrl = finalUrl;
+            finalApiResultUrl = undefined;
+          }
+
           const eagerOriginalSource = normalizePersistableMediaSource(
-            item.originalUrl || item.base64 || item.url,
+            finalOriginalUrl || item.base64 || finalUrl,
             'image/png'
           );
           if (eagerOriginalSource && mode !== GenerationMode.VIDEO && mode !== GenerationMode.AUDIO) {
@@ -1753,9 +1773,9 @@ export const useImageGeneration = (options: {
           return {
             id: uniqueId,
             storageId: uniqueId,
-            url: item.url,
-            originalUrl: item.originalUrl,
-            apiResultUrl,
+            url: finalUrl,
+            originalUrl: finalOriginalUrl,
+            apiResultUrl: finalApiResultUrl,
             prompt: item.taskPrompt || promptToUse, aspectRatio: item.aspectRatio || executionNode.aspectRatio, imageSize: item.imageSize || executionNode.imageSize,
             timestamp: Date.now(), model: item.model || executionNode.model, canvasId: activeCanvasRef.current?.id || 'default',
             modelLabel: resolveModelDisplayName(item.model || executionNode.model, item.modelName || executionNode.modelLabel),
@@ -1774,8 +1794,9 @@ export const useImageGeneration = (options: {
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
             tokens: item.tokens, promptTokens: item.promptTokens, completionTokens: item.completionTokens, cost: item.cost, costSource: item.costSource,
+            partialRedraw: executionNode.partialRedraw,
           };
-        });
+        }));
 
         const finalizedCompletedTasks = completedTasks.map((task) => ({
           ...task,
@@ -1803,6 +1824,12 @@ export const useImageGeneration = (options: {
         const nextNodeBase = clearPendingSyncRequests(latestNode, completedSyncRequestIds);
         const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
         const firstSuccess = validImageData[0];
+        if (
+          shouldRefreshServerBillingState(latestNode)
+          && typeof firstSuccess?.balanceAfter === 'number'
+        ) {
+          applyAuthoritativeBalance(firstSuccess.balanceAfter);
+        }
         const resolvedSuccessDisplay = firstSuccess?.keySlotId
           ? resolveProviderDisplay(firstSuccess.keySlotId, firstSuccess.providerName, firstSuccess.provider)
           : resolveProviderDisplay(undefined, executionNode.providerLabel, executionNode.provider);
@@ -1816,6 +1843,7 @@ export const useImageGeneration = (options: {
           error: undefined,
           errorDetails: undefined,
           refundStatus: undefined,
+          balanceAfter: firstSuccess?.balanceAfter,
           isPaymentProcessed: false,
           paymentTransactionId: undefined,
           generationMetadata: buildGenerationMetadata(nextNodeBase, { pendingTaskIds: pendingIds, pendingSyncRequests: remainingSyncRequests }),
@@ -1954,6 +1982,7 @@ export const useImageGeneration = (options: {
     normalizePptSlidesForCount,
     buildAutoPptSlides,
     rememberPreferredKeyForMode,
+    applyAuthoritativeBalance,
     refreshBilling,
     resolveProviderDisplay,
     shouldPreferRouteProviderDisplay,

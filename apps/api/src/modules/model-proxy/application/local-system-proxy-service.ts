@@ -29,6 +29,8 @@ type LocalSystemProxyMode =
 export interface LocalSystemProxyRequest {
   mode: LocalSystemProxyMode;
   taskId?: string;
+  requestId?: string;
+  attemptId?: string;
   modelId?: string;
   messages?: SecureModelProxyChatRequestDto["messages"];
   temperature?: number;
@@ -137,6 +139,8 @@ export class LocalSystemProxyService {
       });
     }
 
+    const requestId = String(input.requestId || "").trim() || undefined;
+    const attemptId = String(input.attemptId || "").trim() || undefined;
     const payload: Record<string, unknown> = {
       mode: input.mode,
     };
@@ -168,6 +172,14 @@ export class LocalSystemProxyService {
       payload.prompt = String(input.prompt || "");
     } else {
       payload.taskId = String(input.taskId || "").trim();
+    }
+
+    if (requestId) {
+      payload.requestId = requestId;
+    }
+
+    if (attemptId) {
+      payload.attemptId = attemptId;
     }
 
     return this.invokeSecureProxy(accessToken, payload);

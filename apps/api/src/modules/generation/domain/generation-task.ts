@@ -20,6 +20,7 @@ const generationStatusTransitions: Record<GenerationTaskStatus, GenerationTaskSt
 
 export interface GenerationTaskContext {
   requesterId: EntityId;
+  requestId?: string;
   now?: string;
 }
 
@@ -39,6 +40,8 @@ export function createGenerationTask(
     workspaceId: input.workspaceId,
     workflowId: input.workflowId,
     requesterId: context.requesterId,
+    requestId: context.requestId,
+    attemptId: input.attemptId,
     modelCode: input.modelCode,
     taskType: input.taskType,
     status: GenerationTaskStatus.Queued,
