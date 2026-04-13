@@ -1,4 +1,9 @@
 import type { PromptOptimizerResult } from '../../types';
+import type {
+    EcommerceEditableTaskState,
+    EcommerceSeriesTemplate,
+    EcommerceTaskAssetRoleBinding,
+} from '../../types';
 import { keyManager } from '../auth/keyManager';
 import {
     buildAutomaticOptimizationInstruction,
@@ -19,6 +24,16 @@ type PromptOptimizationOptions = {
     referenceImages?: ReferenceImageInput[];
     supportsThinking?: boolean;
     thinkingMode?: 'minimal' | 'high';
+    ecommerceContext?: {
+        taskState: EcommerceEditableTaskState;
+        seriesTemplate: EcommerceSeriesTemplate;
+        assetRoles: EcommerceTaskAssetRoleBinding[];
+        outputTarget?: {
+            label: string;
+            aspectRatio: string;
+            imageSize: string;
+        };
+    };
 };
 
 type PromptOptimizationStrategy = 'reasoning-native' | 'structure-first';
@@ -548,6 +563,8 @@ const buildOptimizerCacheKey = (
         cleanText(options?.thinkingMode).toLowerCase(),
         String(!!options?.supportsThinking),
         refSign,
+        options?.ecommerceContext?.taskState?.taskId || '',
+        options?.ecommerceContext?.outputTarget?.label || '',
     ].join('::');
 };
 
@@ -627,6 +644,16 @@ const buildOptimizationUserMessage = (
         `Image size: ${options?.imageSize || 'default'}`,
         `Mode: ${options?.mode || 'image'}`,
         `Reference images attached: ${options?.referenceImages?.length || 0}`,
+        options?.ecommerceContext ? [
+            'Structured ecommerce context:',
+            `- task id: ${options.ecommerceContext.taskState.taskId}`,
+            `- output label: ${options.ecommerceContext.outputTarget?.label || options.ecommerceContext.taskState.outputTypeLabel}`,
+            `- sparse intent: ${options.ecommerceContext.taskState.sparseUserIntent || 'none'}`,
+            `- role bindings: ${options.ecommerceContext.assetRoles.map((role) => role.normalizedLabel).join(', ') || 'none'}`,
+            `- series tone: ${options.ecommerceContext.seriesTemplate.styleProfile.tone}`,
+            `- copy headline: ${options.ecommerceContext.taskState.copy.headline || 'auto'}`,
+            `- copy highlight: ${options.ecommerceContext.taskState.copy.highlight || 'auto'}`,
+        ].join('\n') : '',
         `Automatic route: ${autoroute.strategyTitle}`,
         `Route task type: ${autoroute.taskType}`,
         `Additional optimization instructions: ${truncateText(autoInstruction, 320)}`,

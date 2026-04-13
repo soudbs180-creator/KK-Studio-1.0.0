@@ -1,4 +1,8 @@
-import type { EcommerceSizePolicy } from '../../types';
+import type {
+  EcommerceEditableTaskState,
+  EcommerceSeriesTemplate,
+  EcommerceSizePolicy,
+} from '../../types';
 
 export type EcommerceAnalysisSizePolicy = EcommerceSizePolicy;
 
@@ -45,6 +49,8 @@ export interface EcommerceAnalysisMainImageItem {
   referenceMentions: EcommerceReferenceMention[];
   productAssetRequired: boolean;
   promptDraft: string;
+  resolvedPromptPreview?: string;
+  editableTask?: EcommerceEditableTaskState;
   needsReview: boolean;
   reviewWarnings: string[];
 }
@@ -65,11 +71,14 @@ export interface EcommerceAnalysisAPlusModule {
   referenceMentions: EcommerceReferenceMention[];
   productAssetRequired: boolean;
   promptDraft: string;
+  resolvedPromptPreview?: string;
+  editableTask?: EcommerceEditableTaskState;
   needsReview: boolean;
   reviewWarnings: string[];
 }
 
 export interface EcommerceAnalysisResult {
+  seriesTemplate: EcommerceSeriesTemplate;
   projectMeta: EcommerceAnalysisProjectMeta;
   assets: {
     productAssets: EcommerceAnalysisAsset[];

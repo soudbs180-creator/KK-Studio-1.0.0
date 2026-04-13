@@ -12,8 +12,10 @@ function readSource(relativePath: string): string {
 test('settings routes and panel use billing-focused naming for consumption records', () => {
   const routesSource = readSource('src/routes/settingsRoutes.tsx');
   const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
 
-  assert.match(routesSource, /label:\s*'消耗账单'/);
+  assert.match(routesSource, /getSettingsNavItems\('zh-CN'\)/);
+  assert.match(registrySource, /labelZh:\s*'消耗账单'/);
   assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'消耗账单',\s*'Billing Ledger'\)/);
 });
 

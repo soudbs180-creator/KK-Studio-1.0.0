@@ -11,11 +11,22 @@ function readSource(relativePath: string): string {
 
 test('DashboardView.localized uses calmer settings primitives for the desktop overview shell', () => {
   const source = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
 
+  assert.match(source, /from '\.\.\/settingsRegistry';/);
   assert.match(source, /SettingsHero/);
   assert.match(source, /SettingsSection/);
   assert.match(source, /<SettingsHero/);
-  assert.match(source, /<SettingsSection[\s\S]*title=\{pick\('快捷操作', 'Quick actions'\)\}/);
-  assert.match(source, /<SettingsSection[\s\S]*title=\{pick\('系统概览', 'System overview'\)\}/);
+  assert.match(source, /Status and next step/);
+  assert.match(source, /SettingsActionButton/);
+  assert.match(source, /icon=\{ArrowRight\}/);
+  assert.match(source, /tone="primary"/);
+  assert.match(source, /getSettingsViewMeta\('dashboard'/);
+  assert.match(source, /getSettingsPrimaryActionMeta\('dashboard'/);
+  assert.match(source, /getSettingsStatusSummaryLabel\('dashboard'/);
+  assert.match(source, /Quick actions/);
+  assert.match(source, /System overview/);
+  assert.match(registrySource, /dashboard:[\s\S]*primaryActionLabelZh:/);
+  assert.match(registrySource, /dashboard:[\s\S]*statusSummaryLabelZh:/);
   assert.doesNotMatch(source, /settings-reference-page-header/);
 });

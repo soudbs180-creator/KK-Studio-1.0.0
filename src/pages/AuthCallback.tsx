@@ -26,6 +26,8 @@ function parseHashParams(): URLSearchParams {
 
 async function hydrateRuntimeProfileFromHash(hashParams: URLSearchParams): Promise<boolean> {
   const accessToken = String(hashParams.get('access_token') || '').trim();
+  const refreshToken = String(hashParams.get('refresh_token') || '').trim() || undefined;
+  const provider = String(hashParams.get('provider') || '').trim().toLowerCase();
   if (!accessToken) {
     return false;
   }
@@ -37,11 +39,17 @@ async function hydrateRuntimeProfileFromHash(hashParams: URLSearchParams): Promi
   }
 
   updateRuntimeAuthStateFromProfile(response.data);
+  if (provider === 'google' || provider === 'wechat') {
+    updateRuntimeUserMetadata({
+      authProvider: provider,
+      addProvider: provider,
+    });
+  }
   emitAuthSessionChange({
     hasSession: true,
     userId: response.data.id,
     accessToken,
-    refreshToken: undefined,
+    refreshToken,
     isTempUser: false,
   });
   return true;
@@ -114,7 +122,7 @@ export default function AuthCallback() {
             'error',
             bindFlow
               ? resolveBindFailureMessage(bindProvider)
-              : '认证回调已收到，但当前本地运行时不会在浏览器里直接完成旧的 Supabase code 交换。',
+              : '认证回调已收到，但当前 KK API 需要由服务器端完成授权码交换。',
             3200,
           );
           return;

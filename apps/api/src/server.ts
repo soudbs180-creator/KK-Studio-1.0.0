@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { URL } from "node:url";
 
@@ -34,7 +34,9 @@ import {
 import {
   AdminConsoleService,
   type AdminConsoleRepository,
+  createAdminConsoleRepositoryFromEnv,
   InMemoryAdminConsoleRepository,
+  PostgresAdminConsoleRepository,
   handleChangeAdminPassword,
   handleGetAdminAccess,
   handleSetUserRole,
@@ -57,7 +59,12 @@ import {
   type AuthDataRepository,
   AuthService,
   FileBackedAuthDataRepository,
+  GoogleAuthService,
   InMemoryAuthDataRepository,
+  PostgresAuthDataRepository,
+  PostgresWechatAuthRepository,
+  createAuthDataRepositoryFromEnv,
+  createWechatAuthRepositoryFromEnv,
   SupabaseUserScopedAuthDataMirror,
   SupabaseAuthDataRepository,
   SupabaseWechatAuthRepository,
@@ -67,14 +74,18 @@ import {
   handleCheckUserRouteConnectivity,
   handleGetKeyManagerCloudState,
   handleGetProfile,
+  handleGoogleCallback,
   handleGetUserApiEntries,
   handleReplaceUserApisPayload,
+  handleStartGoogleBind,
+  handleStartGoogleLogin,
   handleStartWechatBind,
   handleStartWechatLogin,
   handleWechatCallback,
   handleReplaceKeyManagerCloudState,
   handleReplaceUserApiEntries,
   handleSyncUserRoutePricing,
+  handleUpdatePassword,
   handleUpdateProfile,
   UserRouteDiagnosticsService,
   handleVersionedLogin,
@@ -93,6 +104,10 @@ import {
   InMemoryCreditAccountRepository,
   InMemoryCreditExchangeRateRepository,
   InMemoryRechargeSubmissionRepository,
+  PostgresCreditAccountRepository,
+  PostgresCreditExchangeRateRepository,
+  createCreditAccountRepositoryFromEnv,
+  createCreditExchangeRateRepositoryFromEnv,
   StaticRechargeService,
   handleAdminRechargeCredits,
   handleListCreditExchangeRates,
@@ -107,16 +122,18 @@ import {
   handleRefundCredits,
 } from "./modules/billing/index.ts";
 import {
+  createGenerationTaskRepositoryFromEnv,
   GenerationService,
-  InMemoryGenerationTaskRepository,
   handleCreateGenerationTask,
   handleGetGenerationTask,
 } from "./modules/generation/index.ts";
 import {
+  createCreditProviderRepositoryFromEnv,
   CreditProviderService,
   InMemoryCreditProviderRepository,
   InMemoryModelCatalogRepository,
   ModelCatalogService,
+  PostgresCreditProviderRepository,
   SupabaseCreditProviderRepository,
   handleDeleteAdminCreditProvider,
   handleGetAdminCreditProviderPricingCache,
@@ -130,13 +147,17 @@ import {
   handleUpsertSharedProviderPricingCache,
 } from "./modules/model-catalog/index.ts";
 import {
+  createWorkflowRepositoryFromEnv,
   WorkflowService,
   InMemoryWorkflowRepository,
+  PostgresWorkflowRepository,
   handleGetWorkflow,
   handleSaveWorkflow,
 } from "./modules/workflow/index.ts";
 import {
   InMemoryWorkspaceLayoutRepository,
+  PostgresWorkspaceLayoutRepository,
+  createWorkspaceLayoutRepositoryFromEnv,
   SupabaseWorkspaceLayoutRepository,
   WorkspaceCanvasService,
   handleCleanupCloudImages,
@@ -249,13 +270,24 @@ async function readJsonBody(
     options?.maxBytes ?? process.env.KK_API_MAX_JSON_BODY_BYTES ?? defaultMaxJsonBodyBytes,
   );
   let totalBytes = 0;
+  let payloadTooLargeError: PayloadTooLargeError | null = null;
   for await (const chunk of req) {
     const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += bufferChunk.length;
+    if (payloadTooLargeError) {
+      continue;
+    }
     if (Number.isFinite(maxBytes) && maxBytes > 0 && totalBytes > maxBytes) {
-      throw new PayloadTooLargeError(`Request body exceeds ${maxBytes} bytes.`);
+      // Drain the remaining request body so oversized callers receive the 413
+      // response envelope instead of a socket reset.
+      payloadTooLargeError = new PayloadTooLargeError(`Request body exceeds ${maxBytes} bytes.`);
+      continue;
     }
     chunks.push(bufferChunk);
+  }
+
+  if (payloadTooLargeError) {
+    throw payloadTooLargeError;
   }
 
   if (chunks.length === 0) return {};
@@ -467,7 +499,7 @@ export interface ApiServerOptions {
   ) => Promise<ServerSupabasePersistenceProbe>;
 }
 
-type RepositoryBackend = "memory" | "supabase" | "local-file" | "custom";
+type RepositoryBackend = "memory" | "postgres" | "supabase" | "local-file" | "custom";
 const tempUserRateLimitRule = { max: 10, windowMs: 60 * 60 * 1000 } as const;
 
 function normalizeAuthenticatedRequestContext(
@@ -491,10 +523,15 @@ function resolveRepositoryBackend(
   repository: unknown,
   inMemoryCtor: abstract new (...args: any[]) => unknown,
   supabaseCtor: abstract new (...args: any[]) => unknown,
+  postgresCtor?: abstract new (...args: any[]) => unknown,
   localFileCtor?: abstract new (...args: any[]) => unknown,
 ): RepositoryBackend {
   if (repository instanceof inMemoryCtor) {
     return "memory";
+  }
+
+  if (postgresCtor && repository instanceof postgresCtor) {
+    return "postgres";
   }
 
   if (repository instanceof supabaseCtor) {
@@ -514,6 +551,15 @@ function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new InMemoryAdminConsoleRepository();
+  }
+
+  const postgresRepository = createAdminConsoleRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresAdminConsoleRepository) {
+    logStartupMode("info", "Using PostgreSQL admin console repository", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
   }
 
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
@@ -538,6 +584,15 @@ function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfi
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new FileBackedCreditAccountRepository();
+  }
+
+  const postgresRepository = createCreditAccountRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresCreditAccountRepository) {
+    logStartupMode("info", "Using PostgreSQL credit account repository", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
   }
 
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
@@ -566,6 +621,15 @@ function createCreditExchangeRateRepository(
     return new FileBackedCreditExchangeRateRepository();
   }
 
+  const postgresRepository = createCreditExchangeRateRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresCreditExchangeRateRepository) {
+    logStartupMode("info", "Using PostgreSQL credit exchange-rate repository", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     logStartupMode("info", "Using Supabase credit exchange-rate repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
@@ -588,6 +652,14 @@ function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConf
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
     });
     return new InMemoryCreditProviderRepository();
+  }
+
+  const postgresRepository = createCreditProviderRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresCreditProviderRepository) {
+    logStartupMode("info", "Using PostgreSQL credit provider repository", {
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
   }
 
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
@@ -615,6 +687,17 @@ function createRechargeSubmissionRepository() {
 }
 
 function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  const postgresRepository = createAuthDataRepositoryFromEnv({
+    storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
+  });
+  if (postgresRepository instanceof PostgresAuthDataRepository) {
+    logStartupMode("info", "Using PostgreSQL auth data repository", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     logStartupMode("info", "Using Supabase auth data repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
@@ -635,6 +718,21 @@ function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
 }
 
 function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+  if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using in-memory workspace layout repository for KKAI local-only runtime", {
+      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    });
+    return new InMemoryWorkspaceLayoutRepository();
+  }
+
+  const postgresRepository = createWorkspaceLayoutRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresWorkspaceLayoutRepository) {
+    logStartupMode("info", "Using PostgreSQL workspace layout repository", {
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
+  }
+
   if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
     logStartupMode("info", "Using Supabase workspace layout repository", {
       ...summarizeServerSupabaseConfig(serverSupabaseConfig),
@@ -660,6 +758,22 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  const postgresRepository = createWechatAuthRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresWechatAuthRepository) {
+    const resolvedProviderAppId = providerAppId!;
+    const resolvedProviderSecret = providerSecret!;
+    const resolvedCallbackUrl = callbackUrl!;
+    const resolvedStateSigningSecret = stateSigningSecret!;
+    return new WechatAuthService({
+      repository: postgresRepository,
+      providerAppId: resolvedProviderAppId,
+      providerSecret: resolvedProviderSecret,
+      callbackUrl: resolvedCallbackUrl,
+      stateSigningSecret: resolvedStateSigningSecret,
+      allowedRedirectOrigins,
+    });
+  }
 
   if (!serverSupabaseConfig.supabaseUrl || !serverSupabaseConfig.serviceRoleKey) {
     logStartupMode("warn", "WeChat auth service is disabled because Supabase admin config is unavailable.", {
@@ -691,6 +805,36 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
   });
 }
 
+function createGoogleAuthService(): GoogleAuthService | undefined {
+  const clientId = env.get("GOOGLE_OAUTH_CLIENT_ID");
+  const clientSecret = env.get("GOOGLE_OAUTH_CLIENT_SECRET");
+  const callbackUrl = env.get("GOOGLE_OAUTH_REDIRECT_URI");
+  const stateSigningSecret = env.get("GOOGLE_STATE_SIGNING_SECRET");
+  const allowedRedirectOrigins = String(env.get("GOOGLE_ALLOWED_REDIRECT_ORIGINS") || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (!clientId || !clientSecret || !callbackUrl || !stateSigningSecret || allowedRedirectOrigins.length === 0) {
+    logStartupMode("warn", "Google auth service is disabled because Google OAuth env vars are incomplete.", {
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret),
+      hasCallbackUrl: Boolean(callbackUrl),
+      hasStateSigningSecret: Boolean(stateSigningSecret),
+      allowedRedirectOriginCount: allowedRedirectOrigins.length,
+    });
+    return undefined;
+  }
+
+  return new GoogleAuthService({
+    clientId,
+    clientSecret,
+    callbackUrl,
+    stateSigningSecret,
+    allowedRedirectOrigins,
+  });
+}
+
 function buildRuntimePersistenceState(
   serverSupabaseConfig: ServerSupabaseConfig,
   repositoryModes: RepositoryModeMap,
@@ -710,7 +854,7 @@ function buildRuntimePersistenceState(
       {
         configReady: configSummary.hasUserApiEncryptionSecret,
         readyBackends: {
-          authData: ["supabase", "local-file"],
+          authData: ["supabase", "postgres", "local-file"],
         },
         structuralBlockers: [],
       },
@@ -736,6 +880,14 @@ function buildRuntimePersistenceState(
       configSummary,
       { workspaceLayout: "WORKSPACE_LAYOUT_REPOSITORY_DEGRADED" },
       [persistenceProbe?.checks.workspaceLayout],
+      [],
+      {
+        configReady: true,
+        readyBackends: {
+          workspaceLayout: ["supabase", "postgres"],
+        },
+        structuralBlockers: [],
+      },
     ),
     billing: buildCriticalPersistenceState(
       "Billing and credit persistence",
@@ -765,6 +917,14 @@ function buildRuntimePersistenceState(
       configSummary,
       { creditProviders: "CREDIT_PROVIDER_REPOSITORY_DEGRADED" },
       [persistenceProbe?.checks.creditProviders],
+      [],
+      {
+        configReady: true,
+        readyBackends: {
+          creditProviders: ["supabase", "postgres"],
+        },
+        structuralBlockers: [],
+      },
     ),
   } satisfies Record<CriticalPersistenceCapability, CriticalPersistenceState>;
 
@@ -922,21 +1082,23 @@ function buildApiServer(
         }),
   });
   const tempUserRateLimiter = new InMemoryRateLimiter();
-  const generationService = new GenerationService(new InMemoryGenerationTaskRepository());
+  const generationService = new GenerationService(createGenerationTaskRepositoryFromEnv());
   const modelCatalogService = new ModelCatalogService(new InMemoryModelCatalogRepository());
   const creditProviderService = new CreditProviderService(creditProviderRepository);
-  const workflowRepository = new InMemoryWorkflowRepository();
+  const workflowRepository = createWorkflowRepositoryFromEnv();
   const workflowService = new WorkflowService(workflowRepository);
   const workspaceCanvasService = new WorkspaceCanvasService(
     workflowRepository,
     workspaceLayoutRepository,
   );
+  const googleAuthService = createGoogleAuthService();
   const wechatAuthService = createWechatAuthService(serverSupabaseConfig);
   const repositoryModes = {
     adminConsole: resolveRepositoryBackend(
       adminConsoleRepository,
       InMemoryAdminConsoleRepository,
       SupabaseAdminConsoleRepository,
+      PostgresAdminConsoleRepository,
     ),
     authData: resolveRepositoryBackend(
       authDataRepository,
@@ -948,21 +1110,25 @@ function buildApiServer(
       creditAccountRepository,
       InMemoryCreditAccountRepository,
       SupabaseCreditAccountRepository,
+      PostgresCreditAccountRepository,
     ),
     creditExchangeRates: resolveRepositoryBackend(
       creditExchangeRateRepository,
       InMemoryCreditExchangeRateRepository,
       SupabaseCreditExchangeRateRepository,
+      PostgresCreditExchangeRateRepository,
     ),
     creditProviders: resolveRepositoryBackend(
       creditProviderRepository,
       InMemoryCreditProviderRepository,
       SupabaseCreditProviderRepository,
+      PostgresCreditProviderRepository,
     ),
     workspaceLayout: resolveRepositoryBackend(
       workspaceLayoutRepository,
       InMemoryWorkspaceLayoutRepository,
       SupabaseWorkspaceLayoutRepository,
+      PostgresWorkspaceLayoutRepository,
     ),
   } as const;
   const resolvePersistenceProbe = options.probeServerSupabasePersistence || probeServerSupabasePersistence;
@@ -1149,6 +1315,24 @@ function buildApiServer(
           return;
         }
 
+        if (req.method === "GET" && pathname === "/api/v1/auth/google/start") {
+          const result = await handleStartGoogleLogin(googleAuthService, url.searchParams, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/auth/google/bind/start") {
+          const result = await handleStartGoogleBind(googleAuthService, url.searchParams, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/auth/google/callback") {
+          const result = await handleGoogleCallback(googleAuthService, authService, url.searchParams);
+          writeRedirect(res, result.redirectTo);
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/api/v1/auth/wechat/start") {
           if (!wechatAuthService) {
             writeJson(res, 503, {
@@ -1198,7 +1382,7 @@ function buildApiServer(
             return;
           }
 
-          const result = await handleWechatCallback(wechatAuthService, url.searchParams, requestHeaders);
+          const result = await handleWechatCallback(wechatAuthService, authService, url.searchParams, requestHeaders);
           if (result.redirectTo) {
             writeRedirect(res, result.redirectTo, result.statusCode);
             return;
@@ -1222,14 +1406,9 @@ function buildApiServer(
         }
 
         if (req.method === "POST" && pathname === "/api/v1/profile/password") {
-          writeJson(res, 501, {
-            success: false,
-            error: {
-              code: "AUTH_ROUTE_DISABLED",
-              message: "Password change is not available on the local API runtime yet.",
-            },
-            meta: buildErrorMeta(requestId, clientVersion),
-          });
+          const body = await readJsonBody(req);
+          const result = await handleUpdatePassword(authService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
           return;
         }
 

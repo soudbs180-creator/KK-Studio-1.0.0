@@ -177,6 +177,57 @@
   --text-3xs: 10px;
   /* 小标注：最小文字*/
 
+  /* ===== Premium UI type scale ===== */
+  --ui-text-display: 32px;
+  --ui-text-title-1: 24px;
+  --ui-text-title-2: 20px;
+  --ui-text-title-3: 17px;
+  --ui-text-body-1: 15px;
+  --ui-text-body-2: 14px;
+  --ui-text-caption: 12px;
+  --ui-text-micro: 11px;
+
+  /* ===== Premium UI semantic type aliases ===== */
+  --type-display: var(--ui-text-display);
+  --type-title-1: var(--ui-text-title-1);
+  --type-title-2: var(--ui-text-title-2);
+  --type-title-3: var(--ui-text-title-3);
+  --type-body-1: var(--ui-text-body-1);
+  --type-body-2: var(--ui-text-body-2);
+  --type-caption: var(--ui-text-caption);
+  --type-micro: var(--ui-text-micro);
+
+  /* ===== Premium UI radius scale ===== */
+  --ui-radius-tight: 8px;
+  --ui-radius-control: 12px;
+  --ui-radius-card: 16px;
+  --ui-radius-panel: 20px;
+  --ui-radius-shell: 28px;
+
+  /* ===== Premium UI semantic radius aliases ===== */
+  --radius-control-sm: var(--ui-radius-tight);
+  --radius-control-md: var(--ui-radius-control);
+  --radius-surface-md: var(--ui-radius-card);
+  --radius-surface-lg: var(--ui-radius-panel);
+
+  /* ===== Premium UI density scale ===== */
+  --ui-control-height-compact: 32px;
+  --ui-control-height-default: 40px;
+  --ui-control-height-touch: 44px;
+  --ui-section-gap: 24px;
+  --ui-page-gap: 32px;
+  --radius-control-md: var(--ui-radius-control);
+  --radius-card-lg: var(--ui-radius-card);
+  --radius-panel-xl: var(--ui-radius-panel);
+  --type-display: var(--ui-text-display);
+  --type-title-1: var(--ui-text-title-1);
+  --type-title-2: var(--ui-text-title-2);
+  --type-title-3: var(--ui-text-title-3);
+  --type-body-1: var(--ui-text-body-1);
+  --type-body-2: var(--ui-text-body-2);
+  --type-caption: var(--ui-text-caption);
+  --type-micro: var(--ui-text-micro);
+
   /* 字重 */
   --font-normal: 400;
   /* 正文 */
@@ -194,6 +245,22 @@
   /* 正文 */
   --leading-relaxed: 1.75;
   /* 长文阅读 */
+  --ui-line-height-display: 1.15;
+  --ui-line-height-tight: 1.25;
+  --ui-line-height-body: 1.5;
+  --ui-line-height-relaxed: 1.7;
+
+  /* ===== Premium UI motion scale ===== */
+  --ui-duration-hover: 120ms;
+  --ui-duration-toggle: 180ms;
+  --ui-duration-panel: 240ms;
+  --ui-duration-theme: 320ms;
+
+  /* ===== Premium UI semantic motion aliases ===== */
+  --motion-hover: var(--ui-duration-hover);
+  --motion-toggle: var(--ui-duration-toggle);
+  --motion-panel: var(--ui-duration-panel);
+  --motion-theme: var(--ui-duration-theme);
 }
 
 .settings-panel .api-settings-secondary-nav__inner {
@@ -11116,6 +11183,18 @@ body:not(.dark-mode) {
   --settings-sidebar-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.04), 18px 0 40px rgba(15, 23, 42, 0.08);
   --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.48);
   --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.14);
+  --settings-state-info-bg: rgba(59, 130, 246, 0.08);
+  --settings-state-info-border: rgba(59, 130, 246, 0.16);
+  --settings-state-info-text: #2563eb;
+  --settings-state-success-bg: rgba(22, 163, 74, 0.1);
+  --settings-state-success-border: rgba(22, 163, 74, 0.16);
+  --settings-state-success-text: #047857;
+  --settings-state-warning-bg: rgba(245, 158, 11, 0.12);
+  --settings-state-warning-border: rgba(245, 158, 11, 0.2);
+  --settings-state-warning-text: #b45309;
+  --settings-state-danger-bg: rgba(239, 68, 68, 0.08);
+  --settings-state-danger-border: rgba(239, 68, 68, 0.16);
+  --settings-state-danger-text: #b91c1c;
   --text-primary: #111827;
   --text-secondary: rgba(17, 24, 39, 0.76);
   --text-tertiary: rgba(55, 65, 81, 0.68);
@@ -11200,6 +11279,18 @@ body.dark-mode .settings-panel {
   --settings-sidebar-shadow: inset -1px 0 0 rgb(255 255 255 / 0.045), 26px 0 52px rgb(0 0 0 / 0.26);
   --settings-focus-border: rgb(var(--settings-accent-rgb) / 0.74);
   --settings-focus-ring: rgb(var(--settings-accent-rgb) / 0.2);
+  --settings-state-info-bg: rgba(118, 162, 255, 0.16);
+  --settings-state-info-border: rgba(118, 162, 255, 0.28);
+  --settings-state-info-text: #dbeafe;
+  --settings-state-success-bg: rgba(52, 211, 153, 0.16);
+  --settings-state-success-border: rgba(52, 211, 153, 0.26);
+  --settings-state-success-text: #bbf7d0;
+  --settings-state-warning-bg: rgba(245, 158, 11, 0.18);
+  --settings-state-warning-border: rgba(245, 158, 11, 0.28);
+  --settings-state-warning-text: #fde68a;
+  --settings-state-danger-bg: rgba(248, 113, 113, 0.16);
+  --settings-state-danger-border: rgba(248, 113, 113, 0.26);
+  --settings-state-danger-text: #fecaca;
   --text-primary: #fbfdff;
   --text-secondary: rgb(226 232 240 / 0.8);
   --text-tertiary: rgb(148 163 184 / 0.78);

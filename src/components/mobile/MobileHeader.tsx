@@ -35,55 +35,54 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
     return (
-        <div className="fixed top-0 left-0 right-0 z-[980] px-3 pt-[env(safe-area-inset-top)] md:hidden">
-            <div className="ios-mobile-header-glass ios-mobile-header-shell ios-mobile-header-shell--apple rounded-[26px]">
-                <div className="ios-mobile-header-leading">
+        <div className="w-full md:hidden">
+            <div className="ios-mobile-header-glass rounded-[30px] border border-white/10 bg-[rgba(15,18,28,0.88)] px-3 py-3 shadow-[0_22px_44px_rgba(2,6,23,0.28)] backdrop-blur-2xl">
+                <div className="flex items-center gap-2.5">
                     <button
                         type="button"
                         onClick={onUserClick}
                         aria-label="\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3"
-                        className="ios-mobile-header-profile"
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-white/10 bg-white/5 px-2.5 py-2.5 text-left"
                         title={userName}
                     >
-                        <span className="ios-mobile-user-avatar ios-mobile-user-avatar--large">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-white/10 text-sm font-bold text-white">
                             {resolvedAvatarUrl ? (
                                 <img src={resolvedAvatarUrl} alt={userName} className="h-full w-full object-cover" />
                             ) : (
                                 <span>{avatarFallback}</span>
                             )}
                         </span>
-                        <span className="ios-mobile-header-profile-copy">
-                            <span className="ios-mobile-header-kicker">{title}</span>
-                            <span className="ios-mobile-user-name ios-mobile-user-name--strong">{userName}</span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100/70">
+                                {title}
+                            </span>
+                            <span className="mt-1 block truncate text-[15px] font-semibold text-white">
+                                {userName}
+                            </span>
                         </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleRechargeClick}
+                        aria-label="\u67e5\u770b\u79ef\u5206"
+                        className="flex min-w-[92px] shrink-0 flex-col items-start justify-center rounded-[20px] border border-white/10 bg-white/6 px-3 py-2 text-left text-white transition-all active:scale-95 disabled:opacity-55"
+                        disabled={!handleRechargeClick}
+                    >
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">
+                            <Sparkles size={12} className="text-amber-300" />
+                            {'\u79ef\u5206'}
+                        </span>
+                        <span className="mt-1 text-[15px] font-semibold leading-none">{balanceDisplay}</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={onMenuClick}
                         aria-label="\u6253\u5f00\u529f\u80fd\u83dc\u5355"
-                        className={`${iconButtonClass} ios-mobile-header-menu text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}
+                        className={`${iconButtonClass} shrink-0 border border-white/10 bg-white/6 text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}
                     >
                         <Menu size={18} strokeWidth={2.15} />
-                    </button>
-                </div>
-
-                <div className="ios-mobile-balance-group ios-mobile-balance-group--primary">
-                    <div className="ios-mobile-balance-stat">
-                        <Sparkles size={13} className="text-amber-300" />
-                        <div className="min-w-0">
-                            <div className="ios-mobile-balance-label">{'\u5269\u4f59\u79ef\u5206'}</div>
-                            <div className="ios-mobile-balance-value">{balanceDisplay}</div>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={handleRechargeClick}
-                        aria-label="\u5145\u503c\u79ef\u5206"
-                        className="ios-mobile-balance-action"
-                        disabled={!handleRechargeClick}
-                    >
-                        {'\u5145\u503c'}
                     </button>
                 </div>
             </div>

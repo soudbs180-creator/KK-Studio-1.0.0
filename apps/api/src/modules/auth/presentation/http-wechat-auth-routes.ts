@@ -5,6 +5,7 @@ import {
   type WechatAuthStartResponseDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { resolveAuthenticatedUserId } from "../../../../../../packages/shared/src/index.ts";
+import type { AuthService } from "../application/auth-service.ts";
 import type {
   WechatAuthService,
   WechatCallbackResult,
@@ -175,13 +176,14 @@ export async function handleStartWechatBind(
 
 export async function handleWechatCallback(
   service: WechatAuthService,
+  authService: AuthService,
   searchParams: URLSearchParams,
   headers: Record<string, string>,
 ): Promise<HttpWechatRouteResult<never>> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
 
-  const callbackResult = await service.handleCallback({
+  const callbackResult = await service.handleCallback(authService, {
     code: searchParams.get("code") || undefined,
     state: searchParams.get("state") || undefined,
     error: searchParams.get("error") || undefined,

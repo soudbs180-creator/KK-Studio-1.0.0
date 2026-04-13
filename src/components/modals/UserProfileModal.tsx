@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
+import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
   AlertCircle,
   ChevronLeft,
@@ -14,12 +14,12 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
+import { getPreferredKkApiAccessToken } from '../../services/api/authAccessToken';
 import {
   formatRemainingCredits,
   selectRemainingBalanceSummary,
@@ -56,7 +56,7 @@ export type UserProfileView = 'main' | 'change-password' | 'edit-profile' | 'bil
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User | null;
+  user: RuntimeAuthUser | null;
   onSignOut: () => void;
   initialView?: UserProfileView;
   isMobile?: boolean;
@@ -88,7 +88,7 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const getStatusLabel = (status?: string | null) => {
+const getRechargeSubmissionStatusLabel = (status?: string | null) => {
   if (!status) return '已完成';
   const lower = status.toLowerCase();
   if (lower === 'completed') return '已完成';
@@ -383,8 +383,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setMessage(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const apiAccessToken = String(sessionData.session?.access_token || '').trim();
+      const apiAccessToken = String(await getPreferredKkApiAccessToken() || '').trim();
 
       if (!apiAccessToken) {
         saveProfileLocally(finalName, nextAvatarUrl);
@@ -459,8 +458,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         throw signInError;
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-      if (updateError) throw updateError;
+      const response = await kkWebApiClient.updatePassword({
+        currentPassword: oldPassword,
+        newPassword,
+      });
+      if (!response.success) {
+        throw new Error(resolveApiGapMessage(response.error.code, response.error.message || '密码修改失败，请稍后重试。'));
+      }
 
       setMessage({ type: 'success', text: '密码修改成功。' });
       setOldPassword('');
@@ -1063,7 +1067,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                             <div className="text-right">
                               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
-                                {getStatusLabel(record.status)}
+                                {getRechargeSubmissionStatusLabel(record.status || 'completed')}
                               </span>
                               <div className={`mt-1 text-sm font-semibold ${record.amount >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                                 {amountText}
@@ -1113,7 +1117,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </div>
 
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
-                            {getStatusLabel(record.status)}
+                            {getRechargeSubmissionStatusLabel(record.status || 'completed')}
                           </span>
                         </div>
                       </div>

@@ -115,7 +115,19 @@ describe("provider strategy", () => {
     });
 
     assert.equal(runtime.strategyId, "gpt-best");
+    assert.equal(runtime.requestProfileId, "gpt-best");
     assert.equal(runtime.authMethod, "header");
+  });
+
+  test("falls back unknown local providers to the 12AI request profile without changing their strategy id", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Custom",
+      baseUrl: "https://unknown-provider.example.com/v1",
+      format: "openai",
+    });
+
+    assert.equal(runtime.strategyId, "generic-openai");
+    assert.equal(runtime.requestProfileId, "12ai");
   });
 
   test("marks GPT Best llms.txt as provider evidence but not an API base", () => {

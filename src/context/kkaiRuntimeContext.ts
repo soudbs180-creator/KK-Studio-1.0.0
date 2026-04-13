@@ -1,14 +1,13 @@
-import type { Session, User } from '@supabase/supabase-js';
-
 import { getStoredKkApiAccessToken } from '../services/api/authAccessToken.ts';
 import {
   createDefaultRuntimeAuthState,
   getLatestRuntimeAuthState,
 } from '../services/auth/runtimeAuthState.ts';
+import type { RuntimeAuthSession, RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 
 export interface KkaiRuntimeAuthSnapshot {
-  session: Session | null;
-  user: User | null;
+  session: RuntimeAuthSession | null;
+  user: RuntimeAuthUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
   loginAsTempUser: () => Promise<void>;
@@ -16,7 +15,7 @@ export interface KkaiRuntimeAuthSnapshot {
   tempUserExpiry: number | null;
 }
 
-function createRuntimeSession(user: User, accessToken?: string): Session | null {
+function createRuntimeSession(user: RuntimeAuthUser, accessToken?: string): RuntimeAuthSession | null {
   const normalizedAccessToken = String(accessToken || '').trim();
   if (!normalizedAccessToken) {
     return null;
@@ -29,7 +28,7 @@ function createRuntimeSession(user: User, accessToken?: string): Session | null 
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     token_type: 'bearer',
     user,
-  } as Session;
+  };
 }
 
 export function createKkaiRuntimeAuthSnapshot(): KkaiRuntimeAuthSnapshot {

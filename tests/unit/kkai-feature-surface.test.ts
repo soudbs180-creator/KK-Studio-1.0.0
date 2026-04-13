@@ -6,9 +6,9 @@ import {
   shouldEnableWorkspaceCloudSync,
 } from '../../src/app/kkaiFeatureFlags.ts';
 
-test('KKAI disables billing, admin, and workspace cloud sync features', () => {
+test('KKAI keeps billing on while admin and workspace cloud sync stay disabled', () => {
   assert.deepEqual(KKAI_FEATURE_FLAGS, {
-    billing: false,
+    billing: true,
     admin: false,
     workspaceCloudSync: false,
     cloudProfileFallback: false,

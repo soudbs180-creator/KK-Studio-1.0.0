@@ -1,4 +1,4 @@
-# Project Progress Report - KK Studio v1.4.1
+# Project Progress Report - KK Studio v1.4.2
 
 ## 状态
 **Current Status**: Active / Documentation Baseline Synced
@@ -6,11 +6,11 @@
 ## 1. 已完成
 
 ### 1.1 版本与说明统一
-- [x] 主项目版本统一为 `1.4.1`
+- [x] 主项目版本统一为 `1.4.2`
 - [x] `config/release-manifest.json` 统一承载版本真相，`src/config/appInfo.ts` 仅保留运行时只读导出
-- [x] README、开发进度、交接文档、移动端报告同步到 `v1.4.1`
-- [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.4.1`
-- [x] `release/publish/stable/manifest.json` 作为 stable 发布清单回填到 `1.4.1` 并纳入治理检查
+- [x] README、开发进度、交接文档、移动端报告同步到 `v1.4.2`
+- [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.4.2`
+- [x] `release/publish/stable/manifest.json` 作为 stable 发布清单回填到 `1.4.2` 并纳入治理检查
 - [x] 修复 Node/ESM 启动链、用户路由云回退、账单 hydrate 误判与 Canvas 本地持久化问题
 - [x] 构建版本清单补充 `releaseDate / releaseNotes`，便于后续发布与更新校验
 
@@ -28,7 +28,7 @@
 ## 2. 当前重点
 - **稳定优先**：在不破坏既有使用路径的前提下，继续把设置、后台和鉴权链路做稳
 - **部署一致性**：继续降低本地与线上环境差异，尤其是服务端配置与会话相关行为
-- **文档一致性**：今后所有“当前版本”说明以 `config/release-manifest.json` 中的 `1.4.1` 为基线
+- **文档一致性**：今后所有“当前版本”说明以 `config/release-manifest.json` 中的 `1.4.2` 为基线
 - **多供应商架构方案**：已补充独立供应商 / 多协议面 / surface 路由的分层改造方案，详见 `docs/development/multi-vendor-provider-architecture.md`
 - **验证链补强**：集成测试、支付侧静态校验与 Hosted 预检继续纳入默认回归口径
 - **运行时口径一致**：当前在线前端继续以根目录 `src/` 为准，`apps/web/` 明确保持为迁移目标，而 `payment-server/` 明确标注为过渡桥接层
@@ -60,4 +60,4 @@ npm run build
 - [x] Admin model catalog auto-refresh now shares one cooldown policy across focus, visibility, timer, and broadcast triggers.
 - [x] API settings keep snapshot-backed views interactive while cloud reconciliation runs in the background.
 - [x] Third-party provider management now scopes busy states to the active action instead of locking the whole page behind one loading flag.
-*Report Updated: 2026-04-07*
+*Report Updated: 2026-04-14*

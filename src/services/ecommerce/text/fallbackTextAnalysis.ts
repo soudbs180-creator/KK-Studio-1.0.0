@@ -1,4 +1,7 @@
 import { resolveEcommerceAspectPolicy } from '../ecommerceModelPolicy.ts';
+import { buildEcommerceRenderTask } from '../renderTaskBuilder.ts';
+import { extractSeriesTemplateFromAnalysis } from '../seriesTemplateExtractor.ts';
+import { mergeEcommerceTaskState } from '../taskMerger.ts';
 import type {
   EcommerceAnalysisAPlusModule,
   EcommerceAnalysisMainImageItem,
@@ -28,7 +31,7 @@ function splitLines(text: string): string[] {
 
 function extractField(line: string, labels: string[]): string {
   for (const label of labels) {
-    const regex = new RegExp(`${label}\\s*[：:]\\s*([^；;]+)`);
+    const regex = new RegExp(`${label}\\s*[：:]\\s*([^；，。\\n]+)`);
     const match = line.match(regex);
     if (match?.[1]) return match[1].trim();
   }
@@ -49,20 +52,56 @@ function extractReferenceMentions(text: string): EcommerceReferenceMention[] {
     assetId: `text-ref-${index + 1}`,
     label: token.replace(/^图/, '参考图'),
     mentionTokens: [token],
-    notes: '文档文本回退分析无法定位具体图片，请人工确认。',
+    notes: '文本回退分析无法定位具体图片，请人工确认。',
   }));
 }
 
-function buildPrompt(kindLabel: string, line: string, designRequirements: string, copyText: string): string {
-  return [
-    `${kindLabel}草案：${line}`,
-    designRequirements ? `设计要求：${designRequirements}` : '',
-    copyText ? `文案替换：${copyText}` : '',
-    '这是基于文档文本的回退分析结果，请在生成前人工确认参考图与尺寸策略。',
-  ].filter(Boolean).join('\n');
+function createFallbackTaskState(params: {
+  taskId: string;
+  sourceKind: 'main-image' | 'a-plus-module';
+  sourceSheet: '主图' | 'A+';
+  sourceRowKey: string;
+  theme: string;
+  outputTypeLabel: string;
+  sparseIntent: string;
+  seriesTemplate: EcommerceAnalysisResult['seriesTemplate'];
+}) {
+  return mergeEcommerceTaskState({
+    baseTask: {
+      taskId: params.taskId,
+      templateId: params.seriesTemplate.templateId,
+      sourceKind: params.sourceKind,
+      sourceSheet: params.sourceSheet,
+      sourceRowKey: params.sourceRowKey,
+      theme: params.theme,
+      outputTypeLabel: params.outputTypeLabel,
+      imageRoleSummary: ['产品图'],
+      sparseUserIntent: params.sparseIntent,
+      copy: { headline: '', subheadline: '', highlight: '', featureTags: [], cta: '' },
+      style: { tone: '', atmosphere: '', effect: '', backgroundType: '' },
+      layout: { productSize: 'balanced', textPosition: 'top-left', accessoryPolicy: 'auto' },
+      inherit: {
+        keepSeriesStyle: true,
+        keepFontStyle: true,
+        keepLayoutStyle: true,
+        keepCopyStyle: true,
+        keepPalette: true,
+      },
+      assetRoles: [{ assetId: 'product-upload', role: 'product', label: '产品图', normalizedLabel: '产品图', source: 'upload' }],
+      consistencyChecks: [],
+      missingFields: [],
+      resolvedPromptPreview: '',
+      displayLabel: '',
+    },
+    seriesTemplate: params.seriesTemplate,
+    sparseIntent: params.sparseIntent,
+  });
 }
 
-function normalizeMainItems(lines: string[]): EcommerceAnalysisMainImageItem[] {
+function normalizeMainItems(
+  lines: string[],
+  seriesTemplate: EcommerceAnalysisResult['seriesTemplate'],
+): EcommerceAnalysisMainImageItem[] {
   return lines
     .filter((line) => /^\d+[.、]/.test(line))
     .map((line, index) => {
@@ -72,6 +111,22 @@ function normalizeMainItems(lines: string[]): EcommerceAnalysisMainImageItem[] {
       const designRequirements = extractField(line, ['设计要求']);
       const copyText = extractField(line, ['文案']);
       const referenceMentions = extractReferenceMentions(`${line} ${designRequirements}`);
+      const taskState = createFallbackTaskState({
+        taskId: `fallback-task-main-${index + 1}`,
+        sourceKind: 'main-image',
+        sourceSheet: '主图',
+        sourceRowKey: `fallback-main-${index + 1}`,
+        theme,
+        outputTypeLabel: '主图',
+        sparseIntent: [line, designRequirements, copyText].filter(Boolean).join('；'),
+        seriesTemplate,
+      });
+      const renderTask = buildEcommerceRenderTask({
+        taskState,
+        seriesTemplate,
+        aspectRatio: '1:1',
+        imageSize: '4K',
+      });
 
       return {
         itemId: `fallback-main-${index + 1}`,
@@ -87,14 +142,19 @@ function normalizeMainItems(lines: string[]): EcommerceAnalysisMainImageItem[] {
         referenceAssetIds: [],
         referenceMentions,
         productAssetRequired: true,
-        promptDraft: buildPrompt('主图', line, designRequirements, copyText),
+        promptDraft: renderTask.prompt,
+        resolvedPromptPreview: renderTask.prompt,
+        editableTask: taskState,
         needsReview: true,
         reviewWarnings: ['文档文本回退分析无法确定主图参考图锚点，请人工确认。'],
       };
     });
 }
 
-function normalizeAPlusModules(lines: string[]): EcommerceAnalysisAPlusModule[] {
+function normalizeAPlusModules(
+  lines: string[],
+  seriesTemplate: EcommerceAnalysisResult['seriesTemplate'],
+): EcommerceAnalysisAPlusModule[] {
   return lines
     .filter((line) => /^模块\d+/.test(line))
     .map((line, index) => {
@@ -113,6 +173,22 @@ function normalizeAPlusModules(lines: string[]): EcommerceAnalysisAPlusModule[] 
         copyText,
       });
       const referenceMentions = extractReferenceMentions(`${line} ${designRequirements}`);
+      const taskState = createFallbackTaskState({
+        taskId: `fallback-task-aplus-${index + 1}`,
+        sourceKind: 'a-plus-module',
+        sourceSheet: 'A+',
+        sourceRowKey: `fallback-aplus-${index + 1}`,
+        theme: moduleName,
+        outputTypeLabel: 'A+',
+        sparseIntent: [line, designRequirements, copyText].filter(Boolean).join('；'),
+        seriesTemplate,
+      });
+      const renderTask = buildEcommerceRenderTask({
+        taskState,
+        seriesTemplate,
+        aspectRatio: policy.defaultAspectRatio,
+        imageSize: '4K',
+      });
 
       return {
         moduleId: `fallback-aplus-${index + 1}`,
@@ -129,7 +205,9 @@ function normalizeAPlusModules(lines: string[]): EcommerceAnalysisAPlusModule[] 
         referenceAssetIds: [],
         referenceMentions,
         productAssetRequired: true,
-        promptDraft: buildPrompt('A+模块', line, designRequirements, copyText),
+        promptDraft: renderTask.prompt,
+        resolvedPromptPreview: renderTask.prompt,
+        editableTask: taskState,
         needsReview: true,
         reviewWarnings: ['文档文本回退分析无法确定 A+ 参考图锚点，请人工确认。'],
       };
@@ -149,8 +227,76 @@ export function analyzeFallbackEcommerceText(input: FallbackTextInput): Ecommerc
     ? lines.slice(aPlusSectionIndex + 1)
     : [];
 
-  const mainImageItems = normalizeMainItems(mainLines);
-  const modules = normalizeAPlusModules(aPlusLines);
+  const draftAnalysis: EcommerceAnalysisResult = {
+    seriesTemplate: {
+      templateId: 'fallback-template',
+      templateLabel: projectName || productName || 'fallback-template',
+      inheritByDefault: true,
+      styleProfile: {
+        tone: '统一套系风格',
+        primaryColors: [],
+        backgroundStyle: '干净商业背景',
+        effectStyle: '轻量商业特效',
+        shadowStyle: 'soft clean shadow',
+        atmosphere: '明亮干净',
+      },
+      layoutProfile: {
+        productPosition: 'center-right',
+        textPosition: 'top-left',
+        highlightPosition: 'left-middle',
+        accessoryPosition: 'bottom-right',
+        whitespaceStyle: 'clean spacious',
+        productScalePreset: 'balanced',
+      },
+      copyProfile: {
+        languageStyle: 'short commercial phrases',
+        headlineStyle: '2-4 words',
+        subheadlineStyle: '1 short sentence',
+        highlightStyle: 'large numeric value',
+        tone: 'direct, feature-led',
+        preferredLanguage: 'mixed',
+      },
+      fontProfile: {
+        fontStyle: 'sans bold clean',
+        headlineWeight: 700,
+        subheadlineWeight: 500,
+        highlightWeight: 800,
+        headlineScale: 1,
+        subheadlineScale: 0.55,
+        highlightScale: 1.35,
+        textColorPrimary: '#FFFFFF',
+        textColorSecondary: '#1E2B36',
+      },
+      constraints: {
+        mustKeepConsistency: true,
+        forbiddenElements: ['people'],
+        mustKeepProductRealistic: true,
+        allowedOverrides: ['tone', 'effect', 'productScale', 'copy'],
+      },
+    },
+    projectMeta: {
+      projectName,
+      productName,
+      sourceFileName: input.sourceFileName,
+      sourceFileType: input.sourceFileType,
+      warnings: [],
+    },
+    assets: {
+      productAssets: [],
+      referenceAssets: [],
+    },
+    mainImageItems: [],
+    aPlusGroup: {
+      groupId: 'fallback-aplus-group',
+      title: `${productName || 'A+'} A+ 模块`,
+      modules: [],
+      groupWarnings: [],
+    },
+    reviewWarnings: [],
+  };
+  const seriesTemplate = extractSeriesTemplateFromAnalysis(draftAnalysis);
+  const mainImageItems = normalizeMainItems(mainLines, seriesTemplate);
+  const modules = normalizeAPlusModules(aPlusLines, seriesTemplate);
   const reviewWarnings = [
     '当前结果来自文档文本回退分析，参考图编号与尺寸策略需人工确认。',
     ...mainImageItems.flatMap((item) => item.reviewWarnings),
@@ -158,6 +304,7 @@ export function analyzeFallbackEcommerceText(input: FallbackTextInput): Ecommerc
   ];
 
   return {
+    seriesTemplate,
     projectMeta: {
       projectName,
       productName,

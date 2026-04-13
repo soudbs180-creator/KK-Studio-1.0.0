@@ -42,6 +42,11 @@ const functionSecretsRequired = [
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+  "GOOGLE_OAUTH_REDIRECT_URI",
+  "GOOGLE_STATE_SIGNING_SECRET",
+  "GOOGLE_ALLOWED_REDIRECT_ORIGINS",
   "WECHAT_OPEN_APP_ID",
   "WECHAT_OPEN_APP_SECRET",
   "WECHAT_OPEN_REDIRECT_URI",
@@ -273,8 +278,8 @@ function run() {
   printKeyStatuses("Hosted Frontend Required Env", frontendSnapshots, hostedFrontendRequired);
   printKeyStatuses("Hosted Frontend Recommended Env", frontendSnapshots, hostedFrontendRecommended);
   printKeyStatuses("Hosted Frontend Optional Env", frontendSnapshots, hostedFrontendOptional);
-  printKeyStatuses("Supabase Function Required Secrets", hostedFunctionSnapshots, functionSecretsRequired);
-  printKeyStatuses("Supabase Function Recommended Secrets", hostedFunctionSnapshots, functionSecretsRecommended);
+  printKeyStatuses("Hosted API And Function Required Secrets", hostedFunctionSnapshots, functionSecretsRequired);
+  printKeyStatuses("Hosted API And Function Recommended Secrets", hostedFunctionSnapshots, functionSecretsRecommended);
 
   const publicSupabaseUrl = getEffectiveValue(frontendSnapshots, "VITE_SUPABASE_URL")?.value;
   const serverSupabaseUrl = getEffectiveValue(localApiSnapshots, "SUPABASE_URL")?.value || publicSupabaseUrl;
@@ -324,7 +329,7 @@ function run() {
   functionSecretsRequired.forEach((key) => {
     const value = getEffectiveValue(hostedFunctionSnapshots, key);
     if (!value || isPlaceholder(value.value)) {
-      remoteChecks.push(`Function secret ${key} is missing or still a placeholder in the local snapshot. Confirm it in Supabase Secrets before deploying.`);
+      remoteChecks.push(`Hosted API / function secret ${key} is missing or still a placeholder in the local snapshot. Confirm it in the runtime env or Supabase Secrets before deploying.`);
     }
   });
   hostedFrontendForbidden.forEach((key) => {

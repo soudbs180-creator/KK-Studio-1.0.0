@@ -115,11 +115,11 @@ describe("api server persistence guards", () => {
     assert.equal(payload.data.config.projectRefMatches, true);
     assert.equal(payload.data.runtime.allowDegradedPersistence, false);
     assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
-    assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, true);
+    assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
     assert.equal(payload.data.runtime.criticalPersistence.workspaceLayout.ready, false);
     assert.match(
       payload.data.runtime.blockers.join(","),
-      /SUPABASE_SERVICE_ROLE_KEY_MISSING/,
+      /USER_API_ENCRYPTION_SECRET_MISSING|SUPABASE_SERVICE_ROLE_KEY_MISSING|AUTH_DATA_REPOSITORY_DEGRADED/,
     );
   });
 

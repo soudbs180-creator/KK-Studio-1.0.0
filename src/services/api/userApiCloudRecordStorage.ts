@@ -1,10 +1,10 @@
-import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
-import { supabase } from '../../lib/supabase.ts';
+﻿import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
 import {
   getLegacyWebApiFallbackState,
   legacyWebApiClient,
   shouldUseLegacyWebApiFallback,
 } from './kkApiClient.ts';
+import { resolveRuntimeAuthenticatedProfileContext } from '../auth/runtimeSessionProfile.ts';
 import {
   compactUserApisPayloadForTransport,
   extractKeyManagerCloudSlots,
@@ -476,26 +476,8 @@ async function getAuthenticatedProfileContext(
     return createLegacyFallbackProfileContext(expectedUserId);
   }
 
-  const sessionResult = await supabase.auth.getSession();
-  if (sessionResult.error) {
-    throw new Error(getErrorMessage(sessionResult.error, 'Failed to resolve authenticated user session.'));
-  }
-
-  const sessionUser = sessionResult.data.session?.user;
-  const resolvedUser = sessionUser || await (async () => {
-    const userResult = await supabase.auth.getUser();
-    if (userResult.error) {
-      const message = getErrorMessage(userResult.error, '').toLowerCase();
-      if (message.includes('auth session missing') || message.includes('session') && message.includes('missing')) {
-        return null;
-      }
-
-      throw new Error(getErrorMessage(userResult.error, 'Failed to resolve authenticated user profile.'));
-    }
-
-    return userResult.data.user ?? null;
-  })();
-  const userId = String(resolvedUser?.id || '').trim();
+  const resolvedUser = resolveRuntimeAuthenticatedProfileContext(expectedUserId);
+  const userId = String(resolvedUser?.userId || '').trim();
   if (!userId) {
     if (shouldUseLegacyWebApiFallback()) {
       return createLegacyFallbackProfileContext(expectedUserId);
@@ -692,7 +674,13 @@ export async function loadUserApisPayloadFromCloudRecord(
   expectedUserId?: string,
 ): Promise<unknown | null> {
   const payload = await loadUserApisPayloadRaw(expectedUserId);
-  return payload ? sanitizeClientVisibleEnvelope(payload) : null;
+  if (!payload) {
+    return null;
+  }
+
+  return shouldPreferSessionlessLegacyContext()
+    ? cloneEnvelope(payload)
+    : sanitizeClientVisibleEnvelope(payload);
 }
 
 export async function saveUserApisPayloadToCloudRecord(

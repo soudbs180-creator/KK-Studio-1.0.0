@@ -13,6 +13,7 @@ import type {
 } from "../dto/asset-library.ts";
 import type {
   AuthSessionDto,
+  GoogleAuthStartResponseDto,
   KeyManagerCloudStateDto,
   LoginRequestDto,
   LoginResponseDto,
@@ -128,6 +129,14 @@ export interface KkApiClient {
     redirectTo: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<WechatAuthStartResponseDto>>;
+  startGoogleLogin(
+    redirectTo: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GoogleAuthStartResponseDto>>;
+  startGoogleBind(
+    redirectTo: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GoogleAuthStartResponseDto>>;
   startWechatBind(
     redirectTo: string,
     options?: ApiClientRequestOptions,
@@ -617,6 +626,36 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<WechatAuthStartResponseDto>(
         config,
         `api/v1/auth/wechat/start?${query.toString()}`,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    startGoogleLogin(redirectTo, options) {
+      const query = new URLSearchParams({
+        redirectTo,
+      });
+
+      return requestJson<GoogleAuthStartResponseDto>(
+        config,
+        `api/v1/auth/google/start?${query.toString()}`,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    startGoogleBind(redirectTo, options) {
+      const query = new URLSearchParams({
+        redirectTo,
+      });
+
+      return requestJson<GoogleAuthStartResponseDto>(
+        config,
+        `api/v1/auth/google/bind/start?${query.toString()}`,
         {
           method: "GET",
         },

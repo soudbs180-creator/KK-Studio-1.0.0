@@ -58,8 +58,9 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
   assert.match(proxySource, /\/api\/v1\/model-proxy\/user/);
   assert.match(proxySource, /type InvalidJwtLocalSessionState = 'no-session' \| 'invalid' \| 'valid' \| 'unknown';/);
   assert.match(proxySource, /async function inspectLocalSessionForInvalidJwt\(\): Promise<InvalidJwtLocalSessionState> \{/);
-  assert.match(proxySource, /const \{ data, error \} = await supabase\.auth\.getUser\(accessToken\);/);
-  assert.match(proxySource, /Local Supabase session state after Invalid JWT/);
+  assert.match(proxySource, /const profileResponse = await kkWebApiClient\.getProfile\(\{ accessToken \}\);/);
+  assert.match(proxySource, /Local KK session state after Invalid JWT/);
+  assert.doesNotMatch(proxySource, /supabase\.auth\./);
   assert.doesNotMatch(proxySource, /async function tryLocalUserRouteApiFallback\(/);
   assert.doesNotMatch(proxySource, /async function resolveLatestLocalFallbackAccessToken\(/);
   assert.doesNotMatch(proxySource, /Switching local user-route fallback to the freshest browser Supabase access token/);

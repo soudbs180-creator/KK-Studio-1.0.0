@@ -247,6 +247,92 @@ describe("kk api client", () => {
     }
   });
 
+  test("builds google auth start requests with the expected path", async () => {
+    const requests: Array<{ method?: string; url: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            provider: "google",
+            mode: "login",
+            authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
+            callbackUrl: "https://api.example.com/api/v1/auth/google/callback",
+            state: "state-123",
+            expiresAt: "2099-01-01T00:00:00.000Z",
+          },
+          meta: {
+            requestId: "req-google-client",
+            timestamp: "2026-04-13T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    const response = await client.startGoogleLogin("http://127.0.0.1:3000/auth/callback");
+
+    assert.equal(response.success, true);
+    assert.equal(requests.length, 1);
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/auth/google/start?redirectTo=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback",
+    );
+    assert.equal(requests[0].method, "GET");
+  });
+
+  test("builds google bind start requests with the expected path", async () => {
+    const requests: Array<{ method?: string; url: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+        });
+
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "GOOGLE_BIND_UNAVAILABLE",
+            message: "Google bind is not persisted on the VPS runtime yet.",
+          },
+          meta: {
+            requestId: "req-google-bind-client",
+            timestamp: "2026-04-13T00:00:00.000Z",
+          },
+        }), {
+          status: 501,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    const response = await client.startGoogleBind("http://127.0.0.1:3000/auth/callback?mode=google-bind");
+
+    assert.equal(response.success, false);
+    if (response.success) {
+      return;
+    }
+    assert.equal(response.error.code, "GOOGLE_BIND_UNAVAILABLE");
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/auth/google/bind/start?redirectTo=http%3A%2F%2F127.0.0.1%3A3000%2Fauth%2Fcallback%3Fmode%3Dgoogle-bind",
+    );
+  });
+
   test("builds billing transaction, refund, recharge config, and admin recharge requests with the expected paths", async () => {
     const requests: Array<{ method?: string; url: string; body?: string }> = [];
     const client = createKkApiClient({

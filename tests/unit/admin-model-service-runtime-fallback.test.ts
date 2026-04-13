@@ -12,6 +12,7 @@ function readSource(relativePath: string): string {
 test('admin model loading uses the shared web API client while exchange rates remain API-only', () => {
   const clientSource = readSource('src/services/api/kkApiClient.ts');
   const serviceSource = readSource('src/services/model/adminModelService.ts');
+  const routeUnitSource = readSource('src/services/model/adminRouteUnits.ts');
   const exchangeRateSource = readSource('src/services/billing/creditExchangeRateService.ts');
 
   assert.match(clientSource, /export function getLegacyWebApiFallbackState\(\): LegacyWebApiFallbackState \{/);
@@ -21,10 +22,13 @@ test('admin model loading uses the shared web API client while exchange rates re
   assert.match(clientSource, /export const kkWebApiClient = createKkWebApiClient\(\);/);
 
   assert.match(serviceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(serviceSource, /buildCreditModelCatalog/);
   assert.match(serviceSource, /listActiveModels/);
   assert.match(serviceSource, /listActiveCreditModels/);
   assert.doesNotMatch(serviceSource, /listActiveCreditModelsViaEdgeFunction/);
   assert.doesNotMatch(serviceSource, /listActiveCreditModelsViaSupabase/);
+  assert.match(routeUnitSource, /export function buildCreditModelCatalog/);
+  assert.match(routeUnitSource, /export function pickCreditModelSpec/);
 
   assert.match(exchangeRateSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
   assert.match(exchangeRateSource, /kkWebApiClient\.listCreditExchangeRates\(/);

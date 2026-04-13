@@ -3,6 +3,12 @@
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import UpdateNotification from '../common/UpdateNotification';
 import { APP_DISPLAY_VERSION } from '../../config/appInfo';
+import {
+    getCanvasDeviceTier,
+    getCanvasInteractionIdleRelaxationMs,
+    type CanvasDeviceTier,
+    type CanvasInteractionPhase,
+} from '../../canvas/performanceProfile';
 
 export interface InfiniteCanvasHandle {
     zoomIn: () => void;
@@ -18,7 +24,12 @@ interface InfiniteCanvasProps {
     children: React.ReactNode;
     showGrid?: boolean;
     onTransformChange?: (transform: { x: number; y: number; scale: number }) => void;
-    onInteractionChange?: (state: { isDragging: boolean; isZooming: boolean }) => void;
+    onInteractionChange?: (state: {
+        isDragging: boolean;
+        isZooming: boolean;
+        interactionPhase: CanvasInteractionPhase;
+        idleRelaxationMs: number;
+    }) => void;
     onCanvasClick?: () => void; // Called when clicking empty canvas area
     onCanvasDoubleClick?: () => void; // [NEW] Called when double clicking empty canvas area
     onAutoArrange?: () => void; // Called when arrange button is clicked
@@ -36,6 +47,13 @@ interface Transform {
     x: number;
     y: number;
     scale: number;
+}
+
+interface CanvasInteractionState {
+    isDragging: boolean;
+    isZooming: boolean;
+    interactionPhase: CanvasInteractionPhase;
+    idleRelaxationMs: number;
 }
 
 const isValidTransform = (value: any): value is Transform => {
@@ -79,6 +97,32 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     // 🚀 实时坐标追踪 Ref (解决 React 状态异步延迟，确保 getCurrentTransform 永远返回物理最新值)
     const syncTransformRef = useRef<Transform>({ x: 0, y: 0, scale: 1 });
+    const callbackRef = useRef({
+        onTransformChange,
+        onInteractionChange,
+        onMouseDown,
+        onMouseMove,
+        onCanvasClick,
+        onCanvasDoubleClick,
+        onContextMenu,
+        onImageDrop,
+        onResetView,
+    });
+    const interactionDeviceTierRef = useRef<CanvasDeviceTier>(
+        getCanvasDeviceTier({
+            hardwareConcurrency: typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency,
+            deviceMemory: typeof navigator === 'undefined'
+                ? undefined
+                : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+        })
+    );
+    const interactionIdleTimeoutRef = useRef<number | null>(null);
+    const interactionStateRef = useRef<CanvasInteractionState>({
+        isDragging: false,
+        isZooming: false,
+        interactionPhase: 'idle',
+        idleRelaxationMs: 0,
+    });
 
     // 🚀 性能优化：缩放防抖
     const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -92,6 +136,123 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const gridGlowPointerInsideRef = useRef(false);
     const gridGlowCurrentRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
     const gridGlowTargetRef = useRef({ x: 0, y: 0, opacity: 0, scale: 0.32 });
+
+    useEffect(() => {
+        callbackRef.current = {
+            onTransformChange,
+            onInteractionChange,
+            onMouseDown,
+            onMouseMove,
+            onCanvasClick,
+            onCanvasDoubleClick,
+            onContextMenu,
+            onImageDrop,
+            onResetView,
+        };
+    }, [
+        onCanvasClick,
+        onCanvasDoubleClick,
+        onContextMenu,
+        onImageDrop,
+        onInteractionChange,
+        onMouseDown,
+        onMouseMove,
+        onResetView,
+        onTransformChange,
+    ]);
+
+    const emitTransformChange = useCallback((nextTransform: Transform) => {
+        callbackRef.current.onTransformChange?.(nextTransform);
+    }, []);
+
+    const buildInteractionState = useCallback((
+        isDraggingValue: boolean,
+        isZoomingValue: boolean,
+        interactionPhase: CanvasInteractionPhase
+    ): CanvasInteractionState => ({
+        isDragging: isDraggingValue,
+        isZooming: isZoomingValue,
+        interactionPhase,
+        idleRelaxationMs: getCanvasInteractionIdleRelaxationMs(
+            interactionPhase,
+            interactionDeviceTierRef.current
+        ),
+    }), []);
+
+    const emitInteractionState = useCallback((nextState: CanvasInteractionState) => {
+        const prevState = interactionStateRef.current;
+        const didChange =
+            prevState.isDragging !== nextState.isDragging
+            || prevState.isZooming !== nextState.isZooming
+            || prevState.interactionPhase !== nextState.interactionPhase
+            || prevState.idleRelaxationMs !== nextState.idleRelaxationMs;
+
+        interactionStateRef.current = nextState;
+        setIsDragging(prev => (prev === nextState.isDragging ? prev : nextState.isDragging));
+        setIsZooming(prev => (prev === nextState.isZooming ? prev : nextState.isZooming));
+
+        if (didChange) {
+            callbackRef.current.onInteractionChange?.(nextState);
+        }
+    }, []);
+
+    const clearInteractionIdleTimeout = useCallback(() => {
+        if (interactionIdleTimeoutRef.current !== null) {
+            window.clearTimeout(interactionIdleTimeoutRef.current);
+            interactionIdleTimeoutRef.current = null;
+        }
+    }, []);
+
+    const activateInteractionPhase = useCallback((nextPhase: Exclude<CanvasInteractionPhase, 'idle'>) => {
+        clearInteractionIdleTimeout();
+
+        const currentState = interactionStateRef.current;
+        emitInteractionState(buildInteractionState(
+            nextPhase === 'pan' ? true : currentState.isDragging,
+            nextPhase === 'zoom' ? true : false,
+            nextPhase
+        ));
+    }, [buildInteractionState, clearInteractionIdleTimeout, emitInteractionState]);
+
+    const settleInteractionPhase = useCallback((releasedPhase: Exclude<CanvasInteractionPhase, 'idle'>) => {
+        clearInteractionIdleTimeout();
+
+        const currentState = interactionStateRef.current;
+        const nextIsDragging = releasedPhase === 'pan' ? false : currentState.isDragging;
+        const nextIsZooming = releasedPhase === 'zoom' ? false : currentState.isZooming;
+
+        if (nextIsDragging || nextIsZooming) {
+            emitInteractionState(buildInteractionState(
+                nextIsDragging,
+                nextIsZooming,
+                nextIsZooming ? 'zoom' : 'pan'
+            ));
+            return;
+        }
+
+        const relaxingState = buildInteractionState(false, false, releasedPhase);
+        emitInteractionState(relaxingState);
+
+        interactionIdleTimeoutRef.current = window.setTimeout(() => {
+            interactionIdleTimeoutRef.current = null;
+            const latestState = interactionStateRef.current;
+            if (latestState.isDragging || latestState.isZooming) {
+                return;
+            }
+
+            emitInteractionState(buildInteractionState(false, false, 'idle'));
+        }, relaxingState.idleRelaxationMs);
+    }, [buildInteractionState, clearInteractionIdleTimeout, emitInteractionState]);
+
+    const scheduleZoomIdleSettle = useCallback(() => {
+        if (zoomIndicatorTimeoutRef.current) {
+            clearTimeout(zoomIndicatorTimeoutRef.current);
+        }
+
+        zoomIndicatorTimeoutRef.current = setTimeout(() => {
+            settleInteractionPhase('zoom');
+        }, 260);
+    }, [settleInteractionPhase]);
 
     const applyGridGlow = useCallback((x: number, y: number, opacity: number, scale: number) => {
         const grid = gridRef.current;
@@ -213,7 +374,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 if (isValidTransform(parsed)) {
                     setTransform(parsed);
                     syncTransformRef.current = parsed;
-                    onTransformChange?.(parsed);
+                    emitTransformChange(parsed);
                     return;
                 }
 
@@ -232,8 +393,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         };
         setTransform(initialTransform);
         syncTransformRef.current = initialTransform;
-        onTransformChange?.(initialTransform);
-    }, []);
+        emitTransformChange(initialTransform);
+    }, [applyGridGlow, emitTransformChange]);
 
     // Save view to localStorage on change (debounced)
     useEffect(() => {
@@ -244,8 +405,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     }, [transform]);
 
     useEffect(() => {
-        onInteractionChange?.({ isDragging, isZooming });
-    }, [isDragging, isZooming, onInteractionChange]);
+        callbackRef.current.onInteractionChange?.(interactionStateRef.current);
+    }, []);
 
     // Handle mouse wheel zoom
     // 🚀 优化：缩放时使用临时transform + 防抖 + 缓动曲线
@@ -255,13 +416,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             return;
         }
         e.preventDefault();
-        setIsZooming(true);
-        if (zoomIndicatorTimeoutRef.current) {
-            clearTimeout(zoomIndicatorTimeoutRef.current);
-        }
-        zoomIndicatorTimeoutRef.current = setTimeout(() => {
-            setIsZooming(false);
-        }, 260);
+        activateInteractionPhase('zoom');
+        scheduleZoomIdleSettle();
 
         const container = containerRef.current;
         if (!container) return;
@@ -307,9 +463,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
         zoomTimeoutRef.current = setTimeout(() => {
             setTransform(newTransform);
-            onTransformChange?.(newTransform);
+            emitTransformChange(newTransform);
         }, 50);
-    }, [onTransformChange]);
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle]);
 
     // 图片拖拽处理
     const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -344,7 +500,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         dragCounter.current = 0;
         setIsImageDragOver(false);
 
-        if (!onImageDrop) return;
+        if (!callbackRef.current.onImageDrop) return;
 
         // 🚀 [FIX] Ignore Internal Drags (prevent orphan creation from internal move)
         // Check if the drag data includes our internal type
@@ -366,20 +522,20 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 const canvasX = (clientX - transform.x) / transform.scale;
                 const canvasY = (clientY - transform.y) / transform.scale;
 
-                onImageDrop(imageFile, { x: canvasX, y: canvasY });
+                callbackRef.current.onImageDrop?.(imageFile, { x: canvasX, y: canvasY });
             }
         }
-    }, [onImageDrop, transform]);
+    }, [transform]);
 
     const startCanvasPan = useCallback((clientX: number, clientY: number) => {
         const currentTransform = syncTransformRef.current;
 
-        setIsDragging(true);
         isDraggingRef.current = true;
         dragStart.current = { x: clientX, y: clientY };
         lastTransform.current = { x: currentTransform.x, y: currentTransform.y };
+        activateInteractionPhase('pan');
         setGridGlowTarget(clientX, clientY, 0.52, 0.72);
-    }, [setGridGlowTarget]);
+    }, [activateInteractionPhase, setGridGlowTarget]);
 
     const handleMouseDownCapture = useCallback((e: React.MouseEvent) => {
         if (e.button !== 1) return;
@@ -399,7 +555,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
 
         // Call parent handler first
-        onMouseDown?.(e);
+        callbackRef.current.onMouseDown?.(e);
 
         // Pan on Left Button (0) on empty background
         // IGNORE Right Button (2) to allow external handling (Selection)
@@ -408,7 +564,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             startCanvasPan(e.clientX, e.clientY);
             isDraggingRef.current = true; // 🚀 设置拖动标记
         }
-    }, [onMouseDown, startCanvasPan]);
+    }, [startCanvasPan]);
 
     // Handle mouse move for panning
     // 🚀 优化：拖动时只更新临时transform，不触发重绘
@@ -422,7 +578,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const newTransform = {
             x: Math.round(lastTransform.current.x + dx),
             y: Math.round(lastTransform.current.y + dy),
-            scale: transform.scale
+            scale: syncTransformRef.current.scale
         };
 
         // 实时同步到 Ref
@@ -432,10 +588,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         if (viewportRef.current) {
             viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
         }
-    }, [transform.scale]);
+    }, []);
 
     const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-        onMouseMove?.(e);
+        callbackRef.current.onMouseMove?.(e);
         setGridGlowTarget(
             e.clientX,
             e.clientY,
@@ -443,7 +599,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             isDraggingRef.current ? 0.72 : 0.96
         );
         scheduleGridGlowIdleFade();
-    }, [onMouseMove, scheduleGridGlowIdleFade, setGridGlowTarget]);
+    }, [scheduleGridGlowIdleFade, setGridGlowTarget]);
 
     const handleCanvasMouseLeave = useCallback(() => {
         gridGlowPointerInsideRef.current = false;
@@ -497,18 +653,18 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 };
                 syncTransformRef.current = roundedFinal;
                 setTransform(roundedFinal);
-                onTransformChange?.(roundedFinal);
+                emitTransformChange(roundedFinal);
             }
 
             // 检查是否是点击（移动距离<5px）
             if (dist < 5 && e.button === 0) {
-                onCanvasClick?.();
+                callbackRef.current.onCanvasClick?.();
             }
 
             isDraggingRef.current = false;
-            setIsDragging(false);
+            settleInteractionPhase('pan');
         }
-    }, [onTransformChange, onCanvasClick]);
+    }, [emitTransformChange, settleInteractionPhase]);
 
     // Zoom controls
     const zoomIn = useCallback(() => {
@@ -527,8 +683,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
-        onTransformChange?.(newTransform);
-    }, [transform, onTransformChange]);
+        activateInteractionPhase('zoom');
+        scheduleZoomIdleSettle();
+        emitTransformChange(newTransform);
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle, transform]);
 
     const zoomOut = useCallback(() => {
         const newScale = Math.max(0.1, transform.scale / 1.1);
@@ -546,8 +704,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
-        onTransformChange?.(newTransform);
-    }, [transform, onTransformChange]);
+        activateInteractionPhase('zoom');
+        scheduleZoomIdleSettle();
+        emitTransformChange(newTransform);
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle, transform]);
 
     const resetView = useCallback(() => {
         const container = containerRef.current;
@@ -561,8 +721,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         });
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
-        onTransformChange?.(newTransform);
-    }, [onTransformChange]);
+        emitTransformChange(newTransform);
+    }, [emitTransformChange]);
 
     // ✅ 缩放到全览所有卡片
     const fitToAll = useCallback(() => {
@@ -603,8 +763,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
-        onTransformChange?.(newTransform);
-    }, [cardPositions, onTransformChange, resetView]);
+        emitTransformChange(newTransform);
+    }, [cardPositions, emitTransformChange, resetView]);
 
     // Expose methods to parent
     useImperativeHandle(ref, () => ({
@@ -616,7 +776,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             const newTransform = snapTransformForText({ x, y, scale });
             syncTransformRef.current = newTransform;
             setTransform(newTransform);
-            onTransformChange?.(newTransform);
+            emitTransformChange(newTransform);
         },
         // 🚀 获取当前实时的 transform（使用 Ref 绕过 React 状态异步，解决截图/生成时的坐标偏移）
         getCurrentTransform: () => syncTransformRef.current,
@@ -639,8 +799,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
         if (e.key === 'Escape' || e.key === 'Home') {
             // 如果有onResetView prop,使用它(定位最新),否则使用resetView(重置到中心)
-            if (onResetView) {
-                onResetView();
+            if (callbackRef.current.onResetView) {
+                callbackRef.current.onResetView();
             } else {
                 resetView();
             }
@@ -651,31 +811,27 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         if (e.key === '-' || e.key === '_') {
             zoomOut();
         }
-    }, [resetView, zoomIn, zoomOut, onResetView]);
+    }, [resetView, zoomIn, zoomOut]);
 
     // Touch Handling (Mirroring Mouse Logic)
     const handleTouchStart = useCallback((e: TouchEvent) => {
         if (e.touches.length === 1) {
             const touch = e.touches[0];
-            setIsDragging(true);
             isDraggingRef.current = true; // 🚀 [移动端优化] 使用 ref 标记
             dragStart.current = { x: touch.clientX, y: touch.clientY };
-            lastTransform.current = { x: transform.x, y: transform.y };
+            lastTransform.current = {
+                x: syncTransformRef.current.x,
+                y: syncTransformRef.current.y,
+            };
+            activateInteractionPhase('pan');
         }
-    }, [transform]);
+    }, [activateInteractionPhase]);
 
     // 🚀 [移动端性能优化] 触控拖动时直接操作 DOM，与鼠标拖动保持一致
     // 避免每帧 setState 造成 React 重绘，实现 60fps 丝滑滑动
     const handleTouchMove = useCallback((e: TouchEvent) => {
         if (!isDraggingRef.current) return;
         if (e.touches.length === 1) {
-            setIsZooming(true);
-            if (zoomIndicatorTimeoutRef.current) {
-                clearTimeout(zoomIndicatorTimeoutRef.current);
-            }
-            zoomIndicatorTimeoutRef.current = setTimeout(() => {
-                setIsZooming(false);
-            }, 260);
             if (e.cancelable) e.preventDefault();
             const touch = e.touches[0];
             const dx = touch.clientX - dragStart.current.x;
@@ -684,7 +840,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             const newTransform = {
                 x: Math.round(lastTransform.current.x + dx),
                 y: Math.round(lastTransform.current.y + dy),
-                scale: transform.scale
+                scale: syncTransformRef.current.scale
             };
 
             // 🚀 实时同步到 Ref，不触发 React 重绘
@@ -695,7 +851,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
             }
         }
-    }, [transform.scale]);
+    }, []);
 
     // 🚀 [移动端优化] touchEnd 时才提交 React state 同步最终位置
     const handleTouchEnd = useCallback(() => {
@@ -703,17 +859,17 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             clearTimeout(zoomIndicatorTimeoutRef.current);
             zoomIndicatorTimeoutRef.current = null;
         }
-        setIsZooming(false);
-        if (isDraggingRef.current) {
+        const wasDragging = isDraggingRef.current;
+        if (wasDragging) {
             const finalTransform = syncTransformRef.current;
             if (finalTransform.x !== lastTransform.current.x || finalTransform.y !== lastTransform.current.y) {
                 setTransform({ ...finalTransform });
-                onTransformChange?.(finalTransform);
+                emitTransformChange(finalTransform);
             }
             isDraggingRef.current = false;
+            settleInteractionPhase('pan');
         }
-        setIsDragging(false);
-    }, [onTransformChange]);
+    }, [emitTransformChange, settleInteractionPhase]);
 
     // Setup event listeners
     useEffect(() => {
@@ -742,12 +898,17 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             window.removeEventListener('mousemove', handleWindowMouseMoveForGlow);
             window.removeEventListener('mouseup', handleMouseUp);
             window.removeEventListener('keydown', handleKeyDown);
+            if (zoomTimeoutRef.current) {
+                clearTimeout(zoomTimeoutRef.current);
+                zoomTimeoutRef.current = null;
+            }
             if (zoomIndicatorTimeoutRef.current) {
                 clearTimeout(zoomIndicatorTimeoutRef.current);
                 zoomIndicatorTimeoutRef.current = null;
             }
+            clearInteractionIdleTimeout();
         };
-    }, [handleWheel, handleKeyDown, handleMouseMove, handleMouseUp, handleTouchEnd, handleTouchMove, handleTouchStart, handleWindowMouseMoveForGlow]);
+    }, [clearInteractionIdleTimeout, handleWheel, handleKeyDown, handleMouseMove, handleMouseUp, handleTouchEnd, handleTouchMove, handleTouchStart, handleWindowMouseMoveForGlow]);
 
     useEffect(() => {
         return () => {
@@ -757,8 +918,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             if (gridGlowIdleTimeoutRef.current !== null) {
                 window.clearTimeout(gridGlowIdleTimeoutRef.current);
             }
+            clearInteractionIdleTimeout();
         };
-    }, []);
+    }, [clearInteractionIdleTimeout]);
 
     const zoomSliderProgress = Math.max(0, Math.min(100, ((transform.scale * 100) - 10) / 290 * 100));
 
@@ -779,8 +941,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onContextMenu={(e) => {
-                    if (onContextMenu) {
-                        onContextMenu(e);
+                    if (callbackRef.current.onContextMenu) {
+                        callbackRef.current.onContextMenu(e);
                     } else {
                         e.preventDefault();
                         e.stopPropagation();
@@ -789,7 +951,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 onDoubleClick={(e) => {
                     const isEmptyCanvas = e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-grid');
                     if (isEmptyCanvas) {
-                        onCanvasDoubleClick?.();
+                        callbackRef.current.onCanvasDoubleClick?.();
                     }
                 }}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
@@ -841,7 +1003,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                             const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
                             syncTransformRef.current = newTransform;
                             setTransform(newTransform);
-                            onTransformChange?.(newTransform);
+                            activateInteractionPhase('zoom');
+                            scheduleZoomIdleSettle();
+                            emitTransformChange(newTransform);
                         }}
                         className="zoom-slider w-32 cursor-pointer"
                         style={{ '--zoom-slider-progress': `${zoomSliderProgress}%` } as React.CSSProperties}

@@ -1,6 +1,6 @@
 import { resolveKkApiBaseUrl } from './kkApiClient.ts';
 
-export type KkApiRepositoryBackend = 'supabase' | 'memory' | 'local-file' | 'custom' | 'unknown';
+export type KkApiRepositoryBackend = 'supabase' | 'postgres' | 'memory' | 'local-file' | 'custom' | 'unknown';
 
 interface RawHealthEnvelope {
   success?: boolean;
@@ -54,7 +54,7 @@ function normalizeBoolean(value: unknown): boolean {
 }
 
 function normalizeBackend(value: unknown): KkApiRepositoryBackend {
-  return value === 'supabase' || value === 'memory' || value === 'local-file' || value === 'custom'
+  return value === 'supabase' || value === 'postgres' || value === 'memory' || value === 'local-file' || value === 'custom'
     ? value
     : 'unknown';
 }
@@ -220,7 +220,7 @@ export function isKkApiUserDataPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && health.repositories.authData === 'supabase'
+    && (health.repositories.authData === 'supabase' || health.repositories.authData === 'postgres')
     && health.persistence.userApiKeys
     && health.persistence.keyManager
     && health.config.hasUserApiEncryptionSecret,
@@ -234,7 +234,11 @@ export function isKkApiUserDataWritableFromHealth(
     health
     && health.reachable
     && health.verified
-    && (health.repositories.authData === 'supabase' || health.repositories.authData === 'local-file')
+    && (
+      health.repositories.authData === 'supabase'
+      || health.repositories.authData === 'postgres'
+      || health.repositories.authData === 'local-file'
+    )
     && health.persistence.userApiKeys
     && health.persistence.keyManager
     && health.config.hasUserApiEncryptionSecret,
@@ -248,7 +252,7 @@ export function isKkApiBillingPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && health.repositories.creditAccounts === 'supabase'
+    && (health.repositories.creditAccounts === 'supabase' || health.repositories.creditAccounts === 'postgres')
     && health.persistence.credits,
   );
 }
@@ -260,7 +264,11 @@ export function isKkApiBillingAvailableFromHealth(
     health
     && health.reachable
     && health.verified
-    && (health.repositories.creditAccounts === 'supabase' || health.repositories.creditAccounts === 'local-file')
+    && (
+      health.repositories.creditAccounts === 'supabase'
+      || health.repositories.creditAccounts === 'postgres'
+      || health.repositories.creditAccounts === 'local-file'
+    )
     && health.persistence.credits,
   );
 }
@@ -272,7 +280,7 @@ export function isKkApiCreditProviderCatalogPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && health.repositories.creditProviders === 'supabase'
+    && (health.repositories.creditProviders === 'supabase' || health.repositories.creditProviders === 'postgres')
     && health.persistence.creditProviders,
   );
 }

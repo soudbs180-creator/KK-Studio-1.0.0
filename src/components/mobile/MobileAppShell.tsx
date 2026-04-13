@@ -13,20 +13,29 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   composer,
   overlays,
 }) => {
+  const shellStyle = {
+    gridTemplateRows:
+      'minmax(0, var(--mobile-home-header-share, 10fr)) minmax(0, var(--mobile-home-feed-share, 60fr)) minmax(0, var(--mobile-home-composer-share, 30fr))',
+    '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 12px)',
+    '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+    '--mobile-tabbar-total-height': '0px',
+  } as React.CSSProperties;
+
   return (
     <div
       data-testid="mobile-app-shell"
-      className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] md:hidden"
+      className="relative isolate grid min-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] md:hidden"
+      style={shellStyle}
     >
       <div
         data-slot="header"
-        className="sticky top-0 z-20 shrink-0"
+        className="z-20 min-h-0 overflow-hidden"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         {header}
       </div>
 
-      <main data-slot="feed" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <main data-slot="feed" className="flex min-h-0 flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto overscroll-contain">
           {feed}
         </div>
@@ -34,7 +43,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
 
       <div
         data-slot="composer"
-        className="sticky bottom-0 z-20 shrink-0"
+        className="z-20 min-h-0 overflow-hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {composer}

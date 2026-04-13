@@ -6,6 +6,8 @@ import type {
   RegisterRequestDto,
   RegisterResponseDto,
   SendCodeRequestDto,
+  UpdatePasswordRequestDto,
+  UpdatePasswordResponseDto,
   UpdateProfileRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
@@ -199,6 +201,30 @@ export class AuthService {
 
   updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): ProfileDto | undefined {
     return this.identityStore.updateProfile(headers, input);
+  }
+
+  updatePassword(
+    headers: Record<string, string>,
+    input: UpdatePasswordRequestDto,
+  ): UpdatePasswordResponseDto | undefined {
+    const profile = this.getProfile(headers);
+    if (!profile || !input.currentPassword?.trim() || !input.newPassword?.trim()) {
+      return undefined;
+    }
+
+    const updatedProfile = this.identityStore.changePassword(
+      profile.id,
+      input.currentPassword,
+      input.newPassword,
+    );
+    if (!updatedProfile) {
+      return undefined;
+    }
+
+    return {
+      updated: true,
+      profile: updatedProfile,
+    };
   }
 
   private success<T>(statusCode: number, data: T): AuthHandlerResult<T> {

@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from 'node:test';
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
+
+test('settings shell and exported routes use one shared route factory instead of duplicating route trees', () => {
+  const routeConfigSource = readSource('src/components/settings/settingsRouteConfig.tsx');
+  const panelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const routesSource = readSource('src/routes/settingsRoutes.tsx');
+
+  assert.match(routeConfigSource, /export function createSettingsRouteObjects\(/);
+  assert.match(routeConfigSource, /export function renderSettingsRouteElements\(/);
+  assert.match(routeConfigSource, /path: 'storage-settings'/);
+  assert.match(panelSource, /from '\.\/settingsRouteConfig';/);
+  assert.match(routesSource, /from '\.\.\/components\/settings\/settingsRouteConfig';/);
+  assert.doesNotMatch(panelSource, /<Route path="\/settings\/api-management"/);
+  assert.doesNotMatch(panelSource, /<Route path="\/settings\/storage-settings"/);
+  assert.doesNotMatch(routesSource, /path: 'api-management'/);
+  assert.doesNotMatch(routesSource, /path: 'storage-settings'/);
+});

@@ -1,6 +1,6 @@
-import { supabase } from '../../lib/supabase';
 import { GenerationMode, TaskProviderType } from '../../types';
 import { getLatestAuthSessionChange } from '../auth/authSessionEvents';
+import { resolveRuntimeAuthenticatedProfileContext } from '../auth/runtimeSessionProfile.ts';
 import { tempUserService } from '../auth/tempUserService';
 
 export type TaskType = 'image' | 'video' | 'audio';
@@ -91,16 +91,10 @@ async function resolveStorageUserId(): Promise<string | null> {
 
   if (!pendingStorageUserIdPromise) {
     pendingStorageUserIdPromise = (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const sessionUserId = normalizeStorageUserId(session?.user?.id);
-        if (sessionUserId) {
-          return setCachedResolvedStorageUserId(sessionUserId);
-        }
-      } catch (error) {
-        if (!isSupabaseAuthLockError(error)) {
-          console.warn('[TaskPersistence] Failed to resolve storage user from Supabase session:', error);
-        }
+      const runtimeProfile = resolveRuntimeAuthenticatedProfileContext();
+      const runtimeUserId = normalizeStorageUserId(runtimeProfile?.userId);
+      if (runtimeUserId) {
+        return setCachedResolvedStorageUserId(runtimeUserId);
       }
 
       if (authStateExplicitlyCleared) {

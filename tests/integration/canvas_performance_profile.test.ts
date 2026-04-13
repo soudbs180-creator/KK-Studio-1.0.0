@@ -2,10 +2,13 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  getCanvasDeviceTier,
+  getCanvasInteractionIdleRelaxationMs,
   getCanvasPerformanceProfile,
   getCanvasProjectSize,
   getCanvasTextSofteningProfile,
   getCanvasZoomBand,
+  resolveCanvasInteractionPhase,
   shouldSimplifyCard,
   shouldThrottleEdges,
 } from '../../src/canvas/performanceProfile.ts'
@@ -23,19 +26,49 @@ describe('canvas performance profile', () => {
     assert.equal(getCanvasZoomBand(0.2), 'tiny')
   })
 
+  test('derives device tiers from caller-provided hardware hints', () => {
+    assert.equal(getCanvasDeviceTier({ hardwareConcurrency: 4, deviceMemory: 6 }), 'low')
+    assert.equal(getCanvasDeviceTier({ hardwareConcurrency: 8, deviceMemory: 6 }), 'medium')
+    assert.equal(getCanvasDeviceTier({ hardwareConcurrency: 16, deviceMemory: 8 }), 'high')
+  })
+
+  test('resolves interaction phases from explicit phases and legacy flags', () => {
+    assert.equal(resolveCanvasInteractionPhase({ isInteracting: false }), 'idle')
+    assert.equal(resolveCanvasInteractionPhase({ isInteracting: true }), 'pan')
+    assert.equal(resolveCanvasInteractionPhase({ isDragging: true, isZooming: false }), 'pan')
+    assert.equal(resolveCanvasInteractionPhase({ isDragging: true, isZooming: true }), 'zoom')
+    assert.equal(resolveCanvasInteractionPhase({ interactionPhase: 'zoom', isInteracting: false }), 'zoom')
+  })
+
+  test('uses longer idle relaxation for zoom than pan on weaker devices', () => {
+    assert.equal(getCanvasInteractionIdleRelaxationMs('idle', 'medium'), 0)
+    assert.equal(getCanvasInteractionIdleRelaxationMs('pan', 'high'), 120)
+    assert.equal(getCanvasInteractionIdleRelaxationMs('zoom', 'medium'), 220)
+    assert.equal(getCanvasInteractionIdleRelaxationMs('zoom', 'low'), 280)
+  })
+
   test('keeps normal near view fully detailed', () => {
     const profile = getCanvasPerformanceProfile({
       scale: 1,
       isInteracting: false,
+      interactionPhase: 'idle',
       nodeCount: 50,
       connectionCount: 18,
       viewportWidth: 1440,
       viewportHeight: 900,
+      hardwareConcurrency: 16,
+      deviceMemory: 8,
     })
 
     assert.equal(profile.projectSize, 'normal')
+    assert.equal(profile.deviceTier, 'high')
+    assert.equal(profile.interactionPhase, 'idle')
     assert.equal(profile.overscanBuffer, 900)
+    assert.equal(profile.overscanMode, 'wide')
     assert.equal(profile.cardDetailLevel, 'full')
+    assert.equal(profile.edgeMode, 'full')
+    assert.equal(profile.frameBudgetMs, 12)
+    assert.equal(profile.detailHysteresisMs, 0)
     assert.equal(profile.renderMode, 'standard')
     assert.equal(shouldSimplifyCard(profile), false)
     assert.equal(shouldThrottleEdges(profile), false)
@@ -45,13 +78,21 @@ describe('canvas performance profile', () => {
     const profile = getCanvasPerformanceProfile({
       scale: 1,
       isInteracting: true,
+      interactionPhase: 'pan',
       nodeCount: 50,
       connectionCount: 18,
       viewportWidth: 1440,
       viewportHeight: 900,
+      hardwareConcurrency: 8,
+      deviceMemory: 6,
     })
 
     assert.equal(profile.overscanBuffer, 500)
+    assert.equal(profile.interactionPhase, 'pan')
+    assert.equal(profile.overscanMode, 'tight')
+    assert.equal(profile.edgeMode, 'throttled')
+    assert.equal(profile.frameBudgetMs, 9)
+    assert.equal(profile.detailHysteresisMs, 160)
     assert.equal(profile.renderMode, 'interactive')
     assert.equal(shouldThrottleEdges(profile), true)
   })
@@ -60,6 +101,7 @@ describe('canvas performance profile', () => {
     const profile = getCanvasPerformanceProfile({
       scale: 1,
       isInteracting: true,
+      interactionPhase: 'pan',
       nodeCount: 120,
       connectionCount: 80,
       viewportWidth: 1440,
@@ -76,6 +118,7 @@ describe('canvas performance profile', () => {
     const profile = getCanvasPerformanceProfile({
       scale: 0.6,
       isInteracting: false,
+      interactionPhase: 'idle',
       nodeCount: 120,
       connectionCount: 80,
       viewportWidth: 1440,
@@ -92,16 +135,25 @@ describe('canvas performance profile', () => {
   test('uses thumbnail shells for tiny zoom regardless of project size', () => {
     const profile = getCanvasPerformanceProfile({
       scale: 0.2,
-      isInteracting: false,
-      nodeCount: 32,
-      connectionCount: 12,
+      isInteracting: true,
+      interactionPhase: 'zoom',
+      nodeCount: 240,
+      connectionCount: 120,
       viewportWidth: 1440,
       viewportHeight: 900,
+      hardwareConcurrency: 4,
+      deviceMemory: 4,
     })
 
+    assert.equal(profile.deviceTier, 'low')
     assert.equal(profile.cardDetailLevel, 'thumbnail-shell')
+    assert.equal(profile.edgeMode, 'minimal')
+    assert.equal(profile.overscanMode, 'tight')
+    assert.equal(profile.frameBudgetMs, 5)
+    assert.equal(profile.detailHysteresisMs, 280)
     assert.equal(profile.renderMode, 'performance')
     assert.equal(shouldSimplifyCard(profile), true)
+    assert.equal(shouldThrottleEdges(profile), true)
   })
 
   test('progressively softens text from 100% to 50% zoom', () => {

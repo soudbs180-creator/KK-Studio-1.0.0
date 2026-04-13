@@ -12,10 +12,11 @@ function readSource(relativePath: string): string {
 test('shared settings ui primitives use a calmer desktop density scale', () => {
   const source = readSource('src/components/settings/ui/index.tsx');
 
+  assert.match(source, /borderRadius: 'var\(--radius-control-md\)'/);
+  assert.match(source, /fontSize: 'var\(--type-body-2\)'/);
+  assert.match(source, /fontSize: 'var\(--type-caption\)'/);
+  assert.match(source, /minHeight: 'var\(--ui-control-height-default\)'/);
+  assert.match(source, /minHeight: 'var\(--ui-control-height-compact\)'/);
   assert.doesNotMatch(source, /rounded-\[22px\]/);
   assert.doesNotMatch(source, /rounded-\[20px\]/);
-  assert.doesNotMatch(source, /rounded-\[18px\]/);
-  assert.match(source, /rounded-\[16px\]/);
-  assert.match(source, /px-4 py-2\.5 text-sm/);
 });
-

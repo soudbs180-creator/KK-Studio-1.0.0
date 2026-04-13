@@ -1,6 +1,6 @@
 ﻿import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
-import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType } from '../../types';
+import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType, type EcommerceEditableTaskState } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
 import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; // Added getter
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -32,8 +32,9 @@ import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitche
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
 import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
+import MobileEmbeddedComposerShell from './prompt-bar/MobileEmbeddedComposerShell';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
-import { isEcommerceAllowedModel, resolveEcommerceAspectPolicy } from '../../services/ecommerce/ecommerceModelPolicy.ts';
+import { isEcommerceAllowedModel, resolveEcommerceAspectPolicy, resolvePreferredEcommerceImageSize } from '../../services/ecommerce/ecommerceModelPolicy.ts';
 import type { EcommerceAnalysisResult } from '../../services/ecommerce/types.ts';
 
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
@@ -510,6 +511,8 @@ interface PromptBarProps {
     ecommerceExtraReferenceCount?: number;
     ecommerceAnalysis?: EcommerceAnalysisResult | null;
     ecommerceSelection?: Record<string, boolean>;
+    ecommerceTaskStates?: Record<string, EcommerceEditableTaskState | undefined>;
+    ecommerceActiveTaskState?: EcommerceEditableTaskState | null;
     ecommerceAnalyzing?: boolean;
     onPickEcommerceRequirementFile?: (files: FileList | File[]) => void;
     onPickEcommerceProductFiles?: (files: FileList | File[]) => void;
@@ -517,6 +520,12 @@ interface PromptBarProps {
     onResetEcommerceAnalysis?: () => void;
     onConfirmEcommerceAnalysis?: () => void;
     onToggleEcommerceSelection?: (id: string, selected: boolean) => void;
+    onChangeEcommerceTaskState?: (
+        taskId: string,
+        updater:
+            | EcommerceEditableTaskState
+            | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
+    ) => void;
     ecommerceRatioOverride?: AspectRatio[];
     onAnalyzeEcommerceFile?: () => void;
 }
@@ -808,6 +817,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     ecommerceExtraReferenceCount = 0,
     ecommerceAnalysis,
     ecommerceSelection = {},
+    ecommerceTaskStates = {},
+    ecommerceActiveTaskState = null,
     ecommerceAnalyzing = false,
     onPickEcommerceRequirementFile,
     onPickEcommerceProductFiles,
@@ -815,6 +826,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     onResetEcommerceAnalysis,
     onConfirmEcommerceAnalysis,
     onToggleEcommerceSelection,
+    onChangeEcommerceTaskState,
     ecommerceRatioOverride,
     onAnalyzeEcommerceFile,
 }) => {
@@ -1331,12 +1343,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
     }, [filteredDisplayModels, isMobile, modelListWindowStart]);
 
     const getDefaultImageSizeForModel = useCallback((modelId: string): ImageSize => {
+        if (config.mode === GenerationMode.ECOMMERCE) {
+            return resolvePreferredEcommerceImageSize(modelId) as ImageSize;
+        }
         const caps = getModelCapabilities(modelId);
         const supported = caps?.supportedSizes;
         if (!supported || supported.length === 0) return ImageSize.SIZE_1K;
         if (supported.includes(ImageSize.SIZE_1K)) return ImageSize.SIZE_1K;
         return supported[0];
-    }, []);
+    }, [config.mode]);
 
     const getDefaultAspectForModel = useCallback((modelId: string): AspectRatio => {
         if (config.mode === GenerationMode.ECOMMERCE) {
@@ -2393,6 +2408,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const displayModelLabel = useMemo(() => {
         return truncateModelLabel(currentModelName, isMobile ? 24 : 15);
     }, [currentModelName, isMobile, truncateModelLabel]);
+    const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';
 
     // 🚀 [Mobile Layout] Dock to bottom on mobile
     const mobileStyle: React.CSSProperties = isMobile ? (mobileShellMode === 'embedded'
@@ -2436,6 +2452,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
+    const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
 
     // Swipe Detection State
     const wrapperTouchStartY = useRef<number | null>(null);
@@ -2536,7 +2554,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className="text-xs font-semibold text-amber-600 dark:text-amber-500">从此图继续创作</div>
                                 <div className="text-xs text-[var(--text-tertiary)] truncate">{activeSourceImage.prompt}</div>
                             </div>
-                            {!isMobile && (
                             <button
                                 onClick={onClearSource}
                                 className="
@@ -2551,30 +2568,32 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             >
                                 <X size={14} />
                             </button>
-                            )}
                         </div>
                     )}
 
-                    {/* Top Controls Row: Mode toggle on left, prompt optimizer on right */}
+                    {/* Top Controls Row: desktop keeps tools visible; embedded mobile only keeps the mode strip */}
                     <PromptBarTopRow isMobile={isMobile}>
-                        <DesktopComposerModeSwitcher
-                            isMobile={isMobile}
-                            activeMode={activeModeOption.mode}
-                            modeOptions={modeOptions}
-                            onSelectMode={handleSelectPromptBarMode}
-                        />
-
-                        <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
-                            <DesktopComposerPromptTools
+                        <div data-mobile-composer-section="mode-strip" className="min-w-0">
+                            <DesktopComposerModeSwitcher
                                 isMobile={isMobile}
-                                config={config}
-                                showPptOutlinePanel={showPptOutlinePanel}
-                                onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-                                onTogglePromptOptimization={handleTogglePromptOptimization}
+                                activeMode={activeModeOption.mode}
+                                modeOptions={modeOptions}
+                                onSelectMode={handleSelectPromptBarMode}
                             />
+                        </div>
 
-                            {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
-                                <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                        {!isEmbeddedMobileComposer && (
+                            <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
+                                <DesktopComposerPromptTools
+                                    isMobile={isMobile}
+                                    config={config}
+                                    showPptOutlinePanel={showPptOutlinePanel}
+                                    onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                                    onTogglePromptOptimization={handleTogglePromptOptimization}
+                                />
+
+                                {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
+                                    <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
                                     <div className="flex items-center justify-between gap-2 mb-2">
                                         <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
                                         <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
@@ -2700,9 +2719,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             应用页纲
                                         </button>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </PromptBarTopRow>
 
                     {/* Input Area Wrapper with hover detection */}
@@ -2902,7 +2922,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         )}
 
                         {/* Upload button when no reference images - 始终显示，与参考图同行对齐 */}
-                        {config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0 && (
+                        {shouldRenderStandaloneUploadRow && (
                             <div className="flex items-center p-2 px-3 mt-1">
                                 <button
                                     className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-white/5 flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
@@ -2929,6 +2949,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             extraReferenceCount={ecommerceExtraReferenceCount}
                             ecommerceAnalysis={ecommerceAnalysis}
                             ecommerceSelection={ecommerceSelection}
+                            taskStates={ecommerceTaskStates}
+                            activeTaskState={ecommerceActiveTaskState}
                             ecommerceAnalyzing={ecommerceAnalyzing}
                             onPickRequirementFile={onPickEcommerceRequirementFile}
                             onPickProductFiles={onPickEcommerceProductFiles}
@@ -2937,45 +2959,74 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             onResetAnalysis={onResetEcommerceAnalysis}
                             onConfirmAnalysis={onConfirmEcommerceAnalysis}
                             onToggleSelection={onToggleEcommerceSelection}
+                            onTaskStateChange={onChangeEcommerceTaskState}
                         />
 
                         {/* Text Input Area */}
-                        <textarea
-                            ref={textareaRef}
-                            value={promptDraft}
-                            onChange={handleInput}
-                            onKeyDown={handleKeyDown}
-                            onPaste={handlePaste}
-                            onFocus={() => {
-                                setActiveMenu(null);
-                                onFocus?.(); // 通知侧边栏: 输入框有焦点,不要自动隐藏
-                            }}
-                            onBlur={() => {
-                                flushPromptDraftToConfig();
-                                onBlur?.(); // 通知侧边栏: 输入框失去焦点,可以自动隐藏
-                            }}
-                            onCompositionStart={() => { isComposingRef.current = true; }}
-                            onCompositionEnd={handleCompositionEnd}
-                            placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
-                            className="input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none mt-1 py-1 px-3 box-border overflow-y-auto"
-                            style={{
-                                color: 'var(--text-primary)', // 使用 CSS 变量适配主题
-                                minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
-                                maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
-                                lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
-                            }}
-                            rows={PROMPT_TEXTAREA_MIN_ROWS}
-                        />
+                        <div
+                            data-mobile-composer-section="primary-input"
+                            className={[
+                                shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
+                                isEmbeddedMobileComposer
+                                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-white/8 bg-black/15 px-3 py-2.5'
+                                    : '',
+                            ].filter(Boolean).join(' ')}
+                        >
+                            {shouldRenderInlineMobileUploadButton && (
+                                <button
+                                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-white/5 hover:opacity-100"
+                                    style={{
+                                        color: 'var(--text-secondary)',
+                                        borderColor: 'var(--border-light)',
+                                        backgroundColor: 'var(--bg-tertiary)'
+                                    }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="上传参考图"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                </button>
+                            )}
+                            <textarea
+                                ref={textareaRef}
+                                value={promptDraft}
+                                onChange={handleInput}
+                                onKeyDown={handleKeyDown}
+                                onPaste={handlePaste}
+                                onFocus={() => {
+                                    setActiveMenu(null);
+                                    onFocus?.(); // 通知侧边栏: 输入框有焦点,不要自动隐藏
+                                }}
+                                onBlur={() => {
+                                    flushPromptDraftToConfig();
+                                    onBlur?.(); // 通知侧边栏: 输入框失去焦点,可以自动隐藏
+                                }}
+                                onCompositionStart={() => { isComposingRef.current = true; }}
+                                onCompositionEnd={handleCompositionEnd}
+                                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
+                                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
+                                style={{
+                                    color: 'var(--text-primary)', // 使用 CSS 变量适配主题
+                                    minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
+                                    maxHeight: `${PROMPT_TEXTAREA_MAX_HEIGHT_PX}px`,
+                                    lineHeight: `${PROMPT_TEXTAREA_LINE_HEIGHT_PX}px`
+                                }}
+                                rows={PROMPT_TEXTAREA_MIN_ROWS}
+                            />
+                        </div>
                     </div> {/* End of input area hover wrapper */}
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
                         <div className={`flex min-w-0 items-center ${isMobile ? 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2' : 'flex-1 gap-1.5'}`}>
                             {/* Model Button */}
-                            <div className={`relative inline-flex min-w-0 ${isMobile ? 'col-span-2' : 'flex-shrink-0'}`}>
+                            <div className={`relative inline-flex min-w-0 ${isMobile ? (isEmbeddedMobileComposer ? '' : 'col-span-2') : 'flex-shrink-0'}`}>
                                 <button
                                     id="models-dropdown-trigger"
-                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full max-w-full justify-center' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? (isEmbeddedMobileComposer ? 'w-full max-w-full justify-start' : 'w-full max-w-full justify-center') : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed border-[var(--border-light)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3165,7 +3216,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             </div >
 
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
-                            <DesktopComposerModePanel
+                            {!isEmbeddedMobileComposer && (
+                                <DesktopComposerModePanel
                                 isMobile={isMobile}
                                 config={config}
                                 showOptionsPanel={showOptionsPanel}
@@ -3287,7 +3339,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                                 ) : undefined}
-                            />
+                                />
+                            )}
 
                             {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
                             {!isMobile && (
@@ -3456,6 +3509,110 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </div>
                             )}
                         </div>
+                        {isEmbeddedMobileComposer ? (
+                            <details
+                                data-mobile-composer-section="advanced-drawer"
+                                className="w-full rounded-[20px] border border-white/8 bg-black/10 px-1.5 py-1 text-[var(--text-primary)]"
+                            >
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[16px] px-2.5 py-2 text-left marker:hidden">
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                                            高级设置
+                                        </div>
+                                        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
+                                            {displayModelLabel} · {config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · {config.imageSize}
+                                        </div>
+                                    </div>
+                                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
+                                        展开
+                                    </span>
+                                </summary>
+
+                                <div className="space-y-2 px-2.5 pb-2 pt-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <DesktopComposerPromptTools
+                                            isMobile={isMobile}
+                                            config={config}
+                                            showPptOutlinePanel={showPptOutlinePanel}
+                                            onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                                            onTogglePromptOptimization={handleTogglePromptOptimization}
+                                        />
+                                    </div>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <DesktopComposerModePanel
+                                            isMobile={isMobile}
+                                            config={config}
+                                            showOptionsPanel={showOptionsPanel}
+                                            optionsPanelRef={optionsPanelRef}
+                                            mobileFloatingSheetBottom={mobileFloatingSheetBottom}
+                                            mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
+                                            onToggleOptionsPanel={() => {
+                                                setActiveMenu(null);
+                                                setShowOptionsPanel(prev => !prev);
+                                            }}
+                                            optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
+                                                <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                                                    <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {['自动', '30s', '60s', '120s', '240s'].map(dur => (
+                                                            <button
+                                                                key={dur}
+                                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
+                                                                    ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
+                                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
+                                                                    }`}
+                                                                onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
+                                                            >
+                                                                {dur}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
+                                                <ImageOptionsPanel
+                                                    aspectRatio={config.aspectRatio}
+                                                    imageSize={config.imageSize}
+                                                    networkOptions={isMobile ? [
+                                                        ...(groundingSupported ? [{
+                                                            id: 'grounding',
+                                                            label: '联网搜索',
+                                                            active: !!config.enableGrounding,
+                                                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
+                                                        }] : []),
+                                                        ...(imageSearchSupported ? [{
+                                                            id: 'image-search',
+                                                            label: '图片搜索',
+                                                            active: !!config.enableImageSearch,
+                                                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
+                                                        }] : []),
+                                                    ] : []}
+                                                    showThinkingMode={thinkingSupported}
+                                                    thinkingMode={config.thinkingMode || 'minimal'}
+                                                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                                                    availableRatios={availableRatios}
+                                                    availableSizes={availableSizes}
+                                                />
+                                            ) : (
+                                                <VideoOptionsPanel
+                                                    aspectRatio={config.aspectRatio}
+                                                    resolution={config.videoResolution || '720p'}
+                                                    duration={config.videoDuration || '4s'}
+                                                    audio={config.videoAudio || false}
+                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                                    availableRatios={availableRatios}
+                                                    supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                            </details>
+                        ) : null}
                         <div className={isMobile ? '' : 'ml-2 flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton

@@ -6,62 +6,62 @@ type IconLike = React.ComponentType<{ size?: number; className?: string }>;
 const toneStyles: Record<Tone, { iconStyle: CSSProperties; badgeStyle: CSSProperties }> = {
   indigo: {
     iconStyle: {
-      border: '1px solid var(--state-info-border)',
-      background: 'var(--state-info-bg)',
-      color: 'var(--state-info-text)',
+      border: '1px solid var(--settings-state-info-border)',
+      background: 'var(--settings-state-info-bg)',
+      color: 'var(--settings-state-info-text)',
     },
     badgeStyle: {
-      borderColor: 'var(--state-info-border)',
-      background: 'var(--state-info-bg)',
-      color: 'var(--state-info-text)',
+      borderColor: 'var(--settings-state-info-border)',
+      background: 'var(--settings-state-info-bg)',
+      color: 'var(--settings-state-info-text)',
     },
   },
   emerald: {
     iconStyle: {
-      border: '1px solid var(--state-success-border)',
-      background: 'var(--state-success-bg)',
-      color: 'var(--state-success-text)',
+      border: '1px solid var(--settings-state-success-border)',
+      background: 'var(--settings-state-success-bg)',
+      color: 'var(--settings-state-success-text)',
     },
     badgeStyle: {
-      borderColor: 'var(--state-success-border)',
-      background: 'var(--state-success-bg)',
-      color: 'var(--state-success-text)',
+      borderColor: 'var(--settings-state-success-border)',
+      background: 'var(--settings-state-success-bg)',
+      color: 'var(--settings-state-success-text)',
     },
   },
   sky: {
     iconStyle: {
-      border: '1px solid var(--state-info-border)',
-      background: 'var(--state-info-bg)',
-      color: 'var(--state-info-text)',
+      border: '1px solid var(--settings-state-info-border)',
+      background: 'var(--settings-state-info-bg)',
+      color: 'var(--settings-state-info-text)',
     },
     badgeStyle: {
-      borderColor: 'var(--state-info-border)',
-      background: 'var(--state-info-bg)',
-      color: 'var(--state-info-text)',
+      borderColor: 'var(--settings-state-info-border)',
+      background: 'var(--settings-state-info-bg)',
+      color: 'var(--settings-state-info-text)',
     },
   },
   amber: {
     iconStyle: {
-      border: '1px solid var(--state-warning-border)',
-      background: 'var(--state-warning-bg)',
-      color: 'var(--state-warning-text)',
+      border: '1px solid var(--settings-state-warning-border)',
+      background: 'var(--settings-state-warning-bg)',
+      color: 'var(--settings-state-warning-text)',
     },
     badgeStyle: {
-      borderColor: 'var(--state-warning-border)',
-      background: 'var(--state-warning-bg)',
-      color: 'var(--state-warning-text)',
+      borderColor: 'var(--settings-state-warning-border)',
+      background: 'var(--settings-state-warning-bg)',
+      color: 'var(--settings-state-warning-text)',
     },
   },
   rose: {
     iconStyle: {
-      border: '1px solid var(--state-danger-border)',
-      background: 'var(--state-danger-bg)',
-      color: 'var(--state-danger-text)',
+      border: '1px solid var(--settings-state-danger-border)',
+      background: 'var(--settings-state-danger-bg)',
+      color: 'var(--settings-state-danger-text)',
     },
     badgeStyle: {
-      borderColor: 'var(--state-danger-border)',
-      background: 'var(--state-danger-bg)',
-      color: 'var(--state-danger-text)',
+      borderColor: 'var(--settings-state-danger-border)',
+      background: 'var(--settings-state-danger-bg)',
+      color: 'var(--settings-state-danger-text)',
     },
   },
   slate: {
@@ -125,25 +125,30 @@ export const SETTINGS_OVERLAY_STYLE = {
 } as const;
 
 export const SETTINGS_SUCCESS_STYLE = {
-  borderColor: 'var(--state-success-border)',
-  backgroundColor: 'var(--state-success-bg)',
+  borderColor: 'var(--settings-state-success-border)',
+  backgroundColor: 'var(--settings-state-success-bg)',
+} as const;
+
+export const SETTINGS_INFO_STYLE = {
+  borderColor: 'var(--settings-state-info-border)',
+  backgroundColor: 'var(--settings-state-info-bg)',
 } as const;
 
 export const SETTINGS_WARNING_STYLE = {
-  borderColor: 'var(--state-warning-border)',
-  backgroundColor: 'var(--state-warning-bg)',
+  borderColor: 'var(--settings-state-warning-border)',
+  backgroundColor: 'var(--settings-state-warning-bg)',
 } as const;
 
 export const SETTINGS_DANGER_STYLE = {
-  borderColor: 'var(--state-danger-border)',
-  backgroundColor: 'var(--state-danger-bg)',
+  borderColor: 'var(--settings-state-danger-border)',
+  backgroundColor: 'var(--settings-state-danger-bg)',
 } as const;
 
 export const SETTINGS_INPUT_CLASSNAME =
-  'w-full rounded-[8px] border border-[var(--settings-input-border)] bg-[var(--settings-input-bg)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--settings-focus-border)] focus:ring-2 focus:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60';
+  'w-full rounded-[var(--radius-control-md)] border border-[var(--settings-input-border)] bg-[var(--settings-input-bg)] px-3 py-2.5 text-[length:var(--type-body-2)] text-[var(--text-primary)] outline-none transition focus:border-[var(--settings-focus-border)] focus:ring-2 focus:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60';
 
 export const SETTINGS_LABEL_CLASSNAME =
-  'text-[11px] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
+  'text-[length:var(--type-micro)] font-medium tracking-[0.03em] text-[var(--text-tertiary)]';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
   <div className="settings-view-shell settings-reference-stack space-y-6 pb-4">{children}</div>
@@ -155,8 +160,11 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left text-[11px] font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
-    style={toneStyles[tone].badgeStyle}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
+    style={{
+      ...toneStyles[tone].badgeStyle,
+      fontSize: 'var(--type-micro)',
+    }}
   >
     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
   </span>
@@ -199,23 +207,38 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
           <div className="flex min-w-0 items-start gap-4">
             {Icon ? (
               <div
-                className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border"
-                style={toneStyle.iconStyle}
+                className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center border"
+                style={{
+                  ...toneStyle.iconStyle,
+                  borderRadius: 'var(--radius-surface-md)',
+                }}
               >
                 <Icon size={17} />
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="min-w-0 break-words" style={{ overflowWrap: 'anywhere' }}>
+                <h2
+                  className="min-w-0 break-words"
+                  style={{
+                    overflowWrap: 'anywhere',
+                    fontSize: 'var(--type-title-1)',
+                    lineHeight: 'var(--ui-line-height-tight)',
+                  }}
+                >
                   {title}
                 </h2>
                 {badge}
               </div>
               {description ? (
                 <p
-                  className="mt-2 max-w-3xl break-words text-[14px] leading-6"
-                  style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}
+                  className="mt-2 max-w-3xl break-words"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    overflowWrap: 'anywhere',
+                    fontSize: 'var(--type-body-2)',
+                    lineHeight: 'var(--ui-line-height-relaxed)',
+                  }}
                 >
                   {description}
                 </p>
@@ -257,8 +280,11 @@ export const SettingsMetricCard: React.FC<SettingsMetricCardProps> = ({
         </div>
         {Icon ? (
           <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-            style={toneStyle.iconStyle}
+            className="flex h-8 w-8 shrink-0 items-center justify-center border"
+            style={{
+              ...toneStyle.iconStyle,
+              borderRadius: 'var(--radius-control-md)',
+            }}
           >
             <Icon size={14} />
           </div>
@@ -300,8 +326,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   <section className="space-y-3">
     <div className="flex items-start justify-between gap-3 px-1">
       <h3
-        className="text-left text-[12px] font-semibold uppercase tracking-[0.18em]"
-        style={{ color: 'var(--text-tertiary)' }}
+        className="text-left font-semibold uppercase tracking-[0.18em]"
+        style={{ color: 'var(--text-tertiary)', fontSize: 'var(--type-caption)' }}
       >
         {eyebrow || title}
       </h3>
@@ -312,8 +338,13 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     </div>
     {description ? (
       <p
-        className="settings-ios-footer break-words px-1 text-[13px] leading-6"
-        style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}
+        className="settings-ios-footer break-words px-1"
+        style={{
+          color: 'var(--text-secondary)',
+          overflowWrap: 'anywhere',
+          fontSize: 'var(--type-body-2)',
+          lineHeight: 'var(--ui-line-height-relaxed)',
+        }}
       >
         {description}
       </p>
@@ -341,9 +372,11 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
 }) => (
   <button
     type={type}
-    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[8px] border text-left font-medium leading-tight transition-opacity duration-150 hover:opacity-70 active:opacity-50 disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap ${size === 'sm' ? 'min-h-9 px-3 py-1.5 text-xs' : 'min-h-10 px-4 py-2 text-[13px]'} ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium leading-tight transition-opacity duration-150 hover:opacity-70 active:opacity-50 disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap ${size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2'} ${className}`.trim()}
     style={{
-      borderRadius: size === 'sm' ? 14 : 16,
+      borderRadius: size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)',
+      fontSize: size === 'sm' ? 'var(--type-caption)' : 'var(--type-body-2)',
+      minHeight: size === 'sm' ? 'var(--ui-control-height-compact)' : 'var(--ui-control-height-default)',
       ...buttonToneStyles[tone],
       ...style,
     }}
@@ -373,18 +406,34 @@ export const SettingsDangerZone: React.FC<SettingsDangerZoneProps> = ({
   action,
 }) => (
   <div
-    className="settings-danger-zone rounded-[10px] border p-4"
+    className="settings-danger-zone border p-4"
     style={{
       borderColor: 'var(--state-danger-border)',
       backgroundColor: 'var(--state-danger-bg)',
+      borderRadius: 'var(--radius-control-md)',
     }}
   >
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <div className="break-words text-[15px] font-medium" style={{ color: 'var(--state-danger-text)', overflowWrap: 'anywhere' }}>
+        <div
+          className="break-words font-medium"
+          style={{
+            color: 'var(--state-danger-text)',
+            overflowWrap: 'anywhere',
+            fontSize: 'var(--type-body-1)',
+          }}
+        >
           {title}
         </div>
-        <div className="mt-0.5 break-words text-[13px] leading-5" style={{ color: 'var(--text-tertiary)', overflowWrap: 'anywhere' }}>
+        <div
+          className="mt-0.5 break-words"
+          style={{
+            color: 'var(--text-tertiary)',
+            overflowWrap: 'anywhere',
+            fontSize: 'var(--type-body-2)',
+            lineHeight: 'var(--ui-line-height-body)',
+          }}
+        >
           {description}
         </div>
       </div>

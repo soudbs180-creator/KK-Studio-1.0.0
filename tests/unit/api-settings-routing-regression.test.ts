@@ -23,7 +23,7 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
 });
 
 test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('src/components/settings/apiWorkbenchCards.tsx');
 
   assert.match(source, /className="settings-provider-card__header"/);
   assert.match(source, /className="settings-provider-card__header-main"/);
@@ -31,7 +31,7 @@ test('ConsoleEndpointCard keeps the structured header layout for fast scanning',
 });
 
 test('ConsoleEndpointCard keeps the structured metrics layout for scan-friendly cards', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('src/components/settings/apiWorkbenchCards.tsx');
 
   assert.match(source, /className="settings-provider-card__metrics"/);
   assert.ok(source.includes('settings-provider-card__metric'));
@@ -58,9 +58,12 @@ test('Settings mobile shell routes nested API editor back actions to the API man
   assert.match(source, /isApiManagementEditorRoute=\{nestedApiEditorRoute\}/);
 });
 
-test('ApiSettingsView list mode presents a calmer workbench overview before detailed endpoint cards', () => {
+test('ApiSettingsView list mode delegates calmer workbench overview copy to dedicated workbench sections', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(source, /title=\{pick\('API 工作台', 'API workspace'\)\}/);
-  assert.match(source, /title=\{pick\('当前视图', 'Current view'\)\}/);
+  assert.match(source, /<ApiWorkbenchOverviewSection/);
+  assert.match(source, /<ApiWorkbenchCurrentViewSection/);
+  assert.match(sectionSource, /title=\{pick\('工作台摘要', 'Workspace snapshot'\)\}/);
+  assert.match(sectionSource, /title=\{pick\('当前视图', 'Current view'\)\}/);
 });

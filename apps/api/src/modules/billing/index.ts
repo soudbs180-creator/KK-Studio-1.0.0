@@ -12,6 +12,8 @@ export * from "./infrastructure/in-memory-credit-account-repository.ts";
 export * from "./infrastructure/in-memory-credit-exchange-rate-repository.ts";
 export * from "./infrastructure/in-memory-recharge-submission-repository.ts";
 export * from "./infrastructure/legacy-billing-router-adapter.ts";
+export * from "./infrastructure/postgres-credit-account-repository.ts";
+export * from "./infrastructure/postgres-credit-exchange-rate-repository.ts";
 export * from "./infrastructure/supabase-credit-account-repository.ts";
 export * from "./infrastructure/supabase-credit-exchange-rate-repository.ts";
 export * from "./presentation/http-billing-routes.ts";

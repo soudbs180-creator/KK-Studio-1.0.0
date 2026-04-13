@@ -16,16 +16,16 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('kkai local runtime disables billing bootstrap for authenticated local users', () => {
+test('kkai local runtime keeps billing bootstrap available for the fixed local user', () => {
   assert.deepEqual(
     createBillingRuntimeGuard({
       userId: 'local-user',
       isTempUser: false,
     }),
     {
-      billingEnabled: false,
-      activeBillingUserId: null,
-      shouldBootstrapBilling: false,
+      billingEnabled: true,
+      activeBillingUserId: 'local-user',
+      shouldBootstrapBilling: true,
     },
   );
 });

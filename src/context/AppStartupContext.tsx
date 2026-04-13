@@ -64,8 +64,7 @@ function hasReachedStage(stage: AppStartupStage, target: AppStartupStage): boole
 
 export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isTempUser } = useAuth();
-  const localOnlyRuntime = !KKAI_FEATURE_FLAGS.billing
-    && !KKAI_FEATURE_FLAGS.admin
+  const localOnlyRuntime = !KKAI_FEATURE_FLAGS.admin
     && !KKAI_FEATURE_FLAGS.workspaceCloudSync
     && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
   const legacyFallbackState = useMemo(() => getLegacyWebApiFallbackState(), []);

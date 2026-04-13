@@ -10,19 +10,23 @@ function readSource(relativePath: string): string {
   return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf-8') : '';
 }
 
-test('KKAI hides billing and recharge UI surfaces behind the billing feature flag', () => {
+test('KKAI keeps billing surfaces feature-gated and restores the desktop assistant trigger', () => {
   const appSource = readSource('src/App.tsx');
   const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
   const settingsRoutesSource = readSource('src/routes/settingsRoutes.tsx');
   const settingsPanelSource = readSource('src/components/settings/SettingsPanel.tsx');
+  const localizedSettingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(appSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(appSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('billing'\) : undefined\}/);
   assert.match(appSource, /onRechargeClick=\{billingUiEnabled \? \(\) => setShowRechargeModal\(true\) : undefined\}/);
   assert.match(appSource, /\{!isMobile && billingUiEnabled && \(/);
   assert.match(appSource, /\{billingUiEnabled && showRechargeModal && \(/);
+  assert.match(appSource, /id="chat-trigger-button"/);
+  assert.doesNotMatch(appSource, /\{false\s*\?\s*\(\s*<div[\s\S]*id="chat-trigger-button"/);
+  assert.doesNotMatch(appSource, /\{false\s*&&\s*<div[\s\S]*id="chat-trigger-button"/);
 
   assert.match(chatSidebarSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(chatSidebarSource, /const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;/);
@@ -42,8 +46,8 @@ test('KKAI hides billing and recharge UI surfaces behind the billing feature fla
   assert.match(settingsRoutesSource, /path: 'consumption-records'/);
   assert.match(settingsRoutesSource, /element: <CostEstimation embedded \/>/);
 
-  assert.doesNotMatch(settingsPanelSource, /CostEstimation/);
-  assert.doesNotMatch(settingsPanelSource, /AdminSystem/);
-  assert.match(settingsPanelSource, /Exclude<SettingsViewId, 'consumption-records'/);
-  assert.match(settingsPanelSource, /'admin-console'/);
+  assert.match(settingsPanelSource, /export \{ default \} from '\.\/SettingsPanel\.localized';/);
+  assert.match(settingsPanelSource, /export type \{ SettingsViewId \} from '\.\/settingsRegistry';/);
+  assert.doesNotMatch(settingsPanelSource, /lazy\(\(\) => import\('\.\/views\/DashboardView\.localized\.tsx'\)\)/);
+  assert.match(localizedSettingsPanelSource, /CostEstimation embedded/);
 });

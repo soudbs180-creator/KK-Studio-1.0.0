@@ -35,9 +35,71 @@ export type ModelType = string;
 
 export type AppSurface = 'workspace' | 'library' | 'chat' | 'settings' | 'profile';
 
-export type WorkspacePanel = 'history' | 'details' | 'chat' | 'quick-settings' | null;
+export type WorkspacePanel = 'history' | 'chat' | null;
 
 export type MobilePrimaryTab = 'create' | 'library' | 'chat' | 'me';
+
+export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet';
+
+export type MobileSettingsSection = 'dashboard' | 'api-management' | 'consumption-records' | 'system-logs';
+
+export interface MobileResultActions {
+  preview: boolean;
+  useAsSource: boolean;
+  partialRedraw: boolean;
+  download: boolean;
+  delete: boolean;
+}
+
+export interface MobileEcommerceContinuation {
+  promptNodeId: string | null;
+  taskId?: string;
+  sourceSheet: '主图' | 'A+';
+  kind: Exclude<EcommercePromptKind, 'a-plus-group'>;
+  sourceRowKey: string;
+  outputTypeLabel: string;
+  displayLabel: string;
+  declaredSizeText?: string;
+  taskPrompt?: string;
+  assetRoles: EcommerceTaskAssetRoleBinding[];
+  stageLabel: string;
+  stageTone: 'amber' | 'blue' | 'emerald' | 'rose';
+  stageDescription: string;
+  reviewWarnings: string[];
+  selectedForGeneration: boolean;
+  canEditTask: boolean;
+  canConfirmDesktop: boolean;
+  canGenerateMobile: boolean;
+  canToggleSelection: boolean;
+}
+
+export interface MobileResultEntry {
+  id: string;
+  imageId: string;
+  displaySrc: string | null;
+  displayLabel?: string;
+  hasOriginal: boolean;
+  timestamp: number;
+  parentPromptId: string | null;
+  promptSummary: string;
+  fullPrompt: string;
+  referenceImages: ReferenceImage[];
+  modelId?: string;
+  modelLabel: string;
+  aspectRatio: AspectRatio | string;
+  imageSize: ImageSize | string;
+  actions: MobileResultActions;
+  primaryImageSource?: string | null;
+  ecommerceContinuation?: MobileEcommerceContinuation;
+  mobileTileSpan: 2 | 3 | 6;
+  mobileTileEmphasis: 'compact' | 'standard' | 'hero';
+  mobileAspectCategory: 'portrait' | 'square' | 'landscape' | 'wide';
+  detailEntryId?: string;
+  detailEntry?: {
+    imageId: string;
+    promptId: string | null;
+  };
+}
 
 // ============================================
 // 已知模型常量 - 图像和视频生成
@@ -119,6 +181,8 @@ export interface PartialRedrawMetadata {
   generationRect: NormalizedRect;
   targetAspectRatio: AspectRatio;
   extraReferenceImageIds: string[];
+  inheritedDisplayLabel?: string;
+  inheritedTaskState?: EcommerceEditableTaskState;
   compositeVersion: 1;
 }
 
@@ -153,6 +217,7 @@ export interface GeneratedImage {
   position: { x: number; y: number };
   generationTime?: number; // Duration in ms
   dimensions?: string; // e.g. "1024x1024"
+  displayLabel?: string; // Business-facing label such as "主图 1:1 4K"
   mode?: GenerationMode; // New: track creation mode
   tags?: string[]; // Search tags
   tokens?: number; // New: Token usage
@@ -363,6 +428,145 @@ export interface EcommerceReferenceBinding {
   notes?: string;
 }
 
+export type EcommerceAssetRole =
+  | 'product'
+  | 'reference'
+  | 'extra-reference'
+  | 'series-template'
+  | 'accessory';
+
+export interface EcommerceTaskAssetRoleBinding {
+  assetId: string;
+  role: EcommerceAssetRole;
+  label: string;
+  normalizedLabel: string;
+  source: 'upload' | 'analysis' | 'history';
+  note?: string;
+  mentionTokens?: string[];
+}
+
+export interface EcommerceSeriesTemplateStyleProfile {
+  tone: string;
+  primaryColors: string[];
+  backgroundStyle: string;
+  effectStyle: string;
+  shadowStyle: string;
+  atmosphere: string;
+}
+
+export interface EcommerceSeriesTemplateLayoutProfile {
+  productPosition: string;
+  textPosition: string;
+  highlightPosition: string;
+  accessoryPosition: string;
+  whitespaceStyle: string;
+  productScalePreset: 'small' | 'balanced' | 'large';
+}
+
+export interface EcommerceSeriesTemplateCopyProfile {
+  languageStyle: string;
+  headlineStyle: string;
+  subheadlineStyle: string;
+  highlightStyle: string;
+  tone: string;
+  preferredLanguage: 'zh' | 'en' | 'mixed';
+}
+
+export interface EcommerceSeriesTemplateFontProfile {
+  fontStyle: string;
+  headlineWeight: number;
+  subheadlineWeight: number;
+  highlightWeight: number;
+  headlineScale: number;
+  subheadlineScale: number;
+  highlightScale: number;
+  textColorPrimary: string;
+  textColorSecondary: string;
+}
+
+export interface EcommerceSeriesTemplateConstraints {
+  mustKeepConsistency: boolean;
+  forbiddenElements: string[];
+  mustKeepProductRealistic: boolean;
+  allowedOverrides: string[];
+}
+
+export interface EcommerceSeriesTemplate {
+  templateId: string;
+  templateLabel: string;
+  inheritByDefault: boolean;
+  styleProfile: EcommerceSeriesTemplateStyleProfile;
+  layoutProfile: EcommerceSeriesTemplateLayoutProfile;
+  copyProfile: EcommerceSeriesTemplateCopyProfile;
+  fontProfile: EcommerceSeriesTemplateFontProfile;
+  constraints: EcommerceSeriesTemplateConstraints;
+}
+
+export interface EcommerceCopyTaskState {
+  headline: string;
+  subheadline: string;
+  highlight: string;
+  featureTags: string[];
+  cta: string;
+}
+
+export interface EcommerceStyleTaskState {
+  tone: string;
+  atmosphere: string;
+  effect: string;
+  backgroundType: string;
+}
+
+export interface EcommerceLayoutTaskState {
+  productSize: 'small' | 'balanced' | 'large';
+  textPosition: string;
+  accessoryPolicy: string;
+}
+
+export interface EcommerceInheritTaskState {
+  keepSeriesStyle: boolean;
+  keepFontStyle: boolean;
+  keepLayoutStyle: boolean;
+  keepCopyStyle: boolean;
+  keepPalette: boolean;
+}
+
+export interface EcommerceSparseIntentPatch {
+  copy?: Partial<EcommerceCopyTaskState>;
+  style?: Partial<EcommerceStyleTaskState> & {
+    effectEnabled?: boolean;
+  };
+  layout?: Partial<EcommerceLayoutTaskState>;
+  inherit?: Partial<EcommerceInheritTaskState>;
+  font?: {
+    headlineScaleDelta?: number;
+  };
+  outputTypeLabel?: string;
+}
+
+export interface EcommerceEditableTaskState {
+  taskId: string;
+  templateId?: string;
+  sourceKind: Exclude<EcommercePromptKind, 'a-plus-group'>;
+  sourceSheet: '主图' | 'A+';
+  sourceRowKey: string;
+  theme: string;
+  outputTypeLabel: string;
+  imageRoleSummary: string[];
+  sparseUserIntent: string;
+  copy: EcommerceCopyTaskState;
+  style: EcommerceStyleTaskState;
+  layout: EcommerceLayoutTaskState;
+  inherit: EcommerceInheritTaskState;
+  assetRoles: EcommerceTaskAssetRoleBinding[];
+  consistencyChecks: string[];
+  missingFields: string[];
+  resolvedSparseIntent?: EcommerceSparseIntentPatch;
+  resolvedPromptPreview: string;
+  displayLabel: string;
+  lastRenderPrompt?: string;
+}
+
 export interface EcommercePromptState {
   kind: EcommercePromptKind;
   sourceSheet: '主图' | 'A+';
@@ -385,6 +589,9 @@ export interface EcommercePromptState {
   mobileAspectRatio?: AspectRatio;
   needsReview?: boolean;
   reviewWarnings?: string[];
+  seriesTemplate?: EcommerceSeriesTemplate;
+  editableTask?: EcommerceEditableTaskState;
+  displayLabel?: string;
 }
 
 export interface PromptNode {
@@ -434,7 +641,10 @@ export interface PromptNode {
   // 🎯 [添加] 积分退款状态，用于显示“生成失败，积分已退回”
   refundStatus?: 'pending' | 'success' | 'failed';
   creditSettlement?: 'client' | 'server';
+  executionLane?: 'local-user-api' | 'cloud-credit-model';
   billingAttemptId?: string;
+  creditRouteSpecId?: string;
+  creditRouteUnitId?: string;
   paymentTransactionId?: string;
   balanceAfter?: number;
 

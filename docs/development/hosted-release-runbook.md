@@ -88,6 +88,37 @@ Why:
 - Hosted admin access defaults to one owner Supabase user ID.
 - Delegated `profiles.role = 'admin'` users remain supported, but the owner admin must be configured explicitly.
 
+### Hosted API social auth config
+
+The current login screen starts Google and WeChat through `apps/api` routes:
+
+- `GET /api/v1/auth/google/start`
+- `GET /api/v1/auth/wechat/start`
+
+Required:
+
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GOOGLE_OAUTH_REDIRECT_URI`
+- `GOOGLE_STATE_SIGNING_SECRET`
+- `GOOGLE_ALLOWED_REDIRECT_ORIGINS`
+- `WECHAT_OPEN_APP_ID`
+- `WECHAT_OPEN_APP_SECRET`
+- `WECHAT_OPEN_REDIRECT_URI`
+- `WECHAT_STATE_SIGNING_SECRET`
+- `WECHAT_ALLOWED_REDIRECT_ORIGINS`
+
+Recommended:
+
+- `WECHAT_DEFAULT_REDIRECT_URL`
+
+Why:
+
+- Missing Google values surface as `GOOGLE_AUTH_UNAVAILABLE`.
+- Missing WeChat values surface as `WECHAT_AUTH_UNAVAILABLE`.
+- `GOOGLE_ALLOWED_REDIRECT_ORIGINS` and `WECHAT_ALLOWED_REDIRECT_ORIGINS` must include every hosted frontend origin that can start login or account binding.
+- Local examples should use the API callback routes, not legacy Edge Function callback URLs.
+
 ### Runtime ownership map
 
 Hosted release reviews should use this ownership map:
@@ -110,7 +141,7 @@ Reference:
 
 - [Supabase Edge Functions Environment Variables](https://supabase.com/docs/guides/functions/secrets)
 
-For `wechat-auth`, additionally set:
+If you still deploy the legacy `wechat-auth` Edge Function for rollback or compatibility, additionally set:
 
 - `WECHAT_OPEN_APP_ID`
 - `WECHAT_OPEN_APP_SECRET`
@@ -336,7 +367,15 @@ Most likely causes:
 
 - Missing WeChat secrets
 - `WECHAT_ALLOWED_REDIRECT_ORIGINS` does not include the hosted origin
-- `WECHAT_OPEN_REDIRECT_URI` does not point to the Supabase Edge Function callback
+- `WECHAT_OPEN_REDIRECT_URI` does not point to the hosted API callback route
+
+### Google login returns setup or availability errors
+
+Most likely causes:
+
+- Missing Google OAuth secrets
+- `GOOGLE_ALLOWED_REDIRECT_ORIGINS` does not include the hosted origin
+- `GOOGLE_OAUTH_REDIRECT_URI` does not point to the hosted API callback route
 
 ### Hosted login works locally but not on Vercel
 

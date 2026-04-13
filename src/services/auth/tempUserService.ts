@@ -1,12 +1,12 @@
-import { User } from '@supabase/supabase-js';
 import { kkWebApiClient } from '../api/kkApiClient';
 import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
+import type { RuntimeAuthUser } from './runtimeAuthTypes.ts';
 
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
 const TEMP_USER_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export interface TempUserSession {
-  user: User;
+  user: RuntimeAuthUser;
   createdAt: number;
   expiresAt: number;
   isTempUser: true;
@@ -25,7 +25,7 @@ function buildTempUser(input: {
   email: string;
   nickname: string;
   createdAtIso: string;
-}): User {
+}): RuntimeAuthUser {
   return {
     id: input.userId,
     aud: 'authenticated',
@@ -123,7 +123,7 @@ class TempUserService {
     return this.createTempUser();
   }
 
-  isTempUser(user: User | null): boolean {
+  isTempUser(user: RuntimeAuthUser | null): boolean {
     if (!user) return false;
     return user.user_metadata?.isTempUser === true || user.app_metadata?.isTempUser === true;
   }

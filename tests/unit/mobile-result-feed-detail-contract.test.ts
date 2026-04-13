@@ -9,18 +9,22 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('mobile result feed detail drawer exposes prompt, time, references, continue-create, redraw, and download actions', () => {
-  const source = readSource('src/components/mobile/MobileResultFeed.tsx');
+test('mobile result feed stays card-focused and defers full result actions to a dedicated detail screen', () => {
+  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
 
-  assert.match(source, /PartialRedrawModal/);
-  assert.match(source, /formatTimestamp\(activeDetailResult\.timestamp\)/);
-  assert.match(source, /activeDetailPrompt\?\.referenceImages/);
-  assert.match(source, /参考图/);
-  assert.match(source, /继续创作/);
-  assert.match(source, /重绘/);
-  assert.match(source, /下载/);
-  assert.match(source, /onUseAsSource\(activeDetailImage\.id\)/);
-  assert.match(source, /onPartialRedraw\(activeDetailImage, request\)/);
-  assert.match(source, /onImagePreview\(activeDetailImage\.id\)/);
-  assert.match(source, /triggerDownload\(activeDetailResult\)/);
+  assert.doesNotMatch(feedSource, /PartialRedrawModal/);
+  assert.doesNotMatch(feedSource, /activeDetailResult/);
+  assert.match(feedSource, /onEntryOpen/);
+
+  assert.match(detailSource, /data-testid="mobile-result-detail-screen"/);
+  assert.match(detailSource, /fullPrompt/);
+  assert.match(detailSource, /referenceImages/);
+  assert.match(detailSource, /onPreviewOriginal/);
+  assert.match(detailSource, /onUseAsSource/);
+  assert.match(detailSource, /onPartialRedraw/);
+  assert.match(detailSource, /onDownload/);
+  assert.match(detailSource, /onDelete/);
+  assert.match(detailSource, /onPrevious/);
+  assert.match(detailSource, /onNext/);
 });

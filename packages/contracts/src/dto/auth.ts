@@ -163,6 +163,16 @@ export interface AuthActionResultDto {
 }
 
 export type WechatAuthMode = "login" | "bind";
+export type GoogleAuthMode = "login" | "bind";
+
+export interface GoogleAuthStartResponseDto {
+  provider: "google";
+  mode: GoogleAuthMode;
+  authorizationUrl: string;
+  callbackUrl: string;
+  state: string;
+  expiresAt: string;
+}
 
 export interface WechatAuthStartResponseDto {
   provider: "wechat";

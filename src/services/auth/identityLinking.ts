@@ -1,6 +1,5 @@
-import type { User } from "@supabase/supabase-js";
-
 import { resolveAuthRedirectOrigin } from "../../config/authRedirect.ts";
+import { kkWebApiClient } from "../api/kkApiClient.ts";
 import { getLatestRuntimeAuthState } from "./runtimeAuthState.ts";
 
 export type BindableAuthProvider = "google" | "wechat";
@@ -8,6 +7,14 @@ export type BindCallbackMode = `${BindableAuthProvider}-bind`;
 
 type IdentityLike = {
   provider?: string | null;
+};
+
+type RuntimeLinkedUserLike = {
+  app_metadata?: {
+    provider?: string | null;
+    providers?: string[] | null;
+  } | null;
+  identities?: IdentityLike[] | null;
 };
 
 function resolveBrowserOrigin(): string {
@@ -33,7 +40,7 @@ export function buildBindCallbackUrl(
 }
 
 export function collectLinkedAuthProviders(
-  user?: Pick<User, "app_metadata" | "identities"> | null,
+  user?: RuntimeLinkedUserLike | null,
   identities?: IdentityLike[] | null,
 ): string[] {
   const providers = [
@@ -95,8 +102,24 @@ export function resolveBindFailureMessage(
   return "账号绑定失败，请稍后重试。";
 }
 
-export async function startGoogleBind(): Promise<string> {
-  throw new Error("当前本地运行时暂不支持 Google 绑定。");
+type GoogleBindClient = Pick<typeof kkWebApiClient, "startGoogleBind">;
+
+export async function startGoogleBind(
+  client: GoogleBindClient = kkWebApiClient,
+  origin = resolveBrowserOrigin(),
+): Promise<string> {
+  const redirectTo = buildBindCallbackUrl("google", origin);
+  const response = await client.startGoogleBind(redirectTo);
+  if (!response.success) {
+    throw new Error(response.error.message || "无法发起 Google 绑定，请稍后重试。");
+  }
+
+  const authorizationUrl = String(response.data.authorizationUrl || "").trim();
+  if (!authorizationUrl) {
+    throw new Error("Google 绑定授权地址不可用。");
+  }
+
+  return authorizationUrl;
 }
 
 export async function listLinkedAuthProviders(): Promise<string[]> {

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
 
 import { clearStoredAdminSession } from "../services/api/adminSession";
 import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../services/api/authAccessToken";
@@ -16,13 +15,14 @@ import {
   subscribeRuntimeAuthState,
   type RuntimeAuthState,
 } from "../services/auth/runtimeAuthState";
+import type { RuntimeAuthSession, RuntimeAuthUser } from "../services/auth/runtimeAuthTypes.ts";
 import { tempUserService } from "../services/auth/tempUserService";
 import { setTaskPersistenceStorageUserId } from "../services/persistence/taskPersistence";
 import { createKkaiRuntimeAuthSnapshot } from "./kkaiRuntimeContext";
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  session: RuntimeAuthSession | null;
+  user: RuntimeAuthUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
   loginAsTempUser: () => Promise<void>;
@@ -34,7 +34,7 @@ const DEFAULT_AUTH_CONTEXT = createKkaiRuntimeAuthSnapshot();
 
 const AuthContext = createContext<AuthContextType>(DEFAULT_AUTH_CONTEXT);
 
-function createSession(user: User | null, accessToken?: string): Session | null {
+function createSession(user: RuntimeAuthUser | null, accessToken?: string): RuntimeAuthSession | null {
   const normalizedAccessToken = String(accessToken || "").trim();
   if (!user || !normalizedAccessToken) {
     return null;
@@ -47,7 +47,7 @@ function createSession(user: User | null, accessToken?: string): Session | null 
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     token_type: "bearer",
     user,
-  } as Session;
+  };
 }
 
 function resolveInitialRuntimeState(): RuntimeAuthState {

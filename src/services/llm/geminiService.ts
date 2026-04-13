@@ -262,6 +262,9 @@ export const generateImage = async (
     maskUrl?: string; // 🚀 Advanced Editing
     editMode?: 'inpaint' | 'outpaint' | 'vectorize' | 'reframe' | 'upscale' | 'replace-background' | 'edit';
     preferredKeyId?: string;
+    executionLane?: 'local-user-api' | 'cloud-credit-model';
+    creditRouteSpecId?: string;
+    creditRouteUnitId?: string;
     enableWebSearch?: boolean;
     enableImageSearch?: boolean;
     thinkingMode?: 'minimal' | 'high';
@@ -522,6 +525,9 @@ export const generateImage = async (
     maskUrl: options?.maskUrl, // 🚀 Pass Edit Options
     editMode: options?.editMode,
     preferredKeyId: options?.preferredKeyId,
+    executionLane: options?.executionLane,
+    creditRouteSpecId: options?.creditRouteSpecId,
+    creditRouteUnitId: options?.creditRouteUnitId,
     signal: controller?.signal,
     onTaskId: options?.onTaskId,
     syncBridgeRequestId: requestId,

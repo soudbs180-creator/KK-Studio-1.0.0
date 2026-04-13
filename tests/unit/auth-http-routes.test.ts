@@ -5,6 +5,7 @@ import { AuthService } from "../../apps/api/src/modules/auth/application/auth-se
 import { InMemoryAuthIdentityStore } from "../../apps/api/src/modules/auth/infrastructure/in-memory-auth-identity-store.ts";
 import {
   handleGetProfile,
+  handleUpdatePassword,
   handleUpdateProfile,
   handleVersionedLogin,
   handleVersionedRegister,
@@ -93,5 +94,58 @@ describe("auth http routes", () => {
     if (updated.body.success) {
       assert.equal(updated.body.data.nickname, "KK Architect");
     }
+  });
+
+  test("updates password through the versioned auth route and rejects the previous password", async () => {
+    const authService = new AuthService({
+      verifyTurnstileToken: async () => ({ success: true }),
+      identityStore: new InMemoryAuthIdentityStore(),
+    });
+    const register = await handleVersionedRegister(authService, {
+      email: "password-route@example.com",
+      password: "password-123",
+      turnstileToken: "turnstile-ok",
+    }, {
+      "x-request-id": "req-password-register",
+    }, "127.0.0.1");
+    assert.equal(register.body.success, true);
+
+    const login = await handleVersionedLogin(authService, {
+      email: "password-route@example.com",
+      password: "password-123",
+    }, {
+      "x-request-id": "req-password-login",
+    }, "127.0.0.1");
+    assert.equal(login.body.success, true);
+    if (!login.body.success) {
+      return;
+    }
+
+    const update = await handleUpdatePassword(authService, {
+      currentPassword: "password-123",
+      newPassword: "new-password-456",
+    }, {
+      authorization: `Bearer ${login.body.data.accessToken}`,
+      "x-request-id": "req-password-update",
+    });
+
+    assert.equal(update.statusCode, 200);
+    assert.equal(update.body.success, true);
+
+    const staleLogin = await handleVersionedLogin(authService, {
+      email: "password-route@example.com",
+      password: "password-123",
+    }, {
+      "x-request-id": "req-password-stale-login",
+    }, "127.0.0.1");
+    assert.equal(staleLogin.statusCode, 401);
+
+    const freshLogin = await handleVersionedLogin(authService, {
+      email: "password-route@example.com",
+      password: "new-password-456",
+    }, {
+      "x-request-id": "req-password-fresh-login",
+    }, "127.0.0.1");
+    assert.equal(freshLogin.statusCode, 200);
   });
 });

@@ -57,15 +57,18 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
   assert.ok(!source.includes("pick('鎿嶄綔澶辫触'"));
 });
 
-test('ApiSettingsView keeps its secure proxy client import and inline-create aliases wired up', () => {
+test('ApiSettingsView keeps its secure proxy client import and route-driven editor visibility wiring intact', () => {
   const source = readSource(API_SETTINGS_VIEW_PATH);
 
   assert.match(
     source,
     /import \{ kkWebApiClient \} from '\.\.\/\.\.\/services\/api\/kkApiClient';/,
   );
-  assert.match(source, /const showInlineOfficialCreate = activeEditorMode === null && activeTab === 'official';/);
-  assert.match(source, /const showInlineProviderCreate = activeEditorMode === null && activeTab === 'third-party';/);
+  assert.match(source, /const activeEditorMode: TabType \| null = isOfficialEditorRoute \? 'official' : isProviderEditorRoute \? 'third-party' : null;/);
+  assert.match(source, /const showOfficialEditor = activeEditorMode === 'official';/);
+  assert.match(source, /const showProviderEditor = activeEditorMode === 'third-party';/);
+  assert.doesNotMatch(source, /const showInlineOfficialCreate =/);
+  assert.doesNotMatch(source, /const showInlineProviderCreate =/);
 });
 
 test('ApiSettingsView persists readonly user API snapshots in localStorage for cross-session recovery', () => {

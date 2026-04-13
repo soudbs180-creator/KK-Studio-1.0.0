@@ -27,6 +27,15 @@ export interface EcommerceAspectPolicy {
   mobileAspectRatio?: '4:3';
 }
 
+export function resolvePreferredEcommerceImageSize(modelId?: string): '4K' | '2K' | '1K' {
+  const normalized = normalizeEcommerceModelId(modelId);
+  if (!normalized) return '1K';
+  if (normalized.includes('gemini-3.1-flash-image-preview') || normalized.includes('gemini-3-pro-image-preview')) {
+    return '4K';
+  }
+  return '1K';
+}
+
 export function normalizeEcommerceModelId(modelId?: string): string {
   const baseId = String(modelId || '').trim().split('@')[0].toLowerCase();
   if (!baseId) return '';

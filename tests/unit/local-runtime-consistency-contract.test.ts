@@ -27,7 +27,7 @@ test('server local-file readiness contract keeps auth and billing capabilities a
 test('local runtime UI keeps billing management surfaces behind the feature flag while balance reads can use canonical local storage', () => {
   const billingContextSource = readSource('src/context/BillingContext.tsx');
   const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
-  const routesSource = readSource('src/routes/settingsRoutes.tsx');
+  const routeConfigSource = readSource('src/components/settings/settingsRouteConfig.tsx');
 
   assert.match(
     billingContextSource,
@@ -48,7 +48,7 @@ test('local runtime UI keeps billing management surfaces behind the feature flag
   assert.match(profileModalSource, /const billingFeatureEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(profileModalSource, /const passwordChangeEnabled = false;/);
   assert.match(
-    routesSource,
-    /const billingSettingsRouteElement = KKAI_FEATURE_FLAGS\.billing \? <CostEstimation embedded \/> : <Navigate to="\/settings" replace \/>;/,
+    routeConfigSource,
+    /case 'billing':[\s\S]*return KKAI_FEATURE_FLAGS\.billing \? <CostEstimation embedded \/> : <Navigate to=\{\(options\.dashboardBasePath \|\| '\/settings'\)\} replace \/>;/,
   );
 });

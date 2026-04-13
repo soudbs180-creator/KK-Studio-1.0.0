@@ -40,6 +40,8 @@ export interface ActiveCreditModelDto {
   displayName: string;
   description?: string;
   endpointType: string;
+  requestProfileId?: string;
+  routeStrategy?: "priority-failover" | "weighted-random" | "parallel-race";
   creditCost: number;
   priority: number;
   weight: number;
@@ -67,6 +69,8 @@ export interface AdminCreditProviderModelDto {
   displayName: string;
   description?: string;
   endpointType: string;
+  requestProfileId?: string;
+  routeStrategy?: "priority-failover" | "weighted-random" | "parallel-race";
   creditCost: number;
   isActive: boolean;
   callCount: number;

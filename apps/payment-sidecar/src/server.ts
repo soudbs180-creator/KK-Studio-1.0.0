@@ -13,6 +13,8 @@ import {
 } from "../../api/src/lib/request-authenticator.ts";
 import {
   HttpMainApiSettlementWriter,
+  createPaymentCreditAmountResolverFromEnv,
+  createPaymentOrderRepositoryFromEnv,
   type PaymentCreditAmountResolver,
   type PaymentOrderRepository,
   type HttpMainApiSettlementWriterOptions,
@@ -26,6 +28,7 @@ import {
   handleLegacyRedirect,
   InMemoryPaymentOrderRepository,
   PaymentService,
+  PostgresPaymentOrderRepository,
   SupabasePaymentCreditAmountResolver,
   SupabasePaymentOrderRepository,
 } from "./modules/payment/index.ts";
@@ -141,7 +144,7 @@ export interface PaymentSidecarServerOptions {
   settlementWriterOptions?: Partial<HttpMainApiSettlementWriterOptions>;
 }
 
-type RuntimeMode = "memory" | "supabase" | "http" | "custom";
+type RuntimeMode = "memory" | "postgres" | "supabase" | "http" | "custom";
 
 function isHostedRuntime(): boolean {
   return Boolean(
@@ -161,7 +164,7 @@ function allowLegacyPaymentRoutes(): boolean {
 
 function assertHostedPaymentSidecarReady(input: {
   hasPersistentPaymentRepository: boolean;
-  hasSupabaseCreditAmountResolver: boolean;
+  hasDurableCreditAmountResolver: boolean;
   hasSettlementWriteback: boolean;
 }) {
   if (!isHostedRuntime()) {
@@ -170,10 +173,10 @@ function assertHostedPaymentSidecarReady(input: {
 
   if (
     !input.hasPersistentPaymentRepository
-    || !input.hasSupabaseCreditAmountResolver
+    || !input.hasDurableCreditAmountResolver
     || !input.hasSettlementWriteback
   ) {
-    throw new Error("Hosted payment sidecar requires durable Supabase storage and settlement auth.");
+    throw new Error("Hosted payment sidecar requires durable payment storage and settlement auth.");
   }
 }
 
@@ -190,22 +193,30 @@ function resolveRepositoryBackend(
     return "supabase";
   }
 
+  if (repository instanceof PostgresPaymentOrderRepository) {
+    return "postgres";
+  }
+
   return "custom";
 }
 
 function createPaymentOrderRepository(): PaymentOrderRepository {
+  const repository = createPaymentOrderRepositoryFromEnv();
+  if (repository instanceof PostgresPaymentOrderRepository) {
+    paymentLogger.info("Using PostgreSQL payment order repository", {
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return repository;
+  }
+
   const supabaseUrl = env.get("SUPABASE_URL");
   const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY");
-
-  if (supabaseUrl && serviceRoleKey) {
+  if (repository instanceof SupabasePaymentOrderRepository) {
     paymentLogger.info("Using Supabase payment order repository", {
-      hasSupabaseUrl: true,
-      hasServiceRoleKey: true,
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasServiceRoleKey: Boolean(serviceRoleKey),
     });
-    return new SupabasePaymentOrderRepository({
-      supabaseUrl,
-      serviceRoleKey,
-    });
+    return repository;
   }
 
   paymentLogger.warn("Falling back to in-memory payment order repository", {
@@ -216,10 +227,7 @@ function createPaymentOrderRepository(): PaymentOrderRepository {
 }
 
 function createPaymentCreditAmountResolver(): PaymentCreditAmountResolver {
-  return new SupabasePaymentCreditAmountResolver({
-    supabaseUrl: env.get("SUPABASE_URL"),
-    serviceRoleKey: env.get("SUPABASE_SERVICE_ROLE_KEY") || env.get("SUPABASE_SECRET_KEY"),
-  });
+  return createPaymentCreditAmountResolverFromEnv();
 }
 
 export function createPaymentSidecarServer(
@@ -264,7 +272,11 @@ export function createPaymentSidecarServer(
     creditAmountResolver:
       options.creditAmountResolver
         ? "custom"
-        : (supabaseUrl && serviceRoleKey ? "supabase" : "memory"),
+        : (
+          process.env.DATABASE_URL || process.env.PGHOST
+            ? "postgres"
+            : (supabaseUrl && serviceRoleKey ? "supabase" : "memory")
+        ),
     settlementWriter:
       options.settlementWriterOptions?.fetchImpl
         ? "custom"
@@ -272,14 +284,14 @@ export function createPaymentSidecarServer(
           ? "http"
           : "memory",
   } as const;
-  const hasPersistentPaymentRepository = repositoryModes.paymentOrders === "supabase";
-  const hasSupabaseCreditAmountResolver = Boolean(!options.creditAmountResolver && supabaseUrl && serviceRoleKey);
+  const hasPersistentPaymentRepository = repositoryModes.paymentOrders === "supabase" || repositoryModes.paymentOrders === "postgres";
+  const hasDurableCreditAmountResolver = repositoryModes.creditAmountResolver === "supabase" || repositoryModes.creditAmountResolver === "postgres";
   const hasSettlementWriteback = Boolean(configuredKkApiBaseUrl && configuredSettlementToken);
   const legacyRoutesEnabled = allowLegacyPaymentRoutes();
 
   assertHostedPaymentSidecarReady({
     hasPersistentPaymentRepository,
-    hasSupabaseCreditAmountResolver,
+    hasDurableCreditAmountResolver,
     hasSettlementWriteback,
   });
 
@@ -318,7 +330,7 @@ export function createPaymentSidecarServer(
                 paymentOrders: hasPersistentPaymentRepository,
                 paymentCallbacks: hasPersistentPaymentRepository,
                 settlementWriteback: hasSettlementWriteback,
-                creditExchangeRates: hasSupabaseCreditAmountResolver,
+                creditExchangeRates: hasDurableCreditAmountResolver,
               },
             },
             meta: buildErrorMeta(requestId, clientVersion),

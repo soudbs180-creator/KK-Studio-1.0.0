@@ -61,3 +61,17 @@ test('prompt bar tones down send button and mode switcher motion flourishes on d
   assert.doesNotMatch(modeSwitcherSource, /active:scale-95/);
   assert.doesNotMatch(modeSwitcherSource, /cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/);
 });
+
+test('mobile embedded composer keeps the upload affordance inside the input area instead of spending a dedicated row when empty', () => {
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+
+  assert.match(
+    promptBarSource,
+    /const shouldRenderInlineMobileUploadButton = isMobile && config\.mode !== GenerationMode\.ECOMMERCE && config\.referenceImages\.length === 0 && uploadingCount === 0;/,
+  );
+  assert.match(
+    promptBarSource,
+    /const shouldRenderStandaloneUploadRow = !isMobile && config\.mode !== GenerationMode\.ECOMMERCE && config\.referenceImages\.length === 0 && uploadingCount === 0;/,
+  );
+  assert.match(promptBarSource, /shouldRenderInlineMobileUploadButton && \(/);
+});

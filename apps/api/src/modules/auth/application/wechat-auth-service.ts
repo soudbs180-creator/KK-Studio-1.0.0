@@ -5,10 +5,64 @@ import type {
   WechatAuthStartResponseDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
-import {
-  SupabaseWechatAuthRepository,
-  type ExternalIdentityRow,
-} from "../infrastructure/supabase-wechat-auth-repository.ts";
+import type { AuthService } from "./auth-service.ts";
+
+export interface ExternalIdentityRow {
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_appid: string;
+  provider_unionid: string | null;
+  provider_openid: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  raw_profile: Record<string, unknown> | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WechatAuthUserRecord {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+}
+
+export interface WechatAuthRepository {
+  resolveWechatIdentity(
+    providerAppId: string,
+    providerOpenId: string,
+    providerUnionId?: string,
+  ): Promise<{ byOpenId?: ExternalIdentityRow; byUnionId?: ExternalIdentityRow; resolved?: ExternalIdentityRow }>;
+  findProviderIdentityForUser(userId: string, provider: string): Promise<ExternalIdentityRow | undefined>;
+  createOrGetWechatUser(input: {
+    providerAppId: string;
+    providerOpenId: string;
+    providerUnionId?: string;
+    nickname?: string;
+    avatarUrl?: string;
+  }): Promise<{ userId: string; email: string }>;
+  getUserById(userId: string): Promise<WechatAuthUserRecord | undefined>;
+  syncWechatProfile(input: {
+    userId: string;
+    email?: string;
+    providerAppId: string;
+    providerOpenId: string;
+    providerUnionId?: string;
+    nickname?: string;
+    avatarUrl?: string;
+  }): Promise<void>;
+  upsertWechatIdentity(input: {
+    userId: string;
+    providerAppId: string;
+    providerOpenId: string;
+    providerUnionId?: string;
+    nickname?: string;
+    avatarUrl?: string;
+    rawProfile: Record<string, unknown>;
+    lastLoginAt: string;
+  }): Promise<void>;
+}
 
 interface WechatCodeExchangeResponse {
   access_token?: string;
@@ -42,7 +96,7 @@ interface SignedWechatState {
 }
 
 export interface WechatAuthServiceOptions {
-  repository: SupabaseWechatAuthRepository;
+  repository: WechatAuthRepository;
   providerAppId: string;
   providerSecret: string;
   callbackUrl: string;
@@ -73,7 +127,7 @@ export interface WechatCallbackResult {
 }
 
 export class WechatAuthService {
-  private readonly repository: SupabaseWechatAuthRepository;
+  private readonly repository: WechatAuthRepository;
   private readonly providerAppId: string;
   private readonly providerSecret: string;
   private readonly callbackUrl: string;
@@ -139,7 +193,10 @@ export class WechatAuthService {
     };
   }
 
-  async handleCallback(input: HandleWechatCallbackInput): Promise<WechatCallbackResult> {
+  async handleCallback(
+    authService: AuthService,
+    input: HandleWechatCallbackInput,
+  ): Promise<WechatCallbackResult> {
     this.ensureConfigured();
 
     let state: SignedWechatState;
@@ -217,6 +274,7 @@ export class WechatAuthService {
       }
 
       return await this.handleLoginFlow({
+        authService,
         state,
         resolvedIdentity: resolvedIdentity.resolved,
         providerOpenId: tokenData.openid,
@@ -247,6 +305,7 @@ export class WechatAuthService {
   }
 
   private async handleLoginFlow(input: {
+    authService: AuthService;
     state: SignedWechatState;
     resolvedIdentity?: ExternalIdentityRow;
     providerOpenId: string;
@@ -287,13 +346,16 @@ export class WechatAuthService {
       lastLoginAt: input.lastLoginAt,
     });
 
-    const actionLink = await this.repository.createMagicLink(
-      userIdentity.email,
-      input.state.redirectTo,
-    );
+    const session = input.authService.issueLoginSession(userIdentity.email);
+    const redirectTo = new URL(input.state.redirectTo);
+    redirectTo.hash = new URLSearchParams({
+      access_token: session.accessToken,
+      refresh_token: session.refreshToken,
+      provider: "wechat",
+    }).toString();
 
     return {
-      redirectTo: actionLink,
+      redirectTo: redirectTo.toString(),
     };
   }
 
@@ -362,7 +424,7 @@ export class WechatAuthService {
   private async resolveExistingUserIdentity(userId: string): Promise<{ userId: string; email: string }> {
     const user = await this.repository.getUserById(userId);
     if (!user?.email) {
-      throw new Error(`Supabase user ${userId} is missing an email anchor for session bootstrap.`);
+      throw new Error(`User ${userId} is missing an email anchor for session bootstrap.`);
     }
 
     return {

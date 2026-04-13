@@ -1,0 +1,19 @@
+[Unit]
+Description=KK Studio API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kkstudio
+Group=kkstudio
+WorkingDirectory=/opt/kk-studio/current
+EnvironmentFile=/etc/kk-studio/kk-api.env
+ExecStart=/usr/bin/node --env-file=/etc/kk-studio/kk-api.env scripts/run-api-vps.mjs
+Restart=always
+RestartSec=3
+StandardOutput=append:/opt/kk-studio/shared/logs/kk-api.log
+StandardError=append:/opt/kk-studio/shared/logs/kk-api.err.log
+
+[Install]
+WantedBy=multi-user.target

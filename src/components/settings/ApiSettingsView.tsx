@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -50,6 +50,7 @@ import type { Supplier } from '../../services/billing/supplierService';
 import { notify } from '../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
+  SETTINGS_INFO_STYLE,
   SETTINGS_OVERLAY_STYLE,
   SettingsActionButton,
   SettingsBadge,
@@ -63,21 +64,29 @@ import {
   DangerButton,
   EmptyState,
   PrimaryButton,
-  ProgressBar,
   SecondaryButton,
   SegmentedControl,
   SegmentedControlMulti,
   SettingInput,
   SettingSelect,
   SettingToggle,
-  StatusBadge,
 } from './ui/index';
 import {
   buildApiManagementListState,
   readApiManagementListState,
   type ApiManagementTab,
 } from './apiManagementRouteState';
-
+import { ConsoleEndpointCard, type ConsoleEndpointCardMetric } from './apiWorkbenchCards';
+import {
+  ApiWorkbenchCurrentViewSection,
+  ApiWorkbenchDiagnosticsSection,
+  ApiWorkbenchOverviewSection,
+  ApiWorkbenchPlatformSection,
+  ApiWorkbenchStageSection,
+  InfoCell,
+  PlatformAssistantEntryCard,
+} from './apiWorkbenchSections';
+import { resolveApiWorkbenchStageMeta } from './apiWorkbenchState';
 type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = ApiManagementTab;
@@ -671,251 +680,6 @@ const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({
   value: typeof supplier.budgetLimit === 'number' && supplier.budgetLimit > -1 ? String(supplier.budgetLimit) : '',
 });
 
-const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({ label, value, helper }) => (
-  <div className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
-    <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
-    <div className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">{value}</div>
-    {helper ? <div className="mt-1 text-[12px] text-[var(--text-secondary)]">{helper}</div> : null}
-  </div>
-);
-
-type PlatformAssistantEntryCardProps = {
-  title: string;
-  description: string;
-  entryContextLabel: string;
-  localApiLabel: string;
-  localApiValue: string;
-  localApiHelper: string;
-  platformLabel: string;
-  platformValue: string;
-  platformHelper: string;
-  entryActionLabel: string;
-  entryActionHelper: string;
-  onOpen: () => void;
-};
-
-const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProps> = ({
-  title,
-  description,
-  entryContextLabel,
-  localApiLabel,
-  localApiValue,
-  localApiHelper,
-  platformLabel,
-  platformValue,
-  platformHelper,
-  entryActionLabel,
-  entryActionHelper,
-  onOpen,
-}) => (
-  <div className="rounded-[24px] border p-4 md:p-5" style={SETTINGS_ELEVATED_STYLE}>
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-      <div className="min-w-0 space-y-2">
-        <div
-          className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
-          style={SETTINGS_OVERLAY_STYLE}
-        >
-          <Wand2 size={14} />
-          <span>{entryContextLabel}</span>
-        </div>
-        <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
-        <div className="max-w-3xl text-[13px] leading-6 text-[var(--text-secondary)]">{description}</div>
-      </div>
-
-      <div className="w-full max-w-[320px] rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
-        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-          {entryContextLabel}
-        </div>
-        <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{entryActionHelper}</div>
-        <div className="mt-3">
-          <SettingsActionButton icon={Wand2} tone="primary" onClick={onOpen}>
-            {entryActionLabel}
-          </SettingsActionButton>
-        </div>
-      </div>
-    </div>
-
-    <div className="mt-4 grid gap-3 md:grid-cols-2">
-      <InfoCell label={localApiLabel} value={localApiValue} helper={localApiHelper} />
-      <InfoCell label={platformLabel} value={platformValue} helper={platformHelper} />
-    </div>
-  </div>
-);
-
-type EndpointStatusVariant = 'online' | 'offline' | 'warning' | 'error' | 'paused';
-
-type ConsoleEndpointCardMetric = {
-  label: React.ReactNode;
-  value: React.ReactNode;
-  helper?: React.ReactNode;
-  className?: string;
-  valueClassName?: string;
-  helperClassName?: string;
-};
-
-type ConsoleEndpointCardProps = {
-  title: React.ReactNode;
-  subtitle?: React.ReactNode;
-  meta?: React.ReactNode;
-  avatar: React.ReactNode;
-  badges?: React.ReactNode;
-  status: { status: EndpointStatusVariant; label: string };
-  metrics: ConsoleEndpointCardMetric[];
-  progress?: { summary: string; percentage: number };
-  error?: string | null;
-  actions: React.ReactNode;
-  footer?: React.ReactNode;
-  className?: string;
-  cardRef?: React.Ref<HTMLElement>;
-};
-
-function flattenCardActions(node: React.ReactNode): React.ReactNode[] {
-  return React.Children.toArray(node).flatMap((child) => {
-    if (React.isValidElement(child) && child.type === React.Fragment) {
-      return flattenCardActions((child.props as { children?: React.ReactNode }).children);
-    }
-
-    return [child];
-  });
-}
-
-function decorateCardActionNode(
-  node: React.ReactNode,
-  options: {
-    className: string;
-    tone?: 'primary' | 'secondary' | 'danger';
-  },
-): React.ReactNode {
-  if (!React.isValidElement(node)) {
-    return node;
-  }
-
-  const existingProps = node.props as {
-    className?: string;
-    tone?: 'primary' | 'secondary' | 'danger';
-  };
-
-  const nextClassName = [existingProps.className, options.className].filter(Boolean).join(' ');
-
-  return React.cloneElement(
-    node as React.ReactElement<{
-      className?: string;
-      tone?: 'primary' | 'secondary' | 'danger';
-    }>,
-    {
-      className: nextClassName,
-      tone: existingProps.tone ?? options.tone,
-    },
-  );
-}
-
-const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
-  title,
-  subtitle,
-  meta,
-  avatar,
-  badges,
-  status,
-  metrics,
-  progress,
-  error,
-  actions,
-  footer,
-  className = '',
-  cardRef,
-}) => {
-  const cardClass = ['settings-provider-card', className].filter(Boolean).join(' ');
-  const progressPercentage = progress?.percentage ?? 0;
-  const progressTone = progressPercentage >= 90 ? 'rose' : progressPercentage >= 70 ? 'amber' : 'indigo';
-  const actionItems = flattenCardActions(actions);
-  const [primaryAction, ...secondaryActions] = actionItems;
-  const primaryActionNode = decorateCardActionNode(primaryAction, {
-    className: 'settings-provider-card__primary-action settings-provider-card__action-button--wrap',
-    tone: 'primary',
-  });
-  const secondaryActionNodes = secondaryActions.map((action, index) => (
-    <React.Fragment key={`secondary-action-${index}`}>
-      {decorateCardActionNode(action, {
-        className: 'settings-provider-card__action-button--wrap',
-      })}
-    </React.Fragment>
-  ));
-
-  return (
-    <article ref={cardRef} className={cardClass}>
-      <div className="settings-provider-card__header">
-        <div className="settings-provider-card__header-main">
-          <div className="settings-provider-card__avatar">{avatar}</div>
-          <div className="settings-provider-card__header-copy">
-            <div className="settings-provider-card__header-title-row">
-              <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
-              {badges}
-            </div>
-            {subtitle ? <div className="mt-1 text-[13px] text-[var(--text-secondary)]">{subtitle}</div> : null}
-            {meta ? <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{meta}</div> : null}
-          </div>
-        </div>
-        <div className="settings-provider-card__header-side">
-          <StatusBadge status={status.status} label={status.label} />
-          {primaryActionNode ? (
-            <div className="settings-provider-card__header-primary-action">
-              {primaryActionNode}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="settings-provider-card__metrics">
-        {metrics.map((metric, index) => (
-          <div
-            key={`${metric.label}-${index}`}
-            className={['settings-provider-card__metric', metric.className].filter(Boolean).join(' ')}
-          >
-            <div className="settings-provider-card__metric-label">{metric.label}</div>
-            <div className={['settings-provider-card__metric-value', metric.valueClassName].filter(Boolean).join(' ')}>
-              {metric.value}
-            </div>
-            {metric.helper ? (
-              <div className={['settings-provider-card__metric-helper', metric.helperClassName].filter(Boolean).join(' ')}>
-                {metric.helper}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      {footer ? <div className="mt-2">{footer}</div> : null}
-
-      {progress ? (
-        <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
-            <span>{progress.summary}</span>
-            <span>{Math.round(progressPercentage)}%</span>
-          </div>
-          <ProgressBar progress={progressPercentage} tone={progressTone} showLabel={false} />
-        </div>
-      ) : null}
-
-      {error ? (
-        <div
-          className="mt-4 rounded-[18px] border px-4 py-3 text-[13px] leading-6"
-          style={{ borderColor: 'var(--state-danger-border)', backgroundColor: 'var(--state-danger-bg)', color: 'var(--state-danger-text)' }}
-        >
-          {error}
-        </div>
-      ) : null}
-
-      {secondaryActionNodes.length > 0 ? (
-        <div className="settings-provider-card__actions">
-          <div className="settings-provider-card__actions-layout">
-            <div className="settings-provider-card__actions-secondary">{secondaryActionNodes}</div>
-          </div>
-        </div>
-      ) : null}
-    </article>
-  );
-};
-
 const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -948,6 +712,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const [editingOfficialId, setEditingOfficialId] = useState<string | null>(null);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
   const [returnHighlight, setReturnHighlight] = useState<{
     officialId?: string;
@@ -2069,6 +1834,54 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     });
   };
 
+  const stageMeta = resolveApiWorkbenchStageMeta({
+    activeTab,
+    pick,
+    showDiagnostics,
+    stage: userApiViewState.stage,
+    snapshotHydrationHelper,
+    userApiPersistenceWarning,
+    userApiPersistenceHelper,
+    backendUnavailableHelper,
+    userApiActionHelper,
+  });
+  const userApiWorkbenchStage = stageMeta.stage;
+  const stageTone = stageMeta.tone;
+  const stageTitle = stageMeta.title;
+  const stageDescription = stageMeta.description;
+  const stageInteractionLabel = stageMeta.interactionLabel;
+  const stageNextActionLabel = stageMeta.nextActionLabel;
+  const stageBannerStyle = stageMeta.bannerTone === 'elevated'
+    ? SETTINGS_ELEVATED_STYLE
+    : stageMeta.bannerTone === 'info'
+      ? SETTINGS_INFO_STYLE
+      : SETTINGS_WARNING_STYLE;
+  const stagePrimaryActionIcon = stageMeta.primaryActionKind === 'create-official' || stageMeta.primaryActionKind === 'create-provider'
+    ? Plus
+    : RefreshCw;
+  const stagePrimaryActionTone = stageMeta.primaryActionKind === 'create-official' || stageMeta.primaryActionKind === 'create-provider'
+    ? 'primary'
+    : 'secondary';
+  const handleStagePrimaryAction = () => {
+    switch (stageMeta.primaryActionKind) {
+      case 'create-official':
+        beginCreateOfficial();
+        return;
+      case 'create-provider':
+        beginCreateProvider();
+        return;
+      case 'refresh-readonly-snapshot':
+        void refreshReadonlyProfileFallback();
+        return;
+      case 'refresh-runtime-health':
+        void refreshApiHealth(true);
+        return;
+      case 'review-sign-in-requirements':
+      default:
+        notify.info(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
+    }
+  };
+
   if (officialRouteMissing) {
     return (
       <SettingsViewShell>
@@ -2380,146 +2193,65 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         }
       />
 
-      <SettingsSection
-        title={pick('工作台摘要', 'Workspace snapshot')}
-        eyebrow={pick('运行概览', 'Operations overview')}
-        description={pick(
-          '在进入任意卡片前，先在这里查看当前服务健康、持久化状态和预算压力。',
-          'Review current service health, persistence, and budget pressure before jumping into individual cards.'
-        )}
-        action={<SettingsBadge tone={workbenchTone}>{workbenchStatusLabel}</SettingsBadge>}
-      >
-        <div className="space-y-4">
-          {userApiPersistenceWarning || isHydratingRuntimeUserApis ? (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {userApiPersistenceWarning ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                  {userApiPersistenceWarning}
-                </div>
-              ) : null}
-              {isHydratingRuntimeUserApis ? (
-                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_ELEVATED_STYLE}>
-                  {snapshotHydrationHelper}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+      <ApiWorkbenchOverviewSection
+        pick={pick}
+        workbenchStatusLabel={workbenchStatusLabel}
+        workbenchTone={workbenchTone}
+        userApiPersistenceWarning={userApiPersistenceWarning}
+        isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
+        snapshotHydrationHelper={snapshotHydrationHelper}
+        attentionCount={attentionCount}
+        connectedChannels={connectedChannels}
+        officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
+        activeProviders={activeProviders}
+        budgetCount={budgetCount}
+        activeTab={activeTab}
+      />
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <InfoCell
-              label={pick('当前状态', 'Current status')}
-              value={workbenchStatusLabel}
-              helper={attentionCount > 0
-                ? pick('建议先处理异常或暂停链路', 'Resolve failed or paused routes first')
-                : pick('当前可以从下方选择要深入查看的链路类型', 'You can now choose a route type to inspect below')}
-            />
-            <InfoCell
-              label={pick('已接入链路', 'Connected routes')}
-              value={`${connectedChannels}`}
-              helper={pick(
-                `${officialSlots.filter((slot) => !slot.disabled).length} 个官方接口 / ${activeProviders} 个供应商在调度中`,
-                `${officialSlots.filter((slot) => !slot.disabled).length} official / ${activeProviders} providers active`
-              )}
-            />
-            <InfoCell
-              label={pick('预算覆盖', 'Budget coverage')}
-              value={budgetCount > 0 ? pick(`${budgetCount} 条生效中`, `${budgetCount} routes limited`) : pick('暂无', 'None yet')}
-              helper={budgetCount > 0
-                ? pick('已设置预算或词元上限的链路会在卡片中继续显示进度', 'Budgeted or token-limited routes keep showing progress inside the cards')
-                : pick('如果你需要控制成本或词元，可以在各自的编辑器里设置', 'Add budget or token rules later from each editor when needed')}
-            />
-            <InfoCell
-              label={pick('当前焦点', 'Current focus')}
-              value={activeTab === 'official' ? pick('官方接口', 'Official endpoints') : pick('第三方供应商', 'Third-party providers')}
-              helper={activeTab === 'official'
-                ? pick('适合查看直连 OpenAI / Gemini 的稳定链路', 'Best for checking direct OpenAI or Gemini routes')
-                : pick('适合查看协议、价格同步和多源调度', 'Best for protocols, pricing sync, and multi-source routing')}
-            />
-          </div>
-        </div>
-      </SettingsSection>
+      <ApiWorkbenchStageSection
+        pick={pick}
+        showDiagnostics={showDiagnostics}
+        onToggleDiagnostics={() => setShowDiagnostics((current) => !current)}
+        stage={userApiWorkbenchStage}
+        stageTone={stageTone}
+        stageTitle={stageTitle}
+        stageDescription={stageDescription}
+        stageInteractionLabel={stageInteractionLabel}
+        stageNextActionLabel={stageNextActionLabel}
+        stageBannerStyle={stageBannerStyle}
+        primaryActionIcon={stagePrimaryActionIcon}
+        primaryActionTone={stagePrimaryActionTone}
+        onPrimaryAction={handleStagePrimaryAction}
+        primaryActionLoading={busy === 'cloud-refresh'}
+        isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
+        runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
+      />
 
-      <SettingsSection
-        title={pick('当前视图', 'Current view')}
-        eyebrow={pick('链路面板', 'Routing panel')}
-        description={pick(
-          '先决定你当前要看的是官方接口还是第三方供应商，再进入对应的卡片和编辑器。',
-          'Choose whether you want to inspect official endpoints or third-party providers, then move into the matching cards and editor.'
-        )}
-        action={
-          <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
-            {activeTab === 'official' ? pick('官方接口视图', 'Official endpoint view') : pick('第三方供应商视图', 'Third-party provider view')}
-          </SettingsBadge>
-        }
-      >
-        <div className="space-y-4">
-          <SegmentedControl
-            options={[
-              { value: 'official', label: pick('官方接口', 'Official endpoints') },
-              { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
-            ]}
-            value={activeTab}
-            onChange={(value) => setActiveTab(value as TabType)}
-          />
-
-          {latencyCards.length > 0 ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {latencyCards.map((item) => (
-                <InfoCell key={item.id} label={item.label} value={formatLatency(item.latency)} helper={item.helper} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
-              <div className="text-[15px] font-semibold text-[var(--text-primary)]">
-                {pick('全局延迟概览', 'Global latency summary')}
-              </div>
-              <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
-                {pick(
-                  '暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。',
-                  'No recent latency checks are available yet. Use Refresh on any card to re-check connectivity, models, and latency.'
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        title={pick('平台能力入口', 'Platform capabilities')}
-        eyebrow={pick('独立入口', 'Separate entry')}
-        description={pick(
-          '将平台侧辅助能力和你的本地 BYOK 链路分开展示，避免和供应商卡片混在一起。',
-          'Keep platform-managed assistant capabilities separate from your local BYOK routes so they do not blend into provider management cards.'
-        )}
-        action={<SettingsBadge tone="neutral">{pick('不和供应商卡片混排', 'Separate from provider cards')}</SettingsBadge>}
-      >
-        <PlatformAssistantEntryCard
-          title={pick('平台辅助 AI', 'Platform Assistant AI')}
-          description={pick(
-            '平台侧的辅助 AI 会从独立入口接入，和你的第三方供应商管理分开，便于你一眼区分哪些能力来自本地 BYOK，哪些来自平台侧。',
-            'Platform assistant AI is surfaced as a dedicated entry so you can immediately separate local BYOK provider management from platform-side capabilities.',
-          )}
-          entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
-          localApiLabel={pick('用户本地 API', 'User-managed local APIs')}
-          localApiValue={pick('继续使用你的 BYOK', 'Keep your BYOK routes')}
-          localApiHelper={pick(
-            '你的 Base URL、API Key、模型同步、预算规则和路由状态仍然在下面按本地优先方式维护。',
-            'Your base URL, API key, model sync, budget rules, and routing state stay managed below in the local-first BYOK flow.',
-          )}
-          platformLabel={pick('平台能力', 'Platform capability')}
-          platformValue={pick('单独的平台入口', 'Separate platform entry')}
-          platformHelper={pick(
-            '平台侧的辅助 AI 会从这里进入，不和本地 API Key、模型路由或预算规则混在一起。',
-            'Platform assistant capabilities enter here without mixing with local API keys, routing, or budget rules.',
-          )}
-          entryActionLabel={pick('打开平台辅助 AI 入口', 'Open platform assistant entry')}
-          entryActionHelper={pick(
-            '当前先保留入口与说明，后续再接完整的平台辅助流程。',
-            'This keeps the entry and explanation visible now without wiring the full platform assistant flow yet.',
-          )}
-          onOpen={handleOpenPlatformAssistant}
+      {showDiagnostics ? (
+        <ApiWorkbenchDiagnosticsSection
+          pick={pick}
+          diagnosticsActionDisabled={diagnosticsActionDisabled}
+          onRefreshDiagnostics={() => void refreshApiHealth(true)}
+          apiReachable={apiHealth?.reachable}
+          apiErrorMessage={apiHealth?.errorMessage}
+          persistenceWritable={Boolean(apiHealth?.persistence.userApiKeys)}
+          isAuthenticated={isAuthenticated}
+          hasReadonlySnapshot={hasReadonlySnapshot}
         />
-      </SettingsSection>
+      ) : null}
+
+      <ApiWorkbenchPlatformSection
+        pick={pick}
+        onOpenPlatformAssistant={handleOpenPlatformAssistant}
+      />
+
+      <ApiWorkbenchCurrentViewSection
+        pick={pick}
+        activeTab={activeTab}
+        onChangeTab={(value) => setActiveTab(value)}
+        latencyCards={latencyCards}
+        formatLatency={formatLatency}
+      />
 
       {activeTab === 'official' ? (
         <SettingsSection

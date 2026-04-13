@@ -50,9 +50,18 @@ export function resolveImageSurface(input: {
     const supportsGeminiNative = Array.from(endpointHints).some((value) =>
         value.includes('generatecontent') || value.includes('v1beta/models') || value.includes('gemini'),
     );
-    const supportsProviderImages = Array.from(endpointHints).some((value) =>
-        value.includes('images') || value.includes('generations'),
+    const supportsAsyncProviderImages = Array.from(endpointHints).some((value) =>
+        value.includes('image-generation-async')
+        || value.includes('/images/async/')
+        || (value.includes('async') && value.includes('image')),
     );
+    const supportsSyncProviderImages = Array.from(endpointHints).some((value) =>
+        value.includes('image-generation')
+        || value.includes('/images/generations')
+        || value.includes('images')
+        || value.includes('generations'),
+    );
+    const supportsProviderImages = supportsSyncProviderImages || supportsAsyncProviderImages;
     const supportsChatImages = Array.from(endpointHints).some((value) =>
         value.includes('chat') || value.includes('completions'),
     );
@@ -65,8 +74,12 @@ export function resolveImageSurface(input: {
         return 'gemini-native-image';
     }
 
-    if (supportsProviderImages) {
+    if (supportsSyncProviderImages) {
         return 'provider-images';
+    }
+
+    if (supportsAsyncProviderImages && input.runtime.strategyId === '12ai') {
+        return input.preferAsync ? 'async-image' : 'gemini-native-image';
     }
 
     if (

@@ -5,6 +5,7 @@ import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient
 import { isKkApiPersistenceUnavailableError } from './kkApiServerHealth.ts';
 import { extractUserApiEntriesFromPayload } from './userApiPayload.ts';
 import {
+  loadUserApisPayloadMetadataFromCloudRecord,
   loadUserApisPayloadFromCloudRecord,
   mergeUserApisPayloadToCloudRecord,
 } from './userApiCloudRecordStorage.ts';
@@ -226,6 +227,7 @@ function mergeUserApiEntrySets(
     const preferCandidate =
       candidateRevision > existingRevision
       || (candidateRevision === existingRevision && source === preferredSourceOnEqualRevision);
+    const isEqualRevisionTie = candidateRevision === existingRevision;
 
     const newer = preferCandidate ? candidate : existing;
     const older = preferCandidate ? existing : candidate;
@@ -235,7 +237,7 @@ function mergeUserApiEntrySets(
       ...newer,
       key: isUsableStoredSecret(newer.key)
         ? newer.key
-        : isUsableStoredSecret(older.key)
+        : (!isEqualRevisionTie && isUsableStoredSecret(older.key))
           ? older.key
           : newer.key,
     });
@@ -333,7 +335,7 @@ export async function loadUserApiEntries(): Promise<StoredUserApiEntry[]> {
   let cloudError: unknown = null;
 
   try {
-    const cloudPayload = await loadUserApisPayloadFromCloudRecord();
+    const cloudPayload = await loadUserApisPayloadMetadataFromCloudRecord();
     cloudEntries = normalizeEntries(extractUserApiEntriesFromPayload(cloudPayload));
   } catch (error) {
     cloudError = error;

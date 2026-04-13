@@ -20,6 +20,13 @@ test("hosted preflight checks verify auth prerequisites and keep local API fallb
   assert.match(source, /label: "npx vercel whoami"/);
   assert.match(source, /label: "supabase projects list"/);
   assert.match(source, /label: "npx supabase projects list"/);
+  assert.match(source, /"GOOGLE_OAUTH_CLIENT_ID"/);
+  assert.match(source, /"GOOGLE_OAUTH_CLIENT_SECRET"/);
+  assert.match(source, /"GOOGLE_OAUTH_REDIRECT_URI"/);
+  assert.match(source, /"GOOGLE_STATE_SIGNING_SECRET"/);
+  assert.match(source, /"GOOGLE_ALLOWED_REDIRECT_ORIGINS"/);
+  assert.match(source, /Hosted API \/ function secret/);
+  assert.match(source, /runtime env or Supabase Secrets/);
   assert.match(source, /printSection\("Supabase Project Alignment"\);/);
   assert.match(source, /SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL/);
   assert.match(source, /Vercel authentication is unavailable\./);
@@ -70,4 +77,22 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
   assert.match(source, /`PAYMENT_SIDECAR_SETTLEMENT_TOKEN`/);
   assert.match(source, /`PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`/);
+  assert.match(source, /`GOOGLE_OAUTH_CLIENT_ID`/);
+  assert.match(source, /`GOOGLE_OAUTH_CLIENT_SECRET`/);
+  assert.match(source, /`GOOGLE_OAUTH_REDIRECT_URI`/);
+  assert.match(source, /`GOOGLE_STATE_SIGNING_SECRET`/);
+  assert.match(source, /`GOOGLE_ALLOWED_REDIRECT_ORIGINS`/);
+  assert.match(source, /GOOGLE_AUTH_UNAVAILABLE/);
+  assert.match(source, /WECHAT_AUTH_UNAVAILABLE/);
+});
+
+test("local API env example documents hosted Google and WeChat auth server secrets", () => {
+  const source = readSource("apps/api/.env.local.example");
+
+  assert.match(source, /GOOGLE_OAUTH_CLIENT_ID=/);
+  assert.match(source, /GOOGLE_OAUTH_CLIENT_SECRET=/);
+  assert.match(source, /GOOGLE_OAUTH_REDIRECT_URI=/);
+  assert.match(source, /GOOGLE_STATE_SIGNING_SECRET=/);
+  assert.match(source, /GOOGLE_ALLOWED_REDIRECT_ORIGINS=/);
+  assert.match(source, /WECHAT_OPEN_APP_ID=/);
 });

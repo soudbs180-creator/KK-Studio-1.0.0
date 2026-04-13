@@ -1,47 +1,23 @@
 import React from 'react';
 import { RefreshCw, ScrollText, X } from 'lucide-react';
-import { SettingsActionButton } from '../SettingsScaffold';
 
-export type DesktopSettingsViewId =
-  | 'dashboard'
-  | 'api-management'
-  | 'consumption-records'
-  | 'storage-settings'
-  | 'system-logs';
+import { useLocale } from '../../../context/LocaleContext';
+import { SettingsActionButton, SettingsBadge } from '../SettingsScaffold';
+import {
+  SETTINGS_VIEW_META,
+  type CanonicalSettingsViewId as DesktopSettingsViewId,
+} from '../settingsRegistry';
 
-export const DESKTOP_SETTINGS_VIEW_META: Record<
-  DesktopSettingsViewId,
-  { eyebrow: string; title: string; description: string }
-> = {
-  dashboard: {
-    eyebrow: 'Overview',
-    title: '桌面工作台',
-    description: '统一查看关键状态、最近活动和需要继续处理的配置入口。',
-  },
-  'api-management': {
-    eyebrow: 'API Routes',
-    title: 'API 与模型路由',
-    description: '集中管理官方接口、供应商、连通性和预算约束。',
-  },
-  'consumption-records': {
-    eyebrow: 'Billing',
-    title: '计费与账单',
-    description: '查看充值、消费、汇率以及积分使用情况。',
-  },
-  'storage-settings': {
-    eyebrow: 'Storage',
-    title: '存储与缓存',
-    description: '管理本地存储模式、缓存容量和资源整理策略。',
-  },
-  'system-logs': {
-    eyebrow: 'Logs',
-    title: '系统日志',
-    description: '快速检索运行日志、异常来源和当前系统信号。',
-  },
-};
+export { SETTINGS_VIEW_META as DESKTOP_SETTINGS_VIEW_META };
 
 interface SettingsDesktopWorkbenchHeaderProps {
-  meta: { eyebrow: string; title: string; description: string };
+  meta: {
+    eyebrow: string;
+    title: string;
+    description: string;
+  };
+  primaryActionLabel: string;
+  statusSummaryLabel: string;
   languageControl?: React.ReactNode;
   activeView: DesktopSettingsViewId;
   onRefreshCurrentView: () => void;
@@ -51,15 +27,19 @@ interface SettingsDesktopWorkbenchHeaderProps {
 
 const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderProps> = ({
   meta,
+  primaryActionLabel,
+  statusSummaryLabel,
   languageControl,
   activeView,
   onRefreshCurrentView,
   onOpenLogs,
   onClose,
 }) => {
+  const { pick } = useLocale();
+
   return (
     <header
-      className="flex items-start justify-between gap-5 border-b px-8 py-6"
+      className="flex items-start justify-between gap-6 border-b px-8 py-6"
       style={{
         borderColor: 'var(--settings-sidebar-border)',
         background: 'var(--settings-shell-header-bg)',
@@ -67,51 +47,111 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
     >
       <div className="min-w-0 flex-1">
         <div
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: 'var(--text-tertiary)' }}
+          className="uppercase"
+          style={{
+            color: 'var(--text-tertiary)',
+            fontSize: 'var(--type-caption)',
+            fontWeight: 'var(--font-semibold)',
+            letterSpacing: '0.22em',
+            lineHeight: 'var(--leading-normal)',
+          }}
         >
           {meta.eyebrow}
         </div>
         <h2
-          className="mt-3 text-[28px] font-semibold tracking-[-0.05em]"
-          style={{ color: 'var(--text-primary)' }}
+          className="mt-3"
+          style={{
+            color: 'var(--text-primary)',
+            fontSize: 'var(--type-title-1)',
+            fontWeight: 'var(--font-semibold)',
+            letterSpacing: '-0.05em',
+            lineHeight: 'var(--leading-tight)',
+          }}
         >
           {meta.title}
         </h2>
         <p
-          className="mt-2 max-w-3xl text-[14px] leading-7"
-          style={{ color: 'var(--text-secondary)' }}
+          className="mt-2 max-w-3xl"
+          style={{
+            color: 'var(--text-secondary)',
+            fontSize: 'var(--type-body-2)',
+            lineHeight: 'var(--ui-line-height-relaxed)',
+          }}
         >
           {meta.description}
         </p>
+
+        <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div
+            className="rounded-[20px] border px-4 py-3"
+            style={{
+              borderColor: 'var(--settings-border-subtle)',
+              background: 'var(--settings-surface-overlay)',
+            }}
+          >
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+              {pick('当前面板', 'Current surface')}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="text-[15px] font-semibold text-[var(--text-primary)]">{meta.title}</div>
+              <SettingsBadge tone="neutral">{statusSummaryLabel}</SettingsBadge>
+            </div>
+          </div>
+
+          <div
+            className="rounded-[20px] border px-4 py-3"
+            style={{
+              borderColor: 'var(--settings-border-subtle)',
+              background: 'var(--settings-surface-overlay)',
+            }}
+          >
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+              {pick('主要下一步', 'Primary next step')}
+            </div>
+            <div className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">{primaryActionLabel}</div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
-        {languageControl}
-        <SettingsActionButton
-          icon={RefreshCw}
-          tone="secondary"
-          size="sm"
-          onClick={onRefreshCurrentView}
-        >
-          刷新
-        </SettingsActionButton>
-        <SettingsActionButton
-          icon={ScrollText}
-          tone={activeView === 'system-logs' ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={onOpenLogs}
-        >
-          日志
-        </SettingsActionButton>
-        <SettingsActionButton
-          icon={X}
-          tone="secondary"
-          size="sm"
-          onClick={onClose}
-        >
-          关闭
-        </SettingsActionButton>
+      <div
+        className="flex shrink-0 flex-col gap-3 rounded-[22px] border p-3"
+        style={{
+          borderColor: 'var(--settings-border-subtle)',
+          background: 'var(--settings-surface-overlay)',
+        }}
+      >
+        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+          {pick('视图工具', 'View tools')}
+        </div>
+        <div className="flex items-center gap-3">
+          {languageControl}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SettingsActionButton
+            icon={RefreshCw}
+            tone="secondary"
+            size="sm"
+            onClick={onRefreshCurrentView}
+          >
+            {pick('刷新', 'Refresh')}
+          </SettingsActionButton>
+          <SettingsActionButton
+            icon={ScrollText}
+            tone={activeView === 'system-logs' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={onOpenLogs}
+          >
+            {pick('日志', 'Logs')}
+          </SettingsActionButton>
+          <SettingsActionButton
+            icon={X}
+            tone="secondary"
+            size="sm"
+            onClick={onClose}
+          >
+            {pick('关闭', 'Close')}
+          </SettingsActionButton>
+        </div>
       </div>
     </header>
   );

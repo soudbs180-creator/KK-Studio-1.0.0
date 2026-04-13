@@ -10,6 +10,7 @@ import {
   resolveAuthenticatedUserId,
   resolveAuthenticatedUserRole,
 } from "../../../../../../packages/shared/src/index.ts";
+import { createKkSessionToken, verifyKkSessionToken } from "./kk-session-token.ts";
 
 interface StoredSession {
   accessToken: string;
@@ -42,6 +43,7 @@ export interface AuthIdentityStore {
   authenticatePassword(email: string, password: string): LoginResponseDto | undefined;
   createRegisteredUser(email: string): { created: boolean; profile: ProfileDto };
   issueLoginSession(email: string): LoginResponseDto;
+  changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined;
   resolveAccessToken(accessToken: string): ProfileDto | undefined;
   resolveProfile(headers: Record<string, string>): ProfileDto | undefined;
   updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): ProfileDto | undefined;
@@ -175,6 +177,32 @@ export class InMemoryAuthIdentityStore implements AuthIdentityStore {
     return this.issueLoginSessionForUserId(profile.id);
   }
 
+  changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined {
+    const normalizedUserId = String(userId || "").trim();
+    if (!normalizedUserId) {
+      return undefined;
+    }
+
+    const existing = this.usersById.get(normalizedUserId);
+    if (!existing?.passwordSalt || !existing.passwordHash) {
+      return undefined;
+    }
+
+    if (!verifyPasswordSecret(currentPassword, existing.passwordSalt, existing.passwordHash)) {
+      return undefined;
+    }
+
+    const nextProfile: StoredIdentityRecord = {
+      ...existing,
+      ...createPasswordSecret(newPassword),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.storeUser(nextProfile);
+    this.afterStateChange();
+    return cloneProfile(nextProfile);
+  }
+
   resolveAccessToken(accessToken: string): ProfileDto | undefined {
     if (this.pruneExpiredSessions()) {
       this.afterStateChange();
@@ -187,7 +215,12 @@ export class InMemoryAuthIdentityStore implements AuthIdentityStore {
 
     const session = this.sessionsByAccessToken.get(normalizedToken);
     if (!session) {
-      return undefined;
+      const verifiedToken = verifyKkSessionToken(normalizedToken, { tokenType: "access" });
+      if (!verifiedToken) {
+        return undefined;
+      }
+
+      return cloneProfile(this.usersById.get(verifiedToken.userId));
     }
 
     return cloneProfile(this.usersById.get(session.userId));
@@ -272,8 +305,20 @@ export class InMemoryAuthIdentityStore implements AuthIdentityStore {
       throw new Error(`Cannot issue a login session for unknown auth user ${userId}.`);
     }
 
-    const accessToken = `kk-local-access-${randomUUID()}`;
-    const refreshToken = `kk-local-refresh-${randomUUID()}`;
+    const accessToken = createKkSessionToken({
+      tokenType: "access",
+      userId: profile.id,
+      email: profile.email,
+      role: profile.role,
+      expiresInSeconds: sessionTtlSeconds,
+    });
+    const refreshToken = createKkSessionToken({
+      tokenType: "refresh",
+      userId: profile.id,
+      email: profile.email,
+      role: profile.role,
+      expiresInSeconds: sessionTtlSeconds * 24,
+    });
     const expiresAt = new Date(Date.now() + sessionTtlSeconds * 1000).toISOString();
 
     this.sessionsByAccessToken.set(accessToken, {

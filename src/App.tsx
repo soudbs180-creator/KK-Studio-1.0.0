@@ -8,7 +8,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type AppSurface, type MobilePrimaryTab, type PreviewWorkflowNode, type SaveWorkflowNode, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -20,27 +20,38 @@ import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { getModelCapabilities } from './services/model/modelCapabilities';
 import { isSystemModelRoute } from './services/model/modelRoute';
+import { resolveModelExecutionLane } from './services/model/modelExecutionLane';
 import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
 import { resolveEcommercePromptNodeMetadata } from './services/ecommerce/ecommercePromptNodeMetadata.ts';
-import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAspectPolicy } from './services/ecommerce/ecommerceModelPolicy.ts';
+import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAspectPolicy, resolvePreferredEcommerceImageSize } from './services/ecommerce/ecommerceModelPolicy.ts';
 import type { EcommerceAnalysisAsset, EcommerceAnalysisAPlusModule, EcommerceAnalysisMainImageItem, EcommerceAnalysisResult } from './services/ecommerce/types.ts';
+import { buildEcommerceRenderTask } from './services/ecommerce/renderTaskBuilder.ts';
+import { buildEcommerceCanvasGroupLayout } from './services/ecommerce/groupCanvasLayout.ts';
+import { mergeEcommerceTaskState } from './services/ecommerce/taskMerger.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
-import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
+import { buildDockedPromptChildRegroupLayout, buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
-import { base64ToBlob } from './utils/downloadUtils';
+import { base64ToBlob, generateDownloadFilename, triggerDownload } from './utils/downloadUtils';
 import {
   getReferenceImageLookupIds,
   normalizeReferenceImagesStorage,
   toReferenceImageDataUrl,
 } from './utils/referenceImageStorage';
+import {
+  buildPromptGroupLiveSceneSnapshot,
+  resolveLiveSceneNodePosition,
+  type CanvasInteractionPhase,
+  type LiveSceneSnapshot,
+  type PromptGroupLayoutMode,
+} from './canvas/liveScene';
 
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
@@ -52,6 +63,9 @@ type EcommerceRuntimeState = {
   extraReferenceFiles: File[];
   analysis: EcommerceAnalysisResult | null;
   selectedItems: Record<string, boolean>;
+  taskStates: Record<string, EcommerceEditableTaskState>;
+  activeTaskNodeId: string | null;
+  activeTaskState: EcommerceEditableTaskState | null;
   isAnalyzing: boolean;
 };
 
@@ -267,6 +281,18 @@ type PromptGroupView = {
   isOverlapping: boolean;
 };
 
+type PromptGroupLayoutPresentationState = {
+  layoutMode: 'expanded' | 'regrouping' | 'docked';
+  regroupProgress: number;
+  startedAt: number;
+  settleUntil: number | null;
+};
+
+const PROMPT_GROUP_REGROUP_FAST_MS = 110;
+const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
+const PROMPT_GROUP_REGROUP_TOTAL_MS = PROMPT_GROUP_REGROUP_FAST_MS + PROMPT_GROUP_REGROUP_SLOW_MS;
+const PROMPT_GROUP_REGROUP_SETTLE_MS = 180;
+
 type CanvasRenderItem =
   | PromptGroupRenderItem
   | ImageRenderItem
@@ -324,7 +350,7 @@ import {
   syncPptSlidesFromEditablePages,
 } from './utils/pptEditable';
 import { useImageGeneration } from './hooks/useImageGeneration';
-import { useWorkspaceSurface } from './hooks/useWorkspaceSurface';
+import { useWorkspaceSurface, type SettingsSurfaceView } from './hooks/useWorkspaceSurface';
 import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfacePanels';
 // import { notify } from './services/system/notificationService'; // [FIX] Dynamic Import
 
@@ -333,8 +359,13 @@ import ProjectManager from './components/settings/ProjectManager';
 import { Search } from 'lucide-react'; // Import Search icon
 import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
-import { MobileAppShell, MobileHeader, MobileResultFeed, MobileTabBar, MobileWorkspaceQuickBar } from './components/mobile';
+import { MobileWorkspaceSurface } from './components/mobile';
+import { selectMobileFeedResults } from './components/mobile/mobileFeedSelectors';
 import { resolveAvatarUrl } from './utils/presetAvatars';
+import { cleanupImagesOlderThan, cleanupOriginalsOlderThan, getStrictOriginalImage } from './services/storage/imageStorage';
+import { cleanupCompletedTasksOlderThan } from './services/persistence/taskPersistence';
+import { cleanupLogsOlderThan } from './services/system/systemLogService';
+import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
 import {
   GlobalModals,
   WorkspaceShell,
@@ -356,7 +387,6 @@ import {
 import { isWorkflowUtilityNodeKind } from './workflow/schema';
 import {
   getCanvasPerformanceProfile,
-  shouldThrottleEdges,
   type CanvasCardDetailLevel,
 } from './canvas/performanceProfile';
 
@@ -391,10 +421,15 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
   const [generatingGroupIds, setGeneratingGroupIds] = useState<string[]>([]);
   const [groupOverlapMap, setGroupOverlapMap] = useState<Record<string, string[]>>({});
-  const [liveNodePositionById, setLiveNodePositionById] = useState<Record<string, { x: number; y: number }>>({});
+  const [liveNodePositionVersion, setLiveNodePositionVersion] = useState(0);
+  const [canvasInteractionPhase, setCanvasInteractionPhase] = useState<CanvasInteractionPhase>('idle');
+  const [promptGroupLayoutVersion, setPromptGroupLayoutVersion] = useState(0);
   const [imageCardHeightById, setImageCardHeightById] = useState<Record<string, number>>({});
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const nodeDragReleaseFrameRef = useRef<number | null>(null);
+  const liveSceneFrameRef = useRef<number | null>(null);
+  const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
+  const promptGroupRegroupFrameRef = useRef<number | null>(null);
 
 
 
@@ -733,9 +768,28 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [profileInitialView, setProfileInitialView] = useState<UserProfileView>('main');
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
+  const [mobileScreen, setMobileScreen] = useState<MobileSurfaceScreen>('home');
+  const [mobileActiveResultId, setMobileActiveResultId] = useState<string | null>(null);
 
   /* Tutorial Logic - Delayed until Storage is Checked */
   const [isStorageChecked, setIsStorageChecked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const syncMobileViewport = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    syncMobileViewport();
+    window.addEventListener('resize', syncMobileViewport);
+    return () => {
+      window.removeEventListener('resize', syncMobileViewport);
+    };
+  }, []);
 
   useEffect(() => {
     // Only trigger if storage is checked AND we are not showing the modal
@@ -755,19 +809,49 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [isStorageChecked, showStorageModal, showSettingsPanel, isReady]);
 
-  const [settingsInitialView, setSettingsInitialView] = useState<'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs'>('dashboard');
+  const [settingsInitialView, setSettingsInitialView] = useState<SettingsSurfaceView>('dashboard');
   const [settingsInitialSupplier, setSettingsInitialSupplier] = useState<Supplier | null>(null);
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
   const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
   const openSettingsPanel = useCallback((
-    view: 'dashboard' | 'api-management' | 'consumption-records' | 'storage-settings' | 'system-logs' = 'api-management',
+    view: SettingsSurfaceView = 'api-management',
     supplier: Supplier | null = null
   ) => {
     setSettingsPanelSessionKey((prev) => prev + 1);
     setSettingsInitialSupplier(supplier);
     setSettingsInitialView(view);
     setShowSettingsPanel(true);
+  }, []);
+
+  const handleMobileResultOpen = useCallback((entryId: string) => {
+    setMobileActiveResultId(entryId);
+    setMobileScreen('detail');
+  }, []);
+
+  const handleMobileResultDownload = useCallback(async (entry: MobileResultEntry) => {
+    const exportType = 'Image';
+    const filename = generateDownloadFilename(exportType, '.png');
+
+    let target = await getStrictOriginalImage(entry.imageId);
+    if (!target) {
+      target = entry.displaySrc;
+    }
+    if (!target) {
+      return;
+    }
+
+    if (target.startsWith('data:') || target.startsWith('blob:')) {
+      triggerDownload(target, filename);
+      return;
+    }
+
+    const response = await fetch(target);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    triggerDownload(blob, filename);
   }, []);
 
   useEffect(() => {
@@ -1011,7 +1095,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const hasKeys = keyManager.hasValidKeys();
         if (!hasKeys && !hasLoggedInBefore && !isDevMode) {
           // Only first-time users should see the API settings panel automatically
-          openSettingsSurface('api-management');
+          openSettingsSurfaceTracked('api-management');
         }
         setIsStorageChecked(true);
       }
@@ -1113,6 +1197,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     extraReferenceFiles: [],
     analysis: null,
     selectedItems: {},
+    taskStates: {},
+    activeTaskNodeId: null,
+    activeTaskState: null,
     isAnalyzing: false,
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
@@ -1120,6 +1207,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (config.mode !== GenerationMode.ECOMMERCE) {
       setEcommerceRatioOverride(undefined);
+      setEcommerceState((previousState) => ({
+        ...previousState,
+        activeTaskNodeId: null,
+        activeTaskState: null,
+      }));
     }
   }, [config.mode]);
 
@@ -1684,17 +1776,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     setIsChatOpen,
     chatSidebarWidth,
     setChatSidebarWidth,
-    isMobile,
     workspaceSurface,
     setWorkspaceSurface,
     activeAppSurface,
     activeWorkspacePanel,
-    currentMobileTab,
     focusWorkspace,
     toggleChatPanel,
     openProfileSurface,
     openSettingsSurface,
-    handleSelectMobileTab,
   } = useWorkspaceSurface({
     showSettingsPanel,
     showProfileModal,
@@ -1704,6 +1793,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     setShowProfileModal,
     setShowUserMenu,
   });
+
+  const openSettingsSurfaceTracked = useCallback((
+    view: SettingsSurfaceView = 'dashboard',
+    supplier: Supplier | null = null,
+  ) => {
+    openSettingsSurface(view, supplier);
+  }, [openSettingsSurface]);
+
+  const openCurrentMobileSettingsSurface = useCallback(() => {
+    openSettingsSurfaceTracked('dashboard');
+  }, [openSettingsSurfaceTracked]);
 
   const {
     isGenerating,
@@ -1717,6 +1817,32 @@ const AppContent: React.FC<AppContentProps> = () => {
     rememberPreferredKeyForMode
   });
 
+  useEffect(() => {
+    if (!isMobile || !isReady) {
+      return;
+    }
+
+    const retentionMode = getMobileRetentionPreference() || ensureMobileRetentionPreference();
+    if (retentionMode === 'manual') {
+      return;
+    }
+
+    const lastRunAtRaw = localStorage.getItem(`${MOBILE_RETENTION_PREFERENCE_KEY}:last-run-at`);
+    const lastRunAt = Number(lastRunAtRaw || '0');
+    if (Number.isFinite(lastRunAt) && Date.now() - lastRunAt < 12 * 60 * 60 * 1000) {
+      return;
+    }
+
+    const retentionDays = retentionMode === '30d' ? 30 : 7;
+    void Promise.allSettled([
+      cleanupImagesOlderThan(retentionDays),
+      cleanupOriginalsOlderThan(retentionDays),
+      cleanupCompletedTasksOlderThan(retentionDays),
+      Promise.resolve(cleanupLogsOlderThan(retentionDays)),
+    ]).finally(() => {
+      localStorage.setItem(`${MOBILE_RETENTION_PREFERENCE_KEY}:last-run-at`, String(Date.now()));
+    });
+  }, [isMobile, isReady]);
   const createEphemeralId = useCallback((prefix: string) => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return `${prefix}-${crypto.randomUUID()}`;
@@ -1753,10 +1879,101 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
   }, [createEphemeralId]);
 
-  const buildEcommercePrompt = useCallback((basePrompt: string) => {
-    const extraPrompt = String(config.prompt || '').trim();
-    return [basePrompt, extraPrompt ? `额外要求：${extraPrompt}` : ''].filter(Boolean).join('\n');
-  }, [config.prompt]);
+  const buildInitialEcommerceTaskStates = useCallback((analysis: EcommerceAnalysisResult): Record<string, EcommerceEditableTaskState> => {
+    const nextStateMap: Record<string, EcommerceEditableTaskState> = {};
+
+    analysis.mainImageItems.forEach((item) => {
+      if (item.editableTask) {
+        nextStateMap[item.itemId] = item.editableTask;
+      }
+    });
+    analysis.aPlusGroup.modules.forEach((item) => {
+      if (item.editableTask) {
+        nextStateMap[item.moduleId] = item.editableTask;
+      }
+    });
+
+    return nextStateMap;
+  }, []);
+
+  const handleChangeEcommerceTaskState = useCallback((
+    taskId: string,
+    updater:
+      | EcommerceEditableTaskState
+      | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
+  ) => {
+    setEcommerceState((previousState) => {
+      const nextTaskStates = { ...previousState.taskStates };
+      let didUpdate = false;
+
+      Object.entries(nextTaskStates).forEach(([rowKey, taskState]) => {
+        if (!taskState) return;
+        if (taskState.taskId !== taskId && rowKey !== taskId) return;
+        nextTaskStates[rowKey] = typeof updater === 'function' ? updater(taskState) : updater;
+        didUpdate = true;
+      });
+
+      let nextActiveTaskState = previousState.activeTaskState;
+      if (previousState.activeTaskState && previousState.activeTaskState.taskId === taskId) {
+        nextActiveTaskState = typeof updater === 'function'
+          ? updater(previousState.activeTaskState)
+          : updater;
+        didUpdate = true;
+      }
+
+      if (!didUpdate) {
+        return previousState;
+      }
+
+      return {
+        ...previousState,
+        taskStates: nextTaskStates,
+        activeTaskState: nextActiveTaskState,
+      };
+    });
+  }, []);
+
+  const buildRuntimeEcommerceAssetRoles = useCallback((params: {
+    rowAssets: EcommerceAnalysisAsset[];
+    rowMentions: Array<{ assetId: string; mentionTokens: string[]; notes?: string }>;
+    productReferences: ReferenceImage[];
+    extraReferences: ReferenceImage[];
+  }): EcommerceTaskAssetRoleBinding[] => {
+    const productRoles = params.productReferences.map((referenceImage, index) => ({
+      assetId: referenceImage.storageId || referenceImage.id,
+      role: 'product' as const,
+      label: `产品图${index + 1}`,
+      normalizedLabel: index === 0 ? '产品图' : `产品图${index + 1}`,
+      source: 'upload' as const,
+    }));
+
+    const rowReferenceRoles = params.rowAssets.map((asset, index) => {
+      const mention = params.rowMentions.find((item) => item.assetId === asset.assetId) || params.rowMentions[index];
+      return {
+        assetId: asset.assetId,
+        role: 'reference' as const,
+        label: asset.label,
+        normalizedLabel: asset.label || `参考图${index + 1}`,
+        source: 'analysis' as const,
+        note: mention?.notes,
+        mentionTokens: mention?.mentionTokens,
+      };
+    });
+
+    const extraReferenceRoles = params.extraReferences.map((referenceImage, index) => ({
+      assetId: referenceImage.storageId || referenceImage.id,
+      role: 'extra-reference' as const,
+      label: `补充参考图${index + 1}`,
+      normalizedLabel: `补充参考图${index + 1}`,
+      source: 'upload' as const,
+    }));
+
+    return [
+      ...productRoles,
+      ...rowReferenceRoles,
+      ...extraReferenceRoles,
+    ];
+  }, []);
 
   const handlePickEcommerceRequirementFile = useCallback((files: FileList | File[]) => {
     const [file] = Array.from(files);
@@ -1766,6 +1983,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       requirementFile: file,
       analysis: null,
       selectedItems: {},
+      taskStates: {},
+      activeTaskNodeId: null,
+      activeTaskState: null,
     }));
   }, []);
 
@@ -1793,6 +2013,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...previousState,
       analysis: null,
       selectedItems: {},
+      taskStates: {},
+      activeTaskNodeId: null,
+      activeTaskState: null,
       isAnalyzing: false,
     }));
   }, []);
@@ -1829,6 +2052,9 @@ const AppContent: React.FC<AppContentProps> = () => {
         ...previousState,
         analysis,
         selectedItems,
+        taskStates: buildInitialEcommerceTaskStates(analysis),
+        activeTaskNodeId: null,
+        activeTaskState: null,
         isAnalyzing: false,
       }));
       import('./services/system/notificationService').then(({ notify }) => {
@@ -1840,15 +2066,66 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('分析失败', error?.message || '请稍后重试。');
       });
     }
-  }, [ecommerceState.requirementFile]);
+  }, [buildInitialEcommerceTaskStates, ecommerceState.requirementFile]);
 
-  const buildEcommerceGroupNode = useCallback((productName: string, position: { x: number; y: number }): PromptNode => ({
-    id: createEphemeralId('ecom-group'),
-    prompt: `${productName || '电商'} A+ 组卡`,
-    originalPrompt: `${productName || '电商'} A+ 组卡`,
+  useEffect(() => {
+    if (!ecommerceState.activeTaskNodeId || !ecommerceState.activeTaskState) {
+      return;
+    }
+
+    const latestNode = activeCanvas?.promptNodes.find((node) => node.id === ecommerceState.activeTaskNodeId);
+    if (!latestNode?.ecommerce?.seriesTemplate) {
+      return;
+    }
+
+    const mergedTaskState = mergeEcommerceTaskState({
+      baseTask: ecommerceState.activeTaskState,
+      seriesTemplate: latestNode.ecommerce.seriesTemplate,
+      sparseIntent: ecommerceState.activeTaskState.sparseUserIntent,
+      productName: latestNode.ecommerce.productImageRef?.label || latestNode.ecommerce.theme || '',
+    });
+    const nextAspectRatio = latestNode.ecommerce.currentAspectRatio || latestNode.aspectRatio || AspectRatio.SQUARE;
+    const nextImageSize = latestNode.imageSize || (resolvePreferredEcommerceImageSize(latestNode.model) as ImageSize);
+    const renderTask = buildEcommerceRenderTask({
+      taskState: mergedTaskState,
+      seriesTemplate: latestNode.ecommerce.seriesTemplate,
+      aspectRatio: String(nextAspectRatio),
+      imageSize: String(nextImageSize),
+    });
+
+    if (
+      latestNode.originalPrompt === renderTask.prompt
+      && latestNode.ecommerce.displayLabel === renderTask.displayLabel
+      && latestNode.ecommerce.editableTask?.taskId === renderTask.taskState.taskId
+      && latestNode.ecommerce.editableTask?.resolvedPromptPreview === renderTask.taskState.resolvedPromptPreview
+    ) {
+      return;
+    }
+
+    updatePromptNode({
+      ...latestNode,
+      prompt: renderTask.prompt,
+      originalPrompt: renderTask.prompt,
+      imageSize: nextImageSize,
+      ecommerce: {
+        ...latestNode.ecommerce,
+        editableTask: renderTask.taskState,
+        displayLabel: renderTask.displayLabel,
+      },
+    });
+  }, [activeCanvas, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, updatePromptNode]);
+
+  const buildEcommerceGroupNode = useCallback((
+    productName: string,
+    sourceSheet: '主图' | 'A+',
+    position: { x: number; y: number },
+  ): PromptNode => ({
+    id: createEphemeralId(sourceSheet === '主图' ? 'ecom-main-group' : 'ecom-group'),
+    prompt: `${productName || '电商'} ${sourceSheet}组卡`,
+    originalPrompt: `${productName || '电商'} ${sourceSheet}组卡`,
     position,
     aspectRatio: AspectRatio.LANDSCAPE_16_9,
-    imageSize: ImageSize.SIZE_1K,
+    imageSize: resolvePreferredEcommerceImageSize(config.model) as ImageSize,
     model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
     childImageIds: [],
     timestamp: Date.now(),
@@ -1856,11 +2133,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     parallelCount: 1,
     ecommerce: {
       kind: 'a-plus-group',
-      sourceSheet: 'A+',
-      sourceRowKey: 'aplus-group',
+      sourceSheet,
+      sourceRowKey: sourceSheet === '主图' ? 'main-group' : 'aplus-group',
       selectedForGeneration: false,
       stage: 'analysis_ready',
-      theme: `${productName || '电商'} A+ 组卡`,
+      theme: `${productName || '电商'} ${sourceSheet}组卡`,
       sizePolicy: 'sheet-native',
       allowedAspectRatios: [AspectRatio.LANDSCAPE_16_9],
       currentAspectRatio: AspectRatio.LANDSCAPE_16_9,
@@ -1892,12 +2169,12 @@ const AppContent: React.FC<AppContentProps> = () => {
       designRequirements: params.item.designRequirements,
       copyText: params.item.copyText,
     });
+    const preferredImageSize = resolvePreferredEcommerceImageSize(modelId) as ImageSize;
     const rowAssets = params.analysis.assets.referenceAssets.filter((asset) => params.item.referenceAssetIds.includes(asset.assetId));
     const productReferences = await Promise.all(ecommerceState.productFiles.map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)));
     const rowReferences = rowAssets.map(createReferenceImageFromAsset).filter((item): item is ReferenceImage => Boolean(item));
     const extraReferences = await Promise.all(ecommerceState.extraReferenceFiles.map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)));
     const referenceImages = [...rowReferences, ...productReferences, ...extraReferences];
-    const basePrompt = buildEcommercePrompt(params.item.promptDraft);
     const sourceMetadata = params.kind === 'main-image'
       ? resolveEcommercePromptNodeMetadata({
           kind: 'main-image',
@@ -1907,13 +2184,63 @@ const AppContent: React.FC<AppContentProps> = () => {
           kind: 'a-plus-module',
           item: params.item,
         });
+    const sourceKey = params.kind === 'main-image' ? params.item.itemId : params.item.moduleId;
+    const taskStateSeed = ecommerceState.taskStates[sourceKey]
+      || params.item.editableTask;
+    const runtimeAssetRoles = buildRuntimeEcommerceAssetRoles({
+      rowAssets,
+      rowMentions: params.item.referenceMentions,
+      productReferences,
+      extraReferences,
+    });
+    const mergedTaskState = mergeEcommerceTaskState({
+      baseTask: {
+        ...(taskStateSeed || {
+          taskId: `task-${sourceMetadata.sourceRowKey}`,
+          templateId: params.analysis.seriesTemplate.templateId,
+          sourceKind: params.kind,
+          sourceSheet: sourceMetadata.sourceSheet,
+          sourceRowKey: sourceMetadata.sourceRowKey,
+          theme: sourceMetadata.theme,
+          outputTypeLabel: params.kind === 'main-image' ? '主图' : 'A+',
+          imageRoleSummary: runtimeAssetRoles.map((item) => item.normalizedLabel),
+          sparseUserIntent: '',
+          copy: { headline: '', subheadline: '', highlight: '', featureTags: [], cta: '' },
+          style: { tone: '', atmosphere: '', effect: '', backgroundType: '' },
+          layout: { productSize: 'balanced', textPosition: 'top-left', accessoryPolicy: 'auto' },
+          inherit: {
+            keepSeriesStyle: true,
+            keepFontStyle: true,
+            keepLayoutStyle: true,
+            keepCopyStyle: true,
+            keepPalette: true,
+          },
+          assetRoles: runtimeAssetRoles,
+          consistencyChecks: [],
+          missingFields: [],
+          resolvedPromptPreview: '',
+          displayLabel: '',
+        }),
+        assetRoles: runtimeAssetRoles,
+      },
+      seriesTemplate: params.analysis.seriesTemplate,
+      sparseIntent: String(config.prompt || '').trim() || taskStateSeed?.sparseUserIntent || '',
+      productName: params.analysis.projectMeta.productName,
+    });
+    const renderTask = buildEcommerceRenderTask({
+      taskState: mergedTaskState,
+      seriesTemplate: params.analysis.seriesTemplate,
+      aspectRatio: policy.defaultAspectRatio,
+      imageSize: preferredImageSize,
+    });
+
     return {
       id: createEphemeralId(params.kind === 'main-image' ? 'ecom-main' : 'ecom-module'),
-      prompt: basePrompt,
-      originalPrompt: basePrompt,
+      prompt: renderTask.prompt,
+      originalPrompt: renderTask.prompt,
       position: params.position,
       aspectRatio: policy.defaultAspectRatio as AspectRatio,
-      imageSize: ImageSize.SIZE_1K,
+      imageSize: preferredImageSize,
       model: modelId,
       childImageIds: [],
       referenceImages,
@@ -1948,9 +2275,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         mobileAspectRatio: policy.mobileAspectRatio as AspectRatio | undefined,
         needsReview: params.item.needsReview,
         reviewWarnings: params.item.reviewWarnings,
+        seriesTemplate: params.analysis.seriesTemplate,
+        editableTask: renderTask.taskState,
+        displayLabel: renderTask.displayLabel,
       },
     };
-  }, [buildEcommercePrompt, config.model, createEphemeralId, createReferenceImageFromAsset, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles]);
+  }, [buildRuntimeEcommerceAssetRoles, config.model, config.prompt, createEphemeralId, createReferenceImageFromAsset, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles, ecommerceState.taskStates]);
 
   const handleConfirmEcommerceAnalysis = useCallback(async () => {
     if (!ecommerceState.analysis) return;
@@ -1963,6 +2293,33 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     const basePosition = findNextGroupPosition();
     const createdNodeIds: string[] = [];
+    const layoutPlan = buildEcommerceCanvasGroupLayout({
+      basePosition,
+      mainSlotKeys: ecommerceState.analysis.mainImageItems.map((item) => item.itemId),
+      aPlusSlotKeys: ecommerceState.analysis.aPlusGroup.modules.map((item) => item.moduleId),
+    });
+    const mainSlotPositionByKey = new Map(
+      layoutPlan.mainGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
+    );
+    const aPlusSlotPositionByKey = new Map(
+      layoutPlan.aPlusGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
+    );
+
+    const mainGroupNode = buildEcommerceGroupNode(
+      ecommerceState.analysis.projectMeta.productName,
+      '主图',
+      layoutPlan.mainGroup.position,
+    );
+    await addPromptNode(mainGroupNode);
+    createdNodeIds.push(mainGroupNode.id);
+
+    const aPlusGroupNode = buildEcommerceGroupNode(
+      ecommerceState.analysis.projectMeta.productName,
+      'A+',
+      layoutPlan.aPlusGroup.position,
+    );
+    await addPromptNode(aPlusGroupNode);
+    createdNodeIds.push(aPlusGroupNode.id);
 
     const mainItems = ecommerceState.analysis.mainImageItems;
     for (let index = 0; index < mainItems.length; index += 1) {
@@ -1970,10 +2327,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       const node = await buildEcommercePromptNode({
         item,
         kind: 'main-image',
-        position: {
-          x: basePosition.x + (index % 2) * 420,
-          y: basePosition.y + Math.floor(index / 2) * 220,
+        position: mainSlotPositionByKey.get(item.itemId) || {
+          x: layoutPlan.mainGroup.position.x,
+          y: layoutPlan.mainGroup.position.y + 180 + index * 220,
         },
+        groupId: mainGroupNode.id,
         selected: ecommerceState.selectedItems[item.itemId] !== false,
         analysis: ecommerceState.analysis,
       });
@@ -1981,22 +2339,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       createdNodeIds.push(node.id);
     }
 
-    const groupNode = buildEcommerceGroupNode(ecommerceState.analysis.projectMeta.productName, {
-      x: basePosition.x + 940,
-      y: basePosition.y,
-    });
-    await addPromptNode(groupNode);
-    createdNodeIds.push(groupNode.id);
-
     for (let index = 0; index < ecommerceState.analysis.aPlusGroup.modules.length; index += 1) {
       const item = ecommerceState.analysis.aPlusGroup.modules[index];
       const node = await buildEcommercePromptNode({
         item,
         kind: 'a-plus-module',
-        groupId: groupNode.id,
-        position: {
-          x: basePosition.x + 940,
-          y: basePosition.y + 180 + index * 220,
+        groupId: aPlusGroupNode.id,
+        position: aPlusSlotPositionByKey.get(item.moduleId) || {
+          x: layoutPlan.aPlusGroup.position.x,
+          y: layoutPlan.aPlusGroup.position.y + 180 + index * 220,
         },
         selected: ecommerceState.selectedItems[item.moduleId] !== false,
         analysis: ecommerceState.analysis,
@@ -2010,6 +2361,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...previousState,
       analysis: null,
       selectedItems: {},
+      taskStates: {},
+      activeTaskNodeId: null,
+      activeTaskState: null,
     }));
     setConfig((previousConfig) => ({
       ...previousConfig,
@@ -2070,6 +2424,12 @@ const AppContent: React.FC<AppContentProps> = () => {
       if (nodeDragReleaseFrameRef.current !== null) {
         cancelAnimationFrame(nodeDragReleaseFrameRef.current);
       }
+      if (liveSceneFrameRef.current !== null) {
+        cancelAnimationFrame(liveSceneFrameRef.current);
+      }
+      if (promptGroupRegroupFrameRef.current !== null) {
+        cancelAnimationFrame(promptGroupRegroupFrameRef.current);
+      }
     };
   }, []);
 
@@ -2081,6 +2441,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     if (dragging) {
       setIsNodeDragActive(true);
+      setCanvasInteractionPhase('node-drag');
       return;
     }
 
@@ -2089,6 +2450,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     nodeDragReleaseFrameRef.current = requestAnimationFrame(() => {
       nodeDragReleaseFrameRef.current = null;
       setIsNodeDragActive(false);
+      setCanvasInteractionPhase((prev) => (prev === 'node-drag' ? 'idle' : prev));
     });
   }, []);
 
@@ -3318,11 +3680,19 @@ const AppContent: React.FC<AppContentProps> = () => {
     let requiredCredits = 0;
     let perImageCreditCost = 0;
     let paymentTransactionId: string | undefined = undefined;
+    const resolvedCreditRoute = isCreditModel
+      ? adminModelService.getCreditRouteSnapshot(config.model, config.imageSize)
+      : null;
+    const resolvedCreditSpecId = resolvedCreditRoute?.specId;
     const billingAttempt = buildGenerationBillingAttempt({
       nodeId: promptNodeId,
       phase: 'initial',
     });
-    const useServerSideCreditSettlement = isCreditModel && isSystemModelRoute(config.model);
+    const executionLane = resolveModelExecutionLane({
+      modelId: config.model,
+      isCreditModel,
+    });
+    const useServerSideCreditSettlement = executionLane === 'cloud-credit-model';
     if (isCreditModel) {
       if (authLoading) {
         import('./services/system/notificationService').then(({ notify }) => {
@@ -3642,7 +4012,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         errorDetails: undefined,
         refundStatus: undefined,
         creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
+        executionLane,
         billingAttemptId: billingAttempt.attemptId,
+        creditRouteSpecId: resolvedCreditSpecId,
+        creditRouteUnitId: resolvedCreditRoute?.routeUnitId,
         paymentTransactionId,
         isNew: isNewAnim, // Mark the node as newly created so the launch animation can run.
         parallelCount: pptCount,
@@ -4877,6 +5250,19 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [updatePromptNode]);
 
+  const syncActiveEcommerceTask = useCallback((nodeId: string, taskState: EcommerceEditableTaskState) => {
+    setEcommerceState((previousState) => {
+      if (previousState.activeTaskNodeId !== nodeId) {
+        return previousState;
+      }
+
+      return {
+        ...previousState,
+        activeTaskState: taskState,
+      };
+    });
+  }, []);
+
   const runEcommerceNodeGeneration = useCallback(async (
     node: PromptNode,
     options?: {
@@ -4890,21 +5276,107 @@ const AppContent: React.FC<AppContentProps> = () => {
     const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
     if (!latestNode.ecommerce) return;
 
-    const basePrompt = latestNode.originalPrompt || latestNode.prompt;
-    const nextPrompt = [basePrompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
     const nextAspectRatio = options?.aspectRatio || latestNode.aspectRatio || AspectRatio.SQUARE;
+    const nextImageSize = latestNode.imageSize || (resolvePreferredEcommerceImageSize(latestNode.model) as ImageSize);
+    const activeDraft = ecommerceState.activeTaskNodeId === node.id
+      ? ecommerceState.activeTaskState
+      : null;
+    const baseTaskState = activeDraft || latestNode.ecommerce.editableTask;
+    const seriesTemplate = latestNode.ecommerce.seriesTemplate;
+    const mergedTaskState = (baseTaskState && seriesTemplate)
+      ? mergeEcommerceTaskState({
+          baseTask: {
+            ...baseTaskState,
+            assetRoles: baseTaskState.assetRoles,
+          },
+          seriesTemplate,
+          sparseIntent: ecommerceState.activeTaskNodeId === node.id
+            ? (String(config.prompt || '').trim() || baseTaskState.sparseUserIntent || '')
+            : (baseTaskState.sparseUserIntent || ''),
+          productName: latestNode.ecommerce.productImageRef?.label || latestNode.ecommerce.theme || '',
+        })
+      : null;
+    const renderTask = mergedTaskState && seriesTemplate
+      ? buildEcommerceRenderTask({
+          taskState: mergedTaskState,
+          seriesTemplate,
+          aspectRatio: String(nextAspectRatio),
+          imageSize: String(nextImageSize),
+        })
+      : null;
+    let nextPrompt = [renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
+    let optimizedPromptEn: string | undefined;
+    let optimizedPromptZh: string | undefined;
+    let promptOptimizerResult: any | undefined;
+
+    if (config.enablePromptOptimization && nextPrompt) {
+      try {
+        const optimized = await optimizePromptForImage(nextPrompt, {
+          preferredModelId: latestNode.model,
+          aspectRatio: String(nextAspectRatio),
+          imageSize: String(nextImageSize),
+          mode: GenerationMode.ECOMMERCE,
+          supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
+          thinkingMode: config.thinkingMode || 'minimal',
+          referenceImages: (latestNode.referenceImages || [])
+            .filter((referenceImage) => referenceImage.data)
+            .map((referenceImage) => {
+              const mimeType = referenceImage.mimeType || 'image/png';
+              let data = referenceImage.data;
+              if (data.startsWith('data:')) {
+                const match = data.match(/^data:([^;]+);base64,(.+)$/);
+                if (match?.[2]) {
+                  data = match[2];
+                }
+              }
+              return {
+                mimeType,
+                data,
+              };
+            }),
+          ecommerceContext: renderTask && seriesTemplate ? {
+            taskState: renderTask.taskState,
+            seriesTemplate,
+            assetRoles: renderTask.taskState.assetRoles,
+            outputTarget: {
+              label: renderTask.displayLabel,
+              aspectRatio: String(nextAspectRatio),
+              imageSize: String(nextImageSize),
+            },
+          } : undefined,
+        });
+        optimizedPromptEn = optimized.optimizedEn;
+        optimizedPromptZh = optimized.optimizedZh;
+        promptOptimizerResult = optimized.fullResult;
+        nextPrompt = optimized.optimizedEn || nextPrompt;
+      } catch (error) {
+        console.warn('[runEcommerceNodeGeneration] Prompt optimization failed, fallback to render task prompt.', error);
+      }
+    }
+
     const executionNode: PromptNode = {
       ...latestNode,
       prompt: nextPrompt,
+      originalPrompt: renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt,
+      optimizedPromptEn,
+      optimizedPromptZh,
+      promptOptimizerResult,
+      imageSize: nextImageSize,
       mode: GenerationMode.ECOMMERCE,
       aspectRatio: nextAspectRatio,
       ecommerce: {
         ...latestNode.ecommerce,
+        editableTask: renderTask?.taskState || latestNode.ecommerce.editableTask,
+        displayLabel: renderTask?.displayLabel || latestNode.ecommerce.displayLabel,
         currentAspectRatio: nextAspectRatio,
         stage: 'generating',
         ...options?.stagePatch,
       },
     };
+
+    if (renderTask?.taskState) {
+      syncActiveEcommerceTask(node.id, renderTask.taskState);
+    }
 
     await handleRetryNode(executionNode);
 
@@ -4917,7 +5389,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       stage: 'failed',
       ...options?.failurePatch,
     });
-  }, [handleRetryNode, updateEcommerceNodeState]);
+  }, [config.enablePromptOptimization, config.prompt, config.thinkingMode, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, handleRetryNode, syncActiveEcommerceTask, updateEcommerceNodeState]);
 
   const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean) => {
     if (!node.ecommerce) return;
@@ -4968,10 +5440,21 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleGenerateEcommerceGroup = useCallback(async (node: PromptNode, phase: 'desktop' | 'mobile') => {
     if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-group') return;
     const moduleNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      item.ecommerce?.kind === 'a-plus-module'
+      !!item.ecommerce
+      && item.ecommerce.kind !== 'a-plus-group'
       && item.ecommerce.groupId === node.id
       && item.ecommerce.selectedForGeneration !== false
     ));
+
+    if (node.ecommerce.sourceSheet === '主图') {
+      const targetModules = moduleNodes.filter((item) => (
+        item.ecommerce?.kind === 'main-image'
+        && (item.ecommerce.stage === 'analysis_ready' || item.ecommerce.stage === 'ready' || item.ecommerce.stage === 'failed')
+      ));
+
+      await Promise.allSettled(targetModules.map((item) => handleGenerateEcommerceNode(item)));
+      return;
+    }
 
     const targetModules = moduleNodes.filter((item) => {
       if (phase === 'desktop') {
@@ -5795,9 +6278,14 @@ ${slideLayerXml.join('\n')}
       }
     }
 
-    const textToCopy = (isOptimizedView && clickedNode.optimizedPromptEn?.trim())
-      ? clickedNode.optimizedPromptEn.trim()
-      : clickedNode.prompt;
+    const ecommerceTaskState = clickedNode.ecommerce?.editableTask
+      || clickedNode.partialRedraw?.inheritedTaskState
+      || null;
+    const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE && ecommerceTaskState
+      ? (ecommerceTaskState.sparseUserIntent || '')
+      : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
+        ? clickedNode.optimizedPromptEn.trim()
+        : clickedNode.prompt);
 
     setConfig(prev => ({
       ...prev,
@@ -5809,6 +6297,11 @@ ${slideLayerXml.join('\n')}
       mode: clickedNode.mode || GenerationMode.IMAGE // 🎯 Sync Mode (Image/Video)
     }));
     setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE ? clickedNode.id : null,
+      activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE ? ecommerceTaskState : null,
+    }));
 
     // [Draft Logic] Resume Draft if clicked on a draft node
     if (clickedNode.isDraft) {
@@ -5829,6 +6322,11 @@ ${slideLayerXml.join('\n')}
     // Set this image as source for continuing conversation
     setActiveSourceImage(imageId);
     setEcommerceRatioOverride(undefined);
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      activeTaskNodeId: null,
+      activeTaskState: null,
+    }));
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
@@ -5898,6 +6396,11 @@ ${slideLayerXml.join('\n')}
         const parentPromptId = sourceImage.parentPromptId;
         const parentPrompt = canvas?.promptNodes.find((promptNode) => promptNode.id === parentPromptId);
         const sourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
+        const inheritedTaskState = parentPrompt?.ecommerce?.editableTask
+          || sourceImage.partialRedraw?.inheritedTaskState
+          || undefined;
+        const inheritedDisplayLabel = parentPrompt?.ecommerce?.displayLabel
+          || sourceImage.partialRedraw?.inheritedDisplayLabel;
 
         const croppedSourceReference = await buildPartialRedrawReferenceImage(
           sourceImageUrl,
@@ -5943,6 +6446,8 @@ ${slideLayerXml.join('\n')}
             generationRect: request.generationRect,
             targetAspectRatio: request.aspectRatio,
             extraReferenceImageIds: request.referenceImages.map((ref) => ref.storageId || ref.id),
+            inheritedDisplayLabel,
+            inheritedTaskState,
             compositeVersion: 1,
           },
           tags: [],
@@ -5968,6 +6473,80 @@ ${slideLayerXml.join('\n')}
       }
     })();
   }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, handleOpenPreview]);
+
+  const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: PartialRedrawRequest) => {
+    const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);
+    if (!imageNode) {
+      return;
+    }
+
+    handlePartialRedrawRequest(imageNode, request);
+  }, [activeCanvas, handlePartialRedrawRequest]);
+
+  const resolveMobileResultPromptNode = useCallback((entry: MobileResultEntry) => {
+    const promptNodeId = entry.ecommerceContinuation?.promptNodeId
+      || entry.detailEntry?.promptId
+      || entry.parentPromptId;
+    if (!promptNodeId) {
+      return null;
+    }
+
+    return activeCanvasRef.current?.promptNodes.find((node) => node.id === promptNodeId) || null;
+  }, []);
+
+  const handleMobileEditEcommerceTask = useCallback((entry: MobileResultEntry) => {
+    if (!entry.ecommerceContinuation?.canEditTask) {
+      return;
+    }
+
+    const promptNode = resolveMobileResultPromptNode(entry);
+    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
+      return;
+    }
+
+    void handlePromptClick(promptNode, false);
+    focusWorkspace();
+    setMobileScreen('home');
+  }, [focusWorkspace, handlePromptClick, resolveMobileResultPromptNode]);
+
+  const handleMobileToggleEcommerceSelected = useCallback((entry: MobileResultEntry, selected: boolean) => {
+    if (!entry.ecommerceContinuation?.canToggleSelection) {
+      return;
+    }
+
+    const promptNode = resolveMobileResultPromptNode(entry);
+    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
+      return;
+    }
+
+    handleToggleEcommerceSelected(promptNode, selected);
+  }, [handleToggleEcommerceSelected, resolveMobileResultPromptNode]);
+
+  const handleMobileConfirmEcommerceDesktop = useCallback((entry: MobileResultEntry) => {
+    if (!entry.ecommerceContinuation?.canConfirmDesktop) {
+      return;
+    }
+
+    const promptNode = resolveMobileResultPromptNode(entry);
+    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
+      return;
+    }
+
+    handleConfirmEcommerceDesktop(promptNode);
+  }, [handleConfirmEcommerceDesktop, resolveMobileResultPromptNode]);
+
+  const handleMobileGenerateEcommerceMobile = useCallback((entry: MobileResultEntry) => {
+    if (!entry.ecommerceContinuation?.canGenerateMobile) {
+      return;
+    }
+
+    const promptNode = resolveMobileResultPromptNode(entry);
+    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
+      return;
+    }
+
+    void handleRetryEcommerceModule(promptNode);
+  }, [handleRetryEcommerceModule, resolveMobileResultPromptNode]);
 
   // Dynamic Group Bounds Calculation
   const getComputedGroupBounds = useCallback((group: CanvasGroup) => {
@@ -6098,63 +6677,61 @@ ${slideLayerXml.join('\n')}
     return legacyOwnedImages;
   }, []);
 
-  const promptGroupBoundsById = React.useMemo(() => {
-    const boundsMap = new Map<string, { x: number; y: number; width: number; height: number }>();
-    if (!activeCanvas) return boundsMap;
+  const buildPromptGroupRegroupLayouts = useCallback((
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    promptPosition: { x: number; y: number },
+    layoutState: PromptGroupLayoutPresentationState | undefined,
+  ) => {
+    if (!layoutState || childImages.length === 0) {
+      return new Map<string, {
+        renderPosition: { x: number; y: number };
+        settledPosition: { x: number; y: number };
+      }>();
+    }
 
-    const PADDING = 40;
-    const TOP_EXTRA = 40;
-    const BOTTOM_EXTRA = 40;
+    const fastPhaseRatio = PROMPT_GROUP_REGROUP_FAST_MS / PROMPT_GROUP_REGROUP_TOTAL_MS;
+    const fastRegroupProgress = Math.min(1, layoutState.regroupProgress / fastPhaseRatio);
+    const settleRegroupProgress = layoutState.layoutMode === 'docked'
+      ? 1
+      : layoutState.regroupProgress <= fastPhaseRatio
+        ? 0
+        : Math.min(1, (layoutState.regroupProgress - fastPhaseRatio) / (1 - fastPhaseRatio));
 
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      if (promptNode.isDraft && !promptNode.isGenerating) {
-        return;
-      }
-
-      const lockedBounds = lockedGroupBoundsById[promptNode.id];
-      if (lockedBounds) {
-        // Rule: once a prompt-group drag starts, overlap detection keeps using the
-        // pre-drag expanded footprint until the drag ends, preventing focus/stack
-        // state from thrashing while the whole group moves as one unit.
-        boundsMap.set(promptNode.id, lockedBounds);
-        return;
-      }
-
-      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-
-      const addRect = (x: number, y: number, width: number, height: number) => {
-        minX = Math.min(minX, x - width / 2);
-        maxX = Math.max(maxX, x + width / 2);
-        minY = Math.min(minY, y - height);
-        maxY = Math.max(maxY, y);
-      };
-
-      const livePromptPosition = liveNodePositionById[promptNode.id] ?? promptNode.position;
-      addRect(livePromptPosition.x, livePromptPosition.y, 380, promptNode.height || 200);
-      childImages.forEach((imageNode) => {
-        const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);
-        const liveImagePosition = liveNodePositionById[imageNode.id] ?? imageNode.position;
-        addRect(liveImagePosition.x, liveImagePosition.y, width, totalHeight);
-      });
-
-      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-        return;
-      }
-
-      boundsMap.set(promptNode.id, {
-        x: minX - PADDING,
-        y: minY - (PADDING + TOP_EXTRA),
-        width: (maxX - minX) + PADDING * 2,
-        height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA,
-      });
+    const liveStartPositions = childImages.map((imageNode) => (
+      liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
+    ));
+    const layouts = buildDockedPromptChildRegroupLayout({
+      basePosition: promptPosition,
+      items: childImages.map((imageNode) => ({
+        aspectRatio: imageNode.aspectRatio,
+        exactDimensions: imageNode.exactDimensions || parseImageDimensions(imageNode.dimensions),
+      })),
+      mode: promptNode.mode,
+      isMobile,
+      regroupStartPositions: liveStartPositions,
+      fastRegroupProgress,
+      settleRegroupProgress,
     });
 
-    return boundsMap;
-  }, [activeCanvas, lockedGroupBoundsById, liveNodePositionById, resolveCurrentPromptChildImages]);
+    return new Map<string, {
+      renderPosition: { x: number; y: number };
+      settledPosition: { x: number; y: number };
+    }>(
+      childImages.map((imageNode, index) => {
+        const liveStartPosition = liveStartPositions[index] ?? imageNode.position;
+        const layout = layouts[index];
+        const renderPosition = !layout
+          ? liveStartPosition
+          : layout.position;
+        const settledPosition = !layout
+          ? liveStartPosition
+          : layout.settledPosition;
+
+        return [imageNode.id, { renderPosition, settledPosition }] as const;
+      })
+    );
+  }, [isMobile, liveNodePositionVersion, parseImageDimensions]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -6178,41 +6755,6 @@ ${slideLayerXml.join('\n')}
     generatingGroupStateSignatureRef.current = signature;
     setGeneratingGroupIds(nextGeneratingGroupIds);
   }, [activeCanvas, resolveCurrentPromptChildImages]);
-
-  const computedGroupOverlapMap = React.useMemo(() => {
-    const nextOverlapMap: Record<string, string[]> = {};
-    const entries = Array.from(promptGroupBoundsById.entries());
-
-    entries.forEach(([groupId]) => {
-      nextOverlapMap[groupId] = [];
-    });
-
-    for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
-      const [leftId, leftBounds] = entries[leftIndex];
-      for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
-        const [rightId, rightBounds] = entries[rightIndex];
-        if (!boundsIntersect(leftBounds, rightBounds)) continue;
-        nextOverlapMap[leftId].push(rightId);
-        nextOverlapMap[rightId].push(leftId);
-      }
-    }
-
-    return nextOverlapMap;
-  }, [promptGroupBoundsById]);
-
-  const groupOverlapStateSignatureRef = useRef('');
-  useEffect(() => {
-    const normalized = Object.keys(computedGroupOverlapMap)
-      .sort()
-      .map((groupId) => `${groupId}:${(computedGroupOverlapMap[groupId] || []).slice().sort().join(',')}`)
-      .join('|');
-
-    if (groupOverlapStateSignatureRef.current === normalized) {
-      return;
-    }
-    groupOverlapStateSignatureRef.current = normalized;
-    setGroupOverlapMap(computedGroupOverlapMap);
-  }, [computedGroupOverlapMap]);
 
   const maxPersistedCanvasLayer = React.useMemo(() => {
     if (!activeCanvas) return 0;
@@ -6379,11 +6921,23 @@ ${slideLayerXml.join('\n')}
     const nodeCount = promptCount + imageCount;
     const connectionCount = (activeCanvas?.imageNodes.filter((node) => !!node.parentPromptId).length || 0)
       + (activeCanvas?.promptNodes.filter((node) => !!node.sourceImageId).length || 0);
-    const isInteracting = isCanvasTransforming || Boolean(selectionBox?.active) || Boolean(dragConnection?.active);
+    const isInteracting = canvasInteractionPhase !== 'idle' || Boolean(selectionBox?.active) || Boolean(dragConnection?.active);
+    const profileInteractionPhase = canvasInteractionPhase === 'zoom'
+      ? 'zoom'
+      : isInteracting
+        ? 'pan'
+        : 'idle';
 
     return getCanvasPerformanceProfile({
       scale: canvasTransform.scale || 1,
       isInteracting,
+      interactionPhase: profileInteractionPhase,
+      isDragging: profileInteractionPhase === 'pan',
+      isZooming: profileInteractionPhase === 'zoom',
+      hardwareConcurrency: typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency,
+      deviceMemory: typeof navigator === 'undefined'
+        ? undefined
+        : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
       nodeCount,
       connectionCount,
       viewportWidth: typeof window === 'undefined' ? 0 : window.innerWidth,
@@ -6391,9 +6945,9 @@ ${slideLayerXml.join('\n')}
     });
   }, [
     activeCanvas,
+    canvasInteractionPhase,
     canvasTransform.scale,
     dragConnection?.active,
-    isCanvasTransforming,
     selectionBox?.active,
   ]);
 
@@ -6434,7 +6988,7 @@ ${slideLayerXml.join('\n')}
         )
     );
     const resolveViewportNodePosition = <TNode extends { id: string; position: { x: number; y: number } }>(node: TNode) => (
-      liveNodePositionById[node.id] ?? node.position
+      liveNodePositionByIdRef.current[node.id] ?? node.position
     );
 
     // 1. Filter Groups
@@ -6508,7 +7062,7 @@ ${slideLayerXml.join('\n')}
     const nowTimestamp = Date.now();
 
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, liveNodePositionById, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
 
   const actualChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -6534,6 +7088,130 @@ ${slideLayerXml.join('\n')}
     return childIdMap;
   }, [actualChildImagesByPromptId]);
 
+  const promptGroupRegroupLayoutsById = React.useMemo(() => {
+    const regroupLayoutMap = new Map<string, Map<string, {
+      renderPosition: { x: number; y: number };
+      settledPosition: { x: number; y: number };
+    }>>();
+    if (!activeCanvas) return regroupLayoutMap;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+      if (childImages.length === 0) {
+        return;
+      }
+
+      const promptPosition = liveNodePositionByIdRef.current[promptNode.id] ?? promptNode.position;
+      regroupLayoutMap.set(
+        promptNode.id,
+        buildPromptGroupRegroupLayouts(
+          promptNode,
+          childImages,
+          promptPosition,
+          promptGroupLayoutStateByIdRef.current[promptNode.id],
+        ),
+      );
+    });
+
+    return regroupLayoutMap;
+  }, [activeCanvas, actualChildImagesByPromptId, buildPromptGroupRegroupLayouts, liveNodePositionVersion, promptGroupLayoutVersion]);
+
+  const promptGroupBoundsById = React.useMemo(() => {
+    const boundsMap = new Map<string, { x: number; y: number; width: number; height: number }>();
+    if (!activeCanvas) return boundsMap;
+
+    const PADDING = 40;
+    const TOP_EXTRA = 40;
+    const BOTTOM_EXTRA = 40;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      if (promptNode.isDraft && !promptNode.isGenerating) {
+        return;
+      }
+
+      const lockedBounds = lockedGroupBoundsById[promptNode.id];
+      if (lockedBounds) {
+        boundsMap.set(promptNode.id, lockedBounds);
+        return;
+      }
+
+      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      const addRect = (x: number, y: number, width: number, height: number) => {
+        minX = Math.min(minX, x - width / 2);
+        maxX = Math.max(maxX, x + width / 2);
+        minY = Math.min(minY, y - height);
+        maxY = Math.max(maxY, y);
+      };
+
+      const livePromptPosition = liveNodePositionByIdRef.current[promptNode.id]
+        ?? promptNode.position;
+      addRect(livePromptPosition.x, livePromptPosition.y, 380, promptNode.height || 200);
+
+      childImages.forEach((imageNode) => {
+        const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);
+        const liveImagePosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
+        addRect(liveImagePosition.x, liveImagePosition.y, width, totalHeight);
+        const renderPosition = promptGroupRegroupLayoutsById.get(promptNode.id)?.get(imageNode.id)?.renderPosition;
+        if (renderPosition && (renderPosition.x !== liveImagePosition.x || renderPosition.y !== liveImagePosition.y)) {
+          addRect(renderPosition.x, renderPosition.y, width, totalHeight);
+        }
+      });
+
+      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+        return;
+      }
+
+      boundsMap.set(promptNode.id, {
+        x: minX - PADDING,
+        y: minY - (PADDING + TOP_EXTRA),
+        width: (maxX - minX) + PADDING * 2,
+        height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA,
+      });
+    });
+
+    return boundsMap;
+  }, [activeCanvas, actualChildImagesByPromptId, liveNodePositionVersion, lockedGroupBoundsById, promptGroupRegroupLayoutsById]);
+
+  const computedGroupOverlapMap = React.useMemo(() => {
+    const nextOverlapMap: Record<string, string[]> = {};
+    const entries = Array.from(promptGroupBoundsById.entries());
+
+    entries.forEach(([groupId]) => {
+      nextOverlapMap[groupId] = [];
+    });
+
+    for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+      const [leftId, leftBounds] = entries[leftIndex];
+      for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
+        const [rightId, rightBounds] = entries[rightIndex];
+        if (!boundsIntersect(leftBounds, rightBounds)) continue;
+        nextOverlapMap[leftId].push(rightId);
+        nextOverlapMap[rightId].push(leftId);
+      }
+    }
+
+    return nextOverlapMap;
+  }, [promptGroupBoundsById]);
+
+  const groupOverlapStateSignatureRef = useRef('');
+  useEffect(() => {
+    const normalized = Object.keys(computedGroupOverlapMap)
+      .sort()
+      .map((groupId) => `${groupId}:${(computedGroupOverlapMap[groupId] || []).slice().sort().join(',')}`)
+      .join('|');
+
+    if (groupOverlapStateSignatureRef.current === normalized) {
+      return;
+    }
+    groupOverlapStateSignatureRef.current = normalized;
+    setGroupOverlapMap(computedGroupOverlapMap);
+  }, [computedGroupOverlapMap]);
+
   useEffect(() => {
     setImageCardHeightById({});
   }, [activeCanvas?.id]);
@@ -6543,7 +7221,9 @@ ${slideLayerXml.join('\n')}
       setFocusedGroupId(null);
       liveNodePositionByIdRef.current = {};
       liveDerivedNodeIdsByOwnerRef.current = {};
-      setLiveNodePositionById({});
+      promptGroupLayoutStateByIdRef.current = {};
+      setLiveNodePositionVersion((prev) => prev + 1);
+      setPromptGroupLayoutVersion((prev) => prev + 1);
       setLockedGroupBoundsById({});
       return;
     }
@@ -6561,17 +7241,13 @@ ${slideLayerXml.join('\n')}
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
   const syncLiveNodePositionState = useCallback(() => {
-    const next = liveNodePositionByIdRef.current;
-    setLiveNodePositionById((prev) => {
-      const prevKeys = Object.keys(prev);
-      const nextKeys = Object.keys(next);
-      if (prevKeys.length === nextKeys.length && prevKeys.every((key) => (
-        next[key] && prev[key]?.x === next[key].x && prev[key]?.y === next[key].y
-      ))) {
-        return prev;
-      }
+    if (liveSceneFrameRef.current !== null) {
+      return;
+    }
 
-      return { ...next };
+    liveSceneFrameRef.current = requestAnimationFrame(() => {
+      liveSceneFrameRef.current = null;
+      setLiveNodePositionVersion((prev) => prev + 1);
     });
   }, []);
 
@@ -6749,6 +7425,120 @@ ${slideLayerXml.join('\n')}
     });
   }, [activeCanvas, moveSelectedNodesImmediate, promptGroupBoundsById, syncLiveNodePositionState]);
 
+  const syncPromptGroupLayoutState = useCallback((
+    updater: Record<string, PromptGroupLayoutPresentationState>
+    | ((prev: Record<string, PromptGroupLayoutPresentationState>) => Record<string, PromptGroupLayoutPresentationState>)
+  ) => {
+    const prev = promptGroupLayoutStateByIdRef.current;
+    const next = typeof updater === 'function'
+      ? updater(prev)
+      : updater;
+    if (next === prev) {
+      return;
+    }
+    promptGroupLayoutStateByIdRef.current = next;
+    setPromptGroupLayoutVersion((version) => version + 1);
+  }, []);
+
+  const schedulePromptGroupRegroupAnimation = useCallback(() => {
+    if (promptGroupRegroupFrameRef.current !== null) {
+      return;
+    }
+
+    promptGroupRegroupFrameRef.current = requestAnimationFrame(() => {
+      promptGroupRegroupFrameRef.current = null;
+      const now = performance.now();
+
+      syncPromptGroupLayoutState((prev) => {
+        let next = prev;
+
+        Object.entries(prev).forEach(([groupId, state]) => {
+          if (state.layoutMode === 'regrouping') {
+            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / PROMPT_GROUP_REGROUP_TOTAL_MS));
+            if (nextProgress !== state.regroupProgress) {
+              if (next === prev) next = { ...prev };
+              next[groupId] = {
+                ...state,
+                regroupProgress: nextProgress,
+              };
+            }
+            return;
+          }
+
+          if (state.layoutMode === 'docked' && state.settleUntil !== null && now >= state.settleUntil) {
+            if (next === prev) next = { ...prev };
+            delete next[groupId];
+          }
+        });
+
+        return next;
+      });
+
+      const hasAnimatedGroup = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
+        state.layoutMode === 'regrouping'
+        || (state.layoutMode === 'docked' && state.settleUntil !== null)
+      ));
+
+      if (hasAnimatedGroup) {
+        schedulePromptGroupRegroupAnimation();
+      }
+    });
+  }, [syncPromptGroupLayoutState]);
+
+  const beginPromptGroupRegroup = useCallback((groupId: string) => {
+    const now = performance.now();
+    syncPromptGroupLayoutState((prev) => {
+      const existing = prev[groupId];
+      if (existing?.layoutMode === 'regrouping' && existing.regroupProgress >= 1) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [groupId]: {
+          layoutMode: 'regrouping',
+          regroupProgress: existing?.regroupProgress ?? 0,
+          startedAt: existing?.startedAt ?? now,
+          settleUntil: null,
+        },
+      };
+    });
+    schedulePromptGroupRegroupAnimation();
+  }, [schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
+
+  const settlePromptGroupRegroup = useCallback((groupId: string) => {
+    const now = performance.now();
+    syncPromptGroupLayoutState((prev) => {
+      const existing = prev[groupId];
+      if (!existing) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [groupId]: {
+          ...existing,
+          layoutMode: 'docked',
+          regroupProgress: 1,
+          settleUntil: now + PROMPT_GROUP_REGROUP_SETTLE_MS,
+        },
+      };
+    });
+    schedulePromptGroupRegroupAnimation();
+  }, [schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
+
+  const clearPromptGroupRegroup = useCallback((groupId: string) => {
+    syncPromptGroupLayoutState((prev) => {
+      if (!(groupId in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+  }, [syncPromptGroupLayoutState]);
+
   const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
     if (!(height > 0)) return;
 
@@ -6800,6 +7590,49 @@ ${slideLayerXml.join('\n')}
     }
     selectNodes(options.nodeIds, 'replace');
   }, [selectNodes]);
+
+  const shouldAutoRegroupPromptGroup = useCallback((
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    sourceNodeId: string,
+  ) => (
+    sourceNodeId === promptNode.id
+    && selectedNodeIds.length <= 1
+    && childImages.length > 0
+  ), [selectedNodeIds.length]);
+
+  const commitPromptGroupDrag = useCallback((
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    finalPromptPosition: { x: number; y: number },
+    shouldRegroup: boolean,
+  ) => {
+    const latestPrompt = activeCanvas?.promptNodes.find((candidate) => candidate.id === promptNode.id) ?? promptNode;
+    const promptGroupSnapshot = liveSceneRef.current.promptGroups[promptNode.id];
+
+    void updatePromptNode({
+      ...latestPrompt,
+      position: finalPromptPosition,
+      userMoved: true,
+    });
+
+    childImages.forEach((imageNode) => {
+      const fallbackPosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
+      const commitPosition = shouldRegroup
+        ? promptGroupSnapshot?.childRenderPositionsById[imageNode.id]
+          ?? promptGroupSnapshot?.childLogicalPositionsById[imageNode.id]
+          ?? fallbackPosition
+        : fallbackPosition;
+      updateImageNodePosition(imageNode.id, commitPosition, { ignoreSelection: true });
+    });
+
+    if (shouldRegroup && childImages.length > 0) {
+      settlePromptGroupRegroup(promptNode.id);
+      return;
+    }
+
+    clearPromptGroupRegroup(promptNode.id);
+  }, [activeCanvas, clearPromptGroupRegroup, settlePromptGroupRegroup, updateImageNodePosition, updatePromptNode]);
 
   const promptGroupViews = React.useMemo<PromptGroupView[]>(() => {
     if (!activeCanvas) return [];
@@ -6869,12 +7702,13 @@ ${slideLayerXml.join('\n')}
       const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
       if (childImages.length === 0) return;
 
-      const hasLiveDragInGroup = Boolean(liveNodePositionById[promptNode.id])
-        || childImages.some((imageNode) => Boolean(liveNodePositionById[imageNode.id]));
+      const hasLiveDragInGroup = Boolean(liveNodePositionByIdRef.current[promptNode.id])
+        || childImages.some((imageNode) => Boolean(liveNodePositionByIdRef.current[imageNode.id]));
       const hasManualLayoutOverride = Boolean(promptNode.userMoved)
         || childImages.some((imageNode) => Boolean(imageNode.userMoved));
+      const hasPromptGroupPresentationState = Boolean(promptGroupLayoutStateByIdRef.current[promptNode.id]);
 
-      if (hasLiveDragInGroup || hasManualLayoutOverride) return;
+      if (hasLiveDragInGroup || hasManualLayoutOverride || hasPromptGroupPresentationState) return;
 
       const repairKey = [
         activeCanvasId,
@@ -6915,7 +7749,7 @@ ${slideLayerXml.join('\n')}
         updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
       });
     });
-  }, [activeCanvas, actualChildImagesByPromptId, isMobile, liveNodePositionById, parseImageDimensions, updateImageNodePosition]);
+  }, [activeCanvas, actualChildImagesByPromptId, isMobile, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -6926,6 +7760,81 @@ ${slideLayerXml.join('\n')}
     () => new Map((activeCanvas?.promptNodes || []).map(node => [node.id, node])),
     [activeCanvas]
   );
+
+  const liveSceneInteractionPhase: CanvasInteractionPhase = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => state.layoutMode === 'docked')
+    ? 'regroup-settle'
+    : isNodeDragActive
+      ? 'node-drag'
+      : canvasInteractionPhase;
+
+  const liveSceneState = React.useMemo<LiveSceneSnapshot>(() => {
+    const liveNodePositions = liveNodePositionByIdRef.current;
+    const promptGroups: LiveSceneSnapshot['promptGroups'] = {};
+    const nodeRenderPositionById: LiveSceneSnapshot['nodeRenderPositionById'] = {};
+
+    if (!activeCanvas) {
+      return {
+        interactionPhase: liveSceneInteractionPhase,
+        liveNodePositionById: liveNodePositions,
+        nodeRenderPositionById,
+        promptGroups,
+      };
+    }
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+      if (childImages.length === 0) {
+        return;
+      }
+
+      const promptPosition = liveNodePositions[promptNode.id] ?? promptNode.position;
+      const regroupLayoutsById = promptGroupRegroupLayoutsById.get(promptNode.id) ?? new Map();
+      const groupSnapshot = buildPromptGroupLiveSceneSnapshot({
+        promptId: promptNode.id,
+        promptPosition,
+        interactionPhase: liveSceneInteractionPhase,
+        layoutMode: (promptGroupLayoutStateByIdRef.current[promptNode.id]?.layoutMode ?? 'expanded') as PromptGroupLayoutMode,
+        regroupProgress: promptGroupLayoutStateByIdRef.current[promptNode.id]?.regroupProgress ?? 0,
+        liveNodePositionById: liveNodePositions,
+        childNodes: childImages.map((imageNode) => {
+          const livePosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
+          const regroupLayout = regroupLayoutsById.get(imageNode.id);
+
+          return {
+            id: imageNode.id,
+            logicalPosition: livePosition,
+            dockedPosition: regroupLayout?.settledPosition ?? livePosition,
+            renderPosition: regroupLayout?.renderPosition,
+          };
+        }),
+      });
+
+      Object.assign(promptGroups, groupSnapshot.promptGroups);
+      Object.assign(nodeRenderPositionById, groupSnapshot.nodeRenderPositionById);
+    });
+
+    return {
+      interactionPhase: liveSceneInteractionPhase,
+      liveNodePositionById: liveNodePositions,
+      nodeRenderPositionById,
+      promptGroups,
+    };
+  }, [
+    activeCanvas,
+    actualChildImagesByPromptId,
+    canvasInteractionPhase,
+    isNodeDragActive,
+    liveNodePositionVersion,
+    liveSceneInteractionPhase,
+    promptGroupRegroupLayoutsById,
+    promptGroupLayoutVersion,
+  ]);
+
+  const liveSceneRef = useRef(liveSceneState);
+
+  useEffect(() => {
+    liveSceneRef.current = liveSceneState;
+  }, [liveSceneState]);
 
   const visibleImageNodesById = React.useMemo(
     () => new Map(visibleImageNodes.map(node => [node.id, node])),
@@ -7119,90 +8028,8 @@ ${slideLayerXml.join('\n')}
     selectionBox?.active,
   ]);
 
-  const [connectorPromptNodes, setConnectorPromptNodes] = useState<PromptNode[]>(visiblePromptNodes);
-  const [connectorVisibleImageNodes, setConnectorVisibleImageNodes] = useState<GeneratedImage[]>(visibleImageNodes);
-  const connectorLastCommitRef = useRef(0);
-  const connectorThrottleTimerRef = useRef<number | null>(null);
-  const connectorPendingSnapshotRef = useRef<{
-    promptNodes: PromptNode[];
-    imageNodes: GeneratedImage[];
-  }>({
-    promptNodes: visiblePromptNodes,
-    imageNodes: visibleImageNodes,
-  });
-
-  const commitConnectorSnapshot = useCallback((snapshot: { promptNodes: PromptNode[]; imageNodes: GeneratedImage[] }) => {
-    connectorLastCommitRef.current = Date.now();
-    setConnectorPromptNodes(snapshot.promptNodes);
-    setConnectorVisibleImageNodes(snapshot.imageNodes);
-  }, []);
-
-  const shouldUseLiveConnectorSnapshot = isNodeDragActive || !shouldThrottleEdges(canvasPerformanceProfile);
-
-  useEffect(() => {
-    return () => {
-      if (connectorThrottleTimerRef.current !== null) {
-        window.clearTimeout(connectorThrottleTimerRef.current);
-        connectorThrottleTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const nextSnapshot = {
-      promptNodes: visiblePromptNodes,
-      imageNodes: visibleImageNodes,
-    };
-
-    connectorPendingSnapshotRef.current = nextSnapshot;
-
-    if (shouldUseLiveConnectorSnapshot) {
-      if (connectorThrottleTimerRef.current !== null) {
-        window.clearTimeout(connectorThrottleTimerRef.current);
-        connectorThrottleTimerRef.current = null;
-      }
-      commitConnectorSnapshot(nextSnapshot);
-      return;
-    }
-
-    const elapsed = Date.now() - connectorLastCommitRef.current;
-    if (elapsed >= canvasPerformanceProfile.edgeThrottleMs && connectorThrottleTimerRef.current === null) {
-      commitConnectorSnapshot(nextSnapshot);
-      return;
-    }
-
-    if (connectorThrottleTimerRef.current !== null) {
-      return;
-    }
-
-    const waitTime = Math.max(1, canvasPerformanceProfile.edgeThrottleMs - elapsed);
-    connectorThrottleTimerRef.current = window.setTimeout(() => {
-      connectorThrottleTimerRef.current = null;
-      const pendingSnapshot = connectorPendingSnapshotRef.current;
-      if (pendingSnapshot) {
-        commitConnectorSnapshot(pendingSnapshot);
-      }
-    }, waitTime);
-  }, [
-    canvasPerformanceProfile,
-    commitConnectorSnapshot,
-    shouldUseLiveConnectorSnapshot,
-    visibleImageNodes,
-    visiblePromptNodes,
-  ]);
-
-  const connectorRenderPromptNodes = shouldUseLiveConnectorSnapshot ? visiblePromptNodes : connectorPromptNodes;
-  const connectorRenderVisibleImageNodes = shouldUseLiveConnectorSnapshot ? visibleImageNodes : connectorVisibleImageNodes;
-
-  const connectorVisibleImageNodesById = React.useMemo(
-    () => new Map(connectorRenderVisibleImageNodes.map((node) => [node.id, node])),
-    [connectorRenderVisibleImageNodes]
-  );
-
-  const connectorPromptNodesById = React.useMemo(
-    () => new Map(connectorRenderPromptNodes.map((node) => [node.id, node])),
-    [connectorRenderPromptNodes]
-  );
+  const connectorRenderPromptNodes = visiblePromptNodes;
+  const connectorRenderVisibleImageNodes = visibleImageNodes;
 
   const connectorVisibleImageNodeIds = React.useMemo(
     () => new Set(connectorRenderVisibleImageNodes.map((node) => node.id)),
@@ -7211,17 +8038,21 @@ ${slideLayerXml.join('\n')}
 
   const resolveLivePromptPosition = useCallback((promptNode: PromptNode | undefined | null) => {
     if (!promptNode) return null;
-    return liveNodePositionById[promptNode.id]
-      ?? promptNodesById.get(promptNode.id)?.position
-      ?? promptNode.position;
-  }, [liveNodePositionById, promptNodesById]);
+    return resolveLiveSceneNodePosition(
+      liveSceneState,
+      promptNode.id,
+      promptNodesById.get(promptNode.id)?.position ?? promptNode.position,
+    );
+  }, [liveSceneState, promptNodesById]);
 
   const resolveLiveImagePosition = useCallback((imageNode: GeneratedImage | undefined | null) => {
     if (!imageNode) return null;
-    return liveNodePositionById[imageNode.id]
-      ?? imageNodesById.get(imageNode.id)?.position
-      ?? imageNode.position;
-  }, [imageNodesById, liveNodePositionById]);
+    return resolveLiveSceneNodePosition(
+      liveSceneState,
+      imageNode.id,
+      imageNodesById.get(imageNode.id)?.position ?? imageNode.position,
+    );
+  }, [imageNodesById, liveSceneState]);
 
   const connectorChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -7806,11 +8637,17 @@ ${slideLayerXml.join('\n')}
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
             applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
-            moveSelectedNodes(delta, expandedSelectedNodeIds);
+          }
+        }}
+        onDragCommit={(delta, sourceNodeId) => {
+          if (!sourceNodeId) return;
+
+          if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
             return;
           }
 
-          moveSelectedNodes(delta, sourceNodeId);
+          moveSelectedNodesImmediate(delta, sourceNodeId);
         }}
       />
     );
@@ -7833,9 +8670,8 @@ ${slideLayerXml.join('\n')}
     isCanvasTransforming,
     isMobile,
     applyLiveNodeDeltaToDraggedSet,
-    moveSelectedNodes,
+    moveSelectedNodesImmediate,
     resolveLiveImagePosition,
-    moveSelectedNodes,
     nowTimestamp,
     selectedNodeIds,
     updateImageNode,
@@ -7847,6 +8683,7 @@ ${slideLayerXml.join('\n')}
     const { groupView } = item;
     const node = groupView.rootPrompt;
     const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
+    const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
     const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
     const isGeneratingGroup = generatingGroupIds.includes(node.id);
@@ -7856,10 +8693,11 @@ ${slideLayerXml.join('\n')}
     const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
     const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
     const groupConnectorDash = `${groupConnectorDashLength} ${groupConnectorGapLength}`;
-    const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping;
+    const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping || Boolean(promptGroupLayoutState);
     const connectorLayerZIndex = Math.max(0, groupStackZIndex - 1);
     const promptCardZIndex = groupStackZIndex + 20;
     const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
+    const regroupLayoutsById = promptGroupRegroupLayoutsById.get(node.id) ?? new Map();
     const renderedPromptNode = (
       promptConnectorPosition.x === node.position.x && promptConnectorPosition.y === node.position.y
     )
@@ -7879,6 +8717,7 @@ ${slideLayerXml.join('\n')}
     const connectorCanvasPadding = 128;
     const childVisualLayouts = groupView.childImages.map((childNode) => {
       const livePosition = resolveLiveImagePosition(childNode) ?? childNode.position;
+      const regroupLayout = regroupLayoutsById.get(childNode.id);
       const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
       let imageHeight = theoreticalHeight;
 
@@ -7901,7 +8740,8 @@ ${slideLayerXml.join('\n')}
         renderedWidth,
         resolvedImageHeight,
         livePosition,
-        visualPosition: livePosition,
+        visualPosition: regroupLayout?.renderPosition ?? livePosition,
+        settledPosition: regroupLayout?.settledPosition ?? livePosition,
       };
     });
     const groupConnectorNodes = childVisualLayouts.map((layout) => ({
@@ -8071,10 +8911,12 @@ ${slideLayerXml.join('\n')}
           onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
           onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
           onRetryEcommerceModule={handleRetryEcommerceModule}
+          activeEcommerceTaskState={ecommerceState.activeTaskState}
+          onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
+          onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
           ioTrace={getNodeIoTrace(node.id)}
           onOpenStorageSettings={() => {
-            setShowSettingsPanel(true);
-            setSettingsInitialView('storage-settings');
+            openSettingsSurfaceTracked('storage-settings');
           }}
           onDelete={deletePromptNode}
           onDisconnect={handleDisconnectPrompt}
@@ -8097,13 +8939,35 @@ ${slideLayerXml.join('\n')}
           }}
           onDragDelta={(delta, sourceNodeId) => {
             if (!sourceNodeId) return;
-            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
+
+            const shouldRegroup = shouldAutoRegroupPromptGroup(node, groupView.childImages, sourceNodeId);
+            if (shouldRegroup) {
+              beginPromptGroupRegroup(node.id);
+            } else {
+              clearPromptGroupRegroup(node.id);
+            }
+
+            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
               applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
-              moveSelectedNodes(delta, expandedSelectedNodeIds);
             } else {
               applyLiveNodeDeltaToDraggedSet(sourceNodeId, groupNodeIds, delta);
-              moveSelectedNodes(delta, groupNodeIds);
             }
+          }}
+          onDragCommit={(delta, sourceNodeId, finalPosition) => {
+            if (!sourceNodeId || !finalPosition) return;
+
+            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
+              clearPromptGroupRegroup(node.id);
+              moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+              return;
+            }
+
+            commitPromptGroupDrag(
+              node,
+              groupView.childImages,
+              finalPosition,
+              shouldAutoRegroupPromptGroup(node, groupView.childImages, sourceNodeId),
+            );
           }}
           canvasTransform={canvasTransform}
           onDragStateChange={handleCanvasNodeDragStateChange}
@@ -8147,14 +9011,22 @@ ${slideLayerXml.join('\n')}
               onDragStateChange={handleCanvasNodeDragStateChange}
               onDragDelta={(delta, sourceNodeId) => {
                 if (!sourceNodeId) return;
+                clearPromptGroupRegroup(node.id);
 
                 if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
                   applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
-                  moveSelectedNodes(delta, expandedSelectedNodeIds);
+                }
+              }}
+              onDragCommit={(delta, sourceNodeId) => {
+                if (!sourceNodeId) return;
+                clearPromptGroupRegroup(node.id);
+
+                if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
+                  moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
                   return;
                 }
 
-                moveSelectedNodes(delta, [sourceNodeId]);
+                moveSelectedNodesImmediate(delta, [sourceNodeId]);
               }}
             />
           </React.Fragment>
@@ -8194,15 +9066,21 @@ ${slideLayerXml.join('\n')}
     highlightedId,
     isMobile,
     applyLiveNodeDeltaToDraggedSet,
-    moveSelectedNodes,
+    beginPromptGroupRegroup,
+    clearPromptGroupRegroup,
+    commitPromptGroupDrag,
+    moveSelectedNodesImmediate,
     nowTimestamp,
     promptGroupNodeIdsById,
+    promptGroupLayoutVersion,
+    promptGroupRegroupLayoutsById,
     promptGroupLayerById,
     promptGroupStackZIndexById,
     resolveLiveImagePosition,
     resolveLivePromptPosition,
     getPromptHeight,
     selectedNodeIds,
+    shouldAutoRegroupPromptGroup,
     updatePromptNode,
     updateImageNode,
     updateImageNodeDisplayMeta,
@@ -8452,9 +9330,15 @@ ${slideLayerXml.join('\n')}
     });
   }, []);
 
-  const handleCanvasInteractionChange = useCallback((state: { isDragging: boolean; isZooming: boolean }) => {
+  const handleCanvasInteractionChange = useCallback((state: {
+    isDragging: boolean;
+    isZooming: boolean;
+    interactionPhase: 'idle' | 'pan' | 'zoom';
+    idleRelaxationMs: number;
+  }) => {
     const nextValue = state.isDragging || state.isZooming;
     setIsCanvasTransforming(prev => (prev === nextValue ? prev : nextValue));
+    setCanvasInteractionPhase(state.interactionPhase);
   }, []);
 
   const CONNECTOR_LAYER_Z_INDEX = 0;
@@ -8523,6 +9407,11 @@ ${slideLayerXml.join('\n')}
 
   
 
+  const mobileResultEntries = React.useMemo<MobileResultEntry[]>(
+    () => selectMobileFeedResults(activeCanvas?.promptNodes || [], activeCanvas?.imageNodes || []),
+    [activeCanvas?.imageNodes, activeCanvas?.promptNodes],
+  );
+
   // [Blocking Load] Wait for Canvas Hydration to prevent "Triple Load" flash
   // Keep this after all hooks so the hook order stays stable across renders.
   if (!isReady) {
@@ -8535,106 +9424,52 @@ ${slideLayerXml.join('\n')}
 
   const workspaceChrome = null;
 
-  const mobileHeader = isMobile ? (
-    <div className="space-y-3">
-      <MobileHeader
-        onMenuClick={() => setIsSidebarOpen(true)}
-        onDashboardClick={() => openSettingsSurface('dashboard')}
-        onSettingsClick={() => openSettingsSurface('api-management')}
-        onUserClick={() => openProfileSurface('main')}
-        onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
-        onRechargeClick={billingUiEnabled ? () => setShowRechargeModal(true) : undefined}
-        balance={billingUiEnabled ? balance : 0}
-        balanceLoading={billingUiEnabled ? billingLoading : false}
-        title="KK Studio"
-        userName={derivedMobileUserName}
-        userAvatarUrl={derivedMobileUserAvatarUrl}
-      />
-      <MobileWorkspaceQuickBar
-        onSearch={() => {
-          focusWorkspace();
-          setIsSearchOpen(true);
-        }}
-        onTogglePromptOptimization={() => {
-              if (config.mode !== GenerationMode.IMAGE && config.mode !== GenerationMode.PPT && config.mode !== GenerationMode.ECOMMERCE) {
-                return;
-              }
-
-          setConfig((prev) => ({
-            ...prev,
-            enablePromptOptimization: !prev.enablePromptOptimization,
-          }));
-        }}
-        promptOptimizationEnabled={!!config.enablePromptOptimization}
-            promptOptimizationSupported={config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE}
-      />
+  const mobileComposerNode = isMobile ? (
+    <div className="h-full px-3 pb-3 pt-2">
+      <div className="flex h-full flex-col rounded-[30px] border border-[var(--border-light)] bg-[var(--bg-overlay)]/96 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+        <PromptBar
+          config={config}
+          setConfig={setConfig}
+          isGenerating={isGenerating}
+          onUiBusyChange={setPromptBarUiBusy}
+          onGenerate={handleGenerate}
+          onCancel={handleCancelGeneration}
+          onFilesDrop={handleFilesDrop}
+          activeSourceImage={activeSourceImage ?
+            (activeCanvas?.imageNodes.find((node) => node.id === activeSourceImage) ? {
+              id: activeSourceImage,
+              url: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.url,
+              prompt: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.prompt,
+            } : null) : null
+          }
+          onClearSource={handleClearSource}
+          isMobile={isMobile}
+          mobileShellMode="embedded"
+          onOpenSettings={(view) => {
+            openSettingsSurfaceTracked(view === 'api-management' ? 'api-management' : 'dashboard');
+          }}
+          onFocus={() => setIsPromptFocused(true)}
+          onBlur={() => setIsPromptFocused(false)}
+          ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
+          ecommerceProductFileCount={ecommerceState.productFiles.length}
+          ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
+          ecommerceAnalysis={ecommerceState.analysis}
+          ecommerceSelection={ecommerceState.selectedItems}
+          ecommerceTaskStates={ecommerceState.taskStates}
+          ecommerceActiveTaskState={ecommerceState.activeTaskState}
+          ecommerceAnalyzing={ecommerceState.isAnalyzing}
+          onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
+          onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
+          onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
+          onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
+          onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
+          onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+          onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
+          ecommerceRatioOverride={ecommerceRatioOverride}
+          onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
+        />
+      </div>
     </div>
-  ) : null;
-
-  const mobileFeed = isMobile ? (
-    <div className="h-full min-h-0 overflow-y-auto pb-2">
-      <MobileResultFeed
-        promptNodes={activeCanvas?.promptNodes || []}
-        imageNodes={activeCanvas?.imageNodes || []}
-        onImageDelete={deleteImageNode}
-        onImageSelect={(id) => selectNodes([id], 'replace')}
-        onImagePreview={handleOpenPreview}
-        onUseAsSource={handleMobileUseImageAsSource}
-        onPartialRedraw={handlePartialRedrawRequest}
-        activeSourceImage={activeSourceImage}
-        highlightedId={highlightedId}
-      />
-    </div>
-  ) : null;
-
-  const mobileComposer = isMobile ? (
-    <PromptBar
-      config={config}
-      setConfig={setConfig}
-      isGenerating={isGenerating}
-      onUiBusyChange={setPromptBarUiBusy}
-      onGenerate={handleGenerate}
-      onCancel={handleCancelGeneration}
-      onFilesDrop={handleFilesDrop}
-      activeSourceImage={activeSourceImage ?
-        (activeCanvas?.imageNodes.find((node) => node.id === activeSourceImage) ? {
-          id: activeSourceImage,
-          url: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.url,
-          prompt: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.prompt,
-        } : null) : null
-      }
-      onClearSource={handleClearSource}
-      isMobile={isMobile}
-      mobileShellMode="embedded"
-      onOpenSettings={(view) => {
-        openSettingsSurface(view || 'api-management');
-        handleHideMobileNav();
-      }}
-      onInteract={handleShowMobileNav}
-      onFocus={() => {
-        console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
-        setIsPromptFocused(true);
-      }}
-      onBlur={() => {
-        console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
-        setIsPromptFocused(false);
-        setTimeout(() => handleShowMobileNav(), 0);
-      }}
-      ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
-      ecommerceProductFileCount={ecommerceState.productFiles.length}
-      ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
-      ecommerceAnalysis={ecommerceState.analysis}
-      ecommerceSelection={ecommerceState.selectedItems}
-      ecommerceAnalyzing={ecommerceState.isAnalyzing}
-      onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
-      onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
-      onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
-      onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
-      onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
-      onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
-      ecommerceRatioOverride={ecommerceRatioOverride}
-      onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
-    />
   ) : null;
 
   const workspacePanels = (
@@ -8645,7 +9480,7 @@ ${slideLayerXml.join('\n')}
       toggleChatPanel={toggleChatPanel}
       setIsChatOpen={setIsChatOpen}
       isMobile={isMobile}
-      openSettingsSurface={openSettingsSurface}
+      openSettingsSurface={openSettingsSurfaceTracked}
       setIsSidebarHovered={setIsSidebarHovered}
       setChatSidebarWidth={setChatSidebarWidth}
       workspaceSurface={workspaceSurface}
@@ -8733,36 +9568,44 @@ ${slideLayerXml.join('\n')}
               derivedApiStatus === 'error' ? 'bg-red-500' : 'bg-zinc-500'
               }`} style={{ borderColor: 'var(--bg-canvas)' }} />
 
-            {/* New User Menu Dropdown */}
-            {showUserMenu && (
+            {showUserMenu ? (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                <div className="absolute top-12 right-0 w-64 border rounded-xl shadow-2xl z-50 p-2 animate-in fade-in zoom-in-95 duration-100 origin-top-right" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}>
-
-                  {/* User Info Header */}
-                  <div className="px-3 py-3 border-b mb-2 rounded-lg transition-colors cursor-pointer group"
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowUserMenu(false)}
+                />
+                <div
+                  className="absolute right-0 top-12 z-50 w-64 origin-top-right animate-in rounded-xl border p-2 shadow-2xl duration-100 fade-in zoom-in-95"
+                  style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
+                >
+                  <div
+                    className="group mb-2 cursor-pointer rounded-lg border-b px-3 py-3 transition-colors"
                     style={{ borderColor: 'var(--border-light)' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    onMouseEnter={(event) => { event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; }}
+                    onMouseLeave={(event) => { event.currentTarget.style.backgroundColor = 'transparent'; }}
                     onClick={() => {
                       setProfileInitialView('main');
                       setShowProfileModal(true);
                       setShowUserMenu(false);
-                    }}>
+                    }}
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold overflow-hidden">
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-500 font-bold text-white">
                         {derivedMobileUserAvatarUrl ? (
-                          <img src={derivedMobileUserAvatarUrl} className="w-full h-full object-cover" />
+                          <img src={derivedMobileUserAvatarUrl} className="h-full w-full object-cover" />
                         ) : user?.email?.[0].toUpperCase()}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user?.user_metadata?.full_name || '用户'}</div>
-                        <div className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{user?.email}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {user?.user_metadata?.full_name || '用户'}
+                        </div>
+                        <div className="truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {user?.email}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Menu Items */}
                   <div className="space-y-1">
                     <button
                       onClick={() => {
@@ -8770,62 +9613,85 @@ ${slideLayerXml.join('\n')}
                         setShowProfileModal(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
                       style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      onMouseEnter={(event) => {
+                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
+                        event.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={(event) => {
+                        event.currentTarget.style.backgroundColor = 'transparent';
+                        event.currentTarget.style.color = 'var(--text-secondary)';
+                      }}
                     >
-                      <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-blue)' }}><User size={14} /></div>
+                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-blue)' }}>
+                        <User size={14} />
+                      </div>
                       个人中心
                     </button>
 
-                    {/* [NEW] 账户管理鍏ュ彛 */}
                     <button
                       onClick={() => {
                         setProfileInitialView('billing');
                         setShowProfileModal(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
                       style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      onMouseEnter={(event) => {
+                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
+                        event.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={(event) => {
+                        event.currentTarget.style.backgroundColor = 'transparent';
+                        event.currentTarget.style.color = 'var(--text-secondary)';
+                      }}
                     >
-                      <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-yellow)' }}><Zap size={14} /></div>
+                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-yellow)' }}>
+                        <Zap size={14} />
+                      </div>
                       账号管理
                     </button>
 
                     <button
                       onClick={() => {
-                        setShowUserMenu(false);
-                        setShowSettingsPanel(true);
-                        setSettingsInitialView('dashboard');
+                        openSettingsSurfaceTracked('dashboard');
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
                       style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      onMouseEnter={(event) => {
+                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
+                        event.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={(event) => {
+                        event.currentTarget.style.backgroundColor = 'transparent';
+                        event.currentTarget.style.color = 'var(--text-secondary)';
+                      }}
                     >
-                      <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-purple)' }}><LayoutDashboard size={14} /></div>
+                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-purple)' }}>
+                        <LayoutDashboard size={14} />
+                      </div>
                       设置
                     </button>
 
-                    <div className="h-px my-1" style={{ backgroundColor: 'var(--border-light)' }} />
+                    <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
 
                     <button
                       onClick={() => {
                         signOut();
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10"
                     >
-                      <div className="p-1.5 bg-red-500/10 rounded-lg"><LogOut size={14} /></div>
+                      <div className="rounded-lg bg-red-500/10 p-1.5">
+                        <LogOut size={14} />
+                      </div>
                       退出登录
                     </button>
                   </div>
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       )}
@@ -8984,10 +9850,49 @@ ${slideLayerXml.join('\n')}
 
 
       {isMobile && (
-        <MobileAppShell
-          header={mobileHeader}
-          feed={mobileFeed}
-          composer={mobileComposer}
+        <MobileWorkspaceSurface
+          activeScreen={mobileScreen}
+          onScreenChange={setMobileScreen}
+          onOpenSettings={openCurrentMobileSettingsSurface}
+          title="KK Studio"
+          userName={derivedMobileUserName}
+          userAvatarUrl={derivedMobileUserAvatarUrl}
+          balance={billingUiEnabled ? balance : 0}
+          balanceLoading={billingUiEnabled ? billingLoading : false}
+          projectName={activeCanvas?.name || '项目'}
+          projectCount={state.canvases.length}
+          onOpenProjects={() => setMobileScreen('more-sheet')}
+          onOpenSearch={() => {
+            focusWorkspace();
+            setIsSearchOpen(true);
+            setMobileScreen('home');
+          }}
+          onOpenHistory={() => {
+            setWorkspaceSurface('library');
+            setMobileScreen('home');
+          }}
+          onOpenChat={() => {
+            focusWorkspace();
+            setIsChatOpen(true);
+            setMobileScreen('home');
+          }}
+          onOpenProfile={() => openProfileSurface('main')}
+          onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
+          onRechargeClick={billingUiEnabled ? () => setShowRechargeModal(true) : undefined}
+          resultEntries={mobileResultEntries}
+          activeEntryId={mobileActiveResultId}
+          activeSourceImage={activeSourceImage}
+          onEntryOpen={handleMobileResultOpen}
+          onPreviewImage={handleOpenPreview}
+          onUseResultAsSource={handleMobileUseImageAsSource}
+          onPartialRedraw={handleMobileResultPartialRedraw}
+          onDownloadEntry={handleMobileResultDownload}
+          onDeleteImage={deleteImageNode}
+          onEditEcommerceTask={handleMobileEditEcommerceTask}
+          onConfirmEcommerceDesktop={handleMobileConfirmEcommerceDesktop}
+          onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
+          onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
+          composer={mobileComposerNode}
           overlays={workspacePanels}
         />
       )}
@@ -9438,10 +10343,12 @@ ${slideLayerXml.join('\n')}
               onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
               onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
               onRetryEcommerceModule={handleRetryEcommerceModule}
+              activeEcommerceTaskState={ecommerceState.activeTaskState}
+              onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
+              onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
               ioTrace={getNodeIoTrace(node.id)}
               onOpenStorageSettings={() => {
-                setShowSettingsPanel(true);
-                setSettingsInitialView('storage-settings');
+                openSettingsSurfaceTracked('storage-settings');
               }}
               onDelete={deletePromptNode}
               onDisconnect={handleDisconnectPrompt}
@@ -9646,7 +10553,7 @@ ${slideLayerXml.join('\n')}
             onClearSource={handleClearSource}
             isMobile={isMobile}
             onOpenSettings={(view) => {
-              openSettingsSurface(view || 'api-management');
+              openSettingsSurfaceTracked(view || 'api-management');
               handleHideMobileNav();
             }}
             onInteract={handleShowMobileNav}
@@ -9664,6 +10571,8 @@ ${slideLayerXml.join('\n')}
             ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
             ecommerceAnalysis={ecommerceState.analysis}
             ecommerceSelection={ecommerceState.selectedItems}
+            ecommerceTaskStates={ecommerceState.taskStates}
+            ecommerceActiveTaskState={ecommerceState.activeTaskState}
             ecommerceAnalyzing={ecommerceState.isAnalyzing}
             onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
             onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
@@ -9671,6 +10580,7 @@ ${slideLayerXml.join('\n')}
             onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
             onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
             onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+            onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
             ecommerceRatioOverride={ecommerceRatioOverride}
             onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
           />
@@ -9737,7 +10647,7 @@ ${slideLayerXml.join('\n')}
               setShowStorageModal(false);
               setIsStorageChecked(true);
               if (!keyManager.hasValidKeys()) {
-                openSettingsSurface('api-management');
+                openSettingsSurfaceTracked('api-management');
               }
             }}
           />
@@ -9891,56 +10801,57 @@ ${slideLayerXml.join('\n')}
 
       {/* AI chat button - fixed in the bottom-right corner */}
       {/* AI chat button - fixed in the bottom-right corner */}
-      {false && <div className="absolute bottom-6 z-50 transition-all duration-300 hidden md:block" style={{ right: isChatOpen ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))` : '48px' }}>
-        <button
-          id="chat-trigger-button"
-          className="ai-chat-btn flex items-center justify-center cursor-pointer focus-visible:outline-none text-xs disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-blue-400/80 hover:shadow-[0_0_35px] bg-transparent overflow-hidden relative rounded-full aspect-square h-10 hover:scale-110 transition-all duration-300 p-2"
-          type="button"
-          onClick={() => setIsChatOpen(prev => !prev)}
+      {!isMobile ? (
+        <div
+          className="absolute bottom-6 z-50 hidden transition-all duration-300 md:block"
+          style={{ right: isChatOpen ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))` : '48px' }}
         >
-          <div className="uiverse w-full h-full absolute top-0 left-0 z-[-1] visible">
-            <div className="circle circle-12"></div>
-            <div className="circle circle-11"></div>
-            <div className="circle circle-10"></div>
-            <div className="circle circle-9"></div>
-            <div className="circle circle-8"></div>
-            <div className="circle circle-7"></div>
-            <div className="circle circle-6"></div>
-            <div className="circle circle-5"></div>
-            <div className="circle circle-4"></div>
-            <div className="circle circle-3"></div>
-            <div className="circle circle-2"></div>
-            <div className="circle circle-1"></div>
-          </div>
-
-          {/* Soft blue overlay */}
-          <div className="absolute inset-0 rounded-full bg-blue-500/15 z-[1]"></div>
-
-          {/* Spark icon - rotate slowly on hover */}
-          <svg
-            className="ai-chat-icon relative z-10"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="rgba(255, 255, 255, 0.95)"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5))' }}
+          <button
+            id="chat-trigger-button"
+            className="ai-chat-btn relative flex aspect-square h-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-transparent p-2 text-xs transition-all duration-300 hover:scale-110 hover:shadow-[0_0_35px] hover:shadow-blue-400/80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            onClick={() => setIsChatOpen((prev) => !prev)}
           >
-            <path d="M11.6061 4.23218C11.6838 3.79153 12.3162 3.79153 12.3939 4.23218L12.5268 4.98521C13.1111 8.29642 15.7036 10.8889 19.0148 11.4732L19.7678 11.6061C20.2085 11.6838 20.2085 12.3162 19.7678 12.3939L19.0148 12.5268C15.7036 13.1111 13.1111 15.7036 12.5268 19.0148L12.3939 19.7678C12.3162 20.2085 11.6838 20.2085 11.6061 19.7678L11.4732 19.0148C10.8889 15.7036 8.29642 13.1111 4.98521 12.5268L4.23218 12.3939C3.79153 12.3162 3.79153 11.6838 4.23218 11.6061L4.98521 11.4732C8.29642 10.8889 10.8889 8.29642 11.4732 4.98521L11.6061 4.23218Z" fill="rgba(255, 255, 255, 0.95)"></path>
-          </svg>
-          <style>{`
-            .ai-chat-icon {
-              transition: transform 0.7s ease-out;
-            }
-            .ai-chat-btn:hover .ai-chat-icon {
-              transform: rotate(90deg);
-            }
-            .ai-chat-btn:hover .uiverse .circle {
-              animation-duration: calc(var(--duration) / 3) !important;
-            }
-          `}</style>
-        </button>
-      </div>}
+            <div className="uiverse visible absolute left-0 top-0 z-[-1] h-full w-full">
+              <div className="circle circle-12"></div>
+              <div className="circle circle-11"></div>
+              <div className="circle circle-10"></div>
+              <div className="circle circle-9"></div>
+              <div className="circle circle-8"></div>
+              <div className="circle circle-7"></div>
+              <div className="circle circle-6"></div>
+              <div className="circle circle-5"></div>
+              <div className="circle circle-4"></div>
+              <div className="circle circle-3"></div>
+              <div className="circle circle-2"></div>
+              <div className="circle circle-1"></div>
+            </div>
+            <div className="absolute inset-0 z-[1] rounded-full bg-blue-500/15"></div>
+            <svg
+              className="ai-chat-icon relative z-10"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="rgba(255, 255, 255, 0.95)"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5))' }}
+            >
+              <path d="M11.6061 4.23218C11.6838 3.79153 12.3162 3.79153 12.3939 4.23218L12.5268 4.98521C13.1111 8.29642 15.7036 10.8889 19.0148 11.4732L19.7678 11.6061C20.2085 11.6838 20.2085 12.3162 19.7678 12.3939L19.0148 12.5268C15.7036 13.1111 13.1111 15.7036 12.5268 19.0148L12.3939 19.7678C12.3162 20.2085 11.6838 20.2085 11.6061 19.7678L11.4732 19.0148C10.8889 15.7036 8.29642 13.1111 4.98521 12.5268L4.23218 12.3939C3.79153 12.3162 3.79153 11.6838 4.23218 11.6061L4.98521 11.4732C8.29642 10.8889 10.8889 8.29642 11.4732 4.98521L11.6061 4.23218Z" fill="rgba(255, 255, 255, 0.95)"></path>
+            </svg>
+            <style>{`
+              .ai-chat-icon {
+                transition: transform 0.7s ease-out;
+              }
+              .ai-chat-btn:hover .ai-chat-icon {
+                transform: rotate(90deg);
+              }
+              .ai-chat-btn:hover .uiverse .circle {
+                animation-duration: calc(var(--duration) / 3) !important;
+              }
+            `}</style>
+          </button>
+        </div>
+      ) : null}
 
       {/* 🎯 迁移弹窗 */}
       {showMigrateModal && (
@@ -9952,34 +10863,26 @@ ${slideLayerXml.join('\n')}
             currentCanvasId={state.activeCanvasId}
             selectedCount={selectedNodeIds.length}
             onMigrate={(targetCanvasId) => {
-          // Handle the "create a new project and migrate" path
-          if (targetCanvasId === '__new__') {
-            // Create the new project and receive the new canvas ID
-            const newCanvasId = createCanvas();
-            if (newCanvasId) {
-              // Use the returned canvas ID directly for migration instead of waiting for state updates
-              // Keep the current project ID so we can migrate from it
-              const originalCanvasId = state.activeCanvasId;
+              if (targetCanvasId === '__new__') {
+                const newCanvasId = createCanvas();
+                if (newCanvasId) {
+                  const originalCanvasId = state.activeCanvasId;
+                  switchCanvas(originalCanvasId);
+                  setTimeout(() => {
+                    migrateNodes(selectedNodeIds, newCanvasId);
+                    switchCanvas(newCanvasId);
 
-              // Switch back to the original project before running the migration
-              switchCanvas(originalCanvasId);
+                    import('./services/system/notificationService').then(({ notify }) => {
+                      notify.success('迁移成功', `已创建新项目并迁移 ${selectedNodeIds.length} 个项目`);
+                    });
+                  }, 50);
+                }
+              } else {
+                migrateNodes(selectedNodeIds, targetCanvasId);
+              }
 
-              // Wait briefly for the canvas switch to settle, then migrate
-              setTimeout(() => {
-                migrateNodes(selectedNodeIds, newCanvasId);
-                switchCanvas(newCanvasId);
-
-                import('./services/system/notificationService').then(({ notify }) => {
-                  notify.success('迁移成功', `已创建新项目并迁移 ${selectedNodeIds.length} 个项目`);
-                });
-              }, 50);
-            }
-          } else {
-            // Migrate into an existing project
-            migrateNodes(selectedNodeIds, targetCanvasId);
-          }
-          setShowMigrateModal(false);
-          clearSelection();
+              setShowMigrateModal(false);
+              clearSelection();
             }}
           />
         </Suspense>

@@ -14,6 +14,7 @@ test("readonly snapshot hydration stays interactive when display data exists", (
   });
 
   assert.equal(viewState.isHydratingRuntimeUserApis, true);
+  assert.equal(viewState.stage, "syncing");
   assert.equal(viewState.userApiActionsDisabled, false);
   assert.equal(viewState.providerActionsDisabled, false);
   assert.equal(viewState.userApiEditorDisabled, false);
@@ -32,6 +33,7 @@ test("unauthenticated users still stay blocked", () => {
   });
 
   assert.equal(viewState.userApiActionsDisabled, true);
+  assert.equal(viewState.stage, "unauthenticated");
   assert.equal(viewState.providerActionsDisabled, true);
   assert.equal(viewState.userApiEditorDisabled, true);
   assert.equal(viewState.providerEditorReadOnly, true);
@@ -48,6 +50,7 @@ test("authenticated users stay editable when the API server is unreachable but r
   });
 
   assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.stage, "readonly-fallback");
   assert.equal(viewState.providerActionsDisabled, false);
   assert.equal(viewState.userApiEditorDisabled, false);
   assert.equal(viewState.providerEditorReadOnly, false);
@@ -65,8 +68,25 @@ test("authenticated users remain editable during degraded persistence when the A
   });
 
   assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.stage, "editable");
   assert.equal(viewState.providerActionsDisabled, false);
   assert.equal(viewState.userApiEditorDisabled, false);
   assert.equal(viewState.providerEditorReadOnly, false);
+  assert.equal(viewState.shouldUseReadonlySnapshotForDisplay, false);
+});
+
+test("authenticated users enter local-api-unavailable mode when runtime is down and no readonly snapshot exists", () => {
+  const viewState = resolveUserApiViewState({
+    hasReadonlySnapshot: false,
+    isApiReachable: false,
+    isAuthenticated: true,
+    isPersistenceDegraded: true,
+    runtimeOfficialCount: 0,
+    runtimeProviderCount: 0,
+  });
+
+  assert.equal(viewState.stage, "local-api-unavailable");
+  assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.providerActionsDisabled, false);
   assert.equal(viewState.shouldUseReadonlySnapshotForDisplay, false);
 });

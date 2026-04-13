@@ -9,13 +9,15 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('App passes reusable continue-create and partial-redraw handlers into the mobile result feed', () => {
+test('App passes reusable result actions into MobileWorkspaceSurface for preview, continue-create, redraw, download, and delete', () => {
   const source = readSource('src/App.tsx');
 
   assert.match(source, /const handleMobileUseImageAsSource = useCallback/);
   assert.match(source, /const handlePartialRedrawRequest = useCallback/);
-  assert.match(source, /<MobileResultFeed/);
-  assert.match(source, /onUseAsSource=\{handleMobileUseImageAsSource\}/);
+  assert.match(source, /const handleOpenPreview = useCallback/);
+  assert.match(source, /<MobileWorkspaceSurface/);
+  assert.match(source, /onPreviewImage=\{handleOpenPreview\}/);
+  assert.match(source, /onUseResultAsSource=\{handleMobileUseImageAsSource\}/);
   assert.match(source, /onPartialRedraw=\{handlePartialRedrawRequest\}/);
-  assert.match(source, /<GlobalLightbox[\s\S]*onPartialRedraw=\{handlePartialRedrawRequest\}/);
+  assert.match(source, /onDeleteImage=\{deleteImageNode\}/);
 });

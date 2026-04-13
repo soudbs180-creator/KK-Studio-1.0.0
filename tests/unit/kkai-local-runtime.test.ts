@@ -15,7 +15,7 @@ test('createKkaiLocalRuntime returns the fixed local profile and restores the la
       launchTarget: 'restore-last-workspace',
       cloudReadsAllowed: false,
       cloudWritesAllowed: false,
-      billingEnabled: false,
+      billingEnabled: true,
       adminEnabled: false,
     },
   );

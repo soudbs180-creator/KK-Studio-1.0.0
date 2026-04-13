@@ -71,6 +71,9 @@ export interface ImageGenerationOptions {
     modelId: string;
     prompt: string;
     requestId?: string;
+    executionLane?: 'local-user-api' | 'cloud-credit-model';
+    creditRouteSpecId?: string;
+    creditRouteUnitId?: string;
     negativePrompt?: string;
     seed?: number;
 

@@ -1,6 +1,6 @@
 import { Canvas } from '../../types';
 import { logError, logInfo, logWarning } from '../system/systemLogService';
-import { supabase } from '../../lib/supabase';
+import { getRuntimeOwnerId } from '../auth/runtimeSessionProfile.ts';
 import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer';
 import { toReferenceImageDataUrl } from '../../utils/referenceImageStorage';
 
@@ -290,8 +290,7 @@ export const fileSystemService = {
             }
 
             // 2. 检查新名字是否被占用，带上指纹保护
-            const { data: { session } } = await supabase.auth.getSession();
-            const ownerId = session?.user?.id || 'local_user';
+            const ownerId = getRuntimeOwnerId();
 
             let finalNewName = safeNewName;
             let isOwner = true;
@@ -436,8 +435,7 @@ export const fileSystemService = {
 
         logInfo('FileSystem', 'Loading workspace', `folder: ${handle.name}`);
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const ownerId = session?.user?.id || 'local_user';
+        const ownerId = getRuntimeOwnerId();
         let hasRootConfig = false;
         const canvasMap = new Map<string, Canvas>();
 
@@ -713,8 +711,7 @@ export const fileSystemService = {
 
         const sanitizedCanvases = sanitizeCanvasesForProjectFile(canvases);
         if (sanitizedCanvases.length > 0) {
-            const { data: { session } } = await supabase.auth.getSession();
-            const ownerId = session?.user?.id || 'local_user';
+            const ownerId = getRuntimeOwnerId();
             const consolidatedState = {
                 metadata: {
                     version: '4.0',
@@ -1299,8 +1296,7 @@ export const fileSystemService = {
                 throw new Error('Cannot save empty project: canvases array is empty');
             }
 
-            const { data: { session } } = await supabase.auth.getSession();
-            const ownerId = session?.user?.id || 'local_user';
+            const ownerId = getRuntimeOwnerId();
 
             // 1. 获取并合并根目录的 project.json
             let finalCanvases = [...state.canvases];

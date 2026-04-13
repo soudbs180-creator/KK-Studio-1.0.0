@@ -132,6 +132,7 @@ describe("hosted runtime hardening", () => {
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.SUPABASE_SECRET_KEY;
+    delete process.env.DATABASE_URL;
     delete process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN;
     delete process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN;
 
@@ -140,7 +141,7 @@ describe("hosted runtime hardening", () => {
       server = withMutedConsoleWarn(() => createPaymentSidecarServer(0));
       assert.fail("Expected hosted payment sidecar startup to throw without durable dependencies.");
     } catch (error) {
-      assert.match(String(error), /Hosted payment sidecar requires durable Supabase storage and settlement auth/);
+      assert.match(String(error), /Hosted payment sidecar requires durable payment storage and settlement auth/);
     } finally {
       if (server?.listening) {
         await new Promise<void>((resolve, reject) => {
@@ -154,6 +155,30 @@ describe("hosted runtime hardening", () => {
           });
         });
       }
+    }
+  });
+
+  test("hosted payment sidecar accepts postgres-backed durable storage", async () => {
+    process.env.VERCEL = "1";
+    process.env.DATABASE_URL = "postgres://kk:secret@127.0.0.1:5432/kkstudio";
+    process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN = "sidecar-token";
+    process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN = "sidecar-token";
+
+    const server = withMutedConsoleWarn(() => createPaymentSidecarServer(0));
+
+    try {
+      assert.equal(server.listening, true);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((closeError) => {
+          if (closeError) {
+            reject(closeError);
+            return;
+          }
+
+          resolve();
+        });
+      });
     }
   });
 });

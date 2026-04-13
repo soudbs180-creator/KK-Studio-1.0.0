@@ -1209,6 +1209,7 @@ export const useImageGeneration = (options: {
                 sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
+                displayLabel: latestNode.partialRedraw?.inheritedDisplayLabel || latestNode.ecommerce?.displayLabel,
                 provider: (result as any).provider || latestNode.provider,
                 providerLabel: (result as any).providerName || latestNode.providerLabel,
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
@@ -1568,7 +1569,10 @@ export const useImageGeneration = (options: {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
               maskUrl: executionNode.mode === GenerationMode.REDRAW ? undefined : executionNode.maskUrl,
               editMode: executionNode.mode === GenerationMode.INPAINT ? 'inpaint' : (executionNode.mode === GenerationMode.EDIT ? 'edit' : undefined),
-              preferredKeyId: executionNode.keySlotId, 
+              preferredKeyId: executionNode.keySlotId,
+              executionLane: executionNode.executionLane,
+              creditRouteSpecId: executionNode.creditRouteSpecId,
+              creditRouteUnitId: executionNode.creditRouteUnitId,
               onTaskId: (taskId) => {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
@@ -1790,6 +1794,7 @@ export const useImageGeneration = (options: {
             sourceResultIndex,
             position: layoutPosition,
             dimensions: item.dimensions ? `${item.dimensions.width}x${item.dimensions.height}` : undefined,
+            displayLabel: executionNode.partialRedraw?.inheritedDisplayLabel || executionNode.ecommerce?.displayLabel,
             exactDimensions: item.dimensions,
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,

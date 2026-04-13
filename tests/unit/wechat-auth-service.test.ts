@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
 
 import { WechatAuthService } from "../../apps/api/src/modules/auth/application/wechat-auth-service.ts";
+import { AuthService } from "../../apps/api/src/modules/auth/application/auth-service.ts";
 
 const originalConsoleWarn = console.warn;
 const originalConsoleError = console.error;
@@ -85,8 +86,11 @@ describe("wechat auth service", () => {
   test("redirects invalid callback state to the trusted callback URL", async () => {
     await withMutedWechatLogs(async () => {
       const service = createService();
+      const authService = new AuthService({
+        verifyTurnstileToken: async () => ({ success: true }),
+      });
 
-      const result = await service.handleCallback({
+      const result = await service.handleCallback(authService, {
         code: "wechat-code",
         state: "broken-state",
       });
@@ -102,6 +106,9 @@ describe("wechat auth service", () => {
     const targetUserId = "11111111-1111-1111-1111-111111111111";
     const syncCalls: Array<Record<string, unknown>> = [];
     const identityCalls: Array<Record<string, unknown>> = [];
+    const authService = new AuthService({
+      verifyTurnstileToken: async () => ({ success: true }),
+    });
 
     const service = createService({
       fetchImpl: createWechatFetchStub(),
@@ -128,7 +135,7 @@ describe("wechat auth service", () => {
       userId: targetUserId,
     });
 
-    const result = await service.handleCallback({
+    const result = await service.handleCallback(authService, {
       code: "wechat-auth-code",
       state: start.state,
     });
@@ -145,6 +152,9 @@ describe("wechat auth service", () => {
 
   test("rejects binding a WeChat account that already belongs to another user", async () => {
     await withMutedWechatLogs(async () => {
+      const authService = new AuthService({
+        verifyTurnstileToken: async () => ({ success: true }),
+      });
       const service = createService({
         fetchImpl: createWechatFetchStub(),
         repository: {
@@ -173,7 +183,7 @@ describe("wechat auth service", () => {
         userId: "11111111-1111-1111-1111-111111111111",
       });
 
-      const result = await service.handleCallback({
+      const result = await service.handleCallback(authService, {
         code: "wechat-auth-code",
         state: start.state,
       });
@@ -186,5 +196,40 @@ describe("wechat auth service", () => {
         "This WeChat account is already linked to a different KK Studio user.",
       );
     });
+  });
+
+  test("wechat login callback redirects with KK API session tokens in the hash", async () => {
+    const authService = new AuthService({
+      verifyTurnstileToken: async () => ({ success: true }),
+    });
+    const service = createService({
+      fetchImpl: createWechatFetchStub(),
+      repository: {
+        resolveWechatIdentity: async () => ({ resolved: undefined }),
+        createOrGetWechatUser: async () => ({
+          userId: "wechat-user-1",
+          email: "wechat-user@example.com",
+        }),
+        syncWechatProfile: async () => undefined,
+        upsertWechatIdentity: async () => undefined,
+      } as any,
+    });
+
+    const start = service.start({
+      mode: "login",
+      redirectTo: "https://app.example.com/auth/callback",
+    });
+
+    const result = await service.handleCallback(authService, {
+      code: "wechat-login-code",
+      state: start.state,
+    });
+
+    assert.match(String(result.redirectTo || ""), /^https:\/\/app\.example\.com\/auth\/callback#/);
+    const redirectUrl = new URL(result.redirectTo!);
+    const hash = new URLSearchParams(redirectUrl.hash.replace(/^#/, ""));
+    assert.equal(hash.get("provider"), "wechat");
+    assert.ok(hash.get("access_token"));
+    assert.ok(hash.get("refresh_token"));
   });
 });

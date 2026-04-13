@@ -1,14 +1,13 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.1",
-  "displayVersion": "v1.4.1",
-  "releaseDate": "2026-04-07",
+  "version": "1.4.2",
+  "displayVersion": "v1.4.2",
+  "releaseDate": "2026-04-14",
   "releaseNotes": [
-    "Main app, payment sidecar, and documentation are aligned to version 1.4.1.",
-    "User-route proxy startup, billing hydration, and canvas persistence regressions are fixed in this patch release.",
-    "Runtime-truth docs, package governance, and verification gates are aligned to version 1.4.1.",
-    "Integration tests and payment-server static checks now participate in the standard verification chain.",
-    "Hosted release guidance and runtime guards are tightened to reduce dangerous fallback behavior."
+    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.2.",
+    "The current working baseline consolidates the premium settings shell, API routing and credit orchestration groundwork, and mobile ecommerce continuation surfaces into one release line.",
+    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.2.",
+    "Typecheck, encoding, agent-doc governance, and production build verification are green against the unified 1.4.2 baseline."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

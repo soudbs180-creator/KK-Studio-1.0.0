@@ -13,7 +13,7 @@ test('ecommerce analysis types share the canonical size policy and the normalize
   const typesSource = readSource('src/services/ecommerce/types.ts');
   const normalizerSource = readSource('src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts');
 
-  assert.match(typesSource, /import type \{ EcommerceSizePolicy \} from '\.\.\/\.\.\/types';/);
+  assert.match(typesSource, /EcommerceSizePolicy/);
   assert.match(typesSource, /export type EcommerceAnalysisSizePolicy = EcommerceSizePolicy;/);
   assert.match(typesSource, /export interface EcommerceAnalysisMainImageItem[\s\S]*sizePolicy: EcommerceAnalysisSizePolicy;/);
   assert.match(typesSource, /export interface EcommerceAnalysisAPlusModule[\s\S]*sizePolicy: EcommerceAnalysisSizePolicy;/);

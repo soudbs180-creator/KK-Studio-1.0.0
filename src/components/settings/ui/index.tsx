@@ -32,11 +32,12 @@ export const SegmentedControl: React.FC<{
 }> = ({ options, value, onChange }) => {
   return (
     <div
-      className="grid grid-cols-2 gap-2 rounded-[16px] border p-2"
+      className="grid grid-cols-2 gap-2 border p-2"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         borderColor: 'var(--settings-segment-shell-border)',
         boxShadow: 'var(--settings-segment-shell-shadow)',
+        borderRadius: 'var(--radius-control-md)',
       }}
     >
       {options.map((option) => {
@@ -46,7 +47,7 @@ export const SegmentedControl: React.FC<{
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className="min-w-0 overflow-hidden rounded-[16px] border px-3 py-2.5 text-ellipsis whitespace-nowrap text-sm font-medium transition-all duration-200 active:scale-95"
+            className="min-w-0 overflow-hidden border px-3 py-2.5 text-ellipsis whitespace-nowrap font-medium transition-all duration-200 active:scale-95"
             style={{
               background: isActive
                 ? 'var(--settings-segment-active-bg)'
@@ -56,6 +57,9 @@ export const SegmentedControl: React.FC<{
                 : 'var(--settings-segment-border)',
               color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
               boxShadow: isActive ? 'var(--settings-segment-active-shadow)' : 'none',
+              borderRadius: 'var(--radius-control-md)',
+              fontSize: 'var(--type-body-2)',
+              minHeight: 'var(--ui-control-height-default)',
             }}
           >
             {option.label}
@@ -79,21 +83,23 @@ export const SegmentedControlMulti: React.FC<{
 
   return (
     <div 
-      className="relative flex overflow-hidden rounded-[16px] p-1"
+      className="relative flex overflow-hidden p-1"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         border: '1px solid var(--settings-segment-shell-border)',
         boxShadow: 'var(--settings-segment-shell-shadow)',
+        borderRadius: 'var(--radius-control-md)',
       }}
     >
       {/* 滑动背景 */}
       <div
-        className="absolute bottom-1 top-1 rounded-[16px] transition-all duration-200 ease-out"
+        className="absolute bottom-1 top-1 transition-all duration-200 ease-out"
         style={{
           background: 'var(--settings-segment-active-bg)',
           left: slideLeft,
           width: slideWidth,
           boxShadow: 'var(--settings-segment-active-shadow)',
+          borderRadius: 'var(--radius-control-md)',
         }}
       />
       
@@ -107,9 +113,12 @@ export const SegmentedControlMulti: React.FC<{
             }
           }}
           disabled={disabled}
-          className="relative z-10 min-w-0 flex-1 overflow-hidden rounded-[16px] px-2 py-2.5 text-ellipsis whitespace-nowrap text-sm font-medium transition-colors duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          className="relative z-10 min-w-0 flex-1 overflow-hidden px-2 py-2.5 text-ellipsis whitespace-nowrap font-medium transition-colors duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             color: value === option ? 'var(--text-primary)' : 'var(--text-secondary)',
+            borderRadius: 'var(--radius-control-md)',
+            fontSize: 'var(--type-body-2)',
+            minHeight: 'var(--ui-control-height-default)',
           }}
         >
           {option}
@@ -128,11 +137,12 @@ export const IconGrid: React.FC<{
 }> = ({ options, value, onChange, columns = 5 }) => {
   return (
     <div 
-      className="flex gap-1.5 overflow-hidden rounded-[16px] p-2"
+      className="flex gap-1.5 overflow-hidden p-2"
       style={{
         background: 'var(--settings-segment-shell-bg)',
         border: '1px solid var(--settings-segment-shell-border)',
         boxShadow: 'var(--settings-segment-shell-shadow)',
+        borderRadius: 'var(--radius-control-md)',
       }}
     >
       <div 
@@ -148,7 +158,7 @@ export const IconGrid: React.FC<{
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className="flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[16px] transition-all duration-200 active:scale-95"
+              className="flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden transition-all duration-200 active:scale-95"
               style={{
                 height: '52px',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -156,12 +166,16 @@ export const IconGrid: React.FC<{
                   ? 'var(--settings-segment-active-bg)'
                   : 'transparent',
                 boxShadow: isActive ? 'var(--settings-segment-active-shadow)' : 'none',
+                borderRadius: 'var(--radius-control-md)',
               }}
             >
               <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                 {option.icon}
               </div>
-              <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[10px] leading-none">
+              <span
+                className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none"
+                style={{ fontSize: 'var(--type-micro)' }}
+              >
                 {option.label}
               </span>
             </button>
@@ -184,7 +198,10 @@ export const SettingInput: React.FC<{
 }> = ({ label, value, onChange, placeholder, type = 'text', helper, disabled = false }) => {
   return (
     <label className="block">
-      <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+      <div
+        className="mb-2 break-words font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]"
+        style={{ fontSize: 'var(--type-micro)' }}
+      >
         {label}
       </div>
       <input
@@ -193,11 +210,14 @@ export const SettingInput: React.FC<{
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full rounded-[16px] border px-4 py-2.5 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full border px-4 py-2.5 text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           borderColor: 'var(--settings-input-border)',
           background: 'var(--settings-input-bg)',
           boxShadow: 'var(--settings-input-shadow)',
+          borderRadius: 'var(--radius-control-md)',
+          fontSize: 'var(--type-body-2)',
+          minHeight: 'var(--ui-control-height-default)',
         }}
       />
       {helper && (
@@ -220,11 +240,17 @@ export const SettingToggle: React.FC<{
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <div className="break-words text-[13px] font-medium text-[var(--text-primary)]">
+        <div
+          className="break-words font-medium text-[var(--text-primary)]"
+          style={{ fontSize: 'var(--type-body-2)' }}
+        >
           {label}
         </div>
         {helper && (
-          <div className="mt-1 break-words text-xs leading-5 text-[var(--text-secondary)]">
+          <div
+            className="mt-1 break-words text-[var(--text-secondary)]"
+            style={{ fontSize: 'var(--type-caption)', lineHeight: 'var(--ui-line-height-body)' }}
+          >
             {helper}
           </div>
         )}
@@ -267,18 +293,24 @@ export const SettingSelect: React.FC<{
 }> = ({ label, value, options, onChange, helper, disabled = false }) => {
   return (
     <label className="block">
-      <div className="mb-2 break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+      <div
+        className="mb-2 break-words font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]"
+        style={{ fontSize: 'var(--type-micro)' }}
+      >
         {label}
       </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full rounded-[16px] border px-4 py-2.5 text-sm text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full border px-4 py-2.5 text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           borderColor: 'var(--settings-input-border)',
           background: 'var(--settings-input-bg)',
           boxShadow: 'var(--settings-input-shadow)',
+          borderRadius: 'var(--radius-control-md)',
+          fontSize: 'var(--type-body-2)',
+          minHeight: 'var(--ui-control-height-default)',
         }}
       >
         {options.map((option) => (
@@ -316,11 +348,14 @@ export const PrimaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'transparent',
         background: 'var(--settings-button-primary-bg)',
         boxShadow: 'var(--settings-button-primary-shadow)',
+        borderRadius: 'var(--radius-control-md)',
+        fontSize: 'var(--type-body-2)',
+        minHeight: 'var(--ui-control-height-default)',
       }}
     >
       <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -342,10 +377,13 @@ export const SecondaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
         background: 'var(--settings-button-secondary-bg)',
+        borderRadius: 'var(--radius-control-md)',
+        fontSize: 'var(--type-body-2)',
+        minHeight: 'var(--ui-control-height-default)',
       }}
     >
       <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
@@ -365,10 +403,13 @@ export const DangerButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap rounded-[16px] border px-4 py-2.5 text-sm font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
         background: 'var(--settings-button-danger-bg)',
+        borderRadius: 'var(--radius-control-md)',
+        fontSize: 'var(--type-body-2)',
+        minHeight: 'var(--ui-control-height-default)',
       }}
     >
       <span className="inline-flex min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
@@ -432,10 +473,12 @@ export const IconButton: React.FC<{
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-10 w-10 items-center justify-center rounded-2xl border text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] active:scale-95"
+      className="flex h-10 w-10 items-center justify-center border text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] active:scale-95"
       style={{
         background: 'var(--settings-surface-overlay)',
         borderColor: 'var(--settings-border-subtle)',
+        borderRadius: 'var(--radius-control-md)',
+        minHeight: 'var(--ui-control-height-compact)',
         ...variantStyles[variant],
       }}
     >
@@ -473,7 +516,10 @@ export const ProgressBar: React.FC<{
         />
       </div>
       {showLabel && (
-        <div className="mt-1 text-right text-xs text-[var(--text-tertiary)]">
+        <div
+          className="mt-1 text-right text-[var(--text-tertiary)]"
+          style={{ fontSize: 'var(--type-caption)' }}
+        >
           {Math.round(progress)}%
         </div>
       )}
@@ -498,11 +544,12 @@ export const StatusBadge: React.FC<{
 
   return (
     <div
-      className="inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.12em]"
+      className="inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 uppercase tracking-[0.12em]"
       style={{
         borderColor: `${config.color}33`,
         backgroundColor: `${config.color}14`,
         color: config.color,
+        fontSize: 'var(--type-micro)',
       }}
     >
       <span 
@@ -529,11 +576,17 @@ export const EmptyState: React.FC<{
         borderStyle: 'dashed',
       }}
     >
-      <div className="break-words text-sm font-medium text-[var(--text-primary)]">
+      <div
+        className="break-words font-medium text-[var(--text-primary)]"
+        style={{ fontSize: 'var(--type-body-2)' }}
+      >
         {title}
       </div>
       {description && (
-        <div className="mt-1 break-words text-xs text-[var(--text-secondary)]">
+        <div
+          className="mt-1 break-words text-[var(--text-secondary)]"
+          style={{ fontSize: 'var(--type-caption)' }}
+        >
           {description}
         </div>
       )}

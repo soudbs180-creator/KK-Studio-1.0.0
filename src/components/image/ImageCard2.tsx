@@ -92,6 +92,7 @@ interface ImageNodeProps {
     isVisible?: boolean; // 🚀 视口可见性控制（从父组件传入）
     onUpdate?: (id: string, updates: Partial<GeneratedImage>) => void; // 🚀 [New] 更新回调
     onDragDelta?: (delta: { x: number; y: number }, sourceNodeId?: string) => void; // 🚀 [New] Relative Drag
+    onDragCommit?: (delta: { x: number; y: number }, sourceNodeId?: string, finalPosition?: { x: number; y: number }) => void;
     onDragStateChange?: (dragging: boolean) => void;
     isNew?: boolean; // 🚀 [New] 是否为刚生成的图片
     isCanvasTransforming?: boolean;
@@ -129,6 +130,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     isVisible = true, // 🚀 默认可见（向后兼容）
     onUpdate,
     onDragDelta,
+    onDragCommit,
     onDragStateChange,
     isNew = false, // 🚀 [New] 是否为新生成的图片
     isCanvasTransforming = false,
@@ -151,11 +153,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const dragCleanupRef = useRef<(() => void) | null>(null); // 🚀 [Fix] Drag Cleanup Ref
     const dragRafRef = useRef<number | null>(null);
     const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+    const onDragCommitRef = useRef(onDragCommit);
     const topMetaRowRef = useRef<HTMLDivElement>(null);
     const footerInfoRowRef = useRef<HTMLDivElement>(null);
     const hasAnimatedRef = useRef<string | null>(null);
 
     const [isDragging, setIsDragging] = useState(false);
+    useEffect(() => {
+        onDragCommitRef.current = onDragCommit;
+    }, [onDragCommit]);
+
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
 
@@ -633,7 +640,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const modelText = resolveModelDisplayName(image.model || image.id, image.modelLabel || image.model || image.id);
     const providerText = resolveDisplayedProviderLabel(image);
     const sizeText = (image.mode === GenerationMode.VIDEO || (image.imageSize as any) === 'Video') ? '720p' : (image.imageSize || '1K');
-    const aspectSizeLabel = `${image.aspectRatio || '1:1'} · ${sizeText}`;
+    const aspectSizeLabel = image.displayLabel || `${image.aspectRatio || '1:1'} · ${sizeText}`;
     const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
     const footerTimeLabel = clampedGenerationTime > 0
         ? `耗时 ${formatGenerationDurationSeconds(clampedGenerationTime)}s`
@@ -1087,6 +1094,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
         const handleMouseUp = () => {
             const didDrag = wasDraggingRef.current;
+            const finalPos = localPosRef.current;
+            const totalDelta = {
+                x: finalPos.x - dragStartCanvasPos.current.x,
+                y: finalPos.y - dragStartCanvasPos.current.y,
+            };
             setIsDragging(false);
             onDragStateChange?.(false);
             window.removeEventListener('mousemove', handleMouseMove);
@@ -1104,11 +1116,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             // 🚀 拖拽结束 - 位置已经通过left/top实时更新，无需重置transform
             // 但确保最终位置正确
             if (containerRef.current) {
-                const finalPos = localPosRef.current;
                 const finalLeft = snapCanvasCoordinate(finalPos.x - nodeWidth / 2, zoomScale || 1) - originX;
                 const finalTop = snapCanvasCoordinate(finalPos.y - cardHeight, zoomScale || 1) - originY;
                 containerRef.current.style.left = `${finalLeft}px`;
                 containerRef.current.style.top = `${finalTop}px`;
+            }
+            if (didDrag && (totalDelta.x !== 0 || totalDelta.y !== 0)) {
+                onDragCommitRef.current?.(totalDelta, image.id, finalPos);
             }
             onLivePositionChange?.(image.id, null);
         };

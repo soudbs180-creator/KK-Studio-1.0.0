@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata } from '../../types';
+import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
 import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -96,6 +96,92 @@ const getOptimizerStrategySummaryZh = (
     return null;
 };
 
+const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
+    if (node.ecommerce?.displayLabel) return node.ecommerce.displayLabel;
+    if (node.partialRedraw?.inheritedDisplayLabel) return node.partialRedraw.inheritedDisplayLabel;
+    return null;
+};
+
+type EcommercePromptBadge = { label: string; tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'neutral' };
+
+const getEcommerceSelectionBadges = (
+    node: PromptNode,
+    activeTaskState?: EcommerceEditableTaskState | null,
+): EcommercePromptBadge[] => {
+    const ecommerce = node.ecommerce;
+    if (!ecommerce) return [];
+
+    const badges: EcommercePromptBadge[] = [];
+    const taskState = ecommerce.editableTask;
+    const taskIsActive = Boolean(
+        taskState
+        && activeTaskState
+        && (
+            activeTaskState.taskId === taskState.taskId
+            || activeTaskState.sourceRowKey === ecommerce.sourceRowKey
+        ),
+    );
+
+    if (ecommerce.kind !== 'a-plus-group' && ecommerce.selectedForGeneration === false) {
+        badges.push({ label: '已跳过', tone: 'neutral' });
+    }
+
+    if (!ecommerce.needsReview && (taskState?.missingFields || []).length > 0) {
+        badges.push({ label: '待编辑', tone: 'amber' });
+    }
+
+    if (ecommerce.stage === 'ready' && ecommerce.selectedForGeneration !== false && ecommerce.kind !== 'a-plus-group') {
+        badges.push({ label: '已确认生成', tone: 'blue' });
+    }
+
+    if (taskIsActive) {
+        badges.push({ label: '编辑中', tone: 'blue' });
+    }
+
+    return badges;
+};
+
+const getEcommerceStageBadges = (node: PromptNode): EcommercePromptBadge[] => {
+    const ecommerce = node.ecommerce;
+    if (!ecommerce) return [];
+
+    const badges: EcommercePromptBadge[] = [];
+
+    if (ecommerce.needsReview || (ecommerce.reviewWarnings || []).length > 0) {
+        badges.push({ label: '待复核', tone: 'amber' });
+    }
+    if (ecommerce.desktopStage === 'generated') {
+        badges.push({ label: '桌面待确认', tone: 'blue' });
+    } else if (ecommerce.desktopStage === 'confirmed' && ecommerce.mobileStage === 'pending') {
+        badges.push({ label: '桌面已确认待手机版', tone: 'blue' });
+    } else if (ecommerce.desktopStage === 'failed') {
+        badges.push({ label: '桌面生成失败', tone: 'rose' });
+    }
+    if (ecommerce.mobileStage === 'pending' && ecommerce.desktopStage !== 'confirmed') {
+        badges.push({ label: '手机待生成', tone: 'blue' });
+    } else if (ecommerce.mobileStage === 'failed') {
+        badges.push({ label: '手机生成失败', tone: 'rose' });
+    } else if (ecommerce.mobileStage === 'generated') {
+        badges.push({ label: '手机已生成', tone: 'emerald' });
+    }
+    if (ecommerce.stage === 'generated' && badges.length === 0) {
+        badges.push({ label: '已生成', tone: 'emerald' });
+    }
+    if (ecommerce.stage === 'failed' && badges.length === 0) {
+        badges.push({ label: '生成失败', tone: 'rose' });
+    }
+
+    return badges;
+};
+
+const getEcommerceBadges = (
+    node: PromptNode,
+    activeTaskState?: EcommerceEditableTaskState | null,
+): EcommercePromptBadge[] => [
+    ...getEcommerceSelectionBadges(node, activeTaskState),
+    ...getEcommerceStageBadges(node),
+];
+
 interface PromptNodeProps {
     node: PromptNode;
     detailLevel?: CanvasCardDetailLevel;
@@ -126,6 +212,14 @@ interface PromptNodeProps {
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
     onConfirmEcommerceDesktop?: (node: PromptNode) => void;
     onRetryEcommerceModule?: (node: PromptNode) => void;
+    activeEcommerceTaskState?: EcommerceEditableTaskState | null;
+    onActivateEcommerceTask?: (node: PromptNode) => void;
+    onEcommerceTaskStateChange?: (
+        taskId: string,
+        updater:
+            | EcommerceEditableTaskState
+            | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
+    ) => void;
     ioTrace?: {
         inputStorageIds: string[];
         outputStorageIds: string[];
@@ -139,6 +233,7 @@ interface PromptNodeProps {
     onPin?: (id: string, mode: 'button' | 'drag') => void; // 🚀 [New Prop] Pin Draft
     onRemoveTag?: (id: string, tag: string) => void; // 🚀 [New Prop] Remove Tag
     onDragDelta?: (delta: { x: number; y: number }, sourceNodeId?: string) => void; // 🚀 [New Prop] Relative Drag
+    onDragCommit?: (delta: { x: number; y: number }, sourceNodeId?: string, finalPosition?: { x: number; y: number }) => void;
     onDragStateChange?: (dragging: boolean) => void;
     onUpdateNode?: (node: PromptNode) => void; // 🚀 [New Prop] Update node externally
     isCanvasTransforming?: boolean;
@@ -356,6 +451,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onGenerateEcommerceGroup,
     onConfirmEcommerceDesktop,
     onRetryEcommerceModule,
+    activeEcommerceTaskState = null,
+    onActivateEcommerceTask,
+    onEcommerceTaskStateChange,
     ioTrace,
     onOpenStorageSettings,
     onDisconnect,
@@ -366,6 +464,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onPin,
     onRemoveTag,
     onDragDelta,
+    onDragCommit,
     onDragStateChange,
     onUpdateNode,
     isCanvasTransforming = false,
@@ -402,6 +501,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const localPosRef = useRef(node.position);
     const hasAnimatedRef = useRef<string | null>(null);
     const onDragDeltaRef = useRef(onDragDelta);
+    const onDragCommitRef = useRef(onDragCommit);
     const onLivePositionChangeRef = useRef(onLivePositionChange);
     const onDragStateChangeRef = useRef(onDragStateChange);
     const dragRenderMetricsRef = useRef({
@@ -415,6 +515,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     useEffect(() => {
         onDragDeltaRef.current = onDragDelta;
+        onDragCommitRef.current = onDragCommit;
         onLivePositionChangeRef.current = onLivePositionChange;
         onDragStateChangeRef.current = onDragStateChange;
         dragRenderMetricsRef.current = {
@@ -425,7 +526,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             zoomScale: zoomScale || 1,
             nodeId: node.id,
         };
-    }, [cardHeight, cardWidth, node.id, onDragDelta, onDragStateChange, onLivePositionChange, originX, originY, zoomScale]);
+    }, [cardHeight, cardWidth, node.id, onDragCommit, onDragDelta, onDragStateChange, onLivePositionChange, originX, originY, zoomScale]);
 
     // Sync ref when node.position updates externally (and not dragging)
     // 🚀 [Fix] 使用更宽松的条件，避免拖动结束后位置回弹
@@ -722,15 +823,22 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     const handleMouseUp = () => {
         if (isDragging) {
+            const finalPos = localPosRef.current;
+            const totalDelta = {
+                x: finalPos.x - dragStartCanvasPos.current.x,
+                y: finalPos.y - dragStartCanvasPos.current.y,
+            };
             setIsDragging(false);
             onDragStateChangeRef.current?.(false);
             if (containerRef.current) {
-                const finalPos = localPosRef.current;
                 const { cardWidth: liveCardWidth, cardHeight: liveCardHeight, originX: liveOriginX, originY: liveOriginY, zoomScale: liveZoomScale } = dragRenderMetricsRef.current;
                 const finalLeft = snapCanvasCoordinate(finalPos.x - liveCardWidth / 2, liveZoomScale) - liveOriginX;
                 const finalTop = snapCanvasCoordinate(finalPos.y - liveCardHeight, liveZoomScale) - liveOriginY;
                 containerRef.current.style.left = `${finalLeft}px`;
                 containerRef.current.style.top = `${finalTop}px`;
+            }
+            if (hasMoved.current && (totalDelta.x !== 0 || totalDelta.y !== 0)) {
+                onDragCommitRef.current?.(totalDelta, dragRenderMetricsRef.current.nodeId, finalPos);
             }
             onLivePositionChangeRef.current?.(dragRenderMetricsRef.current.nodeId, null);
         }
@@ -1077,6 +1185,25 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {node.mode === GenerationMode.ECOMMERCE && node.ecommerce && onToggleEcommerceSelected && node.ecommerce.kind !== 'a-plus-group' && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleEcommerceSelected(node, node.ecommerce?.selectedForGeneration === false);
+                                }}
+                                aria-label={node.ecommerce.selectedForGeneration === false ? '确认生成' : '取消确认生成'}
+                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-bold transition-all ${
+                                    node.ecommerce.selectedForGeneration === false
+                                        ? 'border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-blue-500/40'
+                                        : 'border-blue-500/35 bg-blue-500/12 text-blue-300 hover:bg-blue-500/18'
+                                }`}
+                                title={node.ecommerce.selectedForGeneration === false ? '确认生成' : '取消确认'}
+                            >
+                                <CheckCircle2 size={10} />
+                                <span>{node.ecommerce.selectedForGeneration === false ? '确认生成' : '取消确认'}</span>
+                            </button>
+                        )}
                         {/* 提示词编译器 Tab 切换 */}
                         {(node.promptOptimizerResult || node.optimizedPromptEn) && (
                             <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5 border border-[var(--border-light)] ml-2">
@@ -1339,9 +1466,59 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             </div>
                         )}
 
-                        {node.ecommerce && onToggleEcommerceSelected && onGenerateEcommerceNode && onGenerateEcommerceGroup && onConfirmEcommerceDesktop && onRetryEcommerceModule && (
+                        {node.ecommerce && getEcommerceBadges(node, activeEcommerceTaskState).length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {getEcommerceBadges(node, activeEcommerceTaskState).map((badge) => {
+                                    const toneStyle = badge.tone === 'emerald'
+                                        ? {
+                                            background: 'rgba(16, 185, 129, 0.12)',
+                                            borderColor: 'rgba(16, 185, 129, 0.28)',
+                                            color: 'rgb(110, 231, 183)',
+                                        }
+                                        : badge.tone === 'neutral'
+                                            ? {
+                                                background: 'rgba(148, 163, 184, 0.10)',
+                                                borderColor: 'rgba(148, 163, 184, 0.22)',
+                                                color: 'rgb(203, 213, 225)',
+                                            }
+                                        : badge.tone === 'rose'
+                                            ? {
+                                                background: 'rgba(244, 63, 94, 0.12)',
+                                                borderColor: 'rgba(244, 63, 94, 0.28)',
+                                                color: 'rgb(253, 164, 175)',
+                                            }
+                                            : badge.tone === 'blue'
+                                                ? {
+                                                    background: 'rgba(59, 130, 246, 0.12)',
+                                                    borderColor: 'rgba(59, 130, 246, 0.28)',
+                                                    color: 'rgb(147, 197, 253)',
+                                                }
+                                                : {
+                                                    background: 'rgba(245, 158, 11, 0.12)',
+                                                    borderColor: 'rgba(245, 158, 11, 0.28)',
+                                                    color: 'rgb(253, 224, 71)',
+                                                };
+
+                                    return (
+                                        <span
+                                            key={`${badge.label}-${badge.tone}`}
+                                            className="rounded-full border px-2 py-1 text-[10px] font-medium"
+                                            style={toneStyle}
+                                        >
+                                            {badge.label}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+
+                        {node.mode === GenerationMode.ECOMMERCE && node.ecommerce && onToggleEcommerceSelected && onGenerateEcommerceNode && onGenerateEcommerceGroup && onConfirmEcommerceDesktop && onRetryEcommerceModule && (
                             <EcommerceCardActions
                                 node={node}
+                                taskState={node.ecommerce.editableTask}
+                                activeTaskState={activeEcommerceTaskState}
+                                onActivateTask={onActivateEcommerceTask}
+                                onTaskStateChange={onEcommerceTaskStateChange}
                                 onToggleSelected={onToggleEcommerceSelected}
                                 onGenerateNode={onGenerateEcommerceNode}
                                 onGenerateGroup={onGenerateEcommerceGroup}
@@ -1524,7 +1701,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             <div className="absolute inset-x-0 top-4 flex items-center justify-between gap-3 px-4">
                                                 <span className="mobile-generating-stack__badge">生成中 {i + 1}/{count}</span>
                                                 <span className="mobile-generating-stack__hint">
-                                                    {node.aspectRatio || '1:1'} · {node.mode === GenerationMode.PPT ? 'PPT' : node.imageSize || '1K'}
+                                                    {getPromptBusinessDisplayLabel(node) || `${node.aspectRatio || '1:1'} · ${node.mode === GenerationMode.PPT ? 'PPT' : node.imageSize || '1K'}`}
                                                 </span>
                                             </div>
 
@@ -1758,14 +1935,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                                     )}
                                                                     <span className="text-[var(--border-medium)] text-[7px]">|</span>
                                                                     <span className="text-[7px] leading-none font-medium text-[var(--text-secondary)] whitespace-nowrap">
-                                                                        {node.aspectRatio || '1:1'} · {node.mode === GenerationMode.VIDEO ? '720p' :
+                                                                        {getPromptBusinessDisplayLabel(node) || `${node.aspectRatio || '1:1'} · ${node.mode === GenerationMode.VIDEO ? '720p' :
                                                                             node.mode === GenerationMode.AUDIO ? '音频' :
                                                                                 node.mode === GenerationMode.PPT ? 'PPT' :
                                                                                     node.mode === GenerationMode.ECOMMERCE ? '电商' :
                                                                                     (node.imageSize as string) === '1024x1024' || (node.imageSize as string) === '1K' ? '1K' :
                                                                                         (node.imageSize as string) === '2048x2048' || (node.imageSize as string) === '2K' ? '2K' :
                                                                                             (node.imageSize as string) === '4096x4096' || (node.imageSize as string) === '4K' ? '4K' :
-                                                                                                (node.imageSize as string) || '1K'}
+                                                                                                (node.imageSize as string) || '1K'}`}
                                                                     </span>
                                                                 </>
                                                             );

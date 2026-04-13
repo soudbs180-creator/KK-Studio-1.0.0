@@ -6,6 +6,7 @@ import type {
     ProtocolFamily,
     ProviderFamily,
 } from './channelConfig.ts';
+import { detectRequestProfileEvidence, resolveLocalRequestProfile, type RequestProfileId } from './requestProfileRegistry.ts';
 
 export type ProviderStrategyFormat = 'auto' | 'openai' | 'gemini' | 'claude';
 export type ProviderStrategyAuthMethod = 'query' | 'header';
@@ -66,6 +67,7 @@ export interface ProviderRuntimeInput {
 export interface ResolvedProviderRuntime {
     strategy: ProviderStrategy;
     strategyId: string;
+    requestProfileId: RequestProfileId;
     providerName: string;
     providerFamily: ProviderFamily;
     protocolFamily: ProtocolFamily;
@@ -623,44 +625,29 @@ export function isLikelyDocumentationBaseUrl(baseUrl?: string): boolean {
     return /\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)(?:$|[?#])/i.test(raw);
 }
 
-function isGptBestProviderAlias(provider?: string | Provider): boolean {
-    const normalized = normalizeProviderAlias(provider);
-    return normalized === 'gpt-best'
-        || normalized === 'gptbest'
-        || normalized === 'gpt best';
-}
-
-function isGptBestDocumentationUrl(baseUrl?: string): boolean {
-    const raw = normalizeBaseUrl(baseUrl);
-    if (!raw) return false;
-
-    return normalizeHost(raw) === 'gpt-best.apifox.cn'
-        && /\/(?:llms\.txt|doc-\d+\.md|api-\d+\.md|schema-\d+\.md)(?:$|[?#])/i.test(raw);
-}
-
 export function detectGptBestEvidence(input: {
     provider?: string | Provider;
     baseUrl?: string;
 }): ProviderEvidence {
-    const providerAliasHit = isGptBestProviderAlias(input.provider);
-    const docsHit = isGptBestDocumentationUrl(input.baseUrl);
-    const host = normalizeHost(input.baseUrl);
-    const hostLooksLikeApiBase = Boolean(host) && !docsHit && /(^|[.-])gpt-?best(?=[.-]|$)/i.test(host);
+    const evidence = detectRequestProfileEvidence({
+        provider: typeof input.provider === 'string' ? input.provider : String(input.provider || ''),
+        baseUrl: input.baseUrl,
+    }, 'gpt-best');
 
-    if (providerAliasHit) {
+    if (evidence.profileId === 'gpt-best' && evidence.sourceType === 'explicit-provider') {
         return {
             providerId: 'gpt-best',
             confidence: 'high',
             sourceType: 'explicit-provider',
-            isDocumentationUrl: docsHit,
-            canUseAsApiBaseUrl: Boolean(normalizeBaseUrl(input.baseUrl)) && !docsHit,
-            reason: docsHit
+            isDocumentationUrl: evidence.isDocumentationUrl,
+            canUseAsApiBaseUrl: evidence.canUseAsApiBaseUrl,
+            reason: evidence.isDocumentationUrl
                 ? 'Matched GPT Best provider alias and Apifox documentation URL.'
                 : 'Matched GPT Best provider alias.',
         };
     }
 
-    if (docsHit) {
+    if (evidence.profileId === 'gpt-best' && evidence.sourceType === 'docs-url') {
         return {
             providerId: 'gpt-best',
             confidence: 'medium',
@@ -671,7 +658,7 @@ export function detectGptBestEvidence(input: {
         };
     }
 
-    if (hostLooksLikeApiBase) {
+    if (evidence.profileId === 'gpt-best' && evidence.sourceType === 'api-base') {
         return {
             providerId: 'gpt-best',
             confidence: 'medium',
@@ -874,6 +861,10 @@ export function resolveProviderStrategy(provider?: string | Provider, baseUrl?: 
 
 export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): ResolvedProviderRuntime {
     const strategy = resolveProviderStrategy(input.provider, input.baseUrl);
+    const requestProfileId = resolveLocalRequestProfile({
+        provider: typeof input.provider === 'string' ? input.provider : String(input.provider || ''),
+        baseUrl: input.baseUrl,
+    }).id;
     const requestedFormat = normalizeFormat(
         input.format,
         strategy.defaultFormat === 'gemini'
@@ -929,6 +920,7 @@ export function resolveProviderRuntime(input: ProviderRuntimeInput = {}): Resolv
     return {
         strategy,
         strategyId: strategy.id,
+        requestProfileId,
         providerName: normalizeProviderName(input.provider),
         providerFamily,
         protocolFamily,

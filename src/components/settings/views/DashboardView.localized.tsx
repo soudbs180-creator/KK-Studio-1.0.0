@@ -33,6 +33,11 @@ import {
   SettingsSection,
   SettingsViewShell,
 } from '../SettingsScaffold';
+import {
+  getSettingsPrimaryActionMeta,
+  getSettingsStatusSummaryLabel,
+  getSettingsViewMeta,
+} from '../settingsRegistry';
 import { EmptyState, ProgressBar, StatusBadge } from '../ui/index';
 
 interface DashboardViewProps {
@@ -172,6 +177,19 @@ const RingRow: React.FC<{
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const { locale, pick } = useLocale();
+  const registryLanguage = locale.startsWith('zh') ? 'zh-CN' : 'en-US';
+  const dashboardMeta = useMemo(
+    () => getSettingsViewMeta('dashboard', registryLanguage),
+    [registryLanguage],
+  );
+  const dashboardPrimaryAction = useMemo(
+    () => getSettingsPrimaryActionMeta('dashboard', registryLanguage),
+    [registryLanguage],
+  );
+  const dashboardStatusSummaryLabel = useMemo(
+    () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
+    [registryLanguage],
+  );
   const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
@@ -405,6 +423,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   );
 
   const statusTone = hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber';
+  const statusLabel = hasCriticalLogs
+    ? pick('需要处理', 'Needs Attention')
+    : hasAvailableRoute
+      ? pick('系统运行中', 'System Active')
+      : pick('等待配置', 'Setup Required');
 
   return (
     <SettingsViewShell>
@@ -426,11 +449,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </SettingsBadge>
           )}
           actions={(
-            <SettingsActionButton icon={ArrowRight} tone="primary" onClick={() => onNavigate('api-management')}>
-              {pick('打开 API 管理', 'Open API Management')}
+            <SettingsActionButton
+              icon={ArrowRight}
+              tone="primary"
+              onClick={() => onNavigate(dashboardPrimaryAction.target)}
+            >
+              {dashboardPrimaryAction.label}
             </SettingsActionButton>
           )}
         />
+
+        <SettingsSection
+          title={pick('状态与下一步', 'Status and next step')}
+          eyebrow={pick('第一屏答案', 'First-screen answers')}
+          description={pick(
+            '先回答这里是什么、当前状态如何，以及下一步最重要的动作是什么；其他入口继续留在下面的次级分组里。',
+            'Answer what this page is, how the system is doing, and what the most important next action is before the secondary groups below.',
+          )}
+          action={(
+            <SettingsActionButton
+              icon={ArrowRight}
+              tone="primary"
+              onClick={() => onNavigate(dashboardMeta.primaryActionTarget)}
+            >
+              {dashboardMeta.primaryActionLabel}
+            </SettingsActionButton>
+          )}
+        >
+          <div className="settings-reference-metric-grid">
+            <MetricTile
+              label={pick('这里是什么', 'What this is')}
+              value={dashboardMeta.title}
+              helper={pick('设置工作台的第一屏，用来决定先进入哪个详细面板。', 'The first-screen workbench summary before opening a detailed settings panel.')}
+            />
+            <MetricTile
+              label={dashboardMeta.statusSummaryLabel}
+              value={statusLabel}
+              helper={hasCriticalLogs
+                ? pick('当前已有需要优先处理的日志或路由异常。', 'Warnings or route issues need attention before deeper changes.')
+                : hasAvailableRoute
+                  ? pick('已有可用路由，可以继续进入 API 管理或账单页面。', 'Active routes are available, so you can continue into API or billing flows.')
+                  : pick('还没有足够的可用路由，建议先完成 API 配置。', 'There are not enough active routes yet, so API setup should be next.')}
+            />
+            <MetricTile
+              label={pick('下一步', 'Next step')}
+              value={dashboardMeta.primaryActionLabel}
+              helper={pick('保持一个主动作，其余常用入口继续放在下面的次级动作分组。', 'Keep one primary move here and leave the rest in the secondary quick-action group.')}
+            />
+          </div>
+        </SettingsSection>
 
         <SettingsSection
           title={pick('快捷操作', 'Quick actions')}

@@ -1,4 +1,27 @@
-import { AspectRatio } from '../types';
+import type { AspectRatio } from '../types.ts';
+
+const coerceAspectRatio = (value: string): AspectRatio => value as unknown as AspectRatio;
+
+const ASPECT_RATIO = {
+    AUTO: coerceAspectRatio('auto'),
+    SQUARE: coerceAspectRatio('1:1'),
+    PORTRAIT_1_8: coerceAspectRatio('1:8'),
+    PORTRAIT_1_4: coerceAspectRatio('1:4'),
+    PORTRAIT_3_4: coerceAspectRatio('3:4'),
+    PORTRAIT_4_5: coerceAspectRatio('4:5'),
+    PORTRAIT_9_16: coerceAspectRatio('9:16'),
+    PORTRAIT_9_21: coerceAspectRatio('9:21'),
+    PORTRAIT_2_3: coerceAspectRatio('2:3'),
+    LANDSCAPE_4_3: coerceAspectRatio('4:3'),
+    LANDSCAPE_5_4: coerceAspectRatio('5:4'),
+    LANDSCAPE_16_9: coerceAspectRatio('16:9'),
+    LANDSCAPE_21_9: coerceAspectRatio('21:9'),
+    LANDSCAPE_4_1: coerceAspectRatio('4:1'),
+    LANDSCAPE_8_1: coerceAspectRatio('8:1'),
+    LANDSCAPE_3_2: coerceAspectRatio('3:2'),
+    STANDARD_2_3: coerceAspectRatio('2:3'),
+    STANDARD_3_2: coerceAspectRatio('3:2'),
+} as const satisfies Record<string, AspectRatio>;
 
 export const CARD_WIDTHS = {
     LANDSCAPE: 320,
@@ -26,55 +49,55 @@ export const getCardDimensions = (aspectRatio?: AspectRatio, includeFooter: bool
     }
 
     switch (aspectRatio) {
-        case AspectRatio.LANDSCAPE_16_9:
-        case AspectRatio.LANDSCAPE_21_9:
-        case AspectRatio.LANDSCAPE_4_1:
-        case AspectRatio.LANDSCAPE_8_1:
+        case ASPECT_RATIO.LANDSCAPE_16_9:
+        case ASPECT_RATIO.LANDSCAPE_21_9:
+        case ASPECT_RATIO.LANDSCAPE_4_1:
+        case ASPECT_RATIO.LANDSCAPE_8_1:
             width = CARD_WIDTHS.LANDSCAPE;
-            if (aspectRatio === AspectRatio.LANDSCAPE_21_9) imageHeight = 137;
-            else if (aspectRatio === AspectRatio.LANDSCAPE_4_1) imageHeight = 80;
-            else if (aspectRatio === AspectRatio.LANDSCAPE_8_1) imageHeight = 40;
+            if (aspectRatio === ASPECT_RATIO.LANDSCAPE_21_9) imageHeight = 137;
+            else if (aspectRatio === ASPECT_RATIO.LANDSCAPE_4_1) imageHeight = 80;
+            else if (aspectRatio === ASPECT_RATIO.LANDSCAPE_8_1) imageHeight = 40;
             else imageHeight = 180; // 16:9
             break;
 
-        case AspectRatio.LANDSCAPE_4_3:
-        case AspectRatio.LANDSCAPE_5_4:
+        case ASPECT_RATIO.LANDSCAPE_4_3:
+        case ASPECT_RATIO.LANDSCAPE_5_4:
             width = CARD_WIDTHS.LANDSCAPE;
-            imageHeight = aspectRatio === AspectRatio.LANDSCAPE_5_4 ? 256 : 240;
+            imageHeight = aspectRatio === ASPECT_RATIO.LANDSCAPE_5_4 ? 256 : 240;
             break;
 
-        case AspectRatio.STANDARD_3_2:
-        case AspectRatio.LANDSCAPE_3_2:
+        case ASPECT_RATIO.STANDARD_3_2:
+        case ASPECT_RATIO.LANDSCAPE_3_2:
             width = CARD_WIDTHS.LANDSCAPE;
             imageHeight = 213;
             break;
 
-        case AspectRatio.PORTRAIT_9_16:
-        case AspectRatio.PORTRAIT_9_21:
+        case ASPECT_RATIO.PORTRAIT_9_16:
+        case ASPECT_RATIO.PORTRAIT_9_21:
             width = CARD_WIDTHS.PORTRAIT;
-            imageHeight = aspectRatio === AspectRatio.PORTRAIT_9_21 ? 560 : 426;
+            imageHeight = aspectRatio === ASPECT_RATIO.PORTRAIT_9_21 ? 560 : 426;
             break;
 
-        case AspectRatio.PORTRAIT_3_4:
-        case AspectRatio.PORTRAIT_4_5:
+        case ASPECT_RATIO.PORTRAIT_3_4:
+        case ASPECT_RATIO.PORTRAIT_4_5:
             width = CARD_WIDTHS.PORTRAIT;
-            imageHeight = aspectRatio === AspectRatio.PORTRAIT_4_5 ? 300 : 320;
+            imageHeight = aspectRatio === ASPECT_RATIO.PORTRAIT_4_5 ? 300 : 320;
             break;
 
-        case AspectRatio.STANDARD_2_3:
-        case AspectRatio.PORTRAIT_2_3:
+        case ASPECT_RATIO.STANDARD_2_3:
+        case ASPECT_RATIO.PORTRAIT_2_3:
             width = CARD_WIDTHS.PORTRAIT;
             imageHeight = 360;
             break;
 
-        case AspectRatio.PORTRAIT_1_4:
-        case AspectRatio.PORTRAIT_1_8:
+        case ASPECT_RATIO.PORTRAIT_1_4:
+        case ASPECT_RATIO.PORTRAIT_1_8:
             width = CARD_WIDTHS.PORTRAIT;
-            imageHeight = aspectRatio === AspectRatio.PORTRAIT_1_8 ? 1920 : 960; // Extreme tall cards
+            imageHeight = aspectRatio === ASPECT_RATIO.PORTRAIT_1_8 ? 1920 : 960; // Extreme tall cards
             break;
 
-        case AspectRatio.SQUARE:
-        case AspectRatio.AUTO:
+        case ASPECT_RATIO.SQUARE:
+        case ASPECT_RATIO.AUTO:
         default:
             width = CARD_WIDTHS.SQUARE;
             imageHeight = 280;

@@ -112,6 +112,42 @@ describe("provider surface router", () => {
     );
   });
 
+  test("prefers sync provider images when a model exposes both sync and async image surfaces", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "GPT Best",
+      baseUrl: "https://gateway.example.com/v1",
+      format: "openai",
+    });
+
+    assert.equal(
+      resolveImageSurface({
+        runtime,
+        modelId: "nano-banana-2",
+        compatibilityMode: "standard",
+        endpointTypes: ["image-generation", "image-generation-async", "gemini"],
+      }),
+      "provider-images",
+    );
+  });
+
+  test("keeps gemini-native routing when image models expose gemini plus chat only", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "GPT Best",
+      baseUrl: "https://gateway.example.com/v1",
+      format: "openai",
+    });
+
+    assert.equal(
+      resolveImageSurface({
+        runtime,
+        modelId: "nano-banana-2",
+        compatibilityMode: "chat",
+        endpointTypes: ["gemini", "openai:/v1/chat/completions"],
+      }),
+      "gemini-native-image",
+    );
+  });
+
   test("routes response-only models to the responses surface", () => {
     const runtime = resolveProviderRuntime({
       provider: "GPT Best",

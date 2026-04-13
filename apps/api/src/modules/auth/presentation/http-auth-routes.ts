@@ -9,6 +9,8 @@ import {
   type ProfileDto,
   type RegisterRequestDto,
   type RegisterResponseDto,
+  type UpdatePasswordRequestDto,
+  type UpdatePasswordResponseDto,
   type UpdateProfileRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { validateAuthEmail } from "../domain/email-policy.ts";
@@ -157,6 +159,26 @@ function validateUpdateProfileRequest(body: unknown): ApiErrorDetail[] {
   return details;
 }
 
+function validateUpdatePasswordRequest(body: unknown): ApiErrorDetail[] {
+  const details: ApiErrorDetail[] = [];
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return [{ field: "body", reason: "Request body must be an object." }];
+  }
+
+  const candidate = body as UpdatePasswordRequestDto;
+  if (!candidate.currentPassword || typeof candidate.currentPassword !== "string") {
+    details.push({ field: "currentPassword", reason: "currentPassword is required." });
+  }
+
+  if (!candidate.newPassword || typeof candidate.newPassword !== "string") {
+    details.push({ field: "newPassword", reason: "newPassword is required." });
+  } else if (candidate.newPassword.length < 8) {
+    details.push({ field: "newPassword", reason: "newPassword must be at least 8 characters." });
+  }
+
+  return details;
+}
+
 export async function handleVersionedRegister(
   service: AuthService,
   body: RegisterRequestDto,
@@ -246,6 +268,38 @@ export async function handleUpdateProfile(
   const updated = service.updateProfile(headers, body);
   if (!updated) {
     return buildErrorEnvelope(requestId, clientVersion, 401, "Authentication is required to update the profile.");
+  }
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      data: updated,
+      meta: buildRequestMeta(requestId, clientVersion),
+    },
+  };
+}
+
+export async function handleUpdatePassword(
+  service: AuthService,
+  body: UpdatePasswordRequestDto,
+  headers: Record<string, string>,
+): Promise<HttpAuthRouteResult<UpdatePasswordResponseDto>> {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const validationErrors = validateUpdatePasswordRequest(body);
+  if (validationErrors.length > 0) {
+    return buildErrorEnvelope(requestId, clientVersion, 400, "Password request validation failed.", validationErrors);
+  }
+
+  const updated = service.updatePassword(headers, body);
+  if (!updated) {
+    return buildErrorEnvelope(
+      requestId,
+      clientVersion,
+      401,
+      "Authentication is required to update the password, or the current password is invalid.",
+    );
   }
 
   return {

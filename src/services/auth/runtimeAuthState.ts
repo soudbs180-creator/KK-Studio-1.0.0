@@ -1,10 +1,10 @@
 import type { ProfileDto } from "../../../packages/contracts/src/index.ts";
-import type { User } from "@supabase/supabase-js";
+import type { RuntimeAuthUser } from "./runtimeAuthTypes.ts";
 
 import { KKAI_LOCAL_USER_ID } from "../../app/kkaiLocalRuntime.ts";
 
 export interface RuntimeAuthState {
-  user: User;
+  user: RuntimeAuthUser;
   isTempUser: boolean;
   tempUserExpiry: number | null;
 }
@@ -50,7 +50,7 @@ function normalizeProviders(values: unknown[]): string[] {
   ));
 }
 
-function buildUser(input?: RuntimeUserMetadataPatch & { id?: string }): User {
+function buildUser(input?: RuntimeUserMetadataPatch & { id?: string }): RuntimeAuthUser {
   const providers = normalizeProviders([
     input?.authProvider || "local",
     ...(input?.providers || []),
@@ -79,11 +79,12 @@ function buildUser(input?: RuntimeUserMetadataPatch & { id?: string }): User {
       provider: providers[0] || "local",
       auth_provider: providers[0] || "local",
       providers,
+      name: fullName,
       full_name: fullName,
       display_name: fullName,
       avatar_url: avatarUrl,
     },
-  } as User;
+  };
 }
 
 export function createDefaultRuntimeAuthState(): RuntimeAuthState {

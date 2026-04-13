@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import logo from '../../assets/logo.png';
-import { User } from '@supabase/supabase-js';
 import { useTheme } from '../../context/ThemeContext';
+import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
 // Lucide icons replaced with SVGs
 
@@ -11,7 +11,7 @@ interface SidebarProps {
     onOpenSettings: () => void;
     hasApiKey: boolean;
     generatedCount: number;
-    user: User | null;
+    user: RuntimeAuthUser | null;
     onSignOut: () => void;
     onOpenProfile: () => void;
     onOpenBilling: () => void;

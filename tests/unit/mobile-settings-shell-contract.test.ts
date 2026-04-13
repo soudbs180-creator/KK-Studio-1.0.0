@@ -9,25 +9,27 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('mobile settings shell keeps the five focused mobile entry points and no day-1 cleanup CTA', () => {
+test('mobile settings shell keeps the focused four-entry home inside the shared router-backed workbench', () => {
+  const appSource = readSource('src/App.tsx');
   const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const storageSource = readSource('src/components/settings/views/StorageSettingsView.localized.tsx');
-  const mobileShellStart = settingsSource.indexOf('const SettingsMobileShell');
-  const mobileShellEnd = settingsSource.indexOf('const SettingsRouterShell');
-  const mobileShellSource = settingsSource.slice(mobileShellStart, mobileShellEnd);
+  const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
+  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const homeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
 
-  assert.match(mobileShellSource, /Mobile Settings/);
-  assert.match(mobileShellSource, /Five Mobile Entries/);
-  assert.match(mobileShellSource, /Only the focused mobile entries are kept here/);
-  assert.match(mobileShellSource, /settings-shell-mobile__focus/);
-  assert.match(mobileShellSource, /Dashboard \/ API \/ Billing \/ Storage \/ Errors/);
-  assert.doesNotMatch(mobileShellSource, /Advanced Settings/);
-  assert.match(settingsSource, /Billing Ledger/);
-  assert.match(settingsSource, /System Error Logs/);
-  assert.match(settingsSource, /API Management/);
-  assert.match(settingsSource, /Dashboard/);
-  assert.match(settingsSource, /Storage/);
-  assert.match(storageSource, /7-Day Policy/);
-  assert.match(storageSource, /30-Day Policy/);
-  assert.doesNotMatch(storageSource, /1 Day Cache|1-Day Policy|1 澶╃紦瀛?/);
+  assert.match(homeSource, /data-testid="mobile-settings-home"/);
+  assert.match(homeSource, /Dashboard \/ API \/ Usage \/ Errors/);
+  assert.doesNotMatch(homeSource, /Storage/);
+  assert.match(settingsSource, /MobileSettingsHome/);
+  assert.match(settingsSource, /onBackToApiManagement/);
+  assert.doesNotMatch(settingsSource, /settings-shell-mobile__focus/);
+  assert.doesNotMatch(appSource, /mobileSettingsSection/);
+  assert.doesNotMatch(appSource, /openMobileSettings/);
+  assert.match(mobileSurfaceSource, /onOpenSettings: \(\) => void;/);
+  assert.match(mobileSurfaceSource, /onClick=\{onOpenSettings\}/);
+  assert.doesNotMatch(mobileSurfaceSource, /settingsHome: React\.ReactNode;/);
+  assert.doesNotMatch(mobileSurfaceSource, /settingsPage: React\.ReactNode;/);
+  assert.doesNotMatch(mobileSurfaceSource, /settings-home/);
+  assert.doesNotMatch(mobileSurfaceSource, /settings-page/);
+  assert.match(registrySource, /id: 'storage-settings'/);
+  assert.match(registrySource, /id: 'system-logs'/);
 });

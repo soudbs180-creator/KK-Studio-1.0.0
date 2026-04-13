@@ -1,14 +1,9 @@
 import React from 'react';
 import { Search } from 'lucide-react';
+import type { CanonicalSettingsViewId } from '../settingsRegistry';
 
 type IconLike = React.ComponentType<{ size?: number; className?: string }>;
-type SettingsDesktopSidebarViewId =
-  | 'dashboard'
-  | 'api-management'
-  | 'consumption-records'
-  | 'storage-settings'
-  | 'system-logs'
-  | 'admin-console';
+type SettingsDesktopSidebarViewId = CanonicalSettingsViewId;
 
 export interface SettingsDesktopSidebarItem {
   id: SettingsDesktopSidebarViewId;

@@ -12,7 +12,10 @@ test('AppStartupProvider skips canonical cloud warnings in KKAI local-only mode'
   );
 
   assert.match(startupSource, /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/app\/kkaiFeatureFlags';/);
-  assert.match(startupSource, /const localOnlyRuntime = !KKAI_FEATURE_FLAGS\.billing/);
+  assert.match(
+    startupSource,
+    /const localOnlyRuntime = !KKAI_FEATURE_FLAGS\.admin\s*&& !KKAI_FEATURE_FLAGS\.workspaceCloudSync\s*&& !KKAI_FEATURE_FLAGS\.cloudProfileFallback;/,
+  );
   assert.match(startupSource, /if \(localOnlyRuntime\) \{/);
   assert.match(startupSource, /setHealthState\('ready'\);/);
   assert.match(startupSource, /setLastStartupWarning\(null\);/);

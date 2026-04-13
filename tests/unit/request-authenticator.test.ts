@@ -1,92 +1,149 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 
 import {
   createRequestAuthenticator,
-  resolveSupabaseAuthLookupTimeoutMs,
   type AuthenticatedRequestContext,
 } from "../../apps/api/src/lib/request-authenticator.ts";
+import { createKkSessionToken } from "../../apps/api/src/modules/auth/infrastructure/kk-session-token.ts";
 
-test("request authenticator caches successful Supabase token lookups", async () => {
+const sessionSecretEnv = "KK_API_SESSION_SIGNING_SECRET";
+const requireSecretEnv = "KK_REQUIRE_SESSION_SIGNING_SECRET";
+const nodeEnv = "NODE_ENV";
+const originalSessionSecret = process.env[sessionSecretEnv];
+const originalRequireSecret = process.env[requireSecretEnv];
+const originalNodeEnv = process.env[nodeEnv];
+
+afterEach(() => {
+  if (typeof originalSessionSecret === "string") {
+    process.env[sessionSecretEnv] = originalSessionSecret;
+  } else {
+    delete process.env[sessionSecretEnv];
+  }
+
+  if (typeof originalRequireSecret === "string") {
+    process.env[requireSecretEnv] = originalRequireSecret;
+  } else {
+    delete process.env[requireSecretEnv];
+  }
+
+  if (typeof originalNodeEnv === "string") {
+    process.env[nodeEnv] = originalNodeEnv;
+  } else {
+    delete process.env[nodeEnv];
+  }
+});
+
+test("request authenticator accepts locally signed KK API access tokens before any fallback", async () => {
+  process.env[sessionSecretEnv] = "request-authenticator-test-secret";
   let resolveCallCount = 0;
-  const expectedContext: AuthenticatedRequestContext = {
-    userId: "auth-user-1",
-    email: "auth@example.com",
-  };
 
   const authenticator = createRequestAuthenticator({
-    resolveSupabaseAccessToken: async () => {
+    resolveLegacyAccessToken: () => {
       resolveCallCount += 1;
-      return expectedContext;
+      return undefined;
     },
   });
 
-  const headers = {
-    authorization: "Bearer test.header.signature",
-  };
-
-  const firstResult = await authenticator.authenticate(headers);
-  const secondResult = await authenticator.authenticate(headers);
-
-  assert.deepEqual(firstResult, expectedContext);
-  assert.deepEqual(secondResult, expectedContext);
-  assert.equal(resolveCallCount, 1);
-});
-
-test("request authenticator collapses concurrent Supabase token lookups", async () => {
-  let resolveCallCount = 0;
-  const expectedContext: AuthenticatedRequestContext = {
-    userId: "auth-user-2",
-  };
-
-  const authenticator = createRequestAuthenticator({
-    resolveSupabaseAccessToken: async () => {
-      resolveCallCount += 1;
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      return expectedContext;
-    },
-  });
-
-  const headers = {
-    authorization: "Bearer concurrent.header.signature",
-  };
-
-  const [firstResult, secondResult] = await Promise.all([
-    authenticator.authenticate(headers),
-    authenticator.authenticate(headers),
-  ]);
-
-  assert.deepEqual(firstResult, expectedContext);
-  assert.deepEqual(secondResult, expectedContext);
-  assert.equal(resolveCallCount, 1);
-});
-
-test("request authenticator suppresses transient Supabase lookup failures", async () => {
-  const authenticator = createRequestAuthenticator({
-    resolveSupabaseAccessToken: async () => {
-      throw new Error("fetch failed");
-    },
+  const accessToken = createKkSessionToken({
+    tokenType: "access",
+    userId: "auth-user-local",
+    email: "local@example.com",
+    role: "admin",
+    expiresInSeconds: 3600,
   });
 
   const result = await authenticator.authenticate({
-    authorization: "Bearer broken.header.signature",
+    authorization: `Bearer ${accessToken}`,
+  });
+
+  assert.equal(result, undefined);
+  assert.equal(resolveCallCount, 1);
+});
+
+test("request authenticator trusts signed KK API tokens when no stateful resolver is configured", async () => {
+  process.env[sessionSecretEnv] = "request-authenticator-test-secret";
+  const authenticator = createRequestAuthenticator({});
+
+  const accessToken = createKkSessionToken({
+    tokenType: "access",
+    userId: "auth-user-direct",
+    email: "direct@example.com",
+    role: "admin",
+    expiresInSeconds: 3600,
+  });
+
+  const result = await authenticator.authenticate({
+    authorization: `Bearer ${accessToken}`,
+  });
+
+  assert.deepEqual(result, {
+    userId: "auth-user-direct",
+    email: "direct@example.com",
+    role: "admin",
+  });
+});
+
+test("request authenticator accepts stateful resolver results for signed KK API access tokens", async () => {
+  process.env[sessionSecretEnv] = "request-authenticator-test-secret";
+  const expectedContext: AuthenticatedRequestContext = {
+    userId: "auth-user-stateful",
+    email: "stateful@example.com",
+    role: "user",
+  };
+
+  const accessToken = createKkSessionToken({
+    tokenType: "access",
+    userId: "auth-user-stateful",
+    email: "stateful@example.com",
+    role: "admin",
+    expiresInSeconds: 3600,
+  });
+
+  const authenticator = createRequestAuthenticator({
+    resolveLegacyAccessToken: (token) => (
+      token === accessToken ? expectedContext : undefined
+    ),
+  });
+
+  const result = await authenticator.authenticate({
+    authorization: `Bearer ${accessToken}`,
+  });
+
+  assert.deepEqual(result, expectedContext);
+});
+
+test("request authenticator rejects refresh tokens used as bearer access tokens", async () => {
+  process.env[sessionSecretEnv] = "request-authenticator-test-secret";
+  const authenticator = createRequestAuthenticator({});
+
+  const refreshToken = createKkSessionToken({
+    tokenType: "refresh",
+    userId: "auth-user-refresh",
+    expiresInSeconds: 3600,
+  });
+
+  const result = await authenticator.authenticate({
+    authorization: `Bearer ${refreshToken}`,
   });
 
   assert.equal(result, undefined);
 });
 
-test("request authenticator timeout is configurable via env", () => {
-  const originalTimeout = process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS;
+test("request authenticator rejects expired signed KK API access tokens", async () => {
+  process.env[sessionSecretEnv] = "request-authenticator-test-secret";
+  const authenticator = createRequestAuthenticator({});
 
-  process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = "9000";
-  assert.equal(resolveSupabaseAuthLookupTimeoutMs(), 9000);
+  const accessToken = createKkSessionToken({
+    tokenType: "access",
+    userId: "auth-user-expired",
+    expiresInSeconds: 1,
+  });
 
-  process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = "invalid";
-  assert.equal(resolveSupabaseAuthLookupTimeoutMs(), 4000);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  const result = await authenticator.authenticate({
+    authorization: `Bearer ${accessToken}`,
+  });
 
-  if (typeof originalTimeout === "string") {
-    process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS = originalTimeout;
-  } else {
-    delete process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS;
-  }
+  assert.equal(result, undefined);
 });

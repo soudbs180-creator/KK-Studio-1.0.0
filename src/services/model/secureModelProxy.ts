@@ -1,12 +1,11 @@
-import { supabase } from '../../lib/supabase';
-import { tempUserService } from '../auth/tempUserService';
+﻿import { tempUserService } from '../auth/tempUserService';
 import {
   getLatestAuthSessionChange,
   requestAuthSessionInvalidation,
   waitForAuthSessionChange,
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { resolveKkApiBaseUrl } from '../api/kkApiClient';
+import { kkWebApiClient, resolveKkApiBaseUrl } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -59,6 +58,8 @@ export interface SecureProxyImageRequest {
   prompt: string;
   requestId?: string;
   attemptId?: string;
+  creditRouteSpecId?: string;
+  creditRouteUnitId?: string;
   aspectRatio?: string;
   imageSize?: string;
   imageCount?: number;
@@ -449,9 +450,9 @@ function getSecureProxyUserRouteInvalidJwtDiagnosticMessage(
 }
 
 async function restoreCloudSessionFromAuthEvent(
-  feature: string,
-  routeKind: SecureProxyRouteKind,
-  forceRefresh = false,
+  _feature: string,
+  _routeKind: SecureProxyRouteKind,
+  _forceRefresh = false,
 ): Promise<CloudSessionResolution | null> {
   const latestAuthSession = getLatestAuthSessionChange();
   if (!latestAuthSession?.hasSession || latestAuthSession.isTempUser) {
@@ -459,40 +460,7 @@ async function restoreCloudSessionFromAuthEvent(
   }
 
   const cachedAccessToken = String(latestAuthSession.accessToken || '').trim();
-  const cachedRefreshToken = String(latestAuthSession.refreshToken || '').trim();
-
-  if (!cachedAccessToken || !cachedRefreshToken) {
-    return !forceRefresh && cachedAccessToken
-      ? { accessToken: cachedAccessToken }
-      : null;
-  }
-
-  try {
-    const { data, error } = await supabase.auth.setSession({
-      access_token: cachedAccessToken,
-      refresh_token: cachedRefreshToken,
-    });
-
-    if (error) {
-      console.warn(
-        `[secureModelProxy] Failed to restore auth event session during ${feature} (${routeKind}):`,
-        error,
-      );
-    }
-
-    if (data.session?.access_token) {
-      return {
-        accessToken: data.session.access_token,
-      };
-    }
-  } catch (error) {
-    console.warn(
-      `[secureModelProxy] Restoring auth event session failed during ${feature} (${routeKind}):`,
-      error,
-    );
-  }
-
-  return !forceRefresh && cachedAccessToken
+  return cachedAccessToken
     ? { accessToken: cachedAccessToken }
     : null;
 }
@@ -546,17 +514,20 @@ async function resolvePreferredRuntimeAccessToken(forceRefresh = false): Promise
   return await resolveStoredCloudAccessToken(false);
 }
 
-async function readCloudSession(feature: string) {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
+type CloudSessionSnapshot = {
+  access_token?: string;
+  expires_at?: number;
+} | null;
 
-  if (error) {
-    throw new Error(error.message || `Unable to verify login state for ${feature}.`);
+async function readCloudSession(_feature: string): Promise<CloudSessionSnapshot> {
+  const accessToken = await resolvePreferredRuntimeAccessToken(false);
+  if (!accessToken) {
+    return null;
   }
 
-  return session;
+  return {
+    access_token: accessToken,
+  };
 }
 
 function hasUsableCloudSession(session: Awaited<ReturnType<typeof readCloudSession>>): session is NonNullable<Awaited<ReturnType<typeof readCloudSession>>> {
@@ -583,18 +554,10 @@ async function recoverCloudSession(feature: string): Promise<CloudSessionResolut
   }
 
   refreshCloudSessionPromise = (async () => {
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError) {
-      console.warn('[secureModelProxy] refreshSession failed:', refreshError);
-    }
-
-    const refreshedSession = !refreshError && refreshData.session?.access_token
-      ? refreshData.session
-      : null;
-
-    if (refreshedSession?.access_token) {
+    const refreshedAccessToken = await refreshPreferredKkApiAccessToken();
+    if (refreshedAccessToken) {
       return {
-        accessToken: refreshedSession.access_token,
+        accessToken: refreshedAccessToken,
       };
     }
 
@@ -653,7 +616,7 @@ async function resolveCloudSession(
 
   if (!shouldForceRefresh && hasUsableCloudSession(session)) {
     return {
-      accessToken: session.access_token,
+      accessToken: session.access_token!,
     };
   }
 
@@ -687,13 +650,13 @@ async function resolveCloudSession(
   }
 
   if (!resolvedSession?.accessToken) {
-    // secure-model-proxy is backed by Supabase auth and must never use the
-    // stale in-memory browser session object alone. If we fail to recover a
-    // valid access token here, surface a reauth error without
-    // force-clearing the browser's local session cache.
+    // secure-model-proxy is backed by the KK API runtime session and must
+    // never rely on stale browser cache alone. If we fail to recover a valid
+    // access token here, surface a reauth error without force-clearing the
+    // local runtime session state immediately.
     const reason = sessionReadError instanceof Error
-      ? `Unable to recover Supabase session for ${feature}: ${sessionReadError.message}`
-      : `Unable to recover Supabase session for ${feature}`;
+      ? `Unable to recover KK API session for ${feature}: ${sessionReadError.message}`
+      : `Unable to recover KK API session for ${feature}`;
     await invalidateCloudSession(reason);
     throw buildCloudSessionError(feature, routeKind);
   }
@@ -709,11 +672,11 @@ async function invalidateCloudSession(reason: string): Promise<void> {
   invalidateCloudSessionPromise = (async () => {
     const now = Date.now();
     if (now - lastCloudSessionInvalidationWarningAt >= 10_000) {
-      // Preserve the browser's local session cache here. Supabase can briefly
-      // return transient 401s during refresh races or platform hiccups, and
-      // force-signing the user out on the first miss is too disruptive.
+      // Preserve the browser's local session cache here. The KK API can briefly
+      // return transient 401s during refresh races or local runtime hiccups,
+      // and force-signing the user out on the first miss is too disruptive.
       console.warn(
-        '[secureModelProxy] Reauth is required, but preserving the local Supabase session cache to avoid an unexpected sign-out:',
+        '[secureModelProxy] Reauth is required, but preserving the local KK runtime session cache to avoid an unexpected sign-out:',
         reason,
       );
       lastCloudSessionInvalidationWarningAt = now;
@@ -747,7 +710,7 @@ async function buildInvocationError(
 
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
-    // A proxy-side 401 does not always mean the local Supabase session is gone.
+    // A proxy-side 401 does not always mean the local KK session is gone.
     // It can also happen when the Edge Function deployment/config drifts from the
     // frontend auth project. Keep the local session intact here so users see a
     // recoverable auth error instead of being force-signed-out mid-generation.
@@ -817,10 +780,17 @@ async function inspectLocalSessionForInvalidJwt(): Promise<InvalidJwtLocalSessio
   }
 
   try {
-    const { data, error } = await supabase.auth.getUser(accessToken);
-    return error || !data.user ? 'invalid' : 'valid';
+    const profileResponse = await kkWebApiClient.getProfile({ accessToken });
+    if (profileResponse.success) {
+      return 'valid';
+    }
+
+    const errorCode = String(profileResponse.error?.code || '').trim().toUpperCase();
+    return errorCode === SECURE_PROXY_SESSION_REAUTH_CODE || errorCode === 'AUTH_REQUIRED'
+      ? 'invalid'
+      : 'unknown';
   } catch (error) {
-    console.warn('[secureModelProxy] Failed to verify current Supabase user after Invalid JWT:', error);
+    console.warn('[secureModelProxy] Failed to verify current KK API profile after Invalid JWT:', error);
     return 'unknown';
   }
 }
@@ -828,7 +798,7 @@ async function inspectLocalSessionForInvalidJwt(): Promise<InvalidJwtLocalSessio
 async function handleInvalidJwtSessionState(feature: string): Promise<InvalidJwtLocalSessionState> {
   const localSessionState = await inspectLocalSessionForInvalidJwt();
   console.warn(
-    `[secureModelProxy] Local Supabase session state after Invalid JWT during ${feature}: ${localSessionState}`,
+    `[secureModelProxy] Local KK session state after Invalid JWT during ${feature}: ${localSessionState}`,
   );
 
   if (localSessionState === 'invalid' || localSessionState === 'no-session') {
@@ -968,7 +938,7 @@ async function invokeLocalUserRouteProxy(
         const localSessionState = await handleInvalidJwtSessionState(feature);
         throw buildSessionReauthError(feature, result.responseBody, 'user-route', localSessionState);
       }
-      // Keep the local session only when the browser's own Supabase client can
+      // Keep the local session only when the browser's own KK API auth state can
       // still validate it. If the local client also rejects the JWT, request a
       // clean local sign-out via AuthContext to break the stale-token loop.
       throw buildSessionReauthError(feature, result.responseBody, 'user-route');
@@ -1198,6 +1168,8 @@ export async function callSecureSystemProxyImage(
     modelId: payload.modelId,
     requestId: payload.requestId,
     attemptId: payload.attemptId,
+    creditRouteSpecId: payload.creditRouteSpecId,
+    creditRouteUnitId: payload.creditRouteUnitId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
     imageSize: payload.imageSize,
@@ -1222,6 +1194,8 @@ export async function callLocalUserRouteProxyImage(
     modelId: payload.modelId,
     requestId: payload.requestId,
     attemptId: payload.attemptId,
+    creditRouteSpecId: payload.creditRouteSpecId,
+    creditRouteUnitId: payload.creditRouteUnitId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
     imageSize: payload.imageSize,

@@ -1,5 +1,5 @@
 export const KKAI_FEATURE_FLAGS = {
-  billing: false,
+  billing: true,
   admin: false,
   workspaceCloudSync: false,
   cloudProfileFallback: false,

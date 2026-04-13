@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, test } from "node:test";
 
 import { AuthService } from "../application/auth-service.ts";
+import { verifyKkSessionToken } from "../infrastructure/kk-session-token.ts";
 import { handleVersionedLogin, handleVersionedRegister } from "./http-auth-routes.ts";
 
 describe("http auth routes", () => {
@@ -60,12 +61,15 @@ describe("http auth routes", () => {
       accessToken: string;
       refreshToken: string;
       profile: {
+        id: string;
         email: string;
       };
     };
-    assert.match(loginData.accessToken, /^kk-local-access-/);
-    assert.match(loginData.refreshToken, /^kk-local-refresh-/);
+    assert.match(loginData.accessToken, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    assert.match(loginData.refreshToken, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     assert.equal(loginData.profile.email, "route-user@example.com");
+    assert.equal(verifyKkSessionToken(loginData.accessToken, { tokenType: "access" })?.userId, loginData.profile.id);
+    assert.equal(verifyKkSessionToken(loginData.refreshToken, { tokenType: "refresh" })?.userId, loginData.profile.id);
     assert.equal(loginResult.body.meta.requestId, "req-auth-module-login");
     } finally {
       if (typeof originalIdentityFile === "string") {

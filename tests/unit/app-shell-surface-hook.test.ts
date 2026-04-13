@@ -13,7 +13,7 @@ test("App shell surface state is extracted into a dedicated hook", () => {
   const appSource = readSource("src/App.tsx");
   const hookSource = readSource("src/hooks/useWorkspaceSurface.ts");
 
-  assert.match(appSource, /import \{ useWorkspaceSurface \} from '\.\/hooks\/useWorkspaceSurface';/);
+  assert.match(appSource, /import \{ useWorkspaceSurface(?:, type SettingsSurfaceView)? \} from '\.\/hooks\/useWorkspaceSurface';/);
   assert.doesNotMatch(appSource, /const \[isSidebarOpen, setIsSidebarOpen\] = useState\(false\);/);
   assert.doesNotMatch(appSource, /const activeAppSurface: AppSurface =/);
   assert.match(hookSource, /export function useWorkspaceSurface\(/);

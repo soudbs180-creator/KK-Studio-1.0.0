@@ -6,7 +6,7 @@ export interface KkaiLocalRuntime {
   launchTarget: 'restore-last-workspace' | 'default-workspace';
   cloudReadsAllowed: false;
   cloudWritesAllowed: false;
-  billingEnabled: false;
+  billingEnabled: true;
   adminEnabled: false;
 }
 
@@ -19,7 +19,7 @@ export function createKkaiLocalRuntime(
     launchTarget: input.hasStoredWorkspace ? 'restore-last-workspace' : 'default-workspace',
     cloudReadsAllowed: false,
     cloudWritesAllowed: false,
-    billingEnabled: false,
+    billingEnabled: true,
     adminEnabled: false,
   };
 }

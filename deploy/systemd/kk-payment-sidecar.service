@@ -1,0 +1,19 @@
+[Unit]
+Description=KK Studio Payment Sidecar
+After=network-online.target postgresql.service kk-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kkstudio
+Group=kkstudio
+WorkingDirectory=/opt/kk-studio/current
+EnvironmentFile=/etc/kk-studio/kk-payment-sidecar.env
+ExecStart=/usr/bin/node --env-file=/etc/kk-studio/kk-payment-sidecar.env scripts/run-payment-sidecar-vps.mjs
+Restart=always
+RestartSec=3
+StandardOutput=append:/opt/kk-studio/shared/logs/kk-payment-sidecar.log
+StandardError=append:/opt/kk-studio/shared/logs/kk-payment-sidecar.err.log
+
+[Install]
+WantedBy=multi-user.target

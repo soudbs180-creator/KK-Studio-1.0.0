@@ -1,13 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import type { ExternalIdentityRow } from "../application/wechat-auth-service.ts";
 
 export interface SupabaseWechatAuthRepositoryOptions {
   supabaseUrl: string;
   serviceRoleKey: string;
 }
 
-export interface ExternalIdentityRow {
+interface SupabaseExternalIdentityRow {
   id: string;
   user_id: string;
   provider: string;
@@ -104,7 +105,7 @@ export class SupabaseWechatAuthRepository {
       .select("*")
       .eq("user_id", userId)
       .eq("provider", provider)
-      .maybeSingle<ExternalIdentityRow>();
+      .maybeSingle<SupabaseExternalIdentityRow>();
 
     if (result.error) {
       throw result.error;
@@ -273,7 +274,7 @@ export class SupabaseWechatAuthRepository {
       .select("*")
       .eq("provider", "wechat")
       .eq("provider_unionid", unionId)
-      .maybeSingle<ExternalIdentityRow>();
+      .maybeSingle<SupabaseExternalIdentityRow>();
 
     if (result.error) {
       throw result.error;
@@ -292,7 +293,7 @@ export class SupabaseWechatAuthRepository {
       .eq("provider", "wechat")
       .eq("provider_appid", providerAppId)
       .eq("provider_openid", openId)
-      .maybeSingle<ExternalIdentityRow>();
+      .maybeSingle<SupabaseExternalIdentityRow>();
 
     if (result.error) {
       throw result.error;

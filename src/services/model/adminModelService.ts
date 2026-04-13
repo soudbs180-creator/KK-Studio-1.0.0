@@ -14,6 +14,13 @@ import {
   getAdminModelAutoRefreshDelay,
   shouldStartAdminModelRefresh,
 } from './adminModelRefreshPolicy';
+import {
+  buildCreditModelCatalog,
+  pickCreditRouteUnit,
+  pickCreditModelSpec,
+  type CreditModelCatalogEntry,
+  type CreditModelSpec,
+} from './adminRouteUnits.ts';
 
 function darkenColor(hex: string, percent: number): string {
   const hslMatch = hex.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/i);
@@ -54,6 +61,8 @@ export interface AdminModelConfig {
   provider: string;
   providerId?: string;
   providerName?: string;
+  requestProfileId?: string;
+  routeStrategy?: 'priority-failover' | 'weighted-random' | 'parallel-race';
   recordId?: string;
   priority?: number;
   weight?: number;
@@ -84,6 +93,8 @@ interface FlatModelRow {
   id?: string;
   provider_id?: string;
   provider_name?: string;
+  request_profile_id?: string;
+  route_strategy?: 'priority-failover' | 'weighted-random' | 'parallel-race' | null;
   model_id?: string;
   display_name?: string;
   description?: string | null;
@@ -131,6 +142,7 @@ class AdminModelService {
   private static readonly BROADCAST_EVENT = 'credit-models-updated';
   private providers: AdminProvider[] = [];
   private models: AdminModelConfig[] = [];
+  private creditCatalog: CreditModelCatalogEntry[] = [];
   private listeners: Array<() => void> = [];
   private loadingPromise: Promise<void> | null = null;
   private lastLoadAttemptAt = 0;
@@ -288,6 +300,8 @@ class AdminModelService {
         id: model.recordId ?? undefined,
         provider_id: provider.providerId ?? undefined,
         provider_name: provider.providerName ?? undefined,
+        request_profile_id: undefined,
+        route_strategy: undefined,
         model_id: model.modelId ?? undefined,
         display_name: model.displayName ?? undefined,
         description: model.description ?? undefined,
@@ -430,6 +444,8 @@ class AdminModelService {
               provider: providerId,
               providerId,
               providerName: (row.provider_name || providerId).trim(),
+              requestProfileId: row.request_profile_id?.trim() || undefined,
+              routeStrategy: row.route_strategy || undefined,
               recordId: row.id?.trim(),
               priority: Number(row.priority || 0),
               weight: Number(row.weight || 0),
@@ -463,6 +479,7 @@ class AdminModelService {
         });
 
         this.models = Array.from(dedupe.values());
+        this.creditCatalog = buildCreditModelCatalog(this.models);
 
         this.modelRefreshHandler?.();
 
@@ -479,6 +496,29 @@ class AdminModelService {
 
   getModels(): AdminModelConfig[] {
     return this.models;
+  }
+
+  getCreditModelCatalog(): CreditModelCatalogEntry[] {
+    return this.creditCatalog;
+  }
+
+  getCreditModelSpec(modelId: string, imageSize?: string | null): CreditModelSpec | undefined {
+    const baseModelId = String(modelId || '').split('@')[0].trim();
+    const catalog = this.creditCatalog.find((entry) => entry.id === baseModelId);
+    return pickCreditModelSpec(catalog, imageSize);
+  }
+
+  getCreditRouteSnapshot(modelId: string, imageSize?: string | null) {
+    const spec = this.getCreditModelSpec(modelId, imageSize);
+    const resolved = this.getResolvedRoute(modelId, imageSize);
+    const routeUnit = pickCreditRouteUnit(spec, resolved?.model.providerId);
+
+    return {
+      specId: spec?.id,
+      routeStrategy: spec?.routeStrategy,
+      routeUnitId: routeUnit?.id,
+      supplierId: routeUnit?.supplierId || resolved?.model.providerId,
+    };
   }
 
   getModelsByProvider(providerId: string): AdminModelConfig[] {

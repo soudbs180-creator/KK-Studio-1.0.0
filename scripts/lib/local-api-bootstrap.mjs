@@ -36,6 +36,14 @@ function parsePositiveInteger(rawValue, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isTruthyValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
 function applyLocalApiBodyLimitDefaults() {
   const explicitGlobalBodyLimit = String(process.env.KK_API_MAX_JSON_BODY_BYTES || "").trim();
   const explicitProfileBodyLimit = String(process.env.KK_API_PROFILE_MAX_JSON_BODY_BYTES || "").trim();
@@ -149,6 +157,14 @@ export async function assertLocalApiConfig(options = {}) {
   }
 }
 
+export function resolveLocalApiTurnstileVerifier(env = process.env) {
+  if (!isTruthyValue(env.VITE_TURNSTILE_LOCAL_BYPASS)) {
+    return undefined;
+  }
+
+  return async () => ({ success: true });
+}
+
 export async function startLocalApiServer(options = {}) {
   const repoRoot = options.repoRoot || defaultRepoRoot;
   const port = options.port ?? Number(process.env.PORT || 3001);
@@ -168,5 +184,10 @@ export async function startLocalApiServer(options = {}) {
     throw new Error("apps/api/src/server.ts does not export startApiServer()");
   }
 
-  return serverModule.startApiServer(port);
+  const verifyTurnstileToken = resolveLocalApiTurnstileVerifier(process.env);
+  const serverOptions = verifyTurnstileToken
+    ? { verifyTurnstileToken }
+    : undefined;
+
+  return serverModule.startApiServer(port, serverOptions);
 }

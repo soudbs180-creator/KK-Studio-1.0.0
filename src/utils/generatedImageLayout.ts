@@ -1,5 +1,11 @@
-import { AspectRatio, GenerationMode } from '../types';
-import { FOOTER_HEIGHT, getCardDimensions } from './styleUtils';
+import type { AspectRatio, GenerationMode } from '../types.ts';
+import { FOOTER_HEIGHT, getCardDimensions } from './styleUtils.ts';
+
+const coerceAspectRatio = (value: string): AspectRatio => value as unknown as AspectRatio;
+const coerceGenerationMode = (value: string): GenerationMode => value as unknown as GenerationMode;
+
+const ASPECT_RATIO_AUTO = coerceAspectRatio('auto');
+const GENERATION_MODE_PPT = coerceGenerationMode('ppt');
 
 export interface GeneratedImageLayoutItem {
     aspectRatio?: AspectRatio;
@@ -26,9 +32,52 @@ interface BuildGeneratedImageBatchPositionsOptions {
     columns?: number;
 }
 
+export interface DockedPromptChildRegroupLayoutItem {
+    index: number;
+    row: number;
+    column: number;
+    width: number;
+    height: number;
+    dockedPosition: { x: number; y: number };
+    settledPosition: { x: number; y: number };
+    position: { x: number; y: number };
+}
+
+interface BuildDockedPromptChildRegroupLayoutOptions {
+    basePosition: { x: number; y: number };
+    items: GeneratedImageLayoutItem[];
+    mode?: GenerationMode;
+    isMobile?: boolean;
+    gapToPrompt?: number;
+    dockGapToPrompt?: number;
+    settledGap?: number;
+    dockedGap?: number;
+    columns?: number;
+    dockedWidthCap?: number;
+    regroupStartPositions?: Array<{ x: number; y: number } | undefined>;
+    fastRegroupProgress?: number;
+    settleRegroupProgress?: number;
+}
+
 const clampGap = (value: number, min: number, max: number) => (
     Math.round(Math.min(max, Math.max(min, value)))
 );
+
+const clampUnitProgress = (value: number | undefined, fallback: number) => {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(1, Math.max(0, value as number));
+};
+
+const lerp = (from: number, to: number, progress: number) => from + ((to - from) * progress);
+
+const lerpPoint = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    progress: number
+) => ({
+    x: lerp(from.x, to.x, progress),
+    y: lerp(from.y, to.y, progress),
+});
 
 const resolveAspectRatioValue = (item: GeneratedImageLayoutItem, fallbackWidth: number, fallbackHeight: number) => {
     const exactWidth = item.exactDimensions?.width;
@@ -39,7 +88,7 @@ const resolveAspectRatioValue = (item: GeneratedImageLayoutItem, fallbackWidth: 
     }
 
     const ratioText = item.aspectRatio;
-    if (ratioText && ratioText !== AspectRatio.AUTO) {
+    if (ratioText && ratioText !== ASPECT_RATIO_AUTO) {
         const match = ratioText.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
         if (match?.[1] && match?.[2]) {
             const numerator = Number(match[1]);
@@ -128,6 +177,54 @@ const resolveDesktopVerticalGap = (
     );
 };
 
+const buildCenteredLayoutPositions = (
+    metrics: ResolvedLayoutMetric[],
+    {
+        basePosition,
+        columns,
+        topGap,
+        horizontalGap,
+        verticalGap,
+        widthCap,
+    }: {
+        basePosition: { x: number; y: number };
+        columns: number;
+        topGap: number;
+        horizontalGap: number;
+        verticalGap: number;
+        widthCap?: number;
+    }
+) => {
+    const safeColumns = Math.max(1, columns);
+    const positions: Array<{ x: number; y: number; row: number; column: number }> = new Array(metrics.length);
+    let currentTop = basePosition.y + topGap;
+
+    for (let rowStart = 0; rowStart < metrics.length; rowStart += safeColumns) {
+        const rowMetrics = metrics.slice(rowStart, rowStart + safeColumns);
+        const rowWidths = rowMetrics.map((metric) => (
+            typeof widthCap === 'number' ? Math.min(metric.width, widthCap) : metric.width
+        ));
+        const rowWidth = rowWidths.reduce((sum, width) => sum + width, 0) + ((rowMetrics.length - 1) * horizontalGap);
+        const rowHeight = Math.max(...rowMetrics.map((metric) => metric.height));
+        let currentLeft = basePosition.x - (rowWidth / 2);
+
+        rowMetrics.forEach((metric, indexInRow) => {
+            const effectiveWidth = rowWidths[indexInRow] ?? metric.width;
+            positions[rowStart + indexInRow] = {
+                x: currentLeft + (effectiveWidth / 2),
+                y: currentTop + metric.height,
+                row: Math.floor(rowStart / safeColumns),
+                column: indexInRow,
+            };
+            currentLeft += effectiveWidth + horizontalGap;
+        });
+
+        currentTop += rowHeight + verticalGap;
+    }
+
+    return positions;
+};
+
 export const buildGeneratedImageBatchPositions = ({
     basePosition,
     items,
@@ -145,7 +242,7 @@ export const buildGeneratedImageBatchPositions = ({
 
     const metrics = items.map(resolveGeneratedImageCardMetrics);
 
-    if (mode === GenerationMode.PPT) {
+    if (mode === GENERATION_MODE_PPT) {
         const verticalGap = metrics.some((metric) => metric.width < 260) ? pptCompactGap : pptGap;
         let currentTop = basePosition.y + gapToImages;
 
@@ -225,4 +322,80 @@ export const buildGeneratedImageBatchPositions = ({
     }
 
     return positions;
+};
+
+export const buildDockedPromptChildRegroupLayout = ({
+    basePosition,
+    items,
+    mode,
+    isMobile = false,
+    gapToPrompt = 56,
+    dockGapToPrompt = 24,
+    settledGap = 32,
+    dockedGap = 16,
+    columns,
+    dockedWidthCap = 96,
+    regroupStartPositions,
+    fastRegroupProgress,
+    settleRegroupProgress,
+}: BuildDockedPromptChildRegroupLayoutOptions): DockedPromptChildRegroupLayoutItem[] => {
+    if (!items.length) return [];
+
+    const metrics = items.map(resolveGeneratedImageCardMetrics);
+    const defaultColumns = mode === GENERATION_MODE_PPT || isMobile
+        ? 1
+        : items.length;
+    const resolvedColumns = Math.min(items.length, Math.max(1, columns ?? defaultColumns));
+    const resolvedFastProgress = clampUnitProgress(
+        fastRegroupProgress,
+        regroupStartPositions?.some(Boolean) ? 1 : 1
+    );
+    const resolvedSettleProgress = clampUnitProgress(settleRegroupProgress, 1);
+
+    const dockedPositions = buildCenteredLayoutPositions(metrics, {
+        basePosition,
+        columns: resolvedColumns,
+        topGap: dockGapToPrompt,
+        horizontalGap: dockedGap,
+        verticalGap: dockedGap,
+        widthCap: dockedWidthCap,
+    });
+
+    const settledPositions = buildCenteredLayoutPositions(metrics, {
+        basePosition,
+        columns: resolvedColumns,
+        topGap: gapToPrompt,
+        horizontalGap: settledGap,
+        verticalGap: settledGap,
+    });
+
+    return metrics.map((metric, index) => {
+        const dockedPosition = dockedPositions[index];
+        const settledPosition = settledPositions[index];
+
+        if (!dockedPosition || !settledPosition) {
+            throw new Error(`Missing regroup layout position for child index ${index}.`);
+        }
+
+        const startPosition = regroupStartPositions?.[index] ?? dockedPosition;
+        const afterFastDock = lerpPoint(startPosition, dockedPosition, resolvedFastProgress);
+        const currentPosition = lerpPoint(afterFastDock, settledPosition, resolvedSettleProgress);
+
+        return {
+            index,
+            row: settledPosition.row,
+            column: settledPosition.column,
+            width: metric.width,
+            height: metric.height,
+            dockedPosition: {
+                x: dockedPosition.x,
+                y: dockedPosition.y,
+            },
+            settledPosition: {
+                x: settledPosition.x,
+                y: settledPosition.y,
+            },
+            position: currentPosition,
+        };
+    });
 };
