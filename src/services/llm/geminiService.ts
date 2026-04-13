@@ -164,6 +164,9 @@ function normalizeError(error: any): Error {
  */
 export interface GenerateImageResult {
   url: string;
+  deducted?: boolean;
+  ledgerId?: string;
+  balanceAfter?: number;
   apiDurationMs?: number;
   tokens?: number;
   promptTokens?: number;
@@ -509,6 +512,7 @@ export const generateImage = async (
   const llmOptions: ImageGenerationOptions = {
     modelId: model,
     prompt: prompt,
+    requestId,
     aspectRatio: aspectRatio,
     imageSize: imageSize, // Pass high level enum
     imageCount: 1,
@@ -565,6 +569,9 @@ export const generateImage = async (
 
     return {
       url: resultUrl,
+      deducted: result.deducted,
+      ledgerId: result.ledgerId,
+      balanceAfter: result.balanceAfter,
       apiDurationMs: result.metadata?.apiDurationMs,
       tokens,
       promptTokens,

@@ -11,12 +11,14 @@ interface MobileTabBarProps {
 }
 
 const modeLabelMap: Record<GenerationMode, string> = {
-  [GenerationMode.IMAGE]: '\u56fe\u7247',
-  [GenerationMode.VIDEO]: '\u89c6\u9891',
-  [GenerationMode.AUDIO]: '\u97f3\u9891',
+  [GenerationMode.IMAGE]: '图片',
+  [GenerationMode.VIDEO]: '视频',
+  [GenerationMode.ECOMMERCE]: '电商',
+  [GenerationMode.AUDIO]: '音频',
   [GenerationMode.PPT]: 'PPT',
-  [GenerationMode.EDIT]: '\u7f16\u8f91',
-  [GenerationMode.INPAINT]: '\u5c40\u90e8',
+  [GenerationMode.EDIT]: '编辑',
+  [GenerationMode.INPAINT]: '局部',
+  [GenerationMode.REDRAW]: '重绘',
 };
 
 const MobileTabBar: React.FC<MobileTabBarProps> = ({
@@ -34,23 +36,23 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
   }> = [
     {
       key: 'create',
-      label: '\u521b\u4f5c',
+      label: '创作',
       caption: modeLabelMap[currentMode],
       icon: <Sparkles size={18} strokeWidth={2.1} />,
     },
     {
       key: 'library',
-      label: '\u8d44\u6e90',
+      label: '资源',
       icon: <Images size={18} strokeWidth={2.1} />,
     },
     {
       key: 'chat',
-      label: '\u804a\u5929',
+      label: '聊天',
       icon: <MessageSquare size={18} strokeWidth={2.1} />,
     },
     {
       key: 'me',
-      label: '\u6211\u7684',
+      label: '我的',
       icon: <User size={18} strokeWidth={2.1} />,
     },
   ];

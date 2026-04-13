@@ -8,6 +8,8 @@ type ChatMessage = {
 type ProxyRequest = {
   mode: 'chat' | 'image' | 'video' | 'audio' | 'task_status' | 'cancel_task' | 'delete_task' | 'download_task';
   modelId: string;
+  requestId?: string;
+  attemptId?: string;
   userRoute?: {
     kind: 'key-slot';
     id: string;
@@ -830,6 +832,8 @@ type EncodedSystemTask = {
   operationName: string;
   transactionId: string;
   userId: string;
+  requestId?: string;
+  attemptId?: string;
 };
 
 type EncodedUserTask = {
@@ -839,6 +843,8 @@ type EncodedUserTask = {
   endpointType: 'gemini' | 'openai' | 'claude';
   operationName: string;
   userId: string;
+  requestId?: string;
+  attemptId?: string;
 };
 
 type EncodedTaskPayload = EncodedSystemTask | EncodedUserTask;
@@ -905,6 +911,8 @@ async function decodeTaskPayload(taskId: string, secret: string): Promise<Encode
               : 'openai',
         operationName: parsed.operationName,
         userId: parsed.userId,
+        requestId: typeof parsed.requestId === 'string' ? parsed.requestId : undefined,
+        attemptId: typeof parsed.attemptId === 'string' ? parsed.attemptId : undefined,
       };
     } else {
       if (
@@ -922,6 +930,8 @@ async function decodeTaskPayload(taskId: string, secret: string): Promise<Encode
         operationName: parsed.operationName,
         transactionId: parsed.transactionId,
         userId: parsed.userId,
+        requestId: typeof parsed.requestId === 'string' ? parsed.requestId : undefined,
+        attemptId: typeof parsed.attemptId === 'string' ? parsed.attemptId : undefined,
       };
     }
 
@@ -1325,6 +1335,15 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as ProxyRequest;
+    const requestTraceId = String(body.requestId || body.attemptId || '').trim();
+    if (requestTraceId) {
+      console.log('[secure-model-proxy] request trace', {
+        requestTraceId,
+        mode: body.mode,
+        modelId: body.modelId,
+        routeKind: body.userRoute ? 'user-route' : 'system',
+      });
+    }
     if (!body || !['chat', 'image', 'video', 'audio', 'task_status', 'cancel_task', 'delete_task', 'download_task'].includes(body.mode)) {
       return json({ success: false, error: 'Unsupported mode' }, 400);
     }
@@ -1580,6 +1599,20 @@ Deno.serve(async (req) => {
       if (taskPayload.userId !== user.id) {
         return json({ success: false, error: 'Forbidden task access' }, 403);
       }
+      const taskTraceId = String(taskPayload.requestId || taskPayload.attemptId || '').trim();
+      const taskTraceResult = {
+        requestId: taskPayload.requestId,
+        attemptId: taskPayload.attemptId,
+      };
+      if (taskTraceId) {
+        console.log('[secure-model-proxy] task trace', {
+          taskTraceId,
+          mode: body.mode,
+          modelId: taskPayload.modelId,
+          routeKind: taskPayload.kind === 'user-video' ? 'user-route' : 'system',
+          ledgerId: 'transactionId' in taskPayload ? taskPayload.transactionId : undefined,
+        });
+      }
 
       if (taskPayload.kind === 'user-video') {
         const userRoute = await resolveSecureProxyUserRoute(
@@ -1596,7 +1629,7 @@ Deno.serve(async (req) => {
         const taskResultNotReady = (message = 'Task result is not ready yet') => (
           body.mode === 'download_task'
             ? json({ success: false, error: message }, 409)
-            : json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType })
+            : json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult })
         );
 
         if (taskPayload.endpointType === 'claude') {
@@ -1629,7 +1662,7 @@ Deno.serve(async (req) => {
             }
           }
 
-          return json({ success: true, status: 'deleted', deducted: false, endpointType: taskPayload.endpointType });
+          return json({ success: true, status: 'deleted', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
         }
 
         if (body.mode === 'cancel_task' && taskPayload.endpointType === 'gemini') {
@@ -1645,7 +1678,7 @@ Deno.serve(async (req) => {
             return json({ success: false, error: `Cancel failed: ${cancelResponse.status} ${errorText}` }, 502);
           }
 
-          return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType });
+          return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
         }
 
         if (body.mode === 'cancel_task') {
@@ -1672,7 +1705,7 @@ Deno.serve(async (req) => {
             return json({ success: false, error: 'Cancel failed for upstream video task' }, 502);
           }
 
-          return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType });
+          return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
         }
 
         if (taskPayload.endpointType === 'gemini') {
@@ -1689,7 +1722,7 @@ Deno.serve(async (req) => {
 
           const statusData = await statusResponse.json();
           if (!statusData.done) {
-            return json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType });
+            return json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
           }
 
           const taskErrorMessage = String(
@@ -1698,7 +1731,7 @@ Deno.serve(async (req) => {
             ''
           ).trim();
           if (taskErrorMessage) {
-            return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType });
+            return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
           }
 
           const generatedVideo = extractGeminiGeneratedVideoPayload(statusData);
@@ -1713,6 +1746,7 @@ Deno.serve(async (req) => {
               url: `data:${generatedVideo.mimeType};base64,${generatedVideo.bytesBase64Encoded.replace(/\s+/g, '')}`,
               deducted: false,
               endpointType: taskPayload.endpointType,
+              ...taskTraceResult,
             });
           }
 
@@ -1725,6 +1759,7 @@ Deno.serve(async (req) => {
               url: base64Video,
               deducted: false,
               endpointType: taskPayload.endpointType,
+              ...taskTraceResult,
             });
           }
 
@@ -1766,7 +1801,7 @@ Deno.serve(async (req) => {
             ).trim();
 
             if (body.mode !== 'download_task' && directUrl) {
-              return json({ success: true, status: 'success', url: directUrl, deducted: false, endpointType: taskPayload.endpointType });
+          return json({ success: true, status: 'success', url: directUrl, deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
             }
 
             const contentCandidates = [
@@ -1800,7 +1835,7 @@ Deno.serve(async (req) => {
           }
 
           if (['failure', 'failed', 'error'].includes(status)) {
-            return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType });
+          return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
           }
 
           if (body.mode === 'download_task') {
@@ -1814,7 +1849,7 @@ Deno.serve(async (req) => {
           return taskResultNotReady('Task content is not ready yet');
         }
 
-        return json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType });
+        return json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
       }
 
       const { data: transactionRow, error: transactionError } = await serviceClient
@@ -1863,9 +1898,13 @@ Deno.serve(async (req) => {
         deducted: true,
         ledgerId: taskPayload.transactionId,
         balanceAfter: Number.isFinite(balanceAfter) ? balanceAfter : undefined,
+        requestId: taskPayload.requestId,
+        attemptId: taskPayload.attemptId,
       };
 
-      const refundTaskCredits = async (reason: string): Promise<{ success: boolean; message?: string }> => {
+      const refundTaskCredits = async (
+        reason: string,
+      ): Promise<{ success: boolean; message?: string; balanceAfter?: number }> => {
         const { data: refundRows, error: refundError } = await serviceClient.rpc('refund_credits', {
           p_transaction_id: taskPayload.transactionId,
           p_reason: reason,
@@ -1874,8 +1913,14 @@ Deno.serve(async (req) => {
         return {
           success: !refundError && Boolean(refundResult?.success),
           message: refundError?.message || refundResult?.message,
+          balanceAfter: typeof refundResult?.new_balance === 'number' ? refundResult.new_balance : undefined,
         };
       };
+      const refundedBillingResult = (refundResult: { success: boolean; message?: string; balanceAfter?: number }) => ({
+        ...billingResult,
+        refundApplied: refundResult.success,
+        refundBalanceAfter: refundResult.balanceAfter,
+      });
       const taskResultNotReady = (message = 'Task result is not ready yet') => (
         body.mode === 'download_task'
           ? json({ success: false, error: message }, 409)
@@ -1907,7 +1952,7 @@ Deno.serve(async (req) => {
           return json({ success: false, error: `Cancel succeeded but credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
 
-        return json({ success: true, status: 'failed', ...billingResult });
+        return json({ success: true, status: 'failed', ...refundedBillingResult(refundResult) });
       }
 
       if (body.mode === 'cancel_task') {
@@ -1940,7 +1985,7 @@ Deno.serve(async (req) => {
           return json({ success: false, error: `Cancel succeeded but credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
 
-        return json({ success: true, status: 'failed', ...billingResult });
+        return json({ success: true, status: 'failed', ...refundedBillingResult(refundResult) });
       }
 
       if (taskPayload.endpointType === 'gemini') {
@@ -1971,7 +2016,7 @@ Deno.serve(async (req) => {
           if (!refundResult.success) {
             return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
           }
-          return json({ success: true, status: 'failed', ...billingResult });
+          return json({ success: true, status: 'failed', ...refundedBillingResult(refundResult) });
         }
 
         const videoUri =
@@ -2071,7 +2116,7 @@ Deno.serve(async (req) => {
         if (!refundResult.success) {
           return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
         }
-        return json({ success: true, status: 'failed', ...billingResult });
+        return json({ success: true, status: 'failed', ...refundedBillingResult(refundResult) });
       }
 
       if (body.mode === 'download_task') {
@@ -2468,6 +2513,8 @@ Deno.serve(async (req) => {
               endpointType,
               operationName,
               userId: user.id,
+              requestId: body.requestId,
+              attemptId: body.attemptId,
             }, taskSecret),
           deducted: false,
           endpointType,
@@ -2566,6 +2613,8 @@ Deno.serve(async (req) => {
                 endpointType: 'openai',
                 operationName: taskId,
                 userId: user.id,
+                requestId: body.requestId,
+                attemptId: body.attemptId,
               }, taskSecret),
             url: directUrl || undefined,
             deducted: false,
@@ -2758,21 +2807,24 @@ Deno.serve(async (req) => {
       return json({ success: false, error: 'Insufficient credits' }, 402);
     }
 
-    const { data: consumeRows, error: consumeError } = await serviceClient.rpc('consume_credits', {
+    const debitBusinessRefId = String(body.attemptId || body.requestId || `${modelId}:${Date.now()}`).trim();
+    const debitIdempotencyKey = String(body.attemptId || body.requestId || crypto.randomUUID()).trim();
+
+    const { data: consumePayload, error: consumeError } = await serviceClient.rpc('api_record_credit_debit_v1', {
       p_user_id: user.id,
-      p_amount: requiredCredits,
-      p_model_id: modelId,
-      p_model_name: String(creditModel.display_name || modelId),
-      p_provider_id: String(creditModel.provider_id || 'system'),
-      p_description: `系统积分模型调用：${modelId} / ${requestedImageSize}`,
+      p_ledger_id: crypto.randomUUID(),
+      p_business_ref_type: 'generation_task',
+      p_business_ref_id: debitBusinessRefId,
+      p_credit_amount: requiredCredits,
+      p_idempotency_key: debitIdempotencyKey,
+      p_model_code: modelId,
     });
 
-    const consumeResult = Array.isArray(consumeRows) ? consumeRows[0] : consumeRows;
-    const transactionId = String(consumeResult?.transaction_id || '');
-    if (consumeError || !consumeResult?.success || !transactionId) {
-      return json({ success: false, error: consumeResult?.message || consumeError?.message || 'Credit deduction failed' }, 402);
+    const transactionId = String(consumePayload?.ledger?.ledger_id || '');
+    if (consumeError || !consumePayload?.success || !transactionId) {
+      return json({ success: false, error: consumePayload?.message || consumeError?.message || 'Credit deduction failed' }, 402);
     }
-    const balanceAfter = Number(consumeResult?.new_balance ?? currentBalance - requiredCredits);
+    const balanceAfter = Number(consumePayload?.ledger?.balance_after ?? currentBalance - requiredCredits);
     const billingResult = {
       deducted: true,
       ledgerId: transactionId,
@@ -3126,6 +3178,8 @@ Deno.serve(async (req) => {
           operationName,
           transactionId,
           userId: user.id,
+          requestId: body.requestId,
+          attemptId: body.attemptId,
         }, taskSecret),
         endpointType,
         ...billingResult,
@@ -3221,6 +3275,8 @@ Deno.serve(async (req) => {
             operationName: taskId,
             transactionId,
             userId: user.id,
+            requestId: body.requestId,
+            attemptId: body.attemptId,
           }, taskSecret),
           url: directUrl || undefined,
           endpointType: 'openai',

@@ -9,20 +9,24 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('keyManager only uses legacy key-manager cloud routes when runtime fallback is explicitly allowed', () => {
+test('keyManager reads and writes user slot/provider state through the local API payload route', () => {
   const source = readSource('src/services/auth/keyManager.ts');
 
-  assert.match(source, /shouldUseLegacyWebApiFallback/);
-  assert.match(source, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
-  assert.match(source, /if \(this\.authIsTempUser\) \{\s*const accessToken = await getPreferredKkApiAccessToken\(\);/);
+  assert.doesNotMatch(source, /loadUserApisPayloadFromCloudRecord/);
+  assert.doesNotMatch(source, /mergeUserApisPayloadToCloudRecord/);
+  assert.match(source, /const accessToken = await getPreferredKkApiAccessToken\(\);/);
   assert.match(source, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
-  assert.match(source, /preferredPayload = await loadUserApisPayloadFromCloudRecord\(activeUserId\);/);
-  assert.doesNotMatch(source, /if \(!this\.authIsTempUser && !\(await isKkApiUserDataPersistedInCloud\(\)\)\) \{/);
-  assert.doesNotMatch(source, /Profile user API storage require the API server to use the canonical Supabase backend\./);
-  assert.match(source, /if \(!this\.authIsTempUser && shouldUseLegacyWebApiFallback\(\) && !this\.hasHydratedCloudState && preferredDensity > 0\) \{/);
-  assert.match(source, /void getPreferredKkApiAccessToken\(\)\.then\(\(accessToken\) => \(/);
-  assert.match(source, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
   assert.match(source, /const response = await legacyWebApiClient\.replaceKeyManagerCloudState\(/);
+  assert.doesNotMatch(source, /void getPreferredKkApiAccessToken\(\)\.then\(\(accessToken\) => \(/);
+});
+
+test('keyManager no longer skips local fixed users when hydrating or syncing payload state', () => {
+  const source = readSource('src/services/auth/keyManager.ts');
+
+  assert.match(source, /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;/);
+  assert.doesNotMatch(source, /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;\s*\s*if \(this\.userId\.startsWith\('dev-user-'\)\) return;/);
+  assert.match(source, /const activeUserId = this\.userId;\s*if \(!activeUserId\) \{/);
+  assert.doesNotMatch(source, /const activeUserId = this\.userId;\s*if \(!activeUserId \|\| activeUserId\.startsWith\('dev-user-'\)\) \{/);
 });
 
 test('keyManager preserves local provider pricing snapshots when cloud payloads refresh provider config', () => {

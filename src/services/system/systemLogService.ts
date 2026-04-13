@@ -22,8 +22,7 @@ export interface SystemLogEntry {
   stack?: string;
 }
 
-interface DailyLogs {
-  date: string;
+interface PersistedLogs {
   entries: SystemLogEntry[];
 }
 
@@ -72,15 +71,14 @@ function sanitizeLogEntry(entry: SystemLogEntry): SystemLogEntry {
   };
 }
 
-function loadLogs(): DailyLogs {
+function loadLogs(): PersistedLogs {
   try {
     const storage = getStorage();
     const stored = storage?.getItem(STORAGE_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored) as DailyLogs;
-      if (parsed.date === getTodayString() && Array.isArray(parsed.entries)) {
+      const parsed = JSON.parse(stored) as PersistedLogs & { date?: string };
+      if (Array.isArray(parsed.entries)) {
         return {
-          date: parsed.date,
           entries: parsed.entries.map((entry) => sanitizeLogEntry(entry)).slice(-MAX_ENTRIES),
         };
       }
@@ -89,18 +87,17 @@ function loadLogs(): DailyLogs {
     console.warn('[SystemLog] 读取日志失败:', error);
   }
 
-  return { date: getTodayString(), entries: [] };
+  return { entries: [] };
 }
 
-function saveLogs(data: DailyLogs): void {
+function saveLogs(data: PersistedLogs): void {
   try {
     const storage = getStorage();
     if (!storage) {
       return;
     }
 
-    const safeData: DailyLogs = {
-      date: data.date,
+    const safeData: PersistedLogs = {
       entries: data.entries.map((entry) => sanitizeLogEntry(entry)).slice(-MAX_ENTRIES),
     };
     storage.setItem(STORAGE_KEY, JSON.stringify(safeData));
@@ -174,7 +171,10 @@ export function logInfo(source: string, message: string, details?: string): void
 }
 
 export function getTodayLogs(): SystemLogEntry[] {
-  return loadLogs().entries;
+  return loadLogs().entries.filter((entry) => {
+    const entryDate = new Date(entry.timestamp).toISOString().split('T')[0];
+    return entryDate === getTodayString();
+  });
 }
 
 export function getLogsByLevel(level: LogLevel): SystemLogEntry[] {
@@ -192,6 +192,21 @@ export function clearLogs(): void {
   const storage = getStorage();
   storage?.removeItem(STORAGE_KEY);
   notifyListeners([]);
+}
+
+export function cleanupLogsOlderThan(days: number): number {
+  if (!Number.isFinite(days) || days <= 0) {
+    throw new Error('INVALID_LOG_RETENTION_RANGE');
+  }
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const data = loadLogs();
+  const nextEntries = data.entries.filter((entry) => entry.timestamp >= cutoff);
+  const removedCount = data.entries.length - nextEntries.length;
+
+  saveLogs({ entries: nextEntries });
+  notifyListeners(nextEntries);
+  return removedCount;
 }
 
 export function exportLogsForAI(): string {

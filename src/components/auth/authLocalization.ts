@@ -1,4 +1,5 @@
 import {
+  localizeUserFacingText,
   pickByResolvedLanguage,
   type ResolvedLanguage,
 } from "../../utils/localeText.ts";
@@ -37,16 +38,16 @@ function extractErrorCode(error: unknown): string | null {
 export function getTurnstileMissingSiteKeyMessage(language: ResolvedLanguage): string {
   return pick(
     language,
-    "当前部署未配置 Turnstile 前端 Site Key，请在 Vercel 项目环境变量中添加 VITE_TURNSTILE_SITE_KEY 后重新部署。",
-    "This deployment is missing the Turnstile site key. Add VITE_TURNSTILE_SITE_KEY to the Vercel project environment variables and redeploy.",
+    "当前部署未配置 Turnstile Site Key，请补齐 VITE_TURNSTILE_SITE_KEY 后再试。",
+    "This deployment is missing the Turnstile site key. Add VITE_TURNSTILE_SITE_KEY and try again.",
   );
 }
 
 export function getTurnstileDisabledMessage(language: ResolvedLanguage): string {
   return pick(
     language,
-    "当前部署已禁用 Turnstile，但服务端仍要求验证码，请检查 VITE_TURNSTILE_ENABLED 与登录风控配置。",
-    "Turnstile is disabled in this deployment, but the server still requires CAPTCHA. Check VITE_TURNSTILE_ENABLED and the sign-in risk-control settings.",
+    "当前部署关闭了 Turnstile，但后端仍然要求验证码，请检查风控配置。",
+    "Turnstile is disabled in this deployment, but the server still requires CAPTCHA. Check the risk-control settings.",
   );
 }
 
@@ -80,7 +81,7 @@ export function getTurnstileStatusMessage(
     case "verified":
       return pick(language, "Turnstile 验证通过", "Turnstile verification complete");
     case "expired":
-      return pick(language, "Turnstile 已过期，正在等待重新验证", "Turnstile expired. Waiting for re-verification");
+      return pick(language, "Turnstile 已过期，等待重新验证", "Turnstile expired. Waiting for re-verification");
     case "loaded":
       return pick(language, "Turnstile 组件已加载", "The Turnstile widget is ready");
     case "missingConfig":
@@ -108,35 +109,35 @@ export function mapTurnstileErrorMessage(language: ResolvedLanguage, error: unkn
     case "400020":
       return pick(
         language,
-        "Cloudflare 返回 Invalid sitekey。请检查当前部署使用的 Turnstile site key 是否与 Cloudflare widget 一致。",
-        "Cloudflare returned Invalid sitekey. Check whether the Turnstile site key in this deployment matches the Cloudflare widget.",
+        "Cloudflare 返回 Invalid sitekey，请检查当前部署里的 Turnstile site key。",
+        "Cloudflare returned Invalid sitekey. Check the Turnstile site key in this deployment.",
       );
     case "400070":
       return pick(
         language,
-        "当前 Turnstile site key 已被禁用，请到 Cloudflare 后台检查 widget 状态。",
+        "当前 Turnstile site key 已被禁用，请检查 Cloudflare widget 状态。",
         "The current Turnstile site key has been disabled. Check the widget status in Cloudflare.",
       );
     case "110200":
       return pick(
         language,
-        "当前域名不在 Turnstile widget 的允许列表里，请把本地域名或正式域名加入 Cloudflare 白名单。",
-        "The current origin is not allowed by the Turnstile widget. Add the local or production domain to the Cloudflare allowlist.",
+        "当前域名不在 Turnstile widget 的允许列表中，请补齐 Cloudflare 白名单。",
+        "The current origin is not allowed by the Turnstile widget. Add the domain to the Cloudflare allowlist.",
       );
     case "200500":
       return pick(
         language,
-        "Turnstile iframe 加载失败，请检查浏览器、代理或安全软件是否拦截了 challenges.cloudflare.com。",
-        "The Turnstile iframe failed to load. Check whether the browser, proxy, or security software blocked challenges.cloudflare.com.",
+        "Turnstile iframe 加载失败，请检查浏览器、代理或安全软件是否拦截了 Cloudflare。",
+        "The Turnstile iframe failed to load. Check whether the browser, proxy, or security software blocked Cloudflare.",
       );
     default:
       return code
         ? pick(language, `Turnstile 加载失败（错误码：${code}）。`, `Turnstile failed to load (error code: ${code}).`)
         : pick(
-            language,
-            "Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。",
-            "Failed to load the Turnstile script. Check whether the browser blocked challenges.cloudflare.com.",
-          );
+          language,
+          "Turnstile 脚本加载失败，请检查浏览器是否拦截了 challenges.cloudflare.com。",
+          "Failed to load the Turnstile script. Check whether the browser blocked challenges.cloudflare.com.",
+        );
   }
 }
 
@@ -150,8 +151,32 @@ export function mapAuthErrorMessage(
   if (isCaptchaErrorMessage(message)) {
     return pick(
       language,
-      "当前请求需要先完成人机验证，请等待 Turnstile 组件验证完成后再试。",
+      "当前请求需要先完成人机验证，请等待 Turnstile 验证完成后再试。",
       "This request requires CAPTCHA verification first. Wait for Turnstile to finish and try again.",
+    );
+  }
+
+  if (message.includes("AUTH_ROUTE_DISABLED")) {
+    if (view === "register") {
+      return pick(
+        language,
+        "注册接口尚未在本地运行时接管，请等待后端认证链路补齐。",
+        "The registration route is not ready in the local runtime yet. Wait for the backend auth flow to catch up.",
+      );
+    }
+
+    return pick(
+      language,
+      "登录接口尚未在本地运行时接管，请等待后端认证链路补齐。",
+      "The sign-in route is not ready in the local runtime yet. Wait for the backend auth flow to catch up.",
+    );
+  }
+
+  if (message.includes("AUTH_RESET_PASSWORD_UNAVAILABLE")) {
+    return pick(
+      language,
+      "当前本地运行时尚未接入重置密码接口。",
+      "The local runtime does not expose password reset yet.",
     );
   }
 
@@ -162,8 +187,8 @@ export function mapAuthErrorMessage(
   if (view === "register" && message.includes("Database error saving new user")) {
     return pick(
       language,
-      "注册服务当前配置异常，用户资料初始化失败，请联系管理员执行最新的 Supabase 迁移。",
-      "Registration is misconfigured right now. User profile initialization failed, so an administrator needs to run the latest Supabase migrations.",
+      "注册配置异常，用户资料初始化失败，请联系管理员检查认证后端。",
+      "Registration is misconfigured right now. Contact an administrator to inspect the auth backend.",
     );
   }
 
@@ -186,12 +211,12 @@ export function mapAuthErrorMessage(
   if (message.includes(HOSTED_PASSWORD_PROXY_DISABLED_CODE)) {
     return pick(
       language,
-      "当前 Hosted 登录主链只允许直连 Supabase Auth，不会再回退旧密码代理。请检查 Supabase Auth 可达性、部署域名配置和前端环境变量是否一致。",
-      "Hosted sign-in now only uses direct Supabase Auth and no longer falls back to the legacy password proxy. Check Supabase Auth reachability, deployment domain settings, and frontend environment variables.",
+      "浏览器端已不再回退到旧的 Supabase 密码代理，请直接检查 KK API 登录路由是否可用。",
+      "The browser no longer falls back to the old Supabase password proxy. Check whether the KK API sign-in route is available.",
     );
   }
 
-  return message || pick(language, "操作失败，请重试。", "Action failed. Please try again.");
+  return localizeUserFacingText(message) || message || pick(language, "操作失败，请重试。", "Action failed. Please try again.");
 }
 
 export function getWechatQrModalCopy(language: ResolvedLanguage) {
@@ -202,7 +227,7 @@ export function getWechatQrModalCopy(language: ResolvedLanguage) {
     loading: pick(language, "正在生成微信扫码二维码...", "Generating a WeChat QR code..."),
     emptyState: pick(
       language,
-      "暂时没有拿到微信二维码地址。请确认 KK API 已启动，或检查微信登录服务端配置。",
+      "暂时没有拿到微信二维码地址。请确认 KK API 已启动，或检查微信登录服务配置。",
       "No WeChat QR URL is available yet. Confirm that the KK API is running and that the WeChat sign-in service is configured correctly.",
     ),
     invalidUrlFallback: pick(

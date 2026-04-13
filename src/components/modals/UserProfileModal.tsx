@@ -19,6 +19,7 @@ import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useAdminRole } from '../../hooks/useAdminRole';
+import { kkWebApiClient } from '../../services/api/kkApiClient';
 import {
   formatRemainingCredits,
   selectRemainingBalanceSummary,
@@ -39,11 +40,16 @@ import {
   type TotpEnrollmentResult,
 } from '../../services/auth/mfa';
 import {
+  updateRuntimeAuthStateFromProfile,
+  updateRuntimeUserMetadata,
+} from '../../services/auth/runtimeAuthState';
+import {
   getDefaultPresetAvatarId,
   getPresetAvatarById,
   PRESET_AVATAR_OPTIONS,
   resolveAvatarUrl,
 } from '../../utils/presetAvatars';
+import { localizeUserFacingText } from '../../utils/localeText';
 
 export type UserProfileView = 'main' | 'change-password' | 'edit-profile' | 'billing' | 'security';
 
@@ -54,6 +60,17 @@ interface UserProfileModalProps {
   onSignOut: () => void;
   initialView?: UserProfileView;
   isMobile?: boolean;
+}
+
+function resolveApiGapMessage(code: string | undefined, fallback: string): string {
+  const normalizedCode = String(code || '').trim().toUpperCase();
+  if (normalizedCode === 'AUTH_ROUTE_DISABLED' || normalizedCode === 'HTTP_404' || normalizedCode === 'HTTP_405') {
+    return '后端认证接口尚未在本地运行时就绪。';
+  }
+  if (normalizedCode === 'AUTH_REQUIRED' || normalizedCode === 'HTTP_401' || normalizedCode === 'HTTP_403') {
+    return '当前还没有可用的 KK API 登录会话。';
+  }
+  return fallback;
 }
 
 const formatDateTime = (value?: string | null) => {
@@ -100,6 +117,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const { isTempUser, tempUserExpiry } = useAuth();
   const { accountRole, checkingAdmin } = useAdminRole();
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
+  const billingFeatureEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     balance,
     billingLogs,
@@ -147,6 +165,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   );
   const selectedPresetAvatar = useMemo(() => getPresetAvatarById(avatarUrl), [avatarUrl]);
   const avatarInputValue = selectedPresetAvatar ? '' : avatarUrl;
+  const passwordChangeEnabled = false;
 
   const roleLabel = useMemo(() => {
     if (checkingAdmin && user) {
@@ -341,8 +360,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setWechatExpiresAt(null);
   };
 
+  const saveProfileLocally = (finalName: string, nextAvatarUrl: string) => {
+    updateRuntimeUserMetadata({
+      email: user?.email || undefined,
+      fullName: finalName,
+      displayName: finalName,
+      avatarUrl: nextAvatarUrl,
+      authProvider: String(user?.user_metadata?.auth_provider || user?.user_metadata?.provider || 'local'),
+      providers: effectiveLinkedProviders,
+    });
+  };
+
   const handleUpdateProfile = async () => {
     const finalName = displayName.trim();
+    const nextAvatarUrl = avatarUrl.trim();
     if (!finalName) {
       setMessage({ type: 'error', text: '请输入昵称。' });
       return;
@@ -352,18 +383,40 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setMessage(null);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: finalName,
-          avatar_url: avatarUrl.trim(),
-        },
+      const { data: sessionData } = await supabase.auth.getSession();
+      const apiAccessToken = String(sessionData.session?.access_token || '').trim();
+
+      if (!apiAccessToken) {
+        saveProfileLocally(finalName, nextAvatarUrl);
+        setMessage({ type: 'success', text: '资料已保存到本地运行时，后端资料接口尚未同步。' });
+        setTimeout(() => setView('main'), 900);
+        return;
+      }
+
+      const response = await kkWebApiClient.updateProfile({
+        nickname: finalName,
+        avatarUrl: nextAvatarUrl || undefined,
       });
 
-      if (error) throw error;
-      setMessage({ type: 'success', text: '个人资料已更新。' });
+      if (!response.success) {
+        const gapMessage = resolveApiGapMessage(response.error.code, response.error.message || '更新失败，请稍后重试。');
+        if (gapMessage !== response.error.message) {
+          saveProfileLocally(finalName, nextAvatarUrl);
+          setMessage({ type: 'success', text: `资料已保存到本地运行时。${gapMessage}` });
+          setTimeout(() => setView('main'), 900);
+          return;
+        }
+        throw new Error(gapMessage);
+      }
+
+      updateRuntimeAuthStateFromProfile(response.data);
+      setMessage({ type: 'success', text: '个人资料已更新并同步到 KK API。' });
       setTimeout(() => setView('main'), 900);
     } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || '更新失败，请稍后重试。' });
+      setMessage({
+        type: 'error',
+        text: localizeUserFacingText(error?.message) || error?.message || '更新失败，请稍后重试。',
+      });
     } finally {
       setLoading(false);
     }

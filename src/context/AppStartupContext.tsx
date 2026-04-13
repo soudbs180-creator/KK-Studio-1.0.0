@@ -174,6 +174,9 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setHealthState('ready');
         setLastStartupWarning(error instanceof Error ? error.message : 'KK API health preflight failed.');
       });
+    } else {
+      setHealthState('ready');
+      setLastStartupWarning(null);
     }
 
     profileTimer = window.setTimeout(() => {
@@ -237,6 +240,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     hostedRuntime,
     isStageReady,
     isTempUser,
+    localOnlyRuntime,
     lastStartupWarning,
     legacyFallbackState.enabled,
     legacyFallbackState.reason,

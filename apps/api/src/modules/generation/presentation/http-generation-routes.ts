@@ -43,6 +43,10 @@ export function validateCreateGenerationTaskRequest(body: unknown): ApiErrorDeta
     details.push({ field: "idempotencyKey", reason: "idempotencyKey is required." });
   }
 
+  if (typeof candidate.attemptId !== "undefined" && typeof candidate.attemptId !== "string") {
+    details.push({ field: "attemptId", reason: "attemptId must be a string when provided." });
+  }
+
   if (!candidate.taskType || typeof candidate.taskType !== "string") {
     details.push({ field: "taskType", reason: "taskType is required." });
   } else if (!supportedGenerationTaskTypes.has(candidate.taskType)) {

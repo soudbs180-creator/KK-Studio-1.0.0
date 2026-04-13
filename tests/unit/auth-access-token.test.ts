@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { supabase } from "../../src/lib/supabase.ts";
 import {
   getPreferredKkApiAccessToken,
   getStoredKkApiAccessToken,
@@ -9,6 +8,7 @@ import {
   setStoredKkApiAccessToken,
   syncStoredKkApiAccessTokenWithSupabaseSession,
 } from "../../src/services/api/authAccessToken.ts";
+import { emitAuthSessionChange } from "../../src/services/auth/authSessionEvents.ts";
 
 const ACCESS_TOKEN_STORAGE_KEY = "kk.api.access_token";
 
@@ -55,16 +55,15 @@ function installBrowserStorage() {
   return { sessionStorage, localStorage };
 }
 
-function restoreAuthMocks(
-  originalGetSession: typeof supabase.auth.getSession,
-  originalRefreshSession: typeof supabase.auth.refreshSession,
-) {
-  supabase.auth.getSession = originalGetSession;
-  supabase.auth.refreshSession = originalRefreshSession;
-}
-
 afterEach(() => {
   setStoredKkApiAccessToken(undefined);
+  emitAuthSessionChange({
+    hasSession: false,
+    userId: null,
+    accessToken: undefined,
+    refreshToken: undefined,
+    isTempUser: false,
+  });
   delete (globalThis as typeof globalThis & { window?: unknown }).window;
 });
 
@@ -79,178 +78,110 @@ test("legacy localStorage token is migrated into session storage and cleared loc
   assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
 });
 
-test("preferred KK API token uses the active Supabase session token and refreshes compatibility storage", async () => {
+test("preferred KK API token follows the latest runtime auth session event and refreshes compatibility storage", async () => {
   const { sessionStorage, localStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
 
   setStoredKkApiAccessToken("compat-token");
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: {
-          access_token: "supabase-token",
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: "kkapi-token",
+    refreshToken: "refresh-token",
+    isTempUser: false,
+  });
 
-  try {
-    const token = await getPreferredKkApiAccessToken();
+  const token = await getPreferredKkApiAccessToken();
 
-    assert.equal(token, "supabase-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "supabase-token");
-    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(token, "kkapi-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "kkapi-token");
+  assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
 });
 
-test("preferred token falls back to the stored compatibility token when Supabase session lookup fails", async () => {
+test("preferred token falls back to the stored compatibility token when runtime auth state has no access token", async () => {
   const { sessionStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
 
   setStoredKkApiAccessToken("compat-token");
-  supabase.auth.getSession = async () => {
-    throw new Error("session unavailable");
-  };
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: undefined,
+    refreshToken: undefined,
+    isTempUser: false,
+  });
 
-  try {
-    const token = await getPreferredKkApiAccessToken();
+  const token = await getPreferredKkApiAccessToken();
 
-    assert.equal(token, "compat-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(token, "compat-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
 });
 
-test("refresh token falls back to the stored compatibility token when Supabase refresh fails", async () => {
+test("refresh token falls back to the stored compatibility token when runtime auth state has no access token", async () => {
   const { sessionStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
 
   setStoredKkApiAccessToken("compat-token");
-  supabase.auth.refreshSession = async () =>
-    ({
-      data: {
-        session: null,
-      },
-      error: new Error("refresh failed"),
-    }) as Awaited<ReturnType<typeof originalRefreshSession>>;
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: undefined,
+    refreshToken: undefined,
+    isTempUser: false,
+  });
 
-  try {
-    const token = await refreshPreferredKkApiAccessToken();
+  const token = await refreshPreferredKkApiAccessToken();
 
-    assert.equal(token, "compat-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(token, "compat-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
 });
 
-test("sync keeps the current Supabase session token without proactively refreshing it", async () => {
+test("sync keeps the current runtime session token without any proactive refresh step", async () => {
   const { sessionStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
-  let refreshCalls = 0;
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: "expiring-token",
+    refreshToken: undefined,
+    isTempUser: false,
+  });
 
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: {
-          access_token: "expiring-token",
-          expires_at: Math.floor((Date.now() + 60_000) / 1000),
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
+  const token = await syncStoredKkApiAccessTokenWithSupabaseSession();
 
-  supabase.auth.refreshSession = async () => {
-    refreshCalls += 1;
-    return ({
-      data: {
-        session: {
-          access_token: "fresh-token",
-          expires_at: Math.floor((Date.now() + 3_600_000) / 1000),
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalRefreshSession>>;
-  };
-
-  try {
-    const token = await syncStoredKkApiAccessTokenWithSupabaseSession();
-
-    assert.equal(token, "expiring-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "expiring-token");
-    assert.equal(refreshCalls, 0);
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(token, "expiring-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "expiring-token");
 });
 
-test("sync preserves the stored compatibility token when Supabase reports no active session", async () => {
+test("sync preserves the stored compatibility token when runtime auth state does not provide a new access token", async () => {
   const { sessionStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
 
   setStoredKkApiAccessToken("compat-token");
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: null,
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: undefined,
+    refreshToken: undefined,
+    isTempUser: false,
+  });
 
-  try {
-    const token = await syncStoredKkApiAccessTokenWithSupabaseSession();
+  const token = await syncStoredKkApiAccessTokenWithSupabaseSession();
 
-    assert.equal(token, "compat-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(token, "compat-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "compat-token");
 });
 
-test("concurrent refresh requests share a single Supabase refresh call", async () => {
+test("concurrent refresh requests resolve the same runtime token", async () => {
   const { sessionStorage } = installBrowserStorage();
-  const originalGetSession = supabase.auth.getSession;
-  const originalRefreshSession = supabase.auth.refreshSession;
-  let refreshCalls = 0;
-  let resolveRefresh:
-    | ((value: Awaited<ReturnType<typeof originalRefreshSession>>) => void)
-    | undefined;
+  emitAuthSessionChange({
+    hasSession: true,
+    userId: "user-1",
+    accessToken: "fresh-token",
+    refreshToken: "refresh-token",
+    isTempUser: false,
+  });
 
-  supabase.auth.refreshSession = async () => {
-    refreshCalls += 1;
-    return await new Promise<Awaited<ReturnType<typeof originalRefreshSession>>>((resolve) => {
-      resolveRefresh = resolve;
-    });
-  };
+  const firstRefresh = refreshPreferredKkApiAccessToken();
+  const secondRefresh = refreshPreferredKkApiAccessToken();
+  const [firstToken, secondToken] = await Promise.all([firstRefresh, secondRefresh]);
 
-  try {
-    const firstRefresh = refreshPreferredKkApiAccessToken();
-    const secondRefresh = refreshPreferredKkApiAccessToken();
-
-    resolveRefresh?.({
-      data: {
-        session: {
-          access_token: "fresh-token",
-        },
-      },
-      error: null,
-    } as Awaited<ReturnType<typeof originalRefreshSession>>);
-
-    const [firstToken, secondToken] = await Promise.all([firstRefresh, secondRefresh]);
-
-    assert.equal(firstToken, "fresh-token");
-    assert.equal(secondToken, "fresh-token");
-    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-token");
-    assert.equal(refreshCalls, 1);
-  } finally {
-    restoreAuthMocks(originalGetSession, originalRefreshSession);
-  }
+  assert.equal(firstToken, "fresh-token");
+  assert.equal(secondToken, "fresh-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-token");
 });

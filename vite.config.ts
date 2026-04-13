@@ -147,6 +147,90 @@ const ROOT_WATCH_FILES = new Set([
     'vite.config.ts',
 ]);
 
+const APP_MANUAL_CHUNK_GROUPS: Array<{ name: string; patterns: string[] }> = [
+    {
+        name: 'settings-shell',
+        patterns: [
+            '/src/components/settings/SettingsPanel',
+            '/src/routes/settingsRoutes.tsx',
+        ],
+    },
+    {
+        name: 'settings-views',
+        patterns: [
+            '/src/components/settings/ApiSettingsView.tsx',
+            '/src/components/settings/views/',
+            '/src/pages/CostEstimation.tsx',
+        ],
+    },
+    {
+        name: 'account-panels',
+        patterns: [
+            '/src/components/modals/UserProfileModal.tsx',
+            '/src/components/modals/RechargeModal.tsx',
+            '/src/components/modals/TagInputModal.tsx',
+        ],
+    },
+    {
+        name: 'storage-modals',
+        patterns: [
+            '/src/components/modals/StorageSelectionModal.tsx',
+            '/src/components/modals/MigrateModal.tsx',
+        ],
+    },
+    {
+        name: 'search-tools',
+        patterns: [
+            '/src/components/layout/SearchPalette.tsx',
+            '/src/components/common/TutorialOverlay.tsx',
+        ],
+    },
+    {
+        name: 'canvas-core',
+        patterns: [
+            '/src/components/canvas/',
+            '/src/context/CanvasContext.tsx',
+        ],
+    },
+    {
+        name: 'workspace-layout',
+        patterns: [
+            '/src/components/layout/PromptBar.tsx',
+            '/src/components/layout/ChatSidebar.tsx',
+            '/src/components/MobileChatFeed.tsx',
+        ],
+    },
+    {
+        name: 'image-workbench',
+        patterns: [
+            '/src/components/image/ImageCard.tsx',
+            '/src/components/image/ImageCard2.tsx',
+            '/src/components/image/GlobalLightbox.tsx',
+            '/src/components/image/InpaintModal.tsx',
+            '/src/components/image/PartialRedrawModal.tsx',
+            '/src/components/image/ImageOptionsPanel.tsx',
+            '/src/components/image/PptStackPreviewModal.tsx',
+            '/src/components/image/PptDeckEditorModal.tsx',
+        ],
+    },
+    {
+        name: 'provider-adapters',
+        patterns: [
+            '/src/services/llm/',
+            '/src/services/ecommerce/',
+        ],
+    },
+    {
+        name: 'model-services',
+        patterns: [
+            '/src/services/model/',
+            '/src/services/auth/keyManager.ts',
+            '/src/services/api/providerStrategy.ts',
+            '/src/hooks/useImageGeneration.ts',
+        ],
+    },
+];
+
 function shouldIgnoreWatchPath(targetPath: string): boolean {
     const normalized = targetPath.replace(/\\/g, '/');
     const segments = normalized.split('/').filter(Boolean);
@@ -191,27 +275,21 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
 function resolveManualChunk(id: string): string | undefined {
     const normalizedId = id.replace(/\\/g, '/');
 
-    if (
-        normalizedId.includes('/src/components/settings/') ||
-        normalizedId.includes('/src/components/modals/StorageSelectionModal.tsx') ||
-        normalizedId.includes('/src/components/modals/MigrateModal.tsx') ||
-        normalizedId.includes('/src/components/modals/RechargeModal.tsx') ||
-        normalizedId.includes('/src/components/modals/UserProfileModal.tsx') ||
-        normalizedId.includes('/src/components/modals/TagInputModal.tsx') ||
-        normalizedId.includes('/src/pages/CostEstimation.tsx')
-    ) {
-        return 'app-panels';
-    }
-
-    if (
-        normalizedId.includes('/src/components/layout/SearchPalette.tsx') ||
-        normalizedId.includes('/src/components/common/TutorialOverlay.tsx') ||
-        normalizedId.includes('/src/components/image/GlobalLightbox.tsx')
-    ) {
-        return 'app-panels';
+    for (const group of APP_MANUAL_CHUNK_GROUPS) {
+        if (group.patterns.some((pattern) => normalizedId.includes(pattern))) {
+            return group.name;
+        }
     }
 
     if (normalizedId.includes('/node_modules/')) {
+        if (normalizedId.includes('/antd/')) {
+            return 'antd-vendor';
+        }
+
+        if (normalizedId.includes('/framer-motion/') || normalizedId.includes('/motion/')) {
+            return 'motion-vendor';
+        }
+
         if (normalizedId.includes('/@supabase/')) {
             return 'supabase-vendor';
         }

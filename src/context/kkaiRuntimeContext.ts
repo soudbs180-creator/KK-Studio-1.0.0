@@ -1,6 +1,10 @@
 import type { Session, User } from '@supabase/supabase-js';
 
-import { KKAI_LOCAL_USER_ID } from '../app/kkaiLocalRuntime.ts';
+import { getStoredKkApiAccessToken } from '../services/api/authAccessToken.ts';
+import {
+  createDefaultRuntimeAuthState,
+  getLatestRuntimeAuthState,
+} from '../services/auth/runtimeAuthState.ts';
 
 export interface KkaiRuntimeAuthSnapshot {
   session: Session | null;
@@ -12,29 +16,34 @@ export interface KkaiRuntimeAuthSnapshot {
   tempUserExpiry: number | null;
 }
 
-function createLocalUser(): User {
+function createRuntimeSession(user: User, accessToken?: string): Session | null {
+  const normalizedAccessToken = String(accessToken || '').trim();
+  if (!normalizedAccessToken) {
+    return null;
+  }
+
   return {
-    id: KKAI_LOCAL_USER_ID,
-    app_metadata: {},
-    user_metadata: {
-      provider: 'local',
-      providers: ['local'],
-    },
-    aud: 'authenticated',
-    created_at: '1970-01-01T00:00:00.000Z',
-    email: 'local-user@kkai.local',
-  } as unknown as User;
+    access_token: normalizedAccessToken,
+    refresh_token: '',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    token_type: 'bearer',
+    user,
+  } as Session;
 }
 
 export function createKkaiRuntimeAuthSnapshot(): KkaiRuntimeAuthSnapshot {
+  const runtimeState = getLatestRuntimeAuthState() || createDefaultRuntimeAuthState();
+  const accessToken = runtimeState.isTempUser ? undefined : getStoredKkApiAccessToken();
+
   return {
-    session: null,
-    user: createLocalUser(),
+    session: runtimeState.user ? createRuntimeSession(runtimeState.user, accessToken) : null,
+    user: runtimeState.user,
     loading: false,
     signOut: async () => {},
     loginAsTempUser: async () => {},
-    isTempUser: false,
-    tempUserExpiry: null,
+    isTempUser: runtimeState.isTempUser,
+    tempUserExpiry: runtimeState.tempUserExpiry,
   };
 }
 

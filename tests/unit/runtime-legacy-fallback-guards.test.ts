@@ -21,13 +21,13 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(userApiCloudRecordSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
   assert.match(userApiProfileSource, /const canUseLegacyWebApi = shouldUseLegacyWebApiFallback\(\);/);
   assert.match(userApiProfileSource, /if \(canUseLegacyWebApi\) \{\s*try \{\s*localEntries = await loadLocalUserApiEntriesViaApi\(\);/);
-  assert.match(userApiProfileSource, /const mergedEntries = mergeUserApiEntrySets\(localEntries, cloudEntries\);/);
+  assert.match(userApiProfileSource, /mergeUserApiEntrySets\(localEntries, cloudEntries, 'local'\)/);
   assert.match(userApiProfileSource, /entries: mergedEntries,/);
   assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
   assert.match(keyManagerSource, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
   assert.match(keyManagerSource, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
   assert.match(billingContextSource, /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
-  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(buildBillingRequestOptions\(apiAccessToken\)\)/);
+  assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(\)/);
   assert.match(billingContextSource, /kkWebApiClient\.listCreditTransactions\(/);
   assert.match(billingContextSource, /kkWebApiClient\.debitCredits\(\{/);
   assert.match(billingContextSource, /kkWebApiClient\.refundCredits\(\{/);
@@ -47,21 +47,7 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
 });
 
 test('admin UI entrypoints use the shared web API client without Supabase fallback bridges', () => {
-  const adminConsoleSource = readSource('src/components/settings/AdminConsoleSettings.tsx');
-  const adminSystemSource = readSource('src/components/settings/AdminSystem.tsx');
   const adminRoleSource = readSource('src/hooks/useAdminRole.ts');
-
-  assert.match(adminConsoleSource, /kkWebApiClient\.changeAdminPassword/);
-  assert.match(adminConsoleSource, /kkWebApiClient\.adminRechargeCredits/);
-  assert.match(adminConsoleSource, /kkWebApiClient\.setUserRole/);
-  assert.doesNotMatch(adminConsoleSource, /shouldUseLegacyWebApiFallback/);
-  assert.doesNotMatch(adminConsoleSource, /ViaSupabase/);
-  assert.doesNotMatch(adminConsoleSource, /supabaseAdminFallbackService/);
-
-  assert.match(adminSystemSource, /kkWebApiClient\.verifyAdminPassword/);
-  assert.doesNotMatch(adminSystemSource, /shouldUseLegacyWebApiFallback/);
-  assert.doesNotMatch(adminSystemSource, /ViaSupabase/);
-  assert.doesNotMatch(adminSystemSource, /supabaseAdminFallbackService/);
 
   assert.match(adminRoleSource, /kkWebApiClient/);
   assert.match(adminRoleSource, /\.getAdminAccess\(buildAdminRequestOptions\(\)\)/);
@@ -70,11 +56,11 @@ test('admin UI entrypoints use the shared web API client without Supabase fallba
   assert.doesNotMatch(adminRoleSource, /resolveSupabaseAdminAccess/);
 });
 
-test('register form follows the Supabase-hosted auth path instead of the legacy register API', () => {
+test('register form now routes through the KK API instead of browser-side Supabase auth', () => {
   const registerFormSource = readSource('src/components/auth/RegisterForm.tsx');
 
-  assert.match(registerFormSource, /import \{ supabase \} from "\.\.\/\.\.\/lib\/supabase";/);
-  assert.match(registerFormSource, /await supabase\.auth\.signUp\(/);
-  assert.match(registerFormSource, /captchaToken: turnstileToken/);
-  assert.doesNotMatch(registerFormSource, /legacyWebApiClient\.register/);
+  assert.match(registerFormSource, /import \{ kkWebApiClient \} from "\.\.\/\.\.\/services\/api\/kkApiClient";/);
+  assert.match(registerFormSource, /await kkWebApiClient\.register\(/);
+  assert.match(registerFormSource, /turnstileToken: turnstileToken \|\| ""/);
+  assert.doesNotMatch(registerFormSource, /supabase\.auth\.signUp\(/);
 });

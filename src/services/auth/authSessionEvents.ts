@@ -15,6 +15,16 @@ function canUseWindow(): boolean {
   return typeof window !== 'undefined';
 }
 
+function canDispatchWindowEvent(): boolean {
+  return canUseWindow() && typeof window.dispatchEvent === 'function';
+}
+
+function canObserveWindowEvent(): boolean {
+  return canUseWindow()
+    && typeof window.addEventListener === 'function'
+    && typeof window.removeEventListener === 'function';
+}
+
 export function emitAuthSessionChange(detail: AuthSessionChangeDetail): void {
   latestAuthSessionChangeDetail = {
     ...detail,
@@ -25,7 +35,7 @@ export function emitAuthSessionChange(detail: AuthSessionChangeDetail): void {
     hasSession: detail.hasSession === true,
   };
 
-  if (!canUseWindow()) {
+  if (!canDispatchWindowEvent()) {
     return;
   }
 
@@ -43,7 +53,7 @@ export function getLatestAuthSessionChange(): AuthSessionChangeDetail | null {
 }
 
 export function requestAuthSessionInvalidation(reason: string): void {
-  if (!canUseWindow()) {
+  if (!canDispatchWindowEvent()) {
     return;
   }
 
@@ -58,7 +68,7 @@ export function requestAuthSessionInvalidation(reason: string): void {
 export function subscribeAuthSessionInvalidationRequest(
   listener: (reason: string) => void,
 ): () => void {
-  if (!canUseWindow()) {
+  if (!canObserveWindowEvent()) {
     return () => {};
   }
 
@@ -76,7 +86,7 @@ export function subscribeAuthSessionInvalidationRequest(
 export function subscribeAuthSessionChange(
   listener: (detail: AuthSessionChangeDetail) => void,
 ): () => void {
-  if (!canUseWindow()) {
+  if (!canObserveWindowEvent()) {
     return () => {};
   }
 
@@ -98,7 +108,7 @@ export async function waitForAuthSessionChange(
   predicate: (detail: AuthSessionChangeDetail) => boolean,
   timeoutMs = 1500,
 ): Promise<AuthSessionChangeDetail | null> {
-  if (!canUseWindow()) {
+  if (!canObserveWindowEvent() || typeof window.setTimeout !== 'function' || typeof window.clearTimeout !== 'function') {
     return null;
   }
 

@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Layers, Plus, Search, ScrollText, Wand2 } from 'lucide-react';
+import { Check, Layers, Plus, Search, Wand2 } from 'lucide-react';
 import { useCanvas } from '../../context/CanvasContext';
 
 interface MobileWorkspaceQuickBarProps {
   onSearch: () => void;
-  onOpenPromptLibrary: () => void;
   onTogglePromptOptimization: () => void;
   promptOptimizationEnabled: boolean;
   promptOptimizationSupported: boolean;
@@ -12,7 +11,6 @@ interface MobileWorkspaceQuickBarProps {
 
 const MobileWorkspaceQuickBar: React.FC<MobileWorkspaceQuickBarProps> = ({
   onSearch,
-  onOpenPromptLibrary,
   onTogglePromptOptimization,
   promptOptimizationEnabled,
   promptOptimizationSupported,
@@ -120,24 +118,8 @@ const MobileWorkspaceQuickBar: React.FC<MobileWorkspaceQuickBarProps> = ({
 
             <button
               type="button"
-              onClick={onOpenPromptLibrary}
-              className="ios-mobile-project-pill ios-mobile-project-pill--utility"
-              aria-label="\u6253\u5f00\u63d0\u793a\u8bcd\u5e93"
-              title="\u63d0\u793a\u8bcd\u5e93"
-            >
-              <span className="ios-mobile-project-pill-icon ios-mobile-project-pill-icon--teal">
-                <ScrollText size={18} />
-              </span>
-              <span className="ios-mobile-project-pill-copy">
-                <span className="ios-mobile-project-pill-label">{'\u5de5\u5177'}</span>
-                <span className="ios-mobile-project-pill-value">{'\u63d0\u793a\u8bcd\u5e93'}</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
               onClick={onTogglePromptOptimization}
-              className={`ios-mobile-project-pill ios-mobile-project-pill--utility ${promptOptimizationEnabled ? 'is-active' : ''}`}
+              className={`ios-mobile-project-pill ios-mobile-project-pill--utility col-span-2 ${promptOptimizationEnabled ? 'is-active' : ''}`}
               aria-label="\u5207\u6362\u63d0\u793a\u8bcd\u4f18\u5316"
               title={promptOptimizationSupported
                 ? (promptOptimizationEnabled ? '\u5df2\u5f00\u542f\u63d0\u793a\u8bcd\u4f18\u5316' : '\u542f\u7528\u63d0\u793a\u8bcd\u4f18\u5316')

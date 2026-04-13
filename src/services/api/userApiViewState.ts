@@ -1,5 +1,6 @@
 export interface UserApiViewStateInput {
   hasReadonlySnapshot: boolean;
+  isApiReachable?: boolean;
   isAuthenticated: boolean;
   isPersistenceDegraded: boolean;
   runtimeOfficialCount: number;

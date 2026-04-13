@@ -25,6 +25,7 @@ import {
   isKkApiUserDataPersistedInCloudFromHealth,
   type KkApiServerHealth,
 } from '../../services/api/kkApiServerHealth';
+import { isKkaiUserApiStorageReady } from '../../services/api/kkaiUserApiStorageMode';
 import {
   loadUserApisPayloadMetadataFromCloudRecord,
   removeUserApiProviderFromCloudRecord,
@@ -80,10 +81,10 @@ import {
 type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = ApiManagementTab;
-const UI_TOKEN_UNIT_LABEL = 'Tokens';
-const UI_TOKEN_LIMIT_LABEL = 'Token limit';
-const UI_LEGACY_TOKEN_LIMIT_LABEL = 'Legacy token limit';
-const UI_BUDGET_OPTIONS = ['Unlimited', 'Budget', UI_TOKEN_LIMIT_LABEL] as const;
+const UI_TOKEN_UNIT_LABEL = '词元';
+const UI_TOKEN_LIMIT_LABEL = '词元上限';
+const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
+const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;
 const suspiciousLocaleCharSet = new Set('鍙闂妫璇淇鏂褰缂閹鏆閲棰渚涘簲鍐娴瀹閫绗鐢浣');
 
 const TOKEN_UNIT_LABEL = '词元';
@@ -327,14 +328,23 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
   const now = Date.now();
   const createdAt = normalizeTimestamp(raw.createdAt ?? raw.created_at, now);
   const usageRaw = isRecord(raw.usage) ? raw.usage : {};
+  const providerName = normalizeString(raw.name) || 'Provider';
+  const providerBaseUrl = normalizeString(raw.baseUrl ?? raw.base_url);
+  const providerFormat = normalizeProtocolFormat(raw.format);
+  const rawProviderModels = normalizeStringArray(raw.models ?? raw.supportedModels ?? raw.supported_models);
 
   return {
     id,
-    name: normalizeString(raw.name) || 'Provider',
-    baseUrl: normalizeString(raw.baseUrl ?? raw.base_url),
+    name: providerName,
+    baseUrl: providerBaseUrl,
     apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? READONLY_SECRET_PLACEHOLDER : '',
-    models: normalizeStringArray(raw.models ?? raw.supportedModels ?? raw.supported_models),
-    format: normalizeProtocolFormat(raw.format),
+    models: resolveEffectiveProviderModels({
+      provider: providerName,
+      baseUrl: providerBaseUrl,
+      format: providerFormat,
+      models: rawProviderModels,
+    }),
+    format: providerFormat,
     group: normalizeString(raw.group) || undefined,
     providerColor: normalizeString(raw.providerColor ?? raw.color) || '#60A5FA',
     isActive:
@@ -390,7 +400,9 @@ function readUserApiViewSnapshot(userId: string | null | undefined): UserApiView
   }
 
   try {
-    const raw = window.sessionStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId));
+    const raw =
+      window.localStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId))
+      || window.sessionStorage.getItem(getUserApiViewSnapshotKey(normalizedUserId));
     if (!raw) {
       return null;
     }
@@ -402,6 +414,7 @@ function readUserApiViewSnapshot(userId: string | null | undefined): UserApiView
 
     const updatedAt = normalizeTimestamp(parsed.updatedAt, 0);
     if (!updatedAt || Date.now() - updatedAt > USER_API_VIEW_SNAPSHOT_TTL_MS) {
+      window.localStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
       window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
       return null;
     }
@@ -428,7 +441,7 @@ function writeUserApiViewSnapshot(
   }
 
   try {
-    window.sessionStorage.setItem(getUserApiViewSnapshotKey(normalizedUserId), JSON.stringify({
+    window.localStorage.setItem(getUserApiViewSnapshotKey(normalizedUserId), JSON.stringify({
       officialSlots: officialSlots
         .map((slot) => toReadonlyOfficialSlot(slot))
         .filter((slot): slot is KeySlot => Boolean(slot)),
@@ -448,6 +461,7 @@ function clearUserApiViewSnapshot(userId: string | null | undefined): void {
     return;
   }
 
+  window.localStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
   window.sessionStorage.removeItem(getUserApiViewSnapshotKey(normalizedUserId));
 }
 
@@ -456,8 +470,7 @@ function isUserApiPersistenceDegradedFromHealth(health: KkApiServerHealth | null
     health
     && (
       !health.reachable
-      || !health.persistence.userApiKeys
-      || !health.persistence.keyManager
+      || !isKkaiUserApiStorageReady(health)
     ),
   );
 }
@@ -666,6 +679,69 @@ const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({
   </div>
 );
 
+type PlatformAssistantEntryCardProps = {
+  title: string;
+  description: string;
+  entryContextLabel: string;
+  localApiLabel: string;
+  localApiValue: string;
+  localApiHelper: string;
+  platformLabel: string;
+  platformValue: string;
+  platformHelper: string;
+  entryActionLabel: string;
+  entryActionHelper: string;
+  onOpen: () => void;
+};
+
+const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProps> = ({
+  title,
+  description,
+  entryContextLabel,
+  localApiLabel,
+  localApiValue,
+  localApiHelper,
+  platformLabel,
+  platformValue,
+  platformHelper,
+  entryActionLabel,
+  entryActionHelper,
+  onOpen,
+}) => (
+  <div className="rounded-[24px] border p-4 md:p-5" style={SETTINGS_ELEVATED_STYLE}>
+    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="min-w-0 space-y-2">
+        <div
+          className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
+          style={SETTINGS_OVERLAY_STYLE}
+        >
+          <Wand2 size={14} />
+          <span>{entryContextLabel}</span>
+        </div>
+        <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
+        <div className="max-w-3xl text-[13px] leading-6 text-[var(--text-secondary)]">{description}</div>
+      </div>
+
+      <div className="w-full max-w-[320px] rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
+        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+          {entryContextLabel}
+        </div>
+        <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{entryActionHelper}</div>
+        <div className="mt-3">
+          <SettingsActionButton icon={Wand2} tone="primary" onClick={onOpen}>
+            {entryActionLabel}
+          </SettingsActionButton>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <InfoCell label={localApiLabel} value={localApiValue} helper={localApiHelper} />
+      <InfoCell label={platformLabel} value={platformValue} helper={platformHelper} />
+    </div>
+  </div>
+);
+
 type EndpointStatusVariant = 'online' | 'offline' | 'warning' | 'error' | 'paused';
 
 type ConsoleEndpointCardMetric = {
@@ -848,6 +924,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const pick = useCallback((zhText: string, enText: string) => (
       localePick(containsLikelyMojibake(zhText) ? enText : zhText, enText)
     ), [localePick]);
+  const handleOpenPlatformAssistant = useCallback(() => {
+    notify.info(
+      pick('平台辅助 AI', 'Platform Assistant AI'),
+      pick('这里会接入平台侧的轻量辅助 AI 能力入口，当前先预留按钮位。', 'This entry will host the platform-managed lightweight assistant AI in a later step.'),
+    );
+  }, [pick]);
   const getOfficialDisplayName = useCallback(
     (provider: OfficialProvider) => (provider === 'Google' ? pick('谷歌', 'Google') : 'OpenAI'),
     [pick]
@@ -895,6 +977,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
   const userApiViewState = resolveUserApiViewState({
     hasReadonlySnapshot,
+    isApiReachable: apiHealth?.reachable,
     isAuthenticated,
     isPersistenceDegraded: isUserApiPersistenceDegraded,
     runtimeOfficialCount: runtimeOfficialSlots.length,
@@ -941,6 +1024,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     officialSlots.filter((slot) => slot.disabled || slot.status === 'invalid' || slot.status === 'rate_limited').length +
     thirdPartyProviders.filter((provider) => !provider.isActive || provider.status === 'error').length;
   const connectedChannels = officialSlots.filter((slot) => !slot.disabled).length + activeProviders;
+  const workbenchTone = isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral';
+  const workbenchStatusLabel = isUsingReadonlyProfileFallback
+    ? pick('来自云端记录的只读回显', 'Read-only data from cloud record')
+    : isUserApiPersistenceDegraded
+      ? pick('本地 API 未连接云端持久化', 'Local API is not using cloud persistence')
+      : connectedChannels > 0
+        ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
+        : pick('尚未接入链路', 'No routes connected yet');
   const userApiPersistenceWarning = useMemo(() => {
     if (!apiHealth) {
       return null;
@@ -949,7 +1040,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (!apiHealth.reachable) {
       return pick(
         '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在账号云端记录里，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
-        'The local API server is unavailable. Signed-in BYOK settings still live in the account-backed cloud record, and this page will keep using the cloud view until the local service recovers.',
+        'The local API server is unavailable. Signed-in BYOK settings now fall back to the account-backed Supabase record, so existing providers can still be shown and new changes can still sync to the user profile.',
       );
     }
 
@@ -970,7 +1061,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     if (!apiHealth.reachable) {
       return pick(
         '本地 API 恢复后会重新接管服务端仓库；在这之前，当前页面会继续优先使用云端同步结果。',
-        'Once the local API is back it can resume the server-side repositories. Until then, this page keeps using the cloud-backed sync path.',
+        'Until the local API comes back, BYOK reads and writes fall back to the authenticated Supabase profile so you can keep working from the account-backed record.',
       );
     }
 
@@ -995,18 +1086,26 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const userApiEditorDisabled = userApiViewState.userApiEditorDisabled;
   const userApiEditorReadOnly = userApiEditorDisabled;
   const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;
-  const userApiActionHelper = !isAuthenticated
+  const backendUnavailableHelper = apiHealth?.reachable === false
+    ? pick(
+        '本地 API 当前不可用。请先恢复服务，再新增、编辑或删除 BYOK 配置。',
+        'The local API server is unavailable. The page will fall back to the current account-backed Supabase profile, so you can still edit and save this BYOK configuration.',
+      )
+    : null;
+  const userApiActionHelper = backendUnavailableHelper ?? (!isAuthenticated
     ? pick(
         '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
         'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
       )
     : isHydratingRuntimeUserApis
       ? snapshotHydrationHelper
-      : null;
+      : null);
   const providerActionHelper = userApiActionHelper;
   const userApiEditorReadOnlyHelper = userApiEditorReadOnly
     ? userApiActionHelper
-    : isUserApiPersistenceDegraded
+    : apiHealth?.reachable === false
+      ? backendUnavailableHelper
+      : isUserApiPersistenceDegraded
       ? pick(
           '当前处于云端直写模式。你保存的官方接口会直接进入账号云端记录，并在本地服务恢复后继续同步。',
           'Cloud-backed write mode is active. Saved official endpoints will go straight to the account-backed cloud record and sync back once the local service recovers.',
@@ -1014,7 +1113,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       : null;
   const providerEditorReadOnlyHelper = providerEditorReadOnly
     ? providerActionHelper
-    : isUserApiPersistenceDegraded
+    : apiHealth?.reachable === false
+      ? backendUnavailableHelper
+      : isUserApiPersistenceDegraded
       ? pick(
           '当前处于云端直写模式。你保存的供应商会直接进入账号云端记录，并在本地服务恢复后继续同步。',
           'Cloud-backed write mode is active. Saved providers will go straight to the account-backed cloud record and sync back once the local service recovers.',
@@ -1026,7 +1127,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
   );
   const headerPrimaryActionDisabled = activeTab === 'official' ? userApiActionsDisabled : providerActionsDisabled;
-  const useCloudBackedUserApiWrites = isAuthenticated && !isTempUser && isUserApiPersistenceDegraded;
+  const useCloudBackedUserApiWrites =
+    isAuthenticated
+    && !isTempUser
+    && (isUserApiPersistenceDegraded || apiHealth?.reachable === false);
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
   const diagnosticsActionDisabled = !isAuthenticated || apiHealth?.reachable === false;
@@ -1039,6 +1143,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const ensureUserApiActionsAllowed = (): boolean => {
     if (!isAuthenticated) {
       notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
+      return false;
+    }
+
+    if (false && apiHealth?.reachable === false) {
+      notify.warning(pick('本地 API 不可用', 'Local API unavailable'), userApiActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
 
@@ -1056,6 +1165,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const ensureProviderActionsAllowed = (): boolean => {
     if (!isAuthenticated) {
       notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper || snapshotHydrationHelper);
+      return false;
+    }
+
+    if (false && apiHealth?.reachable === false) {
+      notify.warning(pick('本地 API 不可用', 'Local API unavailable'), providerActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
 
@@ -1078,10 +1192,8 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     return true;
   };
-  const showInlineOfficialCreate = activeEditorMode === null && activeTab === 'official';
-  const showInlineProviderCreate = activeEditorMode === null && activeTab === 'third-party';
-  const showOfficialEditor = activeEditorMode === 'official' || showInlineOfficialCreate;
-  const showProviderEditor = activeEditorMode === 'third-party' || showInlineProviderCreate;
+  const showOfficialEditor = activeEditorMode === 'official';
+  const showProviderEditor = activeEditorMode === 'third-party';
 
   const latencyCards = useMemo(() => {
     const officialItems = officialSlots
@@ -1365,9 +1477,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       const message =
         error instanceof Error && error.message.trim()
           ? error.message
-          : pick('褰撳墠鎿嶄綔鏆傛椂鏃犳硶瀹屾垚銆?', 'The current action could not be completed right now.');
+          : pick('当前操作暂时无法完成。', 'The current action could not be completed right now.');
 
-      notify.error(pick('鎿嶄綔澶辫触', 'Action failed'), message);
+      notify.error(pick('操作失败', 'Action failed'), message);
     } finally {
       setBusy((current) => (current === key ? null : current));
     }
@@ -1581,6 +1693,24 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     const normalizedApiKey = providerForm.apiKey.trim();
     const nextProviderId = providerForm.id || `provider_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const nextApiKeyValue = normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
+    const connectionSignatureChanged = Boolean(
+      existingProvider && (
+        normalizeProviderConnectionValue(existingProvider.baseUrl) !== normalizeProviderConnectionValue(providerForm.baseUrl)
+        || normalizeProtocolFormat(existingProvider.format, 'auto') !== providerForm.format
+        || (
+          normalizedApiKey
+          && !isReadonlySecretPlaceholder(providerForm.apiKey)
+          && normalizedApiKey !== String(existingProvider.apiKey || '').trim()
+        )
+      )
+    );
+    const effectiveProviderModelsForCloudWrite = resolveEffectiveProviderModels({
+      provider: providerForm.name.trim(),
+      baseUrl: providerForm.baseUrl.trim(),
+      format: providerForm.format,
+      models: connectionSignatureChanged ? [] : (existingProvider?.models || []),
+    });
 
     if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !nextApiKeyValue) {
       notify.error(
@@ -1618,13 +1748,12 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
       if (useCloudBackedUserApiWrites) {
-        const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
         await upsertUserApiProviderToCloudRecord({
           id: nextProviderId,
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
           apiKey: nextApiKeyValue,
-          models: existingProvider?.models || [],
+          models: effectiveProviderModelsForCloudWrite,
           format: providerForm.format,
           group: providerForm.group.trim() || undefined,
           providerColor: providerForm.color,
@@ -1654,6 +1783,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           group: providerForm.group.trim() || undefined,
           providerColor: providerForm.color,
           isActive: providerForm.isActive,
+          models: connectionSignatureChanged ? [] : (existingProvider?.models || []),
           ...payload,
         });
         await keyManager.syncToCloudNow();
@@ -1833,7 +1963,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       await keyManager.updateKey(slot.id, {
         status: check.ok ? 'valid' : 'invalid',
         lastError: check.ok ? null : check.message || '连接失败',
-        supportedModels: check.ok && check.models.length > 0 ? check.models : slot.supportedModels,
+        supportedModels: check.ok ? check.models : slot.supportedModels,
         lastResponseTime: check.ok ? check.latencyMs ?? slot.lastResponseTime : slot.lastResponseTime,
         avgResponseTime: check.ok ? check.latencyMs ?? slot.avgResponseTime : slot.avgResponseTime,
       });
@@ -1872,7 +2002,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         status: check.ok ? 'active' : 'error',
         lastChecked: checkedAt,
         lastError: check.ok ? undefined : check.message || '连接失败',
-        models: check.ok && check.models.length > 0 ? check.models : provider.models,
+        models: check.ok ? check.models : provider.models,
         activitySummary: {
           ...provider.activitySummary,
           lastLatencyMs: check.ok
@@ -2165,15 +2295,15 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         <>
           <SettingsHero
         eyebrow={pick('高级设置', 'Advanced settings')}
-        title={pick('API 管理', 'API management')}
+        title={pick('API 工作台', 'API workspace')}
         description={pick(
           '统一管理官方接口、第三方供应商、通信协议和预算策略。这里所有按钮都只表达一个真实动作，不再混用保存、刷新和同步语义。',
           'Manage official endpoints, third-party providers, protocols, and budgets in one place. Each action now maps to one clear behavior.'
         )}
         icon={Key}
-        tone={isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}
+        tone={workbenchTone}
         badge={
-          <SettingsBadge tone={isUserApiPersistenceDegraded ? 'rose' : attentionCount > 0 ? 'amber' : connectedChannels > 0 ? 'emerald' : 'neutral'}>
+          <SettingsBadge tone={workbenchTone}>
             {isUsingReadonlyProfileFallback
               ? pick('来自云端记录的只读回显', 'Read-only data from cloud record')
               : isUserApiPersistenceDegraded
@@ -2213,7 +2343,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               value={`${officialSlots.length}`}
               helper={pick(
                 `${officialSlots.filter((slot) => !slot.disabled).length} 条当前可参与调度`,
-                `${officialSlots.filter((slot) => !slot.disabled).length} currently available for routing`
+                `${officialSlots.length} endpoints`
               )}
               icon={Shield}
               tone={officialSlots.length > 0 ? 'indigo' : 'neutral'}
@@ -2224,7 +2354,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               helper={thirdPartyProviders.length > 0
                 ? pick(
                     `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} 个存在异常`,
-                    `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} with issues`
+                    `${thirdPartyProviders.length} providers`
                   )
                 : pick('尚未配置第三方供应商', 'No third-party providers configured yet')}
               icon={Globe}
@@ -2251,7 +2381,66 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       />
 
       <SettingsSection
-        title={pick('运行视图', 'Runtime view')}
+        title={pick('工作台摘要', 'Workspace snapshot')}
+        eyebrow={pick('运行概览', 'Operations overview')}
+        description={pick(
+          '在进入任意卡片前，先在这里查看当前服务健康、持久化状态和预算压力。',
+          'Review current service health, persistence, and budget pressure before jumping into individual cards.'
+        )}
+        action={<SettingsBadge tone={workbenchTone}>{workbenchStatusLabel}</SettingsBadge>}
+      >
+        <div className="space-y-4">
+          {userApiPersistenceWarning || isHydratingRuntimeUserApis ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {userApiPersistenceWarning ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
+                  {userApiPersistenceWarning}
+                </div>
+              ) : null}
+              {isHydratingRuntimeUserApis ? (
+                <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_ELEVATED_STYLE}>
+                  {snapshotHydrationHelper}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InfoCell
+              label={pick('当前状态', 'Current status')}
+              value={workbenchStatusLabel}
+              helper={attentionCount > 0
+                ? pick('建议先处理异常或暂停链路', 'Resolve failed or paused routes first')
+                : pick('当前可以从下方选择要深入查看的链路类型', 'You can now choose a route type to inspect below')}
+            />
+            <InfoCell
+              label={pick('已接入链路', 'Connected routes')}
+              value={`${connectedChannels}`}
+              helper={pick(
+                `${officialSlots.filter((slot) => !slot.disabled).length} 个官方接口 / ${activeProviders} 个供应商在调度中`,
+                `${officialSlots.filter((slot) => !slot.disabled).length} official / ${activeProviders} providers active`
+              )}
+            />
+            <InfoCell
+              label={pick('预算覆盖', 'Budget coverage')}
+              value={budgetCount > 0 ? pick(`${budgetCount} 条生效中`, `${budgetCount} routes limited`) : pick('暂无', 'None yet')}
+              helper={budgetCount > 0
+                ? pick('已设置预算或词元上限的链路会在卡片中继续显示进度', 'Budgeted or token-limited routes keep showing progress inside the cards')
+                : pick('如果你需要控制成本或词元，可以在各自的编辑器里设置', 'Add budget or token rules later from each editor when needed')}
+            />
+            <InfoCell
+              label={pick('当前焦点', 'Current focus')}
+              value={activeTab === 'official' ? pick('官方接口', 'Official endpoints') : pick('第三方供应商', 'Third-party providers')}
+              helper={activeTab === 'official'
+                ? pick('适合查看直连 OpenAI / Gemini 的稳定链路', 'Best for checking direct OpenAI or Gemini routes')
+                : pick('适合查看协议、价格同步和多源调度', 'Best for protocols, pricing sync, and multi-source routing')}
+            />
+          </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title={pick('当前视图', 'Current view')}
         eyebrow={pick('链路面板', 'Routing panel')}
         description={pick(
           '先决定你当前要看的是官方接口还是第三方供应商，再进入对应的卡片和编辑器。',
@@ -2295,6 +2484,43 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         </div>
       </SettingsSection>
 
+      <SettingsSection
+        title={pick('平台能力入口', 'Platform capabilities')}
+        eyebrow={pick('独立入口', 'Separate entry')}
+        description={pick(
+          '将平台侧辅助能力和你的本地 BYOK 链路分开展示，避免和供应商卡片混在一起。',
+          'Keep platform-managed assistant capabilities separate from your local BYOK routes so they do not blend into provider management cards.'
+        )}
+        action={<SettingsBadge tone="neutral">{pick('不和供应商卡片混排', 'Separate from provider cards')}</SettingsBadge>}
+      >
+        <PlatformAssistantEntryCard
+          title={pick('平台辅助 AI', 'Platform Assistant AI')}
+          description={pick(
+            '平台侧的辅助 AI 会从独立入口接入，和你的第三方供应商管理分开，便于你一眼区分哪些能力来自本地 BYOK，哪些来自平台侧。',
+            'Platform assistant AI is surfaced as a dedicated entry so you can immediately separate local BYOK provider management from platform-side capabilities.',
+          )}
+          entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
+          localApiLabel={pick('用户本地 API', 'User-managed local APIs')}
+          localApiValue={pick('继续使用你的 BYOK', 'Keep your BYOK routes')}
+          localApiHelper={pick(
+            '你的 Base URL、API Key、模型同步、预算规则和路由状态仍然在下面按本地优先方式维护。',
+            'Your base URL, API key, model sync, budget rules, and routing state stay managed below in the local-first BYOK flow.',
+          )}
+          platformLabel={pick('平台能力', 'Platform capability')}
+          platformValue={pick('单独的平台入口', 'Separate platform entry')}
+          platformHelper={pick(
+            '平台侧的辅助 AI 会从这里进入，不和本地 API Key、模型路由或预算规则混在一起。',
+            'Platform assistant capabilities enter here without mixing with local API keys, routing, or budget rules.',
+          )}
+          entryActionLabel={pick('打开平台辅助 AI 入口', 'Open platform assistant entry')}
+          entryActionHelper={pick(
+            '当前先保留入口与说明，后续再接完整的平台辅助流程。',
+            'This keeps the entry and explanation visible now without wiring the full platform assistant flow yet.',
+          )}
+          onOpen={handleOpenPlatformAssistant}
+        />
+      </SettingsSection>
+
       {activeTab === 'official' ? (
         <SettingsSection
           title={pick('官方接口', 'Official endpoints')}
@@ -2323,7 +2549,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 const usageSummary = getOfficialUsageSummary(slot);
                 const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
 
-                const metrics: ConsoleEndpointCardMetric[] = [
+                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [
                   {
                     label: pick('预算策略', 'Budget rule'),
                     value: getModeLabel(mode),
@@ -2355,6 +2581,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 return (
                   <ConsoleEndpointCard
                     key={slot.id}
+                    cardRef={(node) => registerOfficialCardRef(slot.id, node)}
                     title={getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
                     subtitle={slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint')}
                     meta={isUsingReadonlyProfileFallback
@@ -2362,9 +2589,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                       : pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)}
                     avatar={avatar}
                     status={status}
-                    metrics={metrics}
+                    metrics={prioritizedMetrics}
                     progress={progressData}
                     error={slot.lastError}
+                    className={returnHighlight?.officialId === slot.id ? 'settings-provider-card--return-focus' : ''}
                     actions={
                       <>
                         <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
@@ -2388,7 +2616,9 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
             'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
           )}
-          action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
+          action={
+            <SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>
+          }
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
@@ -2408,7 +2638,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 const usageSummary = getProviderUsageSummary(provider);
                 const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
 
-                const metrics: ConsoleEndpointCardMetric[] = [
+                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [
                   {
                     label: pick('预算策略', 'Budget rule'),
                     value: getModeLabel(mode),
@@ -2445,13 +2675,14 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 return (
                   <ConsoleEndpointCard
                     key={provider.id}
+                    cardRef={(node) => registerProviderCardRef(provider.id, node)}
                     title={provider.name}
                     subtitle={getProtocolLabel(provider.format)}
                     meta={<div className="text-[13px] text-[var(--text-secondary)]">{extractDomain(provider.baseUrl)}</div>}
                     avatar={avatar}
                     badges={provider.group ? <SettingsBadge tone="neutral">{provider.group}</SettingsBadge> : null}
                     status={status}
-                    metrics={metrics}
+                    metrics={prioritizedMetrics}
                     progress={progressData}
                     error={provider.lastError || null}
                     footer={activityLine ? <div className="text-[13px] text-[var(--text-secondary)]">{activityLine}</div> : null}
@@ -2471,7 +2702,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                         </SettingsActionButton>
                       </>
                     }
-                    className="settings-reference-card--soft"
+                    className={[
+                      returnHighlight?.providerId === provider.id ? 'settings-provider-card--return-focus' : '',
+                      'settings-reference-card--soft',
+                    ].filter(Boolean).join(' ')}
                   />
                 );
               })}
@@ -2488,20 +2722,40 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           eyebrow={
             editingOfficialId
               ? pick('编辑官方接口', 'Edit official endpoint')
-              : showInlineOfficialCreate
-                ? pick('快速新增官方接口', 'Quick create official endpoint')
-                : pick('新增官方接口', 'Create official endpoint')
+              : pick('新增官方接口', 'Create official endpoint')
           }
           description={pick(
-            showInlineOfficialCreate
-              ? '如果上方“新增官方接口”按钮没有反应，也可以直接在这里填写并保存。'
-              : '保存只负责提交当前表单；刷新和启用状态请在上面的接口卡片里单独操作。',
-            showInlineOfficialCreate
-              ? 'If the New official endpoint button above does not respond, you can fill out this form here and save directly.'
-              : 'Save only submits this form. Refresh and enable states are still managed from the endpoint cards above.'
+            '保存只负责提交当前表单；刷新和启用状态请在上面的接口卡片里单独操作。',
+            'Save only submits this form. Refresh and enable states are still managed from the endpoint cards above.'
           )}
         >
           <div className="space-y-4">
+            <PlatformAssistantEntryCard
+              title={pick('平台辅助 AI', 'Platform Assistant AI')}
+              description={pick(
+                '这个编辑器仍然只负责你自己的本地 API 配置；如果你要用平台侧的辅助 AI，请改走单独的平台入口。',
+                'This editor still only changes your local API configuration. If you want platform assistant AI, use the separate platform entry instead.',
+              )}
+              entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
+              localApiLabel={pick('用户本地 API', 'User-managed local APIs')}
+              localApiValue={pick('继续使用你的 BYOK', 'Keep your BYOK routes')}
+              localApiHelper={pick(
+                '当前表单依然只保存你的本地 Provider、Key 和预算规则，不会切换到平台侧能力。',
+                'This form still only saves your local providers, keys, and budget rules without switching into platform capabilities.',
+              )}
+              platformLabel={pick('平台能力', 'Platform capability')}
+              platformValue={pick('单独的平台入口', 'Separate platform entry')}
+              platformHelper={pick(
+                '如果你需要平台侧辅助 AI，请使用独立入口，而不是把能力混进本地 API 编辑表单。',
+                'Use the separate platform entry for assistant capabilities instead of mixing them into the local API editor.',
+              )}
+              entryActionLabel={pick('改用平台辅助 AI 入口', 'Use platform assistant entry instead')}
+              entryActionHelper={pick(
+                '这里只保留清晰的分流说明和跳转预留，不在这个任务里接完整流程。',
+                'This keeps the routing explanation clear and reserves the handoff without wiring the full flow in this task.',
+              )}
+              onOpen={handleOpenPlatformAssistant}
+            />
             <div className="grid gap-3 md:grid-cols-3">
               <InfoCell
                 label={pick('当前对象', 'Current object')}
@@ -2610,17 +2864,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           eyebrow={
             editingProviderId
               ? pick('编辑供应商', 'Edit provider')
-              : showInlineProviderCreate
-                ? pick('快速新增供应商', 'Quick create provider')
-                : pick('新增供应商', 'Create provider')
+              : pick('新增供应商', 'Create provider')
           }
           description={pick(
-            showInlineProviderCreate
-              ? '如果上方“新增供应商”按钮没有反应，也可以直接在这里填写并保存。'
-              : '“自动获取价格”只负责同步价格数据，不负责保存当前表单；保存按钮才会提交供应商配置。',
-            showInlineProviderCreate
-              ? 'If the New provider button above does not respond, you can fill out this form here and save directly.'
-              : 'Sync pricing only pulls pricing data. It does not save this form; only Save submits the provider configuration.'
+            '“自动获取价格”只负责同步价格数据，不负责保存当前表单；保存按钮才会提交供应商配置。',
+            'Sync pricing only pulls pricing data. It does not save this form; only Save submits the provider configuration.'
           )}
         >
           <div className="space-y-4">

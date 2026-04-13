@@ -1,16 +1,25 @@
 import React, { useState } from "react";
-import { Loader2, Lock, Mail, Shield, User } from "lucide-react";
+import { Loader2, Lock, Mail, User } from "lucide-react";
 
 import type { RegisterResponseDto } from "../../../packages/contracts/src/index.ts";
 import { useLocale } from "../../context/LocaleContext";
-import { supabase } from "../../lib/supabase";
+import { kkWebApiClient } from "../../services/api/kkApiClient";
 import { notify } from "../../services/system/notificationService";
-import { getDefaultPresetAvatarId } from "../../utils/presetAvatars";
 import { TurnstileWidget, useTurnstile } from "./TurnstileWidget";
 
 interface RegisterFormProps {
   onSuccess?: (result: RegisterResponseDto) => void;
   onLoginClick?: () => void;
+}
+
+function buildAuthErrorMessage(code: string | undefined, fallback: string): string {
+  const normalizedCode = String(code || "").trim();
+
+  if (normalizedCode === "AUTH_ROUTE_DISABLED" || normalizedCode === "HTTP_404" || normalizedCode === "HTTP_405") {
+    return "当前本地运行时的注册接口尚未接管，请等待后端认证链路补齐。";
+  }
+
+  return fallback;
 }
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({
@@ -29,7 +38,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   const {
     token: turnstileToken,
     isVerified,
-    error: turnstileError,
     handleVerify,
     handleError,
     handleExpire,
@@ -105,38 +113,31 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
     try {
       const email = formData.email.trim();
-      const displayName = email.split("@")[0] || "New User";
-      const defaultAvatarId = getDefaultPresetAvatarId(email);
-      const { data, error } = await supabase.auth.signUp({
+      const response = await kkWebApiClient.register({
         email,
         password: formData.password,
-        options: {
-          data: {
-            display_name: displayName,
-            full_name: displayName,
-            avatar_url: defaultAvatarId,
-          },
-          ...(turnstileToken ? { captchaToken: turnstileToken } : {}),
-        },
+        turnstileToken: turnstileToken || "",
       });
 
-      if (error) {
-        throw error;
+      if (!response.success) {
+        throw new Error(buildAuthErrorMessage(
+          response.error.code,
+          response.error.message || "Registration failed.",
+        ));
       }
 
-      const result: RegisterResponseDto = {
-        userId: data.user?.id || "",
-        email: data.user?.email || email,
-        status: data.session ? "registered" : "verification_pending",
-      };
-
       notify.success(
-        pick("注册成功", "Registration successful"),
-        data.session
-          ? pick("账号已创建，正在进入系统。", "Your account was created and you are being signed in.")
-          : pick("账号已创建，请前往邮箱完成验证。", "Your account was created. Please verify your email."),
+        pick("注册请求已提交", "Registration request submitted"),
+        response.data.status === "verification_pending"
+          ? pick(
+            "当前后端认证链路尚未完全接管，请等待服务器开放验证流程。",
+            "The backend auth flow has not fully taken over yet. Wait for the server to open the verification flow.",
+          )
+          : pick("账号信息已创建，请继续登录。", "Your account record was created. Continue to sign in."),
       );
-      onSuccess?.(result);
+
+      onSuccess?.(response.data);
+      onLoginClick?.();
       setIsLoading(false);
       return;
     } catch (error: any) {
@@ -159,7 +160,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           {pick("创建账号", "Create account")}
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {pick("加入 KK Studio，开始你的创作之旅", "Join KK Studio and start creating")}
+          {pick("注册入口已切换到 KK API，本地运行时会在后端未就绪时明确提示。", "The sign-up flow now goes through the KK API and will tell you clearly if the backend is not ready.")}
         </p>
       </div>
 
@@ -180,12 +181,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               required
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            {pick(
-              "请使用真实邮箱，后续验证和通知会依赖这个地址",
-              "Use a real email address for verification and notifications.",
-            )}
-          </p>
         </div>
 
         <div>
@@ -224,78 +219,38 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           </div>
         </div>
 
-        <div className="py-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-green-600" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {pick("安全验证", "Security verification")}
-            </span>
-          </div>
+        <div className="rounded-xl border border-dashed border-gray-200 dark:border-zinc-700 p-3">
           <TurnstileWidget
             onVerify={handleVerify}
             onError={handleError}
             onExpire={handleExpire}
-            theme="auto"
+            appearance="always"
+            action="register"
+            className="min-h-[70px]"
           />
-          {turnstileError && (
-            <p className="text-red-500 text-sm mt-2">{turnstileError}</p>
-          )}
         </div>
 
-        <label className="flex items-start gap-2 cursor-pointer">
+        <label className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(event) => setAgreed(event.target.checked)}
-            className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+            className="mt-1"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {pick("我已阅读并同意", "I have read and agree to")}
-            <a href="#" className="text-blue-600 hover:underline ml-1">
-              {pick("用户协议", "Terms of Service")}
-            </a>
-            {pick("和", "and")}
-            <a href="#" className="text-blue-600 hover:underline ml-1">
-              {pick("隐私政策", "Privacy Policy")}
-            </a>
+          <span>
+            {pick("我已阅读并同意用户协议与隐私政策", "I agree to the terms and privacy policy")}
           </span>
         </label>
 
         <button
           type="submit"
-          disabled={isLoading || !isVerified}
-          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          disabled={isLoading}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-70"
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {pick("注册中...", "Creating account...")}
-            </>
-          ) : (
-            pick("立即注册", "Create account")
-          )}
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {pick("提交注册请求", "Submit registration request")}
         </button>
       </form>
-
-      <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-        {pick("已有账号？", "Already have an account?")}
-        <button
-          type="button"
-          onClick={onLoginClick}
-          className="text-blue-600 hover:underline font-medium ml-1"
-        >
-          {pick("立即登录", "Sign in")}
-        </button>
-      </p>
-
-      <div className="mt-6 pt-4 border-t border-gray-100 dark:border-zinc-800">
-        <p className="text-xs text-gray-400 text-center flex items-center justify-center gap-1">
-          <Shield className="w-3 h-3" />
-          {pick("当前注册表单已对齐 Supabase 托管认证链路", "This form uses the Supabase hosted auth path")}
-        </p>
-      </div>
     </div>
   );
 };
-
-export default RegisterForm;

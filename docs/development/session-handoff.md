@@ -8,6 +8,7 @@
 
 ## 2. 当前版本重点
 - 版本统一：主应用、README、开发文档、工作区包与支付子服务版本已同步到 `1.4.1`
+- 版本治理：`config/release-manifest.json` 继续作为主版本源，`release/publish/stable/manifest.json` 已回填为 portable stable 发布清单
 - 当前补丁重点：修复本地用户路由代理启动链、账单余额 hydrate 误判、Canvas 本地持久化与验证门禁漂移
 - 设置中心升级：设置页采用更清晰的工作台式导航结构，总览、存储、日志与后台管理的边界更明确
 - 本地化底座：通过 `LocaleProvider` 与 localized views 为设置页引入中英双语表达能力
@@ -34,7 +35,9 @@
 `payment-server/` 仍是过渡桥接层
 
 ## 4. 当前版本的事实基线
-- 版本源以 `package.json`、`src/config/appInfo.ts`、`payment-server/package.json` 与 `packages/*/package.json` 为准
+- 主版本源以 `config/release-manifest.json` 为准；`package.json`、`payment-server/package.json` 与 `packages/*/package.json` 必须保持同版
+- `src/config/appInfo.ts` 仅保留运行时只读导出，不再作为独立版本源
+- `release/publish/stable/manifest.json` 是 portable stable 发布清单，必须与当前版本、`releaseDate` 和 `releaseNotes` 对齐
 - 文档基线以 `README.md`、`docs/development/progress.md`、本文件为准
 - AI 规则基线以 `.agent/README.md` 与 `.agent/rules/skills/SKILL.md` 为准
 - Runtime truth: `src/` remains the live frontend runtime.

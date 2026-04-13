@@ -42,7 +42,7 @@ describe("wechat auth client helpers", () => {
         "WECHAT_AUTH_UNAVAILABLE",
         "WeChat auth function secrets are missing.",
       ),
-      /Supabase Edge Function/,
+      /KK API/,
     );
   });
 
@@ -52,24 +52,16 @@ describe("wechat auth client helpers", () => {
         "EDGE_FUNCTION_UNAVAILABLE",
         "Failed to invoke the wechat-auth Edge Function.",
       ),
-      /wechat-auth/i,
+      /KK API/,
     );
   });
 
-  test("prefers Supabase Edge Functions and only falls back to legacy API behind the local runtime guard", () => {
+  test("routes WeChat auth through the KK API client instead of direct Supabase Edge calls", () => {
     const serviceSource = readSource("src/services/auth/wechatAuth.ts");
-    const functionSource = readSource("supabase/functions/wechat-auth/index.ts");
-    const packageSource = readSource("package.json");
-    const workflowSource = readSource(".github/workflows/cloud-auto-deploy.yml");
 
-    assert.match(serviceSource, /supabase\.functions\.invoke\("wechat-auth"/);
-    assert.match(serviceSource, /shouldUseLegacyWebApiFallback\(\) && shouldFallbackToLegacyWechat\(resolvedEdgeError\)/);
-    assert.match(functionSource, /Deno\.serve/);
-    assert.match(functionSource, /WECHAT_OPEN_REDIRECT_URI/);
-    assert.match(functionSource, /auth\.admin\.generateLink/);
-    assert.match(functionSource, /appendQueryParams\(state\.redirectTo, \{\s*wechat_bind: 'success'/);
-    assert.match(packageSource, /"supabase:functions:deploy:wechat-auth"\s*:\s*"npx supabase functions deploy wechat-auth --no-verify-jwt"/);
-    assert.match(workflowSource, /Deploy wechat-auth Edge Function/);
-    assert.match(workflowSource, /supabase functions deploy wechat-auth --no-verify-jwt/);
+    assert.match(serviceSource, /await kkWebApiClient\.startWechatLogin\(redirectTo\)/);
+    assert.match(serviceSource, /await kkWebApiClient\.startWechatBind\(redirectTo\)/);
+    assert.doesNotMatch(serviceSource, /supabase\.functions\.invoke\("wechat-auth"/);
+    assert.doesNotMatch(serviceSource, /shouldUseLegacyWebApiFallback/);
   });
 });

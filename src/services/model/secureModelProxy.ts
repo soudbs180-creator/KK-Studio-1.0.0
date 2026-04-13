@@ -1,4 +1,4 @@
-import { supabase, supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { tempUserService } from '../auth/tempUserService';
 import {
   getLatestAuthSessionChange,
@@ -6,8 +6,7 @@ import {
   waitForAuthSessionChange,
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { resolveKkApiBaseUrl, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
-import { readRuntimeBooleanEnv } from '../../utils/runtimeEnv';
+import { resolveKkApiBaseUrl } from '../api/kkApiClient';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,6 +28,8 @@ export function buildSecureProxyUserRouteFromSlotId(slotId: string): SecureProxy
 export interface SecureProxyChatRequest {
   modelId: string;
   messages: SecureProxyChatMessage[];
+  requestId?: string;
+  attemptId?: string;
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
@@ -39,6 +40,8 @@ export interface SecureProxyBillingMetadata {
   deducted?: boolean;
   ledgerId?: string;
   balanceAfter?: number;
+  refundApplied?: boolean;
+  refundBalanceAfter?: number;
 }
 
 export interface SecureProxyChatResponse extends SecureProxyBillingMetadata {
@@ -54,6 +57,8 @@ export interface SecureProxyChatResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyImageRequest {
   modelId: string;
   prompt: string;
+  requestId?: string;
+  attemptId?: string;
   aspectRatio?: string;
   imageSize?: string;
   imageCount?: number;
@@ -75,6 +80,8 @@ export interface SecureProxyImageResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyVideoRequest {
   modelId: string;
   prompt: string;
+  requestId?: string;
+  attemptId?: string;
   aspectRatio?: string;
   resolution?: string;
   duration?: number;
@@ -94,6 +101,8 @@ export interface SecureProxyVideoResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyAudioRequest {
   modelId: string;
   prompt: string;
+  requestId?: string;
+  attemptId?: string;
   userRoute?: SecureProxyUserRoute;
 }
 
@@ -111,6 +120,8 @@ export interface SecureProxyAudioResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyTaskStatusResponse extends SecureProxyBillingMetadata {
   status: 'pending' | 'success' | 'failed';
   url?: string;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
@@ -125,12 +136,6 @@ export const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5d
 export const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
 
 export type SecureProxyRouteKind = 'system' | 'user-route';
-
-type SecureProxyInvokeResult = {
-  data: any;
-  error: any;
-  response?: Response;
-};
 
 type CloudSessionResolution = {
   accessToken: string;
@@ -168,14 +173,6 @@ const TRANSIENT_PROXY_RETRY_STATUS_CODES = new Set([502, 503, 504]);
 const MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS = 2;
 const TRANSIENT_PROXY_RETRY_BASE_DELAY_MS = 250;
 
-function getSecureProxyEndpoint(): string {
-  return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/secure-model-proxy`;
-}
-
-function getLocalUserRouteProxyEndpoint(): string {
-  return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/user-route-proxy`;
-}
-
 function getLocalUserRouteApiEndpoint(): string {
   return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/user`;
 }
@@ -185,11 +182,11 @@ function getLocalSystemProxyEndpoint(): string {
 }
 
 function shouldUseLocalSystemProxy(): boolean {
-  return shouldUseLegacyWebApiFallback();
+  return true;
 }
 
 function shouldUseLocalUserRouteApi(): boolean {
-  return shouldUseLegacyWebApiFallback() && readRuntimeBooleanEnv('VITE_ENABLE_LOCAL_USER_ROUTE_API', false);
+  return true;
 }
 
 function isRetryableProxyFetchError(error: unknown): boolean {
@@ -423,7 +420,7 @@ function getSecureProxyUserRouteAuthRejectedMessage(responseBody = ''): string {
     return `\u7528\u6237 API \u8def\u7531\u9274\u6743\u5931\u8d25\uff1a${upstreamMessage}`;
   }
 
-  return '\u5f53\u524d\u767b\u5f55\u6001\u672a\u88ab user-route-proxy \u63a5\u53d7\u3002\u8bf7\u5148\u91cd\u65b0\u767b\u5f55\u540e\u91cd\u8bd5\uff1b\u5982\u679c\u91cd\u65b0\u767b\u5f55\u540e\u4ecd\u7136\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5 Supabase Edge Function user-route-proxy \u662f\u5426\u90e8\u7f72\u5728\u4e0e\u524d\u7aef\u76f8\u540c\u7684 Supabase \u9879\u76ee\u3002';
+  return '\u5f53\u524d\u767b\u5f55\u6001\u672a\u88ab\u672c\u5730 KK API user-route \u63a5\u53e3\u63a5\u53d7\u3002\u8bf7\u5148\u91cd\u65b0\u767b\u5f55\u540e\u91cd\u8bd5\uff1b\u5982\u679c\u91cd\u65b0\u767b\u5f55\u540e\u4ecd\u7136\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u672c\u5730 API \u670d\u52a1\u4e0e\u8ba4\u8bc1\u4ee4\u724c\u662f\u5426\u4e00\u81f4\u3002';
 }
 
 function getSecureProxyUserRouteInvalidJwtDiagnosticMessage(
@@ -441,11 +438,11 @@ function getSecureProxyUserRouteInvalidJwtDiagnosticMessage(
   }
 
   if (localSessionState === 'valid') {
-    return '\u5f53\u524d Supabase \u767b\u5f55\u6001\u5728\u672c\u5730\u4ecd\u7136\u6709\u6548\uff0c\u4f46\u8fdc\u7aef user-route-proxy \u8fd4\u56de\u4e86 Invalid JWT\u3002\u8fd9\u901a\u5e38\u610f\u5473\u7740 user-route-proxy \u6ca1\u6709\u90e8\u7f72\u5728\u4e0e\u524d\u7aef\u76f8\u540c\u7684 Supabase \u9879\u76ee\uff0c\u6216\u5176 SUPABASE_URL / SUPABASE_ANON_KEY secrets \u5df2\u6f02\u79fb\u3002';
+    return '\u5f53\u524d\u672c\u5730 KK \u4f1a\u8bdd\u5728\u672c\u5730\u4ecd\u7136\u6709\u6548\uff0c\u4f46\u672c\u5730 KK API user-route \u63a5\u53e3\u8fd4\u56de\u4e86 Invalid JWT\u3002\u8fd9\u901a\u5e38\u610f\u5473\u7740\u672c\u5730 API \u8ba4\u8bc1\u72b6\u6001\u4e0e\u5f53\u524d\u524d\u7aef\u4ee4\u724c\u4e0d\u4e00\u81f4\u3002';
   }
 
   if (localSessionState === 'invalid' || localSessionState === 'no-session') {
-    return '\u5f53\u524d\u672c\u5730 Supabase \u767b\u5f55\u6001\u4e5f\u5df2\u65e0\u6548\uff0c\u5e76\u4e14 user-route-proxy \u8fd4\u56de\u4e86 Invalid JWT\u3002\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
+    return '\u5f53\u524d\u672c\u5730 KK \u767b\u5f55\u6001\u4e5f\u5df2\u65e0\u6548\uff0c\u5e76\u4e14\u672c\u5730 KK API user-route \u63a5\u53e3\u8fd4\u56de\u4e86 Invalid JWT\u3002\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
   }
 
   return getSecureProxyUserRouteAuthRejectedMessage(responseBody);
@@ -506,6 +503,47 @@ async function resolveStoredCloudAccessToken(forceRefresh = false): Promise<stri
     : await getPreferredKkApiAccessToken();
 
   return String(token || '').trim() || null;
+}
+
+async function resolveRuntimeAccessTokenFromAuthEvent(
+  forceRefresh = false,
+): Promise<string | null> {
+  const latestAuthSession = getLatestAuthSessionChange();
+  if (latestAuthSession?.hasSession && !latestAuthSession.isTempUser) {
+    const authEventAccessToken = String(latestAuthSession.accessToken || '').trim();
+    if (authEventAccessToken) {
+      return authEventAccessToken;
+    }
+  }
+
+  if (!forceRefresh) {
+    return null;
+  }
+
+  const sessionEvent = await waitForAuthSessionChange(
+    (detail) => detail.hasSession && !detail.isTempUser && Boolean(String(detail.accessToken || '').trim()),
+    1500,
+  );
+
+  return String(sessionEvent?.accessToken || '').trim() || null;
+}
+
+async function resolvePreferredRuntimeAccessToken(forceRefresh = false): Promise<string | null> {
+  if (forceRefresh) {
+    const refreshedAccessToken = await resolveStoredCloudAccessToken(true);
+    if (refreshedAccessToken) {
+      return refreshedAccessToken;
+    }
+
+    return await resolveRuntimeAccessTokenFromAuthEvent(true);
+  }
+
+  const authEventAccessToken = await resolveRuntimeAccessTokenFromAuthEvent(false);
+  if (authEventAccessToken) {
+    return authEventAccessToken;
+  }
+
+  return await resolveStoredCloudAccessToken(false);
 }
 
 async function readCloudSession(feature: string) {
@@ -596,6 +634,13 @@ async function resolveCloudSession(
 ): Promise<CloudSessionResolution> {
   const shouldForceRefresh = options.forceRefresh === true;
   const routeKind = options.routeKind || 'user-route';
+  const preferredRuntimeAccessToken = await resolvePreferredRuntimeAccessToken(shouldForceRefresh);
+  if (preferredRuntimeAccessToken) {
+    return {
+      accessToken: preferredRuntimeAccessToken,
+    };
+  }
+
   let session: Awaited<ReturnType<typeof readCloudSession>> | null = null;
   let sessionReadError: unknown = null;
 
@@ -725,108 +770,6 @@ async function buildInvocationError(
   });
 }
 
-async function invokeSecureSystemProxyHttp(
-  accessToken: string,
-  body: Record<string, unknown>
-): Promise<SecureProxyInvokeResult> {
-  const response = await fetchWithTransientProxyRetry(getSecureProxyEndpoint(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  }, 'secure-model-proxy');
-
-  let data: any = null;
-  let parseError: Error | null = null;
-
-  try {
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      data = await response.json();
-    } else {
-      const text = await response.text();
-      data = text ? { error: text } : null;
-    }
-  } catch (error) {
-    parseError = error instanceof Error ? error : new Error(String(error));
-  }
-
-  if (!response.ok) {
-    const message =
-      typeof data?.error === 'string'
-        ? data.error
-        : parseError?.message || `secure-model-proxy request failed with status ${response.status}`;
-
-    return {
-      data,
-      error: new Error(message),
-      response,
-    };
-  }
-
-  if (parseError) {
-    return {
-      data: null,
-      error: parseError,
-      response,
-    };
-  }
-
-  return {
-    data,
-    error: null,
-    response,
-  };
-}
-
-async function invokeSecureSystemProxy(
-  feature: string,
-  body: Record<string, unknown>
-): Promise<any> {
-  const invokeWithToken = async (accessToken: string): Promise<SecureProxyInvokeResult> => {
-    try {
-      return await invokeSecureSystemProxyHttp(accessToken, body);
-    } catch (error) {
-      if (isRetryableProxyFetchError(error)) {
-        throw buildSecureProxyBoundaryError('System proxy is temporarily unavailable. Please try again.', {
-          status: 502,
-          feature,
-        });
-      }
-
-      throw error;
-    }
-  };
-
-  const session = await resolveCloudSession(feature, { routeKind: 'system' });
-  let result = await invokeWithToken(session.accessToken);
-
-  if (result.response?.status === 401) {
-    try {
-      console.warn('[secureModelProxy] Proxy returned 401, forcing session refresh before retry');
-      const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'system' });
-      if (recoveredSession.accessToken) {
-        result = await invokeWithToken(recoveredSession.accessToken);
-      }
-    } catch (error) {
-      console.warn('[secureModelProxy] Cloud session recovery failed after proxy 401:', error);
-    }
-  }
-
-  if (result.error) {
-    throw await buildInvocationError(feature, result.error, result.response);
-  }
-
-  if (!result.data?.success) {
-    throw new Error(result.data?.error || 'System proxy returned error');
-  }
-
-  return result.data;
-}
-
 type LocalUserRouteProxyHttpResult = {
   response?: Response;
   payload: any;
@@ -839,20 +782,13 @@ type LocalSystemProxyHttpResult = {
   responseBody: string;
 };
 
-type LocalUserRouteTransportTarget = {
-  endpointName: 'user-route-proxy' | 'local-user-route-api';
-  failureLabel: string;
-  invoke: (
-    accessToken: string,
-    body: Record<string, unknown>,
-  ) => Promise<LocalUserRouteProxyHttpResult>;
-};
-
 function extractSecureProxyBillingMetadata(data: any): SecureProxyBillingMetadata {
   return {
     deducted: Boolean(data.deducted),
     ledgerId: typeof data.ledgerId === 'string' ? data.ledgerId : undefined,
     balanceAfter: typeof data.balanceAfter === 'number' ? data.balanceAfter : undefined,
+    refundApplied: data.refundApplied === true,
+    refundBalanceAfter: typeof data.refundBalanceAfter === 'number' ? data.refundBalanceAfter : undefined,
   };
 }
 
@@ -896,98 +832,10 @@ async function handleInvalidJwtSessionState(feature: string): Promise<InvalidJwt
   );
 
   if (localSessionState === 'invalid' || localSessionState === 'no-session') {
-    requestAuthSessionInvalidation(`${feature}: user-route-proxy returned Invalid JWT`);
+    requestAuthSessionInvalidation(`${feature}: local-user-route-api returned Invalid JWT`);
   }
 
   return localSessionState;
-}
-
-async function resolveLatestLocalFallbackAccessToken(
-  activeAccessToken: string,
-): Promise<string | null> {
-  const authEventAccessToken = String(getLatestAuthSessionChange()?.accessToken || '').trim();
-  if (authEventAccessToken) {
-    if (authEventAccessToken !== activeAccessToken) {
-      console.warn(
-        '[secureModelProxy] Switching local user-route fallback to the freshest browser Supabase access token.',
-      );
-    }
-    return authEventAccessToken;
-  }
-
-  try {
-    const currentSession = await readCloudSession('local user-route fallback');
-    const currentSessionAccessToken = String(currentSession?.access_token || '').trim();
-    if (currentSessionAccessToken) {
-      if (currentSessionAccessToken !== activeAccessToken) {
-        console.warn(
-          '[secureModelProxy] Switching local user-route fallback to the current Supabase session access token.',
-        );
-      }
-      return currentSessionAccessToken;
-    }
-  } catch (error) {
-    console.warn('[secureModelProxy] Failed to read current session for local user-route fallback:', error);
-  }
-
-  return String(activeAccessToken || '').trim() || null;
-}
-
-async function tryLocalUserRouteApiFallback(
-  feature: string,
-  accessToken: string,
-  body: Record<string, unknown>,
-  localSessionState: InvalidJwtLocalSessionState,
-): Promise<LocalUserRouteProxyHttpResult | null> {
-  if (localSessionState !== 'valid' || !shouldUseLocalUserRouteApi()) {
-    return null;
-  }
-
-  const fallbackAccessToken = await resolveLatestLocalFallbackAccessToken(accessToken);
-  if (!fallbackAccessToken) {
-    return null;
-  }
-
-  console.warn(
-    `[secureModelProxy] ${feature} will retry via local KK API user-route proxy because the local Supabase session is still valid.`,
-  );
-
-  try {
-    return await invokeLocalUserRouteApiHttp(fallbackAccessToken, body);
-  } catch (error) {
-    console.warn('[secureModelProxy] Local KK API user-route fallback failed:', error);
-    return null;
-  }
-}
-
-async function invokeLocalUserRouteProxyHttp(
-  accessToken: string,
-  body: Record<string, unknown>,
-): Promise<LocalUserRouteProxyHttpResult> {
-  const response = await fetchWithTransientProxyRetry(getLocalUserRouteProxyEndpoint(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  }, 'user-route-proxy');
-
-  let payload: any = null;
-  let responseBody = '';
-  try {
-    responseBody = await response.clone().text();
-    payload = responseBody ? JSON.parse(responseBody) : null;
-  } catch {
-    payload = null;
-  }
-
-  return {
-    response,
-    payload,
-    responseBody,
-  };
 }
 
 async function invokeLocalUserRouteApiHttp(
@@ -1048,38 +896,22 @@ async function invokeLocalSystemProxyHttp(
   };
 }
 
-function resolveLocalUserRouteTransportTarget(): LocalUserRouteTransportTarget {
-  if (shouldUseLocalUserRouteApi()) {
-    return {
-      endpointName: 'local-user-route-api',
-      failureLabel: 'local KK API user-route proxy',
-      invoke: invokeLocalUserRouteApiHttp,
-    };
-  }
-
-  return {
-    endpointName: 'user-route-proxy',
-    failureLabel: 'user-route proxy',
-    invoke: invokeLocalUserRouteProxyHttp,
-  };
-}
-
 async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
   const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
   let activeAccessToken = session.accessToken;
-  const routeTarget = resolveLocalUserRouteTransportTarget();
+  const failureLabel = 'local KK API user-route proxy';
 
   let result: LocalUserRouteProxyHttpResult;
   try {
-    result = await routeTarget.invoke(activeAccessToken, body);
+    result = await invokeLocalUserRouteApiHttp(activeAccessToken, body);
   } catch (error: any) {
     throw buildSecureProxyBoundaryError(
       isRetryableProxyFetchError(error)
-        ? `${routeTarget.failureLabel} is temporarily unavailable. Please try again.`
-        : error?.message || `Failed to reach the ${routeTarget.failureLabel}.`,
+        ? `${failureLabel} is temporarily unavailable. Please try again.`
+        : error?.message || `Failed to reach the ${failureLabel}.`,
       {
         code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
         status: 502,
@@ -1095,14 +927,14 @@ async function invokeLocalUserRouteProxy(
 
   if (shouldRetryWithFreshSession) {
     console.warn(
-      `[secureModelProxy] ${routeTarget.failureLabel} returned 401/Invalid JWT, forcing session refresh before retry`,
+      `[secureModelProxy] ${failureLabel} returned 401/Invalid JWT, forcing session refresh before retry`,
     );
     try {
       const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'user-route' });
       if (recoveredSession.accessToken) {
         console.log('[secureModelProxy] Session refreshed successfully, retrying request...');
         activeAccessToken = recoveredSession.accessToken;
-        result = await routeTarget.invoke(activeAccessToken, body);
+        result = await invokeLocalUserRouteApiHttp(activeAccessToken, body);
       } else {
         console.warn('[secureModelProxy] Failed to recover session - no access token');
       }
@@ -1111,20 +943,6 @@ async function invokeLocalUserRouteProxy(
       if (isSecureProxySessionReauthError(error)) {
         if (isInvalidJwtResponse(result.responseBody, result.payload)) {
           const localSessionState = await handleInvalidJwtSessionState(feature);
-          if (routeTarget.endpointName !== 'local-user-route-api') {
-            const fallbackResult = await tryLocalUserRouteApiFallback(
-              feature,
-              activeAccessToken,
-              body,
-              localSessionState,
-            );
-            if (fallbackResult) {
-              result = fallbackResult;
-              if (result.response?.ok && result.payload?.success) {
-                return result.payload.data;
-              }
-            }
-          }
           throw buildSessionReauthError(feature, result.responseBody, 'user-route', localSessionState);
         }
         throw buildSessionReauthError(feature, result.responseBody, 'user-route');
@@ -1148,20 +966,6 @@ async function invokeLocalUserRouteProxy(
     ) {
       if (isInvalidJwtResponse(result.responseBody, result.payload)) {
         const localSessionState = await handleInvalidJwtSessionState(feature);
-        if (routeTarget.endpointName !== 'local-user-route-api') {
-          const fallbackResult = await tryLocalUserRouteApiFallback(
-            feature,
-            activeAccessToken,
-            body,
-            localSessionState,
-          );
-          if (fallbackResult) {
-            result = fallbackResult;
-            if (result.response?.ok && result.payload?.success) {
-              return result.payload.data;
-            }
-          }
-        }
         throw buildSessionReauthError(feature, result.responseBody, 'user-route', localSessionState);
       }
       // Keep the local session only when the browser's own Supabase client can
@@ -1262,16 +1066,7 @@ export async function cancelSecureSystemProxyTask(taskId: string): Promise<boole
     return true;
   }
 
-  if (shouldUseLocalSystemProxy()) {
-    await invokeLocalSystemProxy('task cancel', {
-      mode: 'cancel_task',
-      taskId,
-    });
-
-    return true;
-  }
-
-  await invokeSecureSystemProxy('task cancel', {
+  await invokeLocalSystemProxy('task cancel', {
     mode: 'cancel_task',
     taskId,
   });
@@ -1289,16 +1084,7 @@ export async function deleteSecureSystemProxyTask(taskId: string): Promise<boole
     return true;
   }
 
-  if (shouldUseLocalSystemProxy()) {
-    await invokeLocalSystemProxy('task delete', {
-      mode: 'delete_task',
-      taskId,
-    });
-
-    return true;
-  }
-
-  await invokeSecureSystemProxy('task delete', {
+  await invokeLocalSystemProxy('task delete', {
     mode: 'delete_task',
     taskId,
   });
@@ -1316,16 +1102,7 @@ export async function downloadSecureSystemProxyTaskContent(taskId: string): Prom
     return String(data.url || '');
   }
 
-  if (shouldUseLocalSystemProxy()) {
-    const data = await invokeLocalSystemProxy('task download', {
-      mode: 'download_task',
-      taskId,
-    });
-
-    return String(data.url || '');
-  }
-
-  const data = await invokeSecureSystemProxy('task download', {
+  const data = await invokeLocalSystemProxy('task download', {
     mode: 'download_task',
     taskId,
   });
@@ -1359,24 +1136,16 @@ export async function callSecureSystemProxyChat(
     content: normalizeMessageContent(message.content),
   }));
 
-  const data = shouldUseLocalSystemProxy()
-    ? await invokeLocalSystemProxy('chat generation', {
-      mode: 'chat',
-      modelId: payload.modelId,
-      messages: normalizedMessages,
-      temperature: payload.temperature,
-      maxTokens: payload.maxTokens,
-      stream: payload.stream ?? false,
-    })
-    : await invokeSecureSystemProxy('chat generation', {
-      mode: 'chat',
-      modelId: payload.modelId,
-      userRoute: payload.userRoute,
-      messages: normalizedMessages,
-      temperature: payload.temperature,
-      maxTokens: payload.maxTokens,
-      stream: payload.stream ?? false,
-    });
+  const data = await invokeLocalSystemProxy('chat generation', {
+    mode: 'chat',
+    modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
+    messages: normalizedMessages,
+    temperature: payload.temperature,
+    maxTokens: payload.maxTokens,
+    stream: payload.stream ?? false,
+  });
 
   return {
     content: data.content || '',
@@ -1398,6 +1167,8 @@ export async function callLocalUserRouteProxyChat(
     mode: 'chat',
     routeId: payload.routeId,
     modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
     messages: normalizedMessages,
     temperature: payload.temperature,
     maxTokens: payload.maxTokens,
@@ -1422,26 +1193,17 @@ export async function callSecureSystemProxyImage(
     });
   }
 
-  const data = shouldUseLocalSystemProxy()
-    ? await invokeLocalSystemProxy('image generation', {
-      mode: 'image',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      imageSize: payload.imageSize,
-      imageCount: payload.imageCount ?? 1,
-      referenceImages: payload.referenceImages ?? [],
-    })
-    : await invokeSecureSystemProxy('image generation', {
-      mode: 'image',
-      modelId: payload.modelId,
-      userRoute: payload.userRoute,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      imageSize: payload.imageSize,
-      imageCount: payload.imageCount ?? 1,
-      referenceImages: payload.referenceImages ?? [],
-    });
+  const data = await invokeLocalSystemProxy('image generation', {
+    mode: 'image',
+    modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    imageSize: payload.imageSize,
+    imageCount: payload.imageCount ?? 1,
+    referenceImages: payload.referenceImages ?? [],
+  });
 
   return {
     urls: Array.isArray(data.urls) ? data.urls : [],
@@ -1458,6 +1220,8 @@ export async function callLocalUserRouteProxyImage(
     mode: 'image',
     routeId: payload.routeId,
     modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
     imageSize: payload.imageSize,
@@ -1483,30 +1247,19 @@ export async function callSecureSystemProxyVideo(
     });
   }
 
-  const data = shouldUseLocalSystemProxy()
-    ? await invokeLocalSystemProxy('video generation', {
-      mode: 'video',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      resolution: payload.resolution,
-      duration: payload.duration,
-      videoDuration: payload.videoDuration,
-      imageUrl: payload.imageUrl,
-      imageTailUrl: payload.imageTailUrl,
-    })
-    : await invokeSecureSystemProxy('video generation', {
-      mode: 'video',
-      modelId: payload.modelId,
-      userRoute: payload.userRoute,
-      prompt: payload.prompt,
-      aspectRatio: payload.aspectRatio,
-      resolution: payload.resolution,
-      duration: payload.duration,
-      videoDuration: payload.videoDuration,
-      imageUrl: payload.imageUrl,
-      imageTailUrl: payload.imageTailUrl,
-    });
+  const data = await invokeLocalSystemProxy('video generation', {
+    mode: 'video',
+    modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
+    prompt: payload.prompt,
+    aspectRatio: payload.aspectRatio,
+    resolution: payload.resolution,
+    duration: payload.duration,
+    videoDuration: payload.videoDuration,
+    imageUrl: payload.imageUrl,
+    imageTailUrl: payload.imageTailUrl,
+  });
 
   return {
     taskId: data.taskId || '',
@@ -1524,6 +1277,8 @@ export async function callLocalUserRouteProxyVideo(
     mode: 'video',
     routeId: payload.routeId,
     modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
     prompt: payload.prompt,
     aspectRatio: payload.aspectRatio,
     resolution: payload.resolution,
@@ -1552,18 +1307,13 @@ export async function callSecureSystemProxyAudio(
     });
   }
 
-  const data = shouldUseLocalSystemProxy()
-    ? await invokeLocalSystemProxy('audio generation', {
-      mode: 'audio',
-      modelId: payload.modelId,
-      prompt: payload.prompt,
-    })
-    : await invokeSecureSystemProxy('audio generation', {
-      mode: 'audio',
-      modelId: payload.modelId,
-      userRoute: payload.userRoute,
-      prompt: payload.prompt,
-    });
+  const data = await invokeLocalSystemProxy('audio generation', {
+    mode: 'audio',
+    modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
+    prompt: payload.prompt,
+  });
 
   return {
     url: data.url || '',
@@ -1580,6 +1330,8 @@ export async function callLocalUserRouteProxyAudio(
     mode: 'audio',
     routeId: payload.routeId,
     modelId: payload.modelId,
+    requestId: payload.requestId,
+    attemptId: payload.attemptId,
     prompt: payload.prompt,
   });
 
@@ -1592,19 +1344,16 @@ export async function callLocalUserRouteProxyAudio(
 }
 
 export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<SecureProxyTaskStatusResponse> {
-  const data = shouldUseLocalSystemProxy()
-    ? await invokeLocalSystemProxy('task status', {
-      mode: 'task_status',
-      taskId,
-    })
-    : await invokeSecureSystemProxy('task status', {
-      mode: 'task_status',
-      taskId,
-    });
+  const data = await invokeLocalSystemProxy('task status', {
+    mode: 'task_status',
+    taskId,
+  });
 
   return {
     status: data.status || 'pending',
     url: data.url,
+    requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+    attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     ...extractSecureProxyBillingMetadata(data),
   };
 }
@@ -1620,6 +1369,8 @@ export async function checkLocalUserRouteProxyTaskStatus(
   return {
     status: data.status || 'pending',
     url: data.url,
+    requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+    attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     ...extractSecureProxyBillingMetadata(data),
   };
 }

@@ -5,6 +5,7 @@ const root = process.cwd();
 const registryPath = path.join(root, "docs", "architecture", "COMPATIBILITY_LAYER_REGISTRY.json");
 const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
 const registeredPaths = new Set();
+const registryEntriesByPath = new Map();
 const failures = [];
 const discoveryMatches = [];
 
@@ -14,6 +15,7 @@ function fail(message) {
 
 for (const entry of registry.entries) {
   registeredPaths.add(entry.path);
+  registryEntriesByPath.set(entry.path, entry);
 
   if (!entry.path || !entry.currentPurpose || !entry.upstreamCanonicalSource || !entry.removalCondition) {
     fail(`Registry entry is missing required metadata: ${JSON.stringify(entry)}`);
@@ -82,7 +84,9 @@ for (const includeRoot of includeRoots) {
 }
 
 for (const registeredPath of registeredPaths) {
-  if (!discoveryMatches.includes(registeredPath)) {
+  const registeredEntry = registryEntriesByPath.get(registeredPath);
+  const hasExplicitRegistryMarker = registeredEntry?.role === "compatibility-layer";
+  if (!discoveryMatches.includes(registeredPath) && !hasExplicitRegistryMarker) {
     console.log(`[compat:check] registered compatibility layer without naming marker: ${registeredPath}`);
   }
 }

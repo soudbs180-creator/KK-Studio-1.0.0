@@ -16,9 +16,7 @@ import ImageOptionsPanel from '../image/ImageOptionsPanel';
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
 import { sortModels, toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
-import { X, Search, LayoutDashboard, Key, DollarSign, HardDrive, ScrollText, ChevronRight, ChevronUp, Activity, AlertTriangle, Plus, Trash2, FolderOpen, Globe, Loader2, RefreshCw, Copy, Check, Pause, Play, Zap, Mic, Camera, Brain, Video, Star, Sparkles, ArrowUp, Wand2 } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles & Wand2
-import { InpaintModal } from '../image/InpaintModal';
-import { BUILTIN_PROMPT_LIBRARY, PromptLibraryItem } from '../../config/promptLibrary';
+import { X, Search, Key, DollarSign, HardDrive, ChevronRight, ChevronUp, Activity, AlertTriangle, Plus, Trash2, FolderOpen, Globe, Loader2, RefreshCw, Copy, Check, Pause, Play, Zap, Brain, Star, Sparkles, ArrowUp } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { calculateCost } from '../../services/billing/costService';
@@ -28,30 +26,15 @@ import { adminModelService } from '../../services/model/adminModelService';
 import { refreshModelLibraryData, refreshModelLibraryDataInBackground } from '../../services/model/modelLibraryRefresh';
 import PromptBarTopRow from './prompt-bar/PromptBarTopRow';
 import PromptBarFooter from './prompt-bar/PromptBarFooter';
+import { PROMPT_BAR_MODE_REGISTRY, getPromptBarModeOption } from './prompt-bar/composerModeRegistry';
+import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
+import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
+import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
+import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
+import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
-
-// [Animation Styles] Mode switcher animations
-const ModeSwitcherStyles = () => (
-    <style>{`
-        @keyframes pulse-once {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-            100% { transform: scale(1); }
-        }
-        .animate-pulse-once {
-            animation: pulse-once 0.4s ease-out;
-        }
-
-        @keyframes glow-pulse {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.8; }
-        }
-
-        .mode-slider-glow {
-            animation: glow-pulse 2s ease-in-out infinite;
-        }
-    `}</style>
-);
+import { isEcommerceAllowedModel, resolveEcommerceAspectPolicy } from '../../services/ecommerce/ecommerceModelPolicy.ts';
+import type { EcommerceAnalysisResult } from '../../services/ecommerce/types.ts';
 
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
 const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
@@ -385,11 +368,6 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             100% { transform: translateX(-3px); opacity: 0.4; }
         }
 
-        @keyframes send-button-glow {
-            0%, 100% { box-shadow: 0 14px 30px -18px rgba(37, 99, 235, 0.7), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(255,255,255,0.08); }
-            50% { box-shadow: 0 18px 38px -18px rgba(96, 165, 250, 0.88), 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.32), inset 0 -1px 0 rgba(255,255,255,0.12); }
-        }
-
         @keyframes send-button-sheen {
             0% { transform: translateX(-130%); opacity: 0; }
             18% { opacity: 0.9; }
@@ -408,12 +386,12 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <style>{arrowAnimStyle}</style>
                 <button
                     onClick={onClick}
-                    className="group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98]"
+                    className="group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-colors duration-200"
                     style={getGradientStyle()}
                 >
                     {/* 积分消耗显示 */}
                     <div className="flex items-center gap-1" style={{ color: textColor === 'black' ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)' }}>
-                        <Sparkles size={14} className="animate-pulse" fill="currentColor" />
+                        <Sparkles size={14} fill="currentColor" />
                         <span className="text-sm font-bold tabular-nums">{creditCost}</span>
                     </div>
 
@@ -421,7 +399,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                     <div className="w-px h-4" style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)' }} />
 
                     {/* 发送箭头按钮 - 内嵌圆形按钮 🚀 箭头朝右 + 滑动动画 */}
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105 backdrop-blur-sm overflow-hidden"
+                    <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm"
                          style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.25)' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" 
                              style={{ color: textColor === 'black' ? '#000000' : '#ffffff', animation: 'arrow-slide-right 1.5s ease-in-out infinite' }}>
@@ -453,14 +431,13 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 disabled={isDisabled}
                 className={`
                     group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
-                    transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:outline-none
-                    ${!isDisabled && !isInsufficient ? 'hover:translate-x-[1px] hover:scale-[1.025] active:translate-x-0 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-blue-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
+                    transition-colors duration-200 ease-out focus-visible:outline-none
+                    ${!isDisabled && !isInsufficient ? 'focus-visible:ring-2 focus-visible:ring-blue-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
                     ${defaultStyleProps.className || ''}
                 `}
                 style={{
                     paddingRight: '4px',
                     ...(defaultStyleProps.style || {}),
-                    animation: !isDisabled && !isInsufficient ? 'send-button-glow 2.2s ease-in-out infinite' : undefined
                 }}
             >
                 {!isDisabled && !isInsufficient && (
@@ -490,16 +467,16 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                 {/* 发送箭头 🚀 箭头朝右 + 动画 */}
                 <div className={`
-                    relative z-[1] w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden
+                    relative z-[1] flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-colors duration-200
                     ${isDisabled
                         ? 'bg-gray-300 dark:bg-zinc-700 text-gray-500'
                         : isInsufficient
                             ? 'bg-red-500 text-white'
-                            : `border ${textColor === 'black' ? 'border-black/20 bg-black/10 text-black' : 'border-white/20 bg-white/22 text-white'} shadow-[inset_0_1px_0_rgba(255,255,255,0.36),inset_0_-1px_0_rgba(255,255,255,0.08),0_6px_14px_rgba(15,23,42,0.14)] backdrop-blur-md group-hover:scale-[1.08] group-hover:translate-x-[1px] group-hover:bg-white/30`
+                            : `border ${textColor === 'black' ? 'border-black/20 bg-black/10 text-black' : 'border-white/20 bg-white/22 text-white'} shadow-[inset_0_1px_0_rgba(255,255,255,0.36),inset_0_-1px_0_rgba(255,255,255,0.08),0_6px_14px_rgba(15,23,42,0.14)] backdrop-blur-md group-hover:bg-white/30`
                     }
                 `}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                        className="transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-[1.5px]"
+                        className="transition-transform duration-200 ease-out"
                         style={!isDisabled ? { animation: 'arrow-slide-right 1.5s ease-in-out infinite' } : undefined}
                     >
                         <line x1="5" y1="12" x2="19" y2="12" />
@@ -527,6 +504,21 @@ interface PromptBarProps {
     onFocus?: () => void;  // 输入框获取焦点时调用
     onBlur?: () => void;   // 输入框失去焦点时调用
     onOpenMore?: () => void; // [NEW] Mobile More Menu
+    mobileShellMode?: 'legacy-fixed' | 'embedded';
+    ecommerceRequirementFileName?: string;
+    ecommerceProductFileCount?: number;
+    ecommerceExtraReferenceCount?: number;
+    ecommerceAnalysis?: EcommerceAnalysisResult | null;
+    ecommerceSelection?: Record<string, boolean>;
+    ecommerceAnalyzing?: boolean;
+    onPickEcommerceRequirementFile?: (files: FileList | File[]) => void;
+    onPickEcommerceProductFiles?: (files: FileList | File[]) => void;
+    onPickEcommerceExtraReferenceFiles?: (files: FileList | File[]) => void;
+    onResetEcommerceAnalysis?: () => void;
+    onConfirmEcommerceAnalysis?: () => void;
+    onToggleEcommerceSelection?: (id: string, selected: boolean) => void;
+    ecommerceRatioOverride?: AspectRatio[];
+    onAnalyzeEcommerceFile?: () => void;
 }
 
 const MODEL_LIST_VIRTUALIZE_THRESHOLD = 40;
@@ -759,6 +751,7 @@ const buildPromptBarAvailableModels = (
         const type = m.type || 'image';
         if (mode === GenerationMode.IMAGE) return type === 'image' || type === 'image+chat';
         if (mode === GenerationMode.PPT) return type === 'image' || type === 'image+chat';
+        if (mode === GenerationMode.ECOMMERCE) return (type === 'image' || type === 'image+chat') && isEcommerceAllowedModel(m.id);
         if (mode === GenerationMode.VIDEO) return type === 'video';
         if (mode === GenerationMode.AUDIO) return type === 'audio';
         return type === mode;
@@ -793,7 +786,38 @@ const buildPromptBarAvailableModels = (
     return Array.from(displayGroupedModels.values());
 };
 
-const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, isGenerating, onFilesDrop, activeSourceImage, onClearSource, onCancel, isMobile = false, onOpenSettings, onInteract, onUiBusyChange, onFocus, onBlur, onOpenMore }) => {
+const PromptBar: React.FC<PromptBarProps> = ({
+    config,
+    setConfig,
+    onGenerate,
+    isGenerating,
+    onFilesDrop,
+    activeSourceImage,
+    onClearSource,
+    onCancel,
+    isMobile = false,
+    onOpenSettings,
+    onInteract,
+    onUiBusyChange,
+    onFocus,
+    onBlur,
+    onOpenMore,
+    mobileShellMode = 'legacy-fixed',
+    ecommerceRequirementFileName,
+    ecommerceProductFileCount = 0,
+    ecommerceExtraReferenceCount = 0,
+    ecommerceAnalysis,
+    ecommerceSelection = {},
+    ecommerceAnalyzing = false,
+    onPickEcommerceRequirementFile,
+    onPickEcommerceProductFiles,
+    onPickEcommerceExtraReferenceFiles,
+    onResetEcommerceAnalysis,
+    onConfirmEcommerceAnalysis,
+    onToggleEcommerceSelection,
+    ecommerceRatioOverride,
+    onAnalyzeEcommerceFile,
+}) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Track composition state so IME input is not interrupted by background sync.
@@ -845,8 +869,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
     // [NEW] 参考图放大状态
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
-    const [inpaintImage, setInpaintImage] = useState<{ url: string } | null>(null); // [NEW] 局部重绘所需图像
-
     const handleReferenceRecovered = useCallback((payload: { id: string; data: string; mimeType?: string; storageId?: string }) => {
         setConfig(curr => ({
             ...curr,
@@ -874,22 +896,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
     // 状态：选项面板显示
     const [showOptionsPanel, setShowOptionsPanel] = useState(false);
-    const [showPromptLibrary, setShowPromptLibrary] = useState(false);
     const [showPptOutlinePanel, setShowPptOutlinePanel] = useState(false);
     const [pptOutlineDraft, setPptOutlineDraft] = useState('');
     const [pptDragIndex, setPptDragIndex] = useState<number | null>(null);
     const [pptDropIndex, setPptDropIndex] = useState<number | null>(null);
-    const [promptLibrarySearch, setPromptLibrarySearch] = useState('');
-    const [promptLibraryCategory, setPromptLibraryCategory] = useState<'all' | PromptLibraryItem['category']>('all');
-    const [favoritePromptIds, setFavoritePromptIds] = useState<string[]>(() => {
-        try {
-            const raw = localStorage.getItem('kk_prompt_library_favorites');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    });
     const [isInputAreaHovered, setIsInputAreaHovered] = useState(false); // Phase 3: hover state
     const [uploadingCount, setUploadingCount] = useState(0); // [NEW] Uploading indicator count
     const pendingReferenceUploads = useMemo(() => {
@@ -1044,7 +1054,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             || showOptionsPanel
             || contextMenu
             || modelSettingsModal
-            || showPromptLibrary
             || showPptOutlinePanel
         );
         onUiBusyChange?.(busy);
@@ -1054,7 +1063,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         modelSettingsModal,
         onUiBusyChange,
         showOptionsPanel,
-        showPromptLibrary,
         showPptOutlinePanel,
     ]);
 
@@ -1236,14 +1244,19 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [globalModels, config.mode, config.imageSize, canBrowseSystemCreditModels]);
 
     const sortedAvailableModels = useMemo(() => {
-        return filterAndSortModels(availableModels, '', modelCustomizations);
+        const rawModels = filterAndSortModels(availableModels, '', modelCustomizations);
+        if (config.mode !== GenerationMode.ECOMMERCE) {
+            return rawModels;
+        }
+        return rawModels.filter((model) => isEcommerceAllowedModel(model.id));
         // 🚀 [Fix] 加入 pinnedVersion 依赖，确保顶置变化时重新排序
-    }, [availableModels, modelCustomizations, pinnedVersion]);
+    }, [availableModels, config.mode, modelCustomizations, pinnedVersion]);
 
     const pinnedModels = useMemo(() => getPinnedModels(), [pinnedVersion]);
 
     const filteredDisplayModels = useMemo<PromptBarModelOption[]>(() => {
-        const rawModels = filterAndSortModels(availableModels, deferredModelSearch, modelCustomizations);
+        const rawModels = filterAndSortModels(availableModels, deferredModelSearch, modelCustomizations)
+            .filter((model) => config.mode !== GenerationMode.ECOMMERCE || isEcommerceAllowedModel(model.id));
         const uniqueModelMap = new Map<string, ActiveModel>();
 
         rawModels.forEach((model) => {
@@ -1289,7 +1302,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                 resolvedDescription,
             };
         });
-    }, [availableModels, deferredModelSearch, modelCustomizations, pinnedModels]);
+    }, [availableModels, config.mode, deferredModelSearch, modelCustomizations, pinnedModels]);
 
     const modelListViewport = useMemo(() => {
         const shouldWindow = filteredDisplayModels.length > MODEL_LIST_VIRTUALIZE_THRESHOLD;
@@ -1326,12 +1339,15 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, []);
 
     const getDefaultAspectForModel = useCallback((modelId: string): AspectRatio => {
+        if (config.mode === GenerationMode.ECOMMERCE) {
+            return AspectRatio.SQUARE;
+        }
         const caps = getModelCapabilities(modelId);
         const supported = caps?.supportedRatios;
         if (!supported || supported.length === 0) return AspectRatio.AUTO;
         if (supported.includes(AspectRatio.AUTO)) return AspectRatio.AUTO;
         return supported[0];
-    }, []);
+    }, [config.mode]);
 
     // 🚀 [增强版模型自动选择逻辑]
     // 逻辑：1. 如果当前选中的模型已失效（不在当前可用列表中），则必须重新选一个。
@@ -1373,9 +1389,23 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [config.model]);
 
     const availableRatios = useMemo(() => {
+        if (config.mode === GenerationMode.ECOMMERCE) {
+            const policy = resolveEcommerceAspectPolicy({
+                kind: 'main-image',
+                modelId: config.model,
+            });
+            const ratioWhitelist = ecommerceRatioOverride && ecommerceRatioOverride.length > 0
+                ? ecommerceRatioOverride
+                : policy.allowedAspectRatios;
+            const ratioWhitelistSet = new Set<string>(ratioWhitelist.map((ratio) => String(ratio)));
+            const supportedRatios = modelCaps?.supportedRatios && modelCaps.supportedRatios.length > 0
+                ? modelCaps.supportedRatios
+                : Object.values(AspectRatio);
+            return supportedRatios.filter((ratio) => ratioWhitelistSet.has(String(ratio)));
+        }
         const ratios = modelCaps?.supportedRatios;
         return ratios && ratios.length > 0 ? ratios : Object.values(AspectRatio);
-    }, [modelCaps]);
+    }, [config.mode, config.model, ecommerceRatioOverride, modelCaps]);
 
     const availableSizes = useMemo(() => {
         const sizes = modelCaps?.supportedSizes;
@@ -1904,7 +1934,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             const target = event.target as Element;
             if (!target.closest('.input-bar-inner')) {
                 setActiveMenu(null);
-                setShowPromptLibrary(false);
                 setShowPptOutlinePanel(false);
             }
         };
@@ -1914,30 +1943,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
             if (dragSafetyTimer.current) clearTimeout(dragSafetyTimer.current);
         };
     }, []);
-
-    const saveFavoritePromptIds = useCallback((ids: string[]) => {
-        setFavoritePromptIds(ids);
-        localStorage.setItem('kk_prompt_library_favorites', JSON.stringify(ids));
-    }, []);
-
-    const togglePromptFavorite = useCallback((id: string) => {
-        if (favoritePromptIds.includes(id)) {
-            saveFavoritePromptIds(favoritePromptIds.filter(item => item !== id));
-            return;
-        }
-        saveFavoritePromptIds([id, ...favoritePromptIds]);
-    }, [favoritePromptIds, saveFavoritePromptIds]);
-
-    const applyPromptTemplate = useCallback((templatePrompt: string) => {
-        const current = promptDraft.trim();
-        const nextPrompt = current
-            ? `${promptDraft.replace(/\s+$/, '')}\n${templatePrompt}`
-            : templatePrompt;
-        setPromptDraft(nextPrompt);
-        commitPromptToConfig(nextPrompt);
-        setShowPromptLibrary(false);
-        notify.success('提示词已插入', '已追加到输入框，可继续编辑后发送');
-    }, [commitPromptToConfig, promptDraft]);
 
     const parsePptSlides = useCallback((text: string) => {
         return text
@@ -2057,71 +2062,27 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         }));
     }, [config.mode, config.pptSlides, parsePptSlides, pptOutlineDraft, setConfig]);
 
-    const filteredPromptLibrary = useMemo(() => {
-        const keyword = promptLibrarySearch.trim().toLowerCase();
-        const isFavoriteOnly = promptLibraryCategory === 'all' && keyword === 'fav';
+    const modeOptions = PROMPT_BAR_MODE_REGISTRY;
+    const activeModeOption = getPromptBarModeOption(config.mode);
 
-        const base = BUILTIN_PROMPT_LIBRARY.filter(item => {
-            if (promptLibraryCategory !== 'all' && item.category !== promptLibraryCategory) return false;
-            if (isFavoriteOnly && !favoritePromptIds.includes(item.id)) return false;
-            if (!keyword || keyword === 'fav') return true;
-            return (
-                item.title.toLowerCase().includes(keyword)
-                || item.prompt.toLowerCase().includes(keyword)
-                || (item.source || '').toLowerCase().includes(keyword)
-            );
-        });
+    const handleSelectPromptBarMode = useCallback((mode: GenerationMode) => {
+        commitConfigUpdate((previousConfig) => ({
+            ...previousConfig,
+            ...getPromptBarModePatch(previousConfig, mode),
+        }));
+    }, [commitConfigUpdate]);
 
-        return base.sort((a, b) => {
-            const aFav = favoritePromptIds.includes(a.id) ? 1 : 0;
-            const bFav = favoritePromptIds.includes(b.id) ? 1 : 0;
-            return bFav - aFav;
-        });
-    }, [favoritePromptIds, promptLibraryCategory, promptLibrarySearch]);
+    const handleTogglePptOutlinePanel = useCallback(() => {
+        setShowPptOutlinePanel((previousValue) => !previousValue);
+        setActiveMenu(null);
+    }, []);
 
-    const modeOptions = useMemo(() => ([
-        {
-            mode: GenerationMode.IMAGE,
-            label: '图片',
-            icon: Camera,
-            color: '#7dd3fc',
-            activeBg: 'rgba(14, 165, 233, 0.16)',
-            activeBorder: 'rgba(56, 189, 248, 0.4)',
-            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.IMAGE, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
-        },
-        {
-            mode: GenerationMode.VIDEO,
-            label: '视频',
-            icon: Video,
-            color: '#a78bfa',
-            activeBg: 'rgba(139, 92, 246, 0.16)',
-            activeBorder: 'rgba(167, 139, 250, 0.4)',
-            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.VIDEO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
-        },
-        {
-            mode: GenerationMode.AUDIO,
-            label: '音乐',
-            icon: Mic,
-            color: '#f9a8d4',
-            activeBg: 'rgba(236, 72, 153, 0.16)',
-            activeBorder: 'rgba(244, 114, 182, 0.4)',
-            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.AUDIO, parallelCount: Math.min(4, Math.max(1, prev.parallelCount || 1)) }))
-        },
-        {
-            mode: GenerationMode.PPT,
-            label: 'PPT',
-            icon: LayoutDashboard,
-            color: '#fbbf24',
-            activeBg: 'rgba(245, 158, 11, 0.16)',
-            activeBorder: 'rgba(251, 191, 36, 0.4)',
-            onSelect: () => commitConfigUpdate(prev => ({ ...prev, mode: GenerationMode.PPT, parallelCount: Math.min(20, Math.max(1, prev.parallelCount || 6)), pptStyleLocked: prev.pptStyleLocked !== false }))
-        }
-    ]), [commitConfigUpdate]);
-
-    const activeModeIndex = useMemo(() => {
-        const idx = modeOptions.findIndex(item => item.mode === config.mode);
-        return idx >= 0 ? idx : 0;
-    }, [config.mode, modeOptions]);
+    const handleTogglePromptOptimization = useCallback(() => {
+        setConfig((previousConfig) => ({
+            ...previousConfig,
+            enablePromptOptimization: !previousConfig.enablePromptOptimization,
+        }));
+    }, [setConfig]);
 
     // Drag & Drop handlers...
     const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -2169,13 +2130,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
         dragCounter.current = 0;
         setIsDragging(false);
         if (dragSafetyTimer.current) clearTimeout(dragSafetyTimer.current);
-
-        // Prompt template drag-and-drop
-        const promptTemplate = e.dataTransfer.getData('application/x-kk-prompt-template');
-        if (promptTemplate) {
-            applyPromptTemplate(promptTemplate);
-            return;
-        }
 
         // 1. [NEW] Handle Internal Image Reuse (Optimized) - Prioritize internal ref over files
         const internalRefData = e.dataTransfer.getData('application/x-kk-image-ref');
@@ -2318,7 +2272,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     });
             }
         }
-    }, [applyPromptTemplate, processFiles]);
+    }, [processFiles]);
 
     const selectedModelMeta = useMemo(() => {
         const currentModel = availableModels.find(m => m.id === config.model) || null;
@@ -2441,25 +2395,43 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [currentModelName, isMobile, truncateModelLabel]);
 
     // 🚀 [Mobile Layout] Dock to bottom on mobile
-    const mobileStyle: React.CSSProperties = isMobile ? {
-        position: 'fixed',
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height, 72px) + var(--mobile-tabbar-floating-offset, 12px) + var(--mobile-prompt-gap, 12px))',
-        left: '50%',
-        transform: 'translateX(-50%) translateZ(0)',
-        width: 'calc(100vw - 20px)',
-        maxWidth: 'min(960px, calc(100vw - 20px))',
-        margin: 0,
-        borderRadius: '22px',
-        border: '1px solid var(--mobile-glass-border, rgba(255,255,255,0.16))',
-        zIndex: 960,
-        padding: 0,
-        WebkitBackdropFilter: 'blur(26px) saturate(170%)',
-        backdropFilter: 'blur(26px) saturate(170%)',
-        background: 'var(--mobile-glass-bg, rgba(20, 20, 23, 0.84))',
-        boxShadow: '0 24px 56px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.15)',
-        willChange: 'transform',
-        contain: 'layout style paint'
-    } : {
+    const mobileStyle: React.CSSProperties = isMobile ? (mobileShellMode === 'embedded'
+        ? {
+            position: 'relative',
+            bottom: 'auto',
+            left: 'auto',
+            transform: 'none',
+            width: '100%',
+            maxWidth: '100%',
+            margin: 0,
+            borderRadius: '22px',
+            border: '1px solid var(--mobile-glass-border, rgba(255,255,255,0.16))',
+            padding: 0,
+            WebkitBackdropFilter: 'blur(26px) saturate(170%)',
+            backdropFilter: 'blur(26px) saturate(170%)',
+            background: 'var(--mobile-glass-bg, rgba(20, 20, 23, 0.84))',
+            boxShadow: '0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.15)',
+            contain: 'layout style paint',
+        }
+        : {
+            position: 'fixed',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height, 72px) + var(--mobile-tabbar-floating-offset, 12px) + var(--mobile-prompt-gap, 12px))',
+            left: '50%',
+            transform: 'translateX(-50%) translateZ(0)',
+            width: 'calc(100vw - 20px)',
+            maxWidth: 'min(960px, calc(100vw - 20px))',
+            margin: 0,
+            borderRadius: '22px',
+            border: '1px solid var(--mobile-glass-border, rgba(255,255,255,0.16))',
+            zIndex: 960,
+            padding: 0,
+            WebkitBackdropFilter: 'blur(26px) saturate(170%)',
+            backdropFilter: 'blur(26px) saturate(170%)',
+            background: 'var(--mobile-glass-bg, rgba(20, 20, 23, 0.84))',
+            boxShadow: '0 24px 56px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.15)',
+            willChange: 'transform',
+            contain: 'layout style paint'
+        }) : {
         // Desktop floating style handling...
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
@@ -2492,10 +2464,9 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
     return (
         <>
-            <ModeSwitcherStyles />
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible w-[calc(100vw-32px)] max-w-[760px] ${isDragging ? 'ring-2 ring-white/80 shadow-[0_0_36px_rgba(255,255,255,0.22)]' : ''}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'} ${isDragging ? 'ring-2 ring-white/80 shadow-[0_0_36px_rgba(255,255,255,0.22)]' : ''}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -2586,254 +2557,21 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
 
                     {/* Top Controls Row: Mode toggle on left, prompt optimizer on right */}
                     <PromptBarTopRow isMobile={isMobile}>
-                        <div className={isMobile ? 'w-full overflow-x-auto scrollbar-none pb-0.5' : 'flex items-center gap-2'}>
-
-
-                            {(() => {
-                                const MODE_SLOT_WIDTH = isMobile ? 72 : 82;
-                                const sliderWidth = isMobile ? 64 : 74;
-                                const sliderLeft = 4 + activeModeIndex * MODE_SLOT_WIDTH + (MODE_SLOT_WIDTH - sliderWidth) / 2;
-                                return (
-                                    <div className={`
-                                        relative inline-flex items-center p-1 rounded-xl border
-                                        ${isMobile ? 'min-w-max' : ''}
-                                        backdrop-blur-sm
-                                    `}
-                                        style={{
-                                            background: 'var(--prompt-bar-shell-bg)',
-                                            borderColor: 'var(--prompt-bar-shell-border)',
-                                            boxShadow: 'var(--prompt-bar-shell-shadow)',
-                                        }}
-                                    >
-                                        <div
-                                            className="pointer-events-none absolute top-1 h-[calc(100%-8px)] rounded-lg transition-all duration-500"
-                                            style={{
-                                                width: `${sliderWidth}px`,
-                                                left: `${sliderLeft}px`,
-                                                backgroundColor: modeOptions[activeModeIndex]?.activeBg || 'rgba(99,102,241,0.16)',
-                                                border: `1px solid ${modeOptions[activeModeIndex]?.activeBorder || 'var(--prompt-bar-shell-border-strong)'}`,
-                                                boxShadow: 'none',
-                                                transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                            }}
-                                        />
-
-                                        {[1, 2, 3].map((splitIndex) => {
-                                            // Calculate if this divider is near the active slider for dynamic effect
-                                            const dividerCenter = 4 + splitIndex * MODE_SLOT_WIDTH;
-                                            const sliderCenter = sliderLeft + sliderWidth / 2;
-                                            const distance = Math.abs(dividerCenter - sliderCenter);
-                                            const maxDistance = MODE_SLOT_WIDTH;
-                                            const opacity = Math.max(0.04, 0.12 - (distance / maxDistance) * 0.08);
-                                            const scaleY = Math.max(0.5, 1 - (distance / maxDistance) * 0.5);
-
-                                            return (
-                                                <span
-                                                    key={`split-${splitIndex}`}
-                                                    className="absolute inset-y-0 my-auto w-px pointer-events-none transition-all duration-500"
-                                                    style={{
-                                                        left: `${dividerCenter}px`,
-                                                        height: `${50 * scaleY}%`,
-                                                        backgroundColor: 'var(--prompt-bar-shell-border)',
-                                                        opacity,
-                                                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                                    }}
-                                                />
-                                            );
-                                        })}
-
-                                        {modeOptions.map((item) => {
-                                            const isActive = config.mode === item.mode;
-                                            const Icon = item.icon;
-                                            return (
-                                                <div key={item.mode} className="relative z-10">
-                                                    <button
-                                                        type="button"
-                                                        className={`
-                                                            px-2 py-1.5 rounded-lg font-medium
-                                                            ${isMobile ? 'w-[72px] text-[12px]' : 'w-[82px] text-sm'}
-                                                            transition-all duration-300 ease-out
-                                                            hover:scale-105 active:scale-95
-                                                            ${isActive ? 'scale-105' : 'hover:text-[var(--text-primary)]'}
-                                                        `}
-                                                        style={{
-                                                            color: isActive ? item.color : 'var(--text-secondary)',
-                                                        }}
-                                                        onMouseDown={(event) => {
-                                                            event.stopPropagation();
-                                                        }}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            item.onSelect();
-                                                        }}
-                                                    >
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            <Icon
-                                                                size={isActive ? 14 : 13}
-                                                                className={`
-                                                                    transition-all duration-300 ease-out
-                                                                    ${isActive ? 'animate-pulse-once' : ''}
-                                                                `}
-                                                            />
-                                                            <span className={`
-                                                                transition-all duration-300
-                                                                ${isActive ? 'font-semibold tracking-wide' : ''}
-                                                            `}>
-                                                                {item.label}
-                                                            </span>
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })()}
-                        </div>
+                        <DesktopComposerModeSwitcher
+                            isMobile={isMobile}
+                            activeMode={activeModeOption.mode}
+                            modeOptions={modeOptions}
+                            onSelectMode={handleSelectPromptBarMode}
+                        />
 
                         <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
-                            <button
-                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0"
-                                style={{
-                                    background: showPromptLibrary ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
-                                    color: showPromptLibrary ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                    borderColor: showPromptLibrary ? 'var(--prompt-bar-shell-border-strong)' : 'var(--prompt-bar-shell-border)'
-                                }}
-                                onMouseDown={(e) => e.stopPropagation()} onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowPromptLibrary(prev => !prev);
-                                    setShowPptOutlinePanel(false);
-                                    setActiveMenu(null);
-                                }}
-                                title="打开提示词库"
-                            >
-                                <span>提示词库</span>
-                            </button>
-
-                            {config.mode === GenerationMode.PPT && (
-                                <button
-                                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0"
-                                    style={{
-                                        background: showPptOutlinePanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
-                                        color: showPptOutlinePanel ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                        borderColor: showPptOutlinePanel ? 'var(--prompt-bar-shell-border-strong)' : 'var(--prompt-bar-shell-border)'
-                                    }}
-                                    onMouseDown={(e) => e.stopPropagation()} onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowPptOutlinePanel(prev => !prev);
-                                        setShowPromptLibrary(false);
-                                        setActiveMenu(null);
-                                    }}
-                                    title="编辑PPT页纲"
-                                >
-                                    <span>页纲</span>
-                                </button>
-                            )}
-
-                                <button
-                                    className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${config.enablePromptOptimization
-                                    ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
-                                    : 'text-[var(--text-secondary)] hover:border-[var(--prompt-bar-shell-border-strong)]'
-                                    }`}
-                                style={{
-                                    ...(!config.enablePromptOptimization ? {
-                                        background: 'var(--prompt-bar-shell-bg)',
-                                        borderColor: 'var(--prompt-bar-shell-border)',
-                                    } : {}),
-                                    opacity: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? 1 : 0.45,
-                                    pointerEvents: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? 'auto' : 'none'
-                                }}
-                                onClick={() => setConfig(prev => ({ ...prev, enablePromptOptimization: !prev.enablePromptOptimization }))}
-                                title={(config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? '开启后先优化提示词，再发送生成' : '仅图片/PPT模式支持提示词优化'}
-                            >
-                                <Wand2 className={`w-3 h-3 ${config.enablePromptOptimization ? 'animate-pulse' : ''}`} />
-                                <span className="font-bold">优化提示词</span>
-                            </button>
-
-                            {showPromptLibrary && (
-                                <div
-                                    className={isMobile
-                                        ? 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet rounded-[30px] p-3 shadow-2xl overflow-hidden'
-                                        : 'absolute bottom-full right-0 mb-2 z-40 rounded-2xl border shadow-xl p-2 max-w-[calc(100vw-24px)]'}
-                                    style={isMobile
-                                        ? {
-                                            bottom: mobileFloatingSheetBottom,
-                                            maxHeight: mobileFloatingSheetMaxHeight,
-                                            overscrollBehavior: 'contain',
-                                        }
-                                        : {
-                                            width: 'min(34rem, calc(100vw - 24px))',
-                                            backgroundColor: 'var(--bg-secondary)',
-                                            borderColor: 'var(--border-medium)'
-                                        }}
-                                >
-                                    <div className={`mb-2 gap-1 ${isMobile ? 'flex flex-wrap items-center' : 'flex items-center'}`}>
-                                        <button
-                                            className={`px-2 py-1 rounded-md text-[11px] border ${promptLibraryCategory === 'all' ? 'text-blue-400 border-blue-400/40 bg-blue-500/10' : 'text-[var(--text-secondary)] border-[var(--border-light)]'}`}
-                                            onClick={() => setPromptLibraryCategory('all')}
-                                        >全部</button>
-                                        <button
-                                            className={`px-2 py-1 rounded-md text-[11px] border ${promptLibraryCategory === 'banana-pro' ? 'text-blue-400 border-blue-400/40 bg-blue-500/10' : 'text-[var(--text-secondary)] border-[var(--border-light)]'}`}
-                                            onClick={() => setPromptLibraryCategory('banana-pro')}
-                                        >Banana Pro</button>
-                                        <button
-                                            className={`px-2 py-1 rounded-md text-[11px] border ${promptLibraryCategory === 'banana' ? 'text-blue-400 border-blue-400/40 bg-blue-500/10' : 'text-[var(--text-secondary)] border-[var(--border-light)]'}`}
-                                            onClick={() => setPromptLibraryCategory('banana')}
-                                        >Banana</button>
-                                        <button
-                                            className={`px-2 py-1 rounded-md text-[11px] border ${promptLibraryCategory === 'general' ? 'text-blue-400 border-blue-400/40 bg-blue-500/10' : 'text-[var(--text-secondary)] border-[var(--border-light)]'}`}
-                                            onClick={() => setPromptLibraryCategory('general')}
-                                        >通用</button>
-                                        <input
-                                            value={promptLibrarySearch}
-                                            onChange={(e) => setPromptLibrarySearch(e.target.value)}
-                                            placeholder="搜索标题/内容"
-                                            className={`bg-[var(--bg-tertiary)] text-[11px] rounded-md px-2 py-1 border border-[var(--border-light)] outline-none ${isMobile ? 'w-full basis-full mt-1' : 'ml-auto w-40'}`}
-                                        />
-                                    </div>
-
-                                    <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
-                                        {filteredPromptLibrary.map(item => {
-                                            const isFavorite = favoritePromptIds.includes(item.id);
-                                            return (
-                                                <div
-                                                    key={item.id}
-                                                    className="rounded-lg border p-2"
-                                                    style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}
-                                                    draggable
-                                                    onDragStart={(e) => {
-                                                        e.dataTransfer.setData('application/x-kk-prompt-template', item.prompt);
-                                                        e.dataTransfer.setData('text/plain', item.prompt);
-                                                        e.dataTransfer.effectAllowed = 'copy';
-                                                    }}
-                                                >
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="text-xs font-medium text-[var(--text-primary)] truncate">{item.title}</div>
-                                                        <div className="flex items-center gap-1">
-                                                            <button
-                                                                className="text-[10px] px-2 py-1 rounded-md border border-[var(--border-light)] hover:bg-white/5"
-                                                                style={{ color: 'var(--text-secondary)' }}
-                                                                onClick={() => applyPromptTemplate(item.prompt)}
-                                                            >插入</button>
-                                                            <button
-                                                                className="text-[11px] px-2 py-1 rounded-md border border-[var(--border-light)] hover:bg-white/5"
-                                                                style={{ color: isFavorite ? '#fbbf24' : 'var(--text-secondary)' }}
-                                                                onClick={() => togglePromptFavorite(item.id)}
-                                                                title={isFavorite ? '取消收藏' : '收藏'}
-                                                            >★</button>
-                                                        </div>
-                                                    </div>
-                                                    {item.source && <div className="text-[10px] mt-1 text-[var(--text-tertiary)]">来源: {item.source}</div>}
-                                                    <div className="text-[11px] mt-1 text-[var(--text-secondary)] max-h-8 overflow-hidden">{item.prompt}</div>
-                                                </div>
-                                            );
-                                        })}
-                                        {filteredPromptLibrary.length === 0 && (
-                                            <div className="text-xs text-[var(--text-tertiary)] text-center py-4">没有匹配项</div>
-                                        )}
-                                    </div>
-                                    <div className="text-[10px] mt-2 text-[var(--text-tertiary)]">支持拖拽到输入区直接插入；收藏会保存在本地。</div>
-                                </div>
-                            )}
+                            <DesktopComposerPromptTools
+                                isMobile={isMobile}
+                                config={config}
+                                showPptOutlinePanel={showPptOutlinePanel}
+                                onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+                                onTogglePromptOptimization={handleTogglePromptOptimization}
+                            />
 
                             {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
                                 <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
@@ -2990,7 +2728,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                         }}
                     >
                         {/* Reference Images List */}
-                        {(config.referenceImages && config.referenceImages.length > 0 || uploadingCount > 0) && (
+                        {config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
                             <div
                                 ref={refContainerRef}
                                 className="flex flex-nowrap items-center gap-2 transition-all p-2 px-3 mt-1 rounded-lg overflow-x-auto overflow-y-hidden scrollbar-thin"
@@ -3112,17 +2850,10 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     onRecovered={handleReferenceRecovered}
                                                     onClick={handleReferencePreview}
                                                 />
-                                                {/* Mask Indicator - 当前已设置遮罩时显示高亮边框 */}
-                                                {config.maskUrl && config.editMode === 'inpaint' && (
-                                                    <div className="absolute inset-0 border-2 border-white rounded-lg pointer-events-none" />
-                                                )}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         removeReferenceImage(img.id);
-                                                        if (config.maskUrl) {
-                                                            setConfig(prev => ({ ...prev, maskUrl: undefined, editMode: undefined }));
-                                                        }
                                                     }}
                                                     onMouseDown={(e) => e.stopPropagation()}
                                                     className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity transform hover:scale-110 z-10"
@@ -3171,7 +2902,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                         )}
 
                         {/* Upload button when no reference images - 始终显示，与参考图同行对齐 */}
-                        {config.referenceImages.length === 0 && uploadingCount === 0 && (
+                        {config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0 && (
                             <div className="flex items-center p-2 px-3 mt-1">
                                 <button
                                     className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-white/5 flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
@@ -3191,6 +2922,23 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             </div>
                         )}
 
+                        <DesktopComposerEcommercePanel
+                            config={config}
+                            requirementFileName={ecommerceRequirementFileName}
+                            productFileCount={ecommerceProductFileCount}
+                            extraReferenceCount={ecommerceExtraReferenceCount}
+                            ecommerceAnalysis={ecommerceAnalysis}
+                            ecommerceSelection={ecommerceSelection}
+                            ecommerceAnalyzing={ecommerceAnalyzing}
+                            onPickRequirementFile={onPickEcommerceRequirementFile}
+                            onPickProductFiles={onPickEcommerceProductFiles}
+                            onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+                            onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+                            onResetAnalysis={onResetEcommerceAnalysis}
+                            onConfirmAnalysis={onConfirmEcommerceAnalysis}
+                            onToggleSelection={onToggleEcommerceSelection}
+                        />
+
                         {/* Text Input Area */}
                         <textarea
                             ref={textareaRef}
@@ -3208,7 +2956,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             }}
                             onCompositionStart={() => { isComposingRef.current = true; }}
                             onCompositionEnd={handleCompositionEnd}
-                            placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音乐风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : "描述你想要生成的图片..."}
+                            placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
                             className="input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none mt-1 py-1 px-3 box-border overflow-y-auto"
                             style={{
                                 color: 'var(--text-primary)', // 使用 CSS 变量适配主题
@@ -3417,148 +3165,76 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                             </div >
 
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
-                            <div className={`relative inline-flex ${isMobile ? 'row-start-2 min-w-0' : 'min-w-fit flex-shrink-0'}`}>
-                                <button
-                                    data-options-toggle
-                                    className={`flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? 'px-2.5 max-w-none' : 'px-3.5 flex-shrink-0'}`}
-                                    style={{
-                                        background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
-                                        color: 'var(--text-secondary)',
-                                        borderColor: showOptionsPanel ? 'var(--prompt-bar-shell-border-strong)' : 'var(--prompt-bar-shell-border)'
-                                    }}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveMenu(null); // 关闭其他菜单
-                                        setShowOptionsPanel(prev => !prev);
-                                    }}
-                                    title="图片/视频选项"
-                                >
-                                    {config.mode === GenerationMode.AUDIO ? (
-                                        <>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M9 18V5l12-2v13" />
-                                                <circle cx="6" cy="18" r="3" />
-                                                <circle cx="18" cy="16" r="3" />
-                                            </svg>
-                                            <span>{config.audioDuration || '自动'}</span>
-                                        </>
-                                    ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? (
-                                        <>
-                                            {config.aspectRatio === AspectRatio.AUTO ? (
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                                                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                                                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                                                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                                                    <rect width="10" height="8" x="7" y="8" rx="1"></rect>
-                                                </svg>
-                                            ) : (
-                                                getRatioIcon(config.aspectRatio)
-                                            )}
-                                            <span className="whitespace-nowrap">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.imageSize}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {config.aspectRatio === AspectRatio.AUTO ? (
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                                                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                                                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                                                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                                                    <rect width="10" height="8" x="7" y="8" rx="1"></rect>
-                                                </svg>
-                                            ) : (
-                                                getRatioIcon(config.aspectRatio)
-                                            )}
-                                            <span className="whitespace-nowrap">{config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.videoResolution || '720p'}</span>
-                                        </>
-                                    )}
-                                    <svg className={`w-3 h-3 transition-transform ${showOptionsPanel ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M6 9l6 6 6-6" />
-                                    </svg>
-                                </button>
-
-                                {/* Options Panel - positioned relative to button */}
-                                {showOptionsPanel && (
-                                    <div
-                                        className={isMobile ? 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-scaleIn origin-bottom overflow-hidden' : 'absolute bottom-full mb-2 z-30'}
-                                        style={isMobile
-                                            ? { bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }
-                                            : { left: '50%', transform: 'translateX(-50%)' }}
-                                    >
-                                        <div ref={optionsPanelRef}>
-                                            {config.mode === GenerationMode.AUDIO ? (
-                                                /* 音频选项面板 - 时长选择 */
-                                                <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
-                                                    <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {['自动', '30s', '60s', '120s', '240s'].map(dur => (
-                                                            <button
-                                                                key={dur}
-                                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                                                    ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
-                                                                    }`}
-                                                                onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
-                                                            >
-                                                                {dur}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) ? (
-                                                <ImageOptionsPanel
-                                                    aspectRatio={config.aspectRatio}
-                                                    imageSize={config.imageSize}
-                                                    networkOptions={isMobile ? [
-                                                        ...(groundingSupported ? [{
-                                                            id: 'grounding',
-                                                            label: '联网搜索',
-                                                            active: !!config.enableGrounding,
-                                                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                                                        }] : []),
-                                                        ...(imageSearchSupported ? [{
-                                                            id: 'image-search',
-                                                            label: '图片搜索',
-                                                            active: !!config.enableImageSearch,
-                                                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                                                        }] : []),
-                                                    ] : []}
-                                                    showThinkingMode={thinkingSupported}
-                                                    thinkingMode={config.thinkingMode || 'minimal'}
-                                                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
-                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
-                                                    availableRatios={availableRatios}
-                                                    availableSizes={availableSizes}
-                                                />
-                                            ) : (
-                                                <VideoOptionsPanel
-                                                    aspectRatio={config.aspectRatio}
-                                                    resolution={config.videoResolution || '720p'}
-                                                    duration={config.videoDuration || '4s'}
-                                                    audio={config.videoAudio || false}
-                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
-                                                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
-                                                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
-                                                    availableRatios={availableRatios}
-                                                    supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
-                                                />
-                                            )}
+                            <DesktopComposerModePanel
+                                isMobile={isMobile}
+                                config={config}
+                                showOptionsPanel={showOptionsPanel}
+                                optionsPanelRef={optionsPanelRef}
+                                mobileFloatingSheetBottom={mobileFloatingSheetBottom}
+                                mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
+                                onToggleOptionsPanel={() => {
+                                    setActiveMenu(null);
+                                    setShowOptionsPanel(prev => !prev);
+                                }}
+                                optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
+                                    <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                                        <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['自动', '30s', '60s', '120s', '240s'].map(dur => (
+                                                <button
+                                                    key={dur}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
+                                                        ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
+                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
+                                                        }`}
+                                                    onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
+                                                >
+                                                    {dur}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
+                                ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
+                                    <ImageOptionsPanel
+                                        aspectRatio={config.aspectRatio}
+                                        imageSize={config.imageSize}
+                                        networkOptions={isMobile ? [
+                                            ...(groundingSupported ? [{
+                                                id: 'grounding',
+                                                label: '联网搜索',
+                                                active: !!config.enableGrounding,
+                                                onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
+                                            }] : []),
+                                            ...(imageSearchSupported ? [{
+                                                id: 'image-search',
+                                                label: '图片搜索',
+                                                active: !!config.enableImageSearch,
+                                                onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
+                                            }] : []),
+                                        ] : []}
+                                        showThinkingMode={thinkingSupported}
+                                        thinkingMode={config.thinkingMode || 'minimal'}
+                                        onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                        onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                                        availableRatios={availableRatios}
+                                        availableSizes={availableSizes}
+                                    />
+                                ) : (
+                                    <VideoOptionsPanel
+                                        aspectRatio={config.aspectRatio}
+                                        resolution={config.videoResolution || '720p'}
+                                        duration={config.videoDuration || '4s'}
+                                        audio={config.videoAudio || false}
+                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                        onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                        onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                        onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                        availableRatios={availableRatios}
+                                        supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                                    />
                                 )}
-                            </div>
-
-                            {/* Removed duplicate ratio and size controls - now only in options panel */}
-                            {/* End of Left Group Items */}
-
-                            {/* Right: Actions Group */}
-                            {/* Group 1: Network & Provider Settings - Hidden on mobile for compact layout */}
-                            {/* Group 1: Network & Provider Settings - 只在支持时显示 */}
-                            {!isMobile && (groundingSupported || imageSearchSupported) && (
-                                <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                                networkControls={!isMobile && (groundingSupported || imageSearchSupported) ? (
                                     <div
                                         className="flex min-w-0 max-w-full shrink items-center gap-1 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-1 py-0.5 h-10 transition-all duration-200"
                                         style={{
@@ -3569,7 +3245,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                             pointerEvents: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'none' : 'auto'
                                         }}
                                     >
-                                        {/* Grounding Tool */}
                                         {groundingSupported && (
                                             <button
                                                 className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md transition-all text-[11px] font-medium ${config.enableGrounding
@@ -3578,18 +3253,17 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
                                                 title="Google 搜索 (实时信息)"
-                                                >
-                                                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M2 8.8a15 15 0 0 1 20 0" />
-                                                        <path d="M5 12.5a10 10 0 0 1 14 0" />
-                                                        <path d="M8.5 16.3a5 5 0 0 1 7 0" />
-                                                        <line x1="12" y1="20" x2="12.01" y2="20" />
-                                                    </svg>
+                                            >
+                                                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M2 8.8a15 15 0 0 1 20 0" />
+                                                    <path d="M5 12.5a10 10 0 0 1 14 0" />
+                                                    <path d="M8.5 16.3a5 5 0 0 1 7 0" />
+                                                    <line x1="12" y1="20" x2="12.01" y2="20" />
+                                                </svg>
                                                 <span className="min-w-0 truncate whitespace-nowrap">谷歌搜索</span>
                                             </button>
                                         )}
 
-                                        {/* 垂直分界线 */}
                                         {groundingSupported && imageSearchSupported && (
                                             <div className="w-[1px] h-4 bg-[var(--border-light)] mx-0.5" />
                                         )}
@@ -3602,18 +3276,18 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
                                                 title="图片搜索 (参考网络图片)"
-                                                >
-                                                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                                        <circle cx="8.5" cy="8.5" r="1.5" />
-                                                        <path d="M21 15l-5-5L5 21" />
-                                                    </svg>
+                                            >
+                                                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                                    <path d="M21 15l-5-5L5 21" />
+                                                </svg>
                                                 <span className="min-w-0 truncate whitespace-nowrap">图片搜索</span>
                                             </button>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                ) : undefined}
+                            />
 
                             {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
                             {!isMobile && (
@@ -3652,8 +3326,14 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
                                             <div
-                                                className="fixed z-[10010] bg-[#2a2a2e] border border-white/10 rounded-lg shadow-xl py-1 w-32 backdrop-blur-md"
-                                                style={{ top: contextMenu.y, left: contextMenu.x }}
+                                                className="fixed z-[10010] w-32 rounded-[14px] border py-1 backdrop-blur-md"
+                                                style={{
+                                                    top: contextMenu.y,
+                                                    left: contextMenu.x,
+                                                    background: 'var(--prompt-bar-shell-bg)',
+                                                    borderColor: 'var(--prompt-bar-shell-border)',
+                                                    boxShadow: 'var(--shadow-lg)',
+                                                }}
                                             >
                                                 <button
                                                     onClick={(e) => {
@@ -3661,7 +3341,8 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                         toggleModelPin(contextMenu.modelId);
                                                         setContextMenu(null);
                                                     }}
-                                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
+                                                    style={{ color: 'var(--text-primary)' }}
                                                 >
                                                     {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
                                                 </button>
@@ -3676,7 +3357,8 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                         });
                                                         setContextMenu(null);
                                                     }}
-                                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
+                                                    style={{ color: 'var(--text-primary)' }}
                                                 >
                                                     ⚙️ 设置
                                                 </button>
@@ -3687,41 +3369,67 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                         {/* Model Settings Modal */}
                                         {modelSettingsModal && ReactDOM.createPortal(
                                             <div
-                                                className="fixed inset-0 z-[10020] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                                                className="fixed inset-0 z-[10020] flex items-center justify-center p-4"
+                                                style={{
+                                                    background: 'color-mix(in srgb, var(--bg-base) 52%, transparent)',
+                                                    backdropFilter: 'blur(12px)',
+                                                }}
                                                 onClick={() => setModelSettingsModal(null)}
                                             >
                                                 <div
-                                                    className="bg-[#1e1e20] w-full max-w-md rounded-2xl border border-white/10 shadow-2xl p-5 space-y-4"
+                                                    className="w-full max-w-md rounded-[20px] border p-5 space-y-4"
+                                                    style={{
+                                                        background: 'var(--bg-overlay)',
+                                                        borderColor: 'var(--prompt-bar-shell-border)',
+                                                        boxShadow: 'var(--shadow-xl)',
+                                                    }}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <div className="flex justify-between items-center">
-                                                        <h3 className="text-lg font-bold text-white">模型设置</h3>
-                                                        <button onClick={() => setModelSettingsModal(null)} className="text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-white">✕</button>
+                                                        <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>模型设置</h3>
+                                                        <button
+                                                            onClick={() => setModelSettingsModal(null)}
+                                                            className="transition-colors"
+                                                            style={{ color: 'var(--text-tertiary)' }}
+                                                        >
+                                                            ✕
+                                                        </button>
                                                     </div>
-                                                    <div className="text-xs text-gray-500 dark:text-zinc-500 font-mono break-all">ID: {modelSettingsModal.modelId}</div>
+                                                    <div className="text-xs font-mono break-all" style={{ color: 'var(--text-tertiary)' }}>ID: {modelSettingsModal.modelId}</div>
                                                     <div>
-                                                        <label className="block text-xs font-medium text-gray-500 dark:text-zinc-400 mb-1.5">显示别名</label>
+                                                        <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>显示别名</label>
                                                         <input
                                                             value={modelSettingsModal.alias}
                                                             onChange={(e) => setModelSettingsModal({ ...modelSettingsModal, alias: e.target.value })}
                                                             placeholder="留空则使用默认名称"
-                                                            className="w-full bg-gray-100 dark:bg-zinc-900 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                                                            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                                                            style={{
+                                                                background: 'var(--bg-input)',
+                                                                borderColor: 'var(--prompt-bar-shell-border)',
+                                                                color: 'var(--text-primary)',
+                                                            }}
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-medium text-gray-500 dark:text-zinc-400 mb-1.5">模型介绍</label>
+                                                        <label className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>模型介绍</label>
                                                         <textarea
                                                             value={modelSettingsModal.description}
                                                             onChange={(e) => setModelSettingsModal({ ...modelSettingsModal, description: e.target.value })}
                                                             placeholder="留空则使用默认介绍"
                                                             rows={2}
-                                                            className="w-full bg-gray-100 dark:bg-zinc-900 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                                                            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                                                            style={{
+                                                                background: 'var(--bg-input)',
+                                                                borderColor: 'var(--prompt-bar-shell-border)',
+                                                                color: 'var(--text-primary)',
+                                                            }}
                                                         />
                                                     </div>
                                                     <div className="flex justify-end gap-2 pt-2">
                                                         <button
                                                             onClick={() => setModelSettingsModal(null)}
-                                                            className="px-4 py-2 rounded-lg text-sm text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-white hover:bg-white/5"
+                                                            className="rounded-lg px-4 py-2 text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
+                                                            style={{ color: 'var(--text-secondary)' }}
                                                         >
                                                             取消
                                                         </button>
@@ -3730,7 +3438,12 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                                                                 // Placeholder function
                                                                 setModelSettingsModal(null);
                                                             }}
-                                                            className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white"
+                                                            className="rounded-lg px-4 py-2 text-sm font-bold"
+                                                            style={{
+                                                                background: 'var(--settings-button-primary-bg)',
+                                                                color: 'var(--text-inverse)',
+                                                                boxShadow: 'var(--settings-button-primary-shadow)',
+                                                            }}
                                                         >
                                                             保存
                                                         </button>
@@ -3802,23 +3515,6 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
                     )
                 }
 
-                {/* Inpaint Modal */}
-                {
-                    inpaintImage && (
-                        <InpaintModal
-                            imageUrl={inpaintImage!.url}
-                            onCancel={() => setInpaintImage(null)}
-                            onSave={(maskBase64) => {
-                                setConfig(prev => ({
-                                    ...prev,
-                                    maskUrl: maskBase64,
-                                    editMode: 'inpaint'
-                                }));
-                                setInpaintImage(null);
-                            }}
-                        />
-                    )
-                }
             </div>
         </>
     );

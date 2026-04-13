@@ -12,9 +12,12 @@ import {
 import {
   cleanupImagesOlderThan,
   cleanupOriginals,
+  cleanupOriginalsOlderThan,
   getAllImageIds,
   getStorageUsage,
 } from '../../../services/storage/imageStorage';
+import { cleanupCompletedTasksOlderThan } from '../../../services/persistence/taskPersistence';
+import { cleanupLogsOlderThan } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
 import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
@@ -88,12 +91,12 @@ export const StorageSettingsView: React.FC = () => {
 
   const supportsLocal = isFileSystemAccessSupported();
   const cleanupOptions = [
-    { label: pick('1 天缓存', '1 Day Cache'), days: 1 },
-    { label: pick('7 天缓存', '7 Day Cache'), days: 7 },
-    { label: pick('30 天缓存', '30 Day Cache'), days: 30 },
+    { label: pick('7 天策略', '7-Day Policy'), days: 7 },
+    { label: pick('30 天策略', '30-Day Policy'), days: 30 },
   ] as const;
   const mergeCandidates = state.canvases.filter((canvas) => canvas.id !== activeCanvas?.id);
   const usageProgress = Math.min(100, (usageMB / 1024) * 100);
+  const retentionCleanupOptions = cleanupOptions;
 
   const formatMb = (value: number) => `${value.toFixed(2)} MB`;
   const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -254,34 +257,45 @@ export const StorageSettingsView: React.FC = () => {
     }
   };
 
-  const handleCleanupByAge = async (days: number) => {
+  const handleRetentionCleanup = async (days: number) => {
     setCleanupType(days);
     setLastActionMessage(
       pick(
-        `正在清理 ${days} 天前的图片缓存...`,
-        `Cleaning image cache older than ${days} days...`
+        `正在按 ${days} 天策略清理本地资源...`,
+        `Applying the ${days}-day retention policy...`
       )
     );
     try {
-      const result = await cleanupImagesOlderThan(days);
+      const [imageResult, originalResult, removedTasks, removedLogs] = await Promise.all([
+        cleanupImagesOlderThan(days),
+        cleanupOriginalsOlderThan(days),
+        cleanupCompletedTasksOlderThan(days),
+        Promise.resolve(cleanupLogsOlderThan(days)),
+      ]);
+      const totalCount = imageResult.count + originalResult.count + removedTasks + removedLogs;
+      const totalSavedBytes = imageResult.savedBytes + originalResult.savedBytes;
       const summary =
-        result.count > 0
+        totalCount > 0
           ? pick(
-              `已移除 ${days} 天前的 ${result.count} 张缓存图片，约释放 ${formatSavedSpace(result.savedBytes)}。`,
-              `Removed ${result.count} cached images older than ${days} days and reclaimed about ${formatSavedSpace(result.savedBytes)}.`
+              `已按 ${days} 天策略清理 ${totalCount} 项本地资源，释放约 ${formatSavedSpace(totalSavedBytes)}。`,
+              `Removed ${totalCount} local resources using the ${days}-day policy and reclaimed about ${formatSavedSpace(totalSavedBytes)}.`
             )
-          : pick(`没有发现 ${days} 天前的图片缓存。`, `No image cache older than ${days} days was found.`);
-      notify.success(pick('按时间清理完成', 'Timed cleanup complete'), summary);
+          : pick(
+              `没有发现超过 ${days} 天的本地资源。`,
+              `No local resources older than ${days} days were found.`
+            );
+
+      notify.success(pick('按时清理完成', 'Timed cleanup complete'), summary);
       setLastActionMessage(summary);
       await refresh();
     } catch (error) {
-      console.error('[StorageSettingsView] Cleanup by age failed:', error);
+      console.error('[StorageSettingsView] Retention cleanup failed:', error);
       notify.error(
         pick('清理失败', 'Cleanup failed'),
         pick('请稍后重试。', 'Please try again later.')
       );
       setLastActionMessage(
-        pick(`${days} 天缓存清理失败。`, `Timed cleanup for ${days}-day cache failed.`)
+        pick(`${days} 天策略清理失败。`, `Timed cleanup for the ${days}-day policy failed.`)
       );
     } finally {
       setCleanupType(null);
@@ -551,7 +565,10 @@ export const StorageSettingsView: React.FC = () => {
                 <div className="settings-reference-card__eyebrow">{pick('缓存维护', 'Cache Maintenance')}</div>
                 <div className="settings-reference-card__title">{pick('清理控制', 'Cleanup Controls')}</div>
                 <div className="settings-reference-card__meta">
-                  {pick('把清理原图和按时间清理拆开，避免误删不该处理的内容。', 'Each control is a dedicated maintenance action consistent with the rest of the settings console.')}
+                  {pick(
+                    '手机端只保留手动清原图和 7 天 / 30 天策略，避免误触过短档位。',
+                    'Mobile keeps manual original cleanup plus 7-day and 30-day policies only.'
+                  )}
                 </div>
               </div>
               <Trash2 size={18} className="text-[var(--text-primary)]" />
@@ -559,9 +576,12 @@ export const StorageSettingsView: React.FC = () => {
 
             <div className="mt-5 space-y-4">
               <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">{pick('原图缓存', 'Original Cache')}</div>
+                <div className="settings-reference-mini-metric__label">{pick('手动清原图', 'Manual Originals Cleanup')}</div>
                 <div className="settings-reference-mini-metric__helper">
-                  {pick('只删除原始图片素材，保留结果图和项目元数据。', 'Remove original image artifacts while keeping result images and project metadata intact.')}
+                  {pick(
+                    '只在你手动执行时清理原图，结果图和项目数据会保留。',
+                    'Originals are removed only when you run this manual cleanup. Result images and project data stay intact.'
+                  )}
                 </div>
                 <div className="mt-4">
                   <SettingsActionButton
@@ -570,24 +590,27 @@ export const StorageSettingsView: React.FC = () => {
                     loading={cleanupType === 'compress'}
                     onClick={() => void handleCleanup()}
                   >
-                    {pick('清理原图缓存', 'Clean Original Cache')}
+                    {pick('立即手动清原图', 'Clean Originals Manually')}
                   </SettingsActionButton>
                 </div>
               </div>
 
               <div className="settings-reference-grid-3">
-                {cleanupOptions.map((option) => (
+                {retentionCleanupOptions.map((option) => (
                   <div key={option.days} className="settings-reference-mini-metric">
                     <div className="settings-reference-mini-metric__label">{option.label}</div>
                     <div className="settings-reference-mini-metric__helper">
-                      {pick('删除较早的图片缓存，同时保留较新的工作区资源。', 'Remove aged image cache while preserving newer workspace assets.')}
+                      {pick(
+                        `会同时按 ${option.days} 天策略清理缓存图、原图、任务记录和系统日志。`,
+                        `Apply the ${option.days}-day policy to cached images, originals, task records, and system logs.`
+                      )}
                     </div>
                     <div className="mt-4">
                       <SettingsActionButton
                         loading={cleanupType === option.days}
-                        onClick={() => void handleCleanupByAge(option.days)}
+                        onClick={() => void handleRetentionCleanup(option.days)}
                       >
-                        {pick('执行清理', 'Run Cleanup')}
+                        {pick(`应用 ${option.days} 天策略`, `Apply ${option.days}-Day Policy`)}
                       </SettingsActionButton>
                     </div>
                   </div>

@@ -33,9 +33,15 @@ interface CachedAuthenticationResult {
   expiresAt: number;
 }
 
-const supabaseAuthLookupTimeoutMs = 4_000;
 const successfulAuthenticationCacheTtlMs = 60_000;
 const failedAuthenticationCacheTtlMs = 5_000;
+
+export function resolveSupabaseAuthLookupTimeoutMs(): number {
+  const rawValue = Number(process.env.SUPABASE_AUTH_LOOKUP_TIMEOUT_MS || "");
+  return Number.isFinite(rawValue) && rawValue >= 1_000
+    ? Math.floor(rawValue)
+    : 4_000;
+}
 
 function readBearerToken(headers: Record<string, string>): string | undefined {
   const authorization = String(headers.authorization || "").trim();
@@ -125,7 +131,7 @@ class HybridRequestAuthenticator implements RequestAuthenticator {
         global: {
           fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, {
             ...init,
-            signal: init?.signal ?? AbortSignal.timeout(supabaseAuthLookupTimeoutMs),
+            signal: init?.signal ?? AbortSignal.timeout(resolveSupabaseAuthLookupTimeoutMs()),
           }),
         },
       });

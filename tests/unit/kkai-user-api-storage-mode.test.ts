@@ -17,11 +17,33 @@ test('resolveKkaiUserApiStorageMode treats local-file auth persistence as ready 
   );
 });
 
+test('resolveKkaiUserApiStorageMode treats supabase auth persistence as cloud-ready but still writable', () => {
+  assert.equal(
+    resolveKkaiUserApiStorageMode({
+      reachable: true,
+      repositories: { authData: 'supabase' },
+      persistence: { userApiKeys: true, keyManager: true },
+    }),
+    'cloud-ready',
+  );
+});
+
 test('isKkaiUserApiStorageReady rejects unavailable persistence', () => {
   assert.equal(
     isKkaiUserApiStorageReady({
       reachable: false,
       repositories: { authData: 'unknown' },
+      persistence: { userApiKeys: false, keyManager: false },
+    }),
+    false,
+  );
+});
+
+test('isKkaiUserApiStorageReady rejects missing persistence readiness', () => {
+  assert.equal(
+    isKkaiUserApiStorageReady({
+      reachable: true,
+      repositories: { authData: 'memory' },
       persistence: { userApiKeys: false, keyManager: false },
     }),
     false,

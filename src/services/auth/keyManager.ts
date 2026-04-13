@@ -66,8 +66,6 @@ import {
 } from '../api/userApiPayload';
 import {
     getUserApisPayloadDensity,
-    loadUserApisPayloadFromCloudRecord,
-    mergeUserApisPayloadToCloudRecord,
 } from '../api/userApiCloudRecordStorage';
 import {
     isKkApiPersistenceUnavailableError,
@@ -1441,7 +1439,7 @@ export class KeyManager {
     }
 
     /**
-     * Save state to localStorage (Only for anonymous users) or Cloud (For logged in)
+     * Save state for the active user without restoring browser-side plain-text secrets.
      */
     private async saveState(state?: KeyManagerState): Promise<void> {
         const toSave = state || this.state;
@@ -1449,10 +1447,10 @@ export class KeyManager {
 
         try {
             // Security update:
-            // Logged-in users write to cloud storage and skip plain-text local persistence.
+            // Logged-in users sync through the local API payload bridge and skip plain-text local persistence.
             // Local storage is only kept as a compatibility fallback for anonymous sessions.
             if (this.userId) {
-                console.log('[KeyManager] 安全模式：登录用户写入云端，跳过本地明文存储');
+                console.log('[KeyManager] 安全模式：登录用户同步本地 API payload，跳过本地明文存储');
                 // Optional: Clear existing local storage just in case
                 localStorage.removeItem(key);
 
@@ -1499,7 +1497,7 @@ export class KeyManager {
                 console.log('[KeyManager] Local cache loaded:', this.state.slots.length, 'slots');
             }
 
-            // Then hydrate cloud state asynchronously.
+            // Then hydrate the local API payload asynchronously.
             setTimeout(() => {
                 if (this.userId !== userId) {
                     return;
@@ -1517,7 +1515,7 @@ export class KeyManager {
 
                     if (this.providerStorageScope === 'user' && this.providers.length > 0) {
                         void this.saveToCloud(this.state).catch((syncError) => {
-                            console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
+                            console.warn('[KeyManager] Failed to backfill provider state to local API payload:', syncError);
                         });
                     }
                     if (this.canPollCloudState()) {
@@ -1545,7 +1543,7 @@ export class KeyManager {
     setStartupStage(stage: AppStartupStage): void {
         this.startupStage = stage;
 
-        if (!this.userId || this.userId.startsWith('dev-user-')) {
+        if (!this.userId) {
             return;
         }
 
@@ -1562,7 +1560,7 @@ export class KeyManager {
 
                 if (this.providerStorageScope === 'user' && this.providers.length > 0) {
                     void this.saveToCloud(this.state).catch((syncError) => {
-                        console.warn('[KeyManager] Failed to backfill provider state to cloud:', syncError);
+                        console.warn('[KeyManager] Failed to backfill provider state to local API payload:', syncError);
                     });
                 }
 
@@ -1570,7 +1568,7 @@ export class KeyManager {
                     this.subscribeRealtime(activeUserId);
                 }
             }).catch((error) => {
-                console.warn('[KeyManager] Deferred cloud hydration failed:', error);
+                console.warn('[KeyManager] Deferred local API payload hydration failed:', error);
             });
             return;
         }
@@ -1582,21 +1580,21 @@ export class KeyManager {
 
     private subscribeRealtime(userId: string) {
         this.unsubscribeRealtime();
-        console.log('[KeyManager] Starting API-backed cloud sync polling...');
+        console.log('[KeyManager] Starting local API payload polling...');
         this.realtimeChannel = setInterval(() => {
             if (this.userId !== userId || this.isSyncing) {
                 return;
             }
 
             void this.loadFromCloud().catch((error) => {
-                console.warn('[KeyManager] Periodic cloud sync refresh failed:', error);
+                console.warn('[KeyManager] Periodic local API payload refresh failed:', error);
             });
         }, CLOUD_SYNC_POLL_INTERVAL_MS);
     }
 
     private unsubscribeRealtime() {
         if (this.realtimeChannel) {
-            console.log('[KeyManager] Stop cloud sync polling');
+            console.log('[KeyManager] Stop local API payload polling');
             clearInterval(this.realtimeChannel);
             this.realtimeChannel = null;
         }
@@ -1634,7 +1632,7 @@ export class KeyManager {
             this.providerStorageScope = 'cloud';
             this.persistProvidersLocal();
         } else if (shouldPreserveUnsyncedProviders) {
-            console.warn('[KeyManager] Preserving unsynced providers because cloud payload returned an empty provider list.');
+            console.warn('[KeyManager] Preserving unsynced providers because the local API payload returned an empty provider list.');
         }
 
         let cloudSlots = extractKeyManagerCloudSlots(rawPayload) as KeySlot[];
@@ -1650,7 +1648,7 @@ export class KeyManager {
         });
 
         if (rawCloudSlots.length > 0 && validCloudSlots.length === 0) {
-            console.warn('[KeyManager] Cloud user_apis payload is not a key-slot structure, skipping overwrite.');
+            console.warn('[KeyManager] Local API user_apis payload is not a key-slot structure, skipping overwrite.');
             return;
         }
 
@@ -1710,7 +1708,7 @@ export class KeyManager {
                 const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !currentModels.includes(m));
 
                 if (missingDefaults.length > 0 || newProvider !== s.provider) {
-                    console.log(`[KeyManager] Cloud Sync: Auto-adding models/fixing provider for key ${s.name}`);
+                    console.log(`[KeyManager] API payload refresh: Auto-adding models/fixing provider for key ${s.name}`);
                     return {
                         ...s,
                         provider: 'Google',
@@ -1732,51 +1730,39 @@ export class KeyManager {
             .forEach((provider) => {
                 this.clearLegacySlotsForRemovedProvider(provider, { persistState: false });
             });
-        console.log('[KeyManager] Cloud sync completed (overwrite mode). Keys:', this.state.slots.length);
+        console.log('[KeyManager] Local API payload refresh completed (overwrite mode). Keys:', this.state.slots.length);
         this.notifyListeners();
     }
 
     /**
-     * Load state from Supabase (Cloud is Source of Truth)
+     * Refresh state from the local API payload bridge for the active user.
      */
     /**
-     * Load state from Supabase (Cloud is Source of Truth)
+     * Refresh state from the local API payload bridge for the active user.
      */
     private async loadFromCloud() {
         if (!this.userId) return;
-
-        if (this.userId.startsWith('dev-user-')) return;
 
         const activeUserId = this.userId;
 
         try {
             this.isSyncing = true;
-            console.log('[KeyManager] Loading cloud state via API/Supabase...');
+            console.log('[KeyManager] Refreshing key-manager state from local API payload...');
             let preferredPayload: unknown = null;
             let loadError: unknown = null;
+            const accessToken = await getPreferredKkApiAccessToken();
 
-            if (this.authIsTempUser) {
-                const accessToken = await getPreferredKkApiAccessToken();
-
-                try {
-                    const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
-                    if (response.success) {
-                        preferredPayload = response.data;
-                    } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
-                        loadError = new Error(response.error.message || 'Cloud fetch failed.');
-                        console.warn('[KeyManager] Cloud fetch via API failed:', response.error);
-                    }
-                } catch (error) {
-                    loadError = error;
-                    console.warn('[KeyManager] Cloud fetch via API threw:', error);
+            try {
+                const response = await legacyWebApiClient.getKeyManagerCloudState({ accessToken });
+                if (response.success) {
+                    preferredPayload = response.data;
+                } else if (response.error.code !== 'AUTH_REQUIRED' && response.error.code !== 'HTTP_404') {
+                    loadError = new Error(response.error.message || 'Local API payload fetch failed.');
+                    console.warn('[KeyManager] Local API payload fetch failed:', response.error);
                 }
-            } else {
-                try {
-                    preferredPayload = await loadUserApisPayloadFromCloudRecord(activeUserId);
-                } catch (error) {
-                    loadError = error;
-                    console.warn('[KeyManager] Cloud fetch via authenticated API failed:', error);
-                }
+            } catch (error) {
+                loadError = error;
+                console.warn('[KeyManager] Local API payload fetch threw:', error);
             }
 
             if (this.userId !== activeUserId) {
@@ -1787,32 +1773,8 @@ export class KeyManager {
 
             const hasLocalState = this.state.slots.length > 0 || this.providers.length > 0;
             if ((preferredPayload == null || preferredDensity === 0) && hasLocalState && loadError) {
-                console.warn('[KeyManager] Cloud payload empty during degraded sync, preserving local state.');
+                console.warn('[KeyManager] Local API payload empty during degraded sync, preserving local state.');
                 return;
-            }
-
-            if (!this.authIsTempUser && shouldUseLegacyWebApiFallback() && !this.hasHydratedCloudState && preferredDensity > 0) {
-                const normalizedCloudPayload = isUserApisEnvelope(preferredPayload)
-                    ? preferredPayload as { version?: number; slots?: unknown[]; providers?: unknown[] }
-                    : {
-                        version: 2,
-                        slots: extractKeyManagerCloudSlots(preferredPayload),
-                        providers: extractUserApiProvidersFromPayload(preferredPayload),
-                    };
-
-                void getPreferredKkApiAccessToken().then((accessToken) => (
-                    legacyWebApiClient.replaceKeyManagerCloudState({
-                        version: Number(normalizedCloudPayload.version || 2),
-                        slots: Array.isArray(normalizedCloudPayload.slots)
-                            ? normalizedCloudPayload.slots as Record<string, unknown>[]
-                            : [],
-                        providers: Array.isArray(normalizedCloudPayload.providers)
-                            ? normalizedCloudPayload.providers as Record<string, unknown>[]
-                            : [],
-                    }, { accessToken })
-                )).catch((error) => {
-                    console.warn('[KeyManager] Failed to seed local key-manager store from cloud payload:', error);
-                });
             }
 
             const shouldPreserveLocalProviders =
@@ -1824,7 +1786,7 @@ export class KeyManager {
                 preserveLocalProvidersOnEmpty: shouldPreserveLocalProviders,
             });
         } catch (e) {
-            console.error('[KeyManager] Error loading from cloud:', e);
+            console.error('[KeyManager] Error refreshing local API payload:', e);
         } finally {
             this.isSyncing = false;
             if (this.userId === activeUserId && this.hasPendingCloudSync()) {
@@ -1862,7 +1824,7 @@ export class KeyManager {
 
 
     /**
-     * Save state to Supabase
+     * Sync state to the local API payload bridge for the active user.
      */
     private async saveToCloud(
         state: KeyManagerState,
@@ -1872,8 +1834,8 @@ export class KeyManager {
         }
     ) {
         const activeUserId = this.userId;
-        if (!activeUserId || activeUserId.startsWith('dev-user-')) {
-            console.log('[KeyManager] Skip cloud upload (missing userId or dev user)');
+        if (!activeUserId) {
+            console.log('[KeyManager] Skip local API payload sync (missing userId)');
             return;
         }
 
@@ -1883,9 +1845,10 @@ export class KeyManager {
 
         try {
             const canUseLegacyApi = shouldUseLegacyWebApiFallback() || this.authIsTempUser;
-            console.log('[KeyManager] Uploading key-manager state via local API/cloud sync...', {
+            console.log('[KeyManager] Syncing key-manager state to local API payload...', {
                 userId: activeUserId,
-                slotCount: state.slots.length
+                slotCount: state.slots.length,
+                runtimeFallbackEnabled: canUseLegacyApi,
             });
 
             const nextProviders =
@@ -1905,129 +1868,61 @@ export class KeyManager {
 
             let localApiPayload: unknown = null;
             let localApiError: Error | null = null;
-
-            if (this.authIsTempUser) {
-                if (canUseLegacyApi) {
-                    const accessToken = await getPreferredKkApiAccessToken();
-                    const response = await legacyWebApiClient.replaceKeyManagerCloudState({
-                        version: 2,
-                        slots: compactSlots,
-                        providers: compactProviders,
-                    }, { accessToken });
-
-                    if (response.success) {
-                        localApiPayload = response.data;
-                    } else {
-                        const errorCode = response.error?.code || 'UNKNOWN_ERROR';
-                        const errorMessage = response.error?.message || 'Unknown local API sync failure.';
-                        const isNetworkError = errorCode === 'NETWORK_ERROR'
-                            || errorMessage.includes('fetch')
-                            || errorMessage.includes('Network');
-
-                        if (isNetworkError) {
-                            console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21\u672C\u5730 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
-                            this.cloudSyncBackoffUntil = Date.now() + 30_000;
-                            localApiError = new Error(errorMessage);
-                        } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
-                            console.error('[KeyManager] Local API session is missing or expired, postponing sync.');
-                            this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
-                            localApiError = new Error(errorMessage);
-                        } else {
-                            console.error('[KeyManager] Local API sync failed!', {
-                                code: errorCode,
-                                message: errorMessage,
-                                details: response.error?.details,
-                            });
-                            localApiError = new Error(errorMessage);
-                        }
-                    }
-                }
-
-                if (this.userId !== activeUserId) {
-                    return;
-                }
-
-                if (localApiPayload) {
-                    this.hasHydratedCloudState = true;
-                    this.applyCloudPayload(localApiPayload);
-                    this.cloudSyncBackoffUntil = 0;
-                    requestCostSync().catch(console.error);
-                    return;
-                }
-
-                if (localApiError) {
-                    throw localApiError;
-                }
-
-                return;
-            }
-
-            const savedPayload = await mergeUserApisPayloadToCloudRecord({
+            const accessToken = await getPreferredKkApiAccessToken();
+            const response = await legacyWebApiClient.replaceKeyManagerCloudState({
+                version: 2,
                 slots: compactSlots,
                 providers: compactProviders,
-            }, activeUserId);
+            }, { accessToken });
+
+            if (response.success) {
+                localApiPayload = response.data;
+            } else {
+                const errorCode = response.error?.code || 'UNKNOWN_ERROR';
+                const errorMessage = response.error?.message || 'Unknown local API sync failure.';
+                const isNetworkError = errorCode === 'NETWORK_ERROR'
+                    || errorMessage.includes('fetch')
+                    || errorMessage.includes('Network');
+
+                if (isNetworkError) {
+                    console.warn('[KeyManager] \u7F51\u7EDC\u5F02\u5E38\uFF0C\u8DF3\u8FC7\u672C\u6B21\u672C\u5730 API \u540C\u6B65\uFF0C\u7A0D\u540E\u91CD\u8BD5');
+                    this.cloudSyncBackoffUntil = Date.now() + 30_000;
+                    localApiError = new Error(errorMessage);
+                } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
+                    console.error('[KeyManager] Local API session is missing or expired, postponing sync.');
+                    this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
+                    localApiError = new Error(errorMessage);
+                } else {
+                    console.error('[KeyManager] Local API sync failed!', {
+                        code: errorCode,
+                        message: errorMessage,
+                        details: response.error?.details,
+                    });
+                    localApiError = new Error(errorMessage);
+                }
+            }
 
             if (this.userId !== activeUserId) {
                 return;
             }
 
-            this.hasHydratedCloudState = true;
-            this.applyCloudPayload(savedPayload);
-            console.log('[KeyManager] Cloud sync succeeded.');
-            this.cloudSyncBackoffUntil = 0;
-
-            if (canUseLegacyApi) {
-                const accessToken = await getPreferredKkApiAccessToken();
-                const response = await legacyWebApiClient.replaceKeyManagerCloudState({
-                    version: Number((savedPayload as { version?: number } | null | undefined)?.version || 2),
-                    slots: extractKeyManagerCloudSlots(savedPayload) as Record<string, unknown>[],
-                    providers: extractUserApiProvidersFromPayload(savedPayload) as Record<string, unknown>[],
-                }, { accessToken });
-
-                if (response.success) {
-                    localApiPayload = response.data;
-                } else {
-                    const errorCode = response.error?.code || 'UNKNOWN_ERROR';
-                    const errorMessage = response.error?.message || 'Unknown local API sync failure.';
-                    const isNetworkError = errorCode === 'NETWORK_ERROR'
-                        || errorMessage.includes('fetch')
-                        || errorMessage.includes('Network');
-
-                    if (isNetworkError) {
-                        console.warn('[KeyManager] Cloud save succeeded, but local API seed will retry after network recovery.');
-                        this.cloudSyncBackoffUntil = Date.now() + 30_000;
-                        localApiError = new Error(errorMessage);
-                    } else if (errorCode === 'AUTH_REQUIRED' || errorCode === 'HTTP_401' || errorCode === 'HTTP_403') {
-                        console.error('[KeyManager] Cloud save succeeded, but local API session is missing or expired.');
-                        this.cloudSyncBackoffUntil = Date.now() + 5 * 60_000;
-                        localApiError = new Error(errorMessage);
-                    } else {
-                        console.error('[KeyManager] Cloud save succeeded, but local API seed failed!', {
-                            code: errorCode,
-                            message: errorMessage,
-                            details: response.error?.details,
-                        });
-                        localApiError = new Error(errorMessage);
-                    }
-                }
-            }
-
-            if (this.userId === activeUserId && localApiPayload) {
+            if (localApiPayload) {
                 this.hasHydratedCloudState = true;
                 this.applyCloudPayload(localApiPayload);
+                this.cloudSyncBackoffUntil = 0;
+                console.log('[KeyManager] Local API payload sync succeeded.');
+                requestCostSync().catch(console.error);
+                return;
             }
 
             if (localApiError) {
-                console.warn('[KeyManager] Canonical cloud save succeeded, but local key-manager bridge is out of sync:', localApiError);
+                throw localApiError;
             }
-
-            requestCostSync().catch(console.error);
-            return;
         } catch (e: any) {
             if (isKkApiPersistenceUnavailableError(e)) {
                 this.schedulePendingCloudRetry();
                 if (!options?.throwOnError) {
-                    notify.warning('Cloud sync unavailable', e.message);
+                    notify.warning('Local API payload sync unavailable', e.message);
                 }
                 return;
             }
@@ -2080,7 +1975,7 @@ export class KeyManager {
         this.pendingCloudSyncPromise = this.saveToCloud(state).then(() => {
             clearCloudSyncPendingFlagsOnRevisionMatch(this.cloudSyncState, syncRevision);
         }).catch((error) => {
-            console.error('[KeyManager] Failed to sync key-manager state to cloud:', error);
+            console.error('[KeyManager] Failed to sync key-manager state to local API payload:', error);
         }).finally(() => {
             this.pendingCloudSyncPromise = null;
 
@@ -2100,7 +1995,7 @@ export class KeyManager {
     }
 
     async refreshFromCloudNow(): Promise<void> {
-        if (!this.userId || this.userId.startsWith('dev-user-')) {
+        if (!this.userId) {
             return;
         }
 
@@ -2108,7 +2003,7 @@ export class KeyManager {
     }
 
     private ensureCloudHydration(): void {
-        if (!this.userId || this.userId.startsWith('dev-user-')) {
+        if (!this.userId) {
             return;
         }
 
@@ -2121,7 +2016,7 @@ export class KeyManager {
         }
 
         void this.loadFromCloud().catch((error) => {
-            console.warn('[KeyManager] Lazy cloud hydration failed:', error);
+            console.warn('[KeyManager] Lazy local API payload hydration failed:', error);
         });
     }
 

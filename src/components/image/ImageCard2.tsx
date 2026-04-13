@@ -21,6 +21,7 @@ import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { getResolvedCreditCost, isCreditBillingTarget } from '../../utils/creditBilling';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -874,7 +875,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 	    const handleSingleDownload = async (e: React.MouseEvent) => {
 	        e.stopPropagation();
 	        try {
-	            const { base64ToBlob, triggerDownload } = await import('../../utils/downloadUtils');
 	            const isVideoMode = image.mode === GenerationMode.VIDEO || (image.url && image.url.includes('.mp4'));
 	            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
 
@@ -921,7 +921,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
 
 	            // 生成下载专用文档名 (格式: KKStudio_{类别}_{随机英数}.{后缀})
-	            const { generateDownloadFilename } = await import('../../utils/downloadUtils');
 	            const exportType = isAudioMode ? 'Audio' : (isVideoMode ? 'Video' : 'Image');
             const exportExt = isAudioMode ? '.mp3' : (isVideoMode ? '.mp4' : '.png');
             const filename = generateDownloadFilename(exportType, exportExt);

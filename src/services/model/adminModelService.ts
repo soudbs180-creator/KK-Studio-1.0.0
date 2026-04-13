@@ -1,4 +1,5 @@
-﻿import { kkWebApiClient } from '../api/kkApiClient';
+﻿import type { ApiError } from '../../../packages/contracts/src/index.ts';
+import { kkWebApiClient } from '../api/kkApiClient';
 
 
 import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
@@ -329,10 +330,44 @@ class AdminModelService {
     return this.loadAdminModels(true);
   }
 
+  private shouldFallbackToLegacyActiveCreditModels(
+    error: ApiError | null | undefined,
+  ): boolean {
+    const errorCode = String(error?.code || '').trim();
+    const errorMessage = String(error?.message || '').trim().toLowerCase();
+    const has404Status = Array.isArray(error?.details)
+      && error.details.some((detail) => {
+        if (!detail || typeof detail !== 'object') {
+          return false;
+        }
+
+        return Number((detail as { status?: unknown }).status || 0) === 404;
+      });
+
+    return errorCode === 'HTTP_404'
+      || errorCode === 'NOT_FOUND'
+      || has404Status
+      || errorMessage.includes('404')
+      || errorMessage.includes('not found');
+  }
+
   private async readFromApi(): Promise<FlatModelRow[]> {
-    const response = await kkWebApiClient.listActiveCreditModels();
+    const activeModelsResponse = await kkWebApiClient.listActiveModels({ accessToken: '' });
+    if (activeModelsResponse.success) {
+      return this.mapLegacyProviderRows(activeModelsResponse.data.items || []);
+    }
+
+    if (!this.shouldFallbackToLegacyActiveCreditModels(activeModelsResponse.error)) {
+      throw new Error(activeModelsResponse.error?.message || 'Failed to load active model catalog.');
+    }
+
+    const response = await kkWebApiClient.listActiveCreditModels({ accessToken: '' });
     if (!response.success) {
-      throw new Error(response.error?.message || 'Failed to load active credit models.');
+      throw new Error(
+        response.error?.message
+        || activeModelsResponse.error?.message
+        || 'Failed to load active credit models.',
+      );
     }
 
     return this.mapLegacyProviderRows(response.data.items || []);

@@ -13,11 +13,21 @@ function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
   return `http://127.0.0.1:${address.port}`;
 }
 
+function withMutedConsoleWarn<T>(callback: () => T): T {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return callback();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 describe("temp user rate limiting", () => {
-  const server = createApiServer(0, {
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
     authDataRepository: new InMemoryAuthDataRepository(),
     verifyTurnstileToken: async () => ({ success: true }),
-  });
+  }));
   let baseUrl = "";
 
   before(async () => {

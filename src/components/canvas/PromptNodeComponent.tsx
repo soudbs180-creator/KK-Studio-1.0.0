@@ -16,6 +16,7 @@ import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -69,6 +70,32 @@ const resolveGenerationTimerStart = (node: PromptNode): number | undefined => {
     return getFiniteTimerStart(metadata?.attemptStartedAt) ?? getFiniteTimerStart(node.timestamp);
 };
 
+const getOptimizerStrategySummaryZh = (
+    node: Pick<PromptNode, 'promptOptimizerResult'>,
+): string | null => {
+    const title = String(
+        (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
+    ).trim();
+    const taskType = String(node.promptOptimizerResult?.params?.task_type || '').trim();
+
+    if (title.includes('电商主图') || taskType === 'ecommerce_hero') {
+        return '当前这次优化会优先补齐产品主体、卖点焦点、拍摄角度和背景材质，让结果更适合主图与电商展示。';
+    }
+    if (title.includes('界面与版式') || taskType === 'ui') {
+        return '当前这次优化会优先补齐界面类型、信息层级、配色风格和展示场景，让版式表达更清晰。';
+    }
+    if (title.includes('PPT 叙事') || taskType === 'infographic') {
+        return '当前这次优化会优先补齐页面主题、版式层级、主视觉和配色方向，让演示页更稳定易读。';
+    }
+    if (title.includes('电影感场景') || taskType === 'lifestyle_photo') {
+        return '当前这次优化会优先补齐主体身份、场景环境、情绪氛围和镜头语言，让画面更有叙事感。';
+    }
+    if (title) {
+        return '当前这次优化会优先补齐核心主体、风格方向、光线氛围和构图重点，再尽量保持你的原始意图不被改偏。';
+    }
+    return null;
+};
+
 interface PromptNodeProps {
     node: PromptNode;
     detailLevel?: CanvasCardDetailLevel;
@@ -94,6 +121,11 @@ interface PromptNodeProps {
     onExportPptx?: (node: PromptNode) => void;
     onRetryPptPage?: (node: PromptNode, pageIndex: number) => void;
     onExportPptPage?: (node: PromptNode, pageIndex: number) => void;
+    onToggleEcommerceSelected?: (node: PromptNode, selected: boolean) => void;
+    onGenerateEcommerceNode?: (node: PromptNode) => void;
+    onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
+    onConfirmEcommerceDesktop?: (node: PromptNode) => void;
+    onRetryEcommerceModule?: (node: PromptNode) => void;
     ioTrace?: {
         inputStorageIds: string[];
         outputStorageIds: string[];
@@ -319,6 +351,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onExportPptx,
     onRetryPptPage,
     onExportPptPage,
+    onToggleEcommerceSelected,
+    onGenerateEcommerceNode,
+    onGenerateEcommerceGroup,
+    onConfirmEcommerceDesktop,
+    onRetryEcommerceModule,
     ioTrace,
     onOpenStorageSettings,
     onDisconnect,
@@ -1137,9 +1174,15 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 {node.promptOptimizerResult.params.aspect_ratio}
                                             </div>
                                         )}
-                                        {node.promptOptimizerResult?.meta?.template_title && (
+                                        {String(
+                                            (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
+                                        ).trim() && (
                                             <div className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[9px] font-bold border border-emerald-500/20">
-                                                {node.promptOptimizerResult.meta.template_title}
+                                                自动策略 · {
+                                                    String(
+                                                        (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
+                                                    ).trim()
+                                                }
                                             </div>
                                         )}
                                         {node.promptOptimizerResult?.confidence && (
@@ -1215,6 +1258,18 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 </div>
 
                                 {/* Assumptions / Tips */}
+                                {getOptimizerStrategySummaryZh(node) && (
+                                    <div className="mt-2 p-2 rounded-lg bg-violet-500/5 border border-violet-500/15">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-violet-300/90 mb-2">
+                                            <Sparkles size={12} />
+                                            <span>自动策略说明</span>
+                                        </div>
+                                        <div className="text-[10px] text-violet-100/80 leading-normal">
+                                            {getOptimizerStrategySummaryZh(node)}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {(node.promptOptimizerResult?.assumptions || []).length > 0 && (
                                     <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
                                         <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
@@ -1263,7 +1318,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     <div className="mt-2 p-2 rounded-lg bg-red-500/5 border border-red-500/15">
                                         <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-300/90 mb-2">
                                             <AlertTriangle size={12} />
-                                            <span>仍可补充</span>
+                                            <span>建议补充（可选）</span>
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
                                             {(node.promptOptimizerResult?.missing_inputs || []).map((item, index) => (
@@ -1282,6 +1337,17 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             <div className="text-[15px] leading-7 text-[var(--text-primary)] font-normal selection:bg-blue-500/20 pr-2">
                                 {node.originalPrompt || node.prompt || (node.isDraft ? <span className="text-[var(--text-tertiary)] italic">输入提示词...</span> : '')}
                             </div>
+                        )}
+
+                        {node.ecommerce && onToggleEcommerceSelected && onGenerateEcommerceNode && onGenerateEcommerceGroup && onConfirmEcommerceDesktop && onRetryEcommerceModule && (
+                            <EcommerceCardActions
+                                node={node}
+                                onToggleSelected={onToggleEcommerceSelected}
+                                onGenerateNode={onGenerateEcommerceNode}
+                                onGenerateGroup={onGenerateEcommerceGroup}
+                                onConfirmDesktop={onConfirmEcommerceDesktop}
+                                onGenerateMobile={onRetryEcommerceModule}
+                            />
                         )}
 
                         {onEditPptDeck && node.mode === GenerationMode.PPT && (node.childImageIds?.length || 0) > 0 && !node.isGenerating && (
@@ -1695,6 +1761,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                                         {node.aspectRatio || '1:1'} · {node.mode === GenerationMode.VIDEO ? '720p' :
                                                                             node.mode === GenerationMode.AUDIO ? '音频' :
                                                                                 node.mode === GenerationMode.PPT ? 'PPT' :
+                                                                                    node.mode === GenerationMode.ECOMMERCE ? '电商' :
                                                                                     (node.imageSize as string) === '1024x1024' || (node.imageSize as string) === '1K' ? '1K' :
                                                                                         (node.imageSize as string) === '2048x2048' || (node.imageSize as string) === '2K' ? '2K' :
                                                                                             (node.imageSize as string) === '4096x4096' || (node.imageSize as string) === '4K' ? '4K' :

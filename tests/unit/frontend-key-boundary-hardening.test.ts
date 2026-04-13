@@ -159,14 +159,17 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /<SegmentedControlMulti[\s\S]*?value=\{getModeOption\(providerForm\.mode\)\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
 });
 
-test('AuthContext keeps KeyManager scoped to authenticated Supabase users only', () => {
+test('AuthContext keeps KeyManager scoped to the current KK runtime user and clears auth state on invalidation', () => {
   const source = readSource('src/context/AuthContext.tsx');
 
-  assert.match(source, /import \{ keyManager \} from '\.\.\/services\/auth\/keyManager';/);
+  assert.match(source, /import \{ keyManager \} from ["']\.\.\/services\/auth\/keyManager["'];/);
   assert.match(source, /useLayoutEffect/);
-  assert.match(source, /const nextUserId = tempUserSession \? null : \(user\?\.id \|\| null\);/);
-  assert.match(source, /void keyManager\.setUserId\(nextUserId\)\.catch\(\(error\) => \{/);
-  assert.match(source, /emitAuthSessionChange\(\{\s*hasSession: false,\s*userId: cachedTempUser\.user\.id,\s*isTempUser: true,\s*\}\);/);
+  assert.match(source, /const runtimeUserId = runtimeState\.user\?\.id \|\| null;/);
+  assert.match(source, /const keyManagerUserId = runtimeState\.isTempUser \? null : runtimeUserId;/);
+  assert.match(source, /void keyManager\.setUserId\(keyManagerUserId\)\.catch\(\(error\) => \{/);
+  assert.match(source, /emitAuthSessionChange\(\{\s*hasSession: Boolean\(sessionAccessToken\) && !runtimeState\.isTempUser,/);
+  assert.match(source, /subscribeAuthSessionInvalidationRequest\(\(\) => \{/);
+  assert.match(source, /setRuntimeState\(clearPersistedRuntimeAuthState\(\)\);/);
 });
 
 test('KeyManager clears prior in-memory user state before hydrating the next account scope', () => {
@@ -182,7 +185,7 @@ test('BillingContext clears balance and transaction state immediately when the u
 
   assert.match(source, /const \[refreshing, setRefreshing\] = useState\(false\);/);
   assert.match(source, /const \[hydratedUserId, setHydratedUserId\] = useState<string \| null>\(null\);/);
-  assert.match(source, /const activeBillingUserId = !user \|\| isTempUser \? null : user\.id;/);
+  assert.match(source, /const activeBillingUserId = billingRuntime\.activeBillingUserId;/);
   assert.match(source, /const hasVisibleBillingSeed = Boolean\(activeBillingUserId\) && hydratedUserId === activeBillingUserId;/);
   assert.match(source, /useEffect\(\(\) => \{\s*refreshPromiseRef\.current = null;/);
   assert.match(source, /window\.clearTimeout\(realtimeRefreshTimerRef\.current\);/);

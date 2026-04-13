@@ -160,8 +160,6 @@ async function main() {
     const paymentFiles = [
       '.env.example',
       'index.js',
-      'manual_recharge.js',
-      'mcpClient.js',
       'package-lock.json',
       'package.json',
       'runtime_payment_bridge.js',

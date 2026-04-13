@@ -1175,6 +1175,39 @@ export async function cleanupImagesOlderThan(days: number): Promise<{ count: num
     return { count, savedBytes };
 }
 
+export async function cleanupOriginalsOlderThan(days: number): Promise<{ count: number; savedBytes: number }> {
+    if (!Number.isFinite(days) || days <= 0) {
+        throw new Error('INVALID_ORIGINAL_RETENTION_RANGE');
+    }
+
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const ids = await getAllImageIds();
+
+    let count = 0;
+    let savedBytes = 0;
+
+    for (const id of ids) {
+        try {
+            const metadata = await getImageMetadata(id);
+            if (!metadata?.timestamp || metadata.timestamp > cutoff || !metadata.protected) {
+                continue;
+            }
+
+            const original = await getStrictOriginalImage(id);
+            if (original) {
+                savedBytes += original.length;
+            }
+
+            await deleteImage(id);
+            count += 1;
+        } catch (error) {
+            console.warn(`[ImageStorage] Failed to cleanup expired original ${id}`, error);
+        }
+    }
+
+    return { count, savedBytes };
+}
+
 export async function getAllImageIds(): Promise<string[]> {
     try {
         const db = await openDB();

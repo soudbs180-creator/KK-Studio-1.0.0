@@ -15,6 +15,10 @@ const missingEnvKeys = [
 
 const supabaseUrl = hasExplicitSupabaseConfig ? envSupabaseUrl : DISABLED_SUPABASE_URL;
 const supabaseAnonKey = hasExplicitSupabaseConfig ? envSupabaseAnonKey : DISABLED_SUPABASE_ANON_KEY;
+const shouldLogSupabaseConfigIssue =
+  typeof process === 'undefined'
+    ? true
+    : process.env.KK_SUPPRESS_SUPABASE_PUBLIC_CONFIG_LOGS !== 'true';
 
 export const hasSupabaseConfig = hasExplicitSupabaseConfig;
 export const isUsingBuiltinSupabaseConfig = false;
@@ -23,7 +27,7 @@ export const supabaseConfigIssue = hasSupabaseConfig
   : `Missing Supabase public config (${missingEnvKeys.join(', ')}). Auth and cloud sync are disabled.`;
 export { supabaseUrl, supabaseAnonKey };
 
-if (!hasSupabaseConfig) {
+if (!hasSupabaseConfig && shouldLogSupabaseConfigIssue) {
   console.error('[Supabase] Public client config is unavailable.');
   console.error('[Supabase]', supabaseConfigIssue);
 }

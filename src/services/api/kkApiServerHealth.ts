@@ -227,6 +227,20 @@ export function isKkApiUserDataPersistedInCloudFromHealth(
   );
 }
 
+export function isKkApiUserDataWritableFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && (health.repositories.authData === 'supabase' || health.repositories.authData === 'local-file')
+    && health.persistence.userApiKeys
+    && health.persistence.keyManager
+    && health.config.hasUserApiEncryptionSecret,
+  );
+}
+
 export function isKkApiBillingPersistedInCloudFromHealth(
   health: KkApiServerHealth | null | undefined,
 ): boolean {
@@ -235,6 +249,18 @@ export function isKkApiBillingPersistedInCloudFromHealth(
     && health.reachable
     && health.verified
     && health.repositories.creditAccounts === 'supabase'
+    && health.persistence.credits,
+  );
+}
+
+export function isKkApiBillingAvailableFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && (health.repositories.creditAccounts === 'supabase' || health.repositories.creditAccounts === 'local-file')
     && health.persistence.credits,
   );
 }
@@ -283,10 +309,7 @@ export async function assertKkApiUserDataWritable(): Promise<KkApiServerHealth> 
     );
   }
 
-  const userDataPersisted =
-    (health.repositories.authData === 'supabase' || health.repositories.authData === 'local-file')
-    && health.persistence.userApiKeys
-    && health.persistence.keyManager;
+  const userDataPersisted = isKkApiUserDataWritableFromHealth(health);
 
   if (!userDataPersisted) {
     throw new KkApiPersistenceUnavailableError(
@@ -315,6 +338,11 @@ export async function isKkApiUserDataPersistedInCloud(
 export async function isKkApiBillingPersistedInCloud(): Promise<boolean> {
   const health = await getKkApiServerHealth();
   return isKkApiBillingPersistedInCloudFromHealth(health);
+}
+
+export async function isKkApiBillingAvailable(options?: { forceRefresh?: boolean }): Promise<boolean> {
+  const health = await getKkApiServerHealth(options);
+  return isKkApiBillingAvailableFromHealth(health);
 }
 
 export async function isKkApiCreditProviderCatalogPersistedInCloud(): Promise<boolean> {

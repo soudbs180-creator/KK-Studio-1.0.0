@@ -70,6 +70,7 @@ export interface ChatOptions {
 export interface ImageGenerationOptions {
     modelId: string;
     prompt: string;
+    requestId?: string;
     negativePrompt?: string;
     seed?: number;
 
@@ -111,6 +112,9 @@ export function extractRefImageData(ref: string | { data: string; mimeType: stri
 
 export interface ImageGenerationResult {
     urls: string[];
+    deducted?: boolean;
+    ledgerId?: string;
+    balanceAfter?: number;
     usage?: {
         promptTokens?: number;
         completionTokens?: number;

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 
 import {
   AUTHENTICATED_USER_EMAIL_HEADER,
@@ -19,6 +19,7 @@ import {
 
 const REDACTED_KEY_PREFIX = "__kk_redacted__:key:";
 const REDACTED_API_KEY_PREFIX = "__kk_redacted__:apiKey:";
+const originalConsoleWarn = console.warn;
 
 class FakeUserScopedAuthDataMirror implements UserScopedAuthDataMirror {
   public payload: unknown | null = null;
@@ -60,6 +61,38 @@ class FailingUserScopedAuthDataMirror implements UserScopedAuthDataMirror {
     throw new Error("mirror unavailable");
   }
 }
+
+async function withMutedConsoleWarnAsync<T>(callback: () => Promise<T>): Promise<T> {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return await callback();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
+async function withLocalOnlyEnv<T>(callback: () => Promise<T>): Promise<T> {
+  const previousValue = process.env.KKAI_LOCAL_ONLY;
+  process.env.KKAI_LOCAL_ONLY = "true";
+  try {
+    return await callback();
+  } finally {
+    if (typeof previousValue === "undefined") {
+      delete process.env.KKAI_LOCAL_ONLY;
+    } else {
+      process.env.KKAI_LOCAL_ONLY = previousValue;
+    }
+  }
+}
+
+beforeEach(() => {
+  console.warn = () => undefined;
+});
+
+afterEach(() => {
+  console.warn = originalConsoleWarn;
+});
 
 describe("auth data routes", () => {
   test("requires authentication to read and replace user api entries", async () => {
@@ -590,58 +623,120 @@ describe("auth data routes", () => {
   });
 
   test("returns a failure response when the cloud mirror write fails", async () => {
-    const mirror = new FailingUserScopedAuthDataMirror();
-    const repository = new InMemoryAuthDataRepository();
-    const service = new AuthDataService(repository, {
-      cloudMirror: mirror,
+    await withMutedConsoleWarnAsync(async () => {
+      const mirror = new FailingUserScopedAuthDataMirror();
+      const repository = new InMemoryAuthDataRepository();
+      const service = new AuthDataService(repository, {
+        cloudMirror: mirror,
+      });
+      const headers = {
+        authorization: "Bearer supabase-user-token-1",
+        "x-request-id": "req-user-apis-mirror-fail",
+        [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-mirror-fail-1",
+        [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-mirror-fail-1@example.com",
+      };
+
+      const replace = await handleReplaceUserApiEntries(service, {
+        entries: [
+          {
+            id: "entry-1",
+            key: "sk-entry-1-secret",
+            name: "Google Key",
+            provider: "Google",
+            type: "official",
+            format: "gemini",
+            baseUrl: "https://generativelanguage.googleapis.com",
+            supportedModels: ["gemini-2.5-flash"],
+            disabled: false,
+            createdAt: 1700000000000,
+            updatedAt: 1700000000000,
+            status: "unknown",
+            failCount: 0,
+            successCount: 0,
+            totalCost: 0,
+            budgetLimit: -1,
+            tokenLimit: -1,
+            usedTokens: 0,
+            lastUsed: null,
+            lastError: null,
+          },
+        ],
+      }, headers);
+
+      assert.equal(replace.statusCode, 503);
+      assert.equal(replace.body.success, false);
+      if (!replace.body.success) {
+        assert.equal(replace.body.error.code, "CLOUD_MIRROR_FAILED");
+        assert.deepEqual(replace.body.error.details, [{ rollbackSucceeded: true }]);
+      }
+
+      const localPayload = await repository.getUserApisPayload("user-auth-data-mirror-fail-1", "user-auth-data-mirror-fail-1@example.com");
+      assert.deepEqual(localPayload, {
+        version: 2,
+        slots: [],
+        providers: [],
+        entries: [],
+      });
     });
-    const headers = {
-      authorization: "Bearer supabase-user-token-1",
-      "x-request-id": "req-user-apis-mirror-fail",
-      [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-mirror-fail-1",
-      [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-mirror-fail-1@example.com",
-    };
+  });
 
-    const replace = await handleReplaceUserApiEntries(service, {
-      entries: [
-        {
-          id: "entry-1",
-          key: "sk-entry-1-secret",
-          name: "Google Key",
-          provider: "Google",
-          type: "official",
-          format: "gemini",
-          baseUrl: "https://generativelanguage.googleapis.com",
-          supportedModels: ["gemini-2.5-flash"],
-          disabled: false,
-          createdAt: 1700000000000,
-          updatedAt: 1700000000000,
-          status: "unknown",
-          failCount: 0,
-          successCount: 0,
-          totalCost: 0,
-          budgetLimit: -1,
-          tokenLimit: -1,
-          usedTokens: 0,
-          lastUsed: null,
-          lastError: null,
-        },
-      ],
-    }, headers);
+  test("skips cloud mirror persistence failures when KKAI_LOCAL_ONLY is enabled", async () => {
+    await withLocalOnlyEnv(async () => {
+      const mirror = new FailingUserScopedAuthDataMirror();
+      const repository = new InMemoryAuthDataRepository();
+      const service = new AuthDataService(repository, {
+        cloudMirror: mirror,
+        localOnly: true,
+      });
+      const headers = {
+        authorization: "Bearer supabase-user-token-local-only",
+        "x-request-id": "req-user-apis-local-only",
+        [AUTHENTICATED_USER_ID_HEADER]: "user-auth-data-local-only-1",
+        [AUTHENTICATED_USER_EMAIL_HEADER]: "user-auth-data-local-only-1@example.com",
+      };
 
-    assert.equal(replace.statusCode, 503);
-    assert.equal(replace.body.success, false);
-    if (!replace.body.success) {
-      assert.equal(replace.body.error.code, "CLOUD_MIRROR_FAILED");
-      assert.deepEqual(replace.body.error.details, [{ rollbackSucceeded: true }]);
-    }
+      const replace = await handleReplaceUserApiEntries(service, {
+        entries: [
+          {
+            id: "entry-local-only-1",
+            key: "sk-entry-local-only-secret",
+            name: "Local Only Key",
+            provider: "Google",
+            type: "official",
+            format: "gemini",
+            baseUrl: "https://generativelanguage.googleapis.com",
+            supportedModels: ["gemini-2.5-flash"],
+            disabled: false,
+            createdAt: 1700000000000,
+            updatedAt: 1700000000000,
+            status: "unknown",
+            failCount: 0,
+            successCount: 0,
+            totalCost: 0,
+            budgetLimit: -1,
+            tokenLimit: -1,
+            usedTokens: 0,
+            lastUsed: null,
+            lastError: null,
+          },
+        ],
+      }, headers);
 
-    const localPayload = await repository.getUserApisPayload("user-auth-data-mirror-fail-1", "user-auth-data-mirror-fail-1@example.com");
-    assert.deepEqual(localPayload, {
-      version: 2,
-      slots: [],
-      providers: [],
-      entries: [],
+      assert.equal(replace.statusCode, 200);
+      assert.equal(replace.body.success, true);
+
+      const localPayload = await repository.getUserApisPayload(
+        "user-auth-data-local-only-1",
+        "user-auth-data-local-only-1@example.com",
+      );
+      assert.equal(
+        (localPayload as { entries?: Array<{ id?: string; key?: string }> }).entries?.[0]?.id,
+        "entry-local-only-1",
+      );
+      assert.equal(
+        (localPayload as { entries?: Array<{ id?: string; key?: string }> }).entries?.[0]?.key,
+        "sk-entry-local-only-secret",
+      );
     });
   });
 

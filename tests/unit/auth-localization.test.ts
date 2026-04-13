@@ -124,6 +124,10 @@ describe("auth-facing localization helpers", () => {
       authLocalization.mapTurnstileErrorMessage("en-US", "400070"),
       "The current Turnstile site key has been disabled. Check the widget status in Cloudflare.",
     );
+    assert.equal(
+      authLocalization.mapAuthErrorMessage("zh-CN", new Error("Incorrect email or password."), "login"),
+      "请检查账号和密码。",
+    );
   });
 
   test("localizeUserFacingText translates common notification strings to English when English mode is active", () => {

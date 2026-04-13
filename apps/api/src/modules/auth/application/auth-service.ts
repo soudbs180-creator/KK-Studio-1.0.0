@@ -4,12 +4,17 @@ import type {
   LoginResponseDto,
   ProfileDto,
   RegisterRequestDto,
+  RegisterResponseDto,
   SendCodeRequestDto,
   UpdateProfileRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import { validateAuthEmail } from "../domain/email-policy.ts";
-import { InMemoryAuthIdentityStore } from "../infrastructure/in-memory-auth-identity-store.ts";
+import { FileBackedAuthIdentityStore } from "../infrastructure/file-auth-identity-store.ts";
+import {
+  type AuthIdentityStore,
+  InMemoryAuthIdentityStore,
+} from "../infrastructure/in-memory-auth-identity-store.ts";
 import { InMemoryRateLimiter, type RateLimitRule } from "../infrastructure/in-memory-rate-limiter.ts";
 
 export interface TurnstileVerifier {
@@ -19,20 +24,20 @@ export interface TurnstileVerifier {
 export interface AuthServiceDependencies {
   verifyTurnstileToken: TurnstileVerifier;
   rateLimiter?: InMemoryRateLimiter;
-  identityStore?: InMemoryAuthIdentityStore;
+  identityStore?: AuthIdentityStore;
 }
 
 export interface AuthRequestContext {
   ip: string;
 }
 
-export interface AuthHandlerResult {
+export interface AuthHandlerResult<T = AuthActionResultDto> {
   statusCode: number;
   body: {
     success: boolean;
     message?: string;
     error?: string;
-    data?: AuthActionResultDto;
+    data?: T;
   };
 }
 
@@ -41,19 +46,30 @@ const registerEmailRule: RateLimitRule = { max: 3, windowMs: 60 * 60 * 1000 };
 const loginIpRule: RateLimitRule = { max: 20, windowMs: 60 * 60 * 1000 };
 const sendCodeRule: RateLimitRule = { max: 3, windowMs: 60 * 60 * 1000 };
 
+function createDefaultIdentityStore(): AuthIdentityStore {
+  try {
+    return new FileBackedAuthIdentityStore();
+  } catch {
+    return new InMemoryAuthIdentityStore();
+  }
+}
+
 export class AuthService {
   private readonly verifyTurnstileToken: TurnstileVerifier;
   private readonly rateLimiter: InMemoryRateLimiter;
-  private readonly identityStore: InMemoryAuthIdentityStore;
+  private readonly identityStore: AuthIdentityStore;
   private readonly logger = consoleLogger.child({ module: "auth" });
 
   constructor(dependencies: AuthServiceDependencies) {
     this.verifyTurnstileToken = dependencies.verifyTurnstileToken;
     this.rateLimiter = dependencies.rateLimiter || new InMemoryRateLimiter();
-    this.identityStore = dependencies.identityStore || new InMemoryAuthIdentityStore();
+    this.identityStore = dependencies.identityStore || createDefaultIdentityStore();
   }
 
-  async register(input: RegisterRequestDto, context: AuthRequestContext): Promise<AuthHandlerResult> {
+  async register(
+    input: RegisterRequestDto,
+    context: AuthRequestContext,
+  ): Promise<AuthHandlerResult<RegisterResponseDto>> {
     if (!input.email || !input.password || !input.turnstileToken) {
       return this.badRequest("Missing required fields: email, password, turnstileToken.");
     }
@@ -76,22 +92,30 @@ export class AuthService {
       return this.rateLimited("Too many register attempts for this email.");
     }
 
-    this.logger.info("Register request validated by the migrated auth module", {
-      email: emailCheck.normalizedEmail,
-      ip: context.ip,
-    });
-
-    this.logger.warn("Register request rejected because password auth is disabled on the API service", {
-      email: emailCheck.normalizedEmail,
-      ip: context.ip,
-    });
-
-    return this.routeDisabled(
-      "Password registration is not available on /api/v1/auth/register. Use the hosted Supabase auth flow instead.",
+    const registered = this.identityStore.registerPasswordUser(
+      emailCheck.normalizedEmail,
+      input.password,
     );
+    if (!registered.created) {
+      return this.conflict("An account already exists for this email.");
+    }
+
+    this.logger.info("Local password user registered via auth module", {
+      email: registered.profile.email,
+      ip: context.ip,
+    });
+
+    return this.success(201, {
+      userId: registered.profile.id,
+      email: registered.profile.email,
+      status: "registered",
+    });
   }
 
-  async login(input: LoginRequestDto, context: AuthRequestContext): Promise<AuthHandlerResult> {
+  async login(
+    input: LoginRequestDto,
+    context: AuthRequestContext,
+  ): Promise<AuthHandlerResult<LoginResponseDto>> {
     if (!input.email || !input.password) {
       return this.badRequest("Missing required fields: email, password.");
     }
@@ -112,19 +136,20 @@ export class AuthService {
       return this.rateLimited("Too many login attempts from this IP.");
     }
 
-    this.logger.info("Login request validated by the migrated auth module", {
-      email: emailCheck.normalizedEmail,
-      ip: context.ip,
-    });
-
-    this.logger.warn("Login request rejected because password auth is disabled on the API service", {
-      email: emailCheck.normalizedEmail,
-      ip: context.ip,
-    });
-
-    return this.routeDisabled(
-      "Password login is not available on /api/v1/auth/login. Use the hosted Supabase auth flow instead.",
+    const session = this.identityStore.authenticatePassword(
+      emailCheck.normalizedEmail,
+      input.password,
     );
+    if (!session) {
+      return this.unauthorized("Invalid email or password.");
+    }
+
+    this.logger.info("Local password login succeeded via auth module", {
+      email: session.profile.email,
+      ip: context.ip,
+    });
+
+    return this.success(200, session);
   }
 
   async sendCode(input: SendCodeRequestDto, context: AuthRequestContext): Promise<AuthHandlerResult> {
@@ -147,11 +172,6 @@ export class AuthService {
     }
 
     this.logger.info("Send-code request validated by the migrated auth module", {
-      email: emailCheck.normalizedEmail,
-      ip: context.ip,
-    });
-
-    this.logger.warn("Send-code request rejected because password auth is disabled on the API service", {
       email: emailCheck.normalizedEmail,
       ip: context.ip,
     });
@@ -181,7 +201,17 @@ export class AuthService {
     return this.identityStore.updateProfile(headers, input);
   }
 
-  private badRequest(error: string): AuthHandlerResult {
+  private success<T>(statusCode: number, data: T): AuthHandlerResult<T> {
+    return {
+      statusCode,
+      body: {
+        success: true,
+        data,
+      },
+    };
+  }
+
+  private badRequest<T>(error: string): AuthHandlerResult<T> {
     return {
       statusCode: 400,
       body: {
@@ -191,7 +221,7 @@ export class AuthService {
     };
   }
 
-  private forbidden(error: string): AuthHandlerResult {
+  private forbidden<T>(error: string): AuthHandlerResult<T> {
     return {
       statusCode: 403,
       body: {
@@ -201,7 +231,27 @@ export class AuthService {
     };
   }
 
-  private rateLimited(error: string): AuthHandlerResult {
+  private unauthorized<T>(error: string): AuthHandlerResult<T> {
+    return {
+      statusCode: 401,
+      body: {
+        success: false,
+        error,
+      },
+    };
+  }
+
+  private conflict<T>(error: string): AuthHandlerResult<T> {
+    return {
+      statusCode: 409,
+      body: {
+        success: false,
+        error,
+      },
+    };
+  }
+
+  private rateLimited<T>(error: string): AuthHandlerResult<T> {
     return {
       statusCode: 429,
       body: {
@@ -211,7 +261,7 @@ export class AuthService {
     };
   }
 
-  private routeDisabled(error: string): AuthHandlerResult {
+  private routeDisabled<T>(error: string): AuthHandlerResult<T> {
     return {
       statusCode: 501,
       body: {

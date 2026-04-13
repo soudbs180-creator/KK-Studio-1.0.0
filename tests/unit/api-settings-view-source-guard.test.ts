@@ -33,6 +33,10 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
   );
 
   const requiredSnippets = [
+    "const UI_TOKEN_UNIT_LABEL = '词元';",
+    "const UI_TOKEN_LIMIT_LABEL = '词元上限';",
+    "const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';",
+    "const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;",
     "const TOKEN_UNIT_LABEL = '词元';",
     "const TOKEN_LIMIT_LABEL = '词元上限';",
     "const LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';",
@@ -40,11 +44,17 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
     "if (!value.trim()) return '尚未填写';",
     "if (value.length <= 10) return '已填写';",
     "return `${value.slice(0, 6)}••••${value.slice(-4)}`;",
+    "pick('当前操作暂时无法完成。', 'The current action could not be completed right now.')",
+    "pick('操作失败', 'Action failed')",
   ];
 
   for (const snippet of requiredSnippets) {
     assert.ok(source.includes(snippet), `Expected ApiSettingsView.tsx to include: ${snippet}`);
   }
+
+  assert.ok(!source.includes("const UI_BUDGET_OPTIONS = ['Unlimited', 'Budget', UI_TOKEN_LIMIT_LABEL] as const;"));
+  assert.ok(!source.includes("pick('褰撳墠鎿嶄綔鏆傛椂鏃犳硶瀹屾垚銆?'"));
+  assert.ok(!source.includes("pick('鎿嶄綔澶辫触'"));
 });
 
 test('ApiSettingsView keeps its secure proxy client import and inline-create aliases wired up', () => {
@@ -56,4 +66,30 @@ test('ApiSettingsView keeps its secure proxy client import and inline-create ali
   );
   assert.match(source, /const showInlineOfficialCreate = activeEditorMode === null && activeTab === 'official';/);
   assert.match(source, /const showInlineProviderCreate = activeEditorMode === null && activeTab === 'third-party';/);
+});
+
+test('ApiSettingsView persists readonly user API snapshots in localStorage for cross-session recovery', () => {
+  const source = readSource(API_SETTINGS_VIEW_PATH);
+
+  assert.match(source, /window\.localStorage\.getItem\(getUserApiViewSnapshotKey\(normalizedUserId\)\)/);
+  assert.match(source, /window\.localStorage\.setItem\(getUserApiViewSnapshotKey\(normalizedUserId\), JSON\.stringify\(\{/);
+  assert.match(source, /window\.localStorage\.removeItem\(getUserApiViewSnapshotKey\(normalizedUserId\)\)/);
+});
+
+test('ApiSettingsView resolves effective provider models before readonly rendering and cloud-backed saves', () => {
+  const source = readSource(API_SETTINGS_VIEW_PATH);
+
+  assert.match(source, /const providerName = normalizeString\(raw\.name\) \|\| 'Provider';/);
+  assert.match(source, /const providerBaseUrl = normalizeString\(raw\.baseUrl \?\? raw\.base_url\);/);
+  assert.match(source, /const providerFormat = normalizeProtocolFormat\(raw\.format\);/);
+  assert.match(source, /const rawProviderModels = normalizeStringArray\(raw\.models \?\? raw\.supportedModels \?\? raw\.supported_models\);/);
+  assert.match(
+    source,
+    /models:\s*resolveEffectiveProviderModels\(\{\s*provider:\s*providerName,\s*baseUrl:\s*providerBaseUrl,\s*format:\s*providerFormat,\s*models:\s*rawProviderModels,\s*\}\)/,
+  );
+  assert.match(
+    source,
+    /const effectiveProviderModelsForCloudWrite = resolveEffectiveProviderModels\(\{[\s\S]*provider:\s*providerForm\.name\.trim\(\),[\s\S]*baseUrl:\s*providerForm\.baseUrl\.trim\(\),[\s\S]*format:\s*providerForm\.format,[\s\S]*models:\s*connectionSignatureChanged \? \[\] : \(existingProvider\?\.models \|\| \[\]\),[\s\S]*\}\);/,
+  );
+  assert.match(source, /models:\s*effectiveProviderModelsForCloudWrite,/);
 });
