@@ -12,16 +12,21 @@ import type {
   AssetListDto,
 } from "../dto/asset-library.ts";
 import type {
+  AuthSessionDto,
   KeyManagerCloudStateDto,
   LoginRequestDto,
   LoginResponseDto,
+  LogoutResponseDto,
   ProfileDto,
+  RefreshSessionRequestDto,
   ReplaceKeyManagerCloudStateRequestDto,
   ReplaceUserApisPayloadRequestDto,
   RegisterRequestDto,
   RegisterResponseDto,
   ReplaceUserApiEntriesRequestDto,
   TempUserSessionDto,
+  UpdatePasswordRequestDto,
+  UpdatePasswordResponseDto,
   UserRouteConnectivityCheckDto,
   UserRoutePricingSyncDto,
   UpdateProfileRequestDto,
@@ -41,6 +46,8 @@ import type {
   ListCreditTransactionsQueryDto,
   RefundCreditsRequestDto,
   RefundCreditsResponseDto,
+  SubmitRechargeRequestDto,
+  SubmitRechargeResponseDto,
   UpsertCreditExchangeRateRequestDto,
 } from "../dto/billing.ts";
 import type {
@@ -107,6 +114,16 @@ export interface KkApiClient {
     input: LoginRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<LoginResponseDto>>;
+  getSession(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AuthSessionDto>>;
+  refreshSession(
+    input: RefreshSessionRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<AuthSessionDto>>;
+  logout(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<LogoutResponseDto>>;
   startWechatLogin(
     redirectTo: string,
     options?: ApiClientRequestOptions,
@@ -122,6 +139,10 @@ export interface KkApiClient {
     input: UpdateProfileRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<ProfileDto>>;
+  updatePassword(
+    input: UpdatePasswordRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<UpdatePasswordResponseDto>>;
   getUserApiEntries(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserApiEntryListDto>>;
@@ -203,6 +224,10 @@ export interface KkApiClient {
     identity: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminCreditAccountLookupDto>>;
+  submitRecharge(
+    input: SubmitRechargeRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<SubmitRechargeResponseDto>>;
   listCreditExchangeRates(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<CreditExchangeRateListDto>>;
@@ -215,6 +240,9 @@ export interface KkApiClient {
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<ModelCatalogListDto>>;
   listActiveCreditModels(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ActiveCreditModelListDto>>;
+  listActiveModels(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<ActiveCreditModelListDto>>;
   createAdminModel(
@@ -547,6 +575,40 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
+    getSession(options) {
+      return requestJson<AuthSessionDto>(
+        config,
+        "api/v1/auth/session",
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    refreshSession(input, options) {
+      return requestJson<AuthSessionDto>(
+        config,
+        "api/v1/auth/refresh",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    logout(options) {
+      return requestJson<LogoutResponseDto>(
+        config,
+        "api/v1/auth/logout",
+        {
+          method: "POST",
+        },
+        options,
+      );
+    },
+
     startWechatLogin(redirectTo, options) {
       const query = new URLSearchParams({
         redirectTo,
@@ -594,6 +656,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         "api/v1/profile",
         {
           method: "PATCH",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    updatePassword(input, options) {
+      return requestJson<UpdatePasswordResponseDto>(
+        config,
+        "api/v1/profile/password",
+        {
+          method: "POST",
           body: JSON.stringify(input),
         },
         options,
@@ -867,6 +941,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
+    submitRecharge(input, options) {
+      return requestJson<SubmitRechargeResponseDto>(
+        config,
+        "api/v1/billing/submit-recharge",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
     listCreditExchangeRates(options) {
       return requestJson<CreditExchangeRateListDto>(
         config,
@@ -909,6 +995,17 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       return requestJson<ActiveCreditModelListDto>(
         config,
         "api/v1/model-catalog/active-credit-models",
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    listActiveModels(options) {
+      return requestJson<ActiveCreditModelListDto>(
+        config,
+        "api/v1/model-catalog/active",
         {
           method: "GET",
         },

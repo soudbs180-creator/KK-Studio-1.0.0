@@ -9,6 +9,7 @@ import {
   loadUserApisPayloadFromCloudRecord,
   removeUserApiProviderFromCloudRecord,
   removeUserApiSlotFromCloudRecord,
+  resetUserApisPayloadCacheForTests,
   saveUserApisPayloadToCloudRecord,
   upsertUserApiProviderToCloudRecord,
   upsertUserApiSlotToCloudRecord,
@@ -179,6 +180,24 @@ function mockAuthenticatedUser() {
     }) as Awaited<ReturnType<typeof originalGetUser>>;
 }
 
+function mockMissingAuthenticatedUser() {
+  supabase.auth.getSession = async () =>
+    ({
+      data: {
+        session: null,
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetSession>>;
+
+  supabase.auth.getUser = async () =>
+    ({
+      data: {
+        user: null,
+      },
+      error: null,
+    }) as Awaited<ReturnType<typeof originalGetUser>>;
+}
+
 function mockApiState(initialPayload: unknown) {
   mockAuthenticatedUser();
 
@@ -266,6 +285,7 @@ afterEach(() => {
     delete process.env.VITE_KK_API_BASE_URL;
   }
   locationLike.location = originalLocation;
+  resetUserApisPayloadCacheForTests();
 });
 
 describe('user api cloud storage helpers', () => {
@@ -558,6 +578,38 @@ describe('user api cloud storage helpers', () => {
     });
   });
 
+  test('loads the combined local API payload without a Supabase session on local runtimes', async () => {
+    process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
+    process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+    locationLike.location = { origin: 'http://localhost:3000' };
+    mockMissingAuthenticatedUser();
+
+    legacyWebApiClient.getKeyManagerCloudState = async () => ({
+      success: true,
+      data: {
+        version: 2,
+        slots: [{ id: 'slot-local-1' }],
+        providers: [{ id: 'provider-local-1' }],
+        entries: [],
+      },
+    });
+    legacyWebApiClient.getUserApiEntries = async () => ({
+      success: true,
+      data: {
+        entries: [createEntry('entry-local-1')],
+      },
+    });
+
+    const payload = await loadUserApisPayloadFromCloudRecord();
+
+    assert.deepEqual(payload, {
+      version: 2,
+      slots: [{ id: 'slot-local-1' }],
+      providers: [{ id: 'provider-local-1' }],
+      entries: [createEntry('entry-local-1')],
+    });
+  });
+
   test('returns client-visible placeholders when the typed auth API redacts stored secrets', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
@@ -699,6 +751,34 @@ describe('user api cloud storage helpers', () => {
 
     assert.equal(payload.slots[0].key, buildRedactedSecret('slot-1', 'key'));
     assert.equal(payload.entries[0].key, buildRedactedSecret('entry-1', 'key'));
+  });
+
+  test('saves the local API payload without a Supabase session on local runtimes', async () => {
+    process.env.VITE_KK_API_BASE_URL = 'http://127.0.0.1:8787';
+    process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK = 'true';
+    locationLike.location = { origin: 'http://localhost:3000' };
+    mockMissingAuthenticatedUser();
+
+    const api = mockApiState({
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [],
+    });
+
+    const payload = await saveUserApisPayloadToCloudRecord({
+      version: 2,
+      slots: [],
+      providers: [],
+      entries: [createEntry('entry-local-2')],
+    }) as MutableEnvelope;
+
+    assert.equal(api.unifiedReplaceCalls.length, 1);
+    assert.equal(api.keyManagerReplaceCalls.length, 0);
+    assert.equal(api.userApiReplaceCalls.length, 0);
+    assert.equal(api.getCurrentPayload().entries.length, 1);
+    assert.equal(api.getCurrentPayload().entries[0].id, 'entry-local-2');
+    assert.equal(payload.entries[0].key, buildRedactedSecret('entry-local-2', 'key'));
   });
 
   test('falls back to split typed auth endpoints when the unified payload write route is unavailable', async () => {

@@ -176,3 +176,31 @@ export interface UpsertCreditExchangeRateRequestDto {
   maxAmount: number | null;
   isActive: boolean;
 }
+
+export type RechargeSubmissionStatusDto = "pending" | "approved" | "rejected" | "credited";
+export type RechargePaymentChannelDto = "alipay" | "wechat" | "paypal" | "bank" | "manual";
+
+export interface SubmitRechargeRequestDto {
+  amount: number;
+  currencyCode: SupportedRechargeCurrencyDto;
+  paymentChannel: RechargePaymentChannelDto;
+  transferReferenceLast4: string;
+  note?: string;
+}
+
+export interface RechargeSubmissionDto {
+  submissionId: EntityId;
+  userId?: EntityId;
+  amount: number;
+  currencyCode: SupportedRechargeCurrencyDto;
+  paymentChannel: RechargePaymentChannelDto;
+  transferReferenceLast4: string;
+  note?: string;
+  status: RechargeSubmissionStatusDto;
+  submittedAt: string;
+  reviewedAt?: string | null;
+}
+
+export interface SubmitRechargeResponseDto {
+  submission: RechargeSubmissionDto;
+}

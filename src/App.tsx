@@ -10,6 +10,7 @@ import PendingNode from './components/canvas/PendingNode';
 import ChatSidebar from './components/layout/ChatSidebar';
 import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type AgentWorkflowNode, type AppSurface, type MobilePrimaryTab, type PreviewWorkflowNode, type SaveWorkflowNode, type WorkspacePanel, type PptEditableImageLayer, type PptEditablePage } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
@@ -275,12 +276,11 @@ import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
+import { KKAI_FEATURE_FLAGS } from './app/kkaiFeatureFlags';
+import { createAppRootMode } from './context/kkaiRuntimeContext';
 import ConnectionDot from './components/canvas/ConnectionDot';
-import LoginScreen from './components/auth/LoginScreen';
-import AuthCallback from './pages/AuthCallback';
 import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
-import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
 import { formatRemainingCredits } from './services/billing/remainingBalance';
 
@@ -365,6 +365,7 @@ interface AppContentProps {
 }
 
 const AppContent: React.FC<AppContentProps> = () => {
+  const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     user,
     loading: authLoading,
@@ -8059,10 +8060,10 @@ ${slideLayerXml.join('\n')}
             onDashboardClick={() => openSettingsSurface('dashboard')}
             onSettingsClick={() => openSettingsSurface('api-management')}
             onUserClick={() => openProfileSurface('main')}
-            onBillingClick={() => openProfileSurface('billing')}
-            onRechargeClick={() => setShowRechargeModal(true)}
-            balance={balance}
-            balanceLoading={billingLoading}
+            onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
+            onRechargeClick={billingUiEnabled ? () => setShowRechargeModal(true) : undefined}
+            balance={billingUiEnabled ? balance : 0}
+            balanceLoading={billingUiEnabled ? billingLoading : false}
             title="KK Studio"
             userName={derivedMobileUserName}
             userAvatarUrl={derivedMobileUserAvatarUrl}
@@ -8117,7 +8118,7 @@ ${slideLayerXml.join('\n')}
       />
 
       {/* Top Left Credits Display */}
-      {!isMobile && (
+      {!isMobile && billingUiEnabled && (
         <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
           <div
             className="flex items-center gap-3 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-md transition-all hover:border-[var(--border-medium)] group"
@@ -9548,7 +9549,7 @@ ${slideLayerXml.join('\n')}
       )}
 
       {/* Global recharge modal */}
-      {showRechargeModal && (
+      {billingUiEnabled && showRechargeModal && (
         <Suspense fallback={null}>
           <RechargeModal />
         </Suspense>
@@ -9559,16 +9560,8 @@ ${slideLayerXml.join('\n')}
 };
 
 const App: React.FC = () => {
-  const { user, loading } = useAuth();
-
   const [showCostEstimation, setShowCostEstimation] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      keyManager.setStartupStage('signed_out');
-      adminModelService.setStartupStage('signed_out');
-    }
-  }, [user]);
+  const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
 
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {
@@ -9578,29 +9571,8 @@ const App: React.FC = () => {
     });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
-        <Loader2 className="animate-spin text-indigo-500" size={32} />
-      </div>
-    );
-  }
-
-  // OAuth 回调页面（无需登录状态）
-  if (window.location.pathname === '/auth/callback') {
-    return (
-      <ThemeProvider>
-        <AuthCallback />
-      </ThemeProvider>
-    );
-  }
-
-  if (!user) {
-    return (
-      <ThemeProvider>
-        <LoginScreen />
-      </ThemeProvider>
-    );
+  if (createAppRootMode({ pathname: window.location.pathname }) !== 'workspace') {
+    return null;
   }
 
   return (

@@ -5,6 +5,7 @@ import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
+import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
@@ -403,8 +404,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
-    const canAccessSystemCreditModels = !!user && !isTempUser;
-    const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
+    const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
+    const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
+    const canBrowseSystemCreditModels = billingUiEnabled && (authLoading || canAccessSystemCreditModels);
 
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
@@ -533,6 +535,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             return true;
         }
 
+        if (!billingUiEnabled) {
+            notify.error('本地版已禁用积分模型', `KKAI 本地版不提供管理员积分模型${feature}入口。`);
+            return false;
+        }
+
         if (authLoading) {
             notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
             return false;
@@ -551,7 +558,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }
 
         return true;
-    }, [authLoading, balance, canAccessSystemCreditModels, getRequiredCredits, setShowRechargeModal]);
+    }, [authLoading, balance, billingUiEnabled, canAccessSystemCreditModels, getRequiredCredits, setShowRechargeModal]);
 
     // 2. Chat State
     const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {

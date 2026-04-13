@@ -32,6 +32,16 @@ export interface UpdateProfileRequestDto {
   avatarUrl?: string;
 }
 
+export interface UpdatePasswordRequestDto {
+  currentPassword?: string;
+  newPassword: string;
+}
+
+export interface UpdatePasswordResponseDto {
+  updated: boolean;
+  profile: ProfileDto;
+}
+
 export type UserApiEntryType = "official" | "proxy" | "third-party";
 export type UserApiProtocolFormat = "gemini" | "openai" | "auto" | "claude";
 export type UserApiEntryStatus = "valid" | "invalid" | "rate_limited" | "unknown";
@@ -126,6 +136,21 @@ export interface LoginResponseDto {
   refreshToken: string;
   expiresIn: number;
   profile: ProfileDto;
+}
+
+export interface AuthSessionDto {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  profile: ProfileDto;
+}
+
+export interface RefreshSessionRequestDto {
+  refreshToken: string;
+}
+
+export interface LogoutResponseDto {
+  loggedOut: boolean;
 }
 
 export interface SendCodeRequestDto {

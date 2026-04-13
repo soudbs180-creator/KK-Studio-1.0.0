@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { after, afterEach, beforeEach, test } from "node:test";
-
+import { InMemoryAdminConsoleRepository } from "../../apps/api/src/modules/admin-console/index.ts";
 import { InMemoryAuthDataRepository } from "../../apps/api/src/modules/auth/index.ts";
+
 import { resetStartupModeLogDedupForTests, startApiServer } from "../../apps/api/src/server.ts";
 
 const trackedServers = new Set<Awaited<ReturnType<typeof startApiServer>>>();
@@ -46,6 +47,12 @@ async function withLocalOnlyEnv<T>(callback: () => Promise<T>): Promise<T> {
       process.env.KKAI_LOCAL_ONLY = previousValue;
     }
   }
+}
+
+function getBaseUrl(server: Awaited<ReturnType<typeof startApiServer>>): string {
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return `http://127.0.0.1:${address.port}`;
 }
 
 after(async () => {
@@ -194,7 +201,38 @@ test("repeated degraded startup warnings are emitted once per unique startup con
   assert.equal(wechatDisabledCount, 1);
 });
 
-test('startApiServer warns once when the owner admin id is missing', async () => {
+test("startApiServer local-only mode injects the fixed local user for auth-data routes", async () => {
+  const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+    adminConsoleRepository: new InMemoryAdminConsoleRepository(),
+    allowDegradedPersistence: true,
+    authDataRepository: new InMemoryAuthDataRepository(),
+    localOnlyUser: {
+      userId: "local-user",
+    },
+    verifyTurnstileToken: async () => ({ success: true }),
+  }));
+  trackedServers.add(server);
+
+  const response = await fetch(`${getBaseUrl(server)}/api/v1/profile/key-manager-state`, {
+    headers: {
+      "x-request-id": "req-local-only-auth-data",
+    },
+  });
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.success, true);
+  if (!payload.success) {
+    return;
+  }
+
+  assert.equal(payload.data.version, 2);
+  assert.deepEqual(payload.data.slots, []);
+  assert.deepEqual(payload.data.providers, []);
+  assert.deepEqual(payload.data.entries, []);
+});
+
+test("startApiServer warns once when the owner admin id is missing", async () => {
   const originalPrimaryAdminUserId = process.env.KK_PRIMARY_ADMIN_USER_ID;
   delete process.env.KK_PRIMARY_ADMIN_USER_ID;
   resetStartupModeLogDedupForTests();
@@ -213,10 +251,10 @@ test('startApiServer warns once when the owner admin id is missing', async () =>
     trackedServers.add(server);
   } finally {
     console.warn = originalWarn;
-    if (typeof originalPrimaryAdminUserId === 'string') {
+    if (typeof originalPrimaryAdminUserId === "string") {
       process.env.KK_PRIMARY_ADMIN_USER_ID = originalPrimaryAdminUserId;
     }
   }
 
-  assert.match(warnings.join('\n'), /KK_PRIMARY_ADMIN_USER_ID/);
+  assert.match(warnings.join("\n"), /KK_PRIMARY_ADMIN_USER_ID/);
 });

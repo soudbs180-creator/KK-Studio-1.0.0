@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useAdminRole } from '../../hooks/useAdminRole';
@@ -98,6 +99,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 }) => {
   const { isTempUser, tempUserExpiry } = useAuth();
   const { accountRole, checkingAdmin } = useAdminRole();
+  const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     balance,
     billingLogs,
@@ -188,7 +190,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       initialView === 'billing' || initialView === 'change-password' || initialView === 'edit-profile' || initialView === 'security'
         ? initialView
         : 'main';
-    const safeView: UserProfileView = requestedView === 'change-password' && !canChangePassword ? 'main' : requestedView;
+    const safeView: UserProfileView =
+      requestedView === 'change-password' && !canChangePassword
+        ? 'main'
+        : requestedView === 'billing' && !billingUiEnabled
+          ? 'main'
+          : requestedView;
 
     setView(safeView);
     setMessage(null);
@@ -213,14 +220,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setDisplayName(defaultName);
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
-    if (safeView === 'billing') {
+    if (safeView === 'billing' && billingUiEnabled) {
       void refreshBilling({ includeTransactions: true });
     }
 
     if (safeView === 'security') {
       void loadSecurityState();
     }
-  }, [canChangePassword, initialView, isOpen, isShadowWechatEmail, refreshBilling, sessionLinkedProviders, user]);
+  }, [billingUiEnabled, canChangePassword, initialView, isOpen, isShadowWechatEmail, refreshBilling, sessionLinkedProviders, user]);
 
   useEffect(() => {
     if (!isOpen || !user?.id || isTempUser) {
@@ -298,6 +305,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const openBilling = () => {
+    if (!billingUiEnabled) {
+      return;
+    }
     setView('billing');
     void refreshBilling({ includeTransactions: true });
   };
@@ -649,25 +659,27 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      积分
+              {billingUiEnabled && (
+                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        积分
+                      </div>
+                      <div className="mt-1 text-2xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
+                      <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                        {remainingBalanceHint}
+                      </div>
                     </div>
-                    <div className="mt-1 text-2xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      {remainingBalanceHint}
-                    </div>
+                    <button
+                      onClick={() => setShowRechargeModal(true)}
+                      className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-medium text-white"
+                    >
+                      立即充值
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowRechargeModal(true)}
-                    className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-medium text-white"
-                  >
-                    立即充值
-                  </button>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-2">
                 <button
@@ -740,17 +752,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
                 </button>
 
-                <button
-                  onClick={openBilling}
-                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                >
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <Wallet size={15} className="shrink-0" />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">账户管理</span>
-                  </span>
-                  <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
-                </button>
+                {billingUiEnabled && (
+                  <button
+                    onClick={openBilling}
+                    className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                  >
+                    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <Wallet size={15} className="shrink-0" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">账户管理</span>
+                    </span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
@@ -917,7 +931,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           )}
 
-          {view === 'billing' && (
+          {view === 'billing' && billingUiEnabled && (
             <div className="space-y-4">
               <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
                 <div className="flex flex-wrap items-center justify-between gap-3">

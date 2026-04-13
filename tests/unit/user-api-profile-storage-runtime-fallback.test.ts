@@ -3,8 +3,10 @@ import { afterEach, describe, test } from 'node:test';
 
 import { supabase } from '../../src/lib/supabase.ts';
 import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { resetUserApisPayloadCacheForTests } from '../../src/services/api/userApiCloudRecordStorage.ts';
 import {
   loadUserApiEntries,
+  resetUserApiProfileStorageStateForTests,
   saveUserApiEntries,
 } from '../../src/services/api/userApiProfileStorage.ts';
 
@@ -78,6 +80,8 @@ afterEach(() => {
     delete process.env.VITE_KK_API_BASE_URL;
   }
   locationLike.location = originalLocation;
+  resetUserApisPayloadCacheForTests();
+  resetUserApiProfileStorageStateForTests();
 });
 
 describe('user api profile storage runtime fallback', () => {

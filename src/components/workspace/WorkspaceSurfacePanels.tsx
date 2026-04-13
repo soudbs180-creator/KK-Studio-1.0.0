@@ -1,7 +1,7 @@
 import React from 'react';
-
 import ChatSidebar from '../layout/ChatSidebar';
-import type { Canvas, AppSurface, WorkspacePanel } from '../../types';
+import type { AppSurface, Canvas, WorkspacePanel } from '../../types';
+import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { AssetLibraryPanel } from './AssetLibraryPanel';
 import WorkspacePanels from './WorkspacePanels';
 
@@ -12,9 +12,9 @@ interface WorkspaceSurfacePanelsProps {
   toggleChatPanel: () => void;
   setIsChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isMobile: boolean;
-  openSettingsSurface: (view?: 'api-management') => void;
-  setIsSidebarHovered: React.Dispatch<React.SetStateAction<boolean>>;
-  setChatSidebarWidth: React.Dispatch<React.SetStateAction<number>>;
+  openSettingsSurface: (view?: SettingsSurfaceView) => void;
+  setIsSidebarHovered: (isHovered: boolean) => void;
+  setChatSidebarWidth: (width: number) => void;
   workspaceSurface: Extract<AppSurface, 'workspace' | 'library'>;
   activeCanvas: Canvas | null | undefined;
   focusWorkspace: () => void;
@@ -42,18 +42,22 @@ export function WorkspaceSurfacePanels({
     <WorkspacePanels
       activeSurface={activeSurface}
       activePanel={activePanel}
-      chatSidebar={(
-        <ChatSidebar
-          isOpen={isChatOpen}
-          onToggle={toggleChatPanel}
-          onClose={() => setIsChatOpen(false)}
-          isMobile={isMobile}
-          onOpenSettings={openSettingsSurface}
-          onHoverChange={setIsSidebarHovered}
-          onWidthChange={setChatSidebarWidth}
-        />
+      renderChatSidebar={() => (
+        <div id="chat-sidebar-wrapper">
+          <ChatSidebar
+            isOpen={isChatOpen}
+            onToggle={toggleChatPanel}
+            onClose={() => setIsChatOpen(false)}
+            isMobile={isMobile}
+            onOpenSettings={(view) => {
+              openSettingsSurface(view || 'api-management');
+            }}
+            onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
+            onWidthChange={setChatSidebarWidth}
+          />
+        </div>
       )}
-      libraryPanel={(
+      renderLibraryPanel={() => (
         <AssetLibraryPanel
           isOpen={workspaceSurface === 'library'}
           isMobile={isMobile}
@@ -67,5 +71,3 @@ export function WorkspaceSurfacePanels({
     />
   );
 }
-
-export default WorkspaceSurfacePanels;

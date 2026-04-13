@@ -3,6 +3,7 @@ import ReactDOM, { flushSync } from 'react-dom';
 import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
 import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; // Added getter
+import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { getModelCapabilities, modelSupportsGrounding, getModelDisplayInfo, getModelDescription, getModelThemeColor, getModelThemeBgColor, getModelDisplayName } from '../../services/model/modelCapabilities';
 import ModelLogo from '../common/ModelLogo';
 import { getModelBadgeInfo, getProviderBadgeColor, getProviderBadgeStyle } from '../../utils/modelBadge';
@@ -896,10 +897,11 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     }, [config.referenceImages]);
     const uploadingSkeletonCount = Math.max(0, uploadingCount - pendingReferenceUploads);
     const { user, isTempUser, loading: authLoading } = useAuth();
-    const { balance, recharge, loading: billingLoading, showRechargeModal, setShowRechargeModal } = useBilling();
+    const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
-    const canAccessSystemCreditModels = !!user && !isTempUser;
-    const canBrowseSystemCreditModels = authLoading || canAccessSystemCreditModels;
+    const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
+    const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
+    const canBrowseSystemCreditModels = billingUiEnabled && (authLoading || canAccessSystemCreditModels);
 
     // 🚀 [NEW] 模型手动锁定标识 - 解决更换 API 或模式后自动跳第一个的需求
     const [isModelManuallyLocked, setIsModelManuallyLocked] = useState<boolean>(() => {
@@ -2334,7 +2336,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ config, setConfig, onGenerate, is
     const currentModel = selectedModelMeta.currentModel;
 
     // 🚀 [Fix] 判断是否为系统积分模型
-    const isSystemCreditModel = !!currentModel?.isSystemInternal;
+    const isSystemCreditModel = billingUiEnabled && !!currentModel?.isSystemInternal;
     const currentCreditCost = isModelListEmpty
         ? 0
         : (currentModel?.isSystemInternal
