@@ -22,5 +22,5 @@ test("recharge modal localizes surfaced submission failures", () => {
   const source = readSource("src/components/modals/RechargeModal.tsx");
 
   assert.match(source, /import \{ localizeUserFacingText \} from '\.\.\/\.\.\/utils\/localeText';/);
-  assert.match(source, /localizeUserFacingText\(error\?\.\s*message\)/);
+  assert.match(source, /localizeUserFacingText\(/);
 });

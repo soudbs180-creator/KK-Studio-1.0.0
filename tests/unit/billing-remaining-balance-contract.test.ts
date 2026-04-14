@@ -96,7 +96,7 @@ test('recharge modal submission success path refreshes canonical billing balance
   assert.match(rechargeModalSource, /const \{ showRechargeModal, setShowRechargeModal, refreshBilling \} = useBilling\(\);/);
   assert.match(
     rechargeModalSource,
-    /const nextStatus = response\.data\.submission\.status;\s*setSubmissionStatus\(nextStatus\);\s*setSubmissionMessage\(`申请已提交，当前状态：\$\{getRechargeSubmissionStatusLabel\(nextStatus\)\}。`\);[\s\S]*await refreshBilling\(\{ includeTransactions: true \}\);/,
+    /const response = await submitRechargeProof\([\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(response\.data,[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,
   );
   assert.doesNotMatch(
     rechargeModalSource,
