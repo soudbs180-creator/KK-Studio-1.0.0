@@ -25,6 +25,7 @@ import type {
   RegisterRequestDto,
   RegisterResponseDto,
   ReplaceUserApiEntriesRequestDto,
+  SendPasswordChangeCodeResponseDto,
   TempUserSessionDto,
   UpdatePasswordRequestDto,
   UpdatePasswordResponseDto,
@@ -36,17 +37,26 @@ import type {
 } from "../dto/auth.ts";
 import type {
   AdminCreditAccountLookupDto,
-  AdminRechargeCreditsRequestDto,
-  AdminRechargeCreditsResponseDto,
-  CreditTransactionListDto,
-  CreditBalanceDto,
-  CreditExchangeRateDto,
-  CreditExchangeRateListDto,
-  DebitCreditsRequestDto,
-  DebitCreditsResponseDto,
-  ListCreditTransactionsQueryDto,
-  RefundCreditsRequestDto,
-  RefundCreditsResponseDto,
+    AdminRechargeSubmissionDto,
+    AdminRechargeCreditsRequestDto,
+    AdminRechargeCreditsResponseDto,
+    CreateRechargeSubmissionRequestDto,
+    CreateRechargeSubmissionResponseDto,
+    CreditTransactionListDto,
+    CreditBalanceDto,
+    CreditExchangeRateDto,
+    CreditExchangeRateListDto,
+    DebitCreditsRequestDto,
+    DebitCreditsResponseDto,
+    GetAdminRechargeSubmissionResponseDto,
+    ListCreditTransactionsQueryDto,
+    RechargePaymentChannelConfigListDto,
+    RefundCreditsRequestDto,
+    RefundCreditsResponseDto,
+  ReviewRechargeSubmissionRequestDto,
+  ReviewRechargeSubmissionResponseDto,
+  SubmitRechargeProofRequestDto,
+  SubmitRechargeProofResponseDto,
   SubmitRechargeRequestDto,
   SubmitRechargeResponseDto,
   UpsertCreditExchangeRateRequestDto,
@@ -152,6 +162,9 @@ export interface KkApiClient {
     input: UpdatePasswordRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UpdatePasswordResponseDto>>;
+  sendPasswordChangeCode(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<SendPasswordChangeCodeResponseDto>>;
   getUserApiEntries(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserApiEntryListDto>>;
@@ -233,10 +246,31 @@ export interface KkApiClient {
     identity: string,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<AdminCreditAccountLookupDto>>;
-  submitRecharge(
-    input: SubmitRechargeRequestDto,
+  createRechargeSubmission(
+    input: CreateRechargeSubmissionRequestDto,
     options?: ApiClientRequestOptions,
-  ): Promise<ApiResponse<SubmitRechargeResponseDto>>;
+  ): Promise<ApiResponse<CreateRechargeSubmissionResponseDto>>;
+  submitRechargeProof(
+    submissionId: string,
+    input: SubmitRechargeProofRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<SubmitRechargeProofResponseDto>>;
+  getAdminRechargeSubmission(
+    submissionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<GetAdminRechargeSubmissionResponseDto>>;
+    reviewRechargeSubmission(
+      submissionId: string,
+      input: ReviewRechargeSubmissionRequestDto,
+      options?: ApiClientRequestOptions,
+    ): Promise<ApiResponse<ReviewRechargeSubmissionResponseDto>>;
+    listRechargePaymentChannels(
+      options?: ApiClientRequestOptions,
+    ): Promise<ApiResponse<RechargePaymentChannelConfigListDto>>;
+    submitRecharge(
+      input: SubmitRechargeRequestDto,
+      options?: ApiClientRequestOptions,
+    ): Promise<ApiResponse<SubmitRechargeResponseDto>>;
   listCreditExchangeRates(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<CreditExchangeRateListDto>>;
@@ -713,6 +747,17 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
+    sendPasswordChangeCode(options) {
+      return requestJson<SendPasswordChangeCodeResponseDto>(
+        config,
+        "api/v1/profile/password/send-code",
+        {
+          method: "POST",
+        },
+        options,
+      );
+    },
+
     getUserApiEntries(options) {
       return requestJson<UserApiEntryListDto>(
         config,
@@ -980,10 +1025,68 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
-    submitRecharge(input, options) {
-      return requestJson<SubmitRechargeResponseDto>(
+    createRechargeSubmission(input, options) {
+      return requestJson<CreateRechargeSubmissionResponseDto>(
         config,
-        "api/v1/billing/submit-recharge",
+        "api/v1/billing/recharge-submissions",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    submitRechargeProof(submissionId, input, options) {
+      return requestJson<SubmitRechargeProofResponseDto>(
+        config,
+        `api/v1/billing/recharge-submissions/${encodeURIComponent(submissionId)}/proof`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    getAdminRechargeSubmission(submissionId, options) {
+      return requestJson<GetAdminRechargeSubmissionResponseDto>(
+        config,
+        `api/v1/admin/billing/recharge-submissions/${encodeURIComponent(submissionId)}`,
+        {
+          method: "GET",
+        },
+        options,
+      );
+    },
+
+    reviewRechargeSubmission(submissionId, input, options) {
+      return requestJson<ReviewRechargeSubmissionResponseDto>(
+        config,
+        `api/v1/admin/billing/recharge-submissions/${encodeURIComponent(submissionId)}/review`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        options,
+        );
+      },
+
+      listRechargePaymentChannels(options) {
+        return requestJson<RechargePaymentChannelConfigListDto>(
+          config,
+          "api/v1/billing/payment-channels",
+          {
+            method: "GET",
+          },
+          options,
+        );
+      },
+
+      submitRecharge(input, options) {
+        return requestJson<SubmitRechargeResponseDto>(
+          config,
+          "api/v1/billing/submit-recharge",
         {
           method: "POST",
           body: JSON.stringify(input),

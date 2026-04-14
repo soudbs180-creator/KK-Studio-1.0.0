@@ -1,5 +1,6 @@
 import type { Canvas } from '../../types';
 import { shouldEnableWorkspaceCloudSync } from '../../app/kkaiFeatureFlags';
+import type { CanvasLayoutRecordDto } from '../../../packages/contracts/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient';
 
 function unwrapOrThrow<T>(
@@ -31,14 +32,55 @@ function isUnauthorizedResponse(
   return code === 'AUTH_REQUIRED' || code === 'HTTP_401';
 }
 
+function toCanvasLayoutRecord(canvas: Canvas): CanvasLayoutRecordDto {
+  return {
+    id: canvas.id,
+    name: canvas.name,
+    folderName: canvas.folderName,
+    promptNodes: canvas.promptNodes.map((node) => ({ ...node })),
+    imageNodes: canvas.imageNodes.map((node) => ({ ...node })),
+    groups: canvas.groups.map((group) => ({ ...group })),
+    drawings: canvas.drawings.map((drawing) => ({ ...drawing })),
+    workflow: canvas.workflow ? { ...canvas.workflow } : undefined,
+    lastModified: canvas.lastModified,
+  };
+}
+
+function normalizeCanvasRecord(raw: unknown): Canvas | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+
+  const record = raw as Partial<CanvasLayoutRecordDto>;
+  const id = String(record.id || '').trim();
+  const name = String(record.name || '').trim();
+  const lastModified = Number(record.lastModified || 0);
+
+  if (!id || !name || !Number.isFinite(lastModified)) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    folderName: typeof record.folderName === 'string' && record.folderName.trim() ? record.folderName : undefined,
+    promptNodes: Array.isArray(record.promptNodes) ? [...record.promptNodes] as Canvas['promptNodes'] : [],
+    imageNodes: Array.isArray(record.imageNodes) ? [...record.imageNodes] as Canvas['imageNodes'] : [],
+    groups: Array.isArray(record.groups) ? [...record.groups] as Canvas['groups'] : [],
+    drawings: Array.isArray(record.drawings) ? [...record.drawings] as Canvas['drawings'] : [],
+    workflow: record.workflow as Canvas['workflow'] | undefined,
+    lastModified,
+  };
+}
+
 function normalizeCanvasArray(raw: unknown): Canvas[] {
   if (!Array.isArray(raw)) {
     return [];
   }
 
   return raw
-    .filter((item): item is Canvas => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
-    .map((item) => ({ ...item }));
+    .map(normalizeCanvasRecord)
+    .filter((item): item is Canvas => item !== null);
 }
 
 function hasLocalOnlyCanvasMedia(canvases: Canvas[]): boolean {
@@ -63,7 +105,7 @@ export const syncService = {
       }
 
       const response = await kkWebApiClient.saveWorkspaceLayout({
-        canvases: canvases as unknown as Record<string, unknown>[],
+        canvases: canvases.map(toCanvasLayoutRecord),
       });
 
       if (isUnauthorizedResponse(response)) {

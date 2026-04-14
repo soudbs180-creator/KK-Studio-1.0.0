@@ -27,21 +27,21 @@ export function resolveRuntimeAuthenticatedProfileContext(
 ): RuntimeAuthenticatedProfileContext | null {
   const runtimeState = getLatestRuntimeAuthState();
   const latestSessionChange = getLatestAuthSessionChange();
+  const storedAccessToken = getStoredKkApiAccessToken();
   const runtimeUserId = normalizeUserId(runtimeState.user?.id);
   const sessionUserId = normalizeUserId(latestSessionChange?.userId);
-  const storedAccessToken = getStoredKkApiAccessToken();
   const isTempUser = runtimeState.isTempUser || latestSessionChange?.isTempUser === true;
   const userId = sessionUserId || runtimeUserId;
+
+  if (!userId && !storedAccessToken) {
+    return null;
+  }
 
   if (!userId) {
     return null;
   }
 
   if (expectedUserId && expectedUserId !== userId) {
-    return null;
-  }
-
-  if (!isTempUser && !storedAccessToken) {
     return null;
   }
 

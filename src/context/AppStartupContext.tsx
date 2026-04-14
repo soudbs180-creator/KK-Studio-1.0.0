@@ -63,7 +63,7 @@ function hasReachedStage(stage: AppStartupStage, target: AppStartupStage): boole
 }
 
 export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session, isTempUser } = useAuth();
+  const { user, isTempUser } = useAuth();
   const localOnlyRuntime = !KKAI_FEATURE_FLAGS.admin
     && !KKAI_FEATURE_FLAGS.workspaceCloudSync
     && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
@@ -190,7 +190,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cancelled = true;
       clearScheduledWork();
     };
-  }, [isTempUser, localOnlyRuntime, session?.access_token, user?.id]);
+  }, [isTempUser, localOnlyRuntime, user?.id]);
 
   const advanceTo = React.useCallback((nextStage: AppStartupStage) => {
     startTransition(() => {

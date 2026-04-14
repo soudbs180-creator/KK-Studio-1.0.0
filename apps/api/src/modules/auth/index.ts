@@ -10,6 +10,7 @@ export * from "./infrastructure/in-memory-auth-data-repository.ts";
 export * from "./infrastructure/in-memory-auth-identity-store.ts";
 export * from "./infrastructure/postgres-auth-data-repository.ts";
 export * from "./infrastructure/postgres-wechat-auth-repository.ts";
+export * from "./infrastructure/password-change-code-email-sender.ts";
 export * from "./infrastructure/supabase-auth-data-repository.ts";
 export * from "./infrastructure/supabase-user-scoped-auth-data-mirror.ts";
 export * from "./infrastructure/supabase-wechat-auth-repository.ts";

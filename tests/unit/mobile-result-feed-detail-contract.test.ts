@@ -11,11 +11,18 @@ function readSource(relativePath: string): string {
 
 test('mobile result feed stays card-focused and defers full result actions to a dedicated detail screen', () => {
   const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const tileSource = readSource('src/components/mobile/MobileResultTile.tsx');
   const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
 
   assert.doesNotMatch(feedSource, /PartialRedrawModal/);
   assert.doesNotMatch(feedSource, /activeDetailResult/);
   assert.match(feedSource, /onEntryOpen/);
+  assert.match(feedSource, /import MobileResultTile from '\.\/MobileResultTile';/);
+  assert.match(feedSource, /<MobileResultTile/);
+  assert.match(tileSource, /interface MobileResultTileProps/);
+  assert.match(tileSource, /onEntryOpen: \(entryId: string\) => void;/);
+  assert.match(tileSource, /mobileTileSpan/);
+  assert.match(tileSource, /mobileTileEmphasis/);
 
   assert.match(detailSource, /data-testid="mobile-result-detail-screen"/);
   assert.match(detailSource, /fullPrompt/);

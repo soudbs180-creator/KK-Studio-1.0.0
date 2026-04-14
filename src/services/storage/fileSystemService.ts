@@ -581,12 +581,11 @@ export const fileSystemService = {
         logInfo('FileSystem', `Loaded ${canvases.length} canvases and ${images.size} media files`, hasRootConfig ? 'root+legacy merged' : 'legacy recovered');
 
         if (!consolidatedWorkspaceHandles.has(handle)) {
-            try {
-                await this.consolidateWorkspaceLayout(handle, canvases, activeCanvasId);
-                consolidatedWorkspaceHandles.add(handle);
-            } catch (e) {
+            consolidatedWorkspaceHandles.add(handle);
+            void this.consolidateWorkspaceLayout(handle, canvases, activeCanvasId).catch((e) => {
+                consolidatedWorkspaceHandles.delete(handle);
                 logWarning('FileSystem', 'Workspace consolidation skipped after failure', e instanceof Error ? e.message : 'unknown');
-            }
+            });
         }
 
         return { canvases, images, activeCanvasId };

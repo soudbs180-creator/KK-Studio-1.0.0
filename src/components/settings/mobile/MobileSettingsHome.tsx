@@ -67,6 +67,7 @@ const MobileSettingsHome: React.FC<MobileSettingsHomeProps> = ({
             <button
               key={entry.id}
               type="button"
+              data-testid={`mobile-settings-entry-${entry.id}`}
               onClick={() => onSelectSection(entry.id)}
               className={`rounded-[24px] border px-4 py-4 text-left transition ${
                 isActive ? 'border-blue-400/50 bg-blue-500/10' : 'border-[var(--border-light)] bg-[var(--bg-secondary)]/90'

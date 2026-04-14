@@ -60,7 +60,7 @@ const RESPONSE_ONLY_MODEL_PATTERNS = [
   /^o3-deep-research(?:-[\d-]+)?$/i,
 ];
 
-function shouldForceQueryAuthForProvider(provider: string, baseUrl: string): boolean {
+function shouldForceHeaderAuthForProvider(provider: string, baseUrl: string): boolean {
   const normalizedProvider = String(provider || '').trim().toLowerCase();
   const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
   return normalizedProvider === 'gpt-best'
@@ -419,8 +419,8 @@ async function resolveSecureProxyUserRoute(
     String(matchedRecord.baseUrl || matchedRecord.base_url || '').trim(),
     format,
   );
-  const authMethod = shouldForceQueryAuthForProvider(provider, baseUrl)
-    ? 'query'
+  const authMethod = shouldForceHeaderAuthForProvider(provider, baseUrl)
+    ? 'header'
     : matchedRecord.authMethod === 'query'
       ? 'query'
       : 'header';

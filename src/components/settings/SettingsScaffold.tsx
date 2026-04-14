@@ -313,6 +313,7 @@ type SettingsSectionProps = {
   description?: ReactNode;
   eyebrow?: string;
   action?: ReactNode;
+  testId?: string;
   children: ReactNode;
 };
 
@@ -321,9 +322,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   description,
   eyebrow,
   action,
+  testId,
   children,
 }) => (
-  <section className="space-y-3">
+  <section className="space-y-3" data-testid={testId}>
     <div className="flex items-start justify-between gap-3 px-1">
       <h3
         className="text-left font-semibold uppercase tracking-[0.18em]"

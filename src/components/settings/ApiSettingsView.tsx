@@ -16,7 +16,7 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
@@ -84,9 +84,11 @@ import {
   ApiWorkbenchPlatformSection,
   ApiWorkbenchStageSection,
   InfoCell,
-  PlatformAssistantEntryCard,
 } from './apiWorkbenchSections';
-import { resolveApiWorkbenchStageMeta } from './apiWorkbenchState';
+import {
+  resolveApiWorkbenchDiagnosticsAvailability,
+  resolveApiWorkbenchStageMeta,
+} from './apiWorkbenchState';
 type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = ApiManagementTab;
@@ -151,6 +153,8 @@ const USER_API_VIEW_SNAPSHOT_PREFIX = 'kk_user_api_view_snapshot:';
 const USER_API_VIEW_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
 const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
+const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
+const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
 
 const buildOfficialEditorPath = (officialId?: string | null) =>
@@ -680,7 +684,7 @@ const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({
   value: typeof supplier.budgetLimit === 'number' && supplier.budgetLimit > -1 ? String(supplier.budgetLimit) : '',
 });
 
-const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
+const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isTempUser } = useAuth();
@@ -691,7 +695,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const handleOpenPlatformAssistant = useCallback(() => {
     notify.info(
       pick('平台辅助 AI', 'Platform Assistant AI'),
-      pick('这里会接入平台侧的轻量辅助 AI 能力入口，当前先预留按钮位。', 'This entry will host the platform-managed lightweight assistant AI in a later step.'),
+      pick('平台入口仍然是单独能力，当前请先在下方的本地 API 区继续配置你的 Base URL、Key 和预算规则。', 'The platform entry stays separate for now. Please continue configuring your Base URL, key, and budget rules in the local API section below.'),
     );
   }, [pick]);
   const getOfficialDisplayName = useCallback(
@@ -762,8 +766,30 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
   const isUsingReadonlyProfileFallback =
     shouldUseReadonlySnapshotForDisplay
     && hasReadonlySnapshot;
-  const routeOfficialId = useMemo(() => decodeRouteParam(officialId), [officialId]);
-  const routeProviderId = useMemo(() => decodeRouteParam(providerId || legacySupplierId), [legacySupplierId, providerId]);
+  const routeOfficialId = useMemo(() => {
+    const routeValue = decodeRouteParam(officialId);
+    if (routeValue) {
+      return routeValue;
+    }
+
+    if (!location.pathname.startsWith(API_MANAGEMENT_OFFICIAL_PREFIX)) {
+      return '';
+    }
+
+    return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_OFFICIAL_PREFIX.length));
+  }, [location.pathname, officialId]);
+  const routeProviderId = useMemo(() => {
+    const routeValue = decodeRouteParam(providerId || legacySupplierId);
+    if (routeValue) {
+      return routeValue;
+    }
+
+    if (!location.pathname.startsWith(API_MANAGEMENT_PROVIDER_PREFIX)) {
+      return '';
+    }
+
+    return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_PROVIDER_PREFIX.length));
+  }, [legacySupplierId, location.pathname, providerId]);
   const selectedOfficialSlot = useMemo(
     () => officialSlots.find((slot) => normalizeRouteMatchValue(slot.id) === normalizeRouteMatchValue(routeOfficialId)) || null,
     [officialSlots, routeOfficialId]
@@ -872,8 +898,8 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       ? backendUnavailableHelper
       : isUserApiPersistenceDegraded
       ? pick(
-          '当前处于云端直写模式。你保存的官方接口会直接进入账号云端记录，并在本地服务恢复后继续同步。',
-          'Cloud-backed write mode is active. Saved official endpoints will go straight to the account-backed cloud record and sync back once the local service recovers.',
+          '当前处于云端直写模式。你保存的本地 API 会直接进入账号云端记录，并在本地服务恢复后继续同步。',
+          'Cloud-backed write mode is active. Saved local APIs will go straight to the account-backed cloud record and sync back once the local service recovers.',
         )
       : null;
   const providerEditorReadOnlyHelper = providerEditorReadOnly
@@ -891,14 +917,18 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
     '浏览器直连检测已关闭。请先保存到账号，再通过本地后端或云端安全代理链路使用。',
     'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
   );
-  const headerPrimaryActionDisabled = activeTab === 'official' ? userApiActionsDisabled : providerActionsDisabled;
   const useCloudBackedUserApiWrites =
     isAuthenticated
     && !isTempUser
     && (isUserApiPersistenceDegraded || apiHealth?.reachable === false);
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
-  const diagnosticsActionDisabled = !isAuthenticated || apiHealth?.reachable === false;
+  const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability({
+    isAuthenticated,
+    isApiReachable: apiHealth?.reachable,
+  });
+  const diagnosticsRefreshDisabled = diagnosticsAvailability.refreshDisabled;
+  const routeDiagnosticsActionDisabled = diagnosticsAvailability.routeActionsDisabled;
   const userApiReadOnlyHelper = isUserApiPersistenceDegraded
     ? pick(
         '当前页面会优先保住账号云端记录里的配置，并在本地服务恢复后重新和本地状态对齐。',
@@ -1432,7 +1462,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         if (!result.success) {
           notify.error(
             pick('新增失败', 'Creation failed'),
-            result.error || pick('无法创建官方接口。', 'Unable to create the official endpoint.'),
+            result.error || pick('无法创建本地 API。', 'Unable to create the local API.'),
           );
           return;
         }
@@ -1442,8 +1472,8 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       notify.success(
         officialForm.id ? pick('保存成功', 'Saved') : pick('新增成功', 'Created'),
         officialForm.id
-          ? pick('官方接口配置已更新。', 'Official endpoint settings have been updated.')
-          : pick('官方接口已加入当前链路。', 'The official endpoint has been added to the current routing chain.'),
+          ? pick('本地 API 配置已更新。', 'Local API settings have been updated.')
+          : pick('本地 API 已加入当前链路。', 'The local API has been added to the current routing chain.'),
       );
       cancelEdit();
     });
@@ -1593,7 +1623,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       notify.success(
         pick('删除成功', 'Deleted'),
-        pick('官方接口已移除。', 'The official endpoint has been removed.'),
+        pick('本地 API 已移除。', 'The local API has been removed.'),
       );
       if (editingOfficialId === id) cancelEdit();
     });
@@ -1889,8 +1919,8 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           eyebrow={pick('接口编辑', 'Endpoint editor')}
           title={pick('找不到接口', 'Endpoint not found')}
           description={pick(
-            '当前要编辑的官方接口已经不存在了，先回到列表重新选择。',
-            'The official endpoint you are editing no longer exists. Return to the list and pick another one.'
+            '当前要编辑的本地 API 已经不存在了，先回到列表重新选择。',
+            'The local API you are editing no longer exists. Return to the list and pick another one.'
           )}
           icon={Shield}
           tone="amber"
@@ -1903,13 +1933,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
         <SettingsSection title={pick('接口不存在', 'Endpoint missing')} eyebrow={pick('无法继续编辑', 'Cannot continue')}>
           <EmptyState
-            title={pick('这条官方接口可能已经被删除', 'This official endpoint may have been removed')}
+            title={pick('这条本地 API 可能已经被删除', 'This local API may have been removed')}
             description={pick(
               '返回 API 管理列表后重新选择要编辑的接口。',
               'Return to API Management and choose another endpoint to edit.'
             )}
             action={
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回接口列表', 'Back to endpoints')}
               </SettingsActionButton>
             }
@@ -1961,11 +1991,11 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       {activeEditorMode === 'official' ? (
         <SettingsHero
           eyebrow={pick('接口编辑', 'Endpoint editor')}
-          title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增官方接口', 'New official endpoint')}
+          title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增本地 API', 'Add local API')}
           description={
             editingOfficialId
-              ? pick('当前页面只修改这一条官方接口，保存后返回列表。', 'This page edits one official endpoint at a time and returns to the list after saving.')
-              : pick('在独立页面创建官方接口，避免和列表卡片混在一起。', 'Create official endpoints in a focused editor instead of mixing them with the list.')
+              ? pick('当前页面只修改这一条本地 API，保存后返回列表。', 'This page edits one local API at a time and returns to the list after saving.')
+              : pick('在独立页面创建本地 API，避免和列表卡片混在一起。', 'Create a local API in a focused editor instead of mixing it with the list.')
           }
           icon={Shield}
           tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'indigo'}
@@ -1976,13 +2006,13 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
           }
           actions={
             <>
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回接口列表', 'Back to endpoints')}
               </SettingsActionButton>
               {selectedOfficialSlot ? (
                 <SettingsActionButton
                   icon={RefreshCw}
-                  disabled={diagnosticsActionDisabled}
+                  disabled={routeDiagnosticsActionDisabled}
                   loading={busy === `official-check:${selectedOfficialSlot.id}`}
                   onClick={() => void refreshOfficial(selectedOfficialSlot)}
                 >
@@ -1996,7 +2026,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               <SettingsMetricCard
                 label={pick('当前接口', 'Current endpoint')}
                 value={getOfficialDisplayName(officialForm.provider)}
-                helper={editingOfficialId ? pick('你现在编辑的是这一条接口', 'You are editing this endpoint now') : pick('保存后会加入官方接口列表', 'After saving it will join the endpoint list')}
+                helper={editingOfficialId ? pick('你现在编辑的是这一条本地 API', 'You are editing this local API now') : pick('保存后会加入本地 API 列表', 'After saving it will join the local API list')}
                 icon={Key}
                 tone="indigo"
               />
@@ -2051,7 +2081,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 <>
                   <SettingsActionButton
                     icon={RefreshCw}
-                    disabled={diagnosticsActionDisabled}
+                    disabled={routeDiagnosticsActionDisabled}
                     loading={busy === `provider-check:${selectedProvider.id}`}
                     onClick={() => void refreshProvider(selectedProvider)}
                   >
@@ -2059,7 +2089,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                   </SettingsActionButton>
                   <SettingsActionButton
                     icon={Wand2}
-                    disabled={diagnosticsActionDisabled}
+                    disabled={routeDiagnosticsActionDisabled}
                     loading={busy === `provider-price:${selectedProvider.id}`}
                     onClick={() => void syncPricing(selectedProvider)}
                   >
@@ -2110,8 +2140,8 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         eyebrow={pick('高级设置', 'Advanced settings')}
         title={pick('API 工作台', 'API workspace')}
         description={pick(
-          '统一管理官方接口、第三方供应商、通信协议和预算策略。这里所有按钮都只表达一个真实动作，不再混用保存、刷新和同步语义。',
-          'Manage official endpoints, third-party providers, protocols, and budgets in one place. Each action now maps to one clear behavior.'
+          '把本地 API、第三方供应商和预算规则收在一个页面里，优先保留清晰的入口和最少的操作。',
+          'Keep local APIs, third-party providers, and budget rules in one place with clearer entry points and less clutter.'
         )}
         icon={Key}
         tone={workbenchTone}
@@ -2135,9 +2165,6 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             >
               {pick('刷新数据', 'Refresh data')}
             </SettingsActionButton>
-            <SettingsActionButton icon={Plus} tone="primary" disabled={headerPrimaryActionDisabled} onClick={activeTab === 'official' ? beginCreateOfficial : beginCreateProvider}>
-              {activeTab === 'official' ? pick('新增官方接口', 'New official endpoint') : pick('新增供应商', 'New provider')}
-            </SettingsActionButton>
           </>
         }
         metrics={
@@ -2152,7 +2179,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               />
             ) : null}
             <SettingsMetricCard
-              label={pick('官方接口', 'Official endpoints')}
+              label={pick('本地 API', 'Local APIs')}
               value={`${officialSlots.length}`}
               helper={pick(
                 `${officialSlots.filter((slot) => !slot.disabled).length} 条当前可参与调度`,
@@ -2172,13 +2199,6 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 : pick('尚未配置第三方供应商', 'No third-party providers configured yet')}
               icon={Globe}
               tone={activeProviders > 0 ? 'emerald' : 'neutral'}
-            />
-            <SettingsMetricCard
-              label={pick('预算策略', 'Budget rules')}
-              value={`${budgetCount}`}
-              helper={pick('已设置预算或词元上限的链路数量', 'Routes with a budget or token limit')}
-              icon={Layers3}
-              tone={budgetCount > 0 ? 'amber' : 'neutral'}
             />
             <SettingsMetricCard
               label={pick('待处理项', 'Needs attention')}
@@ -2223,6 +2243,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
         primaryActionTone={stagePrimaryActionTone}
         onPrimaryAction={handleStagePrimaryAction}
         primaryActionLoading={busy === 'cloud-refresh'}
+        primaryActionTestId="api-workbench-primary-action"
         isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
         runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
       />
@@ -2230,7 +2251,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       {showDiagnostics ? (
         <ApiWorkbenchDiagnosticsSection
           pick={pick}
-          diagnosticsActionDisabled={diagnosticsActionDisabled}
+          diagnosticsActionDisabled={diagnosticsRefreshDisabled}
           onRefreshDiagnostics={() => void refreshApiHealth(true)}
           apiReachable={apiHealth?.reachable}
           apiErrorMessage={apiHealth?.errorMessage}
@@ -2255,22 +2276,21 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       {activeTab === 'official' ? (
         <SettingsSection
-          title={pick('官方接口', 'Official endpoints')}
-          eyebrow={pick('官方渠道', 'Official channels')}
+          title={pick('本地 API', 'Local APIs')}
+          eyebrow={pick('本地直连', 'Local direct routes')}
           description={pick(
-            '适合直连 OpenAI 和 Gemini 官方接口，用于承担稳定、核心的生产流量。',
-            'Best for direct OpenAI and Gemini traffic that needs a stable primary route.'
+            '把你自己的直连 OpenAI 和 Gemini 配置收在这里。',
+            'Manage your own direct OpenAI and Gemini routes here.'
           )}
-          action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
         >
           {officialSlots.length === 0 ? (
             <EmptyState
-              title={pick('当前还没有官方接口', 'No official endpoints yet')}
+              title={pick('当前还没有本地 API', 'No local APIs yet')}
               description={pick(
-                '先添加 OpenAI 或 Gemini 官方接口，再让它们进入调度。',
-                'Add an OpenAI or Gemini endpoint first, then bring it into routing.'
+                '先添加一个本地 API，再让它进入调度。',
+                'Add a local API first, then bring it into routing.'
               )}
-              action={<SettingsActionButton icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增官方接口', 'New official endpoint')}</SettingsActionButton>}
+              action={<SettingsActionButton data-testid="api-official-empty-create" icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增本地 API', 'Add local API')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
@@ -2328,7 +2348,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                     actions={
                       <>
                         <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
                         <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleOfficial(slot)}>
                           {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
                         </SettingsActionButton>
@@ -2348,9 +2368,6 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
             'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
           )}
-          action={
-            <SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>
-          }
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
@@ -2423,10 +2440,10 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                         <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
                           {pick('编辑', 'Edit')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
                           {pick('刷新', 'Refresh')}
                         </SettingsActionButton>
-                        <SettingsActionButton icon={Wand2} size="sm" disabled={diagnosticsActionDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
+                        <SettingsActionButton icon={Wand2} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
                           {pick('自动获取价格', 'Sync pricing')}
                         </SettingsActionButton>
                         <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
@@ -2450,49 +2467,23 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
 
       {showOfficialEditor ? (
         <SettingsSection
-          title={pick('官方接口编辑器', 'Official endpoint editor')}
+          title={pick('本地 API 编辑器', 'Local API editor')}
           eyebrow={
             editingOfficialId
-              ? pick('编辑官方接口', 'Edit official endpoint')
-              : pick('新增官方接口', 'Create official endpoint')
+              ? pick('编辑本地 API', 'Edit local API')
+              : pick('新增本地 API', 'Add local API')
           }
           description={pick(
-            '保存只负责提交当前表单；刷新和启用状态请在上面的接口卡片里单独操作。',
-            'Save only submits this form. Refresh and enable states are still managed from the endpoint cards above.'
+            '这里只保存当前本地 API；刷新和启用状态仍然在上面的卡片里操作。',
+            'Save only updates this local API. Refresh and enable states stay on the cards above.'
           )}
         >
           <div className="space-y-4">
-            <PlatformAssistantEntryCard
-              title={pick('平台辅助 AI', 'Platform Assistant AI')}
-              description={pick(
-                '这个编辑器仍然只负责你自己的本地 API 配置；如果你要用平台侧的辅助 AI，请改走单独的平台入口。',
-                'This editor still only changes your local API configuration. If you want platform assistant AI, use the separate platform entry instead.',
-              )}
-              entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
-              localApiLabel={pick('用户本地 API', 'User-managed local APIs')}
-              localApiValue={pick('继续使用你的 BYOK', 'Keep your BYOK routes')}
-              localApiHelper={pick(
-                '当前表单依然只保存你的本地 Provider、Key 和预算规则，不会切换到平台侧能力。',
-                'This form still only saves your local providers, keys, and budget rules without switching into platform capabilities.',
-              )}
-              platformLabel={pick('平台能力', 'Platform capability')}
-              platformValue={pick('单独的平台入口', 'Separate platform entry')}
-              platformHelper={pick(
-                '如果你需要平台侧辅助 AI，请使用独立入口，而不是把能力混进本地 API 编辑表单。',
-                'Use the separate platform entry for assistant capabilities instead of mixing them into the local API editor.',
-              )}
-              entryActionLabel={pick('改用平台辅助 AI 入口', 'Use platform assistant entry instead')}
-              entryActionHelper={pick(
-                '这里只保留清晰的分流说明和跳转预留，不在这个任务里接完整流程。',
-                'This keeps the routing explanation clear and reserves the handoff without wiring the full flow in this task.',
-              )}
-              onOpen={handleOpenPlatformAssistant}
-            />
             <div className="grid gap-3 md:grid-cols-3">
               <InfoCell
                 label={pick('当前对象', 'Current object')}
                 value={getOfficialDisplayName(officialForm.provider)}
-                helper={editingOfficialId ? pick('正在编辑已有接口', 'Editing an existing endpoint') : pick('准备新增一条官方链路', 'Preparing a new official route')}
+                helper={editingOfficialId ? pick('正在编辑已有本地 API', 'Editing an existing local API') : pick('准备新增一条本地 API', 'Preparing a new local API')}
               />
               <InfoCell
                 label={pick('服务商', 'Provider')}
@@ -2528,7 +2519,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 value={getOfficialDisplayName(officialForm.provider)}
                 onChange={() => setOfficialForm((current) => ({ ...current, name: current.provider }))}
                 placeholder={pick('会根据提供商自动固定', 'Automatically fixed by provider')}
-                helper={pick('官方接口名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Official endpoint names are fixed by provider; Google follows the current language.')}
+                helper={pick('本地 API 名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Local API names are fixed by provider; Google follows the current language.')}
                 disabled={userApiEditorReadOnly}
               />
               <SettingSelect
@@ -2547,7 +2538,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
               label="API Key"
               value={officialForm.key}
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
-              placeholder={pick('输入官方接口的 API Key', 'Enter the official endpoint API key')}
+              placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
               helper={pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
               disabled={userApiEditorReadOnly}
@@ -2574,7 +2565,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
             <div className="flex flex-wrap gap-2 pt-2">
               <PrimaryButton disabled={userApiActionsDisabled} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
-                {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增官方接口', 'Create endpoint')}
+                {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增本地 API', 'Add local API')}
               </PrimaryButton>
               <SecondaryButton onClick={cancelEdit}>
                 {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
@@ -2718,7 +2709,7 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
                 {editingProviderId ? (
                   <SettingsActionButton
                     icon={Wand2}
-                    disabled={diagnosticsActionDisabled}
+                    disabled={routeDiagnosticsActionDisabled}
                     loading={busy === `provider-price:${editingProviderId}`}
                     onClick={() => {
                       const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
@@ -2771,6 +2762,20 @@ const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ init
       ) : null}
     </SettingsViewShell>
   );
+};
+
+const ApiSettingsView: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
+  const inRouterContext = useInRouterContext();
+
+  if (!inRouterContext) {
+    return (
+      <MemoryRouter initialEntries={[API_MANAGEMENT_HOME_PATH]}>
+        <ApiSettingsViewInner initialSupplier={initialSupplier} />
+      </MemoryRouter>
+    );
+  }
+
+  return <ApiSettingsViewInner initialSupplier={initialSupplier} />;
 };
 
 export default ApiSettingsView;

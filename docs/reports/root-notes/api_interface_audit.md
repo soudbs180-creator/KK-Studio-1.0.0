@@ -55,29 +55,29 @@ const joinPaths = (base: string, admin: string, path: string, shouldAddAdmin: bo
 
 | 接口 | 文档端点 | 实现位置 | 实现端点 | 状态 |
 |------|---------|---------|---------|------|
-| Chat Completions | POST /v1/chat/completions | `api12AIService.ts:26,142` | /v1/chat/completions | ✅ |
-| Image Generations | POST /v1/images/generations | `api12AIService.ts:27,215` | /v1/images/generations | ✅ |
+| Chat Completions | POST /v1/chat/completions | `AI12APIService.ts:26,142` | /v1/chat/completions | ✅ |
+| Image Generations | POST /v1/images/generations | `AI12APIService.ts:27,215` | /v1/images/generations | ✅ |
 
 ### 2.2 Gemini 格式接口 - ✅ 正确实现
 
 | 接口 | 文档端点 | 实现位置 | 实现端点 | 状态 |
 |------|---------|---------|---------|------|
-| Generate Content | POST /v1beta/models/{model}:generateContent | `api12AIService.ts:36,279` | /v1beta/models/{model}:generateContent | ✅ |
-| Stream Generate | POST /v1beta/models/{model}:streamGenerateContent | `api12AIService.ts:37` | /v1beta/models/{model}:streamGenerateContent | ✅ |
+| Generate Content | POST /v1beta/models/{model}:generateContent | `AI12APIService.ts:36,279` | /v1beta/models/{model}:generateContent | ✅ |
+| Stream Generate | POST /v1beta/models/{model}:streamGenerateContent | `AI12APIService.ts:37` | /v1beta/models/{model}:streamGenerateContent | ✅ |
 
 ### 2.3 视频生成接口 - ✅ 正确实现
 
 | 接口 | 文档端点 | 实现位置 | 实现端点 | 状态 |
 |------|---------|---------|---------|------|
-| Create Video | POST /v1/videos | `api12AIService.ts:41,391` | /v1/videos | ✅ |
-| Get Video Status | GET /v1/videos/{id} | `api12AIService.ts:42,427` | /v1/videos/{id} | ✅ |
-| Get Video Content | GET /v1/videos/{id}/content | `api12AIService.ts:43` | /v1/videos/{id}/content | ✅ |
+| Create Video | POST /v1/videos | `AI12APIService.ts:41,391` | /v1/videos | ✅ |
+| Get Video Status | GET /v1/videos/{id} | `AI12APIService.ts:42,427` | /v1/videos/{id} | ✅ |
+| Get Video Content | GET /v1/videos/{id}/content | `AI12APIService.ts:43` | /v1/videos/{id}/content | ✅ |
 
 ### 2.4 认证方式 - ✅ 正确实现
 
 **OpenAI/Claude 格式**:
 ```typescript
-// api12AIService.ts:90
+// AI12APIService.ts:90
 function getOpenAIHeaders(apiKey: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
@@ -88,7 +88,7 @@ function getOpenAIHeaders(apiKey: string): Record<string, string> {
 
 **Gemini 格式**:
 ```typescript
-// api12AIService.ts:285
+// AI12APIService.ts:285
 const url = `${buildUrl('', baseUrl)}${endpoint}?key=${apiKey}`;
 ```
 Gemini 格式使用 URL 查询参数传递 API key，符合文档要求。
@@ -100,7 +100,7 @@ Gemini 格式使用 URL 查询参数传递 API key，符合文档要求。
 **状态**: ✅ 已实现
 
 **实现位置**:
-- `api12AIService.ts`: `claudeMessages()`, `streamClaudeMessages()`
+- `AI12APIService.ts`: `claudeMessages()`, `streamClaudeMessages()`
 - `AI12APIService.ts`: `claudeMessages()`, `streamClaudeMessages()`
 
 **功能**:
@@ -112,7 +112,7 @@ Gemini 格式使用 URL 查询参数传递 API key，符合文档要求。
 #### 问题 2: 视频接口参数扩展 ✅ 已完成
 根据文档，12AI 视频接口支持更多参数（duration, resolution, aspect_ratio）。
 
-**实现位置**: `api12AIService.ts:584-672`
+**实现位置**: `AI12APIService.ts:584-672`
 
 **新增参数**:
 ```typescript
@@ -144,7 +144,7 @@ One API 与 New API 有相似的接口设计。当前实现对 One API 的兼容
 ### 4.1 已完成的修复
 
 1. ✅ **路径规范化** - `newApiAdmin.ts` 已添加 `joinPaths` 辅助函数
-2. ✅ **Claude Messages API** - `api12AIService.ts` 和 `AI12APIService.ts` 已实现
+2. ✅ **Claude Messages API** - `AI12APIService.ts` 已实现
 3. ✅ **视频参数扩展** - `VideoGenerationOptions` 已添加 duration/resolution/aspectRatio
 
 ---
@@ -178,10 +178,10 @@ One API 与 New API 有相似的接口设计。当前实现对 One API 的兼容
 
 #### 1. Claude Messages API
 ```typescript
-import { api12AIService } from './services/api/api12AIService';
+import { ai12ApiService } from './services/api/AI12APIService';
 
 // 非流式调用
-const result = await api12AIService.claudeMessages(apiKey, {
+const result = await ai12ApiService.claudeMessages(apiKey, {
   model: 'claude-3-5-sonnet',
   messages: [{ role: 'user', content: 'Hello!' }],
   system: 'You are a helpful assistant',
@@ -189,7 +189,7 @@ const result = await api12AIService.claudeMessages(apiKey, {
 });
 
 // 流式调用
-for await (const chunk of api12AIService.streamClaudeMessages(apiKey, {
+for await (const chunk of ai12ApiService.streamClaudeMessages(apiKey, {
   model: 'claude-3-5-sonnet',
   messages: [{ role: 'user', content: 'Hello!' }],
 })) {
@@ -199,7 +199,7 @@ for await (const chunk of api12AIService.streamClaudeMessages(apiKey, {
 
 #### 2. 视频生成参数扩展
 ```typescript
-const result = await api12AIService.createVideo(apiKey, {
+const result = await ai12ApiService.createVideo(apiKey, {
   prompt: 'A cat playing piano',
   duration: 10,           // 5, 8, 或 10 秒
   resolution: '1080p',    // 480p, 720p, 1080p

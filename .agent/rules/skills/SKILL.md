@@ -22,6 +22,7 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 - 涉及版本、功能说明、项目结构、部署方式变化时，必须同步 README 与开发文档。
 - 涉及存储、计费、Supabase、支付、接口代理时，必须检查前后端两侧是否一起更新。
 - 不允许为追求“好看”而大幅改动既有 UI 动线；优先稳定、兼容、专业、可维护。
+- Windows PowerShell 默认 `cp936` 会把 UTF-8 中文规则文件误显示成乱码；读取 `.agent`、`docs` 与治理脚本时，优先使用 UTF-8 显式读取或直接运行校验脚本。
 - 修改完成后，默认执行：`npm run typecheck`、`npm run check:encoding`、`npm run build`。
 
 ---
@@ -1057,7 +1058,11 @@ export function calculateFitZoom(bounds: BoundingBox): number {
 - **限制 500 行** - 单个组件/Service
 - **最大 800 行** - 超过必须重构拆分
 
-### 6. 代码注释规范（中文强制）
+### 6. 代码注释规范（关键逻辑 + 导出契约）
+
+- 普通 TS / React / Node 代码默认采用“关键逻辑注释 + 导出契约 JSDoc”，避免为了注释而把文件再次堆重。
+- 注释重点解释“为什么这样做”“边界条件是什么”“跨模块契约是什么”，不要写逐行翻译式注释。
+- Cadence / SKILL 脚本继续保持详尽中文注释要求；本节的轻量化规则主要面向常规前端与 Node 模块。
 
 ```typescript
 /**

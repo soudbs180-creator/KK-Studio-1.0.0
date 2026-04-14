@@ -27,8 +27,7 @@ test("project docs publish one runtime truth table for current and transitional 
 
   assert.match(handoffSource, /当前在线前端运行时：根目录 `src\/`/);
   assert.match(handoffSource, /目标前端运行时：`apps\/web\/`/);
-  assert.match(handoffSource, /主支付运行时：`apps\/payment-sidecar\/`/);
-  assert.match(handoffSource, /`payment-server\/` 仍是过渡桥接层/);
+  assert.match(handoffSource, /`apps\/payment-sidecar\/` is the canonical payment runtime/);
 });
 
 test("verification chain includes integration tests and payment-server static checks", () => {
@@ -45,9 +44,14 @@ test("verification chain includes integration tests and payment-server static ch
   assert.match(packageJson.scripts.typecheck, /npm run typecheck:payment-server/);
   assert.equal(packageJson.scripts["typecheck:payment-server"], "node scripts/check-payment-server.mjs");
   assert.match(packageJson.scripts["verify:changes"], /npm run test/);
+  assert.match(packageJson.scripts["verify:changes"], /verify:prompt-group-drag/);
+  assert.match(packageJson.scripts["verify:changes"], /verify:mobile-settings-smoke/);
+  assert.match(packageJson.scripts["verify:changes"], /verify:desktop-settings-smoke/);
   assert.ok(testsTsconfig.include.includes("tests/integration/**/*.ts"));
-  assert.ok(testsTsconfig.include.includes("tests/unit/payment-runtime-hardening.test.ts"));
-  assert.ok((testsTsconfig.exclude || []).includes("tests/contract/**/*.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/governance-contract.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/runtime-governance-upgrade.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/contract/**/*.ts"));
+  assert.ok((testsTsconfig.exclude || []).includes("tests/e2e/**/*.ts"));
 });
 
 test("version governance checks internal package versions against the release manifest", () => {

@@ -492,6 +492,9 @@ export class LLMService {
                         imageCount: options.imageCount,
                         referenceImages: options.referenceImages,
                     });
+                    if (response.taskId) {
+                        onTaskId?.(response.taskId);
+                    }
 
                     const cleanModelId = options.modelId.split('@')[0];
                     return {
@@ -500,6 +503,8 @@ export class LLMService {
                         deducted: response.deducted,
                         ledgerId: response.ledgerId,
                         balanceAfter: response.balanceAfter,
+                        taskId: response.taskId,
+                        status: response.status,
                         provider: 'SystemProxy',
                         providerName: '系统积分模型',
                         modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
@@ -555,11 +560,16 @@ export class LLMService {
                         }
                     }
 
+                    if (proxyResponse.taskId) {
+                        onTaskId?.(proxyResponse.taskId);
+                    }
                     result = {
                         urls: proxyResponse.urls,
                         ledgerId: proxyResponse.ledgerId,
                         balanceAfter: proxyResponse.balanceAfter,
                         usage: proxyResponse.usage,
+                        taskId: proxyResponse.taskId,
+                        status: proxyResponse.status,
                         provider: keySlot.provider,
                         providerName: keySlot.name,
                         modelName: getModelMetadata(options.modelId)?.name || cleanModelId,
@@ -568,6 +578,9 @@ export class LLMService {
                     };
                 } else {
                     this.throwBrowserDirectProviderCallBlocked('image routing', keySlot);
+                }
+                if (!result) {
+                    throw new Error('Image routing returned no result');
                 }
                 keyManager.reportSuccess(keySlot.id);
 

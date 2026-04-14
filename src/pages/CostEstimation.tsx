@@ -7,7 +7,10 @@ import {
   History,
   Layers3,
   RefreshCw,
+  Search,
+  ShieldCheck,
   Wallet,
+  XCircle,
 } from 'lucide-react';
 
 import type { CreditTransactionLog } from '../context/BillingContext';
@@ -27,6 +30,9 @@ import {
 } from '../services/billing/costService';
 import { formatRemainingCredits } from '../services/billing/remainingBalance';
 import { adminModelService } from '../services/model/adminModelService';
+import { kkWebApiClient } from '../services/api/kkApiClient';
+import { notify } from '../services/system/notificationService';
+import useAdminRole from '../hooks/useAdminRole';
 
 interface CostEstimationProps {
   onBack?: () => void;
@@ -56,6 +62,27 @@ type CreditConsumptionSummary = {
   totalCredits: number;
   totalCount: number;
   latestTimestamp: number;
+};
+
+type RechargeReviewDecision = 'credit' | 'reject';
+
+type AdminRechargeSubmissionView = {
+  submission: {
+    submissionId: string;
+    userId?: string;
+    amount: number;
+    currencyCode: string;
+    paymentChannel: string;
+    transferReferenceLast4?: string | null;
+    note?: string;
+    status: string;
+    submittedAt: string;
+    reviewedAt?: string | null;
+  };
+  userId?: string;
+  subjectId?: string;
+  subjectEmail?: string;
+  creditAmount?: number;
 };
 
 const tableWrapperStyle = {
@@ -152,6 +179,48 @@ const formatDateTime = (value: number, locale = 'zh-CN') =>
     hour12: false,
   });
 
+const formatIsoDateTime = (value?: string | null, locale = 'zh-CN') => {
+  const timestamp = Date.parse(String(value || ''));
+  return Number.isFinite(timestamp)
+    ? formatDateTime(timestamp, locale)
+    : '--';
+};
+
+const getRechargeSubmissionStatusLabel = (
+  status: string | null | undefined,
+  pick: (zh: string, en: string) => string,
+) => {
+  switch (String(status || '').trim().toLowerCase()) {
+    case 'created':
+      return pick('待付款', 'Awaiting payment');
+    case 'pending':
+      return pick('待核销', 'Pending review');
+    case 'credited':
+      return pick('已入账', 'Credited');
+    case 'rejected':
+      return pick('已驳回', 'Rejected');
+    default:
+      return String(status || '').trim() || pick('未知状态', 'Unknown');
+  }
+};
+
+const getRechargeSubmissionStatusTone = (
+  status: string | null | undefined,
+): 'neutral' | 'amber' | 'emerald' | 'rose' => {
+  switch (String(status || '').trim().toLowerCase()) {
+    case 'created':
+      return 'neutral';
+    case 'pending':
+      return 'amber';
+    case 'credited':
+      return 'emerald';
+    case 'rejected':
+      return 'rose';
+    default:
+      return 'neutral';
+  }
+};
+
 const toConsumptionRecordFromApi = (entry: CostEntry): ConsumptionRecord => {
   const parsed = parseModelSource(entry.model);
   return {
@@ -228,7 +297,9 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
 }) => {
   const { pick, locale } = useLocale();
   const { balance, loading: billingLoading, usageLogs, refreshBilling, fetchLogs } = useBilling();
+  const { authLoading: adminAuthLoading, checkingAdmin, isAdmin, adminSessionActive } = useAdminRole();
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
+  const canManageRechargeSubmissions = isAdmin && adminSessionActive;
 
   const [activeTab, setActiveTab] = useState<ConsumptionTab>('api');
   const [summaryRows, setSummaryRows] = useState<CostBreakdownItem[]>([]);
@@ -236,6 +307,12 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   const [creditModelCount, setCreditModelCount] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [adminLookupSubmissionId, setAdminLookupSubmissionId] = useState('');
+  const [adminLookupLoading, setAdminLookupLoading] = useState(false);
+  const [adminReviewLoading, setAdminReviewLoading] = useState<RechargeReviewDecision | null>(null);
+  const [adminReviewNote, setAdminReviewNote] = useState('');
+  const [adminLookupResult, setAdminLookupResult] = useState<AdminRechargeSubmissionView | null>(null);
+  const [adminLookupError, setAdminLookupError] = useState('');
 
   useEffect(() => {
     void fetchLogs();
@@ -343,6 +420,77 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
   const latestApiRecord = apiRecords[0] || null;
   const latestCreditRecord = creditRecords[0] || null;
 
+  const loadAdminRechargeSubmission = async () => {
+    const submissionId = adminLookupSubmissionId.trim();
+    if (!submissionId) {
+      notify.error(
+        pick('请输入账单编号', 'Bill number required'),
+        pick('管理员查询前需要先填写账单编号。', 'Enter a bill number before searching.'),
+      );
+      return;
+    }
+
+    setAdminLookupLoading(true);
+    setAdminLookupError('');
+
+    try {
+      const response = await kkWebApiClient.getAdminRechargeSubmission(submissionId);
+      if (!response.success) {
+        throw new Error(
+          response.error.message || pick('账单查询失败', 'Failed to load the bill.'),
+        );
+      }
+
+      setAdminLookupResult(response.data as AdminRechargeSubmissionView);
+    } catch (error: any) {
+      const message = error?.message || pick('账单查询失败', 'Failed to load the bill.');
+      setAdminLookupResult(null);
+      setAdminLookupError(message);
+      notify.error(pick('查询失败', 'Lookup failed'), message);
+    } finally {
+      setAdminLookupLoading(false);
+    }
+  };
+
+  const reviewAdminRechargeSubmission = async (decision: RechargeReviewDecision) => {
+    const submissionId = String(adminLookupResult?.submission?.submissionId || '').trim();
+    if (!submissionId) {
+      return;
+    }
+
+    setAdminReviewLoading(decision);
+    setAdminLookupError('');
+
+    try {
+      const response = await kkWebApiClient.reviewRechargeSubmission(submissionId, {
+        decision,
+      });
+      if (!response.success) {
+        throw new Error(
+          response.error.message || pick('账单操作失败', 'Failed to review the bill.'),
+        );
+      }
+
+      setAdminLookupResult(response.data as AdminRechargeSubmissionView);
+      notify.success(
+        decision === 'credit'
+          ? pick('核销成功', 'Recharge credited')
+          : pick('驳回成功', 'Bill rejected'),
+        decision === 'credit'
+          ? pick('该账单已完成入账。', 'The selected bill has been credited.')
+          : pick('该账单已被驳回。', 'The selected bill has been rejected.'),
+      );
+      await refreshBilling({ includeTransactions: true });
+      setRefreshTick((value) => value + 1);
+    } catch (error: any) {
+      const message = error?.message || pick('账单操作失败', 'Failed to review the bill.');
+      setAdminLookupError(message);
+      notify.error(pick('操作失败', 'Review failed'), message);
+    } finally {
+      setAdminReviewLoading(null);
+    }
+  };
+
   const content = (
     <SettingsViewShell>
       <div className="settings-reference-stack">
@@ -445,6 +593,267 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
                 badge={<Clock3 size={18} className="text-[var(--text-primary)]" />}
               />
             </div>
+
+            {isAdmin ? (
+              <section className="settings-reference-card settings-reference-card--soft">
+                <div className="settings-reference-card__header">
+                  <div>
+                    <div className="settings-reference-card__eyebrow">
+                      {pick('管理员核销', 'Admin review')}
+                    </div>
+                    <div className="settings-reference-card__title">
+                      {pick('静态码账单核销台', 'Static recharge review desk')}
+                    </div>
+                    <div className="settings-reference-card__meta">
+                      {pick(
+                        '按账单编号查询充值单，并执行核销或驳回。该入口只在管理员会话激活时可操作。',
+                        'Search a recharge bill by bill number, then credit or reject it while the admin session is active.',
+                      )}
+                    </div>
+                  </div>
+                  <SettingsBadge tone={canManageRechargeSubmissions ? 'emerald' : 'amber'}>
+                    {canManageRechargeSubmissions
+                      ? pick('管理员会话已激活', 'Admin session active')
+                      : pick('管理员会话未激活', 'Admin session inactive')}
+                  </SettingsBadge>
+                </div>
+
+                {adminAuthLoading || checkingAdmin ? (
+                  <div className="mt-5 rounded-[22px] border px-4 py-4" style={tableWrapperStyle}>
+                    <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>{pick('正在检查管理员权限...', 'Checking administrator access...')}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-4">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+                      <label className="space-y-2">
+                        <span className="settings-reference-card__eyebrow">{pick('账单编号', 'Bill number')}</span>
+                        <input
+                          type="text"
+                          value={adminLookupSubmissionId}
+                          onChange={(event) => setAdminLookupSubmissionId(event.target.value)}
+                          placeholder={pick('输入 submissionId / 账单编号', 'Enter submissionId / bill number')}
+                          className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                          style={{
+                            borderColor: 'var(--settings-input-border)',
+                            background: 'var(--settings-input-bg)',
+                            color: 'var(--text-primary)',
+                          }}
+                          disabled={!canManageRechargeSubmissions || adminLookupLoading || adminReviewLoading !== null}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void loadAdminRechargeSubmission()}
+                        disabled={!canManageRechargeSubmissions || adminLookupLoading || adminReviewLoading !== null}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition"
+                        style={{
+                          border: '1px solid var(--settings-button-primary-border, transparent)',
+                          background: canManageRechargeSubmissions
+                            ? 'var(--settings-button-primary-bg)'
+                            : 'var(--settings-button-secondary-bg)',
+                          color: canManageRechargeSubmissions
+                            ? 'var(--settings-button-primary-text)'
+                            : 'var(--settings-button-secondary-text)',
+                          boxShadow: canManageRechargeSubmissions
+                            ? 'var(--settings-button-primary-shadow)'
+                            : 'none',
+                        }}
+                      >
+                        {adminLookupLoading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+                        {adminLookupLoading ? pick('查询中...', 'Searching...') : pick('查询账单', 'Lookup bill')}
+                      </button>
+                    </div>
+
+                    {!canManageRechargeSubmissions ? (
+                      <div
+                        className="rounded-[22px] border px-4 py-4 text-sm"
+                        style={{
+                          borderColor: 'var(--settings-state-warning-border)',
+                          background: 'var(--settings-state-warning-bg)',
+                          color: 'var(--settings-state-warning-text)',
+                        }}
+                      >
+                        {pick(
+                          '当前账号已识别为管理员，但管理员会话尚未激活，暂时不能执行核销或驳回。',
+                          'This account is an administrator, but the elevated admin session is not active yet.',
+                        )}
+                      </div>
+                    ) : null}
+
+                    {adminLookupError ? (
+                      <div
+                        className="rounded-[22px] border px-4 py-4 text-sm"
+                        style={{
+                          borderColor: 'var(--settings-state-danger-border)',
+                          background: 'var(--settings-state-danger-bg)',
+                          color: 'var(--settings-state-danger-text)',
+                        }}
+                      >
+                        {adminLookupError}
+                      </div>
+                    ) : null}
+
+                    {adminLookupResult ? (
+                      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+                        <section className="rounded-[22px] border p-4" style={tableWrapperStyle}>
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="settings-reference-card__eyebrow">{pick('账单详情', 'Bill details')}</div>
+                              <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.submission.submissionId}
+                              </div>
+                            </div>
+                            <SettingsBadge tone={getRechargeSubmissionStatusTone(adminLookupResult.submission.status)}>
+                              {getRechargeSubmissionStatusLabel(adminLookupResult.submission.status, pick)}
+                            </SettingsBadge>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('支付金额', 'Amount')}</div>
+                              <div className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.submission.currencyCode} {formatNumber(adminLookupResult.submission.amount, 2, locale)}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('预计到账积分', 'Credit amount')}</div>
+                              <div className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {formatNumber(Number(adminLookupResult.creditAmount || 0), 0, locale)}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('支付渠道', 'Channel')}</div>
+                              <div className="mt-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.submission.paymentChannel}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('流水尾号', 'Transfer tail')}</div>
+                              <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.submission.transferReferenceLast4 || '--'}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('提交时间', 'Submitted at')}</div>
+                              <div className="mt-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {formatIsoDateTime(adminLookupResult.submission.submittedAt, locale)}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('复核时间', 'Reviewed at')}</div>
+                              <div className="mt-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {formatIsoDateTime(adminLookupResult.submission.reviewedAt, locale)}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3 md:col-span-2" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('用户标识', 'User identity')}</div>
+                              <div className="mt-1 break-all text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.subjectEmail || adminLookupResult.userId || adminLookupResult.submission.userId || '--'}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border p-3 md:col-span-2" style={{ borderColor: 'var(--settings-border-subtle)' }}>
+                              <div className="settings-reference-card__eyebrow">{pick('备注', 'Note')}</div>
+                              <div className="mt-1 break-words text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {adminLookupResult.submission.note || pick('无备注', 'No note')}
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="rounded-[22px] border p-4" style={tableWrapperStyle}>
+                          <div className="mb-4 flex items-center gap-3">
+                            <div
+                              className="flex h-10 w-10 items-center justify-center rounded-xl border"
+                              style={{
+                                borderColor: 'var(--settings-state-info-border)',
+                                background: 'var(--settings-state-info-bg)',
+                                color: 'var(--settings-state-info-text)',
+                              }}
+                            >
+                              <ShieldCheck size={16} />
+                            </div>
+                            <div>
+                              <div className="settings-reference-card__title">{pick('管理员操作', 'Admin actions')}</div>
+                              <div className="settings-reference-card__meta">
+                                {pick(
+                                  '核销会立即写积分账本；驳回不会变更余额。',
+                                  'Credit writes the ledger immediately; reject leaves the balance unchanged.',
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <label className="space-y-2">
+                            <span className="settings-reference-card__eyebrow">{pick('复核备注', 'Review note')}</span>
+                            <textarea
+                              value={adminReviewNote}
+                              onChange={(event) => setAdminReviewNote(event.target.value)}
+                              placeholder={pick('可选：补充核销说明或驳回原因', 'Optional note for credit or rejection')}
+                              className="min-h-[120px] w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                              style={{
+                                borderColor: 'var(--settings-input-border)',
+                                background: 'var(--settings-input-bg)',
+                                color: 'var(--text-primary)',
+                                resize: 'vertical',
+                              }}
+                              disabled={adminReviewLoading !== null}
+                            />
+                          </label>
+
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <button
+                              type="button"
+                              onClick={() => void reviewAdminRechargeSubmission('credit')}
+                              disabled={
+                                adminReviewLoading !== null
+                                || !canManageRechargeSubmissions
+                                || adminLookupResult.submission.status === 'credited'
+                                || adminLookupResult.submission.status === 'rejected'
+                              }
+                              className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition"
+                              style={{
+                                border: '1px solid var(--settings-state-success-border)',
+                                background: 'var(--settings-state-success-bg)',
+                                color: 'var(--settings-state-success-text)',
+                              }}
+                            >
+                              {adminReviewLoading === 'credit'
+                                ? <RefreshCw size={15} className="animate-spin" />
+                                : <ShieldCheck size={15} />}
+                              {pick('核销充值', 'Credit recharge')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void reviewAdminRechargeSubmission('reject')}
+                              disabled={
+                                adminReviewLoading !== null
+                                || !canManageRechargeSubmissions
+                                || adminLookupResult.submission.status === 'credited'
+                                || adminLookupResult.submission.status === 'rejected'
+                              }
+                              className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition"
+                              style={{
+                                border: '1px solid var(--settings-state-danger-border)',
+                                background: 'var(--settings-state-danger-bg)',
+                                color: 'var(--settings-state-danger-text)',
+                              }}
+                            >
+                              {adminReviewLoading === 'reject'
+                                ? <RefreshCw size={15} className="animate-spin" />
+                                : <XCircle size={15} />}
+                              {pick('驳回账单', 'Reject bill')}
+                            </button>
+                          </div>
+                        </section>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </section>
+            ) : null}
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
               <section className="settings-reference-card">

@@ -1,68 +1,88 @@
-# KK Studio Project Handoff (v1.4.2)
+# 2026-04-14 单主线交接
 
-## 1. 项目概览
-- 项目名称：KK Studio
-- 当前稳定文档版本：`v1.4.2`
-- 当前状态：版本口径、运行时真相表与默认验证链已同步，当前工作区重点集中在设置中心、后台链路、鉴权稳态与支付收口
-- 定位：面向图像、多模态与提示词生产的可视化 AI 工作台，核心交互为无限画布、设置工作台与管理后台
+## 1. 总状态
+- 当前仍只保留一条执行主线：`API 路由与信用计费`、`设置 / 管理后台 / 鉴权`、`移动端 / 电商续作`。
+- settings 相关本轮新增收口如下：
+  - `/settings` 直达入口已接通。
+  - settings 浮层与 settings 页面已统一为同一套 workbench shell。
+  - fullscreen 启动阻塞卡已取消，后台预热改为非阻塞顶部提示。
+  - `verify:desktop-settings-smoke` 已新增并跑通。
+- 当前对外口径继续保守：除非再补完手工烟测，否则 `设置 / 管理后台 / 鉴权` 继续写成 `已落地待回归`。
 
-## 2. 当前版本重点
-- 版本统一：主应用、README、开发文档、工作区包与支付子服务版本已同步到 `1.4.2`
-- 版本治理：`config/release-manifest.json` 继续作为主版本源，`release/publish/stable/manifest.json` 已回填为 portable stable 发布清单
-- 当前补丁重点：修复本地用户路由代理启动链、账单余额 hydrate 误判、Canvas 本地持久化与验证门禁漂移
-- 设置中心升级：设置页采用更清晰的工作台式导航结构，总览、存储、日志与后台管理的边界更明确
-- 本地化底座：通过 `LocaleProvider` 与 localized views 为设置页引入中英双语表达能力
-- 后台与鉴权收口：服务端 Supabase 配置解析更集中，认证数据访问与管理员链路更易维护
-- 运行时口径统一：当前在线前端仍以根目录 `src/` 为准，`apps/web/` 保持为迁移目标
-- 支付链路收口：`apps/payment-sidecar/` 明确为主支付运行时，`payment-server/` 明确为过渡桥接层
-- 验证链补强：集成测试、支付侧静态校验与 Hosted 预检已纳入默认治理口径
-- 多供应商路由规划：已形成独立供应商、多协议面与 async task 的分层方案，作为后续 API 架构治理基线
-
-## 3. 当前架构
-- Frontend 技术栈：React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS 4
+## 2. 当前事实基线
+- 当前版本：`1.4.2`
+- `config/release-manifest.json` 是主版本源。
+- `src/config/appInfo.ts` 是运行时只读导出。
+- `release/publish/stable/manifest.json` 是 portable stable 发布清单。
 - 当前在线前端运行时：根目录 `src/`
 - 目标前端运行时：`apps/web/`
-- State：React Context + 本地状态 + IndexedDB / File System Access API
-- Storage：浏览器缓存、本地文件夹与工作区维护动作共存
-- Backend / Data：Supabase（Auth / Database / Edge Functions）+ `apps/api/` Node API
-- 主支付运行时：`apps/payment-sidecar/`
-- 迁移桥接层：`server/`、`api/`、`payment-server/`
-- 说明：`payment-server/` 仍是过渡桥接层，不应再被描述为唯一的支付主运行时
+- `src/` remains the live frontend runtime.
+- `apps/payment-sidecar/` is the canonical payment runtime.
+- settings 继续按“自托管 route-driven workbench”描述，不写成“根级路由迁移完成”。
+- `/settings*` 已可直达，但根级 `BrowserRouter` 迁移仍是 `进行中`。
 
-当前在线前端运行时：根目录 `src/`
-目标前端运行时：`apps/web/`
-主支付运行时：`apps/payment-sidecar/`
-`payment-server/` 仍是过渡桥接层
+## 3. 模块状态
+### 3.1 API 路由与信用计费
+- **状态**：`已落地待回归`
+- **交接口径**
+  - request-profile registry / alias truth source 已收口。
+  - credit-route 直测已补齐。
+  - 继续只允许做 provider-specific 统一和回归，不开启新 provider 战线。
 
-## 4. 当前版本的事实基线
-- 主版本源以 `config/release-manifest.json` 为准；`package.json`、`payment-server/package.json` 与 `packages/*/package.json` 必须保持同版
-- `src/config/appInfo.ts` 仅保留运行时只读导出，不再作为独立版本源
-- `release/publish/stable/manifest.json` 是 portable stable 发布清单，必须与当前版本、`releaseDate` 和 `releaseNotes` 对齐
-- 文档基线以 `README.md`、`docs/development/progress.md`、本文件为准
-- AI 规则基线以 `.agent/README.md` 与 `.agent/rules/skills/SKILL.md` 为准
-- Runtime truth: `src/` remains the live frontend runtime.
-- Runtime truth: `apps/web/` remains the target frontend runtime.
-- Runtime truth: `apps/payment-sidecar/` is the canonical payment runtime.
-- Runtime truth: `payment-server/` remains a transitional bridge.
+### 3.2 设置 / 管理后台 / 鉴权
+- **状态**：`已落地待回归`
+- **本轮已支持**
+  - `/settings`、`/settings/api-management` 与 settings 深链可直达。
+  - settings 浮层与直达页面共享同一 shell、同一路由工厂、同一 view 语义。
+  - desktop settings smoke 已覆盖直达 settings、API workbench、diagnostics toggle、editor 进出和工作区打开 settings。
+  - fullscreen startup blocker 已取消，工作区优先渲染。
+  - 启动仍可显示进度，但只作为非阻塞顶部提示出现。
+- **仍未收口**
+  - 根级 `BrowserRouter` 迁移仍在 `进行中`。
+  - settings 最终产品观感、登录回跳和人工体验仍需手工确认。
 
-## 5. 建议优先检查项
-- 设置页：检查 Dashboard、Storage、System Logs、Admin Console 的路由与空状态是否一致
-- 鉴权侧：继续验证管理员登录、会话恢复、权限判断与回退逻辑
-- 部署侧：核对 Vercel、Netlify 与本地环境下 Supabase 服务端配置是否一致，并确认 Hosted 环境不会落入本地或内存降级仓储
-- 支付侧：确认 Hosted 支付运行时在缺失持久化或结算凭证时会 fail closed
-- 资源侧：继续关注重型设置页与图标资源带来的构建体积
-- 供应商侧：按 `docs/development/multi-vendor-provider-architecture.md` 先处理 GPT Best 鉴权覆盖、Suxi 图片路由冲突与 12AI 模型列表漂移
+### 3.3 移动端 / 电商续作
+- **状态**：`已落地待回归`
+- **交接口径**
+  - mobile continuation、three-zone shell、shared projection 继续成立。
+  - 剩余优先级仍是移动端真实触控体验与外部登录回跳人工确认。
 
-## 6. 推荐验证命令
-```bash
+## 4. 今日关键变化
+- `createAppRootMode()` 已支持 `settings` 根模式。
+- 新增 `src/app/SettingsPageRoot.tsx`。
+- `SettingsPanel` 支持 `page / overlay` 双承载。
+- settings token 已朝灰阶控制台统一。
+- `AppStartupScreen` 与 `StorageSelectionModal` 已去掉亮蓝主视觉。
+- 新增 `verify:desktop-settings-smoke` 并并入主验证链。
+
+## 5. 未收口项
+- 手工确认仍需：
+  - 启动体感是否达到“秒进”
+  - settings 页面与浮层最终观感
+  - 外部登录回跳
+  - 移动端真实触控体感
+- `src -> apps/web` 迁移未完成。
+- 根级 `BrowserRouter` 迁移未完成。
+- 支付桥接层与多供应商 follow-up 仍在进行中。
+
+## 6. 验证证据
+```text
+node --test "tests/unit/kkai-app-root.test.ts" "tests/unit/settings-dual-entry-regression.test.ts" "tests/unit/app-startup-coordinator.test.ts" "tests/unit/app-startup-screen-localization.test.ts" "tests/unit/mobile-settings-browser-verify-script.test.ts" "tests/unit/settings-entry-surface-style-regression.test.ts" "tests/unit/settings-shell-scroll-regression.test.ts"
+node scripts/test/verify-desktop-settings-smoke.mjs
 npm run typecheck
-npm run test
-npm run check:encoding
-npm run build
+npm run dev:status
 ```
 
-## 7. 交接备注
-- 历史文档中的旧版本号仅用于追溯，不代表当前发布基线
-- 路径示例继续优先使用 `<project-root>`，避免目录名与版本号耦合
-- 当前工作区仍有较多进行中的业务改动；如果准备发布，建议把设置、后台、登录与支付链路做完整回归
-- 多供应商相关修改优先遵循 `.agent/rules/skills/vendor-routing/SKILL.md` 与新增架构方案文档，不要直接在业务层追加供应商特判
+- 当前结果：以上命令已通过。
+- 浏览器产物目录：
+  - `.tmp-playwright/desktop-settings-smoke`
+  - `.tmp-playwright/mobile-settings-smoke`
+  - `.tmp-playwright/prompt-group-drag`
+
+## 7. 历史线程归档
+- provider-phase / vendor follow-up -> 归入 `API 路由与信用计费`
+- auth-password-change / profile modal -> 归入 `设置 / 管理后台 / 鉴权`
+- prompt-group / mobile-ecommerce / three-zone -> 归入 `移动端 / 电商续作`
+- settings-router / workbench-shell -> 归入 `设置 / 管理后台 / 鉴权`
+
+*Handoff Updated: 2026-04-14*

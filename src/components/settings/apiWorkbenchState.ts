@@ -2,7 +2,7 @@ import type { UserApiWorkbenchStage } from '../../services/api/userApiViewState'
 
 type LocalePick = (zhText: string, enText: string) => string;
 
-export type ApiSettingsWorkbenchStage = UserApiWorkbenchStage | 'diagnostics';
+export type ApiSettingsWorkbenchStage = UserApiWorkbenchStage;
 export type ApiSettingsWorkbenchTone = 'neutral' | 'sky' | 'amber' | 'rose' | 'emerald';
 export type ApiSettingsWorkbenchBannerTone = 'elevated' | 'info' | 'warning';
 export type ApiSettingsWorkbenchPrimaryActionKind =
@@ -35,10 +35,29 @@ export interface ResolveApiWorkbenchStageMetaInput {
   userApiActionHelper: string | null;
 }
 
+export interface ResolveApiWorkbenchDiagnosticsAvailabilityInput {
+  isAuthenticated: boolean;
+  isApiReachable?: boolean;
+}
+
+export interface ApiWorkbenchDiagnosticsAvailability {
+  refreshDisabled: boolean;
+  routeActionsDisabled: boolean;
+}
+
+export function resolveApiWorkbenchDiagnosticsAvailability(
+  input: ResolveApiWorkbenchDiagnosticsAvailabilityInput,
+): ApiWorkbenchDiagnosticsAvailability {
+  return {
+    refreshDisabled: !input.isAuthenticated,
+    routeActionsDisabled: !input.isAuthenticated || input.isApiReachable === false,
+  };
+}
+
 export function resolveApiWorkbenchStageMeta(
   input: ResolveApiWorkbenchStageMetaInput,
 ): ApiWorkbenchStageMeta {
-  const stage: ApiSettingsWorkbenchStage = input.showDiagnostics ? 'diagnostics' : input.stage;
+  const stage: ApiSettingsWorkbenchStage = input.stage;
 
   switch (stage) {
     case 'editable':
@@ -53,7 +72,7 @@ export function resolveApiWorkbenchStageMeta(
         interactionLabel: input.pick('可编辑', 'Editable'),
         nextActionLabel:
           input.activeTab === 'official'
-            ? input.pick('新增官方接口', 'Create an official endpoint')
+            ? input.pick('新增本地 API', 'Add local API')
             : input.pick('新增供应商', 'Create a provider'),
         bannerTone: 'elevated',
         primaryActionKind:
@@ -101,20 +120,6 @@ export function resolveApiWorkbenchStageMeta(
         interactionLabel: input.pick('运行时不可用', 'Runtime unavailable'),
         nextActionLabel: input.pick('重新检查本地 API', 'Check the local API again'),
         bannerTone: 'warning',
-        primaryActionKind: 'refresh-runtime-health',
-      };
-    case 'diagnostics':
-      return {
-        stage,
-        tone: 'sky',
-        title: input.pick('正在查看诊断信息', 'Reviewing diagnostics'),
-        description: input.pick(
-          '这里把连通性、持久化和账户状态拆开显示，避免和列表卡片混在一起。',
-          'Diagnostics separate connectivity, persistence, and account state instead of mixing them into list cards.',
-        ),
-        interactionLabel: input.pick('诊断中', 'Diagnostics'),
-        nextActionLabel: input.pick('刷新诊断', 'Refresh diagnostics'),
-        bannerTone: 'info',
         primaryActionKind: 'refresh-runtime-health',
       };
     default:

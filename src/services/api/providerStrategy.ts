@@ -549,6 +549,15 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
     },
 ];
 
+const REQUEST_PROFILE_STRATEGY_MAP: Partial<Record<RequestProfileId, ProviderStrategy['id']>> = {
+    '12ai': '12ai',
+    'gpt-best': 'gpt-best',
+    'suxi': 'suxi',
+    'wuyinkeji': 'wuyinkeji',
+    'openai-official': 'openai',
+    'anthropic-official': 'anthropic',
+};
+
 function normalizeBaseUrl(baseUrl?: string): string {
     return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
@@ -684,6 +693,27 @@ function matchesAny(patterns: RegExp[] | undefined, value: string): boolean {
     return patterns.some((pattern) => pattern.test(value));
 }
 
+function findStrategyById(strategyId?: ProviderStrategy['id']): ProviderStrategy | undefined {
+    if (!strategyId) return undefined;
+    return PROVIDER_STRATEGIES.find((strategy) => strategy.id === strategyId);
+}
+
+function findStrategyByRequestProfile(
+    provider?: string | Provider,
+    baseUrl?: string,
+): ProviderStrategy | undefined {
+    const evidence = detectRequestProfileEvidence({
+        provider: normalizeProviderAlias(provider),
+        baseUrl,
+    });
+
+    if (evidence.profileId === 'unknown') {
+        return undefined;
+    }
+
+    return findStrategyById(REQUEST_PROFILE_STRATEGY_MAP[evidence.profileId]);
+}
+
 function findStrategyByBase(baseUrl?: string): ProviderStrategy | undefined {
     const normalizedBase = normalizeBaseUrl(baseUrl).toLowerCase();
     const host = normalizeHost(baseUrl);
@@ -695,7 +725,7 @@ function findStrategyByBase(baseUrl?: string): ProviderStrategy | undefined {
 }
 
 function findStrategyByProvider(provider?: string | Provider): ProviderStrategy | undefined {
-    const normalizedProvider = normalizeProviderName(provider);
+    const normalizedProvider = normalizeProviderAlias(provider);
     if (!normalizedProvider) return undefined;
 
     return PROVIDER_STRATEGIES.find((strategy) => matchesAny(strategy.providerPatterns, normalizedProvider));
@@ -834,12 +864,9 @@ export function shouldBypassChatCompatibilityForImages(
 }
 
 export function resolveProviderStrategy(provider?: string | Provider, baseUrl?: string): ProviderStrategy {
-    const gptBestEvidence = detectGptBestEvidence({ provider, baseUrl });
-    if (gptBestEvidence.providerId === 'gpt-best') {
-        const gptBestStrategy = PROVIDER_STRATEGIES.find((strategy) => strategy.id === 'gpt-best');
-        if (gptBestStrategy) {
-            return gptBestStrategy;
-        }
+    const requestProfileMatch = findStrategyByRequestProfile(provider, baseUrl);
+    if (requestProfileMatch) {
+        return requestProfileMatch;
     }
 
     const baseMatch = findStrategyByBase(baseUrl);
@@ -950,7 +977,7 @@ export function resolveProviderKeyType(
     provider?: string | Provider,
     baseUrl?: string,
 ): 'official' | 'proxy' | 'third-party' {
-    const normalizedProvider = normalizeProviderName(provider);
+    const normalizedProvider = normalizeProviderAlias(provider);
     const normalizedBase = normalizeBaseUrl(baseUrl);
     const runtime = resolveProviderRuntime({
         provider,
@@ -963,7 +990,16 @@ export function resolveProviderKeyType(
         || normalizedProvider === 'custom'
         || normalizedProvider === 'google'
         || normalizedProvider === 'gemini'
-        || normalizedProvider === 'openai';
+        || normalizedProvider === 'openai'
+        || normalizedProvider === 'openai api'
+        || normalizedProvider === 'openai official';
+
+    if (!normalizedBase && (
+        runtime.requestProfileId === 'openai-official'
+        || runtime.requestProfileId === 'anthropic-official'
+    )) {
+        return 'official';
+    }
 
     if (
         (normalizedProvider === 'google' && !normalizedBase)

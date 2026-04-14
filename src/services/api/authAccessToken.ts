@@ -7,6 +7,40 @@ const accessTokenStorageKey = "kk.api.access_token";
 let inMemoryCompatibilityAccessToken: string | undefined;
 let stopAccessTokenSessionSync: (() => void) | null = null;
 
+function normalizeHostname(value: unknown): string | undefined {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase().replace(/^\[|\]$/g, "") : "";
+  return normalized || undefined;
+}
+
+function isLoopbackHostname(hostname: string | undefined): boolean {
+  const normalized = normalizeHostname(hostname);
+  return normalized === "localhost"
+    || normalized === "::1"
+    || Boolean(normalized && normalized.startsWith("127."));
+}
+
+function isPrivateNetworkHostname(hostname: string | undefined): boolean {
+  const normalized = normalizeHostname(hostname);
+  return Boolean(
+    normalized
+    && (
+      /^10\./.test(normalized)
+      || /^192\.168\./.test(normalized)
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
+    )
+  );
+}
+
+function shouldPersistAccessTokenDurably(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hostname = normalizeHostname(window.location?.hostname)
+    || normalizeHostname(window.location?.origin ? new URL(window.location.origin).hostname : undefined);
+  return isLoopbackHostname(hostname) || isPrivateNetworkHostname(hostname);
+}
+
 function getSessionStorage(): Storage | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -46,17 +80,42 @@ function migrateLegacyLocalStorageToken(): string | undefined {
   return legacyToken;
 }
 
-export function getStoredKkApiAccessToken(): string | undefined {
-  const sessionStorage = getSessionStorage();
-  const sessionToken = sessionStorage?.getItem(accessTokenStorageKey) || undefined;
-  if (sessionToken) {
-    inMemoryCompatibilityAccessToken = sessionToken;
-    return sessionToken;
+function syncDurableTokenIntoSession(token: string | undefined): string | undefined {
+  if (!token) {
+    return undefined;
   }
 
-  const migratedToken = migrateLegacyLocalStorageToken();
-  if (migratedToken) {
-    return migratedToken;
+  const sessionStorage = getSessionStorage();
+  if (sessionStorage?.getItem(accessTokenStorageKey) !== token) {
+    sessionStorage?.setItem(accessTokenStorageKey, token);
+  }
+  inMemoryCompatibilityAccessToken = token;
+  return token;
+}
+
+export function getStoredKkApiAccessToken(): string | undefined {
+  const sessionStorage = getSessionStorage();
+  const localStorage = getLocalStorage();
+
+  if (shouldPersistAccessTokenDurably()) {
+    const durableToken = localStorage?.getItem(accessTokenStorageKey)
+      || sessionStorage?.getItem(accessTokenStorageKey)
+      || undefined;
+    if (durableToken) {
+      localStorage?.setItem(accessTokenStorageKey, durableToken);
+      return syncDurableTokenIntoSession(durableToken);
+    }
+  } else {
+    const sessionToken = sessionStorage?.getItem(accessTokenStorageKey) || undefined;
+    if (sessionToken) {
+      inMemoryCompatibilityAccessToken = sessionToken;
+      return sessionToken;
+    }
+
+    const migratedToken = migrateLegacyLocalStorageToken();
+    if (migratedToken) {
+      return migratedToken;
+    }
   }
 
   return inMemoryCompatibilityAccessToken;
@@ -75,7 +134,11 @@ export function setStoredKkApiAccessToken(token?: string) {
 
   inMemoryCompatibilityAccessToken = token;
   sessionStorage?.setItem(accessTokenStorageKey, token);
-  localStorage?.removeItem(accessTokenStorageKey);
+  if (shouldPersistAccessTokenDurably()) {
+    localStorage?.setItem(accessTokenStorageKey, token);
+  } else {
+    localStorage?.removeItem(accessTokenStorageKey);
+  }
 }
 
 function syncFromLatestAuthSessionChange(): string | undefined {

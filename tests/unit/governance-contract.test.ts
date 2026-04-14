@@ -132,6 +132,7 @@ test("runtime-truth docs distinguish live runtimes from target architecture", ()
   assert.match(rootGuide, /`apps\/web\/`: target web runtime under migration/i);
   assert.match(projectStructure, /Current runtime truth/i);
   assert.match(projectStructure, /`payment-server\/` \| `bridge`/i);
+  assert.match(handoff, /当前在线前端运行时：根目录 `src\/`/i);
   assert.match(handoff, /`src\/` remains the live frontend runtime/i);
   assert.match(handoff, /`apps\/payment-sidecar\/` is the canonical payment runtime/i);
 });
@@ -160,6 +161,9 @@ test("compatibility layer registry tracks the required migration files", () => {
     assert.ok(entry, `missing compatibility registry entry for ${requiredEntry}`);
     assert.ok(entry?.regressionTests.length, `${requiredEntry} must list regression tests`);
     assert.ok(entry?.removalCondition, `${requiredEntry} must define a removal condition`);
+    for (const regressionTest of entry?.regressionTests || []) {
+      assert.equal(existsSync(path.join(ROOT_DIR, regressionTest)), true, `${requiredEntry} references a missing regression test: ${regressionTest}`);
+    }
   }
 });
 
@@ -196,6 +200,23 @@ test("migration allowlist registry tracks every approved architecture exception 
   assert.ok(serviceImport?.regressionTests.length);
   assert.ok(serviceImport?.removalCondition);
 
+  const localUserRouteImport = registry.serviceAppImports.find(
+    (entry) => entry.source === "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts",
+  );
+  assert.ok(
+    localUserRouteImport,
+    "missing service-app migration allowlist entry for apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts",
+  );
+  assert.deepEqual(localUserRouteImport?.targets, [
+    "src/services/auth/keyManager.ts",
+    "src/services/llm/LLMAdapter.ts",
+    "src/services/llm/VideoCompatibleAdapter.ts",
+    "src/services/llm/AudioCompatibleAdapter.ts",
+  ]);
+  assert.ok(localUserRouteImport?.reason);
+  assert.ok(localUserRouteImport?.regressionTests.length);
+  assert.ok(localUserRouteImport?.removalCondition);
+
   const requiredLegacyZoneEntries = [
     "server/auth_routes.ts",
     "server/billing_routes.ts",
@@ -217,12 +238,34 @@ test("migration allowlist registry tracks every approved architecture exception 
   );
 });
 
-test("auth access token compatibility storage is session-scoped and clears legacy localStorage", () => {
+test("test typecheck script performs semantic diagnostics for unit, integration, and contract tests", () => {
+  const typecheckScript = readSource("scripts/check-tests-types.mjs");
+  const testsTsconfig = JSON.parse(readSource("tsconfig.tests.json")) as {
+    include: string[];
+    exclude?: string[];
+  };
+
+  assert.match(typecheckScript, /ts\.createProgram/);
+  assert.match(typecheckScript, /getSemanticDiagnostics/);
+  assert.match(typecheckScript, /getSyntacticDiagnostics/);
+  assert.match(typecheckScript, /split\(\/\[\\\\\/\]\/\)\.includes\("tests"\)/);
+  assert.ok(testsTsconfig.include.includes("tests/unit/governance-contract.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/runtime-governance-upgrade.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/encoding-check-contract.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/workspace-layout-contract.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/integration/**/*.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/contract/**/*.ts"));
+  assert.ok((testsTsconfig.exclude || []).includes("tests/e2e/**/*.ts"));
+});
+
+test("auth access token compatibility storage stays durable in local runtimes and clears hosted leftovers", () => {
   const source = readSource("src/services/api/authAccessToken.ts");
 
+  assert.match(source, /function shouldPersistAccessTokenDurably\(\): boolean \{/);
   assert.match(source, /sessionStorage/);
+  assert.match(source, /localStorage\?\.setItem\(accessTokenStorageKey, token\);/);
   assert.match(source, /localStorage\?\.removeItem\(accessTokenStorageKey\);/);
-  assert.doesNotMatch(source, /window\.localStorage\.setItem\(accessTokenStorageKey,/);
+  assert.match(source, /if \(shouldPersistAccessTokenDurably\(\)\) \{/);
 });
 
 test("sensitive UI and payment webhook logs avoid raw secret-bearing payloads", () => {

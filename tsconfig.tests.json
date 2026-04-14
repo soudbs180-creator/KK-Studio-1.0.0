@@ -21,33 +21,22 @@
         "noEmit": true
     },
     "include": [
+        "tests/contract/**/*.ts",
         "tests/integration/**/*.ts",
+        "tests/unit/encoding-check-contract.test.ts",
         "tests/unit/governance-contract.test.ts",
         "tests/unit/hosted-release-guardrails.test.ts",
-        "tests/unit/runtime-governance-upgrade.test.ts",
-        "tests/unit/payment-sidecar-service.test.ts",
+        "tests/unit/payment-runtime-hardening.test.ts",
         "tests/unit/payment-server-settlement-bridge.test.ts",
         "tests/unit/payment-settlement-auth.test.ts",
         "tests/unit/payment-settlement-hardening.test.ts",
-        "tests/unit/payment-runtime-hardening.test.ts"
+        "tests/unit/payment-sidecar-service.test.ts",
+        "tests/unit/runtime-governance-upgrade.test.ts",
+        "tests/unit/workspace-layout-contract.test.ts"
     ],
     "exclude": [
         "dist",
         "node_modules",
-        "tests/contract/**/*.ts",
-        "tests/e2e/**/*.ts",
-        "tests/unit/admin-console-routes.test.ts",
-        "tests/unit/admin-console-state.test.ts",
-        "tests/unit/auth-data-routes.test.ts",
-        "tests/unit/billing-http-routes.test.ts",
-        "tests/unit/kk-api-client.test.ts",
-        "tests/unit/local-env-contract.test.ts",
-        "tests/unit/password-sign-in-fallback.test.ts",
-        "tests/unit/supabase-audit-contract.test.ts",
-        "tests/unit/user-api-cloud-storage.test.ts",
-        "tests/unit/user-api-profile-storage-runtime-fallback.test.ts",
-        "tests/unit/user-api-runtime-fallback.test.ts",
-        "tests/unit/user-route-diagnostics-routes.test.ts",
-        "tests/unit/wechat-auth-service.test.ts"
+        "tests/e2e/**/*.ts"
     ]
 }

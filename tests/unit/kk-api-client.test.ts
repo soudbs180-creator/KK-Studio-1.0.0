@@ -415,6 +415,112 @@ describe("kk api client", () => {
     });
   });
 
+  test("builds split recharge submission client requests with the expected paths", async () => {
+    const requests: Array<{ method?: string; url: string; body?: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {},
+          meta: {
+            requestId: "req-recharge-submission-client",
+            timestamp: "2026-04-15T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.createRechargeSubmission({
+      amount: 8,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+    });
+    await client.submitRechargeProof("submission-123", {
+      transferReferenceLast4: "4321",
+      note: "client proof",
+    });
+    await client.getAdminRechargeSubmission("submission-123");
+    await client.reviewRechargeSubmission("submission-123", {
+      decision: "credit",
+    });
+
+    assert.equal(requests.length, 4);
+    assert.equal(requests[0].url, "http://127.0.0.1:3001/api/v1/billing/recharge-submissions");
+    assert.equal(requests[0].method, "POST");
+    assert.deepEqual(JSON.parse(requests[0].body || "{}"), {
+      amount: 8,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+    });
+    assert.equal(
+      requests[1].url,
+      "http://127.0.0.1:3001/api/v1/billing/recharge-submissions/submission-123/proof",
+    );
+    assert.equal(requests[1].method, "POST");
+    assert.deepEqual(JSON.parse(requests[1].body || "{}"), {
+      transferReferenceLast4: "4321",
+      note: "client proof",
+    });
+    assert.equal(
+      requests[2].url,
+      "http://127.0.0.1:3001/api/v1/admin/billing/recharge-submissions/submission-123",
+    );
+    assert.equal(requests[2].method, "GET");
+    assert.equal(
+      requests[3].url,
+      "http://127.0.0.1:3001/api/v1/admin/billing/recharge-submissions/submission-123/review",
+    );
+    assert.equal(requests[3].method, "POST");
+    assert.deepEqual(JSON.parse(requests[3].body || "{}"), {
+      decision: "credit",
+    });
+  });
+
+  test("builds recharge payment channel config requests with the expected path", async () => {
+    const requests: Array<{ method?: string; url: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: { items: [] },
+          meta: {
+            requestId: "req-recharge-payment-channels-client",
+            timestamp: "2026-04-15T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.listRechargePaymentChannels();
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "http://127.0.0.1:3001/api/v1/billing/payment-channels");
+    assert.equal(requests[0].method, "GET");
+  });
+
   test("builds admin console requests with the expected paths", async () => {
     const requests: Array<{ method?: string; url: string; body?: string }> = [];
     const client = createKkApiClient({
@@ -474,6 +580,50 @@ describe("kk api client", () => {
     assert.deepEqual(JSON.parse(requests[3].body || "{}"), {
       identity: "user-1@example.com",
       role: "admin",
+    });
+  });
+
+  test("builds password change verification requests with the expected paths", async () => {
+    const requests: Array<{ method?: string; url: string; body?: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {},
+          meta: {
+            requestId: "req-password-code-client",
+            timestamp: "2026-04-14T00:00:00.000Z",
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.sendPasswordChangeCode();
+    await client.updatePassword({
+      verificationCode: "123456",
+      newPassword: "new-password-123",
+    });
+
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].url, "http://127.0.0.1:3001/api/v1/profile/password/send-code");
+    assert.equal(requests[0].method, "POST");
+    assert.equal(requests[1].url, "http://127.0.0.1:3001/api/v1/profile/password");
+    assert.equal(requests[1].method, "POST");
+    assert.deepEqual(JSON.parse(requests[1].body || "{}"), {
+      verificationCode: "123456",
+      newPassword: "new-password-123",
     });
   });
 

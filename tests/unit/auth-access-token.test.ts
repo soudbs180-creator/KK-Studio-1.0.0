@@ -40,7 +40,7 @@ class MemoryStorage implements Storage {
   }
 }
 
-function installBrowserStorage() {
+function installBrowserStorage(origin?: string) {
   const sessionStorage = new MemoryStorage();
   const localStorage = new MemoryStorage();
 
@@ -49,6 +49,7 @@ function installBrowserStorage() {
     value: {
       sessionStorage,
       localStorage,
+      location: origin ? { origin } : undefined,
     },
   });
 
@@ -95,6 +96,19 @@ test("preferred KK API token follows the latest runtime auth session event and r
   assert.equal(token, "kkapi-token");
   assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "kkapi-token");
   assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
+});
+
+test("local runtime stores the KK API token durably so refresh recovery keeps the user signed in", () => {
+  const { sessionStorage, localStorage } = installBrowserStorage("http://127.0.0.1:3000");
+
+  setStoredKkApiAccessToken("local-runtime-token");
+  sessionStorage.clear();
+
+  const token = getStoredKkApiAccessToken();
+
+  assert.equal(token, "local-runtime-token");
+  assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "local-runtime-token");
+  assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "local-runtime-token");
 });
 
 test("preferred token falls back to the stored compatibility token when runtime auth state has no access token", async () => {

@@ -74,6 +74,7 @@ import {
   handleCheckUserRouteConnectivity,
   handleGetKeyManagerCloudState,
   handleGetProfile,
+  handleSendPasswordChangeCode,
   handleGoogleCallback,
   handleGetUserApiEntries,
   handleReplaceUserApisPayload,
@@ -100,18 +101,26 @@ import {
   type CreditExchangeRateRepository,
   FileBackedCreditAccountRepository,
   FileBackedCreditExchangeRateRepository,
+  FileBackedRechargePaymentChannelConfigRepository,
   FileBackedRechargeSubmissionRepository,
   InMemoryCreditAccountRepository,
   InMemoryCreditExchangeRateRepository,
+  InMemoryRechargePaymentChannelConfigRepository,
   InMemoryRechargeSubmissionRepository,
   PostgresCreditAccountRepository,
   PostgresCreditExchangeRateRepository,
   createCreditAccountRepositoryFromEnv,
   createCreditExchangeRateRepositoryFromEnv,
+  RechargePaymentChannelConfigService,
   StaticRechargeService,
   handleAdminRechargeCredits,
+  handleCreateRechargeSubmission,
+  handleGetAdminRechargeSubmission,
   handleListCreditExchangeRates,
+  handleListRechargePaymentChannels,
+  handleReviewRechargeSubmission,
   handleSubmitRecharge,
+  handleSubmitRechargeProof,
   handleUpsertCreditExchangeRate,
   SupabaseCreditAccountRepository,
   SupabaseCreditExchangeRateRepository,
@@ -462,11 +471,15 @@ function resolveCriticalPersistenceCapability(
     pathname === "/api/v1/billing/credits/balance"
     || pathname === "/api/v1/billing/credits/transactions"
     || pathname === "/api/v1/billing/exchange-rates"
+    || pathname === "/api/v1/billing/payment-channels"
     || pathname === "/api/v1/billing/submit-recharge"
+    || pathname === "/api/v1/billing/recharge-submissions"
+    || /^\/api\/v1\/billing\/recharge-submissions\/[^/]+\/proof$/.test(pathname)
     || pathname === "/api/v1/billing/credits/debit"
     || pathname === "/api/v1/billing/credits/refunds"
     || pathname === "/api/v1/admin/billing/exchange-rates"
     || pathname === "/api/v1/admin/billing/recharges"
+    || /^\/api\/v1\/admin\/billing\/recharge-submissions\/[^/]+(?:\/review)?$/.test(pathname)
     || pathname === "/internal/v1/payment-settlements"
   ) {
     return "billing";
@@ -684,6 +697,14 @@ function createRechargeSubmissionRepository() {
   }
 
   return new InMemoryRechargeSubmissionRepository();
+}
+
+function createRechargePaymentChannelConfigRepository() {
+  if (isKkaiLocalOnlyRuntime()) {
+    return new FileBackedRechargePaymentChannelConfigRepository();
+  }
+
+  return new InMemoryRechargePaymentChannelConfigRepository();
 }
 
 function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
@@ -1048,14 +1069,17 @@ function buildApiServer(
   const adminConsoleService = new AdminConsoleService(adminConsoleRepository, {
     primaryAdminUserId: serverAdminConfig.primaryAdminUserId,
   });
-  const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
-  const creditAccountService = new CreditAccountService(creditAccountRepository);
-  const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
-  const staticRechargeService = new StaticRechargeService({
-    submissionRepository: createRechargeSubmissionRepository(),
-    exchangeRateRepository: creditExchangeRateRepository,
-    creditAccountService,
-  });
+    const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
+    const creditAccountService = new CreditAccountService(creditAccountRepository);
+    const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
+    const rechargePaymentChannelConfigService = new RechargePaymentChannelConfigService(
+      createRechargePaymentChannelConfigRepository(),
+    );
+    const staticRechargeService = new StaticRechargeService({
+      submissionRepository: createRechargeSubmissionRepository(),
+      exchangeRateRepository: creditExchangeRateRepository,
+      creditAccountService,
+    });
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
     resolveLegacyAccessToken: (accessToken) => {
       const resolvedOverride = options.resolveAccessToken?.(accessToken);
@@ -1412,6 +1436,12 @@ function buildApiServer(
           return;
         }
 
+        if (req.method === "POST" && pathname === "/api/v1/profile/password/send-code") {
+          const result = await handleSendPasswordChangeCode(authService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
         if (req.method === "GET" && pathname === "/api/v1/profile/user-apis") {
           const result = await handleGetUserApiEntries(authDataService, requestHeaders);
           writeJson(res, result.statusCode, result.body);
@@ -1549,6 +1579,35 @@ function buildApiServer(
 
         if (req.method === "GET" && pathname === "/api/v1/billing/exchange-rates") {
           const result = await handleListCreditExchangeRates(creditExchangeRateService, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/billing/payment-channels") {
+          const result = await handleListRechargePaymentChannels(
+            rechargePaymentChannelConfigService,
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/billing/recharge-submissions") {
+          const body = await readJsonBody(req);
+          const result = await handleCreateRechargeSubmission(staticRechargeService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const rechargeProofMatch = pathname.match(/^\/api\/v1\/billing\/recharge-submissions\/([^/]+)\/proof$/);
+        if (req.method === "POST" && rechargeProofMatch) {
+          const body = await readJsonBody(req);
+          const result = await handleSubmitRechargeProof(
+            staticRechargeService,
+            decodeURIComponent(rechargeProofMatch[1]),
+            body,
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }
@@ -1742,6 +1801,30 @@ function buildApiServer(
         if (req.method === "POST" && pathname === "/api/v1/admin/billing/recharges") {
           const body = await readJsonBody(req);
           const result = await handleAdminRechargeCredits(creditAccountService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const adminRechargeSubmissionMatch = pathname.match(/^\/api\/v1\/admin\/billing\/recharge-submissions\/([^/]+)$/);
+        if (req.method === "GET" && adminRechargeSubmissionMatch) {
+          const result = await handleGetAdminRechargeSubmission(
+            staticRechargeService,
+            decodeURIComponent(adminRechargeSubmissionMatch[1]),
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const adminRechargeReviewMatch = pathname.match(/^\/api\/v1\/admin\/billing\/recharge-submissions\/([^/]+)\/review$/);
+        if (req.method === "POST" && adminRechargeReviewMatch) {
+          const body = await readJsonBody(req);
+          const result = await handleReviewRechargeSubmission(
+            staticRechargeService,
+            decodeURIComponent(adminRechargeReviewMatch[1]),
+            body,
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }

@@ -277,6 +277,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const billingRuntime = createBillingRuntimeGuard({
     userId: user?.id,
     isTempUser,
+    hasSession: Boolean(session?.access_token),
   });
 
   const [balance, setBalance] = useState(0);

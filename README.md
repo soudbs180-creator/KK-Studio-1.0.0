@@ -11,11 +11,11 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 
 ## Tech Stack
 
-- React 19
-- TypeScript 5.8
-- Vite 6
+- React 19.2.5
+- TypeScript 6.0.2
+- Vite 8.0.8
 - Node.js 24.x
-- Supabase
+- Supabase JS 2.103.0
 
 ## Current runtime truth
 
@@ -72,4 +72,5 @@ npm run check:encoding
 
 - Runtime artifacts under `.kk-local/` are local state, not source-of-truth project files.
 - If local development behaves inconsistently, check `npm run dev:status` and the logs under `.kk-local/logs/`.
+- On Windows PowerShell, `Get-Content` can display UTF-8 Chinese text as mojibake when the session is still on `cp936`; prefer `Get-Content -Encoding UTF8`, `ReadAllText(..., UTF8)`, or the repo governance scripts when checking Chinese docs/rules.
 - For a quick repo orientation, see [PROJECT_ROOT_GUIDE.md](PROJECT_ROOT_GUIDE.md).

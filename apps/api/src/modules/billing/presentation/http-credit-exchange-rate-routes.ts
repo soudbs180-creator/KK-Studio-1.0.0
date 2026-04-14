@@ -12,6 +12,7 @@ import {
   resolveAuthenticatedUserRole,
 } from "../../../../../../packages/shared/src/index.ts";
 import type { CreditExchangeRateService } from "../application/credit-exchange-rate-service.ts";
+import type { RechargePaymentChannelConfigService } from "../application/recharge-payment-channel-config-service.ts";
 
 const supportedCurrencies = new Set<SupportedRechargeCurrencyDto>(["CNY", "USD"]);
 
@@ -148,6 +149,19 @@ export async function handleListCreditExchangeRates(
   return {
     statusCode: 200,
     body: await service.listRates(requestId, clientVersion),
+  };
+}
+
+export async function handleListRechargePaymentChannels(
+  service: RechargePaymentChannelConfigService,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+
+  return {
+    statusCode: 200,
+    body: await service.listChannels(requestId, clientVersion),
   };
 }
 

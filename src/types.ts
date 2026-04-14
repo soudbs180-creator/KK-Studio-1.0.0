@@ -54,7 +54,7 @@ export interface MobileResultActions {
 export interface MobileEcommerceContinuation {
   promptNodeId: string | null;
   taskId?: string;
-  sourceSheet: '主图' | 'A+';
+  sourceSheet: EcommerceGroupSheet;
   kind: Exclude<EcommercePromptKind, 'a-plus-group'>;
   sourceRowKey: string;
   outputTypeLabel: string;
@@ -71,6 +71,18 @@ export interface MobileEcommerceContinuation {
   canConfirmDesktop: boolean;
   canGenerateMobile: boolean;
   canToggleSelection: boolean;
+}
+
+export type EcommerceGroupSheet = '主图' | 'A+';
+
+export interface EcommerceSheetSetting {
+  aspectRatio: AspectRatio;
+  imageSize: ImageSize;
+}
+
+export interface EcommerceSheetSettingPatch {
+  aspectRatio?: AspectRatio;
+  imageSize?: ImageSize;
 }
 
 export interface MobileResultEntry {
@@ -548,7 +560,7 @@ export interface EcommerceEditableTaskState {
   taskId: string;
   templateId?: string;
   sourceKind: Exclude<EcommercePromptKind, 'a-plus-group'>;
-  sourceSheet: '主图' | 'A+';
+  sourceSheet: EcommerceGroupSheet;
   sourceRowKey: string;
   theme: string;
   outputTypeLabel: string;
@@ -569,7 +581,7 @@ export interface EcommerceEditableTaskState {
 
 export interface EcommercePromptState {
   kind: EcommercePromptKind;
-  sourceSheet: '主图' | 'A+';
+  sourceSheet: EcommerceGroupSheet;
   sourceRowKey: string;
   groupId?: string;
   selectedForGeneration?: boolean;

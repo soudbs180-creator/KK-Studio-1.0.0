@@ -16,11 +16,25 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('kkai local runtime keeps billing bootstrap available for the fixed local user', () => {
+test('billing bootstrap stays disabled for the fixed local user until a real KK API session exists', () => {
   assert.deepEqual(
     createBillingRuntimeGuard({
       userId: 'local-user',
       isTempUser: false,
+      hasSession: false,
+    }),
+    {
+      billingEnabled: true,
+      activeBillingUserId: null,
+      shouldBootstrapBilling: false,
+    },
+  );
+
+  assert.deepEqual(
+    createBillingRuntimeGuard({
+      userId: 'local-user',
+      isTempUser: false,
+      hasSession: true,
     }),
     {
       billingEnabled: true,
@@ -53,7 +67,7 @@ test('BillingContext wires the runtime guard into bootstrap and credit paths', (
 
   assert.match(
     billingSource,
-    /createBillingRuntimeGuard\(\{\s*userId: user\?\.id,\s*isTempUser,\s*\}\)/s,
+    /createBillingRuntimeGuard\(\{\s*userId: user\?\.id,\s*isTempUser,\s*hasSession: Boolean\(session\?\.access_token\),\s*\}\)/s,
   );
   assert.match(
     billingSource,

@@ -12,6 +12,8 @@ export interface EcommerceAnalysisAsset {
   source: 'reference' | 'product';
   sheetName?: '主图' | 'A+';
   rowIndex?: number;
+  anchorRowIndex?: number;
+  anchorColRef?: string;
   displayOrder: number;
   previewUrl?: string;
   mimeType?: string;

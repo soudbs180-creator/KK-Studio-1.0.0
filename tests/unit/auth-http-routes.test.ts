@@ -5,6 +5,7 @@ import { AuthService } from "../../apps/api/src/modules/auth/application/auth-se
 import { InMemoryAuthIdentityStore } from "../../apps/api/src/modules/auth/infrastructure/in-memory-auth-identity-store.ts";
 import {
   handleGetProfile,
+  handleSendPasswordChangeCode,
   handleUpdatePassword,
   handleUpdateProfile,
   handleVersionedLogin,
@@ -96,10 +97,18 @@ describe("auth http routes", () => {
     }
   });
 
-  test("updates password through the versioned auth route and rejects the previous password", async () => {
+  test("updates password through the versioned auth route after verifying an emailed code", async () => {
+    let deliveredEmail = "";
+    let deliveredVerificationCode = "";
     const authService = new AuthService({
       verifyTurnstileToken: async () => ({ success: true }),
       identityStore: new InMemoryAuthIdentityStore(),
+      passwordChangeCodeEmailSender: {
+        async sendPasswordChangeCode(payload) {
+          deliveredEmail = payload.email;
+          deliveredVerificationCode = payload.code;
+        },
+      },
     });
     const register = await handleVersionedRegister(authService, {
       email: "password-route@example.com",
@@ -121,8 +130,25 @@ describe("auth http routes", () => {
       return;
     }
 
+    const sendCode = await handleSendPasswordChangeCode(authService, {
+      authorization: `Bearer ${login.body.data.accessToken}`,
+      "x-request-id": "req-password-send-code",
+    });
+
+    assert.equal(sendCode.statusCode, 200);
+    assert.equal(sendCode.body.success, true);
+    if (!sendCode.body.success) {
+      return;
+    }
+
+    assert.equal(sendCode.body.data.sent, true);
+    assert.equal(sendCode.body.data.email, "password-route@example.com");
+    assert.equal(sendCode.body.meta.requestId, "req-password-send-code");
+    assert.equal(deliveredEmail, "password-route@example.com");
+    assert.match(deliveredVerificationCode, /^\d{6}$/);
+
     const update = await handleUpdatePassword(authService, {
-      currentPassword: "password-123",
+      verificationCode: deliveredVerificationCode,
       newPassword: "new-password-456",
     }, {
       authorization: `Bearer ${login.body.data.accessToken}`,
@@ -131,6 +157,12 @@ describe("auth http routes", () => {
 
     assert.equal(update.statusCode, 200);
     assert.equal(update.body.success, true);
+    if (!update.body.success) {
+      return;
+    }
+    assert.equal(update.body.data.updated, true);
+    assert.equal(update.body.data.profile.email, "password-route@example.com");
+    assert.equal(update.body.meta.requestId, "req-password-update");
 
     const staleLogin = await handleVersionedLogin(authService, {
       email: "password-route@example.com",
@@ -139,6 +171,7 @@ describe("auth http routes", () => {
       "x-request-id": "req-password-stale-login",
     }, "127.0.0.1");
     assert.equal(staleLogin.statusCode, 401);
+    assert.equal(staleLogin.body.success, false);
 
     const freshLogin = await handleVersionedLogin(authService, {
       email: "password-route@example.com",
@@ -147,5 +180,78 @@ describe("auth http routes", () => {
       "x-request-id": "req-password-fresh-login",
     }, "127.0.0.1");
     assert.equal(freshLogin.statusCode, 200);
+    assert.equal(freshLogin.body.success, true);
+  });
+
+  test("returns an authentication error envelope when the password-change code is invalid", async () => {
+    const authService = new AuthService({
+      verifyTurnstileToken: async () => ({ success: true }),
+      identityStore: new InMemoryAuthIdentityStore(),
+    });
+    const register = await handleVersionedRegister(authService, {
+      email: "password-route-invalid@example.com",
+      password: "password-123",
+      turnstileToken: "turnstile-ok",
+    }, {
+      "x-request-id": "req-password-invalid-register",
+    }, "127.0.0.1");
+    assert.equal(register.body.success, true);
+
+    const login = await handleVersionedLogin(authService, {
+      email: "password-route-invalid@example.com",
+      password: "password-123",
+    }, {
+      "x-request-id": "req-password-invalid-login",
+    }, "127.0.0.1");
+    assert.equal(login.body.success, true);
+    if (!login.body.success) {
+      return;
+    }
+
+    const sendCode = await handleSendPasswordChangeCode(authService, {
+      authorization: `Bearer ${login.body.data.accessToken}`,
+      "x-request-id": "req-password-invalid-send-code",
+    });
+    assert.equal(sendCode.statusCode, 200);
+    assert.equal(sendCode.body.success, true);
+
+    const update = await handleUpdatePassword(authService, {
+      verificationCode: "000000",
+      newPassword: "new-password-456",
+    }, {
+      authorization: `Bearer ${login.body.data.accessToken}`,
+      "x-request-id": "req-password-invalid-update",
+    });
+
+    assert.equal(update.statusCode, 401);
+    assert.equal(update.body.success, false);
+    assert.equal(update.body.error.code, "AUTH_REQUIRED");
+    assert.equal(update.body.meta.requestId, "req-password-invalid-update");
+
+    const staleLogin = await handleVersionedLogin(authService, {
+      email: "password-route-invalid@example.com",
+      password: "password-123",
+    }, {
+      "x-request-id": "req-password-invalid-stale-login",
+    }, "127.0.0.1");
+    assert.equal(staleLogin.statusCode, 200);
+    assert.equal(staleLogin.body.success, true);
+  });
+
+  test("rejects register requests that omit turnstileToken", async () => {
+    const authService = new AuthService({
+      verifyTurnstileToken: async () => ({ success: true }),
+      identityStore: new InMemoryAuthIdentityStore(),
+    });
+
+    const result = await handleVersionedRegister(authService, {
+      email: "register-no-turnstile@example.com",
+      password: "password-123",
+    }, {
+      "x-request-id": "req-register-missing-turnstile",
+    }, "127.0.0.1");
+
+    assert.equal(result.statusCode, 400);
+    assert.equal(result.body.success, false);
   });
 });

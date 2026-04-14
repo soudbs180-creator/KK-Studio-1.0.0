@@ -207,6 +207,10 @@ function classifyTarget(relativePath) {
     return { kind: "ui-package-target", normalizedPath };
   }
 
+  if (normalizedPath.startsWith("src/")) {
+    return { kind: "legacy-src-target", normalizedPath };
+  }
+
   return { kind: "other-target", normalizedPath };
 }
 
@@ -236,6 +240,19 @@ function isAllowlistedServiceAppImport(source, target) {
 function checkServiceModule(source, target, specifier) {
   if (target.kind === "web-app-target" || target.kind === "web-module-target") {
     fail(source.normalizedPath, specifier, "service modules must not depend on web implementation files");
+    return;
+  }
+
+  if (target.kind === "legacy-src-target") {
+    if (isAllowlistedServiceAppImport(source, target)) {
+      return;
+    }
+
+    fail(
+      source.normalizedPath,
+      specifier,
+      "service modules must not depend on legacy src/* implementation files; extract a shared runtime surface or use an explicit migration allowlist",
+    );
     return;
   }
 
@@ -299,6 +316,19 @@ function checkWebFile(source, target, specifier) {
 function checkServiceApp(source, target, specifier) {
   if (target.kind === "web-app-target" || target.kind === "web-module-target") {
     fail(source.normalizedPath, specifier, "service app files must not depend on web implementation files");
+    return;
+  }
+
+  if (target.kind === "legacy-src-target") {
+    if (isAllowlistedServiceAppImport(source, target)) {
+      return;
+    }
+
+    fail(
+      source.normalizedPath,
+      specifier,
+      "service app files must not depend on legacy src/* implementation files; extract a shared runtime surface or use an explicit migration allowlist",
+    );
     return;
   }
 

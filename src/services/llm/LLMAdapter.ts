@@ -115,6 +115,7 @@ export function extractRefImageData(ref: string | { data: string; mimeType: stri
 
 export interface ImageGenerationResult {
     urls: string[];
+    status?: 'pending' | 'processing' | 'success' | 'failed';
     deducted?: boolean;
     ledgerId?: string;
     balanceAfter?: number;

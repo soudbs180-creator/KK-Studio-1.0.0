@@ -79,6 +79,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                     <button
                         type="button"
                         onClick={onMenuClick}
+                        data-testid="mobile-header-menu-button"
                         aria-label="\u6253\u5f00\u529f\u80fd\u83dc\u5355"
                         className={`${iconButtonClass} shrink-0 border border-white/10 bg-white/6 text-[var(--text-secondary)] hover:text-[var(--text-primary)]`}
                     >

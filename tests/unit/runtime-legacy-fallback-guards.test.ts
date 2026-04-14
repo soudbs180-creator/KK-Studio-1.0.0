@@ -50,6 +50,8 @@ test('admin UI entrypoints use the shared web API client without Supabase fallba
   const adminRoleSource = readSource('src/hooks/useAdminRole.ts');
 
   assert.match(adminRoleSource, /kkWebApiClient/);
+  assert.match(adminRoleSource, /const \{ user, session, loading: authLoading, isTempUser \} = useAuth\(\);/);
+  assert.match(adminRoleSource, /if \(!session\?\.access_token \|\| !user \|\| isTempUser\) \{/);
   assert.match(adminRoleSource, /\.getAdminAccess\(buildAdminRequestOptions\(\)\)/);
   assert.doesNotMatch(adminRoleSource, /shouldUseLegacyWebApiFallback/);
   assert.doesNotMatch(adminRoleSource, /getKkApiServerHealth/);

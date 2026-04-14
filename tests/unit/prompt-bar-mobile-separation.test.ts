@@ -9,15 +9,13 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('prompt bar routes embedded mobile UI through a dedicated shell component', () => {
+test('prompt bar routes embedded mobile UI through a dedicated advanced drawer component', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const mobileShellSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedComposerShell.tsx');
+  const drawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
 
-  assert.match(promptBarSource, /import MobileEmbeddedComposerShell from '\.\/prompt-bar\/MobileEmbeddedComposerShell';/);
+  assert.match(promptBarSource, /import MobileEmbeddedAdvancedDrawer from '\.\/prompt-bar\/MobileEmbeddedAdvancedDrawer';/);
   assert.match(promptBarSource, /isEmbeddedMobileComposer \? \(/);
-  assert.match(promptBarSource, /<MobileEmbeddedComposerShell/);
-  assert.match(mobileShellSource, /data-mobile-composer-shell="embedded"/);
-  assert.match(mobileShellSource, /data-mobile-composer-section="mode-strip"/);
-  assert.match(mobileShellSource, /data-mobile-composer-section="primary-input"/);
-  assert.match(mobileShellSource, /data-mobile-composer-section="advanced-drawer"/);
+  assert.match(promptBarSource, /<MobileEmbeddedAdvancedDrawer/);
+  assert.match(promptBarSource, /data-mobile-composer-section="primary-input"/);
+  assert.match(drawerSource, /data-mobile-composer-section="advanced-drawer"/);
 });

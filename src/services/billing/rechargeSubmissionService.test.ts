@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildRechargeBillRequest,
+  buildRechargeProofSubmissionRequest,
   buildRechargeSubmissionRequest,
   getRechargeSubmissionErrorMessage,
   getRechargeSubmissionStatusLabel,
+  normalizeRechargeBillSnapshot,
   sanitizeTransferReferenceLast4,
 } from './rechargeSubmissionService.ts';
 
@@ -33,6 +36,58 @@ test('buildRechargeSubmissionRequest normalizes amount, note, and reference tail
   );
 });
 
+test('buildRechargeBillRequest normalizes amount and note without requiring a transfer tail', () => {
+  assert.deepEqual(
+    buildRechargeBillRequest({
+      amount: 88,
+      currencyCode: 'CNY',
+      paymentChannel: 'wechat',
+      note: '  reserve balance top-up  ',
+    }),
+    {
+      amount: 88,
+      currencyCode: 'CNY',
+      paymentChannel: 'wechat',
+      note: 'reserve balance top-up',
+    },
+  );
+});
+
+test('buildRechargeProofSubmissionRequest preserves bill references and requires a transfer tail', () => {
+  assert.deepEqual(
+    buildRechargeProofSubmissionRequest({
+      submissionId: 'sub_123',
+      billNumber: 'BILL-20260415-001',
+      amount: 50,
+      currencyCode: 'USD',
+      paymentChannel: 'paypal',
+      transferReferenceLast4: ' aa11 ',
+      note: '  paid from business card  ',
+    }),
+    {
+      submissionId: 'sub_123',
+      billNumber: 'BILL-20260415-001',
+      amount: 50,
+      currencyCode: 'USD',
+      paymentChannel: 'paypal',
+      transferReferenceLast4: 'AA11',
+      note: 'paid from business card',
+    },
+  );
+
+  assert.throws(
+    () => buildRechargeProofSubmissionRequest({
+      submissionId: 'sub_123',
+      billNumber: 'BILL-20260415-001',
+      amount: 50,
+      currencyCode: 'USD',
+      paymentChannel: 'paypal',
+      transferReferenceLast4: 'A1',
+    }),
+    /\u8bf7\u586b\u5199\u8f6c\u8d26\u6d41\u6c34\u540e\u56db\u4f4d/,
+  );
+});
+
 test('buildRechargeSubmissionRequest rejects invalid transfer tails and amounts', () => {
   assert.throws(
     () => buildRechargeSubmissionRequest({
@@ -41,33 +96,119 @@ test('buildRechargeSubmissionRequest rejects invalid transfer tails and amounts'
       paymentChannel: 'wechat',
       transferReferenceLast4: '12',
     }),
-    /请填写转账流水后四位/,
+    /\u8bf7\u586b\u5199\u8f6c\u8d26\u6d41\u6c34\u540e\u56db\u4f4d/,
   );
 
   assert.throws(
-    () => buildRechargeSubmissionRequest({
-      amount: 0,
-      currencyCode: 'USD',
-      paymentChannel: 'paypal',
-      transferReferenceLast4: 'ABCD',
-    }),
-    /充值金额无效/,
+    () =>
+      buildRechargeSubmissionRequest({
+        amount: 0,
+        currencyCode: 'USD',
+        paymentChannel: 'paypal',
+        transferReferenceLast4: 'ABCD',
+      }),
+    /\u5145\u503c\u91d1\u989d\u65e0\u6548/,
   );
 });
 
 test('getRechargeSubmissionStatusLabel exposes stable Chinese labels', () => {
-  assert.equal(getRechargeSubmissionStatusLabel('pending'), '等待审核');
-  assert.equal(getRechargeSubmissionStatusLabel('approved'), '审核通过');
-  assert.equal(getRechargeSubmissionStatusLabel('rejected'), '审核驳回');
-  assert.equal(getRechargeSubmissionStatusLabel('credited'), '已入账');
-  assert.equal(getRechargeSubmissionStatusLabel('completed' as any), '已完成');
-  assert.equal(getRechargeSubmissionStatusLabel(undefined as any), '已完成');
+  assert.equal(getRechargeSubmissionStatusLabel('draft'), '\u5f85\u521b\u5efa\u8d26\u5355');
+  assert.equal(getRechargeSubmissionStatusLabel('bill_created'), '\u5f85\u8f6c\u8d26');
+  assert.equal(getRechargeSubmissionStatusLabel('proof_submitted'), '\u5f85\u5ba1\u6838');
+  assert.equal(getRechargeSubmissionStatusLabel('pending'), '\u7b49\u5f85\u5ba1\u6838');
+  assert.equal(getRechargeSubmissionStatusLabel('approved'), '\u5ba1\u6838\u901a\u8fc7');
+  assert.equal(getRechargeSubmissionStatusLabel('rejected'), '\u5ba1\u6838\u9a73\u56de');
+  assert.equal(getRechargeSubmissionStatusLabel('credited'), '\u5df2\u5165\u8d26');
+  assert.equal(getRechargeSubmissionStatusLabel('completed' as any), '\u5df2\u5b8c\u6210');
+  assert.equal(getRechargeSubmissionStatusLabel(undefined as any), '\u5df2\u5b8c\u6210');
+});
+
+test('normalizeRechargeBillSnapshot supports future bill payloads and legacy submission payloads', () => {
+  assert.deepEqual(
+    normalizeRechargeBillSnapshot(
+      {
+        bill: {
+          submissionId: 'sub_001',
+          billNumber: 'BILL-001',
+          amount: 88,
+          currencyCode: 'CNY',
+          paymentChannel: 'alipay',
+          estimatedCredits: 880,
+          transferReferenceLast4: '8X9Z',
+          status: 'proof_submitted',
+          qrDisplay: {
+            title: 'Static QR',
+            helperText: 'Upload payment proof after the transfer is complete.',
+          },
+        },
+      },
+      {
+        amount: 88,
+        currencyCode: 'CNY',
+        paymentChannel: 'alipay',
+        estimatedCredits: 880,
+      },
+    ),
+    {
+      submissionId: 'sub_001',
+      billNumber: 'BILL-001',
+      amount: 88,
+      currencyCode: 'CNY',
+      paymentChannel: 'alipay',
+      estimatedCredits: 880,
+      transferReferenceLast4: '8X9Z',
+      note: undefined,
+      status: 'proof_submitted',
+      statusLabel: '\u5f85\u5ba1\u6838',
+      qrDisplay: {
+        title: 'Static QR',
+        helperText: 'Upload payment proof after the transfer is complete.',
+      },
+      submittedAt: undefined,
+    },
+  );
+
+  assert.deepEqual(
+    normalizeRechargeBillSnapshot(
+      {
+        submission: {
+          submissionId: 'legacy_sub_9',
+          amount: 20,
+          currencyCode: 'USD',
+          paymentChannel: 'paypal',
+          transferReferenceLast4: 'ABCD',
+          status: 'pending',
+          submittedAt: '2026-04-15T01:02:03.000Z',
+        },
+      },
+      {
+        amount: 20,
+        currencyCode: 'USD',
+        paymentChannel: 'paypal',
+        estimatedCredits: 100,
+      },
+    ),
+    {
+      submissionId: 'legacy_sub_9',
+      billNumber: 'legacy_sub_9',
+      amount: 20,
+      currencyCode: 'USD',
+      paymentChannel: 'paypal',
+      estimatedCredits: 100,
+      transferReferenceLast4: 'ABCD',
+      note: undefined,
+      status: 'pending',
+      statusLabel: '\u7b49\u5f85\u5ba1\u6838',
+      qrDisplay: undefined,
+      submittedAt: '2026-04-15T01:02:03.000Z',
+    },
+  );
 });
 
 test('getRechargeSubmissionErrorMessage surfaces missing runtime support clearly', () => {
   assert.equal(
     getRechargeSubmissionErrorMessage({ error: { code: 'HTTP_404' } }, 'fallback'),
-    '当前运行时尚未部署充值提交接口，请联系管理员。',
+    '\u5f53\u524d\u8fd0\u884c\u65f6\u5c1a\u672a\u90e8\u7f72\u5145\u503c\u63d0\u4ea4\u63a5\u53e3\uff0c\u8bf7\u8054\u7cfb\u7ba1\u7406\u5458\u3002',
   );
   assert.equal(
     getRechargeSubmissionErrorMessage({ error: { message: 'custom failure' } }, 'fallback'),
@@ -78,12 +219,13 @@ test('getRechargeSubmissionErrorMessage surfaces missing runtime support clearly
       {
         error: {
           code: 'SERVER_PERSISTENCE_REQUIRED',
-          message: 'Billing and credit persistence require the API server to use the canonical Supabase backend.',
+          message:
+            'Billing and credit persistence require the API server to use the canonical Supabase backend.',
         },
       },
       'fallback',
     ),
-    '当前充值申请需要可持久化的正式后端，请联系管理员检查账本配置。',
+    '\u5f53\u524d\u5145\u503c\u7533\u8bf7\u9700\u8981\u53ef\u6301\u4e45\u5316\u7684\u6b63\u5f0f\u540e\u7aef\uff0c\u8bf7\u8054\u7cfb\u7ba1\u7406\u5458\u68c0\u67e5\u8d26\u672c\u914d\u7f6e\u3002',
   );
   assert.equal(getRechargeSubmissionErrorMessage(undefined, 'fallback'), 'fallback');
 });

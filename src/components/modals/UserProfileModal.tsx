@@ -30,7 +30,6 @@ import {
   listLinkedAuthProviders,
   startGoogleBind,
 } from '../../services/auth/identityLinking';
-import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { startWechatBind } from '../../services/auth/wechatAuth';
 import {
   enrollTotpFactor,
@@ -142,9 +141,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVerificationCode, setPasswordVerificationCode] = useState('');
+  const [passwordCodeExpiresAt, setPasswordCodeExpiresAt] = useState<string | null>(null);
+  const [passwordCodeSending, setPasswordCodeSending] = useState(false);
 
   const [timeRemaining, setTimeRemaining] = useState('');
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
@@ -165,7 +166,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   );
   const selectedPresetAvatar = useMemo(() => getPresetAvatarById(avatarUrl), [avatarUrl]);
   const avatarInputValue = selectedPresetAvatar ? '' : avatarUrl;
-  const passwordChangeEnabled = false;
 
   const roleLabel = useMemo(() => {
     if (checkingAdmin && user) {
@@ -307,9 +307,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const resetAndClose = () => {
     setView('main');
     setMessage(null);
-    setOldPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setPasswordVerificationCode('');
+    setPasswordCodeExpiresAt(null);
     setWechatModalOpen(false);
     setWechatLoading(false);
     setWechatError(null);
@@ -427,8 +428,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
-    if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-      setMessage({ type: 'error', text: '请完整填写旧密码、新密码和确认密码。' });
+    if (!passwordVerificationCode.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setMessage({ type: 'error', text: '请先输入邮箱验证码，再填写新密码和确认密码。' });
       return;
     }
 
@@ -446,35 +447,51 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setMessage(null);
 
     try {
-      const { error: signInError } = await signInWithPasswordWithFallback({
-        email: user.email,
-        password: oldPassword,
-      });
-      if (signInError) {
-        const lowerMessage = String(signInError.message || '').toLowerCase();
-        if (lowerMessage.includes('invalid login credentials')) {
-          throw new Error('旧密码验证失败，请检查后重试。');
-        }
-        throw signInError;
-      }
-
       const response = await kkWebApiClient.updatePassword({
-        currentPassword: oldPassword,
         newPassword,
+        verificationCode: passwordVerificationCode.trim(),
       });
       if (!response.success) {
         throw new Error(resolveApiGapMessage(response.error.code, response.error.message || '密码修改失败，请稍后重试。'));
       }
 
       setMessage({ type: 'success', text: '密码修改成功。' });
-      setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordVerificationCode('');
+      setPasswordCodeExpiresAt(null);
       setTimeout(() => setView('main'), 1000);
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || '密码修改失败，请稍后重试。' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendPasswordChangeCode = async () => {
+    if (!user?.email) {
+      setMessage({ type: 'error', text: '当前账户缺少邮箱信息，无法发送验证码。' });
+      return;
+    }
+
+    setPasswordCodeSending(true);
+    setMessage(null);
+
+    try {
+      const response = await kkWebApiClient.sendPasswordChangeCode();
+      if (!response.success) {
+        throw new Error(resolveApiGapMessage(response.error.code, response.error.message || '验证码发送失败，请稍后重试。'));
+      }
+
+      setPasswordCodeExpiresAt(response.data.expiresAt);
+      setMessage({
+        type: 'success',
+        text: `验证码已发送到 ${response.data.email}，请在收到后完成密码修改。`,
+      });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || '验证码发送失败，请稍后重试。' });
+    } finally {
+      setPasswordCodeSending(false);
     }
   };
 
@@ -935,15 +952,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           {view === 'change-password' && canChangePassword && (
             <div className="space-y-3">
+              <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      邮箱验证码
+                    </div>
+                    <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      点击发送后，验证码会发到 {displayEmail}。
+                    </div>
+                    {passwordCodeExpiresAt ? (
+                      <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                        本次验证码有效期至：{formatDateTime(passwordCodeExpiresAt)}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    onClick={() => void handleSendPasswordChangeCode()}
+                    disabled={passwordCodeSending || loading}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm disabled:opacity-70"
+                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                  >
+                    {(passwordCodeSending || loading) && <Loader2 size={16} className="animate-spin" />}
+                    发送验证码
+                  </button>
+                </div>
+              </div>
+
               <label className="block space-y-1">
                 <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  当前密码
+                  邮箱验证码
                 </span>
                 <input
-                  type="password"
-                  value={oldPassword}
-                  onChange={(event) => setOldPassword(event.target.value)}
-                  placeholder="请输入当前密码"
+                  value={passwordVerificationCode}
+                  onChange={(event) => setPasswordVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="请输入 6 位验证码"
+                  inputMode="numeric"
                   className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
                   style={{ borderColor: 'var(--border-light)' }}
                 />
@@ -979,7 +1024,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
               <button
                 onClick={() => void handleChangePassword()}
-                disabled={loading}
+                disabled={loading || passwordCodeSending}
                 className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}

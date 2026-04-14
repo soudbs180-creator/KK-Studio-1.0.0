@@ -28,6 +28,16 @@ type CellImageBinding = {
   mediaPath?: string;
 };
 
+type DrawingAnchorBinding = {
+  anchorCellRef: string;
+  anchorRowIndex: number;
+  anchorColRef: string;
+  fromRow: number;
+  fromCol: number;
+  embedRid: string;
+  mediaPath?: string;
+};
+
 function decodeXml(value: string): string {
   return value.replace(/&(amp|lt|gt|quot|apos);/g, (match) => XML_ENTITY_MAP[match] || match);
 }
@@ -59,9 +69,97 @@ function inferMimeType(fileName: string): string {
   return 'application/octet-stream';
 }
 
+function resolveZipPath(basePath: string, target: string): string {
+  const normalizedTarget = target.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!normalizedTarget || normalizedTarget.startsWith('xl/')) {
+    return normalizedTarget;
+  }
+
+  const segments = basePath.replace(/\\/g, '/').split('/');
+  segments.pop();
+
+  normalizedTarget.split('/').forEach((segment) => {
+    if (!segment || segment === '.') return;
+    if (segment === '..') {
+      segments.pop();
+      return;
+    }
+    segments.push(segment);
+  });
+
+  return segments.join('/');
+}
+
+function getRelationshipPath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  const lastSlash = normalized.lastIndexOf('/');
+  const directory = lastSlash >= 0 ? normalized.slice(0, lastSlash) : '';
+  const fileName = lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+  return directory ? `${directory}/_rels/${fileName}.rels` : `_rels/${fileName}.rels`;
+}
+
 function getColumnRef(cellRef: string): string {
   const match = cellRef.match(/^[A-Z]+/i);
   return match ? match[0].toUpperCase() : cellRef.toUpperCase();
+}
+
+function columnIndexToRef(index: number): string {
+  let current = index + 1;
+  let result = '';
+
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    current = Math.floor((current - 1) / 26);
+  }
+
+  return result;
+}
+
+function columnRefToIndex(columnRef: string | undefined): number {
+  if (!columnRef) return Number.MAX_SAFE_INTEGER;
+
+  return String(columnRef)
+    .toUpperCase()
+    .split('')
+    .reduce((sum, char) => sum * 26 + (char.charCodeAt(0) - 64), 0);
+}
+
+function getAssetSpatialRowIndex(asset: Pick<OpenXmlWorkbookAsset, 'anchorRowIndex' | 'rowIndex' | 'fromRow'>): number {
+  if (typeof asset.anchorRowIndex === 'number') return asset.anchorRowIndex;
+  if (typeof asset.rowIndex === 'number') return asset.rowIndex;
+  if (typeof asset.fromRow === 'number') return asset.fromRow + 1;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function getAssetSpatialColIndex(asset: Pick<OpenXmlWorkbookAsset, 'anchorColRef' | 'fromCol'>): number {
+  if (asset.anchorColRef) {
+    return columnRefToIndex(asset.anchorColRef);
+  }
+
+  if (typeof asset.fromCol === 'number') {
+    return asset.fromCol + 1;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function compareMediaAssetsBySpatialOrder(left: OpenXmlWorkbookAsset, right: OpenXmlWorkbookAsset): number {
+  if ((left.sheetName || '') !== (right.sheetName || '')) {
+    return left.displayOrder - right.displayOrder;
+  }
+
+  const rowDelta = getAssetSpatialRowIndex(left) - getAssetSpatialRowIndex(right);
+  if (rowDelta !== 0) {
+    return rowDelta;
+  }
+
+  const colDelta = getAssetSpatialColIndex(left) - getAssetSpatialColIndex(right);
+  if (colDelta !== 0) {
+    return colDelta;
+  }
+
+  return left.displayOrder - right.displayOrder;
 }
 
 function parseSharedStrings(xml: string): string[] {
@@ -195,19 +293,101 @@ function parseCellImages(cellImagesXml: string, relsXml: string): Map<string, Ce
   return bindings;
 }
 
+function parseWorksheetDrawingTargets(
+  sheetXml: string,
+  relsXml: string,
+  sheetPath: string,
+): string[] {
+  const cleanedSheetXml = stripXmlNamespaces(sheetXml);
+  const relationships = parseWorkbookRelationships(relsXml);
+  const relMap = new Map(relationships.map((item) => [item.id, item.target]));
+  const targets = new Set<string>();
+  const drawingRegex = /<drawing[^>]*r:id="([^"]+)"/g;
+
+  let match = drawingRegex.exec(cleanedSheetXml);
+  while (match) {
+    const target = relMap.get(match[1]);
+    if (target) {
+      targets.add(resolveZipPath(sheetPath, target));
+    }
+    match = drawingRegex.exec(cleanedSheetXml);
+  }
+
+  return Array.from(targets);
+}
+
+function parseDrawingAnchors(
+  drawingXml: string,
+  relsXml: string,
+  drawingPath: string,
+): DrawingAnchorBinding[] {
+  const cleanedDrawingXml = stripXmlNamespaces(drawingXml);
+  const relationships = parseWorkbookRelationships(relsXml);
+  const relMap = new Map(relationships.map((item) => [item.id, item.target]));
+  const anchors: DrawingAnchorBinding[] = [];
+  const anchorRegex = /<(?:\w+:)?(?:oneCellAnchor|twoCellAnchor)\b[^>]*>([\s\S]*?)<\/(?:\w+:)?(?:oneCellAnchor|twoCellAnchor)>/g;
+
+  let match = anchorRegex.exec(cleanedDrawingXml);
+  while (match) {
+    const block = match[1];
+    const embedMatch = block.match(/<(?:\w+:)?blip[^>]*r:embed="([^"]+)"/);
+    const fromMatch = block.match(
+      /<(?:\w+:)?from>[\s\S]*?<(?:\w+:)?col>(\d+)<\/(?:\w+:)?col>[\s\S]*?<(?:\w+:)?row>(\d+)<\/(?:\w+:)?row>[\s\S]*?<\/(?:\w+:)?from>/,
+    );
+
+    if (!embedMatch || !fromMatch) {
+      match = anchorRegex.exec(cleanedDrawingXml);
+      continue;
+    }
+
+    const fromCol = Number(fromMatch[1]);
+    const fromRow = Number(fromMatch[2]);
+    const anchorRowIndex = fromRow + 1;
+    const anchorColRef = columnIndexToRef(fromCol);
+    anchors.push({
+      anchorCellRef: `${anchorColRef}${anchorRowIndex}`,
+      anchorRowIndex,
+      anchorColRef,
+      fromRow,
+      fromCol,
+      embedRid: embedMatch[1],
+      mediaPath: (() => {
+        const target = relMap.get(embedMatch[1]);
+        return target ? resolveZipPath(drawingPath, target) : undefined;
+      })(),
+    });
+    match = anchorRegex.exec(cleanedDrawingXml);
+  }
+
+  return anchors;
+}
+
+async function loadPreviewPayload(
+  zip: JSZip,
+  mediaPath: string | undefined,
+): Promise<{ fileName: string; mimeType: string; previewUrl: string } | null> {
+  if (!mediaPath) return null;
+  const fileName = mediaPath.split('/').pop() || mediaPath;
+  const mimeType = inferMimeType(fileName);
+  const raw = await zip.file(mediaPath)?.async('base64');
+  if (!raw) return null;
+  return {
+    fileName,
+    mimeType,
+    previewUrl: `data:${mimeType};base64,${raw}`,
+  };
+}
+
 async function loadPreviewMap(zip: JSZip, bindings: Map<string, CellImageBinding>): Promise<Map<string, { fileName: string; mimeType: string; previewUrl: string; embedRid: string }>> {
   const previewMap = new Map<string, { fileName: string; mimeType: string; previewUrl: string; embedRid: string }>();
   for (const binding of bindings.values()) {
-    if (!binding.mediaPath) continue;
-    const fileName = binding.mediaPath.split('/').pop() || binding.mediaPath;
-    const mimeType = inferMimeType(fileName);
     if (previewMap.has(binding.dispImgId)) continue;
-    const raw = await zip.file(binding.mediaPath)?.async('base64');
-    if (!raw) continue;
+    const preview = await loadPreviewPayload(zip, binding.mediaPath);
+    if (!preview) continue;
     previewMap.set(binding.dispImgId, {
-      fileName,
-      mimeType,
-      previewUrl: `data:${mimeType};base64,${raw}`,
+      fileName: preview.fileName,
+      mimeType: preview.mimeType,
+      previewUrl: preview.previewUrl,
       embedRid: binding.embedRid,
     });
   }
@@ -230,10 +410,12 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
   const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml) : [];
   const sheetEntries = parseWorkbookSheetEntries(workbookXml, relationships);
   const sheets: OpenXmlParsedSheet[] = [];
+  const sheetXmlByPath = new Map<string, string>();
 
   for (const sheetEntry of sheetEntries) {
     const sheetXml = await zip.file(sheetEntry.path)?.async('string');
     if (!sheetXml) continue;
+    sheetXmlByPath.set(sheetEntry.path, sheetXml);
     sheets.push({
       name: sheetEntry.name,
       worksheetPath: sheetEntry.path,
@@ -242,14 +424,34 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
   }
 
   const mediaAssets: OpenXmlWorkbookAsset[] = [];
+  const mediaAssetKeys = new Set<string>();
+  const appendMediaAsset = (asset: Omit<OpenXmlWorkbookAsset, 'displayOrder'>) => {
+    const assetKey = [
+      asset.sheetName || '',
+      asset.anchorCellRef || '',
+      asset.embedRid || '',
+      asset.fileName,
+    ].join('|');
+
+    if (mediaAssetKeys.has(assetKey)) {
+      return;
+    }
+
+    mediaAssetKeys.add(assetKey);
+    mediaAssets.push({
+      ...asset,
+      displayOrder: mediaAssets.length + 1,
+    });
+  };
   const cellImageRelationship = relationships.find((item) => (item.target || '').toLowerCase().includes('cellimages.xml'));
-  const cellImagesXml = cellImageRelationship ? await zip.file(`xl/${cellImageRelationship.target.replace(/^\/+/, '')}`)?.async('string') : undefined;
+  const cellImagesXml = cellImageRelationship
+    ? await zip.file(resolveZipPath('xl/workbook.xml', cellImageRelationship.target))?.async('string')
+    : undefined;
   const cellImagesRelsXml = await zip.file('xl/_rels/cellimages.xml.rels')?.async('string');
 
   if (cellImagesXml && cellImagesRelsXml) {
     const bindings = parseCellImages(cellImagesXml, cellImagesRelsXml);
     const previewMap = await loadPreviewMap(zip, bindings);
-    let displayOrder = 1;
 
     for (const sheet of sheets) {
       for (const row of sheet.rows) {
@@ -257,12 +459,11 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
           if (!slot.dispImgId) continue;
           const preview = previewMap.get(slot.dispImgId);
           if (!preview) continue;
-          mediaAssets.push({
+          appendMediaAsset({
             assetId: `${slot.dispImgId}-${sheet.name}-${slot.cellRef}`,
             fileName: preview.fileName,
             mimeType: preview.mimeType,
             previewUrl: preview.previewUrl,
-            displayOrder,
             sheetName: sheet.name,
             rowIndex: row.rowIndex,
             worksheetPath: sheet.worksheetPath,
@@ -275,7 +476,6 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
             fromCol: slot.columnRef ? slot.columnRef.charCodeAt(0) - 'A'.charCodeAt(0) : undefined,
             linkedCellRefs: [slot.cellRef],
           });
-          displayOrder += 1;
         }
       }
     }
@@ -305,7 +505,7 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
         for (const slot of row.referenceSlots) {
           const asset = fallbackAssets[assetIndex];
           if (!asset) continue;
-          mediaAssets.push({
+          appendMediaAsset({
             ...asset,
             assetId: `${asset.assetId}-${sheet.name}-${slot.cellRef}`,
             sheetName: sheet.name,
@@ -323,6 +523,51 @@ export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fil
       }
     }
   }
+
+  for (const sheet of sheets) {
+    if (!sheet.worksheetPath) continue;
+    const sheetXml = sheetXmlByPath.get(sheet.worksheetPath);
+    if (!sheetXml) continue;
+
+    const sheetRelsPath = getRelationshipPath(sheet.worksheetPath);
+    const sheetRelsXml = await zip.file(sheetRelsPath)?.async('string');
+    if (!sheetRelsXml) continue;
+
+    const drawingTargets = parseWorksheetDrawingTargets(sheetXml, sheetRelsXml, sheet.worksheetPath);
+    for (const drawingPath of drawingTargets) {
+      const drawingXml = await zip.file(drawingPath)?.async('string');
+      const drawingRelsXml = await zip.file(getRelationshipPath(drawingPath))?.async('string');
+      if (!drawingXml || !drawingRelsXml) continue;
+
+      const anchors = parseDrawingAnchors(drawingXml, drawingRelsXml, drawingPath);
+      for (const anchor of anchors) {
+        const preview = await loadPreviewPayload(zip, anchor.mediaPath);
+        if (!preview) continue;
+
+        appendMediaAsset({
+          assetId: `${preview.fileName}-${sheet.name}-${anchor.anchorCellRef}`,
+          fileName: preview.fileName,
+          mimeType: preview.mimeType,
+          previewUrl: preview.previewUrl,
+          sheetName: sheet.name,
+          rowIndex: anchor.anchorRowIndex,
+          worksheetPath: sheet.worksheetPath,
+          embedRid: anchor.embedRid,
+          anchorCellRef: anchor.anchorCellRef,
+          anchorRowIndex: anchor.anchorRowIndex,
+          anchorColRef: anchor.anchorColRef,
+          fromRow: anchor.fromRow,
+          fromCol: anchor.fromCol,
+          linkedCellRefs: [anchor.anchorCellRef],
+        });
+      }
+    }
+  }
+
+  mediaAssets.sort(compareMediaAssetsBySpatialOrder);
+  mediaAssets.forEach((asset, index) => {
+    asset.displayOrder = index + 1;
+  });
 
   return {
     sheets,

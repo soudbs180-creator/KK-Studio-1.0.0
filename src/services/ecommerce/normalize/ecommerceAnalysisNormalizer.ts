@@ -22,6 +22,212 @@ function readCell(row: OpenXmlParsedRow, column: string): string {
   return String(row.cells[column] || '').trim();
 }
 
+type MainSheetColumnKey =
+  | 'sequence'
+  | 'type'
+  | 'angle'
+  | 'theme'
+  | 'sellingPoints'
+  | 'designRequirements'
+  | 'copyZh'
+  | 'copyEn'
+  | 'copyGeneric';
+
+type APlusSheetColumnKey =
+  | 'moduleName'
+  | 'type'
+  | 'declaredSizeText'
+  | 'angle'
+  | 'sellingPoints'
+  | 'designRequirements'
+  | 'copyZh'
+  | 'copyEn'
+  | 'copyGeneric';
+
+type SheetColumnKey = MainSheetColumnKey | APlusSheetColumnKey;
+
+type SheetHeaderDefinition = {
+  key: SheetColumnKey;
+  patterns: string[];
+};
+
+type SheetSchema = {
+  headerRowIndex: number;
+  columns: Partial<Record<SheetColumnKey, string>>;
+};
+
+type MainRowCandidate = {
+  itemKey: string;
+  row: OpenXmlParsedRow;
+  sequence: number;
+  type: string;
+  angle: string;
+  theme: string;
+  designRequirements: string;
+  copyText: string;
+};
+
+type APlusRowCandidate = {
+  moduleKey: string;
+  row: OpenXmlParsedRow;
+  moduleName: string;
+  type: string;
+  declaredSizeText: string;
+  angle: string;
+  sellingPoints: string;
+  designRequirements: string;
+  copyText: string;
+};
+
+const MAIN_SHEET_HEADER_DEFINITIONS: SheetHeaderDefinition[] = [
+  { key: 'copyZh', patterns: ['文案中文', '中文文案'] },
+  { key: 'copyEn', patterns: ['文案英文', '英文文案'] },
+  { key: 'sequence', patterns: ['序号', '编号', '序列'] },
+  { key: 'designRequirements', patterns: ['设计要求', '设计需求', '设计说明', '画面要求', '需求描述'] },
+  { key: 'sellingPoints', patterns: ['卖点', '亮点', '核心卖点'] },
+  { key: 'theme', patterns: ['主题', '场景主题', '风格主题'] },
+  { key: 'angle', patterns: ['角度', '产品角度', '镜头'] },
+  { key: 'type', patterns: ['类型', '画面类型', '版式类型'] },
+  { key: 'copyGeneric', patterns: ['文案', '标题文案'] },
+];
+
+const APLUS_SHEET_HEADER_DEFINITIONS: SheetHeaderDefinition[] = [
+  { key: 'copyZh', patterns: ['文案中文', '中文文案'] },
+  { key: 'copyEn', patterns: ['文案英文', '英文文案'] },
+  { key: 'declaredSizeText', patterns: ['图片尺寸', '模块尺寸', '尺寸', '画布尺寸'] },
+  { key: 'designRequirements', patterns: ['设计要求', '设计需求', '设计说明', '画面要求', '需求描述'] },
+  { key: 'sellingPoints', patterns: ['产品卖点', '卖点', '亮点', '核心卖点'] },
+  { key: 'moduleName', patterns: ['模块名称', '模块名', '模块', '版块'] },
+  { key: 'angle', patterns: ['产品角度', '角度', '镜头'] },
+  { key: 'type', patterns: ['类型', '模块类型', '版式类型'] },
+  { key: 'copyGeneric', patterns: ['文案', '标题文案'] },
+];
+
+function normalizeLabelToken(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\r\n\t]+/g, '')
+    .replace(/[()（）【】\[\]<>《》:：/\\\-_.，。,;；·•]/g, '');
+}
+
+function columnRefToIndex(columnRef: string): number {
+  return String(columnRef || '')
+    .toUpperCase()
+    .split('')
+    .reduce((sum, char) => sum * 26 + (char.charCodeAt(0) - 64), 0);
+}
+
+function getOrderedCells(row: OpenXmlParsedRow): Array<[string, string]> {
+  return Object.entries(row.cells).sort(
+    ([leftColumn], [rightColumn]) => columnRefToIndex(leftColumn) - columnRefToIndex(rightColumn),
+  );
+}
+
+function resolveHeaderKey(value: string, definitions: SheetHeaderDefinition[]): SheetColumnKey | null {
+  const normalizedValue = normalizeLabelToken(value);
+  if (!normalizedValue) return null;
+
+  for (const definition of definitions) {
+    if (definition.patterns.some((pattern) => normalizedValue.includes(pattern))) {
+      return definition.key;
+    }
+  }
+
+  return null;
+}
+
+function detectSheetSchema(
+  sheet: OpenXmlParsedSheet | undefined,
+  definitions: SheetHeaderDefinition[],
+): SheetSchema | null {
+  if (!sheet) return null;
+
+  let bestSchema: SheetSchema | null = null;
+  let bestScore = 0;
+
+  for (const row of sheet.rows.slice(0, 60)) {
+    const columns: Partial<Record<SheetColumnKey, string>> = {};
+    let score = 0;
+
+    for (const [columnRef, value] of getOrderedCells(row)) {
+      const key = resolveHeaderKey(value, definitions);
+      if (!key || columns[key]) continue;
+      columns[key] = columnRef;
+      score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestSchema = {
+        headerRowIndex: row.rowIndex,
+        columns,
+      };
+    }
+  }
+
+  return bestScore >= 3 ? bestSchema : null;
+}
+
+function readSchemaCell(
+  row: OpenXmlParsedRow,
+  schema: SheetSchema | null,
+  key: SheetColumnKey,
+  fallbackColumns: string[] = [],
+): string {
+  const preferredColumn = schema?.columns[key];
+  if (preferredColumn) {
+    const preferredValue = readCell(row, preferredColumn);
+    if (preferredValue) {
+      return preferredValue;
+    }
+  }
+
+  for (const column of fallbackColumns) {
+    const fallbackValue = readCell(row, column);
+    if (fallbackValue) {
+      return fallbackValue;
+    }
+  }
+
+  return '';
+}
+
+function joinUniqueText(parts: string[]): string {
+  return Array.from(
+    new Set(parts.map((part) => String(part || '').trim()).filter(Boolean)),
+  ).join('\n');
+}
+
+function findMetaValue(rows: OpenXmlParsedRow[], labels: string[], fallbackColumn: string): string {
+  const normalizedLabels = labels.map((label) => normalizeLabelToken(label));
+
+  for (const row of rows) {
+    const orderedCells = getOrderedCells(row);
+    const labelIndex = orderedCells.findIndex(([, value]) => {
+      const normalizedValue = normalizeLabelToken(value);
+      return normalizedLabels.some((label) => normalizedValue === label);
+    });
+
+    if (labelIndex === -1) continue;
+
+    const inlineValue = orderedCells
+      .slice(labelIndex + 1)
+      .map(([, value]) => String(value || '').trim())
+      .find(Boolean);
+    if (inlineValue) {
+      return inlineValue;
+    }
+
+    const fallbackValue = readCell(row, fallbackColumn);
+    if (fallbackValue) {
+      return fallbackValue;
+    }
+  }
+
+  return '';
+}
+
 function buildReferenceAssets(parseResult: OpenXmlWorkbookParseResult): EcommerceAnalysisAsset[] {
   return parseResult.mediaAssets.map((asset, index) => ({
     assetId: asset.assetId,
@@ -29,6 +235,8 @@ function buildReferenceAssets(parseResult: OpenXmlWorkbookParseResult): Ecommerc
     source: 'reference',
     sheetName: asset.sheetName as '主图' | 'A+' | undefined,
     rowIndex: asset.rowIndex,
+    anchorRowIndex: asset.anchorRowIndex,
+    anchorColRef: asset.anchorColRef,
     displayOrder: asset.displayOrder,
     previewUrl: asset.previewUrl,
     mimeType: asset.mimeType,
@@ -39,25 +247,176 @@ function getAssetsForRow(
   assets: EcommerceAnalysisAsset[],
   sheetName: '主图' | 'A+',
   rowIndex: number,
+  assetRowAssignments?: Map<string, number>,
 ): EcommerceAnalysisAsset[] {
   return assets
-    .filter((asset) => asset.sheetName === sheetName && asset.rowIndex === rowIndex)
+    .filter((asset) => {
+      if (asset.sheetName !== sheetName) return false;
+      const resolvedRowIndex = assetRowAssignments?.get(asset.assetId) ?? asset.rowIndex;
+      return resolvedRowIndex === rowIndex;
+    })
     .sort((left, right) => left.displayOrder - right.displayOrder);
 }
 
 function extractProjectMeta(parseResult: OpenXmlWorkbookParseResult) {
   const mainSheet = findSheet(parseResult.sheets, '主图');
   const mainRows = mainSheet?.rows || [];
-  const fallbackRow: OpenXmlParsedRow = { rowIndex: 0, cells: {}, referenceSlots: [] };
-  const projectName = readCell(mainRows.find((row) => readCell(row, 'A') === '需求名称') || fallbackRow, 'D');
-  const productName = readCell(mainRows.find((row) => readCell(row, 'A') === '产品名称') || fallbackRow, 'D');
-  const defaultMainImageSizeHint = readCell(mainRows.find((row) => readCell(row, 'A') === '需求尺寸') || fallbackRow, 'D');
+  const projectName = findMetaValue(mainRows, ['需求名称'], 'D');
+  const productName = findMetaValue(mainRows, ['产品名称'], 'D');
+  const defaultMainImageSizeHint = findMetaValue(mainRows, ['需求尺寸', '图片尺寸'], 'D');
 
   return {
     projectName,
     productName,
     defaultMainImageSizeHint,
   };
+}
+
+function resolveNearestRowIndex(targetRowIndex: number, candidateRowIndices: number[]): number | undefined {
+  if (candidateRowIndices.length === 0) return undefined;
+
+  let bestRowIndex = candidateRowIndices[0];
+  let bestDistance = Math.abs(candidateRowIndices[0] - targetRowIndex);
+
+  for (const candidateRowIndex of candidateRowIndices.slice(1)) {
+    const distance = Math.abs(candidateRowIndex - targetRowIndex);
+    if (
+      distance < bestDistance
+      || (distance === bestDistance && candidateRowIndex < bestRowIndex)
+    ) {
+      bestRowIndex = candidateRowIndex;
+      bestDistance = distance;
+    }
+  }
+
+  return bestRowIndex;
+}
+
+function resolveAssetRowAssignments(
+  assets: EcommerceAnalysisAsset[],
+  sheetName: '主图' | 'A+',
+  candidateRowIndices: number[],
+): Map<string, number> {
+  const sortedRowIndices = [...candidateRowIndices].sort((left, right) => left - right);
+  const assignments = new Map<string, number>();
+
+  if (sortedRowIndices.length === 0) {
+    return assignments;
+  }
+
+  for (const asset of assets) {
+    if (asset.sheetName !== sheetName) continue;
+
+    const directRowIndex = asset.rowIndex;
+    if (directRowIndex && sortedRowIndices.includes(directRowIndex)) {
+      assignments.set(asset.assetId, directRowIndex);
+      continue;
+    }
+
+    const anchorRowIndex = asset.anchorRowIndex ?? asset.rowIndex;
+    if (!anchorRowIndex) continue;
+
+    const nearestRowIndex = resolveNearestRowIndex(anchorRowIndex, sortedRowIndices);
+    if (nearestRowIndex !== undefined) {
+      assignments.set(asset.assetId, nearestRowIndex);
+    }
+  }
+
+  return assignments;
+}
+
+function extractMainRowCandidates(sheet: OpenXmlParsedSheet | undefined): MainRowCandidate[] {
+  if (!sheet) return [];
+
+  const schema = detectSheetSchema(sheet, MAIN_SHEET_HEADER_DEFINITIONS);
+  const headerRowIndex = schema?.headerRowIndex ?? 0;
+  let implicitSequence = 0;
+
+  return sheet.rows
+    .filter((row) => row.rowIndex > headerRowIndex)
+    .map((row) => {
+      const type = readSchemaCell(row, schema, 'type', ['B', 'A']);
+      const angle = readSchemaCell(row, schema, 'angle', ['C', 'B']);
+      const sellingPoints = readSchemaCell(row, schema, 'sellingPoints', ['C']);
+      const designRequirements = readSchemaCell(row, schema, 'designRequirements', ['E', 'D']);
+      const copyText = joinUniqueText([
+        readSchemaCell(row, schema, 'copyZh', ['G', 'E']),
+        readSchemaCell(row, schema, 'copyEn', ['F']),
+        readSchemaCell(row, schema, 'copyGeneric', ['G', 'F', 'E']),
+      ]);
+      const theme = readSchemaCell(row, schema, 'theme') || sellingPoints || type;
+      const sequenceText = readSchemaCell(row, schema, 'sequence', ['A']);
+      const parsedSequence = Number(sequenceText);
+      const hasMeaningfulContent = [type, angle, sellingPoints, designRequirements, copyText]
+        .filter(Boolean)
+        .length >= 2;
+
+      if (!hasMeaningfulContent) {
+        return null;
+      }
+
+      implicitSequence += 1;
+      const sequence = Number.isFinite(parsedSequence) && parsedSequence > 0
+        ? parsedSequence
+        : implicitSequence;
+
+      return {
+        itemKey: `main-${Number.isFinite(parsedSequence) && parsedSequence > 0 ? parsedSequence : row.rowIndex}`,
+        row,
+        sequence,
+        type,
+        angle,
+        theme,
+        designRequirements,
+        copyText,
+      };
+    })
+    .filter((row): row is MainRowCandidate => Boolean(row));
+}
+
+function extractAPlusRowCandidates(sheet: OpenXmlParsedSheet | undefined): APlusRowCandidate[] {
+  if (!sheet) return [];
+
+  const schema = detectSheetSchema(sheet, APLUS_SHEET_HEADER_DEFINITIONS);
+  const headerRowIndex = schema?.headerRowIndex ?? 0;
+  let implicitModuleCount = 0;
+
+  return sheet.rows
+    .filter((row) => row.rowIndex > headerRowIndex)
+    .map((row) => {
+      const moduleName = readSchemaCell(row, schema, 'moduleName', ['A']);
+      const type = readSchemaCell(row, schema, 'type', ['B']);
+      const declaredSizeText = readSchemaCell(row, schema, 'declaredSizeText', ['C']);
+      const angle = readSchemaCell(row, schema, 'angle', ['D']);
+      const designRequirements = readSchemaCell(row, schema, 'designRequirements', ['E']);
+      const sellingPoints = readSchemaCell(row, schema, 'sellingPoints', ['F']);
+      const copyText = joinUniqueText([
+        readSchemaCell(row, schema, 'copyZh', ['G']),
+        readSchemaCell(row, schema, 'copyEn'),
+        readSchemaCell(row, schema, 'copyGeneric', ['G']),
+      ]);
+      const hasMeaningfulContent = [moduleName, type, declaredSizeText, designRequirements, copyText]
+        .filter(Boolean)
+        .length >= 2;
+
+      if (!hasMeaningfulContent) {
+        return null;
+      }
+
+      implicitModuleCount += 1;
+      return {
+        moduleKey: `aplus-${row.rowIndex}`,
+        row,
+        moduleName: moduleName || `模块${implicitModuleCount}`,
+        type,
+        declaredSizeText,
+        angle,
+        sellingPoints,
+        designRequirements,
+        copyText,
+      };
+    })
+    .filter((row): row is APlusRowCandidate => Boolean(row));
 }
 
 function buildTaskAssetRoles(params: {
@@ -154,62 +513,77 @@ function buildDraftAnalysisForTemplate(
 ): EcommerceAnalysisResult {
   const mainSheet = findSheet(parseResult.sheets, '主图');
   const aPlusSheet = findSheet(parseResult.sheets, 'A+');
+  const mainRowCandidates = extractMainRowCandidates(mainSheet);
+  const aPlusRowCandidates = extractAPlusRowCandidates(aPlusSheet);
+  const mainAssetAssignments = resolveAssetRowAssignments(
+    referenceAssets,
+    '主图',
+    mainRowCandidates.map((candidate) => candidate.row.rowIndex),
+  );
+  const aPlusAssetAssignments = resolveAssetRowAssignments(
+    referenceAssets,
+    'A+',
+    aPlusRowCandidates.map((candidate) => candidate.row.rowIndex),
+  );
 
-  const mainImageItems: EcommerceAnalysisMainImageItem[] = (mainSheet?.rows || [])
-    .filter((row) => Number(readCell(row, 'A')) > 0 && readCell(row, 'B'))
-    .map((row) => ({
-      itemId: `main-${readCell(row, 'A') || row.rowIndex}`,
-      sheet: '主图',
-      rowIndex: row.rowIndex,
-      sequence: Number(readCell(row, 'A') || row.rowIndex),
-      type: readCell(row, 'B'),
-      angle: readCell(row, 'C'),
-      theme: readCell(row, 'D'),
-      designRequirements: readCell(row, 'E'),
-      copyText: readCell(row, 'G'),
-      sizePolicy: resolveEcommerceAspectPolicy({ kind: 'main-image', modelId }).sizePolicy,
-      referenceAssetIds: getAssetsForRow(referenceAssets, '主图', row.rowIndex).map((asset) => asset.assetId),
+  const mainImageItems: EcommerceAnalysisMainImageItem[] = mainRowCandidates.map((candidate) => ({
+    itemId: candidate.itemKey,
+    sheet: '主图',
+    rowIndex: candidate.row.rowIndex,
+    sequence: candidate.sequence,
+    type: candidate.type,
+    angle: candidate.angle,
+    theme: candidate.theme,
+    designRequirements: candidate.designRequirements,
+    copyText: candidate.copyText,
+    sizePolicy: resolveEcommerceAspectPolicy({ kind: 'main-image', modelId }).sizePolicy,
+    referenceAssetIds: getAssetsForRow(
+      referenceAssets,
+      '主图',
+      candidate.row.rowIndex,
+      mainAssetAssignments,
+    ).map((asset) => asset.assetId),
+    referenceMentions: [],
+    productAssetRequired: true,
+    promptDraft: '',
+    needsReview: false,
+    reviewWarnings: [],
+  }));
+
+  const modules: EcommerceAnalysisAPlusModule[] = aPlusRowCandidates.map((candidate) => {
+    const policy = resolveEcommerceAspectPolicy({
+      kind: 'a-plus-module',
+      modelId,
+      declaredDimensions: candidate.declaredSizeText,
+      designRequirements: candidate.designRequirements,
+      copyText: candidate.copyText,
+    });
+
+    return {
+      moduleId: candidate.moduleKey,
+      sheet: 'A+',
+      rowIndex: candidate.row.rowIndex,
+      moduleName: candidate.moduleName,
+      type: candidate.type,
+      declaredSizeText: candidate.declaredSizeText,
+      angle: candidate.angle,
+      sellingPoints: candidate.sellingPoints,
+      designRequirements: candidate.designRequirements,
+      copyText: candidate.copyText,
+      sizePolicy: policy.sizePolicy,
+      referenceAssetIds: getAssetsForRow(
+        referenceAssets,
+        'A+',
+        candidate.row.rowIndex,
+        aPlusAssetAssignments,
+      ).map((asset) => asset.assetId),
       referenceMentions: [],
       productAssetRequired: true,
       promptDraft: '',
       needsReview: false,
       reviewWarnings: [],
-    }));
-
-  const modules: EcommerceAnalysisAPlusModule[] = (aPlusSheet?.rows || [])
-    .filter((row) => {
-      const moduleCell = readCell(row, 'A');
-      return /^模块/i.test(moduleCell) && moduleCell !== '模块' && readCell(row, 'B') !== '类型';
-    })
-    .map((row) => {
-      const policy = resolveEcommerceAspectPolicy({
-        kind: 'a-plus-module',
-        modelId,
-        declaredDimensions: readCell(row, 'C'),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
-      });
-
-      return {
-        moduleId: `aplus-${row.rowIndex}`,
-        sheet: 'A+',
-        rowIndex: row.rowIndex,
-        moduleName: readCell(row, 'A'),
-        type: readCell(row, 'B'),
-        declaredSizeText: readCell(row, 'C'),
-        angle: readCell(row, 'D'),
-        sellingPoints: readCell(row, 'F'),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
-        sizePolicy: policy.sizePolicy,
-        referenceAssetIds: getAssetsForRow(referenceAssets, 'A+', row.rowIndex).map((asset) => asset.assetId),
-        referenceMentions: [],
-        productAssetRequired: true,
-        promptDraft: '',
-        needsReview: false,
-        reviewWarnings: [],
-      };
-    });
+    };
+  });
 
   return {
     seriesTemplate: {
@@ -289,10 +663,16 @@ function normalizeMainImageItems(
 ): EcommerceAnalysisMainImageItem[] {
   if (!sheet) return [];
 
-  return sheet.rows
-    .filter((row) => Number(readCell(row, 'A')) > 0 && readCell(row, 'B'))
-    .map((row) => {
-      const rowAssets = getAssetsForRow(assets, '主图', row.rowIndex);
+  const rowCandidates = extractMainRowCandidates(sheet);
+  const assetAssignments = resolveAssetRowAssignments(
+    assets,
+    '主图',
+    rowCandidates.map((candidate) => candidate.row.rowIndex),
+  );
+
+  return rowCandidates
+    .map((candidate) => {
+      const rowAssets = getAssetsForRow(assets, '主图', candidate.row.rowIndex, assetAssignments);
       const binding = resolveReferenceBindings({
         assets: rowAssets.map((asset) => ({
           assetId: asset.assetId,
@@ -303,18 +683,18 @@ function normalizeMainImageItems(
           rowIndex: asset.rowIndex,
           sheetName: asset.sheetName,
         })),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
+        designRequirements: candidate.designRequirements,
+        copyText: candidate.copyText,
       });
       const policy = resolveEcommerceAspectPolicy({ kind: 'main-image', modelId });
       const taskState = buildBaseTaskState({
-        taskId: `task-main-${readCell(row, 'A') || row.rowIndex}`,
+        taskId: `task-${candidate.itemKey}`,
         sourceKind: 'main-image',
         sourceSheet: '主图',
-        sourceRowKey: `main-${readCell(row, 'A') || row.rowIndex}`,
-        theme: readCell(row, 'D') || readCell(row, 'B'),
+        sourceRowKey: candidate.itemKey,
+        theme: candidate.theme || candidate.type,
         outputTypeLabel: '主图',
-        sparseIntent: [readCell(row, 'G'), readCell(row, 'E')].filter(Boolean).join('；'),
+        sparseIntent: [candidate.copyText, candidate.designRequirements].filter(Boolean).join('；'),
         assetRoles: buildTaskAssetRoles({
           rowAssets,
           referenceMentions: binding.mentions,
@@ -329,15 +709,15 @@ function normalizeMainImageItems(
       });
 
       return {
-        itemId: `main-${readCell(row, 'A') || row.rowIndex}`,
+        itemId: candidate.itemKey,
         sheet: '主图',
-        rowIndex: row.rowIndex,
-        sequence: Number(readCell(row, 'A') || row.rowIndex),
-        type: readCell(row, 'B'),
-        angle: readCell(row, 'C'),
-        theme: readCell(row, 'D'),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
+        rowIndex: candidate.row.rowIndex,
+        sequence: candidate.sequence,
+        type: candidate.type,
+        angle: candidate.angle,
+        theme: candidate.theme,
+        designRequirements: candidate.designRequirements,
+        copyText: candidate.copyText,
         sizePolicy: policy.sizePolicy,
         referenceAssetIds: rowAssets.map((asset) => asset.assetId),
         referenceMentions: binding.mentions,
@@ -359,13 +739,16 @@ function normalizeAPlusModules(
 ): EcommerceAnalysisAPlusModule[] {
   if (!sheet) return [];
 
-  return sheet.rows
-    .filter((row) => {
-      const moduleCell = readCell(row, 'A');
-      return /^模块/i.test(moduleCell) && moduleCell !== '模块' && readCell(row, 'B') !== '类型';
-    })
-    .map((row) => {
-      const rowAssets = getAssetsForRow(assets, 'A+', row.rowIndex);
+  const rowCandidates = extractAPlusRowCandidates(sheet);
+  const assetAssignments = resolveAssetRowAssignments(
+    assets,
+    'A+',
+    rowCandidates.map((candidate) => candidate.row.rowIndex),
+  );
+
+  return rowCandidates
+    .map((candidate) => {
+      const rowAssets = getAssetsForRow(assets, 'A+', candidate.row.rowIndex, assetAssignments);
       const binding = resolveReferenceBindings({
         assets: rowAssets.map((asset) => ({
           assetId: asset.assetId,
@@ -376,24 +759,24 @@ function normalizeAPlusModules(
           rowIndex: asset.rowIndex,
           sheetName: asset.sheetName,
         })),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
+        designRequirements: candidate.designRequirements,
+        copyText: candidate.copyText,
       });
       const policy = resolveEcommerceAspectPolicy({
         kind: 'a-plus-module',
         modelId,
-        declaredDimensions: readCell(row, 'C'),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
+        declaredDimensions: candidate.declaredSizeText,
+        designRequirements: candidate.designRequirements,
+        copyText: candidate.copyText,
       });
       const taskState = buildBaseTaskState({
-        taskId: `task-aplus-${row.rowIndex}`,
+        taskId: `task-${candidate.moduleKey}`,
         sourceKind: 'a-plus-module',
         sourceSheet: 'A+',
-        sourceRowKey: `aplus-${row.rowIndex}`,
-        theme: readCell(row, 'A'),
+        sourceRowKey: candidate.moduleKey,
+        theme: candidate.moduleName,
         outputTypeLabel: 'A+',
-        sparseIntent: [readCell(row, 'G'), readCell(row, 'E')].filter(Boolean).join('；'),
+        sparseIntent: [candidate.copyText, candidate.designRequirements].filter(Boolean).join('；'),
         assetRoles: buildTaskAssetRoles({
           rowAssets,
           referenceMentions: binding.mentions,
@@ -408,16 +791,16 @@ function normalizeAPlusModules(
       });
 
       return {
-        moduleId: `aplus-${row.rowIndex}`,
+        moduleId: candidate.moduleKey,
         sheet: 'A+',
-        rowIndex: row.rowIndex,
-        moduleName: readCell(row, 'A'),
-        type: readCell(row, 'B'),
-        declaredSizeText: readCell(row, 'C'),
-        angle: readCell(row, 'D'),
-        sellingPoints: readCell(row, 'F'),
-        designRequirements: readCell(row, 'E'),
-        copyText: readCell(row, 'G'),
+        rowIndex: candidate.row.rowIndex,
+        moduleName: candidate.moduleName,
+        type: candidate.type,
+        declaredSizeText: candidate.declaredSizeText,
+        angle: candidate.angle,
+        sellingPoints: candidate.sellingPoints,
+        designRequirements: candidate.designRequirements,
+        copyText: candidate.copyText,
         sizePolicy: policy.sizePolicy,
         referenceAssetIds: rowAssets.map((asset) => asset.assetId),
         referenceMentions: binding.mentions,

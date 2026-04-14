@@ -32,6 +32,9 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupSource, /setStageSafely\('workspace_ready'\);/);
   assert.match(startupSource, /keyManager\.setStartupStage\(nextStage\);/);
   assert.match(startupSource, /adminModelService\.setStartupStage\(nextStage\);/);
+  assert.match(appSource, /const init = async \(\) => \{\s*advanceTo\('session_ready'\);[\s\S]*try \{/);
+  assert.match(appSource, /\} catch \(error\) \{\s*console\.error\('\[App\] Startup bootstrap failed:', error\);\s*\} finally \{/);
+  assert.match(appSource, /finally \{\s*if \(!active\) return;[\s\S]*advanceTo\('workspace_ready'\);/);
   assert.match(healthSource, /export function isKkApiCanonicalCloudReadyFromHealth\(/);
   assert.match(startupSource, /isKkApiCanonicalCloudReadyFromHealth\(health\)/);
   assert.match(startupSource, /KK API canonical billing\/model persistence is not fully configured\./);
@@ -44,25 +47,40 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupScreenSource, /export const AppStartupScreen/);
   assert.match(appSource, /import \{ AppStartupProvider, useAppStartup \} from '\.\/context\/AppStartupContext';/);
   assert.match(appSource, /import \{ AuthenticatedAppShell \} from '\.\/app\/AuthenticatedAppShell';/);
-  assert.match(appSource, /<AuthenticatedAppShell\s+showCostEstimation=\{showCostEstimation\}\s+onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}\s+AppContentComponent=\{AppContent\}\s*\/>/);
+  assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
+  assert.match(appSource, /<AuthenticatedAppShell\s+showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}\s+onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}\s+AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}\s*\/>/);
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);
   assert.doesNotMatch(appSource, /import \{ AppStartupScreen \} from '\.\/components\/common\/AppStartupScreen';/);
   assert.doesNotMatch(appSource, /import NotificationToast from '\.\/components\/common\/NotificationToast';/);
   assert.doesNotMatch(appSource, /const CostEstimation = lazy\(\(\) => import\('\.\/pages\/CostEstimation'\)\);/);
-  assert.match(authenticatedShellSource, /import \{ AppStartupScreen \} from '\.\.\/components\/common\/AppStartupScreen';/);
   assert.match(authenticatedShellSource, /import NotificationToast from '\.\.\/components\/common\/NotificationToast';/);
+  assert.match(authenticatedShellSource, /import \{ pickByDocumentLanguage \} from '\.\.\/utils\/localeText';/);
   assert.match(authenticatedShellSource, /const CostEstimation = lazy\(\(\) => import\('\.\.\/pages\/CostEstimation'\)\);/);
   assert.match(authenticatedShellSource, /export interface AuthenticatedAppShellProps \{/);
   assert.match(authenticatedShellSource, /AppContentComponent: React\.ComponentType;/);
+  assert.match(authenticatedShellSource, /function getStartupStageMessage\(stage: string, isWorkspaceReady: boolean\)/);
+  assert.match(
+    authenticatedShellSource,
+    /case 'workspace_ready':\s*return pickByDocumentLanguage\([\s\S]*'Workspace is ready\. Finishing background warm-up\.\.\.'\);/,
+  );
+  assert.doesNotMatch(
+    authenticatedShellSource,
+    /if \(isWorkspaceReady\) \{\s*return null;\s*\}/,
+  );
   assert.match(authenticatedShellSource, /export const StartupRuntimeBanner: React\.FC = \(\) => \{/);
-  assert.match(authenticatedShellSource, /const message = legacyFallbackEnabled && isHostedRuntime/);
-  assert.match(authenticatedShellSource, /export const AuthenticatedAppShell: React\.FC<AuthenticatedAppShellProps> = \(\{ showCostEstimation, onExitCostEstimation, AppContentComponent \}\) => \{/);
+  assert.match(authenticatedShellSource, /const stageMessage = getStartupStageMessage\(stage, isWorkspaceReady\);/);
+  assert.match(authenticatedShellSource, /const message = hostedWarning \|\| lastStartupWarning \|\| stageMessage;/);
+  assert.match(
+    authenticatedShellSource,
+    /export const AuthenticatedAppShell: React\.FC<AuthenticatedAppShellProps> = \(\{[\s\S]*showCostEstimation,[\s\S]*onExitCostEstimation,[\s\S]*AppContentComponent,[\s\S]*\}\) =>/,
+  );
   assert.match(authenticatedShellSource, /<CostEstimation onBack=\{onExitCostEstimation\} \/>/);
   assert.match(authenticatedShellSource, /<StartupRuntimeBanner \/>/);
   assert.match(authenticatedShellSource, /<NotificationToast \/>/);
   assert.match(authenticatedShellSource, /<AppContentComponent \/>/);
-  assert.match(authenticatedShellSource, /\{!isBackgroundReady \? <AppStartupScreen stage=\{stage\} warning=\{lastStartupWarning\} \/> : null\}/);
+  assert.doesNotMatch(authenticatedShellSource, /AppStartupScreen/);
+  assert.doesNotMatch(startupSource, /session\?\.access_token/);
   assert.match(appSource, /advanceTo\('background_ready'\);/);
 
   assert.match(appSource, /<AppStartupProvider>\s*<BillingProvider>\s*<CanvasProvider>/);

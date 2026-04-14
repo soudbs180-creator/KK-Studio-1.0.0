@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import type {
   LoginResponseDto,
@@ -30,6 +30,9 @@ interface StoredIdentityRecord {
   updatedAt: string;
   passwordSalt?: string;
   passwordHash?: string;
+  passwordChangeCodeSalt?: string;
+  passwordChangeCodeHash?: string;
+  passwordChangeCodeExpiresAt?: string;
 }
 
 export interface PersistedAuthIdentityState {
@@ -43,7 +46,9 @@ export interface AuthIdentityStore {
   authenticatePassword(email: string, password: string): LoginResponseDto | undefined;
   createRegisteredUser(email: string): { created: boolean; profile: ProfileDto };
   issueLoginSession(email: string): LoginResponseDto;
+  issuePasswordChangeCode(userId: string): { code: string; expiresAt: string; profile: ProfileDto } | undefined;
   changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined;
+  changePasswordWithCode(userId: string, verificationCode: string, newPassword: string): ProfileDto | undefined;
   resolveAccessToken(accessToken: string): ProfileDto | undefined;
   resolveProfile(headers: Record<string, string>): ProfileDto | undefined;
   updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): ProfileDto | undefined;
@@ -51,6 +56,7 @@ export interface AuthIdentityStore {
 
 const sessionTtlSeconds = 60 * 60;
 const passwordHashBytes = 64;
+const passwordChangeCodeTtlMs = 15 * 60 * 1000;
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -177,9 +183,45 @@ export class InMemoryAuthIdentityStore implements AuthIdentityStore {
     return this.issueLoginSessionForUserId(profile.id);
   }
 
-  changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined {
+  issuePasswordChangeCode(
+    userId: string,
+  ): { code: string; expiresAt: string; profile: ProfileDto } | undefined {
     const normalizedUserId = String(userId || "").trim();
     if (!normalizedUserId) {
+      return undefined;
+    }
+
+    const existing = this.usersById.get(normalizedUserId);
+    if (!existing?.email || !existing.passwordSalt || !existing.passwordHash) {
+      return undefined;
+    }
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const codeSecret = createPasswordSecret(code);
+    const expiresAt = new Date(Date.now() + passwordChangeCodeTtlMs).toISOString();
+
+    const nextProfile: StoredIdentityRecord = {
+      ...existing,
+      passwordChangeCodeSalt: codeSecret.passwordSalt,
+      passwordChangeCodeHash: codeSecret.passwordHash,
+      passwordChangeCodeExpiresAt: expiresAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.storeUser(nextProfile);
+    this.afterStateChange();
+
+    return {
+      code,
+      expiresAt,
+      profile: cloneProfile(nextProfile)!,
+    };
+  }
+
+  changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined {
+    const normalizedUserId = String(userId || "").trim();
+    const normalizedCurrentPassword = String(currentPassword || "").trim();
+    if (!normalizedUserId || !normalizedCurrentPassword) {
       return undefined;
     }
 
@@ -188,13 +230,59 @@ export class InMemoryAuthIdentityStore implements AuthIdentityStore {
       return undefined;
     }
 
-    if (!verifyPasswordSecret(currentPassword, existing.passwordSalt, existing.passwordHash)) {
+    if (!verifyPasswordSecret(normalizedCurrentPassword, existing.passwordSalt, existing.passwordHash)) {
       return undefined;
     }
 
     const nextProfile: StoredIdentityRecord = {
       ...existing,
       ...createPasswordSecret(newPassword),
+      passwordChangeCodeSalt: undefined,
+      passwordChangeCodeHash: undefined,
+      passwordChangeCodeExpiresAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.storeUser(nextProfile);
+    this.afterStateChange();
+    return cloneProfile(nextProfile);
+  }
+
+  changePasswordWithCode(
+    userId: string,
+    verificationCode: string,
+    newPassword: string,
+  ): ProfileDto | undefined {
+    const normalizedUserId = String(userId || "").trim();
+    const normalizedCode = String(verificationCode || "").trim();
+    if (!normalizedUserId || !normalizedCode) {
+      return undefined;
+    }
+
+    const existing = this.usersById.get(normalizedUserId);
+    if (
+      !existing?.passwordChangeCodeSalt
+      || !existing.passwordChangeCodeHash
+      || !existing.passwordChangeCodeExpiresAt
+    ) {
+      return undefined;
+    }
+
+    const expiresAt = new Date(existing.passwordChangeCodeExpiresAt).getTime();
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      return undefined;
+    }
+
+    if (!verifyPasswordSecret(normalizedCode, existing.passwordChangeCodeSalt, existing.passwordChangeCodeHash)) {
+      return undefined;
+    }
+
+    const nextProfile: StoredIdentityRecord = {
+      ...existing,
+      ...createPasswordSecret(newPassword),
+      passwordChangeCodeSalt: undefined,
+      passwordChangeCodeHash: undefined,
+      passwordChangeCodeExpiresAt: undefined,
       updatedAt: new Date().toISOString(),
     };
 

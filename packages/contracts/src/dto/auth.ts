@@ -33,8 +33,9 @@ export interface UpdateProfileRequestDto {
 }
 
 export interface UpdatePasswordRequestDto {
-  currentPassword?: string;
   newPassword: string;
+  verificationCode?: string;
+  currentPassword?: string;
 }
 
 export interface UpdatePasswordResponseDto {
@@ -156,6 +157,12 @@ export interface LogoutResponseDto {
 export interface SendCodeRequestDto {
   email: string;
   turnstileToken: string;
+}
+
+export interface SendPasswordChangeCodeResponseDto {
+  sent: boolean;
+  email: string;
+  expiresAt: string;
 }
 
 export interface AuthActionResultDto {

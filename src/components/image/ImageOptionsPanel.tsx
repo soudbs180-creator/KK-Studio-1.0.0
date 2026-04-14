@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { AspectRatio, ImageSize } from '../../types';
+import { AspectRatio, EcommerceGroupSheet, ImageSize } from '../../types';
 import { Fullscreen } from 'lucide-react';
 
 interface ImageOptionsPanelProps {
@@ -18,6 +18,10 @@ interface ImageOptionsPanelProps {
   onImageSizeChange: (size: ImageSize) => void;
   availableRatios?: AspectRatio[];
   availableSizes?: ImageSize[];
+  ecommerceSheetSettings?: Record<EcommerceGroupSheet, { aspectRatio: AspectRatio; imageSize: ImageSize }>;
+  onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: { aspectRatio?: AspectRatio; imageSize?: ImageSize }) => void;
+  activeEcommerceSheet?: EcommerceGroupSheet;
+  onActiveEcommerceSheetChange?: (sheet: EcommerceGroupSheet) => void;
 }
 
 const SECTION_STYLE: React.CSSProperties = {
@@ -30,9 +34,11 @@ const TITLE_STYLE: React.CSSProperties = {
 };
 
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-overlay) 94%, transparent) 0%, color-mix(in srgb, var(--bg-base) 96%, transparent) 100%)',
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-overlay) 98%, transparent) 0%, color-mix(in srgb, var(--bg-base) 98%, transparent) 100%)',
   borderColor: 'var(--border-default)',
   boxShadow: 'var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent)',
+  backdropFilter: 'blur(22px) saturate(165%)',
+  WebkitBackdropFilter: 'blur(22px) saturate(165%)',
 };
 
 const SEGMENT_STYLE: React.CSSProperties = {
@@ -92,6 +98,210 @@ const getRatioIcon = (ratio: AspectRatio) => {
   );
 };
 
+const getDisplaySizes = (availableSizes: ImageSize[]) => {
+  const sizeOrder = [ImageSize.SIZE_05K, ImageSize.SIZE_1K, ImageSize.SIZE_2K, ImageSize.SIZE_4K];
+  return sizeOrder.filter((size, index) => availableSizes.includes(size) && sizeOrder.indexOf(size) === index);
+};
+
+const resolveSizeSlide = (displaySizes: ImageSize[], selectedSize: ImageSize) => {
+  if (displaySizes.length === 0) {
+    return { left: '0%', width: '0%' };
+  }
+
+  const index = displaySizes.indexOf(selectedSize);
+  if (index === -1) {
+    return { left: '2px', width: `calc(${100 / displaySizes.length}% - 4px)` };
+  }
+
+  const buttonWidthPercent = 100 / displaySizes.length;
+  return {
+    left: `calc(${buttonWidthPercent * index}% + 2px)`,
+    width: `calc(${buttonWidthPercent}% - 4px)`,
+  };
+};
+
+type RatioLayout = {
+  uniqueRatios: AspectRatio[];
+  gridRatios: AspectRatio[];
+  hasAuto: boolean;
+  autoInGrid: boolean;
+  useDoubleRow: boolean;
+  columns: number;
+  needsScroll: boolean;
+};
+
+const resolveRatioLayout = (availableRatios: AspectRatio[]): RatioLayout => {
+  const uniqueRatios = Array.from(new Set(availableRatios));
+  const gridRatios = uniqueRatios
+    .filter((ratio) => ratio !== AspectRatio.AUTO)
+    .sort((left, right) => {
+      const [leftWidth, leftHeight] = left.split(':').map(Number);
+      const [rightWidth, rightHeight] = right.split(':').map(Number);
+      const leftRatio = leftWidth / leftHeight;
+      const rightRatio = rightWidth / rightHeight;
+      return rightRatio - leftRatio;
+    });
+
+  const hasAuto = uniqueRatios.includes(AspectRatio.AUTO);
+  const isOddCount = gridRatios.length % 2 !== 0;
+  const autoInGrid = hasAuto && isOddCount;
+  const totalGridItems = autoInGrid ? gridRatios.length + 1 : gridRatios.length;
+  const useDoubleRow = totalGridItems > 3 || (hasAuto && !autoInGrid);
+  const columns = useDoubleRow ? Math.ceil(totalGridItems / 2) : Math.max(1, totalGridItems);
+  const needsScroll = useDoubleRow ? columns > 5 : columns > 4;
+
+  return {
+    uniqueRatios,
+    gridRatios,
+    hasAuto,
+    autoInGrid,
+    useDoubleRow,
+    columns,
+    needsScroll,
+  };
+};
+
+interface ImageSizeControlSegmentProps {
+  selectedSize: ImageSize;
+  displaySizes: ImageSize[];
+  onChange: (size: ImageSize) => void;
+}
+
+const ImageSizeControlSegment: React.FC<ImageSizeControlSegmentProps> = ({
+  selectedSize,
+  displaySizes,
+  onChange,
+}) => {
+  const sizeSlide = useMemo(
+    () => resolveSizeSlide(displaySizes, selectedSize),
+    [displaySizes, selectedSize],
+  );
+
+  if (displaySizes.length <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="relative flex rounded-xl p-0.5" style={SEGMENT_STYLE}>
+      <div
+        className="absolute bottom-0.5 top-0.5 rounded-[10px] transition-all duration-200 ease-out"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--bg-hover) 92%, transparent)',
+          left: sizeSlide.left,
+          width: sizeSlide.width,
+        }}
+      />
+
+      {displaySizes.map((size) => (
+        <button
+          key={size}
+          type="button"
+          onClick={() => onChange(size)}
+          className="relative z-10 flex-1 rounded-[10px] px-2 py-2 text-sm transition-colors duration-200"
+          style={{
+            color: selectedSize === size ? 'var(--text-primary)' : 'var(--text-tertiary)',
+          }}
+        >
+          {size}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+interface AspectRatioControlGridProps {
+  selectedAspectRatio: AspectRatio;
+  layout: RatioLayout;
+  onChange: (ratio: AspectRatio) => void;
+}
+
+const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
+  selectedAspectRatio,
+  layout,
+  onChange,
+}) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current && event.deltaY !== 0) {
+      scrollContainerRef.current.scrollLeft += event.deltaY;
+    }
+  };
+
+  return (
+    <div
+      className="flex gap-1.5 overflow-hidden rounded-xl p-1.5"
+      style={SEGMENT_STYLE}
+    >
+      {layout.hasAuto && !layout.autoInGrid ? (
+        <button
+          type="button"
+          onClick={() => onChange(AspectRatio.AUTO)}
+          className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-all duration-200"
+          style={{
+            width: '58px',
+            height: layout.useDoubleRow ? '100px' : '48px',
+            color: selectedAspectRatio === AspectRatio.AUTO ? 'var(--text-primary)' : 'var(--text-tertiary)',
+            backgroundColor: selectedAspectRatio === AspectRatio.AUTO ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
+          }}
+        >
+          <Fullscreen size={18} />
+          <span className="text-xs">自适应</span>
+        </button>
+      ) : null}
+
+      <div
+        ref={scrollContainerRef}
+        onWheel={handleWheel}
+        className={`grid min-w-0 flex-1 overflow-y-hidden ${layout.needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
+        style={{
+          gridTemplateColumns: layout.needsScroll ? `repeat(${layout.columns}, minmax(54px, 1fr))` : `repeat(${layout.columns}, minmax(0, 1fr))`,
+          gridTemplateRows: layout.useDoubleRow ? 'repeat(2, 48px)' : '48px',
+          gap: '4px',
+          paddingBottom: layout.needsScroll ? '4px' : '0',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorX: 'contain',
+        }}
+      >
+        {layout.autoInGrid ? (
+          <button
+            type="button"
+            onClick={() => onChange(AspectRatio.AUTO)}
+            className="flex flex-col items-center justify-center gap-1 rounded-xl transition-all duration-200"
+            style={{
+              height: '46px',
+              padding: '4px',
+              color: selectedAspectRatio === AspectRatio.AUTO ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              backgroundColor: selectedAspectRatio === AspectRatio.AUTO ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
+            }}
+          >
+            <Fullscreen size={14} />
+            <span className="whitespace-nowrap text-[10px] leading-none">自适应</span>
+          </button>
+        ) : null}
+
+        {layout.gridRatios.map((ratio) => (
+          <button
+            key={ratio}
+            type="button"
+            onClick={() => onChange(ratio)}
+            className="flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all duration-200"
+            style={{
+              height: '46px',
+              padding: '4px',
+              color: selectedAspectRatio === ratio ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              backgroundColor: selectedAspectRatio === ratio ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
+            }}
+          >
+            {getRatioIcon(ratio)}
+            <span className="whitespace-nowrap text-[10px] leading-none">{ratio}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   aspectRatio,
   imageSize,
@@ -103,55 +313,25 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   onImageSizeChange,
   availableRatios = Object.values(AspectRatio),
   availableSizes = Object.values(ImageSize),
+  ecommerceSheetSettings,
+  onUpdateEcommerceSheetSetting,
+  activeEcommerceSheet,
+  onActiveEcommerceSheetChange,
 }) => {
-  const uniqueRatios = useMemo(() => Array.from(new Set(availableRatios)), [availableRatios]);
-  const gridRatios = useMemo(() => {
-    const explicitRatios = uniqueRatios.filter((ratio) => ratio !== AspectRatio.AUTO);
-    return explicitRatios.sort((left, right) => {
-      const [leftWidth, leftHeight] = left.split(':').map(Number);
-      const [rightWidth, rightHeight] = right.split(':').map(Number);
-      const leftRatio = leftWidth / leftHeight;
-      const rightRatio = rightWidth / rightHeight;
-      return rightRatio - leftRatio;
-    });
-  }, [uniqueRatios]);
-
-  const displaySizes = useMemo(() => {
-    const sizeOrder = [ImageSize.SIZE_05K, ImageSize.SIZE_1K, ImageSize.SIZE_2K, ImageSize.SIZE_4K];
-    return sizeOrder.filter((size, index) => availableSizes.includes(size) && sizeOrder.indexOf(size) === index);
-  }, [availableSizes]);
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (scrollContainerRef.current && event.deltaY !== 0) {
-      scrollContainerRef.current.scrollLeft += event.deltaY;
+  const displaySizes = useMemo(() => getDisplaySizes(availableSizes), [availableSizes]);
+  const ratioLayout = useMemo(() => resolveRatioLayout(availableRatios), [availableRatios]);
+  const isEcommercePanel = !!ecommerceSheetSettings && !!onUpdateEcommerceSheetSetting;
+  const resolvedEcommerceSheet: EcommerceGroupSheet = activeEcommerceSheet ?? '主图';
+  const activeEcommerceSheetSettings = isEcommercePanel
+    ? ecommerceSheetSettings[resolvedEcommerceSheet] ?? {
+      aspectRatio,
+      imageSize,
     }
-  };
-
-  const sizeSlide = useMemo(() => {
-    if (displaySizes.length === 0) {
-      return { left: '0%', width: '0%' };
-    }
-
-    const index = displaySizes.indexOf(imageSize);
-    if (index === -1) {
-      return { left: '2px', width: `calc(${100 / displaySizes.length}% - 4px)` };
-    }
-
-    const buttonWidthPercent = 100 / displaySizes.length;
-    return {
-      left: `calc(${buttonWidthPercent * index}% + 2px)`,
-      width: `calc(${buttonWidthPercent}% - 4px)`,
+    : {
+      aspectRatio,
+      imageSize,
     };
-  }, [displaySizes, imageSize]);
-
-  const hasAuto = uniqueRatios.includes(AspectRatio.AUTO);
-  const isOddCount = gridRatios.length % 2 !== 0;
-  const autoInGrid = hasAuto && isOddCount;
-  const totalGridItems = autoInGrid ? gridRatios.length + 1 : gridRatios.length;
-  const useDoubleRow = totalGridItems > 3 || (hasAuto && !autoInGrid);
-  const columns = useDoubleRow ? Math.ceil(totalGridItems / 2) : Math.max(1, totalGridItems);
-  const needsScroll = useDoubleRow ? columns > 5 : columns > 4;
+  const shouldShowThinkingMode = !isEcommercePanel && showThinkingMode;
 
   return (
     <div
@@ -165,7 +345,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
       {networkOptions.length > 0 ? (
         <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
           <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-            {'\u641c\u7d22\u589e\u5f3a'}
+            搜索增强
           </div>
           <div className="grid grid-cols-1 gap-2">
             {networkOptions.map((option) => (
@@ -177,17 +357,17 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
                 style={option.active ? ACTIVE_BUTTON_STYLE : INACTIVE_BUTTON_STYLE}
               >
                 <span>{option.label}</span>
-                <span className="text-xs">{option.active ? '\u5df2\u5f00\u542f' : '\u672a\u5f00\u542f'}</span>
+                <span className="text-xs">{option.active ? '已开启' : '未开启'}</span>
               </button>
             ))}
           </div>
         </section>
       ) : null}
 
-      {showThinkingMode ? (
+      {shouldShowThinkingMode ? (
         <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
           <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-            {'\u601d\u8003\u6a21\u5f0f'}
+            思考模式
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -199,7 +379,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
                 color: 'var(--text-tertiary)',
               }}
             >
-              {'\u5feb\u901f (minimal)'}
+              快速 (minimal)
             </button>
             <button
               type="button"
@@ -210,119 +390,90 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
                 color: 'var(--text-tertiary)',
               }}
             >
-              {'\u6df1\u5165 (high)'}
+              深入 (high)
             </button>
           </div>
         </section>
       ) : null}
 
-      {displaySizes.length > 1 ? (
-        <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
-          <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-            {'\u753b\u8d28'}
-          </div>
-          <div className="relative flex rounded-xl p-0.5" style={SEGMENT_STYLE}>
-            <div
-              className="absolute bottom-0.5 top-0.5 rounded-[10px] transition-all duration-200 ease-out"
-              style={{
-                backgroundColor: 'color-mix(in srgb, var(--bg-hover) 92%, transparent)',
-                left: sizeSlide.left,
-                width: sizeSlide.width,
-              }}
-            />
+      {isEcommercePanel ? (
+        <>
+          <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-sm font-medium" style={TITLE_STYLE}>
+                选择模块
+              </div>
+              <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                主图与 A+ 独立参数
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => (
+                <button
+                  key={sheet}
+                  type="button"
+                  onClick={() => onActiveEcommerceSheetChange?.(sheet)}
+                  className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors"
+                  style={resolvedEcommerceSheet === sheet ? ACTIVE_BUTTON_STYLE : INACTIVE_BUTTON_STYLE}
+                >
+                  <span>{sheet}</span>
+                  <span className="text-[11px]">{resolvedEcommerceSheet === sheet ? '当前' : '切换'}</span>
+                </button>
+              ))}
+            </div>
+          </section>
 
-            {displaySizes.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => onImageSizeChange(size)}
-                className="relative z-10 flex-1 rounded-[10px] px-2 py-2 text-sm transition-colors duration-200"
-                style={{
-                  color: imageSize === size ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                }}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
-        <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-          {'\u6bd4\u4f8b'}
-        </div>
-        <div
-          className="flex gap-1.5 overflow-hidden rounded-xl p-1.5"
-          style={SEGMENT_STYLE}
-        >
-          {hasAuto && !autoInGrid ? (
-            <button
-              type="button"
-              onClick={() => onAspectRatioChange(AspectRatio.AUTO)}
-              className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-all duration-200"
-              style={{
-                width: '58px',
-                height: useDoubleRow ? '100px' : '48px',
-                color: aspectRatio === AspectRatio.AUTO ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                backgroundColor: aspectRatio === AspectRatio.AUTO ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
-              }}
-            >
-              <Fullscreen size={18} />
-              <span className="text-xs">{'\u81ea\u9002\u5e94'}</span>
-            </button>
+          {displaySizes.length > 1 ? (
+            <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+              <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+                {resolvedEcommerceSheet} 画质
+              </div>
+              <ImageSizeControlSegment
+                selectedSize={activeEcommerceSheetSettings.imageSize}
+                displaySizes={displaySizes}
+                onChange={(size) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, { imageSize: size })}
+              />
+            </section>
           ) : null}
 
-          <div
-            ref={scrollContainerRef}
-            onWheel={handleWheel}
-            className={`grid min-w-0 flex-1 overflow-y-hidden ${needsScroll ? 'custom-scrollbar overflow-x-auto' : 'overflow-x-hidden'}`}
-            style={{
-              gridTemplateColumns: needsScroll ? `repeat(${columns}, minmax(54px, 1fr))` : `repeat(${columns}, minmax(0, 1fr))`,
-              gridTemplateRows: useDoubleRow ? 'repeat(2, 48px)' : '48px',
-              gap: '4px',
-              paddingBottom: needsScroll ? '4px' : '0',
-              WebkitOverflowScrolling: 'touch',
-              overscrollBehaviorX: 'contain',
-            }}
-          >
-            {autoInGrid ? (
-              <button
-                type="button"
-                onClick={() => onAspectRatioChange(AspectRatio.AUTO)}
-                className="flex flex-col items-center justify-center gap-1 rounded-xl transition-all duration-200"
-                style={{
-                  height: '46px',
-                  padding: '4px',
-                  color: aspectRatio === AspectRatio.AUTO ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                  backgroundColor: aspectRatio === AspectRatio.AUTO ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
-                }}
-              >
-                <Fullscreen size={14} />
-                <span className="whitespace-nowrap text-[10px] leading-none">{'\u81ea\u9002\u5e94'}</span>
-              </button>
-            ) : null}
+          <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+            <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+              {resolvedEcommerceSheet} 比例
+            </div>
+            <AspectRatioControlGrid
+              selectedAspectRatio={activeEcommerceSheetSettings.aspectRatio}
+              layout={ratioLayout}
+              onChange={(ratio) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, { aspectRatio: ratio })}
+            />
+          </section>
+        </>
+      ) : (
+        <>
+          {displaySizes.length > 1 ? (
+            <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+              <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+                画质
+              </div>
+              <ImageSizeControlSegment
+                selectedSize={imageSize}
+                displaySizes={displaySizes}
+                onChange={onImageSizeChange}
+              />
+            </section>
+          ) : null}
 
-            {gridRatios.map((ratio) => (
-              <button
-                key={ratio}
-                type="button"
-                onClick={() => onAspectRatioChange(ratio)}
-                className="flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all duration-200"
-                style={{
-                  height: '46px',
-                  padding: '4px',
-                  color: aspectRatio === ratio ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                  backgroundColor: aspectRatio === ratio ? 'color-mix(in srgb, var(--bg-hover) 92%, transparent)' : 'transparent',
-                }}
-              >
-                {getRatioIcon(ratio)}
-                <span className="whitespace-nowrap text-[10px] leading-none">{ratio}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+          <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+            <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+              比例
+            </div>
+            <AspectRatioControlGrid
+              selectedAspectRatio={aspectRatio}
+              layout={ratioLayout}
+              onChange={onAspectRatioChange}
+            />
+          </section>
+        </>
+      )}
     </div>
   );
 };

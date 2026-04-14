@@ -18,7 +18,7 @@ test('ApiSettingsView list mode exposes a dedicated workspace snapshot section',
 test('ApiSettingsView keeps platform capabilities as a dedicated section instead of mixing them into provider list content', () => {
   const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(source, /Platform capabilities/);
+  assert.match(source, /Platform entry/);
 });
 
 test('ApiSettingsView delegates workbench stages, shared sections, and shared cards to focused modules', () => {
@@ -31,9 +31,10 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(viewSource, /from '\.\/apiWorkbenchSections';/);
   assert.match(viewSource, /from '\.\/apiWorkbenchCards';/);
 
-  assert.match(stageSource, /export type ApiSettingsWorkbenchStage =/);
-  assert.match(stageSource, /'diagnostics'/);
+  assert.match(stageSource, /export type ApiSettingsWorkbenchStage = UserApiWorkbenchStage;/);
+  assert.match(stageSource, /export function resolveApiWorkbenchDiagnosticsAvailability/);
   assert.match(stageSource, /export function resolveApiWorkbenchStageMeta/);
+  assert.doesNotMatch(stageSource, /input\.showDiagnostics \? 'diagnostics' : input\.stage/);
 
   assert.match(viewSource, /<ApiWorkbenchOverviewSection/);
   assert.match(viewSource, /<ApiWorkbenchCurrentViewSection/);
@@ -48,7 +49,21 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.doesNotMatch(viewSource, /const PlatformAssistantEntryCard:/);
   assert.doesNotMatch(viewSource, /const ConsoleEndpointCard:/);
   assert.doesNotMatch(viewSource, /const userApiWorkbenchStage = showDiagnostics \? 'diagnostics' : userApiViewState\.stage;/);
-  assert.doesNotMatch(viewSource, /title=\{pick\('工作台摘要', 'Workspace snapshot'\)\}/);
-  assert.doesNotMatch(viewSource, /title=\{pick\('当前视图', 'Current view'\)\}/);
-  assert.doesNotMatch(viewSource, /title=\{pick\('平台能力入口', 'Platform capabilities'\)\}/);
+});
+
+test('ApiSettingsView surfaces local APIs as the primary BYOK path and avoids duplicated create buttons in list mode', () => {
+  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+
+  assert.match(viewSource, /pick\('本地 API', 'Local APIs'\)/);
+  assert.match(viewSource, /pick\('新增本地 API', 'Add local API'\)/);
+  assert.match(viewSource, /pick\('本地 API 编辑器', 'Local API editor'\)/);
+  assert.match(sectionsSource, /pick\('本地 API 视图', 'Local API view'\)/);
+  assert.match(sectionsSource, /value: 'official', label: pick\('本地 API', 'Local APIs'\)/);
+
+  const createOfficialButtonUsages = viewSource.match(/onClick=\{beginCreateOfficial\}/g) ?? [];
+  const createProviderButtonUsages = viewSource.match(/onClick=\{beginCreateProvider\}/g) ?? [];
+
+  assert.equal(createOfficialButtonUsages.length, 1, 'Expected only the empty state to keep a direct local API create button');
+  assert.equal(createProviderButtonUsages.length, 1, 'Expected only the empty state to keep a direct provider create button');
 });

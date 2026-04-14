@@ -75,6 +75,10 @@ export interface SecureProxyImageResponse extends SecureProxyBillingMetadata {
     totalTokens?: number;
     cost?: number;
   };
+  taskId?: string;
+  status?: 'pending' | 'success' | 'failed';
+  requestId?: string;
+  attemptId?: string;
   endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
@@ -1181,6 +1185,10 @@ export async function callSecureSystemProxyImage(
     urls: Array.isArray(data.urls) ? data.urls : [],
     ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
+    taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
+    status: data.status === 'success' || data.status === 'failed' ? data.status : 'pending',
+    requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+    attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     endpointType: data.endpointType,
   };
 }
@@ -1207,6 +1215,10 @@ export async function callLocalUserRouteProxyImage(
     urls: Array.isArray(data.urls) ? data.urls : [],
     ...extractSecureProxyBillingMetadata(data),
     usage: data.usage,
+    taskId: typeof data.taskId === 'string' ? data.taskId : undefined,
+    status: data.status === 'success' || data.status === 'failed' ? data.status : 'pending',
+    requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+    attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     endpointType: data.endpointType,
   };
 }

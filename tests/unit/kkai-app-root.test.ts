@@ -24,9 +24,11 @@ test('createKkaiRuntimeAuthSnapshot produces a non-loading fixed local runtime u
   assert.equal(snapshot.session, null);
 });
 
-test('createAppRootMode always boots the workspace shell in local-only mode', () => {
+test('createAppRootMode routes workspace paths to the workspace shell and /settings* paths to the settings shell', () => {
   assert.equal(createAppRootMode({ pathname: '/' }), 'workspace');
   assert.equal(createAppRootMode({ pathname: '/auth/callback' }), 'workspace');
+  assert.equal(createAppRootMode({ pathname: '/settings' }), 'settings');
+  assert.equal(createAppRootMode({ pathname: '/settings/api-management' }), 'settings');
 });
 
 test('kkai app root bypasses login and callback routes and mounts a local runtime auth provider', () => {
@@ -40,7 +42,9 @@ test('kkai app root bypasses login and callback routes and mounts a local runtim
   assert.doesNotMatch(appSource, /<AuthCallback \/>/);
   assert.doesNotMatch(appSource, /if \(!user\)/);
   assert.doesNotMatch(appSource, /window\.location\.pathname === '\/auth\/callback'/);
-  assert.match(appSource, /if \(createAppRootMode\(\{ pathname: window\.location\.pathname \}\) !== 'workspace'\) \{/);
+  assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
+  assert.match(appSource, /AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}/);
+  assert.doesNotMatch(appSource, /if \(createAppRootMode\(\{ pathname: window\.location\.pathname \}\) !== 'workspace'\) \{/);
   assert.match(appSource, /<BillingProvider>\s*<CanvasProvider>/);
   assert.match(authContextSource, /createKkaiRuntimeAuthSnapshot/);
   assert.doesNotMatch(authContextSource, /supabase\.auth/);

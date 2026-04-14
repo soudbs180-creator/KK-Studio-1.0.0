@@ -30,6 +30,22 @@ for (const entry of registry.entries) {
     fail(`${entry.path} must list at least one regression test`);
   }
 
+  for (const regressionTest of entry.regressionTests || []) {
+    if (typeof regressionTest !== "string" || regressionTest.trim().length === 0) {
+      fail(`${entry.path} has an invalid regression test entry`);
+      continue;
+    }
+
+    if (!regressionTest.startsWith("tests/")) {
+      fail(`${entry.path} regression test must live under tests/: ${regressionTest}`);
+      continue;
+    }
+
+    if (!fs.existsSync(path.join(root, regressionTest))) {
+      fail(`${entry.path} regression test is missing: ${regressionTest}`);
+    }
+  }
+
   if (!fs.existsSync(path.join(root, entry.path))) {
     fail(`${entry.path} is registered but does not exist`);
   }

@@ -11,10 +11,12 @@ function readSource(relativePath: string): string {
 
 test('app wires main-image and A+ export entrypoints through the ecommerce group export manifest helper', () => {
   const appSource = readSource('src/App.tsx');
+  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(appSource, /buildEcommerceGroupExportManifest/);
-  assert.match(appSource, /打包主图/);
-  assert.match(appSource, /打包A\+/);
+  assert.match(appSource, /handleExportEcommerceGroup/);
+  assert.match(promptNodeSource, /打包主图/);
+  assert.match(promptNodeSource, /打包A\+/);
   assert.match(appSource, /主图包/);
   assert.match(appSource, /A\+包/);
 });

@@ -74,7 +74,6 @@ Use this table when deciding which runtime path is canonical versus transitional
 - Hosted/Web must default to `apps/api` + Supabase Edge Functions + `apps/payment-sidecar`.
 - `server/`, `payment-server/`, and `api/auth-password-login.ts` are not canonical Hosted entrypoints.
 - If a hosted environment re-enables one of these paths, treat it as an explicit migration override and document it in the release runbook before shipping.
-| `payment-server/` | `bridge` | Transitional payment shell and webhook bridge. |
 
 ## Web boundary
 

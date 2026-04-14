@@ -64,7 +64,7 @@
    - 需要将 `setShowApiKeyManager` 和 `setShowCostEstimation` 通过 props 传递给 AppContent
 
 ### 运行时错误
-1. **api12AIService.ts** - ImageSize 类型比较错误
+1. **AI12APIService.ts** - ImageSize 类型比较错误
 2. **keyManager.ts** - Provider 类型比较错误
 
 ## 用户工作流程

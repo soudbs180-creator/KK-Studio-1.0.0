@@ -63,7 +63,7 @@ function toAdminRoleStateFromApi(response: {
 }
 
 export const useAdminRole = (): UseAdminRoleResult => {
-  const { user, loading: authLoading, isTempUser } = useAuth();
+  const { user, session, loading: authLoading, isTempUser } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [accountRole, setAccountRole] = useState<AppAccountRole>('user');
   const [isAdmin, setIsAdmin] = useState(DEFAULT_ADMIN_ROLE_STATE.isAdmin);
@@ -111,7 +111,7 @@ export const useAdminRole = (): UseAdminRoleResult => {
         return;
       }
 
-      if (!user || isTempUser) {
+      if (!session?.access_token || !user || isTempUser) {
         if (alive) {
           lastResolvedStateRef.current = null;
           applyResolvedState(DEFAULT_ADMIN_ROLE_STATE);
@@ -180,7 +180,7 @@ export const useAdminRole = (): UseAdminRoleResult => {
     return () => {
       alive = false;
     };
-  }, [authLoading, isTempUser, sessionRevision, user]);
+  }, [authLoading, isTempUser, session?.access_token, sessionRevision, user]);
 
   return {
     authLoading,

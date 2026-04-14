@@ -35,8 +35,8 @@ describe('canvas performance profile', () => {
   test('resolves interaction phases from explicit phases and legacy flags', () => {
     assert.equal(resolveCanvasInteractionPhase({ isInteracting: false }), 'idle')
     assert.equal(resolveCanvasInteractionPhase({ isInteracting: true }), 'pan')
-    assert.equal(resolveCanvasInteractionPhase({ isDragging: true, isZooming: false }), 'pan')
-    assert.equal(resolveCanvasInteractionPhase({ isDragging: true, isZooming: true }), 'zoom')
+    assert.equal(resolveCanvasInteractionPhase({ isInteracting: true, isDragging: true, isZooming: false }), 'pan')
+    assert.equal(resolveCanvasInteractionPhase({ isInteracting: true, isDragging: true, isZooming: true }), 'zoom')
     assert.equal(resolveCanvasInteractionPhase({ interactionPhase: 'zoom', isInteracting: false }), 'zoom')
   })
 

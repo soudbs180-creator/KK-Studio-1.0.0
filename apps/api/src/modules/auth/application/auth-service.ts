@@ -5,6 +5,7 @@ import type {
   ProfileDto,
   RegisterRequestDto,
   RegisterResponseDto,
+  SendPasswordChangeCodeResponseDto,
   SendCodeRequestDto,
   UpdatePasswordRequestDto,
   UpdatePasswordResponseDto,
@@ -18,6 +19,10 @@ import {
   InMemoryAuthIdentityStore,
 } from "../infrastructure/in-memory-auth-identity-store.ts";
 import { InMemoryRateLimiter, type RateLimitRule } from "../infrastructure/in-memory-rate-limiter.ts";
+import {
+  createPasswordChangeCodeEmailSenderFromEnv,
+  type PasswordChangeCodeEmailSender,
+} from "../infrastructure/password-change-code-email-sender.ts";
 
 export interface TurnstileVerifier {
   (token: string, ip?: string): Promise<{ success: boolean; error?: string }>;
@@ -27,6 +32,7 @@ export interface AuthServiceDependencies {
   verifyTurnstileToken: TurnstileVerifier;
   rateLimiter?: InMemoryRateLimiter;
   identityStore?: AuthIdentityStore;
+  passwordChangeCodeEmailSender?: PasswordChangeCodeEmailSender;
 }
 
 export interface AuthRequestContext {
@@ -47,6 +53,8 @@ const registerIpRule: RateLimitRule = { max: 10, windowMs: 60 * 60 * 1000 };
 const registerEmailRule: RateLimitRule = { max: 3, windowMs: 60 * 60 * 1000 };
 const loginIpRule: RateLimitRule = { max: 20, windowMs: 60 * 60 * 1000 };
 const sendCodeRule: RateLimitRule = { max: 3, windowMs: 60 * 60 * 1000 };
+const passwordChangeCodeRule: RateLimitRule = { max: 3, windowMs: 15 * 60 * 1000 };
+const passwordChangeVerifyRule: RateLimitRule = { max: 5, windowMs: 15 * 60 * 1000 };
 
 function createDefaultIdentityStore(): AuthIdentityStore {
   try {
@@ -60,12 +68,14 @@ export class AuthService {
   private readonly verifyTurnstileToken: TurnstileVerifier;
   private readonly rateLimiter: InMemoryRateLimiter;
   private readonly identityStore: AuthIdentityStore;
+  private readonly passwordChangeCodeEmailSender: PasswordChangeCodeEmailSender;
   private readonly logger = consoleLogger.child({ module: "auth" });
 
   constructor(dependencies: AuthServiceDependencies) {
     this.verifyTurnstileToken = dependencies.verifyTurnstileToken;
     this.rateLimiter = dependencies.rateLimiter || new InMemoryRateLimiter();
     this.identityStore = dependencies.identityStore || createDefaultIdentityStore();
+    this.passwordChangeCodeEmailSender = dependencies.passwordChangeCodeEmailSender || createPasswordChangeCodeEmailSenderFromEnv();
   }
 
   async register(
@@ -81,17 +91,17 @@ export class AuthService {
       return this.badRequest(emailCheck.error);
     }
 
-    const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken, context.ip);
-    if (!turnstileResult.success) {
-      return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
-    }
-
     if (!this.rateLimiter.consume("register-ip", context.ip, registerIpRule)) {
       return this.rateLimited("Too many register attempts from this IP.");
     }
 
     if (!this.rateLimiter.consume("register-email", emailCheck.normalizedEmail, registerEmailRule)) {
       return this.rateLimited("Too many register attempts for this email.");
+    }
+
+    const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken, context.ip);
+    if (!turnstileResult.success) {
+      return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
     }
 
     const registered = this.identityStore.registerPasswordUser(
@@ -183,6 +193,42 @@ export class AuthService {
     );
   }
 
+  async sendPasswordChangeCode(
+    headers: Record<string, string>,
+  ): Promise<AuthHandlerResult<SendPasswordChangeCodeResponseDto>> {
+    const profile = this.getProfile(headers);
+    if (!profile?.email) {
+      return this.unauthorized("Authentication is required before sending a password change code.");
+    }
+
+    if (!this.rateLimiter.consume("password-change-code", profile.email, passwordChangeCodeRule)) {
+      return this.rateLimited("Too many password change code requests for this email.");
+    }
+
+    const issued = this.identityStore.issuePasswordChangeCode(profile.id);
+    if (!issued) {
+      return this.unauthorized("Authentication is required before sending a password change code.");
+    }
+
+    await this.passwordChangeCodeEmailSender.sendPasswordChangeCode({
+      userId: profile.id,
+      email: profile.email,
+      code: issued.code,
+      expiresAt: issued.expiresAt,
+    });
+
+    this.logger.info("Password change verification code issued via auth module", {
+      email: profile.email,
+      expiresAt: issued.expiresAt,
+    });
+
+    return this.success(200, {
+      sent: true,
+      email: profile.email,
+      expiresAt: issued.expiresAt,
+    });
+  }
+
   registerProfile(email: string): { created: boolean; profile: ProfileDto } {
     return this.identityStore.createRegisteredUser(email);
   }
@@ -208,15 +254,21 @@ export class AuthService {
     input: UpdatePasswordRequestDto,
   ): UpdatePasswordResponseDto | undefined {
     const profile = this.getProfile(headers);
-    if (!profile || !input.currentPassword?.trim() || !input.newPassword?.trim()) {
+    if (!profile || !input.newPassword?.trim()) {
       return undefined;
     }
 
-    const updatedProfile = this.identityStore.changePassword(
-      profile.id,
-      input.currentPassword,
-      input.newPassword,
-    );
+    const normalizedCurrentPassword = String(input.currentPassword || "").trim();
+    const normalizedVerificationCode = String(input.verificationCode || "").trim();
+    const updatedProfile = normalizedCurrentPassword
+      ? this.identityStore.changePassword(profile.id, normalizedCurrentPassword, input.newPassword)
+      : normalizedVerificationCode
+        ? (
+          this.rateLimiter.consume("password-change-verify", profile.id, passwordChangeVerifyRule)
+            ? this.identityStore.changePasswordWithCode(profile.id, normalizedVerificationCode, input.newPassword)
+            : undefined
+        )
+        : undefined;
     if (!updatedProfile) {
       return undefined;
     }

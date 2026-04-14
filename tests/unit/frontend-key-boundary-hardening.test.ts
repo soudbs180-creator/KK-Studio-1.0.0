@@ -139,10 +139,13 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.doesNotMatch(source, /if \(!keyManager\.getUserId\(\)\) \{\s*return true;\s*\}/);
   assert.match(source, /'Browser direct calls disabled'/);
   assert.match(source, /if \(!ensureBrowserDirectDiagnosticsAllowed\(\)\) \{\s*return;\s*\}/);
-  assert.match(source, /const diagnosticsActionDisabled = !isAuthenticated \|\| apiHealth\?\.reachable === false;/);
-  assert.match(source, /const headerPrimaryActionDisabled = activeTab === 'official' \? userApiActionsDisabled : providerActionsDisabled;/);
-  assert.match(source, /<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{headerPrimaryActionDisabled\} onClick=\{activeTab === 'official' \? beginCreateOfficial : beginCreateProvider\}>/);
-  assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{beginCreateOfficial\}>/);
+  assert.match(source, /resolveApiWorkbenchDiagnosticsAvailability/);
+  assert.match(source, /const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability\(\{\s*isAuthenticated,\s*isApiReachable: apiHealth\?\.reachable,\s*\}\);/);
+  assert.match(source, /const diagnosticsRefreshDisabled = diagnosticsAvailability\.refreshDisabled;/);
+  assert.match(source, /const routeDiagnosticsActionDisabled = diagnosticsAvailability\.routeActionsDisabled;/);
+  assert.doesNotMatch(source, /const diagnosticsActionDisabled = !isAuthenticated \|\| apiHealth\?\.reachable === false;/);
+  assert.doesNotMatch(source, /const headerPrimaryActionDisabled = activeTab === 'official' \? userApiActionsDisabled : providerActionsDisabled;/);
+  assert.match(source, /data-testid="api-official-empty-create" icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{beginCreateOfficial\}/);
   assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => startEditOfficial\(slot\)\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);

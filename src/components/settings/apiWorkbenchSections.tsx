@@ -80,7 +80,7 @@ export const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProp
         </div>
         <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{entryActionHelper}</div>
         <div className="mt-3">
-          <SettingsActionButton icon={Wand2} tone="primary" onClick={onOpen}>
+          <SettingsActionButton icon={Wand2} tone="secondary" onClick={onOpen}>
             {entryActionLabel}
           </SettingsActionButton>
         </div>
@@ -124,6 +124,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
   activeTab,
 }) => (
   <SettingsSection
+    testId="settings-workbench-overview"
     title={pick('工作台摘要', 'Workspace snapshot')}
     eyebrow={pick('运行概览', 'Operations overview')}
     description={pick(
@@ -173,9 +174,9 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         />
         <InfoCell
           label={pick('当前焦点', 'Current focus')}
-          value={activeTab === 'official' ? pick('官方接口', 'Official endpoints') : pick('第三方供应商', 'Third-party providers')}
+          value={activeTab === 'official' ? pick('本地 API', 'Local APIs') : pick('第三方供应商', 'Third-party providers')}
           helper={activeTab === 'official'
-            ? pick('适合查看直连 OpenAI / Gemini 的稳定链路', 'Best for checking direct OpenAI or Gemini routes')
+            ? pick('适合查看你自己的直连 OpenAI / Gemini 链路', 'Best for checking your own direct OpenAI or Gemini routes')
             : pick('适合查看协议、价格同步和多源调度', 'Best for protocols, pricing sync, and multi-source routing')}
         />
       </div>
@@ -199,22 +200,23 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
   formatLatency,
 }) => (
   <SettingsSection
+    testId="settings-workbench-current-view"
     title={pick('当前视图', 'Current view')}
     eyebrow={pick('链路面板', 'Routing panel')}
     description={pick(
-      '先决定你当前要看的是官方接口还是第三方供应商，再进入对应的卡片和编辑器。',
-      'Choose whether you want to inspect official endpoints or third-party providers, then move into the matching cards and editor.',
+      '先决定你当前要看的是本地 API 还是第三方供应商，再进入对应卡片和编辑器。',
+      'Choose whether you want to inspect local APIs or third-party providers, then move into the matching cards and editor.',
     )}
     action={(
       <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
-        {activeTab === 'official' ? pick('官方接口视图', 'Official endpoint view') : pick('第三方供应商视图', 'Third-party provider view')}
+        {activeTab === 'official' ? pick('本地 API 视图', 'Local API view') : pick('第三方供应商视图', 'Third-party provider view')}
       </SettingsBadge>
     )}
   >
     <div className="space-y-4">
       <SegmentedControl
         options={[
-          { value: 'official', label: pick('官方接口', 'Official endpoints') },
+          { value: 'official', label: pick('本地 API', 'Local APIs') },
           { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
         ]}
         value={activeTab}
@@ -259,6 +261,7 @@ type ApiWorkbenchStageSectionProps = {
   primaryActionTone: ActionTone;
   onPrimaryAction: () => void;
   primaryActionLoading: boolean;
+  primaryActionTestId?: string;
   isUsingReadonlyProfileFallback: boolean;
   runtimeRouteCount: number;
 };
@@ -278,10 +281,12 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
   primaryActionTone,
   onPrimaryAction,
   primaryActionLoading,
+  primaryActionTestId,
   isUsingReadonlyProfileFallback,
   runtimeRouteCount,
 }) => (
   <SettingsSection
+    testId="settings-workbench-stage"
     title={pick('状态与下一步', 'Status and next step')}
     eyebrow={pick('阶段工作流', 'Stage workflow')}
     description={stageDescription}
@@ -289,6 +294,7 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
       <div className="flex flex-wrap items-center gap-2">
         <SettingsBadge tone={stageTone}>{stageInteractionLabel}</SettingsBadge>
         <SettingsActionButton
+          data-testid="api-workbench-diagnostics-toggle"
           icon={Activity}
           size="sm"
           tone={showDiagnostics ? 'primary' : 'secondary'}
@@ -310,10 +316,11 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
               {stageTitle}
             </div>
           </div>
-          <SettingsActionButton
-            icon={primaryActionIcon}
-            tone={primaryActionTone}
-            onClick={onPrimaryAction}
+        <SettingsActionButton
+          data-testid={primaryActionTestId}
+          icon={primaryActionIcon}
+          tone={primaryActionTone}
+          onClick={onPrimaryAction}
             loading={primaryActionLoading}
           >
             {stageNextActionLabel}
@@ -375,6 +382,7 @@ export const ApiWorkbenchDiagnosticsSection: React.FC<ApiWorkbenchDiagnosticsSec
   hasReadonlySnapshot,
 }) => (
   <SettingsSection
+    testId="settings-workbench-diagnostics"
     title={pick('诊断视图', 'Diagnostics view')}
     eyebrow={pick('状态拆解', 'Status breakdown')}
     description={pick(
@@ -429,37 +437,38 @@ export const ApiWorkbenchPlatformSection: React.FC<ApiWorkbenchPlatformSectionPr
   onOpenPlatformAssistant,
 }) => (
   <SettingsSection
-    title={pick('平台能力入口', 'Platform capabilities')}
+    testId="settings-workbench-platform"
+    title={pick('平台入口', 'Platform entry')}
     eyebrow={pick('独立入口', 'Separate entry')}
     description={pick(
-      '将平台侧辅助能力和你的本地 BYOK 链路分开展示，避免和供应商卡片混在一起。',
-      'Keep platform-managed assistant capabilities separate from your local BYOK routes so they do not blend into provider management cards.',
+      '平台侧能力单独放在这里，不和你的本地 API 配置混排。',
+      'Keep platform-managed capabilities separate from your local API configuration.',
     )}
-    action={<SettingsBadge tone="neutral">{pick('不和供应商卡片混排', 'Separate from provider cards')}</SettingsBadge>}
+    action={<SettingsBadge tone="neutral">{pick('与本地 API 分开', 'Separate from local APIs')}</SettingsBadge>}
   >
     <PlatformAssistantEntryCard
       title={pick('平台辅助 AI', 'Platform Assistant AI')}
       description={pick(
-        '平台侧的辅助 AI 会从独立入口接入，和你的第三方供应商管理分开，便于你一眼区分哪些能力来自本地 BYOK，哪些来自平台侧。',
-        'Platform assistant AI is surfaced as a dedicated entry so you can immediately separate local BYOK provider management from platform-side capabilities.',
+        '这里仅保留平台入口，不把它塞进本地 API 编辑器里。',
+        'This keeps the platform entry visible without mixing it into the local API editor.',
       )}
       entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
-      localApiLabel={pick('用户本地 API', 'User-managed local APIs')}
-      localApiValue={pick('继续使用你的 BYOK', 'Keep your BYOK routes')}
+      localApiLabel={pick('本地 API', 'Local APIs')}
+      localApiValue={pick('下方继续配置', 'Continue below')}
       localApiHelper={pick(
-        '你的 Base URL、API Key、模型同步、预算规则和路由状态仍然在下面按本地优先方式维护。',
-        'Your base URL, API key, model sync, budget rules, and routing state stay managed below in the local-first BYOK flow.',
+        '你的 Base URL、API Key、模型同步、预算规则和路由状态仍然在下方维护。',
+        'Your base URL, API key, model sync, budget rules, and routing state stay managed below.',
       )}
-      platformLabel={pick('平台能力', 'Platform capability')}
+      platformLabel={pick('平台入口', 'Platform entry')}
       platformValue={pick('单独的平台入口', 'Separate platform entry')}
       platformHelper={pick(
         '平台侧的辅助 AI 会从这里进入，不和本地 API Key、模型路由或预算规则混在一起。',
         'Platform assistant capabilities enter here without mixing with local API keys, routing, or budget rules.',
       )}
-      entryActionLabel={pick('打开平台辅助 AI 入口', 'Open platform assistant entry')}
+      entryActionLabel={pick('查看平台入口', 'View platform entry')}
       entryActionHelper={pick(
-        '当前先保留入口与说明，后续再接完整的平台辅助流程。',
-        'This keeps the entry and explanation visible now without wiring the full platform assistant flow yet.',
+        '当前先保留入口说明，完整流程还没有接入。',
+        'The full platform assistant flow is not wired yet.',
       )}
       onOpen={onOpenPlatformAssistant}
     />

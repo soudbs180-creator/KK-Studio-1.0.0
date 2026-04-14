@@ -35,8 +35,8 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(reviewPanelSource, /activeTaskState\?:/);
   assert.match(reviewPanelSource, /onTaskStateChange\?:/);
   assert.match(reviewPanelSource, /<EcommerceTaskEditorPanel/);
-  assert.match(reviewPanelSource, /taskStates\[item\.itemId\]/);
-  assert.match(reviewPanelSource, /taskStates\[item\.moduleId\]/);
+  assert.match(reviewPanelSource, /resolveTaskStateForKey\(item\.itemId, taskStates, activeTaskStateProp\)/);
+  assert.match(reviewPanelSource, /resolveTaskStateForKey\(item\.moduleId, taskStates, activeTaskStateProp\)/);
 
   assert.match(cardActionsSource, /taskState\?: EcommerceEditableTaskState/);
   assert.match(cardActionsSource, /onTaskStateChange\?:/);

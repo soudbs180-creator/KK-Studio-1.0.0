@@ -11,10 +11,11 @@ export interface BillingRuntimeGuard {
 export function createBillingRuntimeGuard(input: {
   userId: string | null | undefined;
   isTempUser: boolean;
+  hasSession: boolean;
 }): BillingRuntimeGuard {
   const userId = String(input.userId || '').trim();
   const billingEnabled = KKAI_FEATURE_FLAGS.billing;
-  const activeBillingUserId = billingEnabled && userId && !input.isTempUser
+  const activeBillingUserId = billingEnabled && userId && !input.isTempUser && input.hasSession
     ? userId
     : null;
 

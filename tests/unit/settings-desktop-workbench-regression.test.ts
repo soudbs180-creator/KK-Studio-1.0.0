@@ -19,10 +19,10 @@ test('desktop settings shell wires desktop workbench metadata and clean localize
   assert.match(shellSource, /<SettingsDesktopSidebar/);
   assert.match(shellSource, /<SettingsDesktopWorkbenchHeader/);
   assert.match(shellSource, /const headerMeta = getSettingsViewMeta\(activeView, language\);/);
-  assert.match(shellSource, /const headerPrimaryAction = getSettingsPrimaryActionMeta\(activeView, language\);/);
-  assert.match(shellSource, /const headerStatusSummaryLabel = getSettingsStatusSummaryLabel\(activeView, language\);/);
-  assert.match(shellSource, /primaryActionLabel=\{headerPrimaryAction\.label\}/);
-  assert.match(shellSource, /statusSummaryLabel=\{headerStatusSummaryLabel\}/);
+  assert.doesNotMatch(shellSource, /const headerPrimaryAction = getSettingsPrimaryActionMeta\(activeView, language\);/);
+  assert.doesNotMatch(shellSource, /const headerStatusSummaryLabel = getSettingsStatusSummaryLabel\(activeView, language\);/);
+  assert.doesNotMatch(shellSource, /primaryActionLabel=\{headerPrimaryAction\.label\}/);
+  assert.doesNotMatch(shellSource, /statusSummaryLabel=\{headerStatusSummaryLabel\}/);
   assert.match(shellSource, /aria-label=\{pick\('语言切换', 'Language switch'\)\}/);
   assert.match(shellSource, />\s*中文\s*</);
   assert.match(shellSource, /pick\('当前账户', 'Current account'\)/);
@@ -33,23 +33,23 @@ test('desktop settings shell wires desktop workbench metadata and clean localize
   assert.match(routeConfigSource, /export function renderSettingsRouteElements/);
   assert.doesNotMatch(shellSource, /settings-toolbar-search/);
   assert.doesNotMatch(shellSource, /System Active/);
-  assert.match(headerSource, /SettingsBadge/);
-  assert.match(headerSource, /Current surface/);
-  assert.match(headerSource, /Primary next step/);
   assert.match(headerSource, /View tools/);
-  assert.match(headerSource, /pick\('当前面板', 'Current surface'\)/);
-  assert.match(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
+  assert.doesNotMatch(headerSource, /SettingsBadge/);
+  assert.doesNotMatch(headerSource, /Current surface/);
+  assert.doesNotMatch(headerSource, /Primary next step/);
+  assert.doesNotMatch(headerSource, /pick\('当前面板', 'Current surface'\)/);
+  assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
   assert.match(headerSource, /pick\('视图工具', 'View tools'\)/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
 
-test('desktop workbench header keeps visible Chinese labels for summary cards and tool actions', () => {
+test('desktop workbench header keeps only the compact tool labels after summary cards are removed', () => {
   const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
 
-  assert.match(headerSource, /pick\('当前面板', 'Current surface'\)/);
-  assert.match(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
+  assert.doesNotMatch(headerSource, /pick\('当前面板', 'Current surface'\)/);
+  assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
   assert.match(headerSource, /pick\('视图工具', 'View tools'\)/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);

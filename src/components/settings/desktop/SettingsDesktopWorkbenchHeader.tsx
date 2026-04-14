@@ -2,7 +2,7 @@ import React from 'react';
 import { RefreshCw, ScrollText, X } from 'lucide-react';
 
 import { useLocale } from '../../../context/LocaleContext';
-import { SettingsActionButton, SettingsBadge } from '../SettingsScaffold';
+import { SettingsActionButton } from '../SettingsScaffold';
 import {
   SETTINGS_VIEW_META,
   type CanonicalSettingsViewId as DesktopSettingsViewId,
@@ -16,8 +16,6 @@ interface SettingsDesktopWorkbenchHeaderProps {
     title: string;
     description: string;
   };
-  primaryActionLabel: string;
-  statusSummaryLabel: string;
   languageControl?: React.ReactNode;
   activeView: DesktopSettingsViewId;
   onRefreshCurrentView: () => void;
@@ -27,8 +25,6 @@ interface SettingsDesktopWorkbenchHeaderProps {
 
 const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderProps> = ({
   meta,
-  primaryActionLabel,
-  statusSummaryLabel,
   languageControl,
   activeView,
   onRefreshCurrentView,
@@ -39,7 +35,7 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
 
   return (
     <header
-      className="flex items-start justify-between gap-6 border-b px-8 py-6"
+      className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5 xl:flex-nowrap"
       style={{
         borderColor: 'var(--settings-sidebar-border)',
         background: 'var(--settings-shell-header-bg)',
@@ -59,7 +55,7 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
           {meta.eyebrow}
         </div>
         <h2
-          className="mt-3"
+          className="mt-2"
           style={{
             color: 'var(--text-primary)',
             fontSize: 'var(--type-title-1)',
@@ -80,41 +76,10 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
         >
           {meta.description}
         </p>
-
-        <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div
-            className="rounded-[20px] border px-4 py-3"
-            style={{
-              borderColor: 'var(--settings-border-subtle)',
-              background: 'var(--settings-surface-overlay)',
-            }}
-          >
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-              {pick('当前面板', 'Current surface')}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="text-[15px] font-semibold text-[var(--text-primary)]">{meta.title}</div>
-              <SettingsBadge tone="neutral">{statusSummaryLabel}</SettingsBadge>
-            </div>
-          </div>
-
-          <div
-            className="rounded-[20px] border px-4 py-3"
-            style={{
-              borderColor: 'var(--settings-border-subtle)',
-              background: 'var(--settings-surface-overlay)',
-            }}
-          >
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-              {pick('主要下一步', 'Primary next step')}
-            </div>
-            <div className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">{primaryActionLabel}</div>
-          </div>
-        </div>
       </div>
 
       <div
-        className="flex shrink-0 flex-col gap-3 rounded-[22px] border p-3"
+        className="flex min-w-[260px] max-w-full shrink-0 flex-col gap-3 rounded-[20px] border p-3"
         style={{
           borderColor: 'var(--settings-border-subtle)',
           background: 'var(--settings-surface-overlay)',
@@ -123,7 +88,7 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
         <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           {pick('视图工具', 'View tools')}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {languageControl}
         </div>
         <div className="flex flex-wrap gap-2">

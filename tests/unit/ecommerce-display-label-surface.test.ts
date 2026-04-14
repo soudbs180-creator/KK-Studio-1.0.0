@@ -14,11 +14,14 @@ test('ecommerce business display labels propagate to desktop and mobile result s
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const mobileSelectorSource = readSource('src/components/mobile/mobileFeedSelectors.ts');
   const mobileFeedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
   const mobileDetailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
 
   assert.match(appSource, /displayLabel:\s*renderTask\.displayLabel/);
   assert.match(promptNodeSource, /getPromptBusinessDisplayLabel/);
   assert.match(mobileSelectorSource, /displayLabel:\s*resolveDisplayLabel\(imageNode,\s*promptNode\)/);
-  assert.match(mobileFeedSource, /entry\.displayLabel\s*\|\|/);
+  assert.match(mobileFeedSource, /<MobileResultTile/);
+  assert.match(mobileFeedSource, /entry=\{entry\}/);
+  assert.match(mobileTileSource, /entry\.displayLabel\s*\|\|/);
   assert.match(mobileDetailSource, /entry\.displayLabel/);
 });

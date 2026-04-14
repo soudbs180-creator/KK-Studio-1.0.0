@@ -71,5 +71,10 @@ test("payment settlement rejects mismatched internal caller and token pairs", as
   );
 
   assert.equal(result.statusCode, 401);
-  assert.equal(result.body.error.code, "INTERNAL_AUTH_REQUIRED");
+  if (result.body.success) {
+    assert.fail("expected settlement auth request to fail");
+  } else {
+    const failureBody = result.body as { error: { code: string } };
+    assert.equal(failureBody.error.code, "INTERNAL_AUTH_REQUIRED");
+  }
 });

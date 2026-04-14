@@ -1,6 +1,6 @@
-﻿import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
-import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType, type EcommerceEditableTaskState } from '../../types';
+import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
 import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; // Added getter
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -32,10 +32,12 @@ import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitche
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
 import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
-import MobileEmbeddedComposerShell from './prompt-bar/MobileEmbeddedComposerShell';
+import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
+import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
 import { isEcommerceAllowedModel, resolveEcommerceAspectPolicy, resolvePreferredEcommerceImageSize } from '../../services/ecommerce/ecommerceModelPolicy.ts';
 import type { EcommerceAnalysisResult } from '../../services/ecommerce/types.ts';
+import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
 
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
 const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
@@ -43,6 +45,9 @@ const PROMPT_TEXTAREA_MIN_ROWS = 2;
 const PROMPT_TEXTAREA_MAX_ROWS = 6;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
+const MODEL_MENU_SKELETON_COUNT = 3;
+
+type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
 
 type ReferenceThumbnailProps = {
     image: { id: string, data?: string, mimeType?: string, storageId?: string, url?: string };
@@ -300,6 +305,7 @@ interface CreditSendButtonProps {
     colorStart?: string;
     colorEnd?: string;
     textColor?: 'white' | 'black';
+    className?: string;
     onClick: () => void;
 }
 
@@ -312,6 +318,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     colorStart,
     colorEnd,
     textColor = 'white',
+    className = '',
     onClick
 }) => {
     // 判断积分是否不足
@@ -387,7 +394,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <style>{arrowAnimStyle}</style>
                 <button
                     onClick={onClick}
-                    className="group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-colors duration-200"
+                    className={`${className} group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-colors duration-200`}
                     style={getGradientStyle()}
                 >
                     {/* 积分消耗显示 */}
@@ -431,7 +438,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 onClick={onClick}
                 disabled={isDisabled}
                 className={`
-                    group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
+                    ${className} group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
                     transition-colors duration-200 ease-out focus-visible:outline-none
                     ${!isDisabled && !isInsufficient ? 'focus-visible:ring-2 focus-visible:ring-blue-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
                     ${defaultStyleProps.className || ''}
@@ -508,23 +515,52 @@ interface PromptBarProps {
     mobileShellMode?: 'legacy-fixed' | 'embedded';
     ecommerceRequirementFileName?: string;
     ecommerceProductFileCount?: number;
-    ecommerceExtraReferenceCount?: number;
-    ecommerceAnalysis?: EcommerceAnalysisResult | null;
+     ecommerceExtraReferenceCount?: number;
+     ecommerceProductFiles?: File[];
+     ecommerceExtraReferenceFiles?: File[];
+     ecommerceItemReferenceFiles?: Record<string, Array<{
+         assetId: string;
+         label: string;
+         fileName: string;
+         referenceImage: ReferenceImage;
+         assetRole: EcommerceTaskAssetRoleBinding;
+     }>>;
+     ecommerceAnalysis?: EcommerceAnalysisResult | null;
     ecommerceSelection?: Record<string, boolean>;
     ecommerceTaskStates?: Record<string, EcommerceEditableTaskState | undefined>;
+    ecommerceGroupSlots?: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
     ecommerceActiveTaskState?: EcommerceEditableTaskState | null;
+    ecommerceSheetSettings?: Record<EcommerceGroupSheet, { aspectRatio: AspectRatio; imageSize: ImageSize }>;
+    ecommerceAnalysisConfirmed?: boolean;
+    ecommerceActiveGroupSheet?: EcommerceGroupSheet | null;
     ecommerceAnalyzing?: boolean;
     onPickEcommerceRequirementFile?: (files: FileList | File[]) => void;
     onPickEcommerceProductFiles?: (files: FileList | File[]) => void;
     onPickEcommerceExtraReferenceFiles?: (files: FileList | File[]) => void;
-    onResetEcommerceAnalysis?: () => void;
+    onClearEcommerceRequirementFile?: () => void;
+     onRemoveEcommerceProductFile?: (index: number) => void;
+     onRemoveEcommerceExtraReferenceFile?: (index: number) => void;
+     onPickEcommerceItemReferenceFiles?: (sourceKey: string, files: FileList | File[]) => void;
+     onRemoveEcommerceItemReferenceFile?: (sourceKey: string, index: number) => void;
+     onResetEcommerceAnalysis?: () => void;
     onConfirmEcommerceAnalysis?: () => void;
     onToggleEcommerceSelection?: (id: string, selected: boolean) => void;
+    onActivateEcommerceGroupSheet?: (sheet: EcommerceGroupSheet) => void;
+    onActivateEcommerceTaskBySourceKey?: (sourceKey: string) => void;
+    onUpdateEcommerceSheetSetting?: (
+        sheet: EcommerceGroupSheet,
+        patch: { aspectRatio?: AspectRatio; imageSize?: ImageSize },
+    ) => void;
     onChangeEcommerceTaskState?: (
         taskId: string,
         updater:
             | EcommerceEditableTaskState
             | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
+    ) => void;
+    onPreviewEcommerceSlotHistory?: (
+        sourceSheet: EcommerceGroupSheet,
+        sourceKey: string,
+        preferredImageId?: string,
     ) => void;
     ecommerceRatioOverride?: AspectRatio[];
     onAnalyzeEcommerceFile?: () => void;
@@ -815,18 +851,34 @@ const PromptBar: React.FC<PromptBarProps> = ({
     ecommerceRequirementFileName,
     ecommerceProductFileCount = 0,
     ecommerceExtraReferenceCount = 0,
+    ecommerceProductFiles = [],
+    ecommerceExtraReferenceFiles = [],
+    ecommerceItemReferenceFiles = {},
     ecommerceAnalysis,
     ecommerceSelection = {},
     ecommerceTaskStates = {},
+    ecommerceGroupSlots = { '主图': [], 'A+': [] },
     ecommerceActiveTaskState = null,
+    ecommerceSheetSettings,
+    ecommerceAnalysisConfirmed = false,
+    ecommerceActiveGroupSheet = null,
     ecommerceAnalyzing = false,
     onPickEcommerceRequirementFile,
     onPickEcommerceProductFiles,
     onPickEcommerceExtraReferenceFiles,
+    onClearEcommerceRequirementFile,
+    onRemoveEcommerceProductFile,
+    onRemoveEcommerceExtraReferenceFile,
+    onPickEcommerceItemReferenceFiles,
+    onRemoveEcommerceItemReferenceFile,
     onResetEcommerceAnalysis,
     onConfirmEcommerceAnalysis,
     onToggleEcommerceSelection,
+    onActivateEcommerceGroupSheet,
+    onActivateEcommerceTaskBySourceKey,
+    onUpdateEcommerceSheetSetting,
     onChangeEcommerceTaskState,
+    onPreviewEcommerceSlotHistory,
     ecommerceRatioOverride,
     onAnalyzeEcommerceFile,
 }) => {
@@ -835,7 +887,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     // Track composition state so IME input is not interrupted by background sync.
     const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
-    const [isModelMenuLoading, setIsModelMenuLoading] = useState(false);
+    const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
@@ -923,7 +975,67 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
-    const canBrowseSystemCreditModels = billingUiEnabled && (authLoading || canAccessSystemCreditModels);
+    const canBrowseSystemCreditModels = billingUiEnabled;
+
+    // Dynamic Model State
+    const [globalModels, setGlobalModels] = useState(keyManager.getGlobalModelList());
+
+    // Get available models based on global list and current mode
+    const availableModels = useMemo(() => {
+        return buildPromptBarAvailableModels(
+            globalModels,
+            canBrowseSystemCreditModels,
+            config.imageSize,
+            config.mode,
+        );
+    }, [globalModels, config.mode, config.imageSize, canBrowseSystemCreditModels]);
+
+    useEffect(() => {
+        refreshModelLibraryDataInBackground();
+
+        const unsubscribeKeyManager = keyManager.subscribe(() => {
+            const newModels = keyManager.getGlobalModelList();
+            setGlobalModels(newModels);
+        });
+        return () => {
+            unsubscribeKeyManager();
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+
+        if (!canBrowseSystemCreditModels || availableModels.length > 0) {
+            return;
+        }
+
+        setModelMenuLoadingState('bootstrapping_without_cache');
+
+        void (async () => {
+            try {
+                await refreshModelLibraryData({ force: true });
+                if (!active) {
+                    return;
+                }
+
+                setGlobalModels(keyManager.getGlobalModelList());
+            } catch (error) {
+                console.warn('[PromptBar] Initial model library bootstrap failed:', error);
+            } finally {
+                if (!active) {
+                    return;
+                }
+
+                setModelMenuLoadingState((current) => (
+                    current === 'bootstrapping_without_cache' ? 'idle' : current
+                ));
+            }
+        })();
+
+        return () => {
+            active = false;
+        };
+    }, [availableModels.length, canBrowseSystemCreditModels]);
 
     // 🚀 [NEW] 模型手动锁定标识 - 解决更换 API 或模式后自动跳第一个的需求
     const [isModelManuallyLocked, setIsModelManuallyLocked] = useState<boolean>(() => {
@@ -950,6 +1062,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const hoverTimerRef = useRef<NodeJS.Timeout | null>(null); // 3-second hover delay timer
     const touchStartY = useRef<number | null>(null);
     const modelDropdownRef = useRef<HTMLDivElement>(null); // Model dropdown ref
+    const modelMenuAnchorRef = useRef<HTMLDivElement>(null);
     const modelListScrollRef = useRef<HTMLDivElement>(null); // Model list scroll container ref
     const modelListScrollPos = useRef<number>(0); // Save scroll position
     const modelMenuRequestRef = useRef(0);
@@ -1086,14 +1199,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const closeModelLibraryMenu = useCallback(() => {
         modelMenuRequestRef.current += 1;
-        setIsModelMenuLoading(false);
+        setModelMenuLoadingState('idle');
         setActiveMenu(null);
     }, []);
 
     useEffect(() => {
         if (previousActiveMenuRef.current === 'model' && activeMenu !== 'model') {
             modelMenuRequestRef.current += 1;
-            setIsModelMenuLoading(false);
+            setModelMenuLoadingState('idle');
         }
 
         previousActiveMenuRef.current = activeMenu;
@@ -1107,8 +1220,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             const target = e.target as Element;
             // Check if click is outside dropdown AND not on the model button trigger
             if (modelDropdownRef.current && !modelDropdownRef.current.contains(target)) {
-                const triggerButton = document.getElementById('models-dropdown-trigger');
-                if (triggerButton && (triggerButton.contains(target) || triggerButton === target)) {
+                if (modelMenuAnchorRef.current?.contains(target)) {
                     // Click was on trigger button, let onClick handle it
                     return;
                 }
@@ -1228,32 +1340,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
         }
         touchStartY.current = null;
     };
-
-    // Dynamic Model State
-    const [globalModels, setGlobalModels] = useState(keyManager.getGlobalModelList());
-
-
-    useEffect(() => {
-        refreshModelLibraryDataInBackground();
-
-        const unsubscribeKeyManager = keyManager.subscribe(() => {
-            const newModels = keyManager.getGlobalModelList();
-            setGlobalModels(newModels);
-        });
-        return () => {
-            unsubscribeKeyManager();
-        };
-    }, []);
-
-    // Get available models based on global list and current mode
-    const availableModels = useMemo(() => {
-        return buildPromptBarAvailableModels(
-            globalModels,
-            canBrowseSystemCreditModels,
-            config.imageSize,
-            config.mode,
-        );
-    }, [globalModels, config.mode, config.imageSize, canBrowseSystemCreditModels]);
 
     const sortedAvailableModels = useMemo(() => {
         const rawModels = filterAndSortModels(availableModels, '', modelCustomizations);
@@ -1716,8 +1802,41 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
         const requestId = modelMenuRequestRef.current + 1;
         modelMenuRequestRef.current = requestId;
+        const hasCachedModels = availableModels.length > 0;
         setActiveMenu('model');
-        setIsModelMenuLoading(true);
+        setModelMenuLoadingState(hasCachedModels ? 'refreshing_with_cache' : 'bootstrapping_without_cache');
+
+        if (hasCachedModels) {
+            void refreshModelLibraryData({ force: false })
+                .then(() => {
+                    if (modelMenuRequestRef.current !== requestId) {
+                        return;
+                    }
+
+                    const refreshedGlobalModels = keyManager.getGlobalModelList();
+                    const refreshedAvailableModels = buildPromptBarAvailableModels(
+                        refreshedGlobalModels,
+                        canBrowseSystemCreditModels,
+                        config.imageSize,
+                        config.mode,
+                    );
+
+                    if (refreshedAvailableModels.length > 0) {
+                        setGlobalModels(refreshedGlobalModels);
+                    }
+
+                    setModelMenuLoadingState('idle');
+                })
+                .catch((error) => {
+                    console.warn('[PromptBar] Background model library refresh failed:', error);
+                    if (modelMenuRequestRef.current !== requestId) {
+                        return;
+                    }
+
+                    setModelMenuLoadingState('idle');
+                });
+            return;
+        }
 
         try {
             await refreshModelLibraryData({ force: availableModels.length === 0 });
@@ -1740,13 +1859,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
         setGlobalModels(refreshedGlobalModels);
 
         if (refreshedAvailableModels.length === 0) {
-            setIsModelMenuLoading(false);
+            setModelMenuLoadingState('idle');
             setActiveMenu(null);
             onOpenSettings?.('api-management');
             return;
         }
 
-        setIsModelMenuLoading(false);
+        setModelMenuLoadingState('idle');
     }, [
         activeMenu,
         availableModels.length,
@@ -2244,7 +2363,35 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
         // 2. 处理文档 (External files - only if not internal ref)
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            processFiles(e.dataTransfer.files);
+            const droppedFiles = Array.from(e.dataTransfer.files);
+
+            if (config.mode === GenerationMode.ECOMMERCE) {
+                const ecommerceDropRoute = routeEcommerceDroppedFiles(droppedFiles, {
+                    analysisConfirmed: ecommerceAnalysisConfirmed,
+                });
+                let handledEcommerceDrop = false;
+
+                if (ecommerceDropRoute.requirementFiles.length && onPickEcommerceRequirementFile) {
+                    onPickEcommerceRequirementFile(ecommerceDropRoute.requirementFiles);
+                    handledEcommerceDrop = true;
+                }
+
+                if (ecommerceDropRoute.productFiles.length && onPickEcommerceProductFiles) {
+                    onPickEcommerceProductFiles(ecommerceDropRoute.productFiles);
+                    handledEcommerceDrop = true;
+                }
+
+                if (ecommerceDropRoute.promptReferenceFiles.length > 0) {
+                    processFiles(ecommerceDropRoute.promptReferenceFiles);
+                    handledEcommerceDrop = true;
+                }
+
+                if (handledEcommerceDrop) {
+                    return;
+                }
+            }
+
+            processFiles(droppedFiles);
             return;
         }
 
@@ -2302,6 +2449,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
     }, [availableModels, config.imageSize, config.model]);
 
     const isModelListEmpty = availableModels.length === 0;
+    const isModelMenuLoading = modelMenuLoadingState !== 'idle';
+    const isModelMenuBootstrapping = modelMenuLoadingState === 'bootstrapping_without_cache';
+    const isModelMenuRefreshingWithCache = modelMenuLoadingState === 'refreshing_with_cache';
     const currentModel = selectedModelMeta.currentModel;
 
     // 🚀 [Fix] 判断是否为系统积分模型
@@ -2353,6 +2503,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
         : (modelDisplayInfo?.displayName || currentModel?.label || getModelDisplayName(currentModel?.id || '') || currentModel?.id || '未选择模型');
 
     // 隐藏模型名字中括号及括号内的内容，避免名称过长超出输入框
+    if (isModelListEmpty && isModelMenuBootstrapping) {
+        currentModelName = '正在同步最新模型库...';
+    }
+
     if (typeof currentModelName === 'string') {
         currentModelName = currentModelName.replace(/\s*[（\(].*?[）\)]\s*/g, '');
     }
@@ -2640,18 +2794,32 @@ const PromptBar: React.FC<PromptBarProps> = ({
             requirementFileName={ecommerceRequirementFileName}
             productFileCount={ecommerceProductFileCount}
             extraReferenceCount={ecommerceExtraReferenceCount}
+            productFiles={ecommerceProductFiles}
+            extraReferenceFiles={ecommerceExtraReferenceFiles}
+            itemReferenceFiles={ecommerceItemReferenceFiles}
             ecommerceAnalysis={ecommerceAnalysis}
             ecommerceSelection={ecommerceSelection}
             taskStates={ecommerceTaskStates}
+            groupSlots={ecommerceGroupSlots}
             activeTaskState={ecommerceActiveTaskState}
+            analysisConfirmed={ecommerceAnalysisConfirmed}
+            activeGroupSheet={ecommerceActiveGroupSheet}
             ecommerceAnalyzing={ecommerceAnalyzing}
             onPickRequirementFile={onPickEcommerceRequirementFile}
             onPickProductFiles={onPickEcommerceProductFiles}
             onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+            onClearRequirementFile={onClearEcommerceRequirementFile}
+            onRemoveProductFile={onRemoveEcommerceProductFile}
+            onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
+            onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
+            onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
             onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
             onResetAnalysis={onResetEcommerceAnalysis}
             onConfirmAnalysis={onConfirmEcommerceAnalysis}
             onToggleSelection={onToggleEcommerceSelection}
+            onActivateGroupSheet={onActivateEcommerceGroupSheet}
+            onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
+            onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
             onTaskStateChange={onChangeEcommerceTaskState}
         />
     );
@@ -2713,6 +2881,242 @@ const PromptBar: React.FC<PromptBarProps> = ({
         </div>
     );
 
+    const mobileAdvancedPromptToolsNode = (
+        <DesktopComposerPromptTools
+            isMobile={isMobile}
+            config={config}
+            showPptOutlinePanel={showPptOutlinePanel}
+            onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
+            onTogglePromptOptimization={handleTogglePromptOptimization}
+        />
+    );
+
+    const activeEcommerceFooterSheet: EcommerceGroupSheet = ecommerceActiveTaskState?.sourceSheet ?? ecommerceActiveGroupSheet ?? '主图';
+    const activeEcommerceSheetSetting = ecommerceSheetSettings?.[activeEcommerceFooterSheet];
+    const activeEcommerceAspectRatio = activeEcommerceSheetSetting?.aspectRatio || config.aspectRatio;
+    const activeEcommerceImageSize = activeEcommerceSheetSetting?.imageSize || config.imageSize;
+    const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => (
+                <span
+                    key={`ecommerce-options-summary-${sheet}`}
+                    className="rounded-full border px-2 py-0.5 text-[10px] leading-none"
+                    style={{
+                        borderColor: activeEcommerceFooterSheet === sheet ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-light)',
+                        background: activeEcommerceFooterSheet === sheet ? 'rgba(59, 130, 246, 0.10)' : 'rgba(148, 163, 184, 0.08)',
+                        color: activeEcommerceFooterSheet === sheet ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    }}
+                >
+                    {sheet}
+                </span>
+            ))}
+        </span>
+    ) : undefined;
+
+    const mobileAdvancedModePanelNode = (
+        <DesktopComposerModePanel
+            isMobile={isMobile}
+            config={config}
+            showOptionsPanel={showOptionsPanel}
+            optionsPanelRef={optionsPanelRef}
+            mobileFloatingSheetBottom={mobileFloatingSheetBottom}
+            mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
+            onToggleOptionsPanel={() => {
+                setActiveMenu(null);
+                setShowOptionsPanel(prev => !prev);
+            }}
+            summaryContent={ecommerceOptionsSummary}
+            optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
+                <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                    <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {['自动', '30s', '60s', '120s', '240s'].map(dur => (
+                            <button
+                                key={dur}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
+                                    ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
+                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
+                                    }`}
+                                onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
+                            >
+                                {dur}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
+                <ImageOptionsPanel
+                    aspectRatio={config.aspectRatio}
+                    imageSize={config.imageSize}
+                    networkOptions={isMobile ? [
+                        ...(groundingSupported ? [{
+                            id: 'grounding',
+                            label: '联网搜索',
+                            active: !!config.enableGrounding,
+                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
+                        }] : []),
+                        ...(imageSearchSupported ? [{
+                            id: 'image-search',
+                            label: '图片搜索',
+                            active: !!config.enableImageSearch,
+                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
+                        }] : []),
+                    ] : []}
+                    showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
+                    thinkingMode={config.thinkingMode || 'minimal'}
+                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                    availableRatios={availableRatios}
+                    availableSizes={availableSizes}
+                    ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                    onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                    activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                    onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                />
+            ) : (
+                <VideoOptionsPanel
+                    aspectRatio={config.aspectRatio}
+                    resolution={config.videoResolution || '720p'}
+                    duration={config.videoDuration || '4s'}
+                    audio={config.videoAudio || false}
+                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                    availableRatios={availableRatios}
+                    supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                />
+            )}
+        />
+    );
+    const mobileAdvancedSummaryText = config.mode === GenerationMode.ECOMMERCE
+        ? `${displayModelLabel} · ${activeEcommerceFooterSheet} · ${activeEcommerceAspectRatio === AspectRatio.AUTO ? '自动比例' : activeEcommerceAspectRatio} · ${activeEcommerceImageSize}`
+        : `${displayModelLabel} · ${config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · ${config.imageSize}`;
+    const dragOverlayLabel = config.mode === GenerationMode.ECOMMERCE && !ecommerceAnalysisConfirmed
+        ? '释放导入需求单或产品图'
+        : '释放添加参考图';
+    const isModelMenuOpen = activeMenu === 'model' && (!isModelListEmpty || isModelMenuLoading);
+    const modelDropdownContent = (
+        <>
+            {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
+                <div
+                    className="mb-2 rounded-2xl border p-2.5 shadow-xl max-w-[calc(100vw-24px)]"
+                    style={{
+                        width: 'min(22rem, calc(100vw - 24px))',
+                        background: 'color-mix(in srgb, var(--bg-overlay) 96%, transparent)',
+                        borderColor: 'var(--border-medium)',
+                        backdropFilter: 'blur(20px) saturate(160%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                    }}
+                >
+                    <div className="relative flex items-center">
+                        <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            value={modelSearch}
+                            onChange={(e) => setModelSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="搜索模型..."
+                            className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
+                            autoFocus
+                        />
+                        {modelSearch && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {isModelMenuRefreshingWithCache && (
+                <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>正在同步最新模型库...</span>
+                </div>
+            )}
+
+            <div
+                ref={modelListScrollRef}
+                className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin origin-bottom p-4"
+                style={{
+                    background: 'color-mix(in srgb, var(--bg-overlay) 97%, transparent)',
+                    borderColor: 'var(--border-medium)',
+                    boxShadow: 'var(--shadow-xl)',
+                    borderRadius: '1rem',
+                    backdropFilter: 'blur(22px) saturate(165%)',
+                    WebkitBackdropFilter: 'blur(22px) saturate(165%)',
+                }}
+                onScroll={(e) => {
+                    const nextTop = e.currentTarget.scrollTop;
+                    modelListScrollPos.current = nextTop;
+                    const nextStartIndex = Math.max(
+                        0,
+                        Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                    );
+                    setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
+                }}
+            >
+                {isModelMenuBootstrapping ? (
+                    <div className="py-6">
+                        <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>正在同步最新模型库...</span>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                            {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
+                                <div
+                                    key={`prompt-bar-model-loading-${index}`}
+                                    className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                />
+                            ))}
+                        </div>
+                    </div>
+                ) : (() => {
+                    const visibleModels = modelListViewport.items;
+                    const topSpacerHeight = modelListViewport.shouldWindow
+                        ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                        : 0;
+                    const bottomSpacerHeight = modelListViewport.shouldWindow
+                        ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                        : 0;
+
+                    return (
+                        <>
+                            {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                            {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                const isLast = index === visibleModels.length - 1;
+                                const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+
+                                return (
+                                    <PromptBarModelMenuButton
+                                        key={model.id}
+                                        model={model}
+                                        imageSize={config.imageSize}
+                                        selected={config.model === model.id}
+                                        isLast={isLast}
+                                        description={description}
+                                        onSelect={handleSelectPromptBarModel}
+                                        onOpenContextMenu={handlePromptBarModelContextMenu}
+                                    />
+                                );
+                            })}
+                            {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                        </>
+                    );
+                })()}
+            </div>
+        </>
+    );
+
     return (
         <>
             <div
@@ -2727,7 +3131,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 {/* Drag Overlay */}
                 {isDragging && (
                     <div className="absolute inset-0 z-50 rounded-[inherit] border border-white/65 bg-white/55 backdrop-blur-md flex items-center justify-center animate-fadeIn pointer-events-none">
-                        <span className="font-bold text-sm text-slate-900 drop-shadow-[0_1px_8px_rgba(255,255,255,0.45)]">释放添加参考图</span>
+                        <span className="font-bold text-sm text-slate-900 drop-shadow-[0_1px_8px_rgba(255,255,255,0.45)]">{dragOverlayLabel}</span>
                     </div>
                 )}
 
@@ -3180,18 +3584,32 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             requirementFileName={ecommerceRequirementFileName}
                             productFileCount={ecommerceProductFileCount}
                             extraReferenceCount={ecommerceExtraReferenceCount}
-                            ecommerceAnalysis={ecommerceAnalysis}
+                             productFiles={ecommerceProductFiles}
+                             extraReferenceFiles={ecommerceExtraReferenceFiles}
+                             itemReferenceFiles={ecommerceItemReferenceFiles}
+                             ecommerceAnalysis={ecommerceAnalysis}
                             ecommerceSelection={ecommerceSelection}
                             taskStates={ecommerceTaskStates}
+                            groupSlots={ecommerceGroupSlots}
                             activeTaskState={ecommerceActiveTaskState}
+                            analysisConfirmed={ecommerceAnalysisConfirmed}
+                            activeGroupSheet={ecommerceActiveGroupSheet}
                             ecommerceAnalyzing={ecommerceAnalyzing}
                             onPickRequirementFile={onPickEcommerceRequirementFile}
                             onPickProductFiles={onPickEcommerceProductFiles}
                             onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
-                            onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+                            onClearRequirementFile={onClearEcommerceRequirementFile}
+                             onRemoveProductFile={onRemoveEcommerceProductFile}
+                             onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
+                             onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
+                             onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
+                             onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
                             onResetAnalysis={onResetEcommerceAnalysis}
                             onConfirmAnalysis={onConfirmEcommerceAnalysis}
                             onToggleSelection={onToggleEcommerceSelection}
+                            onActivateGroupSheet={onActivateEcommerceGroupSheet}
+                            onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
+                            onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
                             onTaskStateChange={onChangeEcommerceTaskState}
                         />
 
@@ -3256,10 +3674,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     <PromptBarFooter isMobile={isMobile}>
                         <div className={`flex min-w-0 items-center ${isMobile ? 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2' : 'flex-1 gap-1.5'}`}>
                             {/* Model Button */}
-                            <div className={`relative inline-flex min-w-0 ${isMobile ? (isEmbeddedMobileComposer ? '' : 'col-span-2') : 'flex-shrink-0'}`}>
+                            <div
+                                ref={modelMenuAnchorRef}
+                                className={`relative inline-flex min-w-0 ${isMobile ? (isEmbeddedMobileComposer ? '' : 'col-span-2') : 'flex-shrink-0'}`}
+                            >
                                 <button
-                                    id="models-dropdown-trigger"
-                                    className={`input-bar-model flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? (isEmbeddedMobileComposer ? 'w-full max-w-full justify-start' : 'w-full max-w-full justify-center') : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? (isEmbeddedMobileComposer ? 'w-full max-w-full justify-start' : 'w-full max-w-full justify-center') : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed border-[var(--border-light)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3275,10 +3695,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 true,
                                             );
                                         }
-                                        return {
-                                            background: 'var(--prompt-bar-shell-bg)',
-                                            borderColor: 'var(--prompt-bar-shell-border)',
-                                        };
+                                        return {};
                                     })()}
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
@@ -3343,16 +3760,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </button>
 
                                 {/* Dropdown Menu */}
-                                {activeMenu === 'model' && (!isModelListEmpty || isModelMenuLoading) && (
+                                {isModelMenuOpen && isMobile && (
                                     <div
                                         ref={modelDropdownRef}
-                                        className={isMobile ? 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-scaleIn origin-bottom overflow-hidden' : 'absolute bottom-full mb-3 z-50 animate-scaleIn origin-bottom'}
-                                        style={isMobile
-                                            ? { bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }
-                                            : { left: '50%', transform: 'translateX(-50%)' }}
+                                        className="fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
+                                        style={{ bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
                                     >
                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                        {!isModelMenuLoading && filteredDisplayModels.length > 1 && (
+                                        {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                                             <div className="mb-2 p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-medium)] rounded-2xl shadow-xl animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
                                                 <div className="relative flex items-center">
                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3381,6 +3796,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             </div>
                                         )}
 
+                                        {isModelMenuRefreshingWithCache && (
+                                            <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                <Loader2 size={14} className="animate-spin" />
+                                                <span>正在同步最新模型库...</span>
+                                            </div>
+                                        )}
+
                                         <div
                                             ref={modelListScrollRef}
                                             className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
@@ -3395,14 +3817,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
                                             }}
                                         >
-                                            {isModelMenuLoading ? (
+                                            {isModelMenuBootstrapping ? (
                                                 <div className="py-6">
                                                     <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
                                                         <Loader2 size={14} className="animate-spin" />
                                                         <span>正在同步最新模型库...</span>
                                                     </div>
                                                     <div className="mt-4 space-y-2">
-                                                        {Array.from({ length: 5 }).map((_, index) => (
+                                                        {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
                                                             <div
                                                                 key={`prompt-bar-model-loading-${index}`}
                                                                 className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
@@ -3446,6 +3868,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </div>
                                     </div >
                                 )}
+                                {isModelMenuOpen && !isMobile && (
+                                    <div
+                                        ref={modelDropdownRef}
+                                        className="absolute left-1/2 bottom-full mb-3 z-50 -translate-x-1/2 animate-fadeIn origin-bottom"
+                                    >
+                                        {modelDropdownContent}
+                                    </div>
+                                )}
                             </div >
 
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
@@ -3461,6 +3891,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     setActiveMenu(null);
                                     setShowOptionsPanel(prev => !prev);
                                 }}
+                                summaryContent={ecommerceOptionsSummary}
                                 optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
                                     <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
                                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
@@ -3497,13 +3928,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
                                             }] : []),
                                         ] : []}
-                                        showThinkingMode={thinkingSupported}
+                                        showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
                                         thinkingMode={config.thinkingMode || 'minimal'}
                                         onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
                                         onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                                         onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                                         availableRatios={availableRatios}
                                         availableSizes={availableSizes}
+                                        ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                                        onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                                        activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                                        onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
                                     />
                                 ) : (
                                     <VideoOptionsPanel
@@ -3521,10 +3956,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
                                 networkControls={!isMobile && (groundingSupported || imageSearchSupported) ? (
                                     <div
-                                        className="flex min-w-0 max-w-full shrink items-center gap-1 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-1 py-0.5 h-10 transition-all duration-200"
+                                        className="prompt-bar-liquid-group flex min-w-0 max-w-full shrink items-center gap-1 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-1 py-0.5 h-10 transition-all duration-200"
                                         style={{
-                                            background: 'var(--prompt-bar-shell-bg)',
-                                            borderColor: 'var(--prompt-bar-shell-border)',
                                             opacity: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 0 : 1,
                                             visibility: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'hidden' : 'visible',
                                             pointerEvents: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'none' : 'auto'
@@ -3576,12 +4009,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
 
                             {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
-                            {!isMobile && (
-                                <div className="ml-auto flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0" style={{ background: 'var(--prompt-bar-shell-bg)', borderColor: 'var(--prompt-bar-shell-border)', boxShadow: 'var(--prompt-bar-shell-shadow)' }}>
+                            {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
+                                <div className="prompt-bar-liquid-group ml-auto flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0">
                                     {/* Parallel Count */}
                                     <div className="relative h-full w-[58px]">
                                         <button
-                                            className="flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-white/5"
+                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-white/5"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -3589,7 +4022,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             }}
                                             title="并发数量"
                                         >
-                                            <span className="text-[11px] font-medium">{config.parallelCount} 张</span>
+                                            <span className="text-[11px] font-medium">{`${config.parallelCount} 张`}</span>
                                             <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
                                         </button>
                                         {
@@ -3599,9 +4032,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         {(config.mode === GenerationMode.PPT
                                                             ? Array.from({ length: 20 }, (_, i) => i + 1)
                                                             : [1, 2, 3, 4]
-                                                        ).map(count => (
-                                                            <button key={count} className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`} onClick={() => { updateConfigFields({ parallelCount: count }); setActiveMenu(null); }}>
-                                                                <span>{count} 张</span>
+                                                        ).map((count) => (
+                                                            <button
+                                                                key={count}
+                                                                className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                onClick={() => {
+                                                                    updateConfigFields({ parallelCount: count as number });
+                                                                    setActiveMenu(null);
+                                                                }}
+                                                            >
+                                                                <span>{`${count} 张`}</span>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -3743,108 +4183,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
                         </div>
                         {isEmbeddedMobileComposer ? (
-                            <details
-                                data-mobile-composer-section="advanced-drawer"
-                                className="w-full rounded-[20px] border border-white/8 bg-black/10 px-1.5 py-1 text-[var(--text-primary)]"
-                            >
-                                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[16px] px-2.5 py-2 text-left marker:hidden">
-                                    <div className="min-w-0">
-                                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                                            高级设置
-                                        </div>
-                                        <div className="mt-1 truncate text-[12px] font-medium text-[var(--text-secondary)]">
-                                            {displayModelLabel} · {config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · {config.imageSize}
-                                        </div>
-                                    </div>
-                                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
-                                        展开
-                                    </span>
-                                </summary>
-
-                                <div className="space-y-2 px-2.5 pb-2 pt-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <DesktopComposerPromptTools
-                                            isMobile={isMobile}
-                                            config={config}
-                                            showPptOutlinePanel={showPptOutlinePanel}
-                                            onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-                                            onTogglePromptOptimization={handleTogglePromptOptimization}
-                                        />
-                                    </div>
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        <DesktopComposerModePanel
-                                            isMobile={isMobile}
-                                            config={config}
-                                            showOptionsPanel={showOptionsPanel}
-                                            optionsPanelRef={optionsPanelRef}
-                                            mobileFloatingSheetBottom={mobileFloatingSheetBottom}
-                                            mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
-                                            onToggleOptionsPanel={() => {
-                                                setActiveMenu(null);
-                                                setShowOptionsPanel(prev => !prev);
-                                            }}
-                                            optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
-                                                <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
-                                                    <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {['自动', '30s', '60s', '120s', '240s'].map(dur => (
-                                                            <button
-                                                                key={dur}
-                                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                                                    ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
-                                                                    }`}
-                                                                onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
-                                                            >
-                                                                {dur}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
-                                                <ImageOptionsPanel
-                                                    aspectRatio={config.aspectRatio}
-                                                    imageSize={config.imageSize}
-                                                    networkOptions={isMobile ? [
-                                                        ...(groundingSupported ? [{
-                                                            id: 'grounding',
-                                                            label: '联网搜索',
-                                                            active: !!config.enableGrounding,
-                                                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                                                        }] : []),
-                                                        ...(imageSearchSupported ? [{
-                                                            id: 'image-search',
-                                                            label: '图片搜索',
-                                                            active: !!config.enableImageSearch,
-                                                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                                                        }] : []),
-                                                    ] : []}
-                                                    showThinkingMode={thinkingSupported}
-                                                    thinkingMode={config.thinkingMode || 'minimal'}
-                                                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
-                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
-                                                    availableRatios={availableRatios}
-                                                    availableSizes={availableSizes}
-                                                />
-                                            ) : (
-                                                <VideoOptionsPanel
-                                                    aspectRatio={config.aspectRatio}
-                                                    resolution={config.videoResolution || '720p'}
-                                                    duration={config.videoDuration || '4s'}
-                                                    audio={config.videoAudio || false}
-                                                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
-                                                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
-                                                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
-                                                    availableRatios={availableRatios}
-                                                    supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
-                                                />
-                                            )}
-                                        />
-                                    </div>
-                                </div>
-                            </details>
+                            <MobileEmbeddedAdvancedDrawer
+                                summaryText={mobileAdvancedSummaryText}
+                                promptTools={mobileAdvancedPromptToolsNode}
+                                modePanel={mobileAdvancedModePanelNode}
+                            />
                         ) : null}
                         <div className={isMobile ? '' : 'ml-2 flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
@@ -3857,6 +4200,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 colorStart={currentModel?.colorStart}
                                 colorEnd={currentModel?.colorEnd}
                                 textColor={currentModel?.textColor}
+                                className={isMobile ? '' : 'prompt-bar-liquid-button prompt-bar-liquid-send'}
                                 onClick={() => {
                                     if (isSystemCreditModel && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');

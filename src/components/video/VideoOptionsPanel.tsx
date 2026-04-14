@@ -130,9 +130,12 @@ const VideoOptionsPanel: React.FC<VideoOptionsPanelProps> = ({
             className="p-4 rounded-xl border shadow-2xl max-w-[90vw]"
             style={{
                 width: 'min(380px, calc(100vw - 24px))',
-                backgroundColor: 'var(--bg-secondary)',
-                backdropFilter: 'blur(8px)',
-                borderColor: 'var(--border-light)'
+                background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-overlay) 96%, var(--bg-base)) 0%, color-mix(in srgb, var(--bg-secondary) 94%, var(--bg-base)) 100%)',
+                boxShadow: 'var(--shadow-xl), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent)',
+                backdropFilter: 'blur(20px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                borderColor: 'var(--border-default)',
+                isolation: 'isolate',
             }}
         >
             {/* 1. 音频 - 左右两个按钮带图标 (仅当 supportsAudio 为 true 时显示) */}

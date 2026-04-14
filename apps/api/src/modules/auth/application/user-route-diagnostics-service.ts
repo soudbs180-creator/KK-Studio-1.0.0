@@ -113,10 +113,23 @@ function isGoogleOfficialGeminiBaseUrl(baseUrl: string | undefined): boolean {
   return normalized.includes("googleapis.com") || normalized.includes("generativelanguage.googleapis.com");
 }
 
+function shouldForceHeaderAuthForProvider(provider: string, baseUrl: string): boolean {
+  const normalizedProvider = normalizeString(provider).toLowerCase();
+  const normalizedBaseUrl = normalizeString(baseUrl).toLowerCase();
+  return normalizedProvider === "gpt-best"
+    || normalizedProvider === "gptbest"
+    || normalizedBaseUrl.includes("gpt-best")
+    || normalizedBaseUrl.includes("gptbest");
+}
+
 function inferAuthMethod(
   routeConfig: SecureProxyUserRouteConfigDto,
   format: ResolvedRouteFormat,
 ): ResolvedAuthMethod {
+  if (shouldForceHeaderAuthForProvider(routeConfig.provider, routeConfig.baseUrl)) {
+    return "header";
+  }
+
   if (routeConfig.authMethod === "query" || routeConfig.authMethod === "header") {
     return routeConfig.authMethod;
   }

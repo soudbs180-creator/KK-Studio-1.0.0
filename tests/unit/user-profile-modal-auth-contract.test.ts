@@ -13,6 +13,7 @@ test("UserProfileModal routes profile and password changes through KK API instea
   const source = readSource("src/components/modals/UserProfileModal.tsx");
 
   assert.match(source, /kkWebApiClient\.updateProfile\(/);
+  assert.match(source, /kkWebApiClient\.sendPasswordChangeCode\(/);
   assert.match(source, /kkWebApiClient\.updatePassword\(/);
   assert.doesNotMatch(source, /supabase\.auth\.getSession\(/);
   assert.doesNotMatch(source, /supabase\.auth\.updateUser\(/);

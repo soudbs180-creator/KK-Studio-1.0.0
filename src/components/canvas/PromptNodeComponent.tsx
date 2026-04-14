@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
-import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
+import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
+import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -212,8 +213,11 @@ interface PromptNodeProps {
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
     onConfirmEcommerceDesktop?: (node: PromptNode) => void;
     onRetryEcommerceModule?: (node: PromptNode) => void;
+    onExportEcommerceGroup?: (node: PromptNode) => void;
+    ecommerceSlotState?: EcommerceGroupSlotState | null;
     activeEcommerceTaskState?: EcommerceEditableTaskState | null;
     onActivateEcommerceTask?: (node: PromptNode) => void;
+    onPreviewEcommerceSlotHistory?: (node: PromptNode, preferredImageId?: string) => void;
     onEcommerceTaskStateChange?: (
         taskId: string,
         updater:
@@ -451,8 +455,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onGenerateEcommerceGroup,
     onConfirmEcommerceDesktop,
     onRetryEcommerceModule,
+    onExportEcommerceGroup,
+    ecommerceSlotState = null,
     activeEcommerceTaskState = null,
     onActivateEcommerceTask,
+    onPreviewEcommerceSlotHistory,
     onEcommerceTaskStateChange,
     ioTrace,
     onOpenStorageSettings,
@@ -1185,6 +1192,21 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'a-plus-group' && onExportEcommerceGroup && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onExportEcommerceGroup(node);
+                                }}
+                                aria-label={node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all hover:bg-emerald-500/16"
+                                title={node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}
+                            >
+                                <Download size={10} />
+                                <span>{node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}</span>
+                            </button>
+                        )}
                         {node.mode === GenerationMode.ECOMMERCE && node.ecommerce && onToggleEcommerceSelected && node.ecommerce.kind !== 'a-plus-group' && (
                             <button
                                 type="button"
@@ -1247,6 +1269,45 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         )}
                     </div>
                 </div>
+
+                {node.mode === GenerationMode.ECOMMERCE
+                    && node.ecommerce
+                    && node.ecommerce.kind !== 'a-plus-group'
+                    && ecommerceSlotState
+                    && (ecommerceSlotState.currentImageId || ecommerceSlotState.history.length > 1) ? (
+                    <div
+                        className="mx-3 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-2"
+                        data-testid="ecommerce-slot-version-surface"
+                    >
+                        <span className="rounded-full border border-[var(--border-light)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+                            当前版本 {ecommerceSlotState.currentSource === 'redraw' ? '重绘版' : ecommerceSlotState.currentSource === 'generated' ? '生成版' : '未生成'}
+                        </span>
+                        {onPreviewEcommerceSlotHistory && ecommerceSlotState.currentImageId ? (
+                            <button
+                                type="button"
+                                className="rounded-md border border-[var(--border-light)] px-2 py-1 text-[10px] text-[var(--text-primary)] transition-colors hover:border-blue-500/40 hover:text-blue-300"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPreviewEcommerceSlotHistory(node, ecommerceSlotState.currentImageId || undefined);
+                                }}
+                            >
+                                打开当前版本
+                            </button>
+                        ) : null}
+                        {onPreviewEcommerceSlotHistory && ecommerceSlotState.history.length > 1 ? (
+                            <button
+                                type="button"
+                                className="rounded-md border border-[var(--border-light)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:border-blue-500/40 hover:text-blue-300"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPreviewEcommerceSlotHistory(node);
+                                }}
+                            >
+                                查看历史版本 {ecommerceSlotState.history.length - 1}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 {/* Content Padding Wrapper */}
                 <div className="p-3 flex flex-col flex-1">

@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  AdminRechargeSubmissionDto,
+  CreateRechargeSubmissionRequestDto,
   CreditExchangeRateDto,
   RechargeSubmissionDto,
+  SubmitRechargeProofRequestDto,
   SubmitRechargeRequestDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 
@@ -10,7 +13,7 @@ export interface RechargeSubmissionRecord extends RechargeSubmissionDto {
   userId: string;
   creditAmount: number;
   creditsPerUnit: number;
-  reviewActorUserId?: string;
+  reviewActorUserId?: string | null;
 }
 
 export class RechargeSubmissionNotFoundError extends Error {
@@ -29,6 +32,14 @@ export class RechargeSubmissionNotPendingError extends Error {
   }
 }
 
+export class RechargeSubmissionNotCreatedError extends Error {
+  readonly code = "RECHARGE_SUBMISSION_NOT_CREATED";
+
+  constructor(submissionId: string, status: string) {
+    super(`Recharge submission ${submissionId} is not awaiting proof. Current status: ${status}.`);
+  }
+}
+
 export function roundRechargeAmount(amount: number): number {
   return Math.max(0, Math.round((Number(amount) + Number.EPSILON) * 100) / 100);
 }
@@ -39,16 +50,16 @@ export function calculateRechargeCreditAmount(amount: number, creditsPerUnit: nu
 
 export function resolveRechargeRate(
   rates: CreditExchangeRateDto[],
-  currencyCode: SubmitRechargeRequestDto["currencyCode"],
+  currencyCode: CreateRechargeSubmissionRequestDto["currencyCode"],
 ): CreditExchangeRateDto | undefined {
   return rates.find((rate) => rate.currencyCode === currencyCode && rate.isActive !== false);
 }
 
 export function createRechargeSubmission(
   userId: string,
-  input: SubmitRechargeRequestDto,
+  input: CreateRechargeSubmissionRequestDto,
   rate: CreditExchangeRateDto,
-  submittedAt: string,
+  createdAt: string,
 ): RechargeSubmissionRecord {
   return {
     submissionId: randomUUID(),
@@ -56,13 +67,33 @@ export function createRechargeSubmission(
     amount: roundRechargeAmount(input.amount),
     currencyCode: input.currencyCode,
     paymentChannel: input.paymentChannel,
+    transferReferenceLast4: null,
+    note: input.note,
+    status: "created",
+    createdAt,
+    submittedAt: null,
+    reviewedAt: null,
+    creditAmount: calculateRechargeCreditAmount(input.amount, rate.creditsPerUnit),
+    creditsPerUnit: rate.creditsPerUnit,
+    reviewActorUserId: null,
+  };
+}
+
+export function submitRechargeSubmissionProof(
+  submission: RechargeSubmissionRecord,
+  input: SubmitRechargeProofRequestDto,
+  submittedAt: string,
+): RechargeSubmissionRecord {
+  if (submission.status !== "created") {
+    throw new RechargeSubmissionNotCreatedError(submission.submissionId, submission.status);
+  }
+
+  return {
+    ...submission,
     transferReferenceLast4: input.transferReferenceLast4,
     note: input.note,
     status: "pending",
     submittedAt,
-    reviewedAt: null,
-    creditAmount: calculateRechargeCreditAmount(input.amount, rate.creditsPerUnit),
-    creditsPerUnit: rate.creditsPerUnit,
   };
 }
 
@@ -83,6 +114,23 @@ export function markRechargeSubmissionCredited(
   };
 }
 
+export function markRechargeSubmissionRejected(
+  submission: RechargeSubmissionRecord,
+  actorUserId: string,
+  reviewedAt: string,
+): RechargeSubmissionRecord {
+  if (submission.status !== "pending") {
+    throw new RechargeSubmissionNotPendingError(submission.submissionId, submission.status);
+  }
+
+  return {
+    ...submission,
+    status: "rejected",
+    reviewedAt,
+    reviewActorUserId: actorUserId,
+  };
+}
+
 export function buildStaticRechargeDescription(submission: RechargeSubmissionRecord): string {
   return `Static recharge approved: ${submission.submissionId}`;
 }
@@ -96,7 +144,20 @@ export function toRechargeSubmissionDto(submission: RechargeSubmissionRecord): R
     transferReferenceLast4: submission.transferReferenceLast4,
     note: submission.note,
     status: submission.status,
-    submittedAt: submission.submittedAt,
+    createdAt: submission.createdAt,
+    submittedAt: submission.submittedAt ?? null,
     reviewedAt: submission.reviewedAt ?? null,
+  };
+}
+
+export function toAdminRechargeSubmissionDto(
+  submission: RechargeSubmissionRecord,
+): AdminRechargeSubmissionDto {
+  return {
+    ...toRechargeSubmissionDto(submission),
+    userId: submission.userId,
+    creditAmount: submission.creditAmount,
+    creditsPerUnit: submission.creditsPerUnit,
+    reviewActorUserId: submission.reviewActorUserId ?? null,
   };
 }

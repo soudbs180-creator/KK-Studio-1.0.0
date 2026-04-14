@@ -32,6 +32,17 @@ describe("provider strategy", () => {
     assert.equal(runtime.managementSupport, "native");
   });
 
+  test("prefers request profile registry aliases before provider strategy fallback patterns", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Wu Yin",
+      format: "openai",
+    });
+
+    assert.equal(runtime.requestProfileId, "wuyinkeji");
+    assert.equal(runtime.strategyId, "wuyinkeji");
+    assert.equal(runtime.providerFamily, "newapi-family");
+  });
+
   test("treats Google official hosts as official even for legacy custom provider slots", () => {
     assert.equal(
       resolveProviderKeyType("Custom", "https://generativelanguage.googleapis.com/v1beta"),
@@ -44,6 +55,17 @@ describe("provider strategy", () => {
       resolveProviderKeyType("OpenAI", "https://api.openai.com/v1"),
       "official",
     );
+  });
+
+  test("treats request profile official aliases as official keys even without host evidence", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "OpenAI Official",
+      format: "openai",
+    });
+
+    assert.equal(runtime.requestProfileId, "openai-official");
+    assert.equal(runtime.strategyId, "openai");
+    assert.equal(resolveProviderKeyType("OpenAI Official"), "official");
   });
 
   test("keeps non-official Google-compatible hosts out of the official bucket", () => {

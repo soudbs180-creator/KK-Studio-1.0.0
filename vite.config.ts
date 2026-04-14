@@ -4,6 +4,7 @@ import { isIP } from 'node:net';
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo';
+import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData';
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
 const TURNSTILE_DIAGNOSTIC_ENTRY = path.resolve(__dirname, 'turnstile-diagnostic.html');
@@ -637,6 +638,37 @@ function nutrientDocumentProxyPlugin(): Plugin {
     };
 }
 
+function ecommerceAnalysisProxyPlugin(): Plugin {
+    return {
+        name: 'ecommerce-analysis-proxy',
+        configureServer(server) {
+            server.middlewares.use(async (req, res, next) => {
+                const requestPath = getRequestPath(req.url);
+                if (requestPath !== '/api/ecommerce-analysis') {
+                    return next();
+                }
+
+                if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+                    return next();
+                }
+
+                const body = req.method === 'POST' ? await readIncomingBody(req) : undefined;
+                const { default: ecommerceAnalysisHandler } = await import('./api/ecommerce-analysis.ts');
+                const proxyHeaders = createProxyRequestHeaders(req.headers);
+                const normalizedBody = body ? normalizeMultipartProxyBody(proxyHeaders, body) : body;
+
+                const response = await ecommerceAnalysisHandler(new Request(`http://localhost${req.url || '/api/ecommerce-analysis'}`, {
+                    method: req.method,
+                    headers: proxyHeaders,
+                    body: normalizedBody,
+                }));
+
+                await writeFetchResponse(res, response);
+            });
+        },
+    };
+}
+
 function authPasswordProxyPlugin(): Plugin {
     return {
         name: 'auth-password-proxy',
@@ -704,7 +736,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), authPasswordProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), ecommerceAnalysisProxyPlugin(), authPasswordProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

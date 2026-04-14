@@ -223,6 +223,21 @@
         "tests/unit/hosted-release-guardrails.test.ts"
       ],
       "removalCondition": "Delete once hosted and local password login flows no longer require a same-origin proxy fallback and Supabase-first auth is stable everywhere."
+    },
+    {
+      "path": "src/services/ecommerce/text/fallbackTextAnalysis.ts",
+      "role": "compatibility-layer",
+      "currentPurpose": "Converts document-text fallback extraction into the structured ecommerce analysis/task shape while spreadsheet and richer parsers still coexist.",
+      "upstreamCanonicalSource": "src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts",
+      "downstreamDependents": [
+        "api/ecommerce-analysis.ts"
+      ],
+      "riskLevel": "medium",
+      "regressionTests": [
+        "tests/unit/ecommerce-text-fallback.test.ts",
+        "tests/unit/ecommerce-task-services.test.ts"
+      ],
+      "removalCondition": "Delete once document and spreadsheet ecommerce intake both emit the canonical structured analysis shape without a text-only fallback adapter."
     }
   ]
 }

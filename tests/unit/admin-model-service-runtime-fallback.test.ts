@@ -21,7 +21,7 @@ test('admin model loading uses the shared web API client while exchange rates re
   assert.match(clientSource, /export function createKkWebApiClient\(\): KkApiClient \{/);
   assert.match(clientSource, /export const kkWebApiClient = createKkWebApiClient\(\);/);
 
-  assert.match(serviceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(serviceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient(?:\.ts)?';/);
   assert.match(serviceSource, /buildCreditModelCatalog/);
   assert.match(serviceSource, /listActiveModels/);
   assert.match(serviceSource, /listActiveCreditModels/);
@@ -30,7 +30,7 @@ test('admin model loading uses the shared web API client while exchange rates re
   assert.match(routeUnitSource, /export function buildCreditModelCatalog/);
   assert.match(routeUnitSource, /export function pickCreditModelSpec/);
 
-  assert.match(exchangeRateSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(exchangeRateSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient(?:\.ts)?';/);
   assert.match(exchangeRateSource, /kkWebApiClient\.listCreditExchangeRates\(/);
   assert.match(exchangeRateSource, /kkWebApiClient\.upsertCreditExchangeRate\(/);
   assert.doesNotMatch(exchangeRateSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);

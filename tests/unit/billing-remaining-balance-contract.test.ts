@@ -121,7 +121,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.ok(dashboardLocalizedSource.includes('selectRemainingBalanceSummary'));
   assert.ok(dashboardLocalizedSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);"));
   assert.ok(dashboardLocalizedSource.includes('title: pick('));
-  assert.ok(dashboardLocalizedSource.includes("'Credits & Recharge')"));
+  assert.ok(dashboardLocalizedSource.includes("'Balance and recharge')"));
   assert.ok(dashboardLocalizedSource.includes('value: remainingBalanceDisplay'));
 
   assert.ok(dashboardSource.includes('selectRemainingBalanceSummary'));
@@ -151,8 +151,10 @@ test('user api settings keep working when local API persistence degrades to memo
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;'));
-  assert.ok(apiSettingsViewSource.includes('const headerPrimaryActionDisabled = activeTab === \'official\' ? userApiActionsDisabled : providerActionsDisabled;'));
-  assert.ok(apiSettingsViewSource.includes('disabled={headerPrimaryActionDisabled} onClick={activeTab === \'official\' ? beginCreateOfficial : beginCreateProvider}'));
+  assert.ok(apiSettingsViewSource.includes('const stagePrimaryActionIcon = stageMeta.primaryActionKind === \'create-official\' || stageMeta.primaryActionKind === \'create-provider\''));
+  assert.ok(apiSettingsViewSource.includes('const handleStagePrimaryAction = () => {'));
+  assert.ok(apiSettingsViewSource.includes('onPrimaryAction={handleStagePrimaryAction}'));
+  assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled} onClick={beginCreateOfficial}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerEditorReadOnly}'));
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotToCloudRecord({'));

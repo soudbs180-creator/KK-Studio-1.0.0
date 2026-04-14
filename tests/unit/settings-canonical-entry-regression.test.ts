@@ -41,9 +41,11 @@ test('settings routing metadata is owned by a shared registry instead of duplica
   assert.doesNotMatch(routesSource, /export const settingsNavItems: SettingsNavItem\[] = \[/);
 });
 
-test('settings workbench relies on the app router instead of nesting a MemoryRouter', () => {
+test('settings workbench self-hosts a MemoryRouter because the app root does not mount a global router', () => {
   const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const mainSource = readSource('src/main.tsx');
 
-  assert.doesNotMatch(localizedShellSource, /import \{ MemoryRouter,/);
-  assert.doesNotMatch(localizedShellSource, /<MemoryRouter[\s\S]*<\/MemoryRouter>/);
+  assert.doesNotMatch(mainSource, /<BrowserRouter/);
+  assert.match(localizedShellSource, /import \{ MemoryRouter, Routes, useLocation, useNavigate \} from 'react-router-dom';/);
+  assert.match(localizedShellSource, /<MemoryRouter initialEntries=\{\[initialEntry\]\} key=\{initialEntry\}>[\s\S]*<SettingsRouterShell/);
 });

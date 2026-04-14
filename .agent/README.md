@@ -46,6 +46,10 @@ npm run check:encoding
 npm run build
 ```
 
+## 编码读取提示
+- 本仓库文档与规则文件统一按 UTF-8 保存。
+- 在 Windows PowerShell 默认 `cp936` 会话里，`Get-Content` 可能把中文显示成乱码；优先使用 `Get-Content -Encoding UTF8`、`[System.IO.File]::ReadAllText(..., [System.Text.Encoding]::UTF8)` 或直接运行仓库治理脚本验证。
+
 ## 说明
 `SKILL.md` 是详细规则总纲；本 README 负责说明当前基线版本和“修改时必须同步什么”。
 - 对支持仓库级入口约定的 AI 代理，优先从 `AGENTS.md` 进入。

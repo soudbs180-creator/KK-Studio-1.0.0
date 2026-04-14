@@ -8,11 +8,13 @@ const ROOT_DIR = process.cwd();
 test("encoding check scans root docs and env examples with readable messaging", () => {
   const source = readFileSync(path.join(ROOT_DIR, "scripts", "check-encoding.js"), "utf-8");
 
-  assert.match(source, /'README\.md'/);
-  assert.match(source, /'PROJECT_ROOT_GUIDE\.md'/);
-  assert.match(source, /'\.env\.example'/);
-  assert.match(source, /'\.agent'/);
-  assert.match(source, /apps', 'api', '\.env\.local\.example'/);
+  assert.match(source, /"README\.md"/);
+  assert.match(source, /"PROJECT_ROOT_GUIDE\.md"/);
+  assert.match(source, /"\.env\.example"/);
+  assert.match(source, /"\.agent"/);
+  assert.match(source, /path\.join\("apps", "api", "\.env\.local\.example"\)/);
   assert.match(source, /Found suspicious mojibake text/);
+  assert.match(source, /Found traditional Chinese characters/);
+  assert.match(source, /traditionalOnlyChars/);
   assert.match(source, /Encoding check passed/);
 });

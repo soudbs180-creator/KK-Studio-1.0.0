@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import ts from "typescript";
@@ -20,32 +19,52 @@ const parsedConfig = ts.parseJsonConfigFileContent(
   configPath,
 );
 
-const testFiles = ts.sys.readDirectory(
-  root,
-  [".ts"],
-  configResult.config.exclude,
-  ["tests"],
-).sort();
+const testFiles = parsedConfig.fileNames
+  .filter((fileName) => fileName.split(/[\\/]/).includes("tests"))
+  .sort();
 
-const diagnostics = [];
+const diagnostics = [...parsedConfig.errors];
+const program = ts.createProgram({
+  rootNames: parsedConfig.fileNames,
+  options: parsedConfig.options,
+});
+
+diagnostics.push(...program.getOptionsDiagnostics());
+diagnostics.push(...program.getGlobalDiagnostics());
 
 for (const fileName of testFiles) {
-  const source = fs.readFileSync(fileName, "utf8");
-  const result = ts.transpileModule(source, {
-    compilerOptions: parsedConfig.options,
-    fileName,
-    reportDiagnostics: true,
-  });
-
-  for (const diagnostic of result.diagnostics || []) {
-    if (diagnostic.category === ts.DiagnosticCategory.Error) {
-      diagnostics.push(diagnostic);
-    }
+  const sourceFile = program.getSourceFile(fileName);
+  if (!sourceFile) {
+    diagnostics.push({
+      category: ts.DiagnosticCategory.Error,
+      code: 0,
+      file: undefined,
+      start: undefined,
+      length: undefined,
+      messageText: `Unable to load test source file: ${fileName}`,
+    });
+    continue;
   }
+
+  diagnostics.push(...program.getSyntacticDiagnostics(sourceFile));
+  diagnostics.push(...program.getSemanticDiagnostics(sourceFile));
+  diagnostics.push(...program.getDeclarationDiagnostics(sourceFile));
 }
 
-if (diagnostics.length > 0) {
-  for (const diagnostic of diagnostics) {
+const relevantDiagnostics = diagnostics.filter((diagnostic) => {
+  if (diagnostic.category !== ts.DiagnosticCategory.Error) {
+    return false;
+  }
+
+  if (!diagnostic.file) {
+    return true;
+  }
+
+  return diagnostic.file.fileName.split(/[\\/]/).includes("tests");
+});
+
+if (relevantDiagnostics.length > 0) {
+  for (const diagnostic of relevantDiagnostics) {
     const formatted = ts.formatDiagnosticsWithColorAndContext([diagnostic], {
       getCanonicalFileName: (fileName) => fileName,
       getCurrentDirectory: () => root,
@@ -56,4 +75,4 @@ if (diagnostics.length > 0) {
   process.exit(1);
 }
 
-console.log(`[tests:typecheck] transpile check passed for ${testFiles.length} test files using ${path.basename(configPath)}.`);
+console.log(`[tests:typecheck] semantic check passed for ${testFiles.length} test files using ${path.basename(configPath)}.`);

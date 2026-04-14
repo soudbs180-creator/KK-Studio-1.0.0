@@ -40,9 +40,9 @@ test("docked regroup layout keeps child cards under the parent with a compact do
   assert.deepEqual(
     layouts.map((layout) => layout.dockedPosition),
     [
-      { x: 388, y: 644 },
-      { x: 500, y: 644 },
-      { x: 612, y: 644 },
+      { x: 196, y: 676 },
+      { x: 500, y: 676 },
+      { x: 804, y: 676 },
     ],
   );
   assert.deepEqual(
@@ -93,10 +93,10 @@ test("docked regroup layout supports fast-then-slow interpolation from caller-pr
   })[0];
 
   assert.deepEqual(initialLayout.position, { x: 100, y: 100 });
-  assert.deepEqual(initialLayout.dockedPosition, { x: 500, y: 644 });
+  assert.deepEqual(initialLayout.dockedPosition, { x: 500, y: 676 });
   assert.deepEqual(initialLayout.settledPosition, { x: 500, y: 676 });
-  assert.deepEqual(halfwayToDock.position, { x: 300, y: 372 });
+  assert.deepEqual(halfwayToDock.position, { x: 300, y: 388 });
   assert.deepEqual(dockedLayout.position, dockedLayout.dockedPosition);
-  assert.deepEqual(halfwayToSettled.position, { x: 500, y: 660 });
+  assert.deepEqual(halfwayToSettled.position, { x: 500, y: 676 });
   assert.deepEqual(settledLayout.position, settledLayout.settledPosition);
 });

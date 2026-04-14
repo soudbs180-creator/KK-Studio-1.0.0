@@ -70,6 +70,7 @@ type LocalTaskPayload = {
   userId: string;
   routeId: string;
   taskId: string;
+  mode?: "image" | "video";
   requestId?: string;
   attemptId?: string;
 };
@@ -231,7 +232,7 @@ type LocalResolvedRouteEndpointType = "openai" | "gemini" | "claude";
 type LocalResolvedRouteFormat = "openai" | "gemini" | "claude";
 type LocalResolvedAuthMethod = "query" | "header";
 type LocalAuthorizationValueFormat = "bearer" | "raw";
-type LocalResolvedImageSurface = "chat-image" | "provider-images" | "gemini-native-image";
+type LocalResolvedImageSurface = "chat-image" | "provider-images" | "gemini-native-image" | "async-image";
 
 function normalizeRouteString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -320,6 +321,15 @@ function isSiliconFlowRoute(routeConfig: SecureProxyUserRouteConfigDto): boolean
   return provider.includes("siliconflow") || baseUrl.includes("siliconflow");
 }
 
+function shouldForceHeaderAuthForProvider(provider: string | undefined, baseUrl: string | undefined): boolean {
+  const normalizedProvider = normalizeRouteString(provider).toLowerCase();
+  const normalizedBaseUrl = normalizeRouteString(baseUrl).toLowerCase();
+  return normalizedProvider === "gpt-best"
+    || normalizedProvider === "gptbest"
+    || normalizedBaseUrl.includes("gpt-best")
+    || normalizedBaseUrl.includes("gptbest");
+}
+
 function detectLocalRouteStrategy(routeConfig: SecureProxyUserRouteConfigDto): string {
   if (is12AIBaseUrl(routeConfig.baseUrl)) return "12ai";
   if (isWuyinGeminiRoute(routeConfig)) return "wuyinkeji";
@@ -375,6 +385,33 @@ function isGeminiImageModel(modelId?: string): boolean {
   );
 }
 
+function is12AIAsyncImageModel(modelId?: string): boolean {
+  const normalized = String(modelId || "").trim().toLowerCase();
+  if (!normalized) return false;
+
+  return normalized.includes("gemini-2.5-flash-image")
+    || normalized.includes("gemini-3.1-flash-image-preview")
+    || normalized.includes("gemini-3-pro-image-preview")
+    || normalized.includes("nano-banana")
+    || normalized.includes("nanobanana");
+}
+
+function shouldUse12AIAsyncImageRoute(
+  routeConfig: SecureProxyUserRouteConfigDto,
+  modelId?: string,
+  imageCount?: number,
+): boolean {
+  if (detectLocalRouteStrategy(routeConfig) !== "12ai") {
+    return false;
+  }
+
+  if (!is12AIAsyncImageModel(modelId)) {
+    return false;
+  }
+
+  return Math.max(1, Number(imageCount || 1)) > 1;
+}
+
 function shouldBypassChatCompatibilityForImages(routeConfig: SecureProxyUserRouteConfigDto): boolean {
   const strategy = detectLocalRouteStrategy(routeConfig);
   return strategy === "12ai"
@@ -386,10 +423,15 @@ function shouldBypassChatCompatibilityForImages(routeConfig: SecureProxyUserRout
 function resolveLocalImageSurface(
   routeConfig: SecureProxyUserRouteConfigDto,
   modelId?: string,
+  imageCount?: number,
 ): LocalResolvedImageSurface {
   const format = inferLocalRouteFormat(routeConfig);
   const isGeminiImage = isGeminiImageModel(modelId);
   const compatibilityMode = normalizeRouteString(routeConfig.compatibilityMode).toLowerCase();
+
+  if (shouldUse12AIAsyncImageRoute(routeConfig, modelId, imageCount)) {
+    return "async-image";
+  }
 
   if (format === "gemini" && isGeminiImage) {
     return "gemini-native-image";
@@ -446,6 +488,10 @@ function inferLocalAuthMethod(
   routeConfig: SecureProxyUserRouteConfigDto,
   format: LocalResolvedRouteFormat,
 ): LocalResolvedAuthMethod {
+  if (shouldForceHeaderAuthForProvider(routeConfig.provider, routeConfig.baseUrl)) {
+    return "header";
+  }
+
   if (routeConfig.authMethod === "query" || routeConfig.authMethod === "header") {
     return routeConfig.authMethod;
   }
@@ -917,6 +963,87 @@ function extractImageUrlsFromOpenAICompatPayload(data: any): string[] {
   return Array.from(new Set(urls));
 }
 
+function extractAsyncImageUrls(data: any): string[] {
+  const urls = extractImageUrlsFromOpenAICompatPayload(data);
+  const push = (value: unknown) => {
+    if (typeof value === "string" && value.trim()) {
+      urls.push(value.trim());
+    }
+  };
+
+  push(data?.url);
+  push(data?.image_url);
+  push(data?.data?.url);
+  push(data?.data?.image_url);
+  push(data?.result?.url);
+  push(data?.result?.image_url);
+
+  (Array.isArray(data?.images) ? data.images : []).forEach((item: any) => {
+    push(item?.url);
+    push(item?.image_url);
+  });
+  (Array.isArray(data?.result?.images) ? data.result.images : []).forEach((item: any) => {
+    push(item?.url);
+    push(item?.image_url);
+  });
+
+  return Array.from(new Set(urls));
+}
+
+function extractAsyncTaskId(data: any): string {
+  return String(
+    data?.task_id
+    || data?.taskId
+    || data?.id
+    || data?.data?.task_id
+    || data?.data?.taskId
+    || data?.result?.task_id
+    || data?.result?.taskId
+    || "",
+  ).trim();
+}
+
+function normalizeAsyncTaskStatus(data: any): "pending" | "success" | "failed" {
+  const normalized = String(
+    data?.status
+    || data?.state
+    || data?.task_status
+    || data?.data?.status
+    || data?.result?.status
+    || "",
+  ).trim().toLowerCase();
+
+  if (!normalized) {
+    return extractAsyncImageUrls(data).length > 0 ? "success" : "pending";
+  }
+
+  if (["success", "succeeded", "completed", "done", "finish", "finished"].includes(normalized)) {
+    return "success";
+  }
+
+  if (["failed", "failure", "error", "cancelled", "canceled"].includes(normalized)) {
+    return "failed";
+  }
+
+  return "pending";
+}
+
+function toAsyncImageReference(ref: string | { data: string; mimeType?: string }): string | null {
+  if (typeof ref === "string") {
+    const normalized = ref.trim();
+    if (!normalized) return null;
+    if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith("data:")) {
+      return normalized;
+    }
+    return null;
+  }
+
+  const rawData = String(ref.data || "").trim();
+  if (!rawData) return null;
+  if (rawData.startsWith("data:")) return rawData;
+  return `data:${ref.mimeType || "image/png"};base64,${rawData}`;
+}
+
 function buildGoogleImageExtraBody(input: LocalUserRouteProxyRequest): Record<string, unknown> | undefined {
   const imageConfig: Record<string, unknown> = {};
   const aspectRatio = normalizeAspectRatio(input.aspectRatio);
@@ -1181,6 +1308,16 @@ export class LocalUserRouteProxyService {
       );
     }
 
+    if ((effectiveMode === "task_status" || effectiveMode === "download_task") && decodedTask?.mode === "image") {
+      return this.invokeDirectImageTaskRoute(
+        routeConfig,
+        effectiveMode,
+        upstreamTaskId,
+        requestId,
+        attemptId,
+      );
+    }
+
     const payload: Record<string, unknown> = {
       mode: effectiveMode,
       routeConfig,
@@ -1284,6 +1421,32 @@ export class LocalUserRouteProxyService {
       }
     }
 
+    if (effectiveMode === "image") {
+      const imageResponse = response as SecureModelProxyImageTransportDto;
+      if (typeof imageResponse.taskId === "string" && imageResponse.taskId.trim()) {
+        return {
+          ...imageResponse,
+          taskId: this.encodeLocalTaskToken({
+            v: 1,
+            userId,
+            routeId,
+            taskId: imageResponse.taskId,
+            mode: "image",
+            requestId: imageResponse.requestId || requestId,
+            attemptId: imageResponse.attemptId || attemptId,
+          }),
+          requestId: imageResponse.requestId || requestId,
+          attemptId: imageResponse.attemptId || attemptId,
+        } satisfies SecureModelProxyImageTransportDto;
+      }
+
+      return {
+        ...imageResponse,
+        requestId: imageResponse.requestId || requestId,
+        attemptId: imageResponse.attemptId || attemptId,
+      } satisfies SecureModelProxyImageTransportDto;
+    }
+
     if (effectiveMode === "video") {
       const videoResponse = response as SecureModelProxyVideoTransportDto;
       if (typeof videoResponse.taskId === "string" && videoResponse.taskId.trim()) {
@@ -1294,6 +1457,7 @@ export class LocalUserRouteProxyService {
             userId,
             routeId,
             taskId: videoResponse.taskId,
+            mode: "video",
             requestId: videoResponse.requestId || requestId,
             attemptId: videoResponse.attemptId || attemptId,
           }),
@@ -1713,7 +1877,7 @@ export class LocalUserRouteProxyService {
     input: LocalUserRouteProxyRequest,
   ): Promise<SecureModelProxyImageTransportDto> {
     const endpointType = resolveLocalRouteEndpointType(routeConfig);
-    const imageSurface = resolveLocalImageSurface(routeConfig, input.modelId);
+    const imageSurface = resolveLocalImageSurface(routeConfig, input.modelId, input.imageCount);
     const routeStrategy = detectLocalRouteStrategy(routeConfig);
     const modelId = getUpstreamModelId(String(input.modelId || ""));
     if (!modelId) {
@@ -1732,6 +1896,85 @@ export class LocalUserRouteProxyService {
         code: "UNSUPPORTED_ROUTE",
         statusCode: 400,
       });
+    }
+
+    if (imageSurface === "async-image") {
+      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations`, routeConfig, "openai");
+      const requestedSize = normalizeImageSize(input.imageSize);
+      const body: Record<string, unknown> = {
+        model: modelId,
+        prompt: input.prompt || "",
+        n: Math.max(1, Number(input.imageCount || 1)),
+        size: normalizeAspectRatio(input.aspectRatio) || requestedSize,
+        quality: requestedSize === "4K" ? "4K" : requestedSize === "2K" ? "hd" : "standard",
+      };
+
+      const refs = (input.referenceImages || [])
+        .map((ref) => toAsyncImageReference(ref))
+        .filter((value): value is string => typeof value === "string" && value.length > 0);
+      if (refs.length === 1) {
+        body.image = refs[0];
+      } else if (refs.length > 1) {
+        body.images = refs;
+      }
+
+      const imageResponse = await fetch(auth.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(auth.headers as Record<string, string>),
+        },
+        body: JSON.stringify(body),
+      });
+
+      const responseText = await imageResponse.text();
+      if (!imageResponse.ok) {
+        throw new LocalUserRouteProxyError(`Upstream error: ${imageResponse.status} ${responseText} [surface=${imageSurface};strategy=${routeStrategy}]`, {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: imageResponse.status || 502,
+        });
+      }
+
+      let result: Record<string, unknown> = {};
+      try {
+        result = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new LocalUserRouteProxyError("Upstream returned an invalid JSON response.", {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      const imageUrls = extractAsyncImageUrls(result);
+      if (imageUrls.length > 0) {
+        return {
+          success: true,
+          urls: imageUrls,
+          deducted: false,
+          endpointType,
+          requestId: input.requestId,
+          attemptId: input.attemptId,
+        };
+      }
+
+      const taskId = extractAsyncTaskId(result);
+      if (!taskId) {
+        throw new LocalUserRouteProxyError("12AI async-image submit succeeded but no task id was returned.", {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      return {
+        success: true,
+        urls: [],
+        taskId,
+        status: "pending",
+        deducted: false,
+        endpointType,
+        requestId: input.requestId,
+        attemptId: input.attemptId,
+      };
     }
 
     if (imageSurface === "gemini-native-image") {
@@ -1918,6 +2161,74 @@ export class LocalUserRouteProxyService {
         completionTokens: Number(result?.usage?.completion_tokens || 0),
         totalTokens: Number(result?.usage?.total_tokens || 0),
       },
+    };
+  }
+
+  private async invokeDirectImageTaskRoute(
+    routeConfig: SecureProxyUserRouteConfigDto,
+    mode: "task_status" | "download_task",
+    upstreamTaskId: string,
+    requestId?: string,
+    attemptId?: string,
+  ): Promise<SecureModelProxyTaskTransportDto | SecureModelProxyDownloadTransportDto> {
+    const auth = buildOpenAICompatAuth(
+      `${normalizeRouteString(routeConfig.baseUrl).replace(/\/+$/, "")}/v1/images/async/generations/${encodeURIComponent(upstreamTaskId)}`,
+      routeConfig,
+      "openai",
+    );
+    const response = await fetch(auth.url, {
+      method: "GET",
+      headers: auth.headers,
+    });
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new LocalUserRouteProxyError(`Status polling failed: ${response.status} ${responseText}`, {
+        code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+        statusCode: response.status || 502,
+      });
+    }
+
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      throw new LocalUserRouteProxyError("Upstream returned an invalid JSON response.", {
+        code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+        statusCode: 502,
+      });
+    }
+
+    const status = normalizeAsyncTaskStatus(payload);
+    const imageUrls = extractAsyncImageUrls(payload);
+
+    if (mode === "download_task") {
+      if (status === "success" && imageUrls[0]) {
+        return {
+          success: true,
+          url: imageUrls[0],
+          deducted: false,
+          requestId,
+          attemptId,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Task content is not ready yet",
+        deducted: false,
+        requestId,
+        attemptId,
+      };
+    }
+
+    return {
+      success: true,
+      status: status === "success" ? "success" : status === "failed" ? "failed" : "pending",
+      url: status === "success" ? imageUrls[0] : undefined,
+      taskId: upstreamTaskId,
+      deducted: false,
+      requestId,
+      attemptId,
     };
   }
 

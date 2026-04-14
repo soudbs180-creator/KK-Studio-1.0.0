@@ -157,6 +157,9 @@ interface SessionImportPreview {
 
 const CHAT_SESSION_STORAGE_KEY = 'kk_chat_sidebar_sessions_v1';
 const CHAT_SESSION_TREE_EXPAND_KEY = 'kk_chat_sidebar_tree_expand_v1';
+const MODEL_MENU_SKELETON_COUNT = 3;
+
+type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
 
 const createWelcomeMessage = (): Message => ({
     id: 'welcome',
@@ -406,14 +409,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
-    const canBrowseSystemCreditModels = billingUiEnabled && (authLoading || canAccessSystemCreditModels);
+    const canBrowseSystemCreditModels = billingUiEnabled;
 
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
     const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
     const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
     const [showModelMenu, setShowModelMenu] = useState(false);
-    const [isModelMenuLoading, setIsModelMenuLoading] = useState(false);
+    const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const modelMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -696,7 +699,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const closeModelMenu = useCallback(() => {
         modelMenuRequestRef.current += 1;
-        setIsModelMenuLoading(false);
+        setModelMenuLoadingState('idle');
         setShowModelMenu(false);
     }, []);
 
@@ -712,9 +715,50 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         const requestId = modelMenuRequestRef.current + 1;
         modelMenuRequestRef.current = requestId;
         setShowModelMenu(true);
-        setIsModelMenuLoading(true);
-
         let nextAvailableModels = availableModels;
+        const hasCachedModels = nextAvailableModels.length > 0;
+        setModelMenuLoadingState(hasCachedModels ? 'refreshing_with_cache' : 'bootstrapping_without_cache');
+
+        const applyRefreshedModels = (models: ChatModel[]) => {
+            setAvailableModels(models);
+
+            const matchedSelectedModel = models.find(model => model.id === selectedModel.id);
+            if (!matchedSelectedModel) {
+                setSelectedModel(models[0]);
+                return;
+            }
+
+            if (
+                matchedSelectedModel.name !== selectedModel.name
+                || matchedSelectedModel.description !== selectedModel.description
+            ) {
+                setSelectedModel(matchedSelectedModel);
+            }
+        };
+
+        if (hasCachedModels) {
+            void refreshModelLibraryData({ force: false })
+                .then(() => {
+                    if (modelMenuRequestRef.current !== requestId) {
+                        return;
+                    }
+
+                    nextAvailableModels = buildAvailableChatModels(canBrowseSystemCreditModels);
+                    if (nextAvailableModels.length > 0) {
+                        applyRefreshedModels(nextAvailableModels);
+                    }
+                    setModelMenuLoadingState('idle');
+                })
+                .catch((error) => {
+                    console.warn('[ChatSidebar] Background model library refresh failed:', error);
+                    if (modelMenuRequestRef.current !== requestId) {
+                        return;
+                    }
+
+                    setModelMenuLoadingState('idle');
+                });
+            return;
+        }
 
         try {
             await refreshModelLibraryData({ force: nextAvailableModels.length === 0 });
@@ -727,26 +771,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }
 
         nextAvailableModels = buildAvailableChatModels(canBrowseSystemCreditModels);
-        setAvailableModels(nextAvailableModels);
 
         if (nextAvailableModels.length === 0) {
-            setIsModelMenuLoading(false);
+            setModelMenuLoadingState('idle');
             setShowModelMenu(false);
             onOpenSettings?.('api-management');
             return;
         }
 
-        const matchedSelectedModel = nextAvailableModels.find(model => model.id === selectedModel.id);
-        if (!matchedSelectedModel) {
-            setSelectedModel(nextAvailableModels[0]);
-        } else if (
-            matchedSelectedModel.name !== selectedModel.name
-            || matchedSelectedModel.description !== selectedModel.description
-        ) {
-            setSelectedModel(matchedSelectedModel);
-        }
-
-        setIsModelMenuLoading(false);
+        applyRefreshedModels(nextAvailableModels);
+        setModelMenuLoadingState('idle');
     }, [
         availableModels,
         canBrowseSystemCreditModels,
@@ -835,6 +869,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             };
         });
     }, [availableModels, deferredModelSearch, modelCustomizations, pinnedModels]);
+    const isModelMenuBootstrapping = modelMenuLoadingState === 'bootstrapping_without_cache';
+    const isModelMenuRefreshingWithCache = modelMenuLoadingState === 'refreshing_with_cache';
 
     const handleSelectModelFromMenu = useCallback((model: ChatSidebarModelMenuItem) => {
         setSelectedModel(model);
@@ -2272,7 +2308,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                         }}
                                                     >
                                                         <div className="flex flex-col gap-2">
-                                                            {!isModelMenuLoading && (
+                                                            {!isModelMenuBootstrapping && (
                                                                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-xl p-2 relative z-30">
                                                                     <div className="relative flex items-center">
                                                                         <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2301,20 +2337,29 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                 </div>
                                                             )}
 
+                                                            {isModelMenuRefreshingWithCache && (
+                                                                <div className="px-2 pb-2">
+                                                                    <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                                        <Loader2 size={14} className="animate-spin" />
+                                                                        <span>正在同步最新模型库...</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
                                                             {/* Model List Module */}
                                                             <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-2xl p-1.5 max-h-[50vh] overflow-y-auto overflow-x-hidden scrollbar-thin relative z-30">
                                                                 <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-bold border-b border-[var(--border-light)] mb-1 select-none flex justify-between items-center">
                                                                     <span>选择模型 (右键可顶置)</span>
                                                                 </div>
 
-                                                                {isModelMenuLoading ? (
+                                                                {isModelMenuBootstrapping ? (
                                                                     <div className="px-2 py-4">
                                                                         <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
                                                                             <Loader2 size={14} className="animate-spin" />
                                                                             <span>正在同步最新模型库...</span>
                                                                         </div>
                                                                         <div className="mt-4 space-y-2">
-                                                                            {Array.from({ length: 4 }).map((_, index) => (
+                                                                            {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
                                                                                 <div
                                                                                     key={`chat-sidebar-model-loading-${index}`}
                                                                                     className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"

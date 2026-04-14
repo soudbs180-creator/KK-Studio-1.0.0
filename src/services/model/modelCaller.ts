@@ -7,7 +7,7 @@
  * - Official models -> Use user's own key
  */
 
-import { type ChatMessage } from '../api/AI12APIService';
+import { type ChatMessage } from '../llm/LLMAdapter';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { keyManager, parseModelString, resolveEffectiveProviderModels } from '../auth/keyManager';
 import { supplierService } from '../billing/supplierService';

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
@@ -93,12 +93,24 @@ describe('mobile home three-zone contract', () => {
 
   test('embedded mobile composer exposes dedicated mode, input, and advanced-drawer sections', () => {
     const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+    const drawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
 
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
     assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);
     assert.match(promptBarSource, /data-mobile-composer-section="primary-input"/);
-    assert.match(promptBarSource, /data-mobile-composer-section="advanced-drawer"/);
+    assert.match(promptBarSource, /import MobileEmbeddedAdvancedDrawer from '\.\/prompt-bar\/MobileEmbeddedAdvancedDrawer';/);
+    assert.match(promptBarSource, /<MobileEmbeddedAdvancedDrawer/);
     assert.match(promptBarSource, /!isEmbeddedMobileComposer && \(/);
     assert.match(promptBarSource, /<DesktopComposerPromptTools/);
+    assert.match(drawerSource, /data-mobile-composer-section="advanced-drawer"/);
+    assert.match(drawerSource, /promptTools: React\.ReactNode;/);
+    assert.match(drawerSource, /modePanel: React\.ReactNode;/);
+  });
+
+  test('mobile prompt-bar cleanup removes the obsolete embedded composer shell file', () => {
+    assert.equal(
+      existsSync(path.join(ROOT_DIR, 'src/components/layout/prompt-bar/MobileEmbeddedComposerShell.tsx')),
+      false,
+    );
   });
 });

@@ -11,6 +11,7 @@ function readSource(relativePath: string): string {
 
 test('server local-file readiness contract keeps auth and billing capabilities available', () => {
   const serverSource = readSource('apps/api/src/server.ts');
+  const authRoutesSource = readSource('apps/api/src/modules/auth/presentation/http-auth-routes.ts');
 
   assert.match(
     serverSource,
@@ -21,7 +22,7 @@ test('server local-file readiness contract keeps auth and billing capabilities a
     /billing:\s*buildCriticalPersistenceState\([\s\S]*creditAccounts: \["supabase", "local-file"\][\s\S]*creditExchangeRates: \["supabase", "local-file"\]/,
   );
   assert.match(serverSource, /req\.method === "POST" && pathname === "\/api\/v1\/profile\/password"/);
-  assert.match(serverSource, /code: "AUTH_ROUTE_DISABLED"/);
+  assert.match(authRoutesSource, /AUTH_ROUTE_DISABLED/);
 });
 
 test('local runtime UI keeps billing management surfaces behind the feature flag while balance reads can use canonical local storage', () => {
@@ -46,7 +47,11 @@ test('local runtime UI keeps billing management surfaces behind the feature flag
     /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/\.\.\/app\/kkaiFeatureFlags';/,
   );
   assert.match(profileModalSource, /const billingFeatureEnabled = KKAI_FEATURE_FLAGS\.billing;/);
-  assert.match(profileModalSource, /const passwordChangeEnabled = false;/);
+  assert.match(
+    profileModalSource,
+    /const canChangePassword = Boolean\(user\?\.email\) && !isTempUser && !isShadowWechatEmail;/,
+  );
+  assert.doesNotMatch(profileModalSource, /const passwordChangeEnabled = false;/);
   assert.match(
     routeConfigSource,
     /case 'billing':[\s\S]*return KKAI_FEATURE_FLAGS\.billing \? <CostEstimation embedded \/> : <Navigate to=\{\(options\.dashboardBasePath \|\| '\/settings'\)\} replace \/>;/,

@@ -28,6 +28,7 @@ import {
     clearPersistedCanvasStorageSnapshot,
     getCachedStrippedCanvases,
     persistCanvasStateToLocalStorage,
+    restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
 import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
@@ -800,62 +801,47 @@ const hasUnrecoverableSyncGenerationInFlight = (state?: CanvasState | null): boo
     );
 };
 
+const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState => {
+    const nextState: CanvasState = {
+        ...DEFAULT_STATE,
+        ...restoredState,
+        canvases: Array.isArray(restoredState.canvases) && restoredState.canvases.length > 0
+            ? restoredState.canvases
+            : DEFAULT_STATE.canvases,
+        history: restoredState.history || {},
+        selectedNodeIds: restoredState.selectedNodeIds || [],
+        subCardLayoutMode: restoredState.subCardLayoutMode || DEFAULT_STATE.subCardLayoutMode,
+        viewportCenter: restoredState.viewportCenter || DEFAULT_STATE.viewportCenter,
+    };
+
+    console.log('[CanvasProvider] 解析成功:', `画布数: ${nextState.canvases?.length || 0}`);
+
+    nextState.canvases = nextState.canvases.map(canvas => ({
+        ...canvas,
+        imageNodes: (canvas.imageNodes || []).map(img => ({
+            ...img,
+            generationTime: clampGenerationDurationMs(img.generationTime),
+            canvasId: img.canvasId || canvas.id,
+            parentPromptId: img.parentPromptId || 'unknown',
+            prompt: img.prompt || '',
+            dimensions: img.dimensions || "1024x1024",
+            aspectRatio: img.aspectRatio || AspectRatio.SQUARE,
+            model: img.model || KnownModel.IMAGEN_4
+        })),
+    })).map(normalizeCanvasPromptRecovery);
+
+    // File system handles are restored separately from IndexedDB.
+    nextState.fileSystemHandle = null;
+
+    return nextState;
+};
+
 export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, session, isTempUser } = useAuth();
     const { isStageReady } = useAppStartup();
     const [isLoading, setIsLoading] = useState(true);
     const [isShellReady, setIsShellReady] = useState(false);
-    const [state, setState] = useState<CanvasState>(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            console.log('[CanvasProvider] localStorage restore status:', stored ? 'Found persisted canvas data' : 'No data');
-            if (stored) {
-                const parsed: CanvasState = JSON.parse(stored);
-                console.log('[CanvasProvider] 解析成功:', `画布数: ${parsed.canvases?.length || 0}`);
-
-                // Migration step 1: ensure history exists.
-                if (!parsed.history) parsed.history = {};
-                if (!parsed.selectedNodeIds) parsed.selectedNodeIds = [];
-
-                // Migration step 2: normalize recovered node data from older payloads.
-                parsed.canvases = parsed.canvases.map(canvas => ({
-                    ...canvas,
-                    // Repair recovered image nodes.
-                    imageNodes: (canvas.imageNodes || []).map(img => ({
-                        ...img,
-                        // Ensure newer fields always exist.
-                        generationTime: clampGenerationDurationMs(img.generationTime),
-                        canvasId: img.canvasId || canvas.id,
-                        parentPromptId: img.parentPromptId || 'unknown',
-                        prompt: img.prompt || '',
-                        dimensions: img.dimensions || "1024x1024", // Default dimensions fallback.
-                        aspectRatio: img.aspectRatio || AspectRatio.SQUARE,
-                        model: img.model || KnownModel.IMAGEN_4 // 回退到当前默认官方模型
-                    })),
-                })).map(normalizeCanvasPromptRecovery);
-
-                // [Critical fix] FileSystemHandle cannot be restored from localStorage.
-                // Force it to null and let the restore flow recover it from IndexedDB.
-                parsed.fileSystemHandle = null;
-                // folderName may remain for UI display even before the folder is reconnected.
-                // parsed.folderName = null;
-
-                return parsed;
-            }
-        } catch (e) {
-            // [Critical fix] Catch initialization parse failures, including stack overflows.
-            // If persisted data is corrupted, clear localStorage to avoid an infinite crash loop.
-            console.error('[CanvasProvider] Failed to parse stored state (Resetting):', e);
-            try {
-                localStorage.removeItem(STORAGE_KEY);
-                clearPersistedCanvasStorageSnapshot();
-            } catch (cleanupErr) {
-                console.error('[CanvasProvider] Failed to clear localStorage:', cleanupErr);
-            }
-            return DEFAULT_STATE;
-        }
-        return DEFAULT_STATE;
-    });
+    const [state, setState] = useState<CanvasState>(DEFAULT_STATE);
 
     // Track in-flight save tasks to reduce data loss during refresh.
     const pendingSavesRef = useRef<Set<Promise<void>>>(new Set());
@@ -916,9 +902,235 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, []);
 
+    const applyStartupHydratedImages = useCallback((hydratedImageMap: Map<string, string>) => {
+        if (hydratedImageMap.size === 0) {
+            return;
+        }
+
+        startTransition(() => {
+            setState(prev => ({
+                ...prev,
+                canvases: prev.canvases.map(c => syncCanvasCompatibility({
+                    ...c,
+                    imageNodes: c.imageNodes.map(img => {
+                        const storedUrl = hydratedImageMap.get(img.storageId || img.id);
+                        let displayUrl = img.url || '';
+                        if (storedUrl) {
+                            if (storedUrl.startsWith('data:')) {
+                                const blob = base64ToBlob(storedUrl);
+                                displayUrl = URL.createObjectURL(blob);
+                            } else {
+                                displayUrl = storedUrl;
+                            }
+                        }
+                        return {
+                            ...img,
+                            url: displayUrl,
+                            originalUrl: img.originalUrl || img.apiResultUrl
+                        };
+                    }),
+                    promptNodes: c.promptNodes.map(pn => ({
+                        ...pn,
+                        referenceImages: pn.referenceImages?.map(ref => {
+                            const storedUrl = hydratedImageMap.get(ref.storageId || ref.id);
+                            if (storedUrl) {
+                                let finalData = storedUrl;
+                                let finalMime = ref.mimeType || 'image/png';
+
+                                const corruptedMatch = storedUrl.match(/^data:.*;base64,(http.*|blob:.*)$/);
+                                if (corruptedMatch) {
+                                    console.log('[CanvasContext] Recovering corrupted URL:', corruptedMatch[1]);
+                                    finalData = corruptedMatch[1];
+                                } else if (storedUrl.startsWith('data:')) {
+                                    const matches = storedUrl.match(/^data:(.+);base64,(.+)$/);
+                                    if (matches) {
+                                        finalMime = matches[1];
+                                    }
+                                }
+
+                                if (finalData.startsWith('data:') || finalData.startsWith('http') || finalData.startsWith('blob:') || finalData.length > 20) {
+                                    return { ...ref, mimeType: finalMime, data: finalData };
+                                }
+                            }
+                            return ref;
+                        }) || []
+                    }))
+                }))
+            }));
+        });
+    }, []);
+
+    const hydrateStartupPreviewImages = useCallback(async (startupState: CanvasState) => {
+        console.log('[CanvasContext] Starting optimized image loading...');
+
+        // Collect the image IDs required by the current state.
+        const requiredImageIds = new Set<string>();
+        startupState.canvases.forEach(c => {
+            c.imageNodes.forEach(img => {
+                requiredImageIds.add(img.storageId || img.id);
+            });
+            c.promptNodes.forEach(pn => {
+                if (pn.referenceImages) {
+                    pn.referenceImages.forEach(ref => {
+                        requiredImageIds.add(ref.storageId || ref.id);
+                    });
+                }
+            });
+        });
+
+        console.log(`[CanvasContext] Found ${requiredImageIds.size} images needed in current state`);
+
+        const referenceImageIds = new Set<string>();
+        const generatedImageIds = new Set<string>();
+
+        startupState.canvases.forEach(c => {
+            c.imageNodes.forEach(img => {
+                generatedImageIds.add(img.storageId || img.id);
+            });
+            c.promptNodes.forEach(pn => {
+                if (pn.referenceImages) {
+                    pn.referenceImages.forEach(ref => {
+                        referenceImageIds.add(ref.storageId || ref.id);
+                    });
+                }
+            });
+        });
+
+        const MAX_GENERATED_LOAD = 5;
+        let generatedIdsArray = Array.from(generatedImageIds);
+
+        const viewportX = startupState.viewportCenter.x;
+        const viewportY = startupState.viewportCenter.y;
+        const imagesWithDistance = generatedIdsArray.map(id => {
+            let minDistance = Infinity;
+            startupState.canvases.forEach(c => {
+                const node = c.imageNodes.find(n => (n.storageId || n.id) === id);
+                if (node) {
+                    const dx = node.position.x - viewportX;
+                    const dy = node.position.y - viewportY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    minDistance = Math.min(minDistance, distance);
+                }
+            });
+            return { id, distance: minDistance };
+        });
+
+        imagesWithDistance.sort((a, b) => a.distance - b.distance);
+        generatedIdsArray = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
+
+        const generatedPreviewMap = new Map<string, string>();
+        if (generatedIdsArray.length > 0) {
+            const generatedPreviewResults = await Promise.all(
+                generatedIdsArray.map((id) => getImageByQuality(id, ImageQuality.MICRO))
+            );
+
+            generatedIdsArray.forEach((id, index) => {
+                const url = generatedPreviewResults[index];
+                if (url) {
+                    generatedPreviewMap.set(id, url);
+                }
+            });
+
+            if (generatedPreviewMap.size > 0) {
+                applyStartupHydratedImages(generatedPreviewMap);
+            }
+        }
+
+        const imageIdsArray = Array.from(referenceImageIds);
+
+        if (generatedImageIds.size > MAX_GENERATED_LOAD) {
+            console.warn(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading only ${MAX_GENERATED_LOAD} nearest to center`);
+        }
+        console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} generated images`);
+
+        const imageMap = new Map<string, string>(generatedPreviewMap);
+        const finalHydrationMap = new Map<string, string>();
+        const BATCH_SIZE = 5;
+
+        for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
+            const batch = imageIdsArray.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(id => getImageByQuality(id, ImageQuality.MICRO));
+            const batchResults = await Promise.all(batchPromises);
+
+            batch.forEach((id, index) => {
+                const url = batchResults[index];
+                if (url) {
+                    imageMap.set(id, url);
+                    finalHydrationMap.set(id, url);
+                }
+            });
+
+            console.log(`[CanvasContext] Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
+        }
+
+        console.log(`[CanvasContext] Successfully loaded ${imageMap.size}/${requiredImageIds.size} required images`);
+
+        if (imageMap.size < requiredImageIds.size) {
+            console.debug(`[CanvasContext] ${requiredImageIds.size - imageMap.size} images not found in IndexedDB`);
+        }
+
+        let needsMigration = false;
+        const imagesToMigrate: { id: string; url: string }[] = [];
+
+        startupState.canvases.forEach(c => {
+            c.imageNodes.forEach(img => {
+                if (img.url && img.url.startsWith('data:') && !imageMap.has(img.id)) {
+                    imagesToMigrate.push({ id: img.id, url: img.url });
+                    needsMigration = true;
+                }
+            });
+
+            c.promptNodes.forEach(pn => {
+                if (pn.referenceImages) {
+                    pn.referenceImages.forEach(ref => {
+                        const lookupIds = getReferenceImageLookupIds(ref);
+                        if (ref.data && lookupIds.some((lookupId) => !imageMap.has(lookupId))) {
+                            const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType);
+                            lookupIds.forEach((lookupId) => {
+                                if (!imageMap.has(lookupId)) {
+                                    imagesToMigrate.push({ id: lookupId, url: fullUrl });
+                                    needsMigration = true;
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        for (const img of imagesToMigrate) {
+            await saveImage(img.id, img.url);
+            imageMap.set(img.id, img.url);
+            finalHydrationMap.set(img.id, img.url);
+        }
+
+        if (needsMigration) {
+            console.log(`Migrated ${imagesToMigrate.length} images (generated & references) to IndexedDB`);
+        }
+
+        if (finalHydrationMap.size > 0) {
+            applyStartupHydratedImages(finalHydrationMap);
+        }
+    }, [applyStartupHydratedImages]);
+
     // Load image URLs from IndexedDB AND Restore Folder Handle
     useEffect(() => {
+        if (!isShellReady) return;
+
         const init = async () => {
+            const restoredState = restoreCanvasStateFromLocalStorage(STORAGE_KEY);
+            const startupState = restoredState
+                ? normalizeRestoredCanvasState(restoredState as CanvasState)
+                : DEFAULT_STATE;
+
+            if (restoredState) {
+                startTransition(() => {
+                    setState(startupState);
+                });
+            }
+
+            const startupImageHydrationPromise = hydrateStartupPreviewImages(startupState);
+
             try {
                 // 1. Restore Local Folder Handle (Fix for 0B issue)
                 try {
@@ -934,7 +1146,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             // This overrides localStorage state with the true file state
                             try {
                                 logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
-                                const { canvases, images, activeCanvasId: savedActiveCanvasId } = await fileSystemService.loadProjectWithThumbs(handle);
+                                const projectLoadPromise = fileSystemService.loadProjectWithThumbs(handle);
+                                const referenceImageLoadPromise = fileSystemService.loadAllReferenceImages(handle);
+                                const [{ canvases, images, activeCanvasId: savedActiveCanvasId }, refUrls] = await Promise.all([
+                                    projectLoadPromise,
+                                    referenceImageLoadPromise,
+                                ]);
                                 logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
 
                                 // Hydrate the cache without ever letting thumbnails overwrite the original slot.
@@ -942,14 +1159,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                     void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
                                         console.warn('[CanvasContext] Cache hydration failed', id, error);
                                     });
-                                }
-
-                                // Load the reference-image map so missing references can be restored.
-                                let refUrls = new Map<string, string>();
-                                try {
-                                    refUrls = await fileSystemService.loadAllReferenceImages(handle);
-                                } catch (e) {
-                                    console.warn('[CanvasContext] Failed to load reference images', e);
                                 }
 
                                 if (canvases.length > 0) {
@@ -1021,230 +1230,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     logError('CanvasContext', e, '恢复文件夹句柄失败');
                 }
 
-                // 2. Load images from IndexedDB on demand.
-                console.log('[CanvasContext] Starting optimized image loading...');
-
-                // Collect the image IDs required by the current state.
-                const requiredImageIds = new Set<string>();
-                state.canvases.forEach(c => {
-                    // Generated image IDs: prefer storageId because persistence uses that key.
-                    c.imageNodes.forEach(img => {
-                        requiredImageIds.add(img.storageId || img.id);
-                    });
-                    // Reference image IDs.
-                    c.promptNodes.forEach(pn => {
-                        if (pn.referenceImages) {
-                            pn.referenceImages.forEach(ref => {
-                                requiredImageIds.add(ref.storageId || ref.id);
-                            });
-                        }
-                    });
-                });
-
-
-                console.log(`[CanvasContext] Found ${requiredImageIds.size} images needed in current state`);
-
-                // Separate reference images from generated images.
-                const referenceImageIds = new Set<string>();
-                const generatedImageIds = new Set<string>();
-
-                state.canvases.forEach(c => {
-                    // Generated images.
-                    c.imageNodes.forEach(img => {
-                        generatedImageIds.add(img.storageId || img.id);
-                    });
-                    // Reference images: collect separately so they load first.
-                    c.promptNodes.forEach(pn => {
-                        if (pn.referenceImages) {
-                            pn.referenceImages.forEach(ref => {
-                                referenceImageIds.add(ref.storageId || ref.id);
-                            });
-                        }
-                    });
-                });
-
-                // [Fix] Always load all reference images.
-                // Only the generated-image set is capped.
-                const MAX_GENERATED_LOAD = 5;
-                let generatedIdsArray = Array.from(generatedImageIds);
-
-                // Prioritize generated images closest to the viewport center.
-                const viewportX = state.viewportCenter.x;
-                const viewportY = state.viewportCenter.y;
-                const imagesWithDistance = generatedIdsArray.map(id => {
-                    let minDistance = Infinity;
-                    state.canvases.forEach(c => {
-                        const node = c.imageNodes.find(n => (n.storageId || n.id) === id);
-                        if (node) {
-                            const dx = node.position.x - viewportX;
-                            const dy = node.position.y - viewportY;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-                            minDistance = Math.min(minDistance, distance);
-                        }
-                    });
-                    return { id, distance: minDistance };
-                });
-
-                // Sort by distance so center-adjacent images load first.
-                imagesWithDistance.sort((a, b) => a.distance - b.distance);
-                generatedIdsArray = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
-
-                // [Key fix] Combine all references with the capped generated set.
-                const imageIdsArray = [...Array.from(referenceImageIds), ...generatedIdsArray];
-
-                if (generatedImageIds.size > MAX_GENERATED_LOAD) {
-                    console.warn(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading only ${MAX_GENERATED_LOAD} nearest to center`);
-                }
-                console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} generated images`);
-
-                // Load only the images needed by the current state.
-                const imageMap = new Map<string, string>();
-                const BATCH_SIZE = 5; // Smaller batches reduce peak memory usage.
-
-                for (let i = 0; i < imageIdsArray.length; i += BATCH_SIZE) {
-                    const batch = imageIdsArray.slice(i, i + BATCH_SIZE);
-                    // [OOM fix] Load MICRO quality (<50KB) instead of THUMBNAIL.
-                    const batchPromises = batch.map(id => getImageByQuality(id, ImageQuality.MICRO));
-                    const batchResults = await Promise.all(batchPromises);
-
-                    batch.forEach((id, index) => {
-                        const url = batchResults[index];
-                        if (url) {
-                            imageMap.set(id, url);
-                        }
-                    });
-
-                    console.log(`[CanvasContext] Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
-                }
-
-                console.log(`[CanvasContext] Successfully loaded ${imageMap.size}/${requiredImageIds.size} required images`);
-
-                if (imageMap.size < requiredImageIds.size) {
-                    console.debug(`[CanvasContext] ${requiredImageIds.size - imageMap.size} images not found in IndexedDB`);
-                }
-
-                // Migrate old images: if localStorage has URLs but IndexedDB doesn't, save them
-                // Also migrate Reference Images
-                let needsMigration = false;
-                const imagesToMigrate: { id: string; url: string }[] = [];
-
-                state.canvases.forEach(c => {
-                    // Check generated images
-                    c.imageNodes.forEach(img => {
-                        if (img.url && img.url.startsWith('data:') && !imageMap.has(img.id)) {
-                            imagesToMigrate.push({ id: img.id, url: img.url });
-                            needsMigration = true;
-                        }
-                    });
-
-                    // Check reference images in prompt nodes
-                    c.promptNodes.forEach(pn => {
-                        if (pn.referenceImages) {
-                            pn.referenceImages.forEach(ref => {
-                                const lookupIds = getReferenceImageLookupIds(ref);
-                                if (ref.data && lookupIds.some((lookupId) => !imageMap.has(lookupId))) {
-                                    // Reconstruct data URL if needed or just store raw base64 depending on storage format
-                                    // referenceImages.data is typically just the base64 string, not full URL
-                                    const fullUrl = toReferenceImageDataUrl(ref.data, ref.mimeType);
-                                    lookupIds.forEach((lookupId) => {
-                                        if (!imageMap.has(lookupId)) {
-                                            imagesToMigrate.push({ id: lookupId, url: fullUrl });
-                                            needsMigration = true;
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
-                });
-
-                // Save migrated images to IndexedDB
-                for (const img of imagesToMigrate) {
-                    await saveImage(img.id, img.url);
-                    imageMap.set(img.id, img.url);
-                }
-
-                if (needsMigration) {
-                    console.log(`Migrated ${imagesToMigrate.length} images (generated & references) to IndexedDB`);
-                }
-
-                // Update state with images from IndexedDB (or already in state)
-                if (imageMap.size > 0) {
-                    startTransition(() => {
-                        setState(prev => ({
-                        ...prev,
-                        canvases: prev.canvases.map(c => syncCanvasCompatibility({
-                            ...c,
-                            imageNodes: c.imageNodes.map(img => {
-                                const storedUrl = imageMap.get(img.storageId || img.id);
-                                // Prefer cached URL. It might be:
-                                // - data:... (base64) -> convert to blob URL for perf
-                                // - http(s)/blob:...  -> use as-is (fix for empty url after strip)
-                                let displayUrl = img.url || '';
-                                if (storedUrl) {
-                                    if (storedUrl.startsWith('data:')) {
-                                        const blob = base64ToBlob(storedUrl);
-                                        displayUrl = URL.createObjectURL(blob);
-                                    } else {
-                                        displayUrl = storedUrl;
-                                    }
-                                }
-                                return {
-                                    ...img,
-                                    url: displayUrl, // Use Blob URL
-                                    // IMPORTANT:
-                                    // `storedUrl` here is the MICRO preview loaded for canvas performance,
-                                    // not the protected original. Never hydrate it into `originalUrl`,
-                                    // otherwise lightbox will mistake the thumbnail for the full image.
-                                    originalUrl: img.originalUrl || img.apiResultUrl
-                                };
-                            }),
-                            // Rehydrate reference images
-                            promptNodes: c.promptNodes.map(pn => ({
-                                ...pn,
-                                referenceImages: pn.referenceImages?.map(ref => {
-                                    const storedUrl = imageMap.get(ref.storageId || ref.id);
-                                    if (storedUrl) {
-                                        let finalData = storedUrl;
-                                        let finalMime = ref.mimeType || 'image/png';
-
-                                        // [SELF-HEALING] Detect corrupted double-wrapped URLs (e.g. data:image/png;base64,http...)
-                                        // This fixes images that were saved with the previous buggy logic
-                                        const corruptedMatch = storedUrl.match(/^data:.*;base64,(http.*|blob:.*)$/);
-                                        if (corruptedMatch) {
-                                            console.log('[CanvasContext] Recovering corrupted URL:', corruptedMatch[1]);
-                                            finalData = corruptedMatch[1];
-                                        } else if (storedUrl.startsWith('data:')) {
-                                            // Normal Data URL extraction
-                                            const matches = storedUrl.match(/^data:(.+);base64,(.+)$/);
-                                            if (matches) {
-                                                finalMime = matches[1];
-                                                // We keep the full URL for the component to render, or just the base64?
-                                                // ReferenceThumbnail handles both, but let's keep full URL for consistency if it's valid
-                                            }
-                                        }
-
-                                        // Accept Data URL, HTTP, Blob, or Raw Base64
-                                        if (finalData.startsWith('data:') || finalData.startsWith('http') || finalData.startsWith('blob:') || finalData.length > 20) {
-                                            return { ...ref, mimeType: finalMime, data: finalData };
-                                        }
-                                    }
-                                    return ref;
-                                }) || []
-                            }))
-                        }))
-                    }));
-                    });
-                }
             } catch (error) {
                 console.error('Failed to load images from IndexedDB:', error);
             } finally {
+                try {
+                    await startupImageHydrationPromise;
+                } catch (error) {
+                    console.error('Failed to load startup preview images:', error);
+                }
                 setIsLoading(false);
             }
         };
 
         init();
-    }, []);
+    }, [isShellReady]);
 
     // Helper: Strip image URLs for storage
 

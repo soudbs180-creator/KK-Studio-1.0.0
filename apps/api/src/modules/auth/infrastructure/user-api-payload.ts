@@ -296,6 +296,15 @@ function resolveDefaultRouteBaseUrl(
   return normalizedBaseUrl;
 }
 
+function shouldForceHeaderAuthForProvider(provider: string, baseUrl: string): boolean {
+  const normalizedProvider = String(provider || "").trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || "").trim().toLowerCase();
+  return normalizedProvider === "gpt-best"
+    || normalizedProvider === "gptbest"
+    || normalizedBaseUrl.includes("gpt-best")
+    || normalizedBaseUrl.includes("gptbest");
+}
+
 function resolveRouteConfigFromRecord(
   routeId: string,
   rawRecord: unknown,
@@ -332,7 +341,9 @@ function resolveRouteConfigFromRecord(
     baseUrl,
     apiKey,
     format,
-    authMethod: rawRecord.authMethod === "query" ? "query" : "header",
+    authMethod: shouldForceHeaderAuthForProvider(provider, baseUrl)
+      ? "header"
+      : rawRecord.authMethod === "query" ? "query" : "header",
     headerName: typeof rawRecord.headerName === "string" ? rawRecord.headerName.trim() : undefined,
     compatibilityMode:
       rawRecord.compatibilityMode === "chat"

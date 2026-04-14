@@ -38,7 +38,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
 }) => {
   return (
     <aside
-      className="flex h-full w-[232px] shrink-0 flex-col border-r px-4 py-5"
+      className="flex h-full min-h-0 w-[232px] shrink-0 flex-col border-r px-4 py-5"
       style={{
         borderColor: 'var(--settings-sidebar-border)',
         background: 'var(--settings-sidebar-bg)',
@@ -95,7 +95,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         />
       </label>
 
-      <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
+      <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {items.length === 0 ? (
           <div
             className="rounded-[18px] border px-4 py-3 text-[12px] leading-6"

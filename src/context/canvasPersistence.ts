@@ -93,6 +93,29 @@ export const clearPersistedCanvasStorageSnapshot = () => {
     lastPersistedCanvasStorageSnapshot = null;
 };
 
+export const restoreCanvasStateFromLocalStorage = (
+    storageKey: string
+): CanvasStorageStateLike | null => {
+    try {
+        const stored = localStorage.getItem(storageKey);
+        console.log('[CanvasProvider] localStorage restore status:', stored ? 'Found persisted canvas data' : 'No data');
+        if (!stored) {
+            return null;
+        }
+
+        return JSON.parse(stored) as CanvasStorageStateLike;
+    } catch (error) {
+        console.error('[CanvasProvider] Failed to parse stored state (Resetting):', error);
+        try {
+            localStorage.removeItem(storageKey);
+            clearPersistedCanvasStorageSnapshot();
+        } catch (cleanupErr) {
+            console.error('[CanvasProvider] Failed to clear localStorage:', cleanupErr);
+        }
+        return null;
+    }
+};
+
 export const getCachedCanvasStorageSnapshot = <T extends CanvasStorageStateLike>(
     state: T,
     aggressive: boolean

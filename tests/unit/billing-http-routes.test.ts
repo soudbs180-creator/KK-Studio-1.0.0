@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { after, describe, test } from "node:test";
 
 import {
   AUTHENTICATED_ADMIN_SESSION_HEADER,
   AUTHENTICATED_USER_ID_HEADER,
   AUTHENTICATED_USER_ROLE_HEADER,
 } from "../../packages/shared/src/index.ts";
+import { startApiServer } from "../../apps/api/src/server.ts";
 import { CreditExchangeRateService } from "../../apps/api/src/modules/billing/application/credit-exchange-rate-service.ts";
+import { RechargePaymentChannelConfigService } from "../../apps/api/src/modules/billing/application/recharge-payment-channel-config-service.ts";
 import { CreditAccountService } from "../../apps/api/src/modules/billing/application/credit-account-service.ts";
+import { StaticRechargeService } from "../../apps/api/src/modules/billing/application/static-recharge-service.ts";
 import { InMemoryCreditAccountRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-credit-account-repository.ts";
 import { InMemoryCreditExchangeRateRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-credit-exchange-rate-repository.ts";
+import { InMemoryRechargePaymentChannelConfigRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-recharge-payment-channel-config-repository.ts";
+import { InMemoryRechargeSubmissionRepository } from "../../apps/api/src/modules/billing/infrastructure/in-memory-recharge-submission-repository.ts";
 import {
   handleAdminRechargeCredits,
   handleDebitCredits,
@@ -19,9 +24,74 @@ import {
 } from "../../apps/api/src/modules/billing/presentation/http-billing-routes.ts";
 import {
   handleListCreditExchangeRates,
+  handleListRechargePaymentChannels,
   handleUpsertCreditExchangeRate,
   validateUpsertCreditExchangeRateRequest,
 } from "../../apps/api/src/modules/billing/presentation/http-credit-exchange-rate-routes.ts";
+import {
+  handleCreateRechargeSubmission,
+  handleGetAdminRechargeSubmission,
+  handleReviewRechargeSubmission,
+  handleSubmitRecharge,
+  handleSubmitRechargeProof,
+} from "../../apps/api/src/modules/billing/presentation/http-static-recharge-routes.ts";
+
+const trackedServers = new Set<Awaited<ReturnType<typeof startApiServer>>>();
+
+async function withMutedConsoleWarnAsync<T>(callback: () => Promise<T>): Promise<T> {
+  const originalWarn = console.warn;
+  console.warn = () => undefined;
+  try {
+    return await callback();
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
+function getBaseUrl(server: Awaited<ReturnType<typeof startApiServer>>): string {
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return `http://127.0.0.1:${address.port}`;
+}
+
+function createStaticRechargeFixture(initialBalance = 10) {
+  const creditAccountService = new CreditAccountService(
+    new InMemoryCreditAccountRepository(initialBalance),
+  );
+
+  return {
+    creditAccountService,
+    service: new StaticRechargeService({
+      submissionRepository: new InMemoryRechargeSubmissionRepository(),
+      exchangeRateRepository: new InMemoryCreditExchangeRateRepository({
+        CNY: {
+          creditsPerUnit: 7,
+          minAmount: 5,
+          maxAmount: 100,
+          isActive: true,
+        },
+      }),
+      creditAccountService,
+    }),
+  };
+}
+
+after(async () => {
+  for (const server of trackedServers) {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  trackedServers.clear();
+});
 
 describe("billing http routes", () => {
   test("requires an authenticated billing identity", async () => {
@@ -233,6 +303,239 @@ describe("billing http routes", () => {
     assert.equal(success.body.data.balanceAfter, 125);
   });
 
+  test("static recharge handlers create, submit proof, expose admin lookup, and credit by submission id", async () => {
+    const fixture = createStaticRechargeFixture();
+    const userHeaders = {
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-static-1",
+      "x-request-id": "req-billing-static-create",
+    };
+
+    const created = await handleCreateRechargeSubmission(fixture.service, {
+      amount: 8,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+    }, userHeaders);
+
+    assert.equal(created.statusCode, 200);
+    assert.equal(created.body.success, true);
+    if (!created.body.success) {
+      return;
+    }
+
+    assert.equal(created.body.data.submission.status, "created");
+    assert.equal(created.body.data.submission.transferReferenceLast4, null);
+    assert.equal(created.body.data.submission.submittedAt, null);
+
+    const proof = await handleSubmitRechargeProof(
+      fixture.service,
+      created.body.data.submission.submissionId,
+      {
+        transferReferenceLast4: "6789",
+        note: "cashier line",
+      },
+      {
+        ...userHeaders,
+        "x-request-id": "req-billing-static-proof",
+      },
+    );
+
+    assert.equal(proof.statusCode, 200);
+    assert.equal(proof.body.success, true);
+    if (!proof.body.success) {
+      return;
+    }
+
+    assert.equal(proof.body.data.submission.status, "pending");
+    assert.equal(proof.body.data.submission.transferReferenceLast4, "6789");
+
+    const adminHeaders = {
+      [AUTHENTICATED_USER_ID_HEADER]: "admin-billing-static-1",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+      [AUTHENTICATED_ADMIN_SESSION_HEADER]: "true",
+      "x-request-id": "req-billing-static-admin",
+    };
+
+    const adminLookup = await handleGetAdminRechargeSubmission(
+      fixture.service,
+      created.body.data.submission.submissionId,
+      adminHeaders,
+    );
+
+    assert.equal(adminLookup.statusCode, 200);
+    assert.equal(adminLookup.body.success, true);
+    if (!adminLookup.body.success) {
+      return;
+    }
+
+    assert.equal(adminLookup.body.data.submission.userId, "user-billing-static-1");
+    assert.equal(adminLookup.body.data.submission.creditAmount, 56);
+
+    const reviewed = await handleReviewRechargeSubmission(
+      fixture.service,
+      created.body.data.submission.submissionId,
+      {
+        decision: "credit",
+      },
+      {
+        ...adminHeaders,
+        "x-request-id": "req-billing-static-review",
+      },
+    );
+
+    assert.equal(reviewed.statusCode, 200);
+    assert.equal(reviewed.body.success, true);
+    if (!reviewed.body.success) {
+      return;
+    }
+
+    assert.equal(reviewed.body.data.submission.status, "credited");
+    assert.equal(reviewed.body.data.recharge?.identity, "user-billing-static-1");
+    assert.equal(reviewed.body.data.recharge?.balanceAfter, 66);
+
+    const balance = await handleGetCreditBalance(fixture.creditAccountService, {
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-static-1",
+      "x-request-id": "req-billing-static-balance",
+    });
+
+    assert.equal(balance.statusCode, 200);
+    assert.equal(balance.body.success, true);
+    if (!balance.body.success) {
+      return;
+    }
+
+    assert.equal(balance.body.data.balance, 66);
+  });
+
+  test("api server registers split recharge submission routes and keeps the legacy submit route compatible", async () => {
+    const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+      allowDegradedPersistence: true,
+      resolveAccessToken: (accessToken) => (
+        accessToken === "billing-static-user-token"
+          ? { userId: "billing-static-route-user", role: "user" }
+          : accessToken === "billing-static-admin-token"
+            ? { userId: "billing-static-route-admin", role: "admin" }
+            : undefined
+      ),
+      verifyTurnstileToken: async () => ({ success: true }),
+    }));
+    trackedServers.add(server);
+
+    const baseUrl = getBaseUrl(server);
+
+    const createdResponse = await fetch(`${baseUrl}/api/v1/billing/recharge-submissions`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer billing-static-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-server-static-create",
+      },
+      body: JSON.stringify({
+        amount: 8,
+        currencyCode: "CNY",
+        paymentChannel: "manual",
+      }),
+    });
+
+    assert.equal(createdResponse.status, 200);
+    const createdPayload = await createdResponse.json() as {
+      success: boolean;
+      data?: { submission: { submissionId: string; status: string } };
+    };
+    assert.equal(createdPayload.success, true);
+    assert.equal(createdPayload.data?.submission.status, "created");
+
+    const submissionId = createdPayload.data?.submission.submissionId || "";
+    assert.ok(submissionId);
+
+    const proofResponse = await fetch(`${baseUrl}/api/v1/billing/recharge-submissions/${submissionId}/proof`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer billing-static-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-server-static-proof",
+      },
+      body: JSON.stringify({
+        transferReferenceLast4: "4321",
+        note: "server route proof",
+      }),
+    });
+
+    assert.equal(proofResponse.status, 200);
+    const proofPayload = await proofResponse.json() as {
+      success: boolean;
+      data?: { submission: { status: string; transferReferenceLast4: string } };
+    };
+    assert.equal(proofPayload.success, true);
+    assert.equal(proofPayload.data?.submission.status, "pending");
+    assert.equal(proofPayload.data?.submission.transferReferenceLast4, "4321");
+
+    const adminLookupResponse = await fetch(
+      `${baseUrl}/api/v1/admin/billing/recharge-submissions/${submissionId}`,
+      {
+        headers: {
+          authorization: "Bearer billing-static-admin-token",
+          "x-request-id": "req-server-static-admin-lookup",
+        },
+      },
+    );
+
+    assert.equal(adminLookupResponse.status, 403);
+    const adminLookupPayload = await adminLookupResponse.json() as {
+      success: boolean;
+      error?: { code?: string };
+    };
+    assert.equal(adminLookupPayload.success, false);
+    assert.equal(adminLookupPayload.error?.code, "ADMIN_ELEVATION_REQUIRED");
+
+    const adminReviewResponse = await fetch(
+      `${baseUrl}/api/v1/admin/billing/recharge-submissions/${submissionId}/review`,
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer billing-static-admin-token",
+          "content-type": "application/json",
+          "x-request-id": "req-server-static-admin-review",
+        },
+        body: JSON.stringify({
+          decision: "credit",
+        }),
+      },
+    );
+
+    assert.equal(adminReviewResponse.status, 403);
+    const adminReviewPayload = await adminReviewResponse.json() as {
+      success: boolean;
+      error?: { code?: string };
+    };
+    assert.equal(adminReviewPayload.success, false);
+    assert.equal(adminReviewPayload.error?.code, "ADMIN_ELEVATION_REQUIRED");
+
+    const legacyResponse = await fetch(`${baseUrl}/api/v1/billing/submit-recharge`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer billing-static-user-token",
+        "content-type": "application/json",
+        "x-request-id": "req-server-static-legacy-submit",
+      },
+      body: JSON.stringify({
+        amount: 6,
+        currencyCode: "CNY",
+        paymentChannel: "manual",
+        transferReferenceLast4: "9876",
+        note: "legacy submit",
+      }),
+    });
+
+    assert.equal(legacyResponse.status, 200);
+    const legacyPayload = await legacyResponse.json() as {
+      success: boolean;
+      data?: { submission: { status: string; transferReferenceLast4: string } };
+    };
+    assert.equal(legacyPayload.success, true);
+    assert.equal(legacyPayload.data?.submission.status, "pending");
+    assert.equal(legacyPayload.data?.submission.transferReferenceLast4, "9876");
+  });
+
   test("lists recharge exchange rates and preserves decimal values", async () => {
     const service = new CreditExchangeRateService(new InMemoryCreditExchangeRateRepository({
       CNY: {
@@ -258,6 +561,34 @@ describe("billing http routes", () => {
     assert.equal(result.body.data.items[0].creditsPerUnit, 5.5);
     assert.equal(result.body.data.items[0].minAmount, 6.5);
     assert.equal(result.body.data.items[0].maxAmount, 520.25);
+  });
+
+  test("lists recharge payment channels from the canonical billing surface", async () => {
+    const service = new RechargePaymentChannelConfigService(
+      new InMemoryRechargePaymentChannelConfigRepository({
+        alipay: {
+          label: "支付宝静态码",
+          qrImageDataUrl: "data:image/png;base64,abc123",
+          instructionText: "转账后提交账单编号和流水尾号。",
+          isActive: true,
+        },
+      }),
+    );
+
+    const result = await handleListRechargePaymentChannels(service, {
+      "x-request-id": "req-billing-payment-channels-list",
+    });
+
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.success, true);
+    if (!result.body.success) {
+      return;
+    }
+
+    assert.equal(result.body.data.items.length >= 1, true);
+    assert.equal(result.body.data.items[0].channel, "alipay");
+    assert.equal(result.body.data.items[0].label, "支付宝静态码");
+    assert.equal(result.body.data.items[0].qrImageDataUrl, "data:image/png;base64,abc123");
   });
 
   test("exchange rate mutations require an elevated admin session and validate the payload", async () => {

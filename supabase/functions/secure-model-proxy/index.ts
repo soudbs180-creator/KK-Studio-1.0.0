@@ -408,6 +408,15 @@ function resolveDefaultRouteBaseUrl(
   return normalizedBaseUrl;
 }
 
+function shouldForceHeaderAuthForProvider(provider: string, baseUrl: string): boolean {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+  return normalizedProvider === 'gpt-best'
+    || normalizedProvider === 'gptbest'
+    || normalizedBaseUrl.includes('gpt-best')
+    || normalizedBaseUrl.includes('gptbest');
+}
+
 function resolveUserRouteEndpointType(route: ResolvedUserRoute): 'openai' | 'gemini' | 'claude' {
   const normalizedFormat = String(route.format || '').trim().toLowerCase();
   const normalizedProvider = String(route.provider || '').trim().toLowerCase();
@@ -505,7 +514,9 @@ async function resolveSecureProxyUserRoute(
     baseUrl,
     apiKey,
     format,
-    authMethod: matchedRecord.authMethod === 'query' ? 'query' : 'header',
+    authMethod: shouldForceHeaderAuthForProvider(provider, baseUrl)
+      ? 'header'
+      : matchedRecord.authMethod === 'query' ? 'query' : 'header',
     headerName: typeof matchedRecord.headerName === 'string' ? matchedRecord.headerName.trim() : undefined,
     compatibilityMode:
       matchedRecord.compatibilityMode === 'chat'
@@ -550,7 +561,9 @@ function resolveInlineRouteConfig(raw: unknown): ResolvedUserRoute | null {
     ),
     apiKey,
     format,
-    authMethod: candidate.authMethod === 'query' ? 'query' : 'header',
+    authMethod: shouldForceHeaderAuthForProvider(provider, String(candidate.baseUrl || '').trim())
+      ? 'header'
+      : candidate.authMethod === 'query' ? 'query' : 'header',
     headerName: typeof candidate.headerName === 'string' ? candidate.headerName.trim() : undefined,
     compatibilityMode:
       candidate.compatibilityMode === 'chat'
@@ -619,6 +632,65 @@ function buildClaudeAuth(
     headers: {
       ...headers,
       'anthropic-version': '2023-06-01',
+    },
+  };
+}
+
+function isBearerGeminiCompatProvider(providerId: string | undefined, baseUrl: string | undefined): boolean {
+  const normalizedProvider = String(providerId || '').trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+  return normalizedProvider === 'gpt-best'
+    || normalizedProvider === 'gptbest'
+    || normalizedProvider === 'suxi'
+    || normalizedProvider === 'newapi'
+    || normalizedProvider === 'new-api'
+    || normalizedProvider === 'oneapi'
+    || normalizedProvider === 'one-api'
+    || normalizedBaseUrl.includes('gpt-best')
+    || normalizedBaseUrl.includes('gptbest')
+    || normalizedBaseUrl.includes('suxi')
+    || normalizedBaseUrl.includes('newapi')
+    || normalizedBaseUrl.includes('new-api')
+    || normalizedBaseUrl.includes('oneapi')
+    || normalizedBaseUrl.includes('one-api');
+}
+
+function isWuyinGeminiCompatProvider(providerId: string | undefined, baseUrl: string | undefined): boolean {
+  const normalizedProvider = String(providerId || '').trim().toLowerCase();
+  const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+  return normalizedProvider.includes('wuyin') || normalizedBaseUrl.includes('wuyinkeji');
+}
+
+function buildSystemGeminiAuth(url: string, providerId: string | undefined, baseUrl: string, apiKey: string): { url: string; headers: HeadersInit } {
+  if (isBearerGeminiCompatProvider(providerId, baseUrl)) {
+    return {
+      url,
+      headers: {
+        Authorization: /^Bearer\s+/i.test(apiKey) ? apiKey : `Bearer ${apiKey}`,
+      },
+    };
+  }
+
+  if (isWuyinGeminiCompatProvider(providerId, baseUrl)) {
+    return {
+      url,
+      headers: {
+        Authorization: apiKey,
+      },
+    };
+  }
+
+  if (is12AIGeminiBaseUrl(baseUrl) || baseUrl.includes('googleapis.com') || baseUrl.includes('generativelanguage.googleapis.com')) {
+    return {
+      url: applyQueryApiKey(url, apiKey),
+      headers: {},
+    };
+  }
+
+  return {
+    url,
+    headers: {
+      'x-goog-api-key': apiKey,
     },
   };
 }
@@ -825,7 +897,7 @@ function mapAspectRatioToOpenAI(aspectRatio?: string): string {
 }
 
 type EncodedSystemTask = {
-  kind: 'video' | 'system-video';
+  kind: 'video' | 'system-video' | 'image' | 'system-image';
   modelId: string;
   providerId?: string;
   endpointType: 'gemini' | 'openai';
@@ -837,7 +909,7 @@ type EncodedSystemTask = {
 };
 
 type EncodedUserTask = {
-  kind: 'user-video';
+  kind: 'user-video' | 'user-image';
   modelId: string;
   userRouteId: string;
   endpointType: 'gemini' | 'openai' | 'claude';
@@ -883,7 +955,7 @@ async function decodeTaskPayload(taskId: string, secret: string): Promise<Encode
     const parsed = JSON.parse(raw) as Partial<SignedSystemTask>;
     if (
       !parsed ||
-      !['video', 'system-video', 'user-video'].includes(String(parsed.kind || '')) ||
+      !['video', 'system-video', 'image', 'system-image', 'user-video', 'user-image'].includes(String(parsed.kind || '')) ||
       typeof parsed.modelId !== 'string' ||
       typeof parsed.endpointType !== 'string' ||
       typeof parsed.operationName !== 'string' ||
@@ -894,13 +966,13 @@ async function decodeTaskPayload(taskId: string, secret: string): Promise<Encode
     }
 
     let payload: EncodedTaskPayload | null = null;
-    if (parsed.kind === 'user-video') {
+    if (parsed.kind === 'user-video' || parsed.kind === 'user-image') {
       if (typeof parsed.userRouteId !== 'string') {
         return null;
       }
 
       payload = {
-        kind: 'user-video',
+        kind: parsed.kind === 'user-image' ? 'user-image' : 'user-video',
         modelId: parsed.modelId,
         userRouteId: parsed.userRouteId,
         endpointType:
@@ -923,7 +995,14 @@ async function decodeTaskPayload(taskId: string, secret: string): Promise<Encode
       }
 
       payload = {
-        kind: parsed.kind === 'system-video' ? 'system-video' : 'video',
+        kind:
+          parsed.kind === 'system-video'
+            ? 'system-video'
+            : parsed.kind === 'system-image'
+              ? 'system-image'
+              : parsed.kind === 'image'
+                ? 'image'
+                : 'video',
         modelId: parsed.modelId,
         providerId: typeof parsed.providerId === 'string' ? parsed.providerId : undefined,
         endpointType: parsed.endpointType === 'gemini' ? 'gemini' : 'openai',
@@ -951,6 +1030,19 @@ function normalizeAspectRatio(aspectRatio?: string): string | undefined {
   return value;
 }
 
+type CreditRouteSurface = 'provider-images' | 'gemini-native-image' | 'async-image';
+
+function inferCreditRouteSurface(endpoint: string | null | undefined): CreditRouteSurface {
+  const normalized = String(endpoint || '').trim().toLowerCase();
+  if (normalized.includes('image-generation-async') || normalized.includes('/images/async/')) {
+    return 'async-image';
+  }
+  if (normalized.includes('gemini') || normalized.includes('generatecontent')) {
+    return 'gemini-native-image';
+  }
+  return 'provider-images';
+}
+
 function getVideoDurationSeconds(body: ProxyRequest): number | undefined {
   if (typeof body.duration === 'number' && Number.isFinite(body.duration) && body.duration > 0) {
     return Math.round(body.duration);
@@ -969,6 +1061,18 @@ function isGeminiImageCompatModel(modelId: string): boolean {
   return (lower.includes('gemini') && lower.includes('image')) ||
     lower.includes('nano-banana') ||
     lower.includes('banana');
+}
+
+function shouldUse12AIAsyncImageRoute(baseUrl: string, modelId: string, imageCount?: number): boolean {
+  if (!is12AIGeminiBaseUrl(baseUrl)) {
+    return false;
+  }
+
+  if (!isGeminiImageCompatModel(modelId)) {
+    return false;
+  }
+
+  return Math.max(1, Number(imageCount || 1)) > 1;
 }
 
 function toOpenAIImageUrl(ref: string | { data: string; mimeType?: string }): string | null {
@@ -1021,20 +1125,123 @@ function extractImageUrlsFromOpenAICompatPayload(data: any): string[] {
   return Array.from(new Set(urls));
 }
 
+function extractAsyncImageUrls(data: any): string[] {
+  const urls = extractImageUrlsFromOpenAICompatPayload(data);
+  const push = (value: unknown) => {
+    if (typeof value === 'string' && value.trim()) {
+      urls.push(value.trim());
+    }
+  };
+
+  push(data?.url);
+  push(data?.image_url);
+  push(data?.data?.url);
+  push(data?.data?.image_url);
+  push(data?.result?.url);
+  push(data?.result?.image_url);
+
+  (Array.isArray(data?.images) ? data.images : []).forEach((item: any) => {
+    push(item?.url);
+    push(item?.image_url);
+  });
+  (Array.isArray(data?.result?.images) ? data.result.images : []).forEach((item: any) => {
+    push(item?.url);
+    push(item?.image_url);
+  });
+
+  return Array.from(new Set(urls));
+}
+
+function extractAsyncTaskId(data: any): string {
+  return String(
+    data?.task_id
+    || data?.taskId
+    || data?.id
+    || data?.data?.task_id
+    || data?.data?.taskId
+    || data?.result?.task_id
+    || data?.result?.taskId
+    || '',
+  ).trim();
+}
+
+function normalizeAsyncTaskStatus(data: any): SecureProxyTaskStatus {
+  const normalized = String(
+    data?.status
+    || data?.state
+    || data?.task_status
+    || data?.data?.status
+    || data?.result?.status
+    || '',
+  ).trim().toLowerCase();
+
+  if (!normalized) {
+    return extractAsyncImageUrls(data).length > 0 ? 'success' : 'pending';
+  }
+
+  if (['success', 'succeeded', 'completed', 'done', 'finish', 'finished'].includes(normalized)) {
+    return 'success';
+  }
+
+  if (['failed', 'failure', 'error', 'cancelled', 'canceled'].includes(normalized)) {
+    return 'failed';
+  }
+
+  return 'pending';
+}
+
+function toAsyncImageReference(ref: string | { data: string; mimeType?: string }): string | null {
+  if (typeof ref === 'string') {
+    const normalized = ref.trim();
+    if (!normalized) return null;
+    if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith('data:')) {
+      return normalized;
+    }
+    return null;
+  }
+
+  const rawData = String(ref.data || '').trim();
+  if (!rawData) return null;
+  if (rawData.startsWith('data:')) return rawData;
+  return `data:${ref.mimeType || 'image/png'};base64,${rawData}`;
+}
+
+function buildAsyncImageSubmitBody(body: ProxyRequest, modelId: string): Record<string, unknown> {
+  const requestedSize = normalizeImageSize(body.imageSize);
+  const payload: Record<string, unknown> = {
+    model: modelId,
+    prompt: body.prompt || '',
+    n: Math.max(1, Number(body.imageCount || 1)),
+    size: normalizeAspectRatio(body.aspectRatio) || requestedSize,
+    quality: requestedSize === '4K' ? '4K' : requestedSize === '2K' ? 'hd' : 'standard',
+  };
+
+  const refs = (body.referenceImages || [])
+    .map((ref) => toAsyncImageReference(ref))
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+  if (refs.length === 1) {
+    payload.image = refs[0];
+  } else if (refs.length > 1) {
+    payload.images = refs;
+  }
+
+  return payload;
+}
+
 async function tryDeleteUpstreamVideoTask(
   endpointType: 'gemini' | 'openai',
   baseUrl: string,
   selectedKey: string,
-  operationName: string
+  operationName: string,
+  providerId?: string,
 ): Promise<void> {
   try {
     if (endpointType === 'gemini') {
       const apiBase = baseUrl.includes('/v1') ? baseUrl : `${baseUrl}/v1beta`;
-      await fetch(`${apiBase}/${operationName}?key=${encodeURIComponent(selectedKey)}`, {
+      const geminiAuth = buildSystemGeminiAuth(`${apiBase}/${operationName}`, providerId, baseUrl, selectedKey);
+      await fetch(geminiAuth.url, {
         method: 'DELETE',
-        headers: {
-          'x-goog-api-key': selectedKey,
-        },
+        headers: geminiAuth.headers,
       }).catch(() => undefined);
       return;
     }
@@ -1609,12 +1816,12 @@ Deno.serve(async (req) => {
           taskTraceId,
           mode: body.mode,
           modelId: taskPayload.modelId,
-          routeKind: taskPayload.kind === 'user-video' ? 'user-route' : 'system',
+          routeKind: taskPayload.kind === 'user-video' || taskPayload.kind === 'user-image' ? 'user-route' : 'system',
           ledgerId: 'transactionId' in taskPayload ? taskPayload.transactionId : undefined,
         });
       }
 
-      if (taskPayload.kind === 'user-video') {
+      if (taskPayload.kind === 'user-video' || taskPayload.kind === 'user-image') {
         const userRoute = await resolveSecureProxyUserRoute(
           serviceClient,
           user.id,
@@ -1631,6 +1838,47 @@ Deno.serve(async (req) => {
             ? json({ success: false, error: message }, 409)
             : json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult })
         );
+
+        if (taskPayload.kind === 'user-image') {
+          if (body.mode === 'cancel_task') {
+            return json({ success: false, error: 'Async image tasks do not support cancellation in secure proxy' }, 400);
+          }
+
+          if (body.mode === 'delete_task') {
+            return json({ success: true, status: 'deleted', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
+          }
+
+          const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations/${encodeURIComponent(taskPayload.operationName)}`, userRoute);
+          const statusResponse = await fetch(auth.url, {
+            headers: auth.headers,
+          });
+
+          if (!statusResponse.ok) {
+            const errorText = await statusResponse.text();
+            return json({ success: false, error: `Status polling failed: ${statusResponse.status} ${errorText}` }, 502);
+          }
+
+          const statusData = await statusResponse.json();
+          const status = normalizeAsyncTaskStatus(statusData);
+          const urls = extractAsyncImageUrls(statusData);
+
+          if (body.mode === 'download_task') {
+            if (status === 'success' && urls[0]) {
+              return json({ success: true, url: urls[0], deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
+            }
+            return taskResultNotReady('Task content is not ready yet');
+          }
+
+          if (status === 'success' && urls[0]) {
+            return json({ success: true, status: 'success', url: urls[0], deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
+          }
+
+          if (status === 'failed') {
+            return json({ success: true, status: 'failed', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
+          }
+
+          return json({ success: true, status: 'pending', deducted: false, endpointType: taskPayload.endpointType, ...taskTraceResult });
+        }
 
         if (taskPayload.endpointType === 'claude') {
           return json({ success: false, error: 'Claude routes do not support async video tasks' }, 400);
@@ -1928,18 +2176,65 @@ Deno.serve(async (req) => {
       );
 
       const baseUrl = String(creditModel.base_url || '').replace(/\/$/, '');
+      if (taskPayload.kind === 'image' || taskPayload.kind === 'system-image') {
+        if (body.mode === 'cancel_task') {
+          return json({ success: false, error: 'Async image tasks do not support cancellation in secure proxy' }, 400);
+        }
+
+        if (body.mode === 'delete_task') {
+          return json({ success: true, status: 'deleted', ...billingResult });
+        }
+
+        const openaiBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        const statusResponse = await fetch(`${openaiBase}/images/async/generations/${encodeURIComponent(taskPayload.operationName)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${selectedKey}`,
+          },
+        });
+
+        if (!statusResponse.ok) {
+          const errorText = await statusResponse.text();
+          return json({ success: false, error: `Status polling failed: ${statusResponse.status} ${errorText}` }, 502);
+        }
+
+        const statusData = await statusResponse.json();
+        const status = normalizeAsyncTaskStatus(statusData);
+        const urls = extractAsyncImageUrls(statusData);
+
+        if (body.mode === 'download_task') {
+          if (status === 'success' && urls[0]) {
+            return json({ success: true, status: 'success', url: urls[0], ...billingResult });
+          }
+          return taskResultNotReady('Task content is not ready yet');
+        }
+
+        if (status === 'success' && urls[0]) {
+          return json({ success: true, status: 'success', url: urls[0], ...billingResult });
+        }
+
+        if (status === 'failed') {
+          const refundResult = await refundTaskCredits('image_generation_failed');
+          if (!refundResult.success) {
+            return json({ success: false, error: `Task failed and credit rollback failed: ${refundResult.message || 'unknown error'}` }, 500);
+          }
+          return json({ success: true, status: 'failed', ...refundedBillingResult(refundResult) });
+        }
+
+        return json({ success: true, status: 'pending', ...billingResult });
+      }
+
       if (body.mode === 'delete_task') {
-        await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
+        await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName, taskPayload.providerId);
         return json({ success: true, status: 'deleted', ...billingResult });
       }
 
       if (body.mode === 'cancel_task' && taskPayload.endpointType === 'gemini') {
         const apiBase = baseUrl.includes('/v1') ? baseUrl : `${baseUrl}/v1beta`;
-        const cancelResponse = await fetch(`${apiBase}/${taskPayload.operationName}:cancel?key=${encodeURIComponent(selectedKey)}`, {
+        const geminiAuth = buildSystemGeminiAuth(`${apiBase}/${taskPayload.operationName}:cancel`, taskPayload.providerId, baseUrl, selectedKey);
+        const cancelResponse = await fetch(geminiAuth.url, {
           method: 'POST',
-          headers: {
-            'x-goog-api-key': selectedKey,
-          },
+          headers: geminiAuth.headers,
         });
 
         if (!cancelResponse.ok) {
@@ -1990,11 +2285,8 @@ Deno.serve(async (req) => {
 
       if (taskPayload.endpointType === 'gemini') {
         const apiBase = baseUrl.includes('/v1') ? baseUrl : `${baseUrl}/v1beta`;
-        const statusResponse = await fetch(`${apiBase}/${taskPayload.operationName}?key=${encodeURIComponent(selectedKey)}`, {
-          headers: {
-            'x-goog-api-key': selectedKey,
-          },
-        });
+        const geminiAuth = buildSystemGeminiAuth(`${apiBase}/${taskPayload.operationName}`, taskPayload.providerId, baseUrl, selectedKey);
+        const statusResponse = await fetch(geminiAuth.url, { headers: geminiAuth.headers });
 
         if (!statusResponse.ok) {
           const errorText = await statusResponse.text();
@@ -2030,13 +2322,12 @@ Deno.serve(async (req) => {
 
         let dataUrl = '';
         try {
-          dataUrl = await downloadVideoAsDataUrl(videoUri, {
-            'x-goog-api-key': selectedKey,
-          });
+          const mediaAuth = buildSystemGeminiAuth(videoUri, taskPayload.providerId, baseUrl, selectedKey);
+          dataUrl = await downloadVideoAsDataUrl(mediaAuth.url, mediaAuth.headers);
         } catch (_downloadError) {
           return taskResultNotReady('Generated video is still processing');
         }
-        await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
+        await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName, taskPayload.providerId);
         return json({
           success: true,
           status: 'success',
@@ -2074,7 +2365,7 @@ Deno.serve(async (req) => {
 
       if (['success', 'completed', 'succeed'].includes(status)) {
         if (directUrl) {
-          await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
+          await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName, taskPayload.providerId);
           return json({ success: true, status: 'success', url: directUrl, ...billingResult });
         }
         const contentCandidates = [
@@ -2098,7 +2389,7 @@ Deno.serve(async (req) => {
             sawRetryableContent = true;
             continue;
           }
-          await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName);
+          await tryDeleteUpstreamVideoTask(taskPayload.endpointType, baseUrl, selectedKey, taskPayload.operationName, taskPayload.providerId);
           return json({
             success: true,
             status: 'success',
@@ -2147,6 +2438,8 @@ Deno.serve(async (req) => {
       const baseUrl = endpointType === 'claude'
         ? normalizeClaudeBaseUrl(userRoute.baseUrl)
         : String(userRoute.baseUrl || '').replace(/\/$/, '');
+      const useAsyncImageRoute = body.mode === 'image'
+        && shouldUse12AIAsyncImageRoute(baseUrl, modelId, body.imageCount);
 
       let content = '';
       let imageUrls: string[] = [];
@@ -2297,6 +2590,49 @@ Deno.serve(async (req) => {
           } else {
             return json({ success: false, error: message }, 502);
           }
+        }
+      } else if (body.mode === 'image' && useAsyncImageRoute) {
+        const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations`, userRoute);
+        const imageResponse = await fetch(auth.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(buildAsyncImageSubmitBody(body, modelId)),
+        });
+
+        if (!imageResponse.ok) {
+          const errorText = await imageResponse.text();
+          return json({ success: false, error: `Upstream error: ${imageResponse.status} ${errorText}` }, 502);
+        }
+
+        const result = await imageResponse.json();
+        imageUrls = extractAsyncImageUrls(result);
+        if (!imageUrls.length) {
+          const taskId = extractAsyncTaskId(result);
+          if (!taskId) {
+            return json({ success: false, error: 'Async image submit succeeded but no task id was returned' }, 502);
+          }
+
+          return json({
+            success: true,
+            status: 'pending',
+            taskId: await encodeTaskPayload({
+              kind: 'user-image',
+              modelId,
+              userRouteId: userRoute.routeId,
+              endpointType,
+              operationName: taskId,
+              userId: user.id,
+              requestId: body.requestId,
+              attemptId: body.attemptId,
+            }, taskSecret),
+            endpointType,
+            deducted: false,
+            requestId: body.requestId,
+            attemptId: body.attemptId,
+          });
         }
       } else if (body.mode === 'image' && endpointType === 'gemini') {
         const parts: any[] = [];
@@ -2850,6 +3186,7 @@ Deno.serve(async (req) => {
     fatalRefund = failWithRefund;
 
     const endpointType = creditModel.endpoint_type === 'gemini' ? 'gemini' : 'openai';
+    const requestSurface = inferCreditRouteSurface(creditModel.endpoint_type);
     const baseUrl = String(creditModel.base_url || '').replace(/\/$/, '');
 
     let content = '';
@@ -2888,16 +3225,15 @@ Deno.serve(async (req) => {
         };
       }
 
-      const geminiResponse = await fetch(
-        `${baseUrl}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(selectedKey)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const geminiAuth = buildSystemGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, String(creditModel.provider_id || ''), baseUrl, selectedKey);
+      const geminiResponse = await fetch(geminiAuth.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(geminiAuth.headers as Record<string, string>),
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!geminiResponse.ok) {
         const errorText = await geminiResponse.text();
@@ -2966,6 +3302,50 @@ Deno.serve(async (req) => {
           return await failWithRefund(message);
         }
       }
+    } else if (body.mode === 'image' && requestSurface === 'async-image') {
+      const openaiBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+      const imageResponse = await fetch(`${openaiBase}/images/async/generations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${selectedKey}`,
+        },
+        body: JSON.stringify(buildAsyncImageSubmitBody(body, modelId)),
+      });
+
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        return await failWithRefund(`Upstream error: ${imageResponse.status} ${errorText}`);
+      }
+
+      const result = await imageResponse.json();
+      imageUrls = extractAsyncImageUrls(result);
+      if (!imageUrls.length) {
+        const taskId = extractAsyncTaskId(result);
+        if (!taskId) {
+          return await failWithRefund('Async image submit succeeded but no task id was returned');
+        }
+
+        return json({
+          success: true,
+          status: 'pending',
+          taskId: await encodeTaskPayload({
+            kind: 'image',
+            modelId,
+            providerId: String(creditModel.provider_id || ''),
+            endpointType,
+            operationName: taskId,
+            transactionId,
+            userId: user.id,
+            requestId: body.requestId,
+            attemptId: body.attemptId,
+          }, taskSecret),
+          endpointType,
+          requestId: body.requestId,
+          attemptId: body.attemptId,
+          ...billingResult,
+        });
+      }
     } else if (body.mode === 'image' && endpointType === 'gemini') {
       const useSnakeCase = is12AIGeminiBaseUrl(baseUrl);
       const parts: any[] = [];
@@ -2990,17 +3370,18 @@ Deno.serve(async (req) => {
         generationConfig.imageConfig = imageConfig;
       }
 
-      const imageResponse = await fetch(
-        `${baseUrl}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(selectedKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig,
-          }),
-        }
-      );
+      const geminiAuth = buildSystemGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, String(creditModel.provider_id || ''), baseUrl, selectedKey);
+      const imageResponse = await fetch(geminiAuth.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(geminiAuth.headers as Record<string, string>),
+        },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig,
+        }),
+      });
 
       if (!imageResponse.ok) {
         const errorText = await imageResponse.text();
@@ -3144,17 +3525,15 @@ Deno.serve(async (req) => {
       if (Object.keys(parameters).length) requestBody.parameters = parameters;
 
       const apiBase = baseUrl.includes('/v1') ? baseUrl : `${baseUrl}/v1beta`;
-      const initResponse = await fetch(
-        `${apiBase}/models/${modelId}:predictLongRunning?key=${encodeURIComponent(selectedKey)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': selectedKey,
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
+      const geminiAuth = buildSystemGeminiAuth(`${apiBase}/models/${modelId}:predictLongRunning`, String(creditModel.provider_id || ''), baseUrl, selectedKey);
+      const initResponse = await fetch(geminiAuth.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(geminiAuth.headers as Record<string, string>),
+        },
+        body: JSON.stringify(requestBody),
+      });
 
       if (!initResponse.ok) {
         const errorText = await initResponse.text();
@@ -3298,19 +3677,20 @@ Deno.serve(async (req) => {
     } else if (body.mode === 'audio' && endpointType === 'gemini') {
       const isLyria = modelId.toLowerCase().includes('lyria');
       if (isLyria) {
-        const audioResponse = await fetch(
-          `${baseUrl}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(selectedKey)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
-              generationConfig: {
-                responseModalities: ['AUDIO', 'TEXT'],
-              },
-            }),
-          }
-        );
+        const geminiAuth = buildSystemGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, String(creditModel.provider_id || ''), baseUrl, selectedKey);
+        const audioResponse = await fetch(geminiAuth.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(geminiAuth.headers as Record<string, string>),
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
+            generationConfig: {
+              responseModalities: ['AUDIO', 'TEXT'],
+            },
+          }),
+        });
 
         if (!audioResponse.ok) {
           const errorText = await audioResponse.text();
@@ -3327,20 +3707,21 @@ Deno.serve(async (req) => {
         }
         audioUrl = `data:${mimeType};base64,${audioData}`;
       } else {
-        const audioResponse = await fetch(
-          `${baseUrl}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(selectedKey)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
-              },
-            }),
-          }
-        );
+        const geminiAuth = buildSystemGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, String(creditModel.provider_id || ''), baseUrl, selectedKey);
+        const audioResponse = await fetch(geminiAuth.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(geminiAuth.headers as Record<string, string>),
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: body.prompt || '' }] }],
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
+            },
+          }),
+        });
 
         if (!audioResponse.ok) {
           const errorText = await audioResponse.text();

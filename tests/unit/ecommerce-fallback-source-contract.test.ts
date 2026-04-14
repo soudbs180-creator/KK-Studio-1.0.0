@@ -23,7 +23,8 @@ test('ecommerce analysis accepts document fallback formats and routes them throu
   assert.match(routeSource, /lowerName\.endsWith\('\.md'\)/);
   assert.match(routeSource, /extractTextForFallback/);
   assert.match(routeSource, /analyzeEcommerceTextFallback/);
-  assert.match(importPanelSource, /上传需求单（xlsx\/pdf\/docx\/doc\/txt\/md）/);
+  assert.match(importPanelSource, />上传需求单</);
+  assert.match(importPanelSource, /支持 xlsx \/ pdf \/ doc \/ docx \/ txt \/ md/);
   assert.match(importPanelSource, /accept="\.xlsx,\.pdf,\.doc,\.docx,\.txt,\.md"/);
   assert.match(fallbackSource, /当前结果来自文档文本回退分析/);
   assert.match(fallbackSource, /export const analyzeEcommerceTextFallback = analyzeFallbackEcommerceText;/);

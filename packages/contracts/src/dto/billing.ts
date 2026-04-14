@@ -177,8 +177,34 @@ export interface UpsertCreditExchangeRateRequestDto {
   isActive: boolean;
 }
 
-export type RechargeSubmissionStatusDto = "pending" | "approved" | "rejected" | "credited";
+export type RechargeSubmissionStatusDto = "created" | "pending" | "approved" | "rejected" | "credited";
 export type RechargePaymentChannelDto = "alipay" | "wechat" | "paypal" | "bank" | "manual";
+export type ReviewRechargeSubmissionDecisionDto = "credit" | "reject";
+
+export interface RechargePaymentChannelConfigDto {
+  channel: RechargePaymentChannelDto;
+  label: string;
+  qrImageDataUrl?: string | null;
+  qrImagePath?: string | null;
+  instructionText?: string | null;
+  isActive: boolean;
+}
+
+export interface RechargePaymentChannelConfigListDto {
+  items: RechargePaymentChannelConfigDto[];
+}
+
+export interface CreateRechargeSubmissionRequestDto {
+  amount: number;
+  currencyCode: SupportedRechargeCurrencyDto;
+  paymentChannel: RechargePaymentChannelDto;
+  note?: string;
+}
+
+export interface SubmitRechargeProofRequestDto {
+  transferReferenceLast4: string;
+  note?: string;
+}
 
 export interface SubmitRechargeRequestDto {
   amount: number;
@@ -194,13 +220,44 @@ export interface RechargeSubmissionDto {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargePaymentChannelDto;
-  transferReferenceLast4: string;
+  transferReferenceLast4?: string | null;
   note?: string;
   status: RechargeSubmissionStatusDto;
-  submittedAt: string;
+  createdAt: string;
+  submittedAt?: string | null;
   reviewedAt?: string | null;
+}
+
+export interface AdminRechargeSubmissionDto extends RechargeSubmissionDto {
+  userId: EntityId;
+  creditAmount: number;
+  creditsPerUnit: number;
+  reviewActorUserId?: EntityId | null;
+}
+
+export interface CreateRechargeSubmissionResponseDto {
+  submission: RechargeSubmissionDto;
+}
+
+export interface SubmitRechargeProofResponseDto {
+  submission: RechargeSubmissionDto;
 }
 
 export interface SubmitRechargeResponseDto {
   submission: RechargeSubmissionDto;
+}
+
+export interface GetAdminRechargeSubmissionResponseDto {
+  submission: AdminRechargeSubmissionDto;
+}
+
+export interface ReviewRechargeSubmissionRequestDto {
+  decision: ReviewRechargeSubmissionDecisionDto;
+  note?: string;
+}
+
+export interface ReviewRechargeSubmissionResponseDto {
+  submission: AdminRechargeSubmissionDto;
+  recharge: AdminRechargeCreditsResponseDto | null;
+  creditAmount: number;
 }

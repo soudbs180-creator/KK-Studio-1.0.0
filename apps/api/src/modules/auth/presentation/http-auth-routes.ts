@@ -9,6 +9,7 @@ import {
   type ProfileDto,
   type RegisterRequestDto,
   type RegisterResponseDto,
+  type SendPasswordChangeCodeResponseDto,
   type UpdatePasswordRequestDto,
   type UpdatePasswordResponseDto,
   type UpdateProfileRequestDto,
@@ -166,8 +167,10 @@ function validateUpdatePasswordRequest(body: unknown): ApiErrorDetail[] {
   }
 
   const candidate = body as UpdatePasswordRequestDto;
-  if (!candidate.currentPassword || typeof candidate.currentPassword !== "string") {
-    details.push({ field: "currentPassword", reason: "currentPassword is required." });
+  const hasCurrentPassword = typeof candidate.currentPassword === "string" && candidate.currentPassword.trim().length > 0;
+  const hasVerificationCode = typeof candidate.verificationCode === "string" && candidate.verificationCode.trim().length > 0;
+  if (!hasCurrentPassword && !hasVerificationCode) {
+    details.push({ field: "currentPassword", reason: "currentPassword or verificationCode is required." });
   }
 
   if (!candidate.newPassword || typeof candidate.newPassword !== "string") {
@@ -177,6 +180,31 @@ function validateUpdatePasswordRequest(body: unknown): ApiErrorDetail[] {
   }
 
   return details;
+}
+
+export async function handleSendPasswordChangeCode(
+  service: AuthService,
+  headers: Record<string, string>,
+): Promise<HttpAuthRouteResult<SendPasswordChangeCodeResponseDto>> {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+
+  const result = await service.sendPasswordChangeCode(headers);
+  if (!result.body.success) {
+    return buildErrorEnvelope(
+      requestId,
+      clientVersion,
+      result.statusCode,
+      result.body.error || "Password change verification code request failed.",
+    );
+  }
+
+  return buildSuccessEnvelope(
+    requestId,
+    clientVersion,
+    result.statusCode,
+    result.body.data as SendPasswordChangeCodeResponseDto,
+  );
 }
 
 export async function handleVersionedRegister(

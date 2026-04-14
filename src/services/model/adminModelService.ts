@@ -1,19 +1,19 @@
 ﻿import type { ApiError } from '../../../packages/contracts/src/index.ts';
-import { kkWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient.ts';
 
 
-import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
+import { isStartupStageReady, type AppStartupStage } from '../system/appStartup.ts';
 
 import {
   type AdminModelQualityPricing,
   getAdminModelCreditCostForSize,
   isAdminQualityEnabled,
   normalizeAdminQualityPricing,
-} from './adminModelQuality';
+} from './adminModelQuality.ts';
 import {
   getAdminModelAutoRefreshDelay,
   shouldStartAdminModelRefresh,
-} from './adminModelRefreshPolicy';
+} from './adminModelRefreshPolicy.ts';
 import {
   buildCreditModelCatalog,
   pickCreditRouteUnit,
@@ -265,7 +265,7 @@ class AdminModelService {
     this.startupStage = stage;
     this.setBackgroundRefreshEnabled(isStartupStageReady(stage, 'background_ready'));
 
-    if (isStartupStageReady(stage, 'background_ready')) {
+    if (isStartupStageReady(stage, 'workspace_ready')) {
       void this.forceLoadAdminModels().catch((error) => {
         console.warn('[AdminModelService] Deferred startup refresh failed:', error);
       });
@@ -322,7 +322,7 @@ class AdminModelService {
   }
 
   async loadAdminModels(force = false): Promise<void> {
-    if (!isStartupStageReady(this.startupStage, 'background_ready')) {
+    if (!isStartupStageReady(this.startupStage, 'workspace_ready')) {
       return;
     }
 

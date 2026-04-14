@@ -8,7 +8,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -28,11 +28,19 @@ import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAsp
 import type { EcommerceAnalysisAsset, EcommerceAnalysisAPlusModule, EcommerceAnalysisMainImageItem, EcommerceAnalysisResult } from './services/ecommerce/types.ts';
 import { buildEcommerceRenderTask } from './services/ecommerce/renderTaskBuilder.ts';
 import { buildEcommerceCanvasGroupLayout } from './services/ecommerce/groupCanvasLayout.ts';
+import { buildEcommerceGroupExportManifest } from './services/ecommerce/groupExportManifest.ts';
+import {
+  applyEcommerceSlotResult,
+  buildEcommerceSlotPreviewBundle,
+  buildInitialEcommerceGroupSlotState,
+  type EcommerceGroupSlotState,
+} from './services/ecommerce/groupSlotState.ts';
 import { mergeEcommerceTaskState } from './services/ecommerce/taskMerger.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
+import { appendUploadFilesWithinLimit } from './components/ecommerce/ecommerceImportPreview.ts';
 import { getCardDimensions } from './utils/styleUtils';
-import { buildDockedPromptChildRegroupLayout, buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
+import { buildDockedPromptChildRegroupLayout, buildGeneratedImageBatchPositions, resolveRegroupTargetSlotIndices } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
 import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
@@ -61,13 +69,50 @@ type EcommerceRuntimeState = {
   requirementFile: File | null;
   productFiles: File[];
   extraReferenceFiles: File[];
+  itemReferenceFiles: Record<string, EcommerceManualReferenceBinding[]>;
   analysis: EcommerceAnalysisResult | null;
+  analysisConfirmed: boolean;
   selectedItems: Record<string, boolean>;
   taskStates: Record<string, EcommerceEditableTaskState>;
+  sheetSettings: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
+  groupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
   activeTaskNodeId: string | null;
   activeTaskState: EcommerceEditableTaskState | null;
+  activeGroupSheet: EcommerceGroupSheet | null;
   isAnalyzing: boolean;
 };
+
+type EcommerceManualReferenceBinding = {
+  assetId: string;
+  label: string;
+  fileName: string;
+  referenceImage: ReferenceImage;
+  assetRole: EcommerceTaskAssetRoleBinding;
+};
+
+const MAX_ECOMMERCE_PRODUCT_FILES = 4;
+const MAX_ECOMMERCE_EXTRA_REFERENCE_FILES = 4;
+const MAX_ECOMMERCE_ITEM_REFERENCE_FILES = 6;
+
+const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceGroupSheet, EcommerceSheetSetting> => {
+  const preferredImageSize = resolvePreferredEcommerceImageSize(normalizeEcommerceModelId(modelId) || modelId) as ImageSize;
+
+  return {
+    '主图': {
+      aspectRatio: AspectRatio.SQUARE,
+      imageSize: preferredImageSize,
+    },
+    'A+': {
+      aspectRatio: AspectRatio.LANDSCAPE_16_9,
+      imageSize: preferredImageSize,
+    },
+  };
+};
+
+const PromptBarCompat = PromptBar as React.ComponentType<React.ComponentProps<typeof PromptBar> & {
+  ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
+  onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch) => void;
+}>;
 
 const boundsIntersect = (
   left: { x: number; y: number; width: number; height: number },
@@ -286,6 +331,7 @@ type PromptGroupLayoutPresentationState = {
   regroupProgress: number;
   startedAt: number;
   settleUntil: number | null;
+  targetSlotIndicesByChildId: Record<string, number>;
 };
 
 const PROMPT_GROUP_REGROUP_FAST_MS = 110;
@@ -366,6 +412,7 @@ import { cleanupImagesOlderThan, cleanupOriginalsOlderThan, getStrictOriginalIma
 import { cleanupCompletedTasksOlderThan } from './services/persistence/taskPersistence';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
+import SettingsPageRoot from './app/SettingsPageRoot';
 import {
   GlobalModals,
   WorkspaceShell,
@@ -507,11 +554,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     selectedNodeIdsRef.current = selectedNodeIds;
   }, [selectedNodeIds]);
-
-  useEffect(() => {
-    keyManager.setStartupStage(stage);
-    adminModelService.setStartupStage(stage);
-  }, [stage]);
 
   const resolveProviderDisplay = useCallback((keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
     return resolveProviderIdentity({
@@ -1034,100 +1076,97 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     const init = async () => {
       advanceTo('session_ready');
-
-      // 0. Initialize the local model surface first. Hosted catalog refreshes
-      // stay deferred until the startup coordinator reaches background_ready.
-      await unifiedModelService.initialize();
-      if (!active) return;
-
-      // 1. Sync User ID
-      const authenticatedUserId = user && !isTempUser ? user.id : null;
-      const keyManagerUserId = user?.id || null;
-
-      if (authenticatedUserId) {
-        import('./services/billing/costService').then(async ({ setUserId }) => {
-          if (!active) return;
-          await setUserId(authenticatedUserId);
-        }).catch(err => console.error('[App] CostService sync failed:', err));
-        await keyManager.setUserId(keyManagerUserId);
+      try {
+        // 0. Initialize the local model surface first. Hosted catalog refreshes
+        // stay deferred until the startup coordinator reaches background_ready.
+        await unifiedModelService.initialize();
         if (!active) return;
 
-        // [New] Mark user as logged in on this browser (for future skips)
-        localStorage.setItem('kk_has_logged_in', 'true');
-      } else {
-        import('./services/billing/costService').then(async ({ setUserId }) => {
-          if (!active) return;
-          await setUserId(null);
-        }).catch(err => console.error('[App] CostService reset failed:', err));
-        await keyManager.setUserId(keyManagerUserId);
-        if (!active) return;
-      }
+        // 1. Sync User ID
+        const authenticatedUserId = user && !isTempUser ? user.id : null;
 
-      advanceTo('profile_ready');
+        if (authenticatedUserId) {
+          import('./services/billing/costService').then(async ({ setUserId }) => {
+            if (!active) return;
+            await setUserId(authenticatedUserId);
+          }).catch(err => console.error('[App] CostService sync failed:', err));
 
-      // 2. Check for Returning User (Smart Skip)
-      const hasLoggedInBefore = localStorage.getItem('kk_has_logged_in');
-      const isDevMode = window.location.hostname === 'localhost';
-
-      // 3. Storage Mode Check
-      const { getStorageMode } = await import('./services/storage/storagePreference');
-      const storageMode = await getStorageMode();
-
-      // 4. Tutorial Logic
-      const tutorialSeen = localStorage.getItem('kk_tutorial_seen');
-
-      // [Smart Logic]
-      // A. Storage Modal: Show ONLY if no mode set AND user is NOT a returning user (unless critical)
-      // Actually, if storageMode is missing, we MUST show it or default it, otherwise app won't work.
-      // But user said: "If storage settings are already set, do not pop up" -> Already handled by `!storageMode` check.
-      // "If my account has already logged in ... do not pop up selection" -> This implies we might need a default if missing?
-      // For safety, if storageMode is MISSING, we must ask. But if it exists, we skip.
-
-      if (!storageMode) {
-        // If returning user but somehow lost storage config? 
-        // We still need to ask, to avoid data saving to nowhere.
-        // However, if the user implies "don't ask me *again*", likely they have it set.
-        // Current logic: `if (!storageMode) setShowStorageModal(true)`
-        setShowStorageModal(true);
-      } else {
-        // Mode exists -> Check Keys for API Panel
-        // Only show the API settings panel for first-time users; do not auto-open it for returning users
-        const hasKeys = keyManager.hasValidKeys();
-        if (!hasKeys && !hasLoggedInBefore && !isDevMode) {
-          // Only first-time users should see the API settings panel automatically
-          openSettingsSurfaceTracked('api-management');
+          // [New] Mark user as logged in on this browser (for future skips)
+          localStorage.setItem('kk_has_logged_in', 'true');
+        } else {
+          import('./services/billing/costService').then(async ({ setUserId }) => {
+            if (!active) return;
+            await setUserId(null);
+          }).catch(err => console.error('[App] CostService reset failed:', err));
         }
-        setIsStorageChecked(true);
-      }
 
-      // B. Tutorial Logic
-      // "Only new users and developer mode should pop up tutorial"
-      // "If my account has already logged in ... do not pop up tutorial"
-      if (isDevMode) {
-        // Dev Mode: Allow normal logic (show if not seen, or always? User said "Only... pop up")
-        // We'll stick to "Show if not seen" for Devs, unless user explicitly meant "Always for Devs".
-        // Assuming "Only [New Users OR Dev Mode] get it" implies Devs get it too.
-        if (!tutorialSeen) {
-          // Handled by the other useEffect, we just ensure we don't block it here.
+        advanceTo('profile_ready');
+
+        // 2. Check for Returning User (Smart Skip)
+        const hasLoggedInBefore = localStorage.getItem('kk_has_logged_in');
+        const isDevMode = window.location.hostname === 'localhost';
+
+        // 3. Storage Mode Check
+        const { getStorageMode } = await import('./services/storage/storagePreference');
+        const storageMode = await getStorageMode();
+
+        // 4. Tutorial Logic
+        const tutorialSeen = localStorage.getItem('kk_tutorial_seen');
+
+        // [Smart Logic]
+        // A. Storage Modal: Show ONLY if no mode set AND user is NOT a returning user (unless critical)
+        // Actually, if storageMode is missing, we MUST show it or default it, otherwise app won't work.
+        // But user said: "If storage settings are already set, do not pop up" -> Already handled by `!storageMode` check.
+        // "If my account has already logged in ... do not pop up selection" -> This implies we might need a default if missing?
+        // For safety, if storageMode is MISSING, we must ask. But if it exists, we skip.
+
+        if (!storageMode) {
+          // If returning user but somehow lost storage config?
+          // We still need to ask, to avoid data saving to nowhere.
+          // However, if the user implies "don't ask me *again*", likely they have it set.
+          // Current logic: `if (!storageMode) setShowStorageModal(true)`
+          setShowStorageModal(true);
+        } else {
+          // Mode exists -> Check Keys for API Panel
+          // Only show the API settings panel for first-time users; do not auto-open it for returning users
+          const hasKeys = keyManager.hasValidKeys();
+          if (!hasKeys && !hasLoggedInBefore && !isDevMode) {
+            // Only first-time users should see the API settings panel automatically
+            openSettingsSurfaceTracked('api-management');
+          }
+          setIsStorageChecked(true);
         }
-      } else {
-        if (hasLoggedInBefore) {
+
+        // B. Tutorial Logic
+        // "Only new users and developer mode should pop up tutorial"
+        // "If my account has already logged in ... do not pop up tutorial"
+        if (isDevMode) {
+          // Dev Mode: Allow normal logic (show if not seen, or always? User said "Only... pop up")
+          // We'll stick to "Show if not seen" for Devs, unless user explicitly meant "Always for Devs".
+          // Assuming "Only [New Users OR Dev Mode] get it" implies Devs get it too.
+          if (!tutorialSeen) {
+            // Handled by the other useEffect, we just ensure we don't block it here.
+          }
+        } else if (hasLoggedInBefore) {
           // Returning User -> FORCE SKIP TUTORIAL
           // Even if 'kk_tutorial_seen' is missing (e.g. cleared cache but kept local storage key?)
           // We'll trust 'kk_has_logged_in'.
-          // actually 'kk_has_logged_in' is set above.
           localStorage.setItem('kk_tutorial_seen', 'true'); // Silently mark as seen
         }
+      } catch (error) {
+        console.error('[App] Startup bootstrap failed:', error);
+      } finally {
+        if (!active) return;
+
+        advanceTo('workspace_ready');
+
+        backgroundReadyTimer = window.setTimeout(() => {
+          if (!active) {
+            return;
+          }
+          advanceTo('background_ready');
+        }, 0);
       }
-
-      advanceTo('workspace_ready');
-
-      backgroundReadyTimer = window.setTimeout(() => {
-        if (!active) {
-          return;
-        }
-        advanceTo('background_ready');
-      }, 0);
     };
 
     init();
@@ -1195,14 +1234,103 @@ const AppContent: React.FC<AppContentProps> = () => {
     requirementFile: null,
     productFiles: [],
     extraReferenceFiles: [],
+    itemReferenceFiles: {},
     analysis: null,
+    analysisConfirmed: false,
     selectedItems: {},
     taskStates: {},
+    sheetSettings: createDefaultEcommerceSheetSettings(config.model),
+    groupSlots: { '主图': [], 'A+': [] },
     activeTaskNodeId: null,
     activeTaskState: null,
+    activeGroupSheet: null,
     isAnalyzing: false,
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
+
+  const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
+    config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
+  ), [config.mode, config.thinkingMode]);
+
+  const resolveEcommerceNodeGenerationSettings = useCallback((
+    node: PromptNode,
+    generationTarget?: 'sheet' | 'desktop' | 'mobile',
+  ) => {
+    const fallbackSheetSettings = createDefaultEcommerceSheetSettings(node.model);
+    const sheetSettings = node.ecommerce
+      ? (ecommerceState.sheetSettings[node.ecommerce.sourceSheet] || fallbackSheetSettings[node.ecommerce.sourceSheet])
+      : fallbackSheetSettings['主图'];
+
+    if (!node.ecommerce) {
+      return {
+        aspectRatio: node.aspectRatio || sheetSettings.aspectRatio,
+        imageSize: node.imageSize || sheetSettings.imageSize,
+      };
+    }
+
+    if (generationTarget === 'mobile') {
+      return {
+        aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
+        imageSize: sheetSettings.imageSize,
+      };
+    }
+
+    if (node.ecommerce.kind === 'a-plus-module' && node.ecommerce.sizePolicy === 'desktop-then-mobile') {
+      return {
+        aspectRatio: (sheetSettings.aspectRatio || node.ecommerce.desktopAspectRatio || node.aspectRatio || AspectRatio.LANDSCAPE_21_9) as AspectRatio,
+        imageSize: sheetSettings.imageSize,
+      };
+    }
+
+    return {
+      aspectRatio: (sheetSettings.aspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.SQUARE) as AspectRatio,
+      imageSize: sheetSettings.imageSize || node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize),
+    };
+  }, [ecommerceState.sheetSettings]);
+
+  const resolveEcommerceSlotState = useCallback((node: PromptNode) => {
+    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
+      return null;
+    }
+
+    return ecommerceState.groupSlots[node.ecommerce.sourceSheet].find(
+      (slot) => slot.sourceKey === node.ecommerce?.sourceRowKey,
+    ) ?? null;
+  }, [ecommerceState.groupSlots]);
+
+  const handlePreviewEcommerceSlotHistory = useCallback((
+    sourceSheet: EcommerceGroupSheet,
+    sourceKey: string,
+    preferredImageId?: string,
+  ) => {
+    const canvas = activeCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const slotState = ecommerceState.groupSlots[sourceSheet].find((slot) => slot.sourceKey === sourceKey);
+    if (!slotState) {
+      return;
+    }
+
+    const imagesById = new Map(canvas.imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
+    const previewBundle = buildEcommerceSlotPreviewBundle(slotState, imagesById, preferredImageId);
+    if (!previewBundle) {
+      return;
+    }
+
+    setWorkspaceSurface('workspace');
+    setPreviewImages(previewBundle.images);
+    setPreviewInitialIndex(previewBundle.initialIndex);
+  }, [ecommerceState.groupSlots]);
+
+  const handlePreviewEcommerceSlotHistoryForNode = useCallback((node: PromptNode, preferredImageId?: string) => {
+    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
+      return;
+    }
+
+    handlePreviewEcommerceSlotHistory(node.ecommerce.sourceSheet, node.ecommerce.sourceRowKey, preferredImageId);
+  }, [handlePreviewEcommerceSlotHistory]);
 
   useEffect(() => {
     if (config.mode !== GenerationMode.ECOMMERCE) {
@@ -1212,8 +1340,17 @@ const AppContent: React.FC<AppContentProps> = () => {
         activeTaskNodeId: null,
         activeTaskState: null,
       }));
+      return;
     }
-  }, [config.mode]);
+
+    if (config.thinkingMode !== 'high') {
+      setConfig((previousConfig) => (
+        previousConfig.mode === GenerationMode.ECOMMERCE && previousConfig.thinkingMode !== 'high'
+          ? { ...previousConfig, thinkingMode: 'high' }
+          : previousConfig
+      ));
+    }
+  }, [config.mode, config.thinkingMode, setConfig]);
 
   const [modePreferredKeyMap, setModePreferredKeyMap] = useState<Partial<Record<GenerationMode, string>>>(() => {
     try {
@@ -1857,27 +1994,106 @@ const AppContent: React.FC<AppContentProps> = () => {
     reader.readAsDataURL(blob);
   }), []);
 
+  const sanitizeReferenceToken = useCallback((value: string) => (
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w.-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'ref'
+  ), []);
+
+  const buildUploadReferenceIdentity = useCallback((file: File, labelPrefix: string) => (
+    `${labelPrefix}-${sanitizeReferenceToken(file.name || labelPrefix)}-${file.size}-${file.lastModified}`
+  ), [sanitizeReferenceToken]);
+
+  const buildProductImageRef = useCallback((referenceImage?: ReferenceImage | null): EcommerceImageRef | undefined => (
+    referenceImage
+      ? {
+          id: referenceImage.id,
+          storageId: referenceImage.storageId,
+          label: '产品图1',
+          mimeType: referenceImage.mimeType,
+          url: referenceImage.url,
+        }
+      : undefined
+  ), []);
+
+  const buildReferenceImageSignature = useCallback((referenceImages: ReferenceImage[]) => (
+    referenceImages.map((referenceImage) => [
+      referenceImage.id,
+      referenceImage.storageId || '',
+      referenceImage.mimeType || '',
+      referenceImage.url || '',
+      referenceImage.data || '',
+    ].join('|')).join('||')
+  ), []);
+
+  const buildEcommerceImageRefSignature = useCallback((reference?: EcommerceImageRef) => (
+    reference
+      ? [reference.id, reference.storageId || '', reference.label || '', reference.mimeType || '', reference.url || ''].join('|')
+      : ''
+  ), []);
+
+  const buildTaskStateSyncSignature = useCallback((taskState?: EcommerceEditableTaskState | null) => JSON.stringify({
+    imageRoleSummary: taskState?.imageRoleSummary || [],
+    assetRoles: taskState?.assetRoles || [],
+    missingFields: taskState?.missingFields || [],
+    resolvedPromptPreview: taskState?.resolvedPromptPreview || '',
+    displayLabel: taskState?.displayLabel || '',
+  }), []);
+
   const createReferenceImageFromFile = useCallback(async (file: File, labelPrefix: string): Promise<ReferenceImage> => {
     const dataUrl = await readBlobAsDataUrl(file);
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    const referenceIdentity = buildUploadReferenceIdentity(file, labelPrefix);
     return {
-      id: createEphemeralId(labelPrefix),
+      id: referenceIdentity,
+      storageId: referenceIdentity,
       data: match?.[2] || '',
       mimeType: match?.[1] || file.type || 'image/png',
       url: dataUrl,
     };
-  }, [createEphemeralId, readBlobAsDataUrl]);
+  }, [buildUploadReferenceIdentity, readBlobAsDataUrl]);
 
   const createReferenceImageFromAsset = useCallback((asset: EcommerceAnalysisAsset): ReferenceImage | null => {
     if (!asset.previewUrl) return null;
     const match = asset.previewUrl.match(/^data:([^;]+);base64,(.+)$/);
     return {
-      id: createEphemeralId(asset.assetId),
+      id: `analysis-${asset.assetId}`,
+      storageId: asset.assetId,
       data: match?.[2] || '',
       mimeType: match?.[1] || asset.mimeType || 'image/png',
       url: asset.previewUrl,
     };
-  }, [createEphemeralId]);
+  }, []);
+
+  const buildCurrentEcommerceUploadReferences = useCallback(async () => {
+    const productReferences = await Promise.all(
+      ecommerceState.productFiles
+        .slice(0, MAX_ECOMMERCE_PRODUCT_FILES)
+        .map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)),
+    );
+    const extraReferences = await Promise.all(
+      ecommerceState.extraReferenceFiles
+        .slice(0, MAX_ECOMMERCE_EXTRA_REFERENCE_FILES)
+        .map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)),
+    );
+
+    return {
+      productReferences,
+      extraReferences,
+      productImageRef: buildProductImageRef(productReferences[0]),
+    };
+  }, [buildProductImageRef, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles]);
+
+  const extractEcommerceManualReferenceBindings = useCallback((taskStateSeed?: EcommerceEditableTaskState | null) => {
+    if (!taskStateSeed?.sourceRowKey) {
+      return [] as EcommerceManualReferenceBinding[];
+    }
+
+    return ecommerceState.itemReferenceFiles[taskStateSeed.sourceRowKey] || [];
+  }, [ecommerceState.itemReferenceFiles]);
 
   const buildInitialEcommerceTaskStates = useCallback((analysis: EcommerceAnalysisResult): Record<string, EcommerceEditableTaskState> => {
     const nextStateMap: Record<string, EcommerceEditableTaskState> = {};
@@ -1894,6 +2110,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
 
     return nextStateMap;
+  }, []);
+
+  const findEcommerceAnalysisItemBySourceKey = useCallback((analysis: EcommerceAnalysisResult, sourceKey: string) => {
+    return analysis.mainImageItems.find((item) => item.itemId === sourceKey)
+      || analysis.aPlusGroup.modules.find((item) => item.moduleId === sourceKey)
+      || null;
   }, []);
 
   const handleChangeEcommerceTaskState = useCallback((
@@ -1936,6 +2158,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const buildRuntimeEcommerceAssetRoles = useCallback((params: {
     rowAssets: EcommerceAnalysisAsset[];
     rowMentions: Array<{ assetId: string; mentionTokens: string[]; notes?: string }>;
+    manualReferences: EcommerceManualReferenceBinding[];
     productReferences: ReferenceImage[];
     extraReferences: ReferenceImage[];
   }): EcommerceTaskAssetRoleBinding[] => {
@@ -1960,6 +2183,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       };
     });
 
+    const manualReferenceRoles = params.manualReferences.map((reference) => reference.assetRole);
+
     const extraReferenceRoles = params.extraReferences.map((referenceImage, index) => ({
       assetId: referenceImage.storageId || referenceImage.id,
       role: 'extra-reference' as const,
@@ -1969,8 +2194,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     }));
 
     return [
-      ...productRoles,
       ...rowReferenceRoles,
+      ...manualReferenceRoles,
+      ...productRoles,
       ...extraReferenceRoles,
     ];
   }, []);
@@ -1981,11 +2207,32 @@ const AppContent: React.FC<AppContentProps> = () => {
     setEcommerceState((previousState) => ({
       ...previousState,
       requirementFile: file,
+      itemReferenceFiles: {},
       analysis: null,
+      analysisConfirmed: false,
       selectedItems: {},
       taskStates: {},
+      groupSlots: { '主图': [], 'A+': [] },
       activeTaskNodeId: null,
       activeTaskState: null,
+      activeGroupSheet: null,
+    }));
+  }, []);
+
+  const handleClearEcommerceRequirementFile = useCallback(() => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      requirementFile: null,
+      itemReferenceFiles: {},
+      analysis: null,
+      analysisConfirmed: false,
+      selectedItems: {},
+      taskStates: {},
+      groupSlots: { '主图': [], 'A+': [] },
+      activeTaskNodeId: null,
+      activeTaskState: null,
+      activeGroupSheet: null,
+      isAnalyzing: false,
     }));
   }, []);
 
@@ -1994,7 +2241,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (nextFiles.length === 0) return;
     setEcommerceState((previousState) => ({
       ...previousState,
-      productFiles: [...previousState.productFiles, ...nextFiles],
+      productFiles: appendUploadFilesWithinLimit(
+        previousState.productFiles,
+        nextFiles,
+        MAX_ECOMMERCE_PRODUCT_FILES,
+      ),
       analysis: previousState.analysis,
     }));
   }, []);
@@ -2004,18 +2255,94 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (nextFiles.length === 0) return;
     setEcommerceState((previousState) => ({
       ...previousState,
-      extraReferenceFiles: [...previousState.extraReferenceFiles, ...nextFiles],
+      extraReferenceFiles: appendUploadFilesWithinLimit(
+        previousState.extraReferenceFiles,
+        nextFiles,
+        MAX_ECOMMERCE_EXTRA_REFERENCE_FILES,
+      ),
+    }));
+  }, []);
+
+  const handleRemoveEcommerceProductFile = useCallback((index: number) => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      productFiles: previousState.productFiles.filter((_, fileIndex) => fileIndex !== index),
+    }));
+  }, []);
+
+  const handleRemoveEcommerceExtraReferenceFile = useCallback((index: number) => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      extraReferenceFiles: previousState.extraReferenceFiles.filter((_, fileIndex) => fileIndex !== index),
+    }));
+  }, []);
+
+  const handlePickEcommerceItemReferenceFiles = useCallback(async (sourceKey: string, files: FileList | File[]) => {
+    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (!sourceKey || nextFiles.length === 0) {
+      return;
+    }
+
+    const manualReferenceBindings = await Promise.all(
+      nextFiles.map(async (file, index) => {
+        const referenceImage = await createReferenceImageFromFile(file, `item-${sourceKey}-${index + 1}`);
+        const assetId = referenceImage.storageId || referenceImage.id;
+        const label = `手动参考图${index + 1}`;
+
+        return {
+          assetId,
+          label,
+          fileName: file.name,
+          referenceImage,
+          assetRole: {
+            assetId,
+            role: 'reference' as const,
+            label,
+            normalizedLabel: label,
+            source: 'upload' as const,
+            note: '用户手动补传到当前需求的参考图',
+          },
+        } satisfies EcommerceManualReferenceBinding;
+      }),
+    );
+
+    setEcommerceState((previousState) => {
+      const previousBindings = previousState.itemReferenceFiles[sourceKey] || [];
+      return {
+        ...previousState,
+        itemReferenceFiles: {
+          ...previousState.itemReferenceFiles,
+          [sourceKey]: [
+            ...previousBindings,
+            ...manualReferenceBindings,
+          ].slice(0, MAX_ECOMMERCE_ITEM_REFERENCE_FILES),
+        },
+      };
+    });
+  }, [createReferenceImageFromFile]);
+
+  const handleRemoveEcommerceItemReferenceFile = useCallback((sourceKey: string, index: number) => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      itemReferenceFiles: {
+        ...previousState.itemReferenceFiles,
+        [sourceKey]: (previousState.itemReferenceFiles[sourceKey] || []).filter((_, bindingIndex) => bindingIndex !== index),
+      },
     }));
   }, []);
 
   const handleResetEcommerceAnalysis = useCallback(() => {
     setEcommerceState((previousState) => ({
       ...previousState,
+      itemReferenceFiles: {},
       analysis: null,
+      analysisConfirmed: false,
       selectedItems: {},
       taskStates: {},
+      groupSlots: { '主图': [], 'A+': [] },
       activeTaskNodeId: null,
       activeTaskState: null,
+      activeGroupSheet: null,
       isAnalyzing: false,
     }));
   }, []);
@@ -2029,6 +2356,72 @@ const AppContent: React.FC<AppContentProps> = () => {
       },
     }));
   }, []);
+
+  const handleUpdateEcommerceSheetSetting = useCallback((
+    sheet: EcommerceGroupSheet,
+    patch: EcommerceSheetSettingPatch,
+  ) => {
+    const previousSetting = ecommerceState.sheetSettings[sheet] || createDefaultEcommerceSheetSettings(config.model)[sheet];
+    const nextSetting: EcommerceSheetSetting = {
+      ...previousSetting,
+      ...patch,
+    };
+
+    if (
+      previousSetting.aspectRatio === nextSetting.aspectRatio
+      && previousSetting.imageSize === nextSetting.imageSize
+    ) {
+      return;
+    }
+
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      sheetSettings: {
+        ...previousState.sheetSettings,
+        [sheet]: nextSetting,
+      },
+    }));
+
+    if (config.mode === GenerationMode.ECOMMERCE) {
+      setConfig((previousConfig) => ({
+        ...previousConfig,
+        aspectRatio: nextSetting.aspectRatio,
+        imageSize: nextSetting.imageSize,
+        thinkingMode: 'high',
+      }));
+    }
+
+    startTransition(() => {
+      const promptNodes = activeCanvasRef.current?.promptNodes || [];
+      promptNodes
+        .filter((node) => (
+          node.mode === GenerationMode.ECOMMERCE
+          && node.ecommerce?.sourceSheet === sheet
+          && node.ecommerce.kind !== 'a-plus-group'
+        ))
+        .forEach((node) => {
+          if (!node.ecommerce) {
+            return;
+          }
+
+          const nextNodeAspectRatio = nextSetting.aspectRatio;
+          const nextNodeImageSize = nextSetting.imageSize;
+
+          updatePromptNode({
+            ...node,
+            aspectRatio: nextNodeAspectRatio,
+            imageSize: nextNodeImageSize,
+            ecommerce: {
+              ...node.ecommerce,
+              currentAspectRatio: nextNodeAspectRatio,
+              desktopAspectRatio: node.ecommerce.kind === 'a-plus-module' && node.ecommerce.sizePolicy === 'desktop-then-mobile'
+                ? nextNodeAspectRatio
+                : node.ecommerce.desktopAspectRatio,
+            },
+          });
+        });
+    });
+  }, [activeCanvasRef, config.mode, config.model, ecommerceState.sheetSettings, setConfig, updatePromptNode]);
 
   const handleAnalyzeEcommerceRequirement = useCallback(async () => {
     if (!ecommerceState.requirementFile) {
@@ -2051,10 +2444,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       setEcommerceState((previousState) => ({
         ...previousState,
         analysis,
+        itemReferenceFiles: previousState.itemReferenceFiles,
+        analysisConfirmed: false,
         selectedItems,
         taskStates: buildInitialEcommerceTaskStates(analysis),
+        groupSlots: { '主图': [], 'A+': [] },
         activeTaskNodeId: null,
         activeTaskState: null,
+        activeGroupSheet: null,
         isAnalyzing: false,
       }));
       import('./services/system/notificationService').then(({ notify }) => {
@@ -2115,36 +2512,186 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [activeCanvas, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, updatePromptNode]);
 
+  useEffect(() => {
+    const analysis = ecommerceState.analysis;
+    if (!ecommerceState.analysisConfirmed || !analysis || !activeCanvas?.promptNodes.length) {
+      return;
+    }
+
+    const ecommercePromptNodes = activeCanvas.promptNodes.filter(
+      (node) => node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind !== 'a-plus-group',
+    );
+    if (ecommercePromptNodes.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const {
+        productReferences: nextProductReferences,
+        extraReferences: nextExtraReferences,
+        productImageRef: nextProductImageRef,
+      } = await buildCurrentEcommerceUploadReferences();
+      if (cancelled) {
+        return;
+      }
+
+      const nextTaskStatesBySourceKey: Record<string, EcommerceEditableTaskState> = {};
+      const nextActiveTaskCandidates = new Map<string, EcommerceEditableTaskState>();
+
+      ecommercePromptNodes.forEach((node) => {
+        if (!node.ecommerce?.seriesTemplate) {
+          return;
+        }
+
+        const sourceItem = findEcommerceAnalysisItemBySourceKey(analysis, node.ecommerce.sourceRowKey);
+        if (!sourceItem) {
+          return;
+        }
+
+        const rowAssets = analysis.assets.referenceAssets.filter((asset) => (
+          sourceItem.referenceAssetIds.includes(asset.assetId)
+        ));
+        const rowReferences = rowAssets
+          .map(createReferenceImageFromAsset)
+          .filter((referenceImage): referenceImage is ReferenceImage => Boolean(referenceImage));
+        const taskStateSeed = ecommerceState.taskStates[node.ecommerce.sourceRowKey] || node.ecommerce.editableTask;
+        const manualReferences = extractEcommerceManualReferenceBindings(taskStateSeed);
+        const nextImageSize = node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize);
+        const nextAspectRatio = node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.SQUARE;
+        const nextReferenceImages = [...rowReferences, ...manualReferences.map((reference) => reference.referenceImage), ...nextProductReferences, ...nextExtraReferences];
+        const nextAssetRoles = buildRuntimeEcommerceAssetRoles({
+          rowAssets,
+          rowMentions: sourceItem.referenceMentions,
+          manualReferences: manualReferences,
+          productReferences: nextProductReferences,
+          extraReferences: nextExtraReferences,
+        });
+        const nextRenderTask = taskStateSeed
+          ? buildEcommerceRenderTask({
+              taskState: mergeEcommerceTaskState({
+                baseTask: {
+                  ...taskStateSeed,
+                  assetRoles: nextAssetRoles,
+                },
+                seriesTemplate: node.ecommerce.seriesTemplate,
+                sparseIntent: taskStateSeed.sparseUserIntent,
+                productName: analysis.projectMeta.productName,
+              }),
+              seriesTemplate: node.ecommerce.seriesTemplate,
+              aspectRatio: String(nextAspectRatio),
+              imageSize: String(nextImageSize),
+            })
+          : null;
+
+        if (nextRenderTask) {
+          nextTaskStatesBySourceKey[node.ecommerce.sourceRowKey] = nextRenderTask.taskState;
+          nextActiveTaskCandidates.set(nextRenderTask.taskState.taskId, nextRenderTask.taskState);
+          nextActiveTaskCandidates.set(node.ecommerce.sourceRowKey, nextRenderTask.taskState);
+        }
+
+        const nextEditableTask = nextRenderTask?.taskState || node.ecommerce.editableTask;
+        const nextDisplayLabel = nextRenderTask?.displayLabel || node.ecommerce.displayLabel;
+        const referenceImagesChanged = buildReferenceImageSignature(node.referenceImages || [])
+          !== buildReferenceImageSignature(nextReferenceImages);
+        const productImageRefChanged = buildEcommerceImageRefSignature(node.ecommerce.productImageRef)
+          !== buildEcommerceImageRefSignature(nextProductImageRef);
+        const taskStateChanged = buildTaskStateSyncSignature(node.ecommerce.editableTask)
+          !== buildTaskStateSyncSignature(nextEditableTask);
+        const displayLabelChanged = (node.ecommerce.displayLabel || '') !== (nextDisplayLabel || '');
+
+        if (!referenceImagesChanged && !productImageRefChanged && !taskStateChanged && !displayLabelChanged) {
+          return;
+        }
+
+        updatePromptNode({
+          ...node,
+          prompt: nextRenderTask?.prompt || node.prompt,
+          originalPrompt: nextRenderTask?.prompt || node.originalPrompt || node.prompt,
+          referenceImages: nextReferenceImages,
+          ecommerce: {
+            ...node.ecommerce,
+            productImageRef: nextProductImageRef,
+            editableTask: nextEditableTask,
+            displayLabel: nextDisplayLabel,
+          },
+        });
+      });
+
+      if (Object.keys(nextTaskStatesBySourceKey).length === 0) {
+        return;
+      }
+
+      setEcommerceState((previousState) => ({
+        ...previousState,
+        taskStates: {
+          ...previousState.taskStates,
+          ...nextTaskStatesBySourceKey,
+        },
+        activeTaskState: previousState.activeTaskState
+          ? nextActiveTaskCandidates.get(previousState.activeTaskState.taskId)
+            || nextActiveTaskCandidates.get(previousState.activeTaskState.sourceRowKey)
+            || previousState.activeTaskState
+          : previousState.activeTaskState,
+      }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCanvas?.id,
+    activeCanvas?.promptNodes.length,
+    buildCurrentEcommerceUploadReferences,
+    buildEcommerceImageRefSignature,
+    buildReferenceImageSignature,
+    buildRuntimeEcommerceAssetRoles,
+    buildTaskStateSyncSignature,
+    createReferenceImageFromAsset,
+    extractEcommerceManualReferenceBindings,
+    ecommerceState.analysis,
+    ecommerceState.analysisConfirmed,
+    ecommerceState.taskStates,
+    findEcommerceAnalysisItemBySourceKey,
+    updatePromptNode,
+  ]);
+
   const buildEcommerceGroupNode = useCallback((
     productName: string,
     sourceSheet: '主图' | 'A+',
     position: { x: number; y: number },
-  ): PromptNode => ({
-    id: createEphemeralId(sourceSheet === '主图' ? 'ecom-main-group' : 'ecom-group'),
-    prompt: `${productName || '电商'} ${sourceSheet}组卡`,
-    originalPrompt: `${productName || '电商'} ${sourceSheet}组卡`,
-    position,
-    aspectRatio: AspectRatio.LANDSCAPE_16_9,
-    imageSize: resolvePreferredEcommerceImageSize(config.model) as ImageSize,
-    model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
-    childImageIds: [],
-    timestamp: Date.now(),
-    mode: GenerationMode.ECOMMERCE,
-    parallelCount: 1,
-    ecommerce: {
-      kind: 'a-plus-group',
-      sourceSheet,
-      sourceRowKey: sourceSheet === '主图' ? 'main-group' : 'aplus-group',
-      selectedForGeneration: false,
-      stage: 'analysis_ready',
-      theme: `${productName || '电商'} ${sourceSheet}组卡`,
-      sizePolicy: 'sheet-native',
-      allowedAspectRatios: [AspectRatio.LANDSCAPE_16_9],
-      currentAspectRatio: AspectRatio.LANDSCAPE_16_9,
-      desktopStage: 'pending',
-      mobileStage: 'locked',
-    },
-  }), [config.model, createEphemeralId]);
+  ): PromptNode => {
+    const sheetSetting = ecommerceState.sheetSettings[sourceSheet] || createDefaultEcommerceSheetSettings(config.model)[sourceSheet];
+
+    return {
+      id: createEphemeralId(sourceSheet === '主图' ? 'ecom-main-group' : 'ecom-group'),
+      prompt: `${productName || '电商'} ${sourceSheet}组卡`,
+      originalPrompt: `${productName || '电商'} ${sourceSheet}组卡`,
+      position,
+      aspectRatio: sheetSetting.aspectRatio,
+      imageSize: sheetSetting.imageSize,
+      model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
+      childImageIds: [],
+      timestamp: Date.now(),
+      mode: GenerationMode.ECOMMERCE,
+      parallelCount: 1,
+      thinkingMode: 'high',
+      ecommerce: {
+        kind: 'a-plus-group',
+        sourceSheet,
+        sourceRowKey: sourceSheet === '主图' ? 'main-group' : 'aplus-group',
+        selectedForGeneration: false,
+        stage: 'analysis_ready',
+        theme: `${productName || '电商'} ${sourceSheet}组卡`,
+        sizePolicy: 'sheet-native',
+        allowedAspectRatios: [sheetSetting.aspectRatio],
+        currentAspectRatio: sheetSetting.aspectRatio,
+        desktopStage: 'pending',
+        mobileStage: 'locked',
+      },
+    };
+  }, [config.model, createEphemeralId, ecommerceState.sheetSettings]);
 
   const buildEcommercePromptNode = useCallback(async (params: ({
     item: EcommerceAnalysisMainImageItem;
@@ -2171,10 +2718,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
     const preferredImageSize = resolvePreferredEcommerceImageSize(modelId) as ImageSize;
     const rowAssets = params.analysis.assets.referenceAssets.filter((asset) => params.item.referenceAssetIds.includes(asset.assetId));
-    const productReferences = await Promise.all(ecommerceState.productFiles.map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)));
+    const {
+      productReferences,
+      extraReferences,
+      productImageRef,
+    } = await buildCurrentEcommerceUploadReferences();
     const rowReferences = rowAssets.map(createReferenceImageFromAsset).filter((item): item is ReferenceImage => Boolean(item));
-    const extraReferences = await Promise.all(ecommerceState.extraReferenceFiles.map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)));
-    const referenceImages = [...rowReferences, ...productReferences, ...extraReferences];
     const sourceMetadata = params.kind === 'main-image'
       ? resolveEcommercePromptNodeMetadata({
           kind: 'main-image',
@@ -2185,11 +2734,16 @@ const AppContent: React.FC<AppContentProps> = () => {
           item: params.item,
         });
     const sourceKey = params.kind === 'main-image' ? params.item.itemId : params.item.moduleId;
+    const sheetSetting = ecommerceState.sheetSettings[sourceMetadata.sourceSheet]
+      || createDefaultEcommerceSheetSettings(modelId)[sourceMetadata.sourceSheet];
     const taskStateSeed = ecommerceState.taskStates[sourceKey]
       || params.item.editableTask;
+    const taskManualReferences = extractEcommerceManualReferenceBindings(taskStateSeed);
+    const referenceImages = [...rowReferences, ...taskManualReferences.map((reference) => reference.referenceImage), ...productReferences, ...extraReferences];
     const runtimeAssetRoles = buildRuntimeEcommerceAssetRoles({
       rowAssets,
       rowMentions: params.item.referenceMentions,
+      manualReferences: taskManualReferences,
       productReferences,
       extraReferences,
     });
@@ -2230,8 +2784,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     const renderTask = buildEcommerceRenderTask({
       taskState: mergedTaskState,
       seriesTemplate: params.analysis.seriesTemplate,
-      aspectRatio: policy.defaultAspectRatio,
-      imageSize: preferredImageSize,
+      aspectRatio: sheetSetting.aspectRatio,
+      imageSize: sheetSetting.imageSize,
     });
 
     return {
@@ -2239,39 +2793,34 @@ const AppContent: React.FC<AppContentProps> = () => {
       prompt: renderTask.prompt,
       originalPrompt: renderTask.prompt,
       position: params.position,
-      aspectRatio: policy.defaultAspectRatio as AspectRatio,
-      imageSize: preferredImageSize,
+      aspectRatio: sheetSetting.aspectRatio,
+      imageSize: sheetSetting.imageSize,
       model: modelId,
       childImageIds: [],
       referenceImages,
       timestamp: Date.now(),
       mode: GenerationMode.ECOMMERCE,
       parallelCount: 1,
+      thinkingMode: 'high',
       ecommerce: {
         kind: params.kind,
         sourceSheet: sourceMetadata.sourceSheet,
         sourceRowKey: sourceMetadata.sourceRowKey,
         groupId: params.groupId,
         selectedForGeneration: params.selected,
-        productImageRef: productReferences[0] ? {
-          id: productReferences[0].id,
-          storageId: productReferences[0].storageId,
-          label: '产品图1',
-          mimeType: productReferences[0].mimeType,
-          url: productReferences[0].url,
-        } : undefined,
+        productImageRef,
         referenceBindings: params.item.referenceMentions,
         copyText: params.item.copyText,
         designRequirements: params.item.designRequirements,
         theme: sourceMetadata.theme,
         sizePolicy: policy.sizePolicy,
         allowedAspectRatios: policy.allowedAspectRatios as AspectRatio[],
-        currentAspectRatio: policy.defaultAspectRatio as AspectRatio,
+        currentAspectRatio: sheetSetting.aspectRatio,
         stage: 'analysis_ready',
         desktopStage: policy.sizePolicy === 'desktop-then-mobile' ? 'pending' : 'not_applicable',
         mobileStage: policy.sizePolicy === 'desktop-then-mobile' ? 'locked' : 'not_applicable',
         declaredSizeText: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
-        desktopAspectRatio: policy.sizePolicy === 'desktop-then-mobile' ? AspectRatio.LANDSCAPE_21_9 : undefined,
+        desktopAspectRatio: policy.sizePolicy === 'desktop-then-mobile' ? sheetSetting.aspectRatio : undefined,
         mobileAspectRatio: policy.mobileAspectRatio as AspectRatio | undefined,
         needsReview: params.item.needsReview,
         reviewWarnings: params.item.reviewWarnings,
@@ -2280,16 +2829,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         displayLabel: renderTask.displayLabel,
       },
     };
-  }, [buildRuntimeEcommerceAssetRoles, config.model, config.prompt, createEphemeralId, createReferenceImageFromAsset, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles, ecommerceState.taskStates]);
+  }, [buildCurrentEcommerceUploadReferences, buildRuntimeEcommerceAssetRoles, config.model, config.prompt, createEphemeralId, createReferenceImageFromAsset, ecommerceState.sheetSettings, ecommerceState.taskStates, extractEcommerceManualReferenceBindings]);
 
   const handleConfirmEcommerceAnalysis = useCallback(async () => {
     if (!ecommerceState.analysis) return;
-    if (ecommerceState.productFiles.length === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('缺少产品图', '请先上传至少一张产品图，再确认建卡。');
-      });
-      return;
-    }
 
     const basePosition = findNextGroupPosition();
     const createdNodeIds: string[] = [];
@@ -2304,19 +2847,46 @@ const AppContent: React.FC<AppContentProps> = () => {
     const aPlusSlotPositionByKey = new Map(
       layoutPlan.aPlusGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
     );
+    const initialGroupSlots = {
+      '主图': buildInitialEcommerceGroupSlotState({
+        groupKey: 'main',
+        slots: layoutPlan.mainGroup.slots.map((slot) => ({
+          slotId: slot.slotId,
+          sourceKey: slot.sourceKey,
+        })),
+        selectedItems: ecommerceState.selectedItems,
+      }),
+      'A+': buildInitialEcommerceGroupSlotState({
+        groupKey: 'aplus',
+        slots: layoutPlan.aPlusGroup.slots.map((slot) => ({
+          slotId: slot.slotId,
+          sourceKey: slot.sourceKey,
+        })),
+        selectedItems: ecommerceState.selectedItems,
+      }),
+    };
+
+    const mainImageGroupShellSpec = {
+      sourceSheet: '主图' as const,
+      position: layoutPlan.mainGroup.position,
+    };
+    const aPlusGroupShellSpec = {
+      sourceSheet: 'A+' as const,
+      position: layoutPlan.aPlusGroup.position,
+    };
 
     const mainGroupNode = buildEcommerceGroupNode(
       ecommerceState.analysis.projectMeta.productName,
-      '主图',
-      layoutPlan.mainGroup.position,
+      mainImageGroupShellSpec.sourceSheet,
+      mainImageGroupShellSpec.position,
     );
     await addPromptNode(mainGroupNode);
     createdNodeIds.push(mainGroupNode.id);
 
     const aPlusGroupNode = buildEcommerceGroupNode(
       ecommerceState.analysis.projectMeta.productName,
-      'A+',
-      layoutPlan.aPlusGroup.position,
+      aPlusGroupShellSpec.sourceSheet,
+      aPlusGroupShellSpec.position,
     );
     await addPromptNode(aPlusGroupNode);
     createdNodeIds.push(aPlusGroupNode.id);
@@ -2359,11 +2929,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     bringNodesToFront(createdNodeIds);
     setEcommerceState((previousState) => ({
       ...previousState,
-      analysis: null,
-      selectedItems: {},
-      taskStates: {},
+      analysisConfirmed: true,
+      groupSlots: initialGroupSlots,
       activeTaskNodeId: null,
       activeTaskState: null,
+      activeGroupSheet: '主图',
     }));
     setConfig((previousConfig) => ({
       ...previousConfig,
@@ -2374,6 +2944,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       notify.success('建卡完成', `已创建 ${createdNodeIds.length} 张电商相关卡片。`);
     });
   }, [addPromptNode, bringNodesToFront, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.productFiles.length, ecommerceState.selectedItems, findNextGroupPosition]);
+
+  const handleActivateEcommerceGroupSheet = useCallback((sheet: '主图' | 'A+') => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      activeTaskNodeId: null,
+      activeTaskState: null,
+      activeGroupSheet: sheet,
+    }));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -3267,6 +3846,183 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     return await response.blob();
   }, []);
+
+  const sanitizeEcommerceExportName = useCallback((value: string, fallback: string) => {
+    const normalized = String(value || '')
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-')
+      .trim();
+    return normalized || fallback;
+  }, []);
+
+  const resolveLatestEcommerceSlotImage = useCallback((node: PromptNode) => {
+    const canvas = activeCanvasRef.current;
+    const taskId = node.ecommerce?.editableTask?.taskId;
+    if (!canvas || !node.ecommerce) {
+      return null;
+    }
+
+    const candidatePromptIds = new Set<string>([node.id]);
+    if (taskId) {
+      canvas.promptNodes.forEach((promptNode) => {
+        if (promptNode.partialRedraw?.inheritedTaskState?.taskId === taskId) {
+          candidatePromptIds.add(promptNode.id);
+        }
+      });
+    }
+
+    const latestImage = canvas.imageNodes
+      .filter((imageNode) => imageNode.parentPromptId && candidatePromptIds.has(imageNode.parentPromptId))
+      .sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0))[0];
+
+    if (!latestImage) {
+      return null;
+    }
+
+    return {
+      image: latestImage,
+      latestSource: latestImage.parentPromptId === node.id ? 'generated' as const : 'redraw' as const,
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ecommerceState.analysisConfirmed) {
+      return;
+    }
+
+    setEcommerceState((previousState) => {
+      const nextGroupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> = {
+        '主图': previousState.groupSlots['主图'].map((slot) => ({
+          ...slot,
+          selected: previousState.selectedItems[slot.sourceKey] !== false,
+        })),
+        'A+': previousState.groupSlots['A+'].map((slot) => ({
+          ...slot,
+          selected: previousState.selectedItems[slot.sourceKey] !== false,
+        })),
+      };
+
+      (activeCanvas?.promptNodes || []).forEach((promptNode) => {
+        if (!promptNode.ecommerce || promptNode.ecommerce.kind === 'a-plus-group') {
+          return;
+        }
+
+        const sheet = promptNode.ecommerce.sourceSheet;
+        const slot = nextGroupSlots[sheet].find((entry) => entry.sourceKey === promptNode.ecommerce?.sourceRowKey);
+        if (!slot) {
+          return;
+        }
+
+        const latest = resolveLatestEcommerceSlotImage(promptNode);
+        if (!latest) {
+          return;
+        }
+
+        nextGroupSlots[sheet] = applyEcommerceSlotResult(nextGroupSlots[sheet], {
+          slotId: slot.slotId,
+          imageId: latest.image.id,
+          source: latest.latestSource,
+        });
+      });
+
+      const previousSignature = JSON.stringify(previousState.groupSlots);
+      const nextSignature = JSON.stringify(nextGroupSlots);
+      if (previousSignature === nextSignature) {
+        return previousState;
+      }
+
+      return {
+        ...previousState,
+        groupSlots: nextGroupSlots,
+      };
+    });
+  }, [activeCanvas, ecommerceState.analysisConfirmed, ecommerceState.selectedItems, resolveLatestEcommerceSlotImage]);
+
+  const handleExportEcommerceGroup = useCallback(async (groupNode: PromptNode) => {
+    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
+      return;
+    }
+
+    const canvas = activeCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const moduleNodes = canvas.promptNodes.filter((promptNode) => (
+      !!promptNode.ecommerce
+      && promptNode.ecommerce.kind !== 'a-plus-group'
+      && promptNode.ecommerce.groupId === groupNode.id
+    ));
+    const slotStateBySourceKey = new Map(
+      ecommerceState.groupSlots[groupNode.ecommerce.sourceSheet].map((slot) => [slot.sourceKey, slot] as const),
+    );
+
+    const packageType = groupNode.ecommerce.sourceSheet === '主图' ? 'main-image-group' : 'a-plus-group';
+    const packageLabel = groupNode.ecommerce.sourceSheet === '主图' ? '主图包' : 'A+包';
+    const zip = new JSZip();
+    const exportables: Array<{ fileName: string; image: GeneratedImage }> = [];
+
+    const manifest = buildEcommerceGroupExportManifest({
+      packageType,
+      groupId: groupNode.id,
+      groupLabel: groupNode.ecommerce.sourceSheet,
+      sourcePromptId: groupNode.id,
+      slots: moduleNodes.map((promptNode, index) => {
+        const latest = resolveLatestEcommerceSlotImage(promptNode);
+        const slotLabel = promptNode.ecommerce?.displayLabel || promptNode.ecommerce?.sourceRowKey || `${groupNode.ecommerce?.sourceSheet} 模块`;
+        const slotState = promptNode.ecommerce
+          ? slotStateBySourceKey.get(promptNode.ecommerce.sourceRowKey)
+          : undefined;
+        const slotId = slotState?.slotId || `${groupNode.id}-slot-${index + 1}`;
+        const isSelected = slotState?.selected ?? (promptNode.ecommerce?.selectedForGeneration !== false);
+        if (!promptNode.ecommerce || !isSelected) {
+          return {
+            slotId,
+            slotLabel,
+            selectedForGeneration: false,
+          };
+        }
+
+        if (!latest) {
+          return {
+            slotId,
+            slotLabel,
+            selectedForGeneration: true,
+          };
+        }
+
+        const extension = latest.image.mimeType?.includes('jpeg') || latest.image.mimeType?.includes('jpg')
+          ? 'jpg'
+          : latest.image.mimeType?.includes('webp')
+            ? 'webp'
+            : 'png';
+        const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}.${extension}`;
+        exportables.push({ fileName, image: latest.image });
+
+        return {
+          slotId,
+          slotLabel,
+          selectedForGeneration: true,
+          latestImageId: latest.image.id,
+          latestSource: latest.latestSource,
+          fileName,
+        };
+      }),
+    });
+
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+    for (const exportItem of exportables) {
+      const blob = await resolvePptImageBlob(exportItem.image);
+      zip.file(exportItem.fileName, blob);
+    }
+
+    const content = await zip.generateAsync({ type: 'blob' });
+    saveAs(content, `${sanitizeEcommerceExportName(packageLabel, packageLabel)}-${Date.now()}.zip`);
+    import('./services/system/notificationService').then(({ notify }) => {
+      notify.success('导出完成', `${packageLabel}已导出，共 ${exportables.length} 张图片。`);
+    });
+  }, [ecommerceState.groupSlots, resolveLatestEcommerceSlotImage, resolvePptImageBlob, sanitizeEcommerceExportName]);
 
   const renderBlobIntoImage = useCallback((blob: Blob) => (
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -5267,6 +6023,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     node: PromptNode,
     options?: {
       aspectRatio?: AspectRatio;
+      imageSize?: ImageSize;
+      generationTarget?: 'sheet' | 'desktop' | 'mobile';
       promptSuffix?: string;
       stagePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
       successPatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
@@ -5276,8 +6034,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
     if (!latestNode.ecommerce) return;
 
-    const nextAspectRatio = options?.aspectRatio || latestNode.aspectRatio || AspectRatio.SQUARE;
-    const nextImageSize = latestNode.imageSize || (resolvePreferredEcommerceImageSize(latestNode.model) as ImageSize);
+    const nextGenerationSettings = resolveEcommerceNodeGenerationSettings(latestNode, options?.generationTarget);
+    const nextAspectRatio = options?.aspectRatio || nextGenerationSettings.aspectRatio;
+    const nextImageSize = options?.imageSize || nextGenerationSettings.imageSize;
     const activeDraft = ecommerceState.activeTaskNodeId === node.id
       ? ecommerceState.activeTaskState
       : null;
@@ -5317,7 +6076,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           imageSize: String(nextImageSize),
           mode: GenerationMode.ECOMMERCE,
           supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
-          thinkingMode: config.thinkingMode || 'minimal',
+          thinkingMode: resolveEffectiveEcommerceThinkingMode(),
           referenceImages: (latestNode.referenceImages || [])
             .filter((referenceImage) => referenceImage.data)
             .map((referenceImage) => {
@@ -5362,6 +6121,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       optimizedPromptZh,
       promptOptimizerResult,
       imageSize: nextImageSize,
+      thinkingMode: resolveEffectiveEcommerceThinkingMode(),
       mode: GenerationMode.ECOMMERCE,
       aspectRatio: nextAspectRatio,
       ecommerce: {
@@ -5389,18 +6149,35 @@ const AppContent: React.FC<AppContentProps> = () => {
       stage: 'failed',
       ...options?.failurePatch,
     });
-  }, [config.enablePromptOptimization, config.prompt, config.thinkingMode, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, handleRetryNode, syncActiveEcommerceTask, updateEcommerceNodeState]);
+  }, [config.enablePromptOptimization, config.prompt, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, handleRetryNode, resolveEcommerceNodeGenerationSettings, resolveEffectiveEcommerceThinkingMode, syncActiveEcommerceTask, updateEcommerceNodeState]);
 
   const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean) => {
     if (!node.ecommerce) return;
     updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      selectedItems: {
+        ...previousState.selectedItems,
+        [node.ecommerce?.sourceRowKey || node.id]: selected,
+      },
+      groupSlots: node.ecommerce?.sourceSheet
+        ? {
+            ...previousState.groupSlots,
+            [node.ecommerce.sourceSheet]: previousState.groupSlots[node.ecommerce.sourceSheet].map((slot) => (
+              slot.sourceKey === node.ecommerce?.sourceRowKey
+                ? { ...slot, selected }
+                : slot
+            )),
+          }
+        : previousState.groupSlots,
+    }));
   }, [updateEcommerceNodeState]);
 
   const handleGenerateEcommerceNode = useCallback(async (node: PromptNode) => {
     if (!node.ecommerce) return;
     if (node.ecommerce.kind === 'main-image') {
       await runEcommerceNodeGeneration(node, {
-        aspectRatio: (node.ecommerce.currentAspectRatio || node.ecommerce.allowedAspectRatios?.[0] || AspectRatio.SQUARE) as AspectRatio,
+        generationTarget: 'sheet',
       });
       return;
     }
@@ -5408,7 +6185,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (node.ecommerce.kind === 'a-plus-module') {
       const isDesktopThenMobile = node.ecommerce.sizePolicy === 'desktop-then-mobile';
       await runEcommerceNodeGeneration(node, {
-        aspectRatio: (isDesktopThenMobile ? (node.ecommerce.desktopAspectRatio || AspectRatio.LANDSCAPE_21_9) : (node.ecommerce.currentAspectRatio || AspectRatio.LANDSCAPE_16_9)) as AspectRatio,
+        generationTarget: isDesktopThenMobile ? 'desktop' : 'sheet',
         promptSuffix: isDesktopThenMobile ? '先生成桌面端 21:9 电商横幅版本。' : undefined,
         stagePatch: isDesktopThenMobile ? { desktopStage: 'generating' } : undefined,
         successPatch: isDesktopThenMobile ? { desktopStage: 'generated', mobileStage: 'locked' } : undefined,
@@ -5429,7 +6206,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleRetryEcommerceModule = useCallback(async (node: PromptNode) => {
     if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-module' || node.ecommerce.desktopStage !== 'confirmed') return;
     await runEcommerceNodeGeneration(node, {
-      aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
+      generationTarget: 'mobile',
       promptSuffix: '继续生成手机端 4:3 版本，保持主体、文案与参考图逻辑一致。',
       stagePatch: { mobileStage: 'generating' },
       successPatch: { mobileStage: 'generated' },
@@ -6281,8 +7058,8 @@ ${slideLayerXml.join('\n')}
     const ecommerceTaskState = clickedNode.ecommerce?.editableTask
       || clickedNode.partialRedraw?.inheritedTaskState
       || null;
-    const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE && ecommerceTaskState
-      ? (ecommerceTaskState.sparseUserIntent || '')
+    const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE
+      ? ''
       : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
         ? clickedNode.optimizedPromptEn.trim()
         : clickedNode.prompt);
@@ -6301,6 +7078,7 @@ ${slideLayerXml.join('\n')}
       ...previousState,
       activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE ? clickedNode.id : null,
       activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE ? ecommerceTaskState : null,
+      activeGroupSheet: clickedNode.mode === GenerationMode.ECOMMERCE ? (clickedNode.ecommerce?.sourceSheet || null) : null,
     }));
 
     // [Draft Logic] Resume Draft if clicked on a draft node
@@ -6311,6 +7089,30 @@ ${slideLayerXml.join('\n')}
       setDraftNodeId(null);
     }
   }, [setConfig]);
+
+  const handleActivateEcommerceTaskBySourceKey = useCallback((sourceKey: string) => {
+    const targetNode = activeCanvas?.promptNodes.find((node) => (
+      node.mode === GenerationMode.ECOMMERCE
+      && node.ecommerce?.sourceRowKey === sourceKey
+    ));
+
+    if (targetNode) {
+      void handlePromptClick(targetNode, false);
+      return;
+    }
+
+    const fallbackTask = ecommerceState.taskStates[sourceKey];
+    if (!fallbackTask) {
+      return;
+    }
+
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      activeTaskNodeId: null,
+      activeTaskState: fallbackTask,
+      activeGroupSheet: fallbackTask.sourceSheet,
+    }));
+  }, [activeCanvas, ecommerceState.taskStates, handlePromptClick]);
 
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换（向后兼容），无修饰键=替换
@@ -6326,6 +7128,7 @@ ${slideLayerXml.join('\n')}
       ...previousState,
       activeTaskNodeId: null,
       activeTaskState: null,
+      activeGroupSheet: null,
     }));
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
@@ -6691,9 +7494,11 @@ ${slideLayerXml.join('\n')}
     }
 
     const fastPhaseRatio = PROMPT_GROUP_REGROUP_FAST_MS / PROMPT_GROUP_REGROUP_TOTAL_MS;
-    const fastRegroupProgress = Math.min(1, layoutState.regroupProgress / fastPhaseRatio);
+    const fastRegroupProgress = layoutState.layoutMode === 'docked'
+      ? 0
+      : Math.min(1, layoutState.regroupProgress / fastPhaseRatio);
     const settleRegroupProgress = layoutState.layoutMode === 'docked'
-      ? 1
+      ? layoutState.regroupProgress
       : layoutState.regroupProgress <= fastPhaseRatio
         ? 0
         : Math.min(1, (layoutState.regroupProgress - fastPhaseRatio) / (1 - fastPhaseRatio));
@@ -6712,6 +7517,7 @@ ${slideLayerXml.join('\n')}
       regroupStartPositions: liveStartPositions,
       fastRegroupProgress,
       settleRegroupProgress,
+      targetSlotIndices: childImages.map((imageNode) => layoutState.targetSlotIndicesByChildId[imageNode.id]),
     });
 
     return new Map<string, {
@@ -6723,7 +7529,9 @@ ${slideLayerXml.join('\n')}
         const layout = layouts[index];
         const renderPosition = !layout
           ? liveStartPosition
-          : layout.position;
+          : isNodeDragActive && layoutState.layoutMode === 'regrouping'
+            ? layout.dockedPosition
+            : layout.position;
         const settledPosition = !layout
           ? liveStartPosition
           : layout.settledPosition;
@@ -6731,7 +7539,7 @@ ${slideLayerXml.join('\n')}
         return [imageNode.id, { renderPosition, settledPosition }] as const;
       })
     );
-  }, [isMobile, liveNodePositionVersion, parseImageDimensions]);
+  }, [isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -6950,10 +7758,30 @@ ${slideLayerXml.join('\n')}
     dragConnection?.active,
     selectionBox?.active,
   ]);
+  const groupOverlapStateSignatureRef = useRef('');
+  const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
+  const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
+  const stableVisibleCanvasSceneRef = useRef<{
+    visiblePromptNodes: PromptNode[];
+    visibleImageNodes: GeneratedImage[];
+    visibleWorkflowUtilityNodes: WorkflowUtilityCanvasNode[];
+    visibleGroups: CanvasGroup[];
+    nowTimestamp: number;
+  }>({
+    visiblePromptNodes: [],
+    visibleImageNodes: [],
+    visibleWorkflowUtilityNodes: [],
+    visibleGroups: [],
+    nowTimestamp: Date.now(),
+  });
   const { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp } = React.useMemo(() => {
+    if (isNodeDragActive) {
+      return stableVisibleCanvasSceneRef.current;
+    }
+
     if (!activeCanvas) {
       return {
         visiblePromptNodes: [],
@@ -7061,8 +7889,16 @@ ${slideLayerXml.join('\n')}
 
     const nowTimestamp = Date.now();
 
+    stableVisibleCanvasSceneRef.current = {
+      visiblePromptNodes,
+      visibleImageNodes,
+      visibleWorkflowUtilityNodes,
+      visibleGroups,
+      nowTimestamp,
+    };
+
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, isNodeDragActive, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
 
   const actualChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -7087,6 +7923,8 @@ ${slideLayerXml.join('\n')}
 
     return childIdMap;
   }, [actualChildImagesByPromptId]);
+  const stablePromptGroupBoundsByIdRef = useRef(new Map<string, { x: number; y: number; width: number; height: number }>());
+  const stablePromptGroupViewsRef = useRef<PromptGroupView[]>([]);
 
   const promptGroupRegroupLayoutsById = React.useMemo(() => {
     const regroupLayoutMap = new Map<string, Map<string, {
@@ -7100,6 +7938,10 @@ ${slideLayerXml.join('\n')}
       if (childImages.length === 0) {
         return;
       }
+      const layoutState = promptGroupLayoutStateByIdRef.current[promptNode.id];
+      if (!layoutState) {
+        return;
+      }
 
       const promptPosition = liveNodePositionByIdRef.current[promptNode.id] ?? promptNode.position;
       regroupLayoutMap.set(
@@ -7108,7 +7950,7 @@ ${slideLayerXml.join('\n')}
           promptNode,
           childImages,
           promptPosition,
-          promptGroupLayoutStateByIdRef.current[promptNode.id],
+          layoutState,
         ),
       );
     });
@@ -7117,6 +7959,10 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, actualChildImagesByPromptId, buildPromptGroupRegroupLayouts, liveNodePositionVersion, promptGroupLayoutVersion]);
 
   const promptGroupBoundsById = React.useMemo(() => {
+    if (isNodeDragActive && stablePromptGroupBoundsByIdRef.current.size > 0) {
+      return stablePromptGroupBoundsByIdRef.current;
+    }
+
     const boundsMap = new Map<string, { x: number; y: number; width: number; height: number }>();
     if (!activeCanvas) return boundsMap;
 
@@ -7174,10 +8020,15 @@ ${slideLayerXml.join('\n')}
       });
     });
 
+    stablePromptGroupBoundsByIdRef.current = boundsMap;
     return boundsMap;
-  }, [activeCanvas, actualChildImagesByPromptId, liveNodePositionVersion, lockedGroupBoundsById, promptGroupRegroupLayoutsById]);
+  }, [activeCanvas, actualChildImagesByPromptId, isNodeDragActive, liveNodePositionVersion, lockedGroupBoundsById, promptGroupRegroupLayoutsById]);
 
   const computedGroupOverlapMap = React.useMemo(() => {
+    if (isNodeDragActive) {
+      return groupOverlapMap;
+    }
+
     const nextOverlapMap: Record<string, string[]> = {};
     const entries = Array.from(promptGroupBoundsById.entries());
 
@@ -7196,9 +8047,8 @@ ${slideLayerXml.join('\n')}
     }
 
     return nextOverlapMap;
-  }, [promptGroupBoundsById]);
+  }, [groupOverlapMap, isNodeDragActive, promptGroupBoundsById]);
 
-  const groupOverlapStateSignatureRef = useRef('');
   useEffect(() => {
     const normalized = Object.keys(computedGroupOverlapMap)
       .sort()
@@ -7238,9 +8088,21 @@ ${slideLayerXml.join('\n')}
     }
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
 
-  const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
-  const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
   const syncLiveNodePositionState = useCallback(() => {
+    const hasActivePromptGroupDragPresentation = isNodeDragActive
+      && Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
+        state.layoutMode === 'regrouping' || state.layoutMode === 'docked'
+      ));
+
+    if (hasActivePromptGroupDragPresentation) {
+      if (liveSceneFrameRef.current !== null) {
+        cancelAnimationFrame(liveSceneFrameRef.current);
+        liveSceneFrameRef.current = null;
+      }
+      setLiveNodePositionVersion((prev) => prev + 1);
+      return;
+    }
+
     if (liveSceneFrameRef.current !== null) {
       return;
     }
@@ -7249,7 +8111,7 @@ ${slideLayerXml.join('\n')}
       liveSceneFrameRef.current = null;
       setLiveNodePositionVersion((prev) => prev + 1);
     });
-  }, []);
+  }, [isNodeDragActive]);
 
   const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
     const livePosition = liveNodePositionByIdRef.current[nodeId];
@@ -7465,9 +8327,22 @@ ${slideLayerXml.join('\n')}
             return;
           }
 
-          if (state.layoutMode === 'docked' && state.settleUntil !== null && now >= state.settleUntil) {
-            if (next === prev) next = { ...prev };
-            delete next[groupId];
+          if (state.layoutMode === 'docked' && state.settleUntil !== null) {
+            const settleDuration = Math.max(1, state.settleUntil - state.startedAt);
+            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / settleDuration));
+
+            if (nextProgress !== state.regroupProgress) {
+              if (next === prev) next = { ...prev };
+              next[groupId] = {
+                ...state,
+                regroupProgress: nextProgress,
+              };
+            }
+
+            if (now >= state.settleUntil) {
+              if (next === prev) next = { ...prev };
+              delete next[groupId];
+            }
           }
         });
 
@@ -7485,11 +8360,38 @@ ${slideLayerXml.join('\n')}
     });
   }, [syncPromptGroupLayoutState]);
 
-  const beginPromptGroupRegroup = useCallback((groupId: string) => {
+  const beginPromptGroupRegroup = useCallback((groupId: string, childImages: GeneratedImage[]) => {
     const now = performance.now();
+    const promptNode = activeCanvas?.promptNodes.find((candidate) => candidate.id === groupId) ?? null;
     syncPromptGroupLayoutState((prev) => {
       const existing = prev[groupId];
-      if (existing?.layoutMode === 'regrouping' && existing.regroupProgress >= 1) {
+      const hasStableTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
+        && childImages.every((imageNode) => typeof existing?.targetSlotIndicesByChildId?.[imageNode.id] === 'number');
+      const regroupStartPositions = childImages.map((imageNode) => (
+        liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
+      ));
+      const targetSlotIndices = hasStableTargetSlots
+        ? childImages.map((imageNode) => existing!.targetSlotIndicesByChildId[imageNode.id])
+        : resolveRegroupTargetSlotIndices(
+            regroupStartPositions,
+            isMobile || promptNode?.mode === GenerationMode.PPT ? 1 : childImages.length,
+            childImages.length,
+          );
+      const targetSlotIndicesByChildId = childImages.reduce<Record<string, number>>((acc, imageNode, index) => {
+        acc[imageNode.id] = targetSlotIndices[index] ?? index;
+        return acc;
+      }, {});
+      const hasSameTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
+        && childImages.every((imageNode) => (
+          existing?.targetSlotIndicesByChildId?.[imageNode.id] === targetSlotIndicesByChildId[imageNode.id]
+        ));
+
+      if (
+        existing
+        && existing.layoutMode === 'regrouping'
+        && existing.settleUntil === null
+        && hasSameTargetSlots
+      ) {
         return prev;
       }
 
@@ -7500,11 +8402,12 @@ ${slideLayerXml.join('\n')}
           regroupProgress: existing?.regroupProgress ?? 0,
           startedAt: existing?.startedAt ?? now,
           settleUntil: null,
+          targetSlotIndicesByChildId,
         },
       };
     });
     schedulePromptGroupRegroupAnimation();
-  }, [schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
+  }, [activeCanvas, isMobile, schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
 
   const settlePromptGroupRegroup = useCallback((groupId: string) => {
     const now = performance.now();
@@ -7519,7 +8422,8 @@ ${slideLayerXml.join('\n')}
         [groupId]: {
           ...existing,
           layoutMode: 'docked',
-          regroupProgress: 1,
+          regroupProgress: 0,
+          startedAt: now,
           settleUntil: now + PROMPT_GROUP_REGROUP_SETTLE_MS,
         },
       };
@@ -7635,9 +8539,13 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, clearPromptGroupRegroup, settlePromptGroupRegroup, updateImageNodePosition, updatePromptNode]);
 
   const promptGroupViews = React.useMemo<PromptGroupView[]>(() => {
+    if (isNodeDragActive && stablePromptGroupViewsRef.current.length > 0) {
+      return stablePromptGroupViewsRef.current;
+    }
+
     if (!activeCanvas) return [];
 
-    return activeCanvas.promptNodes
+    const nextPromptGroupViews = activeCanvas.promptNodes
       .filter((promptNode) => !(promptNode.isDraft && !promptNode.isGenerating))
       .map((promptNode) => {
         const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
@@ -7665,7 +8573,9 @@ ${slideLayerXml.join('\n')}
         } satisfies PromptGroupView;
       })
       .filter((groupView): groupView is PromptGroupView => Boolean(groupView));
-  }, [activeCanvas, actualChildImagesByPromptId, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupBoundsById, promptGroupLayerById]);
+    stablePromptGroupViewsRef.current = nextPromptGroupViews;
+    return nextPromptGroupViews;
+  }, [activeCanvas, actualChildImagesByPromptId, focusedGroupId, generatingGroupIds, groupOverlapMap, isNodeDragActive, promptGroupBoundsById, promptGroupLayerById]);
 
   const visiblePromptGroupViews = React.useMemo(() => {
     const promptIdSet = new Set(visiblePromptNodes.map((promptNode) => promptNode.id));
@@ -7693,7 +8603,7 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas?.id]);
 
   useEffect(() => {
-    if (!activeCanvas) return;
+    if (!activeCanvas || isNodeDragActive) return;
 
     const repairKeys = autoRepairedPromptLayoutKeysRef.current;
     const activeCanvasId = activeCanvas.id;
@@ -7749,7 +8659,7 @@ ${slideLayerXml.join('\n')}
         updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
       });
     });
-  }, [activeCanvas, actualChildImagesByPromptId, isMobile, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
+  }, [activeCanvas, actualChildImagesByPromptId, isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
   const imageNodesById = React.useMemo(
     () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
@@ -8039,20 +8949,20 @@ ${slideLayerXml.join('\n')}
   const resolveLivePromptPosition = useCallback((promptNode: PromptNode | undefined | null) => {
     if (!promptNode) return null;
     return resolveLiveSceneNodePosition(
-      liveSceneState,
+      liveSceneRef.current,
       promptNode.id,
       promptNodesById.get(promptNode.id)?.position ?? promptNode.position,
     );
-  }, [liveSceneState, promptNodesById]);
+  }, [promptNodesById]);
 
   const resolveLiveImagePosition = useCallback((imageNode: GeneratedImage | undefined | null) => {
     if (!imageNode) return null;
     return resolveLiveSceneNodePosition(
-      liveSceneState,
+      liveSceneRef.current,
       imageNode.id,
       imageNodesById.get(imageNode.id)?.position ?? imageNode.position,
     );
-  }, [imageNodesById, liveSceneState]);
+  }, [imageNodesById]);
 
   const connectorChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -8755,24 +9665,12 @@ ${slideLayerXml.join('\n')}
     const promptCardRight = promptConnectorPosition.x + (promptCardWidth / 2);
     const promptCardTop = promptConnectorPosition.y - promptCardHeight;
     const promptCardBottom = promptConnectorPosition.y;
-    const connectorBounds = groupConnectorNodes.reduce((acc, childLayout) => {
-      const childLeft = childLayout.childConnectorPosition.x - (childLayout.renderedWidth / 2);
-      const childRight = childLayout.childConnectorPosition.x + (childLayout.renderedWidth / 2);
-      const childTop = childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight;
-      const childBottom = childLayout.childConnectorPosition.y;
-
-      return {
-        minX: Math.min(acc.minX, childLeft),
-        maxX: Math.max(acc.maxX, childRight),
-        minY: Math.min(acc.minY, childTop),
-        maxY: Math.max(acc.maxY, childBottom),
-      };
-    }, {
-      minX: promptCardLeft,
-      maxX: promptCardRight,
-      minY: promptCardTop,
-      maxY: promptCardBottom,
-    });
+    const connectorBounds = {
+      minX: groupView.bounds.x,
+      maxX: groupView.bounds.x + groupView.bounds.width,
+      minY: groupView.bounds.y,
+      maxY: groupView.bounds.y + groupView.bounds.height,
+    };
     const connectorSvgLeft = connectorBounds.minX - connectorCanvasPadding;
     const connectorSvgTop = connectorBounds.minY - connectorCanvasPadding;
     const connectorSvgWidth = Math.max(1, (connectorBounds.maxX - connectorBounds.minX) + (connectorCanvasPadding * 2));
@@ -8816,7 +9714,7 @@ ${slideLayerXml.join('\n')}
         {groupConnectorLayouts.length > 0 && (
           <svg
             className="absolute top-0 left-0 pointer-events-none"
-            shapeRendering="auto"
+            shapeRendering="geometricPrecision"
             width={connectorSvgWidth}
             height={connectorSvgHeight}
             viewBox={`0 0 ${connectorSvgWidth} ${connectorSvgHeight}`}
@@ -8865,6 +9763,7 @@ ${slideLayerXml.join('\n')}
                   stroke="var(--connector-color, #6366f1)"
                   strokeWidth={groupConnectorStroke}
                   strokeDasharray={groupConnectorDash}
+                  vectorEffect="non-scaling-stroke"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   opacity={isGroupFocused ? 0.68 : 0.4}
@@ -8911,9 +9810,12 @@ ${slideLayerXml.join('\n')}
           onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
           onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
           onRetryEcommerceModule={handleRetryEcommerceModule}
+          onExportEcommerceGroup={handleExportEcommerceGroup}
           activeEcommerceTaskState={ecommerceState.activeTaskState}
           onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
           onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
+          ecommerceSlotState={resolveEcommerceSlotState(renderedPromptNode)}
+          onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistoryForNode}
           ioTrace={getNodeIoTrace(node.id)}
           onOpenStorageSettings={() => {
             openSettingsSurfaceTracked('storage-settings');
@@ -8942,13 +9844,15 @@ ${slideLayerXml.join('\n')}
 
             const shouldRegroup = shouldAutoRegroupPromptGroup(node, groupView.childImages, sourceNodeId);
             if (shouldRegroup) {
-              beginPromptGroupRegroup(node.id);
+              beginPromptGroupRegroup(node.id, groupView.childImages);
             } else {
               clearPromptGroupRegroup(node.id);
             }
 
             if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
               applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
+            } else if (shouldRegroup) {
+              applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta);
             } else {
               applyLiveNodeDeltaToDraggedSet(sourceNodeId, groupNodeIds, delta);
             }
@@ -9427,7 +10331,7 @@ ${slideLayerXml.join('\n')}
   const mobileComposerNode = isMobile ? (
     <div className="h-full px-3 pb-3 pt-2">
       <div className="flex h-full flex-col rounded-[30px] border border-[var(--border-light)] bg-[var(--bg-overlay)]/96 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
-        <PromptBar
+        <PromptBarCompat
           config={config}
           setConfig={setConfig}
           isGenerating={isGenerating}
@@ -9453,18 +10357,34 @@ ${slideLayerXml.join('\n')}
           ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
           ecommerceProductFileCount={ecommerceState.productFiles.length}
           ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
+          ecommerceProductFiles={ecommerceState.productFiles}
+          ecommerceExtraReferenceFiles={ecommerceState.extraReferenceFiles}
+          ecommerceItemReferenceFiles={ecommerceState.itemReferenceFiles}
           ecommerceAnalysis={ecommerceState.analysis}
           ecommerceSelection={ecommerceState.selectedItems}
           ecommerceTaskStates={ecommerceState.taskStates}
+          ecommerceGroupSlots={ecommerceState.groupSlots}
           ecommerceActiveTaskState={ecommerceState.activeTaskState}
+          ecommerceSheetSettings={ecommerceState.sheetSettings}
+          ecommerceAnalysisConfirmed={ecommerceState.analysisConfirmed}
+          ecommerceActiveGroupSheet={ecommerceState.activeGroupSheet}
           ecommerceAnalyzing={ecommerceState.isAnalyzing}
           onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
           onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
           onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
+          onClearEcommerceRequirementFile={handleClearEcommerceRequirementFile}
+          onRemoveEcommerceProductFile={handleRemoveEcommerceProductFile}
+          onRemoveEcommerceExtraReferenceFile={handleRemoveEcommerceExtraReferenceFile}
+          onPickEcommerceItemReferenceFiles={handlePickEcommerceItemReferenceFiles}
+          onRemoveEcommerceItemReferenceFile={handleRemoveEcommerceItemReferenceFile}
           onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
           onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
           onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+          onActivateEcommerceGroupSheet={handleActivateEcommerceGroupSheet}
+          onActivateEcommerceTaskBySourceKey={handleActivateEcommerceTaskBySourceKey}
+          onUpdateEcommerceSheetSetting={handleUpdateEcommerceSheetSetting}
           onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
+          onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistory}
           ecommerceRatioOverride={ecommerceRatioOverride}
           onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
         />
@@ -9550,6 +10470,7 @@ ${slideLayerXml.join('\n')}
           {/* User Avatar & Dropdown Trigger */}
           <div className="relative group">
             <button
+              data-testid="desktop-user-menu-trigger"
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="relative w-10 h-10 rounded-full overflow-hidden border-2 transition-all shadow-2xl flex items-center justify-center cursor-pointer active:scale-95"
               style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-secondary)' }}
@@ -9654,8 +10575,10 @@ ${slideLayerXml.join('\n')}
                     </button>
 
                     <button
+                      data-testid="desktop-user-menu-settings"
                       onClick={() => {
                         openSettingsSurfaceTracked('dashboard');
+                        setShowUserMenu(false);
                       }}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
                       style={{ color: 'var(--text-secondary)' }}
@@ -9991,6 +10914,9 @@ ${slideLayerXml.join('\n')}
               stroke="#6366f1"
               strokeWidth={activeDragStroke}
               strokeDasharray={`${activeDragDashA} ${activeDragDashB}`}
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               className="opacity-80 animate-pulse"
             />
           )}
@@ -10096,7 +11022,9 @@ ${slideLayerXml.join('\n')}
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
                   strokeDasharray={connectorStrokeDasharray}
+                  vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
+                  strokeLinejoin="round"
                   opacity="0.5"
                   className={showConnectorButtons ? `transition-opacity duration-200 ${hoverClass} group-hover:opacity-100` : undefined}
                 />
@@ -10179,7 +11107,9 @@ ${slideLayerXml.join('\n')}
                   stroke={baseColor}
                   strokeWidth={connectorStroke}
                   strokeDasharray={connectorStrokeDasharray}
+                  vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
+                  strokeLinejoin="round"
                   opacity="0.5"
                   className={showConnectorButtons ? `transition-opacity duration-200 ${hoverClass} group-hover:opacity-100` : undefined}
                 />
@@ -10252,7 +11182,9 @@ ${slideLayerXml.join('\n')}
                   stroke={strokeColor}
                   strokeWidth={connectorStroke}
                   strokeDasharray={connectorStrokeDasharray}
+                  vectorEffect="non-scaling-stroke"
                   strokeLinecap={connectorStrokeLinecap}
+                  strokeLinejoin="round"
                   opacity="0.45"
                 />
                 <circle cx={endX} cy={endY} r={connectorDotEnd} fill={strokeColor} opacity="0.55" />
@@ -10343,9 +11275,12 @@ ${slideLayerXml.join('\n')}
               onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
               onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
               onRetryEcommerceModule={handleRetryEcommerceModule}
+              onExportEcommerceGroup={handleExportEcommerceGroup}
               activeEcommerceTaskState={ecommerceState.activeTaskState}
               onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
               onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
+              ecommerceSlotState={resolveEcommerceSlotState(node)}
+              onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistoryForNode}
               ioTrace={getNodeIoTrace(node.id)}
               onOpenStorageSettings={() => {
                 openSettingsSurfaceTracked('storage-settings');
@@ -10535,7 +11470,7 @@ ${slideLayerXml.join('\n')}
 
       {!isMobile && (
         <div className="contents">
-          <PromptBar
+          <PromptBarCompat
             config={config}
             setConfig={setConfig}
             isGenerating={isGenerating}
@@ -10569,18 +11504,34 @@ ${slideLayerXml.join('\n')}
             ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
             ecommerceProductFileCount={ecommerceState.productFiles.length}
             ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
-            ecommerceAnalysis={ecommerceState.analysis}
+             ecommerceProductFiles={ecommerceState.productFiles}
+             ecommerceExtraReferenceFiles={ecommerceState.extraReferenceFiles}
+             ecommerceItemReferenceFiles={ecommerceState.itemReferenceFiles}
+             ecommerceAnalysis={ecommerceState.analysis}
             ecommerceSelection={ecommerceState.selectedItems}
             ecommerceTaskStates={ecommerceState.taskStates}
+            ecommerceGroupSlots={ecommerceState.groupSlots}
             ecommerceActiveTaskState={ecommerceState.activeTaskState}
+            ecommerceSheetSettings={ecommerceState.sheetSettings}
+            ecommerceAnalysisConfirmed={ecommerceState.analysisConfirmed}
+            ecommerceActiveGroupSheet={ecommerceState.activeGroupSheet}
             ecommerceAnalyzing={ecommerceState.isAnalyzing}
             onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
             onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
             onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
-            onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
+            onClearEcommerceRequirementFile={handleClearEcommerceRequirementFile}
+             onRemoveEcommerceProductFile={handleRemoveEcommerceProductFile}
+             onRemoveEcommerceExtraReferenceFile={handleRemoveEcommerceExtraReferenceFile}
+             onPickEcommerceItemReferenceFiles={handlePickEcommerceItemReferenceFiles}
+             onRemoveEcommerceItemReferenceFile={handleRemoveEcommerceItemReferenceFile}
+             onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
             onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
             onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
+            onActivateEcommerceGroupSheet={handleActivateEcommerceGroupSheet}
+            onActivateEcommerceTaskBySourceKey={handleActivateEcommerceTaskBySourceKey}
+            onUpdateEcommerceSheetSetting={handleUpdateEcommerceSheetSetting}
             onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
+            onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistory}
             ecommerceRatioOverride={ecommerceRatioOverride}
             onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
           />
@@ -10901,6 +11852,7 @@ ${slideLayerXml.join('\n')}
 
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
+  const rootMode = createAppRootMode({ pathname: window.location.pathname });
 
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {
@@ -10910,19 +11862,15 @@ const App: React.FC = () => {
     });
   }, []);
 
-  if (createAppRootMode({ pathname: window.location.pathname }) !== 'workspace') {
-    return null;
-  }
-
   return (
     <ThemeProvider>
       <AppStartupProvider>
         <BillingProvider>
           <CanvasProvider>
             <AuthenticatedAppShell
-              showCostEstimation={showCostEstimation}
+              showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
               onExitCostEstimation={() => setShowCostEstimation(false)}
-              AppContentComponent={AppContent}
+              AppContentComponent={rootMode === 'settings' ? SettingsPageRoot : AppContent}
             />
           </CanvasProvider>
         </BillingProvider>

@@ -10,7 +10,15 @@ export interface CanvasSummaryDto {
 }
 
 export interface CanvasLayoutRecordDto {
-  [key: string]: unknown;
+  id: EntityId;
+  name: string;
+  folderName?: string;
+  promptNodes?: unknown[];
+  imageNodes?: unknown[];
+  groups?: unknown[];
+  drawings?: unknown[];
+  workflow?: unknown;
+  lastModified: number;
 }
 
 export interface CanvasLayoutDto {

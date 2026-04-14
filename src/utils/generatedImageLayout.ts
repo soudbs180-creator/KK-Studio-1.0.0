@@ -53,10 +53,10 @@ interface BuildDockedPromptChildRegroupLayoutOptions {
     settledGap?: number;
     dockedGap?: number;
     columns?: number;
-    dockedWidthCap?: number;
     regroupStartPositions?: Array<{ x: number; y: number } | undefined>;
     fastRegroupProgress?: number;
     settleRegroupProgress?: number;
+    targetSlotIndices?: number[];
 }
 
 const clampGap = (value: number, min: number, max: number) => (
@@ -78,6 +78,120 @@ const lerpPoint = (
     x: lerp(from.x, to.x, progress),
     y: lerp(from.y, to.y, progress),
 });
+
+const measurePointDistance = (
+    left: { x: number; y: number },
+    right: { x: number; y: number },
+) => Math.hypot(left.x - right.x, left.y - right.y);
+
+const normalizeRangeValue = (value: number, min: number, max: number) => {
+    if (!Number.isFinite(value)) return 0.5;
+
+    const range = max - min;
+    if (range <= 1) return 0.5;
+
+    return Math.min(1, Math.max(0, (value - min) / range));
+};
+
+const resolveLayeredRegroupProgress = (
+    progress: number,
+    travelDistance: number,
+    minTravelDistance: number,
+    maxTravelDistance: number,
+) => {
+    const normalizedDistance = normalizeRangeValue(
+        travelDistance,
+        minTravelDistance,
+        maxTravelDistance,
+    );
+    const midMotionEnvelope = 4 * progress * (1 - progress);
+    const progressOffset = (normalizedDistance - 0.5) * 0.24 * midMotionEnvelope;
+
+    return clampUnitProgress(progress + progressOffset, progress);
+};
+
+const compareRegroupVisualOrder = (
+    left: { index: number; position: { x: number; y: number } | undefined },
+    right: { index: number; position: { x: number; y: number } | undefined },
+    columns: number,
+    itemCount: number,
+) => {
+    const leftPosition = left.position ?? { x: 0, y: 0 };
+    const rightPosition = right.position ?? { x: 0, y: 0 };
+    const xDiff = leftPosition.x - rightPosition.x;
+    const yDiff = leftPosition.y - rightPosition.y;
+
+    if (columns <= 1) {
+        if (Math.abs(yDiff) > 1) return yDiff;
+        if (Math.abs(xDiff) > 1) return xDiff;
+        return left.index - right.index;
+    }
+
+    if (columns >= itemCount) {
+        if (Math.abs(xDiff) > 1) return xDiff;
+        if (Math.abs(yDiff) > 1) return yDiff;
+        return left.index - right.index;
+    }
+
+    if (Math.abs(yDiff) > 1) return yDiff;
+    if (Math.abs(xDiff) > 1) return xDiff;
+    return left.index - right.index;
+};
+
+const buildRegroupTargetSlotIndexByItem = (
+    regroupStartPositions: Array<{ x: number; y: number } | undefined> | undefined,
+    columns: number,
+    itemCount: number,
+) => {
+    const slotIndexByItem = new Map<number, number>();
+    const indexedPositions = Array.from({ length: itemCount }, (_, index) => ({
+        index,
+        position: regroupStartPositions?.[index],
+    }));
+
+    indexedPositions
+        .sort((left, right) => compareRegroupVisualOrder(left, right, columns, itemCount))
+        .forEach((entry, slotIndex) => {
+            slotIndexByItem.set(entry.index, slotIndex);
+        });
+
+    return slotIndexByItem;
+};
+
+const isValidTargetSlotIndices = (
+    targetSlotIndices: number[] | undefined,
+    itemCount: number,
+): targetSlotIndices is number[] => {
+    if (!targetSlotIndices || targetSlotIndices.length !== itemCount) {
+        return false;
+    }
+
+    const uniqueIndices = new Set(targetSlotIndices);
+    if (uniqueIndices.size !== itemCount) {
+        return false;
+    }
+
+    return targetSlotIndices.every((value) => Number.isInteger(value) && value >= 0 && value < itemCount);
+};
+
+export const resolveRegroupTargetSlotIndices = (
+    regroupStartPositions: Array<{ x: number; y: number } | undefined> | undefined,
+    columns: number,
+    itemCount: number,
+    targetSlotIndices?: number[],
+): number[] => {
+    if (isValidTargetSlotIndices(targetSlotIndices, itemCount)) {
+        return [...targetSlotIndices];
+    }
+
+    const slotIndexByItem = buildRegroupTargetSlotIndexByItem(
+        regroupStartPositions,
+        columns,
+        itemCount,
+    );
+
+    return Array.from({ length: itemCount }, (_, index) => slotIndexByItem.get(index) ?? index);
+};
 
 const resolveAspectRatioValue = (item: GeneratedImageLayoutItem, fallbackWidth: number, fallbackHeight: number) => {
     const exactWidth = item.exactDimensions?.width;
@@ -330,14 +444,14 @@ export const buildDockedPromptChildRegroupLayout = ({
     mode,
     isMobile = false,
     gapToPrompt = 56,
-    dockGapToPrompt = 24,
+    dockGapToPrompt = 56,
     settledGap = 32,
-    dockedGap = 16,
+    dockedGap = 24,
     columns,
-    dockedWidthCap = 96,
     regroupStartPositions,
     fastRegroupProgress,
     settleRegroupProgress,
+    targetSlotIndices,
 }: BuildDockedPromptChildRegroupLayoutOptions): DockedPromptChildRegroupLayoutItem[] => {
     if (!items.length) return [];
 
@@ -351,6 +465,12 @@ export const buildDockedPromptChildRegroupLayout = ({
         regroupStartPositions?.some(Boolean) ? 1 : 1
     );
     const resolvedSettleProgress = clampUnitProgress(settleRegroupProgress, 1);
+    const resolvedTargetSlotIndices = resolveRegroupTargetSlotIndices(
+        regroupStartPositions,
+        resolvedColumns,
+        metrics.length,
+        targetSlotIndices,
+    );
 
     const dockedPositions = buildCenteredLayoutPositions(metrics, {
         basePosition,
@@ -358,7 +478,6 @@ export const buildDockedPromptChildRegroupLayout = ({
         topGap: dockGapToPrompt,
         horizontalGap: dockedGap,
         verticalGap: dockedGap,
-        widthCap: dockedWidthCap,
     });
 
     const settledPositions = buildCenteredLayoutPositions(metrics, {
@@ -368,17 +487,41 @@ export const buildDockedPromptChildRegroupLayout = ({
         horizontalGap: settledGap,
         verticalGap: settledGap,
     });
+    const regroupTravelDistances = metrics.map((_, index) => {
+        const targetSlotIndex = resolvedTargetSlotIndices[index] ?? index;
+        const dockedPosition = dockedPositions[targetSlotIndex];
+
+        if (!dockedPosition) {
+            throw new Error(`Missing docked regroup position for child index ${index}.`);
+        }
+
+        const startPosition = regroupStartPositions?.[index] ?? dockedPosition;
+        return measurePointDistance(startPosition, dockedPosition);
+    });
+    const minRegroupTravelDistance = regroupTravelDistances.length
+        ? Math.min(...regroupTravelDistances)
+        : 0;
+    const maxRegroupTravelDistance = regroupTravelDistances.length
+        ? Math.max(...regroupTravelDistances)
+        : 0;
 
     return metrics.map((metric, index) => {
-        const dockedPosition = dockedPositions[index];
-        const settledPosition = settledPositions[index];
+        const targetSlotIndex = resolvedTargetSlotIndices[index] ?? index;
+        const dockedPosition = dockedPositions[targetSlotIndex];
+        const settledPosition = settledPositions[targetSlotIndex];
 
         if (!dockedPosition || !settledPosition) {
             throw new Error(`Missing regroup layout position for child index ${index}.`);
         }
 
         const startPosition = regroupStartPositions?.[index] ?? dockedPosition;
-        const afterFastDock = lerpPoint(startPosition, dockedPosition, resolvedFastProgress);
+        const layeredFastProgress = resolveLayeredRegroupProgress(
+            resolvedFastProgress,
+            regroupTravelDistances[index] ?? 0,
+            minRegroupTravelDistance,
+            maxRegroupTravelDistance,
+        );
+        const afterFastDock = lerpPoint(startPosition, dockedPosition, layeredFastProgress);
         const currentPosition = lerpPoint(afterFastDock, settledPosition, resolvedSettleProgress);
 
         return {

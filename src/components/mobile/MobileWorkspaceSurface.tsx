@@ -53,7 +53,7 @@ const moreSheetActionClass =
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
   onScreenChange,
-  onOpenSettings,
+  onOpenSettings: openSettings,
   title = 'KK Studio',
   userName,
   userAvatarUrl,
@@ -105,6 +105,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
     action();
   };
 
+  const onOpenSettings = () => {
+    closeMoreSheet();
+    openSettings();
+  };
+
   const header = (
     <div className="px-3 pb-3 pt-2">
       <MobileHeader
@@ -142,7 +147,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
       />
 
       {showMoreSheet ? (
-        <div className="fixed inset-0 z-[985] flex flex-col justify-end bg-black/55 backdrop-blur-sm">
+        <div data-testid="mobile-more-sheet" className="fixed inset-0 z-[985] flex flex-col justify-end bg-black/55 backdrop-blur-sm">
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -247,7 +252,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => runFromMoreSheet(onOpenSettings)}
+                onClick={onOpenSettings}
+                data-testid="mobile-more-menu-settings"
                 className={moreSheetActionClass}
               >
                 <Settings size={17} className="mb-2.5" />

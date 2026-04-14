@@ -101,6 +101,10 @@ export interface SecureProxyImageRequestDto extends SecureProxyRouteSelectionDto
 export interface SecureProxyImageTransportDto extends SecureProxyTransportResultDto {
   urls?: string[];
   usage?: SecureProxyUsageDto;
+  taskId?: string;
+  status?: SecureProxyTaskStatus;
+  requestId?: string;
+  attemptId?: string;
 }
 
 export interface SecureProxyVideoRequestDto extends SecureProxyRouteSelectionDto {

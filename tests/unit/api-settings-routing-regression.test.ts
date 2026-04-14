@@ -17,9 +17,14 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
   assert.match(source, /const showOfficialEditor = activeEditorMode === 'official';/);
   assert.match(source, /const showProviderEditor = activeEditorMode === 'third-party';/);
   assert.match(source, /navigate\(API_MANAGEMENT_HOME_PATH,\s*\{\s*state:\s*buildApiManagementListState\(/);
-  assert.match(source, /<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{headerPrimaryActionDisabled\}/);
-  assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{beginCreateOfficial\}/);
-  assert.match(source, /<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
+  assert.doesNotMatch(source, /headerPrimaryActionDisabled/);
+  assert.match(source, /<SettingsActionButton\s+icon=\{RefreshCw\}\s+loading=\{busy === 'cloud-refresh'\}/);
+
+  const createOfficialButtonUsages = source.match(/onClick=\{beginCreateOfficial\}/g) ?? [];
+  const createProviderButtonUsages = source.match(/onClick=\{beginCreateProvider\}/g) ?? [];
+
+  assert.equal(createOfficialButtonUsages.length, 1);
+  assert.equal(createProviderButtonUsages.length, 1);
 });
 
 test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {

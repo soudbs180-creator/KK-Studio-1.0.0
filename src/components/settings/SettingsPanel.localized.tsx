@@ -18,10 +18,8 @@ import {
   buildSettingsPath,
   getCurrentSettingsViewId,
   getSettingsNavItems,
-  getSettingsPrimaryActionMeta,
   getSettingsSearchPlaceholder,
   getSettingsShellCopy,
-  getSettingsStatusSummaryLabel,
   getSettingsViewMeta,
   resolveCanonicalSettingsViewId,
   type CanonicalSettingsViewId,
@@ -35,6 +33,8 @@ export interface SettingsPanelProps {
   onClose: () => void;
   initialView?: SettingsViewId;
   initialSupplier?: Supplier | null;
+  presentation?: 'overlay' | 'page';
+  initialPathname?: string;
 }
 
 const ViewFallback: React.FC = () => (
@@ -110,8 +110,6 @@ const SettingsDesktopShell: React.FC<{
   const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
   const navigate = useNavigate();
   const headerMeta = getSettingsViewMeta(activeView, language);
-  const headerPrimaryAction = getSettingsPrimaryActionMeta(activeView, language);
-  const headerStatusSummaryLabel = getSettingsStatusSummaryLabel(activeView, language);
   const shellCopy = getSettingsShellCopy(language);
 
   const filteredItems = items.filter((item) => {
@@ -164,11 +162,9 @@ const SettingsDesktopShell: React.FC<{
           )}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <SettingsDesktopWorkbenchHeader
             meta={headerMeta}
-            primaryActionLabel={headerPrimaryAction.label}
-            statusSummaryLabel={headerStatusSummaryLabel}
             languageControl={<SettingsLanguageToggle />}
             activeView={activeView}
             onRefreshCurrentView={onRefreshCurrentView}
@@ -176,7 +172,7 @@ const SettingsDesktopShell: React.FC<{
             onClose={onClose}
           />
 
-          <main className="settings-shell-page settings-shell-page--desktop" style={{ padding: '28px' }}>
+          <main className="settings-shell-page settings-shell-page--desktop">
             <Suspense fallback={<ViewFallback />}>
               <Routes>
                 {renderSettingsRouteElements({
@@ -383,8 +379,17 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   onClose,
   initialView = 'dashboard',
   initialSupplier = null,
+  presentation = 'overlay',
+  initialPathname,
 }) => {
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1024 : false));
+  const safeInitialView = resolveCanonicalSettingsViewId(initialView);
+  const normalizedInitialPathname = initialPathname && initialPathname.startsWith('/settings') ? initialPathname : null;
+  const initialEntry = normalizedInitialPathname || (
+    safeInitialView === 'api-management' && initialSupplier
+      ? `/settings/api-management/provider/${encodeURIComponent(initialSupplier.id || initialSupplier.baseUrl)}`
+      : buildSettingsPath(safeInitialView)
+  );
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -393,7 +398,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || presentation !== 'overlay') return;
 
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
@@ -405,13 +410,25 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
 
   if (!isOpen) return null;
 
-  const safeInitialView = resolveCanonicalSettingsViewId(initialView);
-  const initialEntry =
-    safeInitialView === 'api-management' && initialSupplier
-      ? `/settings/api-management/provider/${encodeURIComponent(initialSupplier.id || initialSupplier.baseUrl)}`
-      : buildSettingsPath(safeInitialView);
+  const shellContent = (
+    <MemoryRouter initialEntries={[initialEntry]} key={initialEntry}>
+      <SettingsRouterShell
+        initialSupplier={initialSupplier}
+        onClose={onClose}
+        initialView={safeInitialView}
+        isMobile={isMobile}
+      />
+    </MemoryRouter>
+  );
 
-  const content = (
+  const content = presentation === 'page' ? (
+    <div
+      className="settings-panel settings-page-root"
+      data-testid="settings-page-root"
+    >
+      {shellContent}
+    </div>
+  ) : (
     <div
       className="settings-panel settings-shell-backdrop"
       style={{
@@ -421,16 +438,13 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
       }}
       onClick={onClose}
     >
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <SettingsRouterShell
-          initialSupplier={initialSupplier}
-          onClose={onClose}
-          initialView={safeInitialView}
-          isMobile={isMobile}
-        />
-      </MemoryRouter>
+      {shellContent}
     </div>
   );
+
+  if (presentation === 'page') {
+    return content;
+  }
 
   return createPortal(content, document.body);
 };

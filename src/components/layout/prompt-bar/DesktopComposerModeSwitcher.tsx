@@ -19,7 +19,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
   const normalizedActiveIndex = activeModeIndex >= 0 ? activeModeIndex : 0;
   const modeSlotWidth = isMobile ? 72 : 82;
   const sliderWidth = isMobile ? 64 : 74;
-  const sliderLeft =
+  const sliderOffset =
     4 + normalizedActiveIndex * modeSlotWidth + (modeSlotWidth - sliderWidth) / 2;
 
   return (
@@ -33,13 +33,14 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
         }}
       >
         <div
-          className="pointer-events-none absolute top-1 h-[calc(100%-8px)] rounded-lg transition-[left,background-color,border-color] duration-200 ease-out"
+          className="pointer-events-none absolute left-0 top-1 h-[calc(100%-8px)] rounded-lg transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{
             width: `${sliderWidth}px`,
-            left: `${sliderLeft}px`,
+            transform: `translate3d(${sliderOffset}px, 0, 0)`,
             backgroundColor: modeOptions[normalizedActiveIndex]?.activeBg || 'rgba(99,102,241,0.16)',
             border: `1px solid ${modeOptions[normalizedActiveIndex]?.activeBorder || 'var(--prompt-bar-shell-border-strong)'}`,
             boxShadow: 'none',
+            willChange: 'transform, background-color, border-color, box-shadow',
           }}
         />
 
