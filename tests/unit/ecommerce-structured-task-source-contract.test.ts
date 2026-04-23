@@ -18,11 +18,14 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   const promptBarSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
   const optimizerSource = readSource('src/services/llm/promptOptimizerService.ts');
+  const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
 
   assert.match(typesSource, /export interface EcommerceEditableTaskState/);
   assert.match(typesSource, /export interface EcommerceSeriesTemplate/);
   assert.match(typesSource, /editableTask\?: EcommerceEditableTaskState/);
   assert.match(typesSource, /displayLabel\?: string/);
+  assert.match(typesSource, /sizeTier\?: EcommerceAPlusSizeTier/);
+  assert.match(typesSource, /ecommerceDeliveryKind\?: EcommerceSlotDeliveryKind/);
 
   assert.match(editorPanelSource, /taskState:\s*EcommerceEditableTaskState/);
   assert.match(editorPanelSource, /onTaskStateChange:\s*\(\s*taskId:\s*string,\s*updater:/);
@@ -35,13 +38,13 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(reviewPanelSource, /activeTaskState\?:/);
   assert.match(reviewPanelSource, /onTaskStateChange\?:/);
   assert.match(reviewPanelSource, /<EcommerceTaskEditorPanel/);
-  assert.match(reviewPanelSource, /resolveTaskStateForKey\(item\.itemId, taskStates, activeTaskStateProp\)/);
-  assert.match(reviewPanelSource, /resolveTaskStateForKey\(item\.moduleId, taskStates, activeTaskStateProp\)/);
+  assert.match(reviewPanelSource, /sizeTier/);
 
   assert.match(cardActionsSource, /taskState\?: EcommerceEditableTaskState/);
   assert.match(cardActionsSource, /onTaskStateChange\?:/);
   assert.match(cardActionsSource, /activeTaskState\?: EcommerceEditableTaskState \| null/);
-  assert.match(cardActionsSource, /编辑任务/);
+  assert.match(cardActionsSource, /600.*450/);
+  assert.match(cardActionsSource, /转 .*手机端|生成 .*手机端/);
 
   assert.match(promptBarSource, /activeTaskState/);
   assert.match(promptBarSource, /taskStates/);
@@ -57,4 +60,7 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(imageCardSource, /image\.displayLabel \|\| /);
   assert.match(optimizerSource, /ecommerceContext\?:/);
   assert.match(optimizerSource, /Structured ecommerce context:/);
+  assert.match(generationHookSource, /ecommerceDeliveryKind:/);
+  assert.match(generationHookSource, /activeDeliveryKind/);
+  assert.match(generationHookSource, /inheritedDeliveryKind/);
 });

@@ -1,11 +1,12 @@
 param(
     [switch]$OpenBrowser,
-    [switch]$Restart
+    [switch]$Restart,
+    [switch]$SkipVite
 )
 
 $ErrorActionPreference = 'Stop'
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $runDir = Join-Path $projectRoot '.kk-local\run'
 $logDir = Join-Path $projectRoot '.kk-local\logs'
 $vitePidFile = Join-Path $runDir 'dev-vite.pid'
@@ -23,6 +24,31 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 function Get-NodeExe {
     $nodeCommand = Get-Command node -ErrorAction Stop
     return $nodeCommand.Source
+}
+
+function Test-ApiWatchSpawnError {
+    param([string]$LogSnippet)
+
+    $normalized = [string]$LogSnippet
+    return $normalized -match 'spawn EPERM' -and $normalized -match 'watch_mode'
+}
+
+function Start-DetachedPowerShellScript {
+    param(
+        [string]$ScriptPath,
+        [string]$WorkingDirectory,
+        [string]$PidFile
+    )
+
+    $process = Start-Process `
+        -FilePath 'powershell' `
+        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) `
+        -WorkingDirectory $WorkingDirectory `
+        -WindowStyle Hidden `
+        -PassThru
+
+    Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
+    return $process.Id
 }
 
 function Remove-StalePidFile {
@@ -96,15 +122,22 @@ function Get-ListeningProcessIdByPort {
     $ownerPids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess -Unique)
 
+    $resolvedOwnerPids = @()
     foreach ($ownerPid in $ownerPids) {
         $resolvedOwnerPid = 0
-        if (-not [int]::TryParse([string]$ownerPid, [ref]$resolvedOwnerPid)) {
-            continue
+        if ([int]::TryParse([string]$ownerPid, [ref]$resolvedOwnerPid)) {
+            $resolvedOwnerPids += $resolvedOwnerPid
         }
+    }
 
+    foreach ($resolvedOwnerPid in $resolvedOwnerPids) {
         if (Is-KnownDevProcess -ProcessId $resolvedOwnerPid -Port $Port) {
             return $resolvedOwnerPid
         }
+    }
+
+    if ($resolvedOwnerPids.Count -eq 1) {
+        return $resolvedOwnerPids[0]
     }
 
     return $null
@@ -151,11 +184,12 @@ function Is-KnownDevProcess {
     }
 
     if ($Port -eq 3000) {
-        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
+        return $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js' `
+            -or $commandLine -match 'scripts[\\/]+dev[\\/]+run-vite-dev\.ps1'
     }
 
     if ($Port -eq 3001) {
-        return $commandLine -match 'scripts[\\/]+run-api-dev\.mjs' `
+        return $commandLine -match 'scripts[\\/]+run-api-(?:dev|local)\.mjs' `
             -or $commandLine -match 'vite[\\/]+bin[\\/]+vite\.js'
     }
 
@@ -200,6 +234,35 @@ function Test-UrlReady {
         try {
             $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                return $true
+            }
+        } catch {
+        }
+
+        if ($attempt -lt ($Attempts - 1)) {
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return $false
+}
+
+function Test-KkApiHealth {
+    param(
+        [string]$Url,
+        [int]$Attempts = 1,
+        [int]$DelayMilliseconds = 250
+    )
+
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt += 1) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
+            $content = [string]$response.Content
+            if (
+                $response.StatusCode -eq 200 `
+                -and $content -match '"success"\s*:\s*true' `
+                -and $content -match '"service"\s*:\s*"kk-studio-api"'
+            ) {
                 return $true
             }
         } catch {
@@ -275,7 +338,7 @@ function Assert-PortAvailable {
         return
     }
 
-    throw "Port $Port is already in use by process id(s): $($unexpectedIds -join ', '). Run scripts/dev-stop.ps1 or close the conflicting app first."
+    throw "Port $Port is already in use by process id(s): $($unexpectedIds -join ', '). Run scripts/dev/dev-stop.ps1 or close the conflicting app first."
 }
 
 function Reset-LogFile {
@@ -295,17 +358,51 @@ function Start-DetachedNodeProcess {
         [string]$StdErrLog
     )
 
-    Reset-LogFile -Path $StdOutLog
-    Reset-LogFile -Path $StdErrLog
+    $originalCi = [string]$env:CI
+    $originalPathUpper = [string]$env:PATH
+    $originalPathMixed = [string]$env:Path
 
-    $process = Start-Process `
-        -FilePath $script:nodeExe `
-        -ArgumentList $Arguments `
-        -WorkingDirectory $WorkingDirectory `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $StdOutLog `
-        -RedirectStandardError $StdErrLog `
-        -PassThru
+    try {
+        if ($originalPathUpper -and $originalPathMixed) {
+            Remove-Item Env:PATH -ErrorAction SilentlyContinue
+        }
+
+        $env:CI = 'true'
+
+        $startProcessParams = @{
+            FilePath = $script:nodeExe
+            ArgumentList = $Arguments
+            WorkingDirectory = $WorkingDirectory
+            WindowStyle = 'Hidden'
+            PassThru = $true
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($StdOutLog)) {
+            Reset-LogFile -Path $StdOutLog
+            $startProcessParams.RedirectStandardOutput = $StdOutLog
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($StdErrLog)) {
+            Reset-LogFile -Path $StdErrLog
+            $startProcessParams.RedirectStandardError = $StdErrLog
+        }
+
+        $process = Start-Process @startProcessParams
+    } finally {
+        if ($originalCi) {
+            $env:CI = $originalCi
+        } else {
+            Remove-Item Env:CI -ErrorAction SilentlyContinue
+        }
+
+        if ($originalPathUpper) {
+            $env:PATH = $originalPathUpper
+        }
+
+        if ($originalPathMixed) {
+            $env:Path = $originalPathMixed
+        }
+    }
 
     Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
     return $process.Id
@@ -324,21 +421,84 @@ function Sync-PidFileToPortOwner {
     return $resolvedPid
 }
 
+function Start-ApiProcess {
+    param(
+        [string]$ApiScript,
+        [bool]$UseWatch = $true
+    )
+
+    $arguments = if ($UseWatch) {
+        @('--watch', $ApiScript)
+    } else {
+        @($ApiScript)
+    }
+
+    return Start-DetachedNodeProcess `
+        -Arguments $arguments `
+        -WorkingDirectory $projectRoot `
+        -PidFile $apiPidFile `
+        -StdOutLog $apiOutLog `
+        -StdErrLog $apiErrLog
+}
+
 $nodeExe = Get-NodeExe
 $viteCli = Join-Path $projectRoot 'node_modules\vite\bin\vite.js'
-$apiScript = Join-Path $projectRoot 'scripts\run-api-dev.mjs'
+$viteRunnerScript = Join-Path $projectRoot 'scripts\dev\run-vite-dev.ps1'
+$apiDevScript = Join-Path $projectRoot 'scripts\dev\run-api-dev.mjs'
+$apiLocalScript = Join-Path $projectRoot 'scripts\dev\run-api-local.mjs'
+$apiScript = $apiDevScript
+$apiMode = 'canonical'
 
 if (-not (Test-Path -LiteralPath $viteCli)) {
     throw "Vite CLI was not found at $viteCli. Run npm install first."
 }
 
-if (-not (Test-Path -LiteralPath $apiScript)) {
-    throw "API dev script was not found at $apiScript."
+if (-not (Test-Path -LiteralPath $viteRunnerScript)) {
+    throw "Vite runner script was not found at $viteRunnerScript."
 }
 
-& $nodeExe $apiScript --check
-if ($LASTEXITCODE -ne 0) {
-    throw "Local API config preflight failed. Update apps/api/.env.local before starting the dev stack."
+if (-not (Test-Path -LiteralPath $apiDevScript)) {
+    throw "API dev script was not found at $apiDevScript."
+}
+
+if (-not (Test-Path -LiteralPath $apiLocalScript)) {
+    throw "API local-only fallback script was not found at $apiLocalScript."
+}
+
+Reset-LogFile -Path $apiOutLog
+Reset-LogFile -Path $apiErrLog
+
+$apiEnabled = $true
+$originalPathUpper = [string]$env:PATH
+$originalPathMixed = [string]$env:Path
+try {
+    if ($originalPathUpper -and $originalPathMixed) {
+        Remove-Item Env:PATH -ErrorAction SilentlyContinue
+    }
+
+    $apiPreflight = Start-Process `
+        -FilePath $nodeExe `
+        -ArgumentList @($apiScript, '--check') `
+        -WorkingDirectory $projectRoot `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $apiOutLog `
+        -RedirectStandardError $apiErrLog `
+        -PassThru `
+        -Wait
+} finally {
+    if ($originalPathUpper) {
+        $env:PATH = $originalPathUpper
+    }
+
+    if ($originalPathMixed) {
+        $env:Path = $originalPathMixed
+    }
+}
+
+if ($apiPreflight.ExitCode -ne 0) {
+    $apiScript = $apiLocalScript
+    $apiMode = 'local-only'
+    Write-Warning "Local API config preflight failed. Starting Vite with the local-only API fallback. Update apps/api/.env.local to restore canonical API routes."
 }
 
 if ($Restart) {
@@ -347,34 +507,78 @@ if ($Restart) {
 }
 
 $apiPid = Get-AliveProcessId -PidFile $apiPidFile
+if ($apiPid) {
+    $apiCommandLine = [string](Get-ProcessCommandLine -ProcessId $apiPid)
+    $apiUsesWatch = $apiCommandLine -match '--watch'
+} else {
+    $apiUsesWatch = $true
+}
+
 if ($apiPid -and -not (Test-UrlReady -Url $apiUrl)) {
     Stop-TrackedProcess -PidFile $apiPidFile
     $apiPid = $null
+    $apiUsesWatch = $true
 }
 
-if (-not $apiPid) {
-    Clear-KnownDevPortConflicts -Port 3001
-    Assert-PortAvailable -Port 3001
-    $apiPid = Start-DetachedNodeProcess `
-        -Arguments @('--watch', $apiScript) `
-        -WorkingDirectory $projectRoot `
-        -PidFile $apiPidFile `
-        -StdOutLog $apiOutLog `
-        -StdErrLog $apiErrLog
-}
-
-if (-not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
-    $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
-    if ($apiLogSnippet) {
-        throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
+$apiReusedExistingListener = $false
+if (-not $apiPid -and (Test-KkApiHealth -Url $apiUrl)) {
+    $existingApiPid = Get-ListeningProcessIdByPort -Port 3001
+    if ($existingApiPid) {
+        $apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $existingApiPid
+    } else {
+        Remove-StalePidFile -PidFile $apiPidFile
     }
 
-    throw "The local API server did not become ready in time. Check $apiErrLog"
+    $apiReusedExistingListener = $true
+    Write-Warning "Reusing the local API listener that is already healthy on port 3001."
 }
 
-# Keep the API pid file pinned to the stable `node --watch` supervisor process.
-# The child listener PID rotates on every restart and causes duplicate watchers if we persist it here.
-Set-Content -LiteralPath $apiPidFile -Value $apiPid -Encoding ascii
+if (-not $apiPid -and -not $apiReusedExistingListener) {
+    Clear-KnownDevPortConflicts -Port 3001
+    Assert-PortAvailable -Port 3001
+    $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $true
+}
+
+if (-not $apiReusedExistingListener -and -not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
+    $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+    if ($apiUsesWatch -and (Test-ApiWatchSpawnError -LogSnippet $apiLogSnippet)) {
+        Write-Warning "Node watch mode is unavailable on this machine. Restarting the local API without watch mode."
+        Stop-TrackedProcess -PidFile $apiPidFile
+        $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $false
+        $apiUsesWatch = $false
+
+        if (-not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
+            $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+            if ($apiLogSnippet) {
+                throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
+            }
+
+            throw "The local API server did not become ready in time. Check $apiErrLog"
+        }
+    } else {
+        if ($apiLogSnippet) {
+            throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
+        }
+
+        throw "The local API server did not become ready in time. Check $apiErrLog"
+    }
+}
+
+# Keep the API pid file pinned to the currently active API process.
+$apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $apiPid
+
+if ($SkipVite) {
+    Write-Host "KK Studio local API is ready at http://localhost:3001"
+    if ($apiReusedExistingListener -and -not $apiPid) {
+        Write-Host "API PID: external healthy listener on port 3001"
+    } elseif ($apiMode -eq 'local-only') {
+        Write-Host "API PID: $apiPid (local-only fallback)"
+    } else {
+        Write-Host "API PID: $apiPid"
+    }
+    Write-Host "Logs: $logDir"
+    return
+}
 
 $vitePid = Get-AliveProcessId -PidFile $vitePidFile
 if ($vitePid -and -not (Test-UrlReady -Url $viteUrl)) {
@@ -385,12 +589,10 @@ if ($vitePid -and -not (Test-UrlReady -Url $viteUrl)) {
 if (-not $vitePid) {
     Clear-KnownDevPortConflicts -Port 3000
     Assert-PortAvailable -Port 3000
-    $vitePid = Start-DetachedNodeProcess `
-        -Arguments @($viteCli) `
+    $vitePid = Start-DetachedPowerShellScript `
+        -ScriptPath $viteRunnerScript `
         -WorkingDirectory $projectRoot `
-        -PidFile $vitePidFile `
-        -StdOutLog $viteOutLog `
-        -StdErrLog $viteErrLog
+        -PidFile $vitePidFile
 }
 
 if (-not (Wait-UrlReadyOrExit -Url $viteUrl -ProcessId $vitePid -Attempts 80 -DelayMilliseconds 500)) {
@@ -405,10 +607,20 @@ if (-not (Wait-UrlReadyOrExit -Url $viteUrl -ProcessId $vitePid -Attempts 80 -De
 $vitePid = Sync-PidFileToPortOwner -PidFile $vitePidFile -Port 3000 -FallbackProcessId $vitePid
 
 if ($OpenBrowser) {
-    Start-Process 'http://localhost:3000' | Out-Null
+    try {
+        Start-Process 'http://localhost:3000' | Out-Null
+    } catch {
+        Write-Warning "Failed to open the browser automatically. Open http://localhost:3000 manually if needed."
+    }
 }
 
 Write-Host "KK Studio dev server is ready at http://localhost:3000"
 Write-Host "Vite PID: $vitePid"
-Write-Host "API PID: $apiPid"
+if ($apiReusedExistingListener -and -not $apiPid) {
+    Write-Host "API PID: external healthy listener on port 3001"
+} elseif ($apiMode -eq 'local-only') {
+    Write-Host "API PID: $apiPid (local-only fallback)"
+} else {
+    Write-Host "API PID: $apiPid"
+}
 Write-Host "Logs: $logDir"

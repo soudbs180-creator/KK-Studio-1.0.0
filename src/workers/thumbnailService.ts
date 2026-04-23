@@ -5,6 +5,8 @@
  * 提供简单的API供其他模块调用
  */
 
+import ThumbnailWorker from './thumbnailWorker.ts?worker';
+
 // Worker实例（懒加载）
 let worker: Worker | null = null;
 let workerReady = false;
@@ -46,11 +48,7 @@ async function initWorker(): Promise<Worker> {
 
     workerPromise = new Promise((resolve, reject) => {
         try {
-            // 使用Vite的Worker导入语法
-            worker = new Worker(
-                new URL('./thumbnailWorker.ts', import.meta.url),
-                { type: 'module' }
-            );
+            worker = new ThumbnailWorker();
 
             const onReady = (event: MessageEvent) => {
                 if (event.data.type === 'ready') {

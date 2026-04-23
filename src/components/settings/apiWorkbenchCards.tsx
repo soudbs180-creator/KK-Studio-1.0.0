@@ -108,11 +108,11 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
           <div className="settings-provider-card__avatar">{avatar}</div>
           <div className="settings-provider-card__header-copy">
             <div className="settings-provider-card__header-title-row">
-              <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
+              <div className="text-[length:var(--type-title-3)] font-semibold text-[var(--text-primary)]">{title}</div>
               {badges}
             </div>
-            {subtitle ? <div className="mt-1 text-[13px] text-[var(--text-secondary)]">{subtitle}</div> : null}
-            {meta ? <div className="mt-2 text-[12px] text-[var(--text-tertiary)]">{meta}</div> : null}
+            {subtitle ? <div className="mt-1 text-[length:var(--type-body-2)] text-[var(--text-secondary)]">{subtitle}</div> : null}
+            {meta ? <div className="mt-2 text-[length:var(--type-caption)] text-[var(--text-tertiary)]">{meta}</div> : null}
           </div>
         </div>
         <div className="settings-provider-card__header-side">
@@ -148,7 +148,7 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
 
       {progress ? (
         <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between text-[12px] text-[var(--text-secondary)]">
+          <div className="mb-2 flex items-center justify-between text-[length:var(--type-caption)] text-[var(--text-secondary)]">
             <span>{progress.summary}</span>
             <span>{Math.round(progressPercentage)}%</span>
           </div>
@@ -158,7 +158,7 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
 
       {error ? (
         <div
-          className="mt-4 rounded-[18px] border px-4 py-3 text-[13px] leading-6"
+          className="mt-4 rounded-[12px] border px-4 py-3 text-[length:var(--type-body-2)] leading-6"
           style={{
             borderColor: 'var(--state-danger-border)',
             backgroundColor: 'var(--state-danger-bg)',

@@ -1,6 +1,6 @@
-import { normalizeEcommerceAnalysis } from '../src/services/ecommerce/normalize/ecommerceAnalysisNormalizer';
+import { normalizeEcommerceAnalysis } from '../src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts';
 import { analyzeEcommerceTextFallback } from '../src/services/ecommerce/text/fallbackTextAnalysis.ts';
-import { parseOpenXmlWorkbook } from '../src/services/ecommerce/xlsx/openXmlWorkbookParser';
+import { parseOpenXmlWorkbook } from '../src/services/ecommerce/xlsx/openXmlWorkbookParser.ts';
 
 export const config = { runtime: 'edge' };
 

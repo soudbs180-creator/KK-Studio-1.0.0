@@ -159,6 +159,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const hasAnimatedRef = useRef<string | null>(null);
 
     const [isDragging, setIsDragging] = useState(false);
+    const isDraggingRef = useRef(false);
     useEffect(() => {
         onDragCommitRef.current = onDragCommit;
     }, [onDragCommit]);
@@ -327,14 +328,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     // [FIX] Sync localPosRef with external position updates (when not dragging)
     useEffect(() => {
-        if (!isDragging) {
+        if (!isDragging && !isDraggingRef.current) {
             localPosRef.current = position;
-            // Force update DOM if needed
             if (containerRef.current) {
+                const currentLeft = parseFloat(containerRef.current.style.left) || 0;
+                const currentTop = parseFloat(containerRef.current.style.top) || 0;
                 const targetLeft = snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX;
                 const targetTop = snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY;
-                containerRef.current.style.left = `${targetLeft}px`;
-                containerRef.current.style.top = `${targetTop}px`;
+                if (Math.abs(currentLeft - targetLeft) > 1 || Math.abs(currentTop - targetTop) > 1) {
+                    containerRef.current.style.left = `${targetLeft}px`;
+                    containerRef.current.style.top = `${targetTop}px`;
+                }
             }
         }
     }, [position.x, position.y, isDragging, nodeWidth, cardHeight, originX, originY, zoomScale]);
@@ -1019,6 +1023,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
+        isDraggingRef.current = true;
         setIsDragging(true);
         onDragStateChange?.(true);
         wasDraggingRef.current = false;
@@ -1099,6 +1104,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 x: finalPos.x - dragStartCanvasPos.current.x,
                 y: finalPos.y - dragStartCanvasPos.current.y,
             };
+            isDraggingRef.current = false;
             setIsDragging(false);
             onDragStateChange?.(false);
             window.removeEventListener('mousemove', handleMouseMove);
@@ -1300,7 +1306,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         borderWidth: adaptiveBorderWidth,
                         boxShadow: cardSurfaceShadow,
                         transform: cardSurfaceTransform,
-                        transformOrigin: '50% 50%',
+                        transformOrigin: '50% 100%',
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'transform, box-shadow, border-color',
                     }}
@@ -1428,7 +1434,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         borderWidth: adaptiveBorderWidth,
                         boxShadow: cardSurfaceShadow,
                         transform: cardSurfaceTransform,
-                        transformOrigin: '50% 50%',
+                        transformOrigin: '50% 100%',
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'transform, box-shadow, border-color'
                     }}

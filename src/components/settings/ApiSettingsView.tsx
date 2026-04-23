@@ -941,7 +941,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return false;
     }
 
-    if (false && apiHealth?.reachable === false) {
+    if (apiHealth?.reachable === false && !useCloudBackedUserApiWrites) {
       notify.warning(pick('本地 API 不可用', 'Local API unavailable'), userApiActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
@@ -963,7 +963,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return false;
     }
 
-    if (false && apiHealth?.reachable === false) {
+    if (apiHealth?.reachable === false && !useCloudBackedUserApiWrites) {
       notify.warning(pick('本地 API 不可用', 'Local API unavailable'), providerActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
@@ -2138,7 +2138,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         <>
           <SettingsHero
         eyebrow={pick('高级设置', 'Advanced settings')}
-        title={pick('API 工作台', 'API workspace')}
+        title={pick('API 工作台', 'API Workspace')}
         description={pick(
           '把本地 API、第三方供应商和预算规则收在一个页面里，优先保留清晰的入口和最少的操作。',
           'Keep local APIs, third-party providers, and budget rules in one place with clearer entry points and less clutter.'
@@ -2164,6 +2164,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               onClick={() => void run('cloud-refresh', () => refreshCloudData())}
             >
               {pick('刷新数据', 'Refresh data')}
+            </SettingsActionButton>
+            <SettingsActionButton
+              style={{ display: 'none' }}
+              data-testid="api-workbench-hero-diagnostics-toggle"
+              icon={Activity}
+              tone={showDiagnostics ? 'primary' : 'secondary'}
+              onClick={() => setShowDiagnostics((current) => !current)}
+            >
+              {showDiagnostics ? pick('收起诊断', 'Hide diagnostics') : pick('查看诊断', 'Show diagnostics')}
             </SettingsActionButton>
           </>
         }
@@ -2274,6 +2283,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         formatLatency={formatLatency}
       />
 
+      <SegmentedControl
+        options={[
+          { value: 'official', label: pick('本地 API', 'Local APIs') },
+          { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
+        ]}
+        value={activeTab}
+        onChange={(value) => setActiveTab(value as TabType)}
+      />
+
       {activeTab === 'official' ? (
         <SettingsSection
           title={pick('本地 API', 'Local APIs')}
@@ -2282,6 +2300,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             '把你自己的直连 OpenAI 和 Gemini 配置收在这里。',
             'Manage your own direct OpenAI and Gemini routes here.'
           )}
+          action={
+            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}>
+              {pick('新增', 'Add')}
+            </SettingsActionButton>
+          }
         >
           {officialSlots.length === 0 ? (
             <EmptyState
@@ -2368,6 +2391,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
             'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
           )}
+          action={
+            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={providerActionsDisabled} onClick={() => beginCreateProvider()}>
+              {pick('新增', 'Add')}
+            </SettingsActionButton>
+          }
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState

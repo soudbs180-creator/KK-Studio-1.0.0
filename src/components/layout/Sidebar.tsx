@@ -64,13 +64,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                     backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.98)' : 'var(--toolbar-bg-dark)',
                     backdropFilter: 'blur(40px) saturate(180%)',
                     WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                    border: isLightMode ? '2px solid rgba(0, 0, 0, 0.15)' : '1px solid var(--border-light)',
+                    border: isLightMode ? '2px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.05)',
                     borderRadius: '24px',
                     boxShadow: isLightMode ? '0 8px 32px rgba(0, 0, 0, 0.15)' : 'var(--shadow-xl)'
                 }}
             >
                 {/* Header */}
-                <div className="sidebar-header" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <div className="sidebar-header pb-4 mb-2">
                     <div className="sidebar-logo">
                         <img 
                             src={logo} 
@@ -143,7 +143,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <div className="px-3 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
                                 最近生成
                             </div>
-                            <div className="px-3 py-12 text-center flex flex-col items-center justify-center border border-dashed rounded-2xl" style={{ borderColor: 'var(--border-light)', color: 'var(--text-muted)' }}>
+                            <div className="px-3 py-12 text-center flex flex-col items-center justify-center rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)' }}>
                                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-3 opacity-50">
                                     <path d="M12 8v4l3 3" />
                                     <circle cx="12" cy="12" r="9" />
@@ -155,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </nav>
 
                 {/* Footer */}
-                <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border-light)' }}>
+                <div className="sidebar-footer pt-4 mt-2">
                     {/* UI Mode */}
                     <div className="p-3 rounded-xl mb-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>

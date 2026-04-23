@@ -1,3 +1,6 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import {
   collectEnvSnapshots,
   compareSupabaseProjectRefs,
@@ -5,11 +8,10 @@ import {
   findSnapshotEntries,
   findIgnoredLegacySecrets,
   getEffectiveValue,
-  resolveRepoRoot,
   summarizeValue,
-} from "./lib/env-contract.mjs";
+} from "../lib/env-contract.mjs";
 
-const rootPath = resolveRepoRoot(import.meta.url);
+const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_JSON_BODY_MAX_BYTES = 1024 * 1024;
 const DEFAULT_PROFILE_JSON_BODY_MAX_BYTES = 4 * 1024 * 1024;
 

@@ -23,9 +23,12 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(source, /getSettingsViewMeta\('dashboard'/);
   assert.match(source, /getSettingsPrimaryActionMeta\('dashboard'/);
   assert.match(source, /getSettingsStatusSummaryLabel\('dashboard'/);
-  assert.match(source, /Quick access/);
+  assert.match(source, /Primary routes/);
+  assert.match(source, /Maintenance/);
   assert.match(source, /Workspace snapshot/);
   assert.match(source, /Recent activity/);
+  assert.doesNotMatch(source, /Quick access/);
+  assert.doesNotMatch(source, /Storage settings/);
   assert.doesNotMatch(source, /Status and next step/);
   assert.doesNotMatch(source, /System overview/);
   assert.doesNotMatch(source, /Request Trend/);
@@ -34,4 +37,11 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(registrySource, /dashboard:[\s\S]*primaryActionLabelZh:/);
   assert.match(registrySource, /dashboard:[\s\S]*statusSummaryLabelZh:/);
   assert.doesNotMatch(source, /settings-reference-page-header/);
+  assert.match(source, /const refreshStorageSnapshot = useCallback\(async \(\) => \{/);
+  assert.match(source, /const scheduleStorageSnapshotRefresh = useCallback\(\(\) => \{/);
+  assert.match(source, /requestIdleCallback/);
+  assert.doesNotMatch(
+    source,
+    /const \[nextStorageMode, usageBytes, imageIds\] = await Promise\.all\(\[\s*getStorageMode\(\),\s*getStorageUsage\(\)\.catch\(\(\) => 0\),\s*getAllImageIds\(\)\.catch\(\(\) => \[\]\),\s*\]\);/,
+  );
 });

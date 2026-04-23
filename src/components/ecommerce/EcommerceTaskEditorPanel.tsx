@@ -1,6 +1,7 @@
 import React from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
-import type { EcommerceEditableTaskState } from '../../types';
+import type { EcommerceAPlusControlMode, EcommerceEditableTaskState } from '../../types';
 
 export type EcommerceTaskStateUpdater =
   | EcommerceEditableTaskState
@@ -18,10 +19,11 @@ interface EcommerceTaskEditorPanelProps {
     updater: EcommerceTaskStateUpdater,
   ) => void;
   compact?: boolean;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
 }
 
 const inputClassName = 'w-full rounded-lg border bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[rgba(59,130,246,0.45)]';
-const textareaClassName = `${inputClassName} min-h-[72px] resize-y`;
 const toggleClassName = 'flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition-colors';
 
 const toneOptions = ['专业冷静', '清新轻盈', '高级质感', '活力种草', '科技理性'];
@@ -57,11 +59,35 @@ const summaryChipStyle: React.CSSProperties = {
   color: 'var(--text-secondary)',
 };
 
+const selectedFieldContainerStyle: React.CSSProperties = {
+  background: 'rgba(59, 130, 246, 0.12)',
+  borderColor: 'rgba(59, 130, 246, 0.30)',
+  color: 'var(--text-primary)',
+};
+
+const aPlusOverrideOptions: Array<{ value: EcommerceAPlusControlMode | null; label: string }> = [
+  { value: null, label: '跟随全局' },
+  { value: '1464x600', label: '1464x600' },
+  { value: '970x600', label: '970x600' },
+  { value: '600x450', label: '600x450' },
+];
+
 const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
   taskState,
   onTaskStateChange,
   compact = false,
+  collapsible = false,
+  defaultExpanded = true,
 }) => {
+  const [isExpanded, setIsExpanded] = React.useState(() => !collapsible || defaultExpanded);
+  const rootPaddingClassName = compact ? 'p-2.5' : 'p-3';
+  const textareaMinHeightClassName = compact ? 'min-h-[56px]' : 'min-h-[72px]';
+  const textareaClassName = `${inputClassName} ${textareaMinHeightClassName} resize-y`;
+  const chipLimit = compact ? 2 : 4;
+  const headerClassName = compact ? 'mb-2.5 flex flex-wrap items-start justify-between gap-2' : 'mb-3 flex flex-wrap items-start justify-between gap-2';
+  const toggleGridClassName = compact ? 'mt-2.5 grid gap-2 md:grid-cols-2' : 'mt-3 grid gap-2 md:grid-cols-2';
+  const statusClassName = compact ? 'mt-2.5 flex flex-wrap gap-1.5' : 'mt-3 flex flex-wrap gap-1.5';
+
   const updateTaskState = (updater: EcommerceTaskStateUpdater) => {
     onTaskStateChange(taskState.taskId, updater);
   };
@@ -118,12 +144,28 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
     }));
   };
 
+  const promptOverrideValue = taskState.promptOverride && taskState.promptOverride.length > 0
+    ? taskState.promptOverride
+    : taskState.resolvedPromptPreview;
+  const isAPlusModule = taskState.sourceSheet === 'A+' && taskState.sourceKind === 'a-plus-module';
+  const collapsedSummary = [
+    taskState.copy.headline || '待补主标题',
+    taskState.copy.subheadline || '待补副标题',
+    `语气 ${taskState.style.tone}`,
+    `效果 ${taskState.style.effect}`,
+    `占比 ${productSizeLabels[taskState.layout.productSize]}`,
+  ].join(' · ');
+
+  React.useEffect(() => {
+    setIsExpanded(!collapsible || defaultExpanded);
+  }, [collapsible, defaultExpanded, taskState.taskId]);
+
   return (
     <div
-      className="rounded-xl border p-3"
+      className={`rounded-xl border ${rootPaddingClassName}`}
       style={{ background: 'rgba(15, 23, 42, 0.18)', borderColor: 'rgba(59, 130, 246, 0.16)' }}
     >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <div className={headerClassName}>
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold text-[var(--text-primary)]">
             {taskState.displayLabel || taskState.outputTypeLabel || taskState.theme}
@@ -133,7 +175,19 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {taskState.imageRoleSummary.slice(0, compact ? 2 : 4).map((summary) => (
+          {collapsible ? (
+            <button
+              type="button"
+              data-testid="ecommerce-task-editor-toggle"
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px]"
+              style={summaryChipStyle}
+              onClick={() => setIsExpanded((previous) => !previous)}
+            >
+              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              {isExpanded ? '收起编辑' : '展开编辑'}
+            </button>
+          ) : null}
+          {taskState.imageRoleSummary.slice(0, chipLimit).map((summary) => (
             <span
               key={summary}
               className="rounded-full border px-2 py-1 text-[10px]"
@@ -142,9 +196,45 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               {summary}
             </span>
           ))}
+          {isAPlusModule && taskState.sizeTier ? (
+            <span className="rounded-full border px-2 py-1 text-[10px]" style={summaryChipStyle}>
+              识别档位 {taskState.sizeTier}
+            </span>
+          ) : null}
+          {isAPlusModule && taskState.effectiveSizeTier ? (
+            <span className="rounded-full border px-2 py-1 text-[10px]" style={summaryChipStyle}>
+              实际采用档位 {taskState.effectiveSizeTier}
+            </span>
+          ) : null}
         </div>
       </div>
 
+      {!isExpanded ? (
+        <div className="rounded-xl border p-3" style={fieldContainerStyle}>
+          <div className="text-[11px] font-medium text-[var(--text-secondary)]">编辑摘要</div>
+          <div className="mt-2 text-xs leading-5 text-[var(--text-primary)]">
+            {collapsedSummary}
+          </div>
+          {(taskState.missingFields.length > 0 || taskState.consistencyChecks.length > 0) ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {taskState.missingFields.slice(0, 2).map((field) => (
+                <span
+                  key={`collapsed-missing-${field}`}
+                  className="rounded-full border px-2 py-1 text-[10px]"
+                  style={{
+                    background: 'rgba(245, 158, 11, 0.10)',
+                    borderColor: 'rgba(245, 158, 11, 0.22)',
+                    color: 'rgb(251, 191, 36)',
+                  }}
+                >
+                  待补充：{field}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <>
       <div className="grid gap-2 md:grid-cols-2">
         <label className="block">
           <div className="mb-1 text-[11px] font-medium text-[var(--text-secondary)]">主标题</div>
@@ -178,6 +268,35 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             className={textareaClassName}
             style={fieldContainerStyle}
             placeholder="例如：防泼水面料、双层隔热、3 秒速开"
+          />
+        </label>
+
+        <label className="block md:col-span-2">
+          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-[var(--text-secondary)]">
+            <span>提示词改写</span>
+            {taskState.promptOverride ? (
+              <button
+                type="button"
+                className="rounded-full border px-2 py-0.5 text-[10px]"
+                style={summaryChipStyle}
+                onClick={() => updateTaskState((previous) => ({
+                  ...previous,
+                  promptOverride: undefined,
+                }))}
+              >
+                恢复自动
+              </button>
+            ) : null}
+          </div>
+          <textarea
+            value={promptOverrideValue}
+            onChange={(event) => updateTaskState((previous) => ({
+              ...previous,
+              promptOverride: event.target.value,
+            }))}
+            className={textareaClassName}
+            style={fieldContainerStyle}
+            placeholder="当前实际提示词，可直接人工重写后再生成"
           />
         </label>
 
@@ -237,7 +356,32 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         </label>
       </div>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
+      {isAPlusModule ? (
+        <div className="mt-3 rounded-xl border p-3" style={fieldContainerStyle}>
+          <div className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">A+ 尺寸覆盖</div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {aPlusOverrideOptions.map((option) => {
+              const isSelected = (taskState.sizeControlOverride ?? null) === option.value;
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  className="rounded-lg border px-3 py-2 text-[11px] transition-colors"
+                  style={isSelected ? selectedFieldContainerStyle : fieldContainerStyle}
+                  onClick={() => updateTaskState((previous) => ({
+                    ...previous,
+                    sizeControlOverride: option.value,
+                  }))}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className={toggleGridClassName}>
         {inheritanceToggles.map((toggle) => {
           const enabled = taskState.inherit[toggle.key];
           return (
@@ -275,7 +419,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
       </div>
 
       {(taskState.missingFields.length > 0 || taskState.consistencyChecks.length > 0) ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className={statusClassName}>
           {taskState.missingFields.slice(0, 3).map((field) => (
             <span
               key={`missing-${field}`}
@@ -304,6 +448,8 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
           ))}
         </div>
       ) : null}
+        </>
+      )}
     </div>
   );
 };

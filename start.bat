@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul
 cls
+cd /d "%~dp0"
 
 echo ================================================
 echo    KK Studio - Stable Dev Server
@@ -37,22 +38,28 @@ REM Start server
 echo.
 echo [START] Starting stable dev server...
 echo.
+call npm run clean
+if %errorlevel% neq 0 (
+    echo [ERROR] Clean failed
+    pause
+    exit /b 1
+)
+echo.
 echo ----------------------------------------
 echo  URL: http://localhost:3000
 echo  Stop: npm run dev:stop
+echo  Logs: .kk-local\logs
 echo ----------------------------------------
 echo.
+echo [INFO] Keep this window open while using http://localhost:3000
+echo.
 
-powershell -ExecutionPolicy Bypass -File scripts/dev-launch.ps1 -OpenBrowser
-
-REM Handle errors
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -Restart -SkipVite
 if %errorlevel% neq 0 (
-    echo.
-    echo [ERROR] Server failed
-    echo Possible reasons:
-    echo   1. Port 3000 is in use
-    echo   2. Port 3001 is in use
-    echo   3. Config error
-    echo.
+    echo [ERROR] Local API bootstrap failed
     pause
+    exit /b 1
 )
+
+start "" powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000'"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/run-vite-dev.ps1

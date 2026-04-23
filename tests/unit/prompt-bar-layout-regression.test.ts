@@ -11,6 +11,7 @@ function readSource(relativePath: string): string {
 
 test('prompt bar keeps footer wrapping while allowing full desktop control labels', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const ecommercePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const topRowSource = readSource('src/components/layout/prompt-bar/PromptBarTopRow.tsx');
   const topRowDesktopSource = readSource('src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx');
   const footerShellSource = readSource('src/components/layout/prompt-bar/PromptBarFooter.tsx');
@@ -23,6 +24,8 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
     footerSource,
     /className="input-bar-footer flex w-full min-w-0 flex-wrap items-center gap-1\.5 px-1 pb-1 pt-0\.5 min-h-\[42px\]"/,
   );
+  assert.match(promptBarSource, /import DesktopComposerEcommercePanel from '\.\/prompt-bar\/DesktopComposerEcommercePanel';/);
+  assert.match(ecommercePanelSource, /const DesktopComposerEcommercePanel: React\.FC/);
   assert.match(promptBarSource, /import PromptBarTopRow from '\.\/prompt-bar\/PromptBarTopRow';/);
   assert.match(promptBarSource, /import PromptBarFooter from '\.\/prompt-bar\/PromptBarFooter';/);
   assert.match(topRowSource, /if \(isMobile\) \{\s*return <PromptBarTopRowMobile>\{children\}<\/PromptBarTopRowMobile>;\s*\}/);

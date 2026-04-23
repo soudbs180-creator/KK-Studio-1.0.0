@@ -165,6 +165,136 @@ test("profile auth-data routes stay available in KKAI local-only mode without ca
   });
 });
 
+test("local-only mode keeps guest sessions, workspace layout, and active credit models available without canonical persistence", async () => {
+  await withLocalOnlyEnv(async () => {
+    const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+      allowDegradedPersistence: false,
+      requestAuthenticator: {
+        authenticate: async (headers) => (
+          headers.authorization
+            ? {
+              userId: "startup-user-local-runtime",
+              email: "startup-user-local-runtime@example.com",
+            }
+            : undefined
+        ),
+      },
+      verifyTurnstileToken: async () => ({ success: true }),
+    }));
+    trackedServers.add(server);
+
+    const baseUrl = getBaseUrl(server);
+
+    const healthResponse = await fetch(`${baseUrl}/healthz`);
+    assert.equal(healthResponse.status, 200);
+    const healthPayload = await healthResponse.json() as {
+      success: boolean;
+      data?: {
+        persistence?: {
+          tempUsers?: boolean;
+          workspaceLayout?: boolean;
+          creditProviders?: boolean;
+          credits?: boolean;
+        };
+      };
+    };
+    assert.equal(healthPayload.success, true);
+    assert.equal(healthPayload.data?.persistence?.tempUsers, true);
+    assert.equal(healthPayload.data?.persistence?.workspaceLayout, true);
+    assert.equal(healthPayload.data?.persistence?.creditProviders, true);
+    assert.equal(healthPayload.data?.persistence?.credits, true);
+
+    const tempUserResponse = await fetch(`${baseUrl}/api/v1/auth/temp-users`, {
+      method: "POST",
+      headers: {
+        "x-request-id": "req-local-only-temp-user",
+      },
+    });
+    assert.equal(tempUserResponse.status, 201);
+    const tempUserPayload = await tempUserResponse.json() as {
+      success: boolean;
+      data?: {
+        userId?: string;
+      };
+    };
+    assert.equal(tempUserPayload.success, true);
+    assert.ok(tempUserPayload.data?.userId);
+
+    const saveLayoutResponse = await fetch(`${baseUrl}/api/v1/workspaces/layout`, {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer startup-user-local-runtime-token",
+        "content-type": "application/json",
+        "x-request-id": "req-local-only-layout-save",
+      },
+      body: JSON.stringify({
+        canvases: [
+          {
+            id: "canvas-local-only",
+            name: "Local only workspace",
+            promptNodes: [],
+            imageNodes: [],
+            groups: [],
+            drawings: [],
+            lastModified: Date.now(),
+          },
+        ],
+      }),
+    });
+    assert.equal(saveLayoutResponse.status, 200);
+    const saveLayoutPayload = await saveLayoutResponse.json() as {
+      success: boolean;
+    };
+    assert.equal(saveLayoutPayload.success, true);
+
+    const getLayoutResponse = await fetch(`${baseUrl}/api/v1/workspaces/layout`, {
+      headers: {
+        authorization: "Bearer startup-user-local-runtime-token",
+        "x-request-id": "req-local-only-layout-get",
+      },
+    });
+    assert.equal(getLayoutResponse.status, 200);
+    const getLayoutPayload = await getLayoutResponse.json() as {
+      success: boolean;
+      data?: {
+        canvases?: Array<{ id?: string }>;
+      };
+    };
+    assert.equal(getLayoutPayload.success, true);
+    assert.equal(getLayoutPayload.data?.canvases?.[0]?.id, "canvas-local-only");
+
+    const activeModelsResponse = await fetch(`${baseUrl}/api/v1/model-catalog/active-credit-models`, {
+      headers: {
+        "x-request-id": "req-local-only-active-models",
+      },
+    });
+    assert.equal(activeModelsResponse.status, 200);
+    const activeModelsPayload = await activeModelsResponse.json() as {
+      success: boolean;
+      data?: {
+        items?: unknown[];
+      };
+    };
+    assert.equal(activeModelsPayload.success, true);
+    assert.deepEqual(activeModelsPayload.data?.items, []);
+
+    const exchangeRatesResponse = await fetch(`${baseUrl}/api/v1/billing/exchange-rates`, {
+      headers: {
+        "x-request-id": "req-local-only-exchange-rates",
+      },
+    });
+    assert.equal(exchangeRatesResponse.status, 200);
+    const exchangeRatesPayload = await exchangeRatesResponse.json() as {
+      success: boolean;
+      data?: {
+        items?: Array<{ currencyCode?: string }>;
+      };
+    };
+    assert.equal(exchangeRatesPayload.success, true);
+    assert.ok((exchangeRatesPayload.data?.items?.length || 0) > 0);
+  });
+});
+
 test("repeated degraded startup warnings are emitted once per unique startup context", async () => {
   const originalWarn = console.warn;
   const warnings: string[] = [];

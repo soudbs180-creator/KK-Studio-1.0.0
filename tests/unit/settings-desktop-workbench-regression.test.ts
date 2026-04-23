@@ -9,16 +9,22 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('desktop settings shell wires desktop workbench metadata and clean localized labels into the shared header', () => {
+test('desktop settings shell keeps navigation metadata in the sidebar and leaves page titles to the active settings view', () => {
   const shellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const routeConfigSource = readSource('src/components/settings/settingsRouteConfig.tsx');
   const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
   assert.match(shellSource, /import SettingsDesktopSidebar from '\.\/desktop\/SettingsDesktopSidebar';/);
   assert.match(shellSource, /import SettingsDesktopWorkbenchHeader from '\.\/desktop\/SettingsDesktopWorkbenchHeader';/);
   assert.match(shellSource, /<SettingsDesktopSidebar/);
   assert.match(shellSource, /<SettingsDesktopWorkbenchHeader/);
-  assert.match(shellSource, /const headerMeta = getSettingsViewMeta\(activeView, language\);/);
+  assert.match(shellSource, /const sections = getSettingsNavSections\(language\);/);
+  assert.match(shellSource, /sections=\{sections\}/);
+  assert.match(shellSource, /<SettingsLanguageToggle compact \/>/);
+  assert.doesNotMatch(shellSource, /const headerMeta = getSettingsViewMeta\(activeView, language\);/);
+  assert.doesNotMatch(shellSource, /languageControl=<\{?<SettingsLanguageToggle \/>/);
+  assert.doesNotMatch(shellSource, /<SettingsLanguageToggle \/>/);
   assert.doesNotMatch(shellSource, /const headerPrimaryAction = getSettingsPrimaryActionMeta\(activeView, language\);/);
   assert.doesNotMatch(shellSource, /const headerStatusSummaryLabel = getSettingsStatusSummaryLabel\(activeView, language\);/);
   assert.doesNotMatch(shellSource, /primaryActionLabel=\{headerPrimaryAction\.label\}/);
@@ -33,24 +39,35 @@ test('desktop settings shell wires desktop workbench metadata and clean localize
   assert.match(routeConfigSource, /export function renderSettingsRouteElements/);
   assert.doesNotMatch(shellSource, /settings-toolbar-search/);
   assert.doesNotMatch(shellSource, /System Active/);
-  assert.match(headerSource, /View tools/);
+  assert.match(sidebarSource, /items\.filter\(\(item\) => item\.section === section\.id\)/);
+  assert.match(sidebarSource, /item\.description/);
+  assert.match(sidebarSource, /section\.label/);
   assert.doesNotMatch(headerSource, /SettingsBadge/);
   assert.doesNotMatch(headerSource, /Current surface/);
   assert.doesNotMatch(headerSource, /Primary next step/);
+  assert.doesNotMatch(headerSource, /meta:/);
+  assert.doesNotMatch(headerSource, /languageControl\?: React\.ReactNode;/);
+  assert.doesNotMatch(headerSource, /meta\.title/);
+  assert.doesNotMatch(headerSource, /meta\.description/);
+  assert.doesNotMatch(headerSource, /meta\.eyebrow/);
   assert.doesNotMatch(headerSource, /pick\('当前面板', 'Current surface'\)/);
   assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
-  assert.match(headerSource, /pick\('视图工具', 'View tools'\)/);
+  assert.doesNotMatch(headerSource, /pick\('视图工具', 'View tools'\)/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
 
-test('desktop workbench header keeps only the compact tool labels after summary cards are removed', () => {
+test('desktop workbench header stays action-only so it does not duplicate the active page hero', () => {
   const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
 
   assert.doesNotMatch(headerSource, /pick\('当前面板', 'Current surface'\)/);
   assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
-  assert.match(headerSource, /pick\('视图工具', 'View tools'\)/);
+  assert.doesNotMatch(headerSource, /pick\('视图工具', 'View tools'\)/);
+  assert.doesNotMatch(headerSource, /meta\.title/);
+  assert.doesNotMatch(headerSource, /meta\.description/);
+  assert.doesNotMatch(headerSource, /meta\.eyebrow/);
+  assert.doesNotMatch(headerSource, /languageControl/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 
+const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 const scanRoots = [
   "src",
   "apps",
@@ -39,24 +40,23 @@ const scanExtensions = new Set([
 ]);
 
 const suspiciousFragments = [
-  "鏄竴娆",
-  "鍙戠幇",
-  "缂栫爜",
-  "璇峰",
-  "淇濆瓨",
-  "鏆傛椂",
-  "妫€娴",
-  "褰撳墠",
-  "瀹樻柟",
-  "绗笁鏂",
-  "鎺ュ彛",
-  "鍒锋柊",
-  "娴忚鍣",
-  "鐢ㄤ簬鎵胯浇",
-  "SUPABASE_SERVICE_ROLE_KEY=浣犵殑",
+  "\u93C4\uE219\u7AF4\u5A06",
+  "\u9359\u6220\u5E47",
+  "\u7F02\u682B\u721C",
+  "\u7487\u5CF0",
+  "\u6DC7\u6FC6\u74E8",
+  "\u93C6\u509B\u6902",
+  "\u59AB\u20AC\u5A34",
+  "\u8930\u64B3\u58A0",
+  "\u7039\u6A3B\u67DF",
+  "\u7ED7\uE0FF\u7B01\u93C2",
+  "\u93BA\u30E5\u5F5B",
+  "\u9352\u950B\u67CA",
+  "\u5A34\u5FDA\uE74D\u9363",
+  "\u9422\u3124\u7C2C\u93B5\u80EF\u6D47",
+  "SUPABASE_SERVICE_ROLE_KEY=\u6D63\u72B5\u6B91",
 ];
-
-const suspiciousCharSet = new Set("鍙闂妫璇淇鏂褰缂閹鏆閲棰渚涘簲鍐娴瀹閫绗鐢浣");
+const suspiciousCharSet = new Set("\u9359\u95C2\u59AB\u7487\u6DC7\u93C2\u8930\u7F02\u95B9\u93C6\u95B2\u68F0\u6E1A\u6D98\u7C32\u9350\u5A34\u7039\u95AB\u7ED7\u9422\u6D63");
 const traditionalOnlyChars = new Set(["這", "個", "們", "為", "與", "會", "體", "點", "對", "於", "裡", "發", "說", "請", "將", "後", "臺", "門", "風", "務", "應", "變", "數", "圖", "層", "審", "寫", "則", "誤", "檢", "碼", "邏", "輯", "網"]);
 const skipDirectories = new Set([
   "node_modules",
@@ -73,10 +73,16 @@ const skipDirectories = new Set([
 ]);
 const ignoreFiles = new Set([
   path.resolve(process.argv[1]),
-  path.resolve("scripts/fix-garbled-chars.cjs"),
+  path.resolve("scripts", "ci", "fix-garbled-chars.cjs"),
 ]);
+const invalidUtf8Issues = [];
 const mojibakeIssues = [];
 const traditionalIssues = [];
+
+function decodeUtf8OrThrow(filePath) {
+  const raw = fs.readFileSync(filePath);
+  return utf8Decoder.decode(raw);
+}
 
 function shouldScan(filePath) {
   if (ignoreFiles.has(path.resolve(filePath))) {
@@ -171,7 +177,13 @@ function walk(targetPath) {
     return;
   }
 
-  const content = fs.readFileSync(resolvedPath, "utf8");
+  let content;
+  try {
+    content = decodeUtf8OrThrow(resolvedPath);
+  } catch (error) {
+    invalidUtf8Issues.push(`${resolvedPath}: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
   const lines = content.split(/\r?\n/);
 
   lines.forEach((line, index) => {
@@ -197,6 +209,14 @@ for (const target of scanRoots) {
 if (mojibakeIssues.length > 0) {
   console.error("Found suspicious mojibake text. Please review the following locations:");
   for (const issue of mojibakeIssues) {
+    console.error(issue);
+  }
+  process.exit(1);
+}
+
+if (invalidUtf8Issues.length > 0) {
+  console.error("Found invalid UTF-8 bytes. Please repair the affected files before continuing:");
+  for (const issue of invalidUtf8Issues) {
     console.error(issue);
   }
   process.exit(1);

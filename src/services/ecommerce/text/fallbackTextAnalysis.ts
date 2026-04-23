@@ -63,6 +63,8 @@ function createFallbackTaskState(params: {
   sourceRowKey: string;
   theme: string;
   outputTypeLabel: string;
+  declaredSizeText?: string;
+  sizeTier?: ReturnType<typeof resolveEcommerceAspectPolicy>['sizeTier'];
   sparseIntent: string;
   seriesTemplate: EcommerceAnalysisResult['seriesTemplate'];
 }) {
@@ -75,6 +77,8 @@ function createFallbackTaskState(params: {
       sourceRowKey: params.sourceRowKey,
       theme: params.theme,
       outputTypeLabel: params.outputTypeLabel,
+      declaredSizeText: params.declaredSizeText,
+      sizeTier: params.sizeTier,
       imageRoleSummary: ['产品图'],
       sparseUserIntent: params.sparseIntent,
       copy: { headline: '', subheadline: '', highlight: '', featureTags: [], cta: '' },
@@ -118,6 +122,8 @@ function normalizeMainItems(
         sourceRowKey: `fallback-main-${index + 1}`,
         theme,
         outputTypeLabel: '主图',
+        declaredSizeText: undefined,
+        sizeTier: undefined,
         sparseIntent: [line, designRequirements, copyText].filter(Boolean).join('；'),
         seriesTemplate,
       });
@@ -139,6 +145,7 @@ function normalizeMainItems(
         designRequirements,
         copyText,
         sizePolicy: 'main-default',
+        sizeTier: undefined,
         referenceAssetIds: [],
         referenceMentions,
         productAssetRequired: true,
@@ -180,6 +187,8 @@ function normalizeAPlusModules(
         sourceRowKey: `fallback-aplus-${index + 1}`,
         theme: moduleName,
         outputTypeLabel: 'A+',
+        declaredSizeText,
+        sizeTier: policy.sizeTier,
         sparseIntent: [line, designRequirements, copyText].filter(Boolean).join('；'),
         seriesTemplate,
       });
@@ -202,6 +211,7 @@ function normalizeAPlusModules(
         designRequirements,
         copyText,
         sizePolicy: policy.sizePolicy,
+        sizeTier: policy.sizeTier,
         referenceAssetIds: [],
         referenceMentions,
         productAssetRequired: true,

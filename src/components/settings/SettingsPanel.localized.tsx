@@ -18,9 +18,9 @@ import {
   buildSettingsPath,
   getCurrentSettingsViewId,
   getSettingsNavItems,
+  getSettingsNavSections,
   getSettingsSearchPlaceholder,
   getSettingsShellCopy,
-  getSettingsViewMeta,
   resolveCanonicalSettingsViewId,
   type CanonicalSettingsViewId,
   type SettingsNavItem,
@@ -38,8 +38,23 @@ export interface SettingsPanelProps {
 }
 
 const ViewFallback: React.FC = () => (
-  <div className="flex min-h-[320px] items-center justify-center p-4">
-    <div className="text-sm text-[var(--text-secondary)]">Loading settings...</div>
+  <div className="flex w-full flex-col p-8 animate-pulse" style={{ animationDuration: '1.5s', opacity: 0.6 }}>
+    {/* Header Skeleton */}
+    <div className="w-48 h-8 rounded-lg mb-3 bg-black/5 dark:bg-white/10"></div>
+    <div className="w-3/4 h-4 rounded-md mb-10 bg-black/5 dark:bg-white/5"></div>
+    
+    {/* Items Skeleton */}
+    <div className="flex flex-col gap-4">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="w-full h-[76px] rounded-[22px] flex items-center px-5 gap-4 bg-black/5 dark:bg-white/5">
+          <div className="w-11 h-11 rounded-[14px] bg-black/10 dark:bg-white/10"></div>
+          <div className="flex flex-col gap-2.5 flex-1">
+            <div className="w-1/4 h-5 rounded-md bg-black/10 dark:bg-white/10"></div>
+            <div className="w-2/5 h-3.5 rounded-md bg-black/5 dark:bg-white/5"></div>
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -58,7 +73,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
       }}
       aria-label={pick('语言切换', 'Language switch')}
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: 'var(--text-tertiary)' }}>
+      <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: 'var(--settings-nav-text-tertiary)' }}>
         <Globe2 size={compact ? 14 : 16} />
       </span>
       <button
@@ -67,7 +82,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
         onClick={() => setLanguage('zh-CN')}
         style={{
           background: language === 'zh-CN' ? 'var(--settings-nav-active-bg)' : 'transparent',
-          color: language === 'zh-CN' ? 'var(--text-primary)' : 'var(--text-secondary)',
+          color: language === 'zh-CN' ? 'var(--settings-nav-text-primary)' : 'var(--settings-nav-text-secondary)',
         }}
       >
         中文
@@ -78,7 +93,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
         onClick={() => setLanguage('en-US')}
         style={{
           background: language === 'en-US' ? 'var(--settings-nav-active-bg)' : 'transparent',
-          color: language === 'en-US' ? 'var(--text-primary)' : 'var(--text-secondary)',
+          color: language === 'en-US' ? 'var(--settings-nav-text-primary)' : 'var(--settings-nav-text-secondary)',
         }}
       >
         EN
@@ -96,6 +111,7 @@ const SettingsDesktopShell: React.FC<{
   onRefreshCurrentView: () => void;
   onClose: () => void;
   initialSupplier: Supplier | null;
+  contentRefreshKey: number;
 }> = ({
   items,
   activeView,
@@ -105,12 +121,13 @@ const SettingsDesktopShell: React.FC<{
   onRefreshCurrentView,
   onClose,
   initialSupplier,
+  contentRefreshKey,
 }) => {
   const { language, pick } = useLocale();
   const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
   const navigate = useNavigate();
-  const headerMeta = getSettingsViewMeta(activeView, language);
   const shellCopy = getSettingsShellCopy(language);
+  const sections = getSettingsNavSections(language);
 
   const filteredItems = items.filter((item) => {
     const keyword = navQuery.trim().toLowerCase();
@@ -130,7 +147,8 @@ const SettingsDesktopShell: React.FC<{
     <div className="settings-shell settings-shell--desktop" onClick={(event) => event.stopPropagation()}>
       <section className="settings-shell-desktop">
         <SettingsDesktopSidebar
-          items={filteredItems.map((item) => ({ id: item.id, label: item.label, icon: item.icon }))}
+          items={filteredItems}
+          sections={sections}
           activeView={activeView}
           navQuery={navQuery}
           searchPlaceholder={getSettingsSearchPlaceholder(activeView, language)}
@@ -140,32 +158,33 @@ const SettingsDesktopShell: React.FC<{
           description={shellCopy.workbenchDescription}
           emptyLabel={shellCopy.emptySearchLabel}
           accountBlock={(
-            <button
-              type="button"
-              onClick={() => {
-                navigate(buildSettingsPath('api-management'));
-              }}
-              className="flex w-full items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left"
-              style={{
-                borderColor: 'var(--settings-border-subtle)',
-                background: 'var(--settings-surface-overlay)',
-              }}
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)]">
-                {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{accountName}</span>
-                <span className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{accountMeta}</span>
-              </span>
-            </button>
+            <div className="space-y-3">
+              <SettingsLanguageToggle compact />
+              <button
+                type="button"
+                onClick={() => {
+                  navigate(buildSettingsPath('api-management'));
+                }}
+                className="flex w-full items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left"
+                style={{
+                  borderColor: 'var(--settings-nav-glass-border)',
+                  background: 'color-mix(in srgb, var(--settings-nav-glass-bg) 74%, transparent)',
+                }}
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)]">
+                  {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-[var(--settings-nav-text-primary)]">{accountName}</span>
+                  <span className="mt-1 block truncate text-xs text-[var(--settings-nav-text-secondary)]">{accountMeta}</span>
+                </span>
+              </button>
+            </div>
           )}
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <SettingsDesktopWorkbenchHeader
-            meta={headerMeta}
-            languageControl={<SettingsLanguageToggle />}
             activeView={activeView}
             onRefreshCurrentView={onRefreshCurrentView}
             onOpenLogs={() => onNavigate('system-logs')}
@@ -173,7 +192,7 @@ const SettingsDesktopShell: React.FC<{
           />
 
           <main className="settings-shell-page settings-shell-page--desktop">
-            <Suspense fallback={<ViewFallback />}>
+            <Suspense key={`${activeView}:${contentRefreshKey}`} fallback={<ViewFallback />}>
               <Routes>
                 {renderSettingsRouteElements({
                   initialSupplier,
@@ -239,7 +258,7 @@ const SettingsMobileShell: React.FC<{
             type="button"
             onClick={handleLeadingAction}
             className="apple-icon-button h-11 w-11 shrink-0 rounded-2xl"
-            aria-label={showHome ? pick('关闭设置', 'Close settings') : pick('返回手机设置首页', 'Back to mobile settings home')}
+            aria-label={showHome ? pick('关闭设置', 'Close settings') : pick('返回移动设置首页', 'Back to mobile settings home')}
           >
             {showHome ? <X size={18} /> : <ArrowLeft size={18} />}
           </button>
@@ -282,13 +301,13 @@ const SettingsMobileShell: React.FC<{
                 {shellCopy.mobileHomeKicker}
               </div>
               <div className="mt-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Dashboard / API / Usage / Errors
+                Overview / API / Billing / Errors
               </div>
               <div className="mt-2 text-xs text-[var(--text-secondary)]">
-                {pickByLanguage(language, '消耗账单', 'Billing Ledger')} / {pickByLanguage(language, '系统错误日志', 'System Error Logs')}
+                {pickByLanguage(language, '计费', 'Billing')} / {pickByLanguage(language, '错误', 'Errors')}
               </div>
               <div className="mt-1 text-xs text-[var(--text-tertiary)]">
-                {pickByLanguage(language, '排查运行异常、错误和警告', 'Inspect runtime errors, warnings, and troubleshooting details.')}
+                {pickByLanguage(language, '系统错误、告警与排障信号。', 'System errors, warnings, and troubleshooting signals.')}
               </div>
             </div>
             <MobileSettingsHome
@@ -298,7 +317,6 @@ const SettingsMobileShell: React.FC<{
           </div>
         ) : (
           <Suspense fallback={<ViewFallback />}>
-            {/* CostEstimation embedded route is provided by settingsRouteConfig. */}
             <Routes>
               {renderSettingsRouteElements({
                 initialSupplier,
@@ -324,7 +342,7 @@ const SettingsRouterShell: React.FC<{
   const activeView = getCurrentSettingsViewId(location.pathname);
   const [navQuery, setNavQuery] = useState('');
   const [showHome, setShowHome] = useState(resolveCanonicalSettingsViewId(initialView) === 'dashboard');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [contentRefreshKey, setContentRefreshKey] = useState(0);
   const nestedApiEditorRoute = isApiManagementEditorRoute(location.pathname);
   const nestedApiListState = useMemo(
     () => deriveApiManagementListStateFromPath(location.pathname),
@@ -366,10 +384,10 @@ const SettingsRouterShell: React.FC<{
       navQuery={navQuery}
       onQueryChange={setNavQuery}
       onNavigate={handleNavigate}
-      onRefreshCurrentView={() => setRefreshKey((current) => current + 1)}
+      onRefreshCurrentView={() => setContentRefreshKey((current) => current + 1)}
       onClose={onClose}
       initialSupplier={initialSupplier}
-      key={refreshKey}
+      contentRefreshKey={contentRefreshKey}
     />
   );
 };
@@ -383,8 +401,10 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   initialPathname,
 }) => {
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1024 : false));
-  const safeInitialView = resolveCanonicalSettingsViewId(initialView);
   const normalizedInitialPathname = initialPathname && initialPathname.startsWith('/settings') ? initialPathname : null;
+  const safeInitialView = normalizedInitialPathname
+    ? getCurrentSettingsViewId(normalizedInitialPathname)
+    : resolveCanonicalSettingsViewId(initialView);
   const initialEntry = normalizedInitialPathname || (
     safeInitialView === 'api-management' && initialSupplier
       ? `/settings/api-management/provider/${encodeURIComponent(initialSupplier.id || initialSupplier.baseUrl)}`
@@ -406,7 +426,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     return () => {
       document.body.style.overflow = overflow;
     };
-  }, [isOpen]);
+  }, [isOpen, presentation]);
 
   if (!isOpen) return null;
 

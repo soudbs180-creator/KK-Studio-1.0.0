@@ -1,4 +1,5 @@
 import type {
+  EcommerceAPlusSizeTier,
   EcommerceEditableTaskState,
   EcommerceSeriesTemplate,
   EcommerceSizePolicy,
@@ -47,6 +48,7 @@ export interface EcommerceAnalysisMainImageItem {
   designRequirements: string;
   copyText: string;
   sizePolicy: EcommerceAnalysisSizePolicy;
+  sizeTier?: EcommerceAPlusSizeTier;
   referenceAssetIds: string[];
   referenceMentions: EcommerceReferenceMention[];
   productAssetRequired: boolean;
@@ -69,6 +71,7 @@ export interface EcommerceAnalysisAPlusModule {
   designRequirements: string;
   copyText: string;
   sizePolicy: EcommerceAnalysisSizePolicy;
+  sizeTier?: EcommerceAPlusSizeTier;
   referenceAssetIds: string[];
   referenceMentions: EcommerceReferenceMention[];
   productAssetRequired: boolean;

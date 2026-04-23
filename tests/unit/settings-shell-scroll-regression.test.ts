@@ -11,34 +11,52 @@ function readSource(relativePath: string): string {
 
 test('desktop settings shell keeps a real inner scroll container and viewport-safe shell sizing', () => {
   const shellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
   const cssSource = readSource('src/index.css');
 
   assert.match(shellSource, /className="flex min-h-0 min-w-0 flex-1 flex-col"/);
+  assert.match(sidebarSource, /width: 'var\(--settings-sidebar-width\)'/);
   assert.match(
     cssSource,
-    /\.settings-shell-desktop \{[\s\S]*width: min\(1480px, calc\(100vw - 48px\)\);[\s\S]*height: min\(calc\(100dvh - 48px\), 920px\);/,
+    /\.settings-shell-desktop \{[\s\S]*grid-template-columns: var\(--settings-sidebar-width\) minmax\(0, 1fr\);[\s\S]*width: min\(1480px, calc\(100vw - 48px\)\);[\s\S]*height: min\(calc\(100dvh - 48px\), 920px\);[\s\S]*border-radius: var\(--settings-radius-unified\);[\s\S]*overflow: hidden;/,
   );
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-sidebar-width: 292px;/);
   assert.match(cssSource, /\.settings-shell-main \{[\s\S]*min-height: 0;/);
+  assert.match(cssSource, /\.settings-shell-nav \{[\s\S]*position: relative;[\s\S]*z-index: 2;/);
+  assert.match(cssSource, /\.settings-shell-main \{[\s\S]*z-index: 1;/);
   assert.match(cssSource, /\.settings-shell-page \{[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/);
-});
-
-test('dark-mode settings shell avoids the pure black canvas that made the workbench feel too heavy', () => {
-  const cssSource = readSource('src/index.css');
-
-  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-shell-bg: #1B1D21;/);
-  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-page-bg: #24272C;/);
-  assert.doesNotMatch(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-shell-bg: #000000;/);
-  assert.doesNotMatch(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-page-bg: #000000;/);
-});
-
-test('settings visual tokens use neutral gray accents and keep nested cards shadowless by default', () => {
-  const cssSource = readSource('src/index.css');
-
-  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-accent-rgb: 148 152 161;/);
-  assert.doesNotMatch(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-accent-rgb: 118 162 255;/);
-  assert.doesNotMatch(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-button-primary-bg: linear-gradient\(135deg, #8bbdff 0%, #6c90ff 100%\);/);
-  assert.match(
+  assert.match(cssSource, /\.settings-shell-mobile__topbar \{[\s\S]*backdrop-filter: saturate\(180%\) blur\(20px\);/);
+  assert.doesNotMatch(sidebarSource, /backdropFilter:/);
+  assert.doesNotMatch(headerSource, /backdropFilter:/);
+  assert.doesNotMatch(
     cssSource,
-    /\.settings-panel \.settings-metric-card,[\s\S]*\.settings-panel \.api-settings-provider-item,[\s\S]*\.settings-panel \.settings-dashboard-row,[\s\S]*box-shadow: none;/,
+    /\.settings-shell-nav,\s*\.settings-shell-main,\s*\.settings-shell-mobile\s*\{[^}]*backdrop-filter:/,
   );
+  assert.doesNotMatch(
+    cssSource,
+    /body\.dark-mode\s+\.settings-shell-mobile,\s*body\.dark-mode\s+\.settings-shell-nav,\s*body\.dark-mode\s+\.settings-shell-main\s*\{[^}]*backdrop-filter:/,
+  );
+});
+
+test('settings shell uses Apple page surfaces instead of the old gray control-console canvas', () => {
+  const cssSource = readSource('src/index.css');
+
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-page-bg: #f5f5f7;/);
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-shell-bg: #ffffff;/);
+  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-shell-bg: #000000;/);
+  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-page-bg: #0f0f10;/);
+  assert.doesNotMatch(cssSource, /\.settings-panel \{[\s\S]*--settings-page-bg: #EEF1F4;/);
+});
+
+test('settings visual tokens use Apple blue accents and soft product-card shadows by default', () => {
+  const cssSource = readSource('src/index.css');
+
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-accent-rgb: 0 113 227;/);
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-radius-unified: 20px;/);
+  assert.match(cssSource, /\.settings-panel \.settings-sidebar-item \{[\s\S]*border-radius: var\(--settings-radius-unified\)/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-nav__search \{[\s\S]*border-radius: var\(--settings-radius-unified\)/);
+  assert.match(cssSource, /\.settings-panel \.settings-reference-card \{[\s\S]*border-radius: var\(--settings-radius-unified\)/);
+  assert.doesNotMatch(cssSource, /--settings-accent-rgb: 148 152 161;/);
+  assert.match(cssSource, /\.settings-panel \.settings-reference-card \{[\s\S]*box-shadow: var\(--settings-card-shadow\);/);
 });

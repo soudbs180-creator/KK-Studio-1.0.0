@@ -17,7 +17,10 @@ test('mobile settings shell keeps the focused four-entry home inside the shared 
   const homeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
 
   assert.match(homeSource, /data-testid="mobile-settings-home"/);
-  assert.match(homeSource, /Dashboard \/ API \/ Usage \/ Errors/);
+  assert.match(homeSource, /Overview \/ API \/ Billing \/ Errors/);
+  assert.match(homeSource, /label: 'Overview'/);
+  assert.match(homeSource, /label: 'Billing'/);
+  assert.match(homeSource, /label: 'Errors'/);
   assert.doesNotMatch(homeSource, /Storage/);
   assert.match(settingsSource, /MobileSettingsHome/);
   assert.match(settingsSource, /onBackToApiManagement/);

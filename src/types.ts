@@ -75,14 +75,18 @@ export interface MobileEcommerceContinuation {
 
 export type EcommerceGroupSheet = '主图' | 'A+';
 
+export type EcommerceAPlusControlMode = 'auto' | '1464x600' | '970x600' | '600x450';
+
 export interface EcommerceSheetSetting {
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
+  aPlusControlMode?: EcommerceAPlusControlMode;
 }
 
 export interface EcommerceSheetSettingPatch {
   aspectRatio?: AspectRatio;
   imageSize?: ImageSize;
+  aPlusControlMode?: EcommerceAPlusControlMode;
 }
 
 export interface MobileResultEntry {
@@ -195,6 +199,7 @@ export interface PartialRedrawMetadata {
   extraReferenceImageIds: string[];
   inheritedDisplayLabel?: string;
   inheritedTaskState?: EcommerceEditableTaskState;
+  inheritedDeliveryKind?: EcommerceSlotDeliveryKind;
   compositeVersion: 1;
 }
 
@@ -262,6 +267,7 @@ export interface GeneratedImage {
   // 🎯 [New] 完整的提示词优化结果对象
   promptOptimizerResult?: PromptOptimizerResult;
   partialRedraw?: PartialRedrawMetadata;
+  ecommerceDeliveryKind?: EcommerceSlotDeliveryKind;
 
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
@@ -408,6 +414,10 @@ export type EcommercePromptKind = 'main-image' | 'a-plus-group' | 'a-plus-module
 
 export type EcommerceSizePolicy = 'main-default' | 'sheet-native' | 'desktop-then-mobile';
 
+export type EcommerceAPlusSizeTier = '1464x600' | '970x600' | '600x450' | 'unknown';
+
+export type EcommerceSlotDeliveryKind = 'default' | 'desktop' | 'mobile';
+
 export type EcommercePromptStage =
   | 'analysis_pending'
   | 'analysis_ready'
@@ -452,6 +462,7 @@ export interface EcommerceTaskAssetRoleBinding {
   role: EcommerceAssetRole;
   label: string;
   normalizedLabel: string;
+  aliasLabel?: string;
   source: 'upload' | 'analysis' | 'history';
   note?: string;
   mentionTokens?: string[];
@@ -564,6 +575,11 @@ export interface EcommerceEditableTaskState {
   sourceRowKey: string;
   theme: string;
   outputTypeLabel: string;
+  declaredSizeText?: string;
+  sizeTier?: EcommerceAPlusSizeTier;
+  effectiveSizePolicy?: EcommerceSizePolicy;
+  effectiveSizeTier?: EcommerceAPlusSizeTier;
+  sizeControlOverride?: EcommerceAPlusControlMode | null;
   imageRoleSummary: string[];
   sparseUserIntent: string;
   copy: EcommerceCopyTaskState;
@@ -577,6 +593,7 @@ export interface EcommerceEditableTaskState {
   resolvedPromptPreview: string;
   displayLabel: string;
   lastRenderPrompt?: string;
+  promptOverride?: string;
 }
 
 export interface EcommercePromptState {
@@ -591,8 +608,14 @@ export interface EcommercePromptState {
   designRequirements?: string;
   theme?: string;
   sizePolicy?: EcommerceSizePolicy;
+  sizeTier?: EcommerceAPlusSizeTier;
+  effectiveSizePolicy?: EcommerceSizePolicy;
+  effectiveSizeTier?: EcommerceAPlusSizeTier;
+  aPlusControlMode?: EcommerceAPlusControlMode;
+  sizeControlOverride?: EcommerceAPlusControlMode | null;
   allowedAspectRatios?: AspectRatio[];
   currentAspectRatio?: AspectRatio;
+  activeDeliveryKind?: EcommerceSlotDeliveryKind;
   stage?: EcommercePromptStage;
   desktopStage?: 'not_applicable' | 'pending' | 'generating' | 'generated' | 'confirmed' | 'failed';
   mobileStage?: 'not_applicable' | 'locked' | 'pending' | 'generating' | 'generated' | 'failed';

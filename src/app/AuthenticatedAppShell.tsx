@@ -34,14 +34,14 @@ export interface AuthenticatedAppShellProps {
   AppContentComponent: React.ComponentType;
 }
 
-function getStartupStageMessage(stage: string, isWorkspaceReady: boolean) {
+function getStartupStageMessage(stage: string, isWorkspaceReady: boolean, healthState: 'idle' | 'checking' | 'ready') {
   switch (stage) {
     case 'signed_out':
       return pickByDocumentLanguage('正在准备登录环境…', 'Preparing the sign-in environment...');
     case 'session_ready':
       return pickByDocumentLanguage('正在确认会话…', 'Confirming your session...');
     case 'profile_ready':
-      return isWorkspaceReady
+      return isWorkspaceReady || healthState !== 'checking'
         ? null
         : pickByDocumentLanguage('正在校验账号与 API 连通性…', 'Checking your account and API connectivity...');
     case 'workspace_ready':
@@ -75,13 +75,14 @@ export const StartupRuntimeBanner: React.FC = () => {
   const [bannerLeft, setBannerLeft] = useState<number | null>(null);
   const {
     stage,
+    healthState,
     isWorkspaceReady,
     isHostedRuntime,
     legacyFallbackEnabled,
     lastStartupWarning,
   } = useAppStartup();
 
-  const stageMessage = getStartupStageMessage(stage, isWorkspaceReady);
+  const stageMessage = getStartupStageMessage(stage, isWorkspaceReady, healthState);
   const hostedWarning = legacyFallbackEnabled && isHostedRuntime
     ? 'Hosted runtime should not use legacy Web API fallback. Check VITE_KK_API_BASE_URL and VITE_ENABLE_LEGACY_WEB_API_FALLBACK.'
     : null;

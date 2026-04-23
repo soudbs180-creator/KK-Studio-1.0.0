@@ -1,6 +1,15 @@
+import type { EcommerceSlotDeliveryKind } from '../../types.ts';
+
 export type EcommerceGroupPackageType = 'main-image-group' | 'a-plus-group';
 export type EcommerceGroupExportSlotStatus = 'exported' | 'skipped' | 'missing';
 export type EcommerceGroupExportLatestSource = 'generated' | 'redraw';
+
+export interface EcommerceGroupExportDeliverableInput {
+  deliveryKind: EcommerceSlotDeliveryKind;
+  latestImageId?: string;
+  latestSource?: EcommerceGroupExportLatestSource;
+  fileName?: string;
+}
 
 export interface EcommerceGroupExportSlotInput {
   slotId: string;
@@ -9,6 +18,7 @@ export interface EcommerceGroupExportSlotInput {
   latestImageId?: string;
   latestSource?: EcommerceGroupExportLatestSource;
   fileName?: string;
+  deliverables?: EcommerceGroupExportDeliverableInput[];
 }
 
 export interface BuildEcommerceGroupExportManifestInput {
@@ -19,6 +29,15 @@ export interface BuildEcommerceGroupExportManifestInput {
   slots: EcommerceGroupExportSlotInput[];
 }
 
+export interface EcommerceGroupExportManifestDeliverable {
+  deliveryKind: EcommerceSlotDeliveryKind;
+  status: EcommerceGroupExportSlotStatus;
+  latestImageId?: string;
+  latestSource?: EcommerceGroupExportLatestSource;
+  fileName?: string;
+  imageQuality?: 'original' | 'fallback';
+}
+
 export interface EcommerceGroupExportManifestSlot {
   slotId: string;
   slotLabel: string;
@@ -27,6 +46,8 @@ export interface EcommerceGroupExportManifestSlot {
   latestImageId?: string;
   latestSource?: EcommerceGroupExportLatestSource;
   fileName?: string;
+  imageQuality?: 'original' | 'fallback';
+  deliverables?: EcommerceGroupExportManifestDeliverable[];
 }
 
 export interface EcommerceGroupExportManifest {
@@ -39,12 +60,22 @@ export interface EcommerceGroupExportManifest {
   slots: EcommerceGroupExportManifestSlot[];
 }
 
-function resolveSlotStatus(slot: EcommerceGroupExportSlotInput): EcommerceGroupExportSlotStatus {
+function resolveSlotStatus(slot: Pick<EcommerceGroupExportSlotInput, 'selectedForGeneration' | 'latestImageId' | 'fileName'>): EcommerceGroupExportSlotStatus {
   if (!slot.selectedForGeneration) {
     return 'skipped';
   }
 
   if (slot.latestImageId && slot.fileName) {
+    return 'exported';
+  }
+
+  return 'missing';
+}
+
+function resolveDeliverableStatus(
+  deliverable: EcommerceGroupExportDeliverableInput,
+): EcommerceGroupExportSlotStatus {
+  if (deliverable.latestImageId && deliverable.fileName) {
     return 'exported';
   }
 
@@ -62,7 +93,36 @@ export function buildEcommerceGroupExportManifest(
     groupLabel: input.groupLabel,
     sourcePromptId: input.sourcePromptId,
     slots: input.slots.map((slot) => {
-      const status = resolveSlotStatus(slot);
+      const deliverables = slot.deliverables?.map((deliverable) => {
+        const status = resolveDeliverableStatus(deliverable);
+
+        return status === 'exported'
+          ? {
+              deliveryKind: deliverable.deliveryKind,
+              status,
+              latestImageId: deliverable.latestImageId,
+              latestSource: deliverable.latestSource ?? 'generated',
+              fileName: deliverable.fileName,
+            }
+          : {
+              deliveryKind: deliverable.deliveryKind,
+              status,
+            };
+      });
+
+      const status = deliverables && deliverables.length > 0
+        ? (deliverables.some((deliverable) => deliverable.status === 'exported') ? 'exported' : 'missing')
+        : resolveSlotStatus(slot);
+
+      if (deliverables && deliverables.length > 0) {
+        return {
+          slotId: slot.slotId,
+          slotLabel: slot.slotLabel,
+          status,
+          selectedForGeneration: slot.selectedForGeneration,
+          deliverables,
+        };
+      }
 
       return status === 'exported'
         ? {

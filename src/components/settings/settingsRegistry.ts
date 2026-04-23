@@ -43,8 +43,10 @@ export interface SettingsNavItem {
 
 export interface SettingsViewMetaEntry {
   eyebrow: string;
-  title: string;
-  description: string;
+  titleZh: string;
+  titleEn: string;
+  descriptionZh: string;
+  descriptionEn: string;
   primaryActionLabelZh: string;
   primaryActionLabelEn: string;
   primaryActionTarget: CanonicalSettingsViewId;
@@ -88,108 +90,35 @@ interface SettingsNavItemDefinition {
   featureFlag?: 'billing';
 }
 
-const zh = {
-  workspace: '工作台',
-  system: '系统',
-  workbenchTitle: '设置',
-  workbenchDescription: '管理 API、账单和运行状态。',
-  emptySearchLabel: '没有匹配的设置项。',
-  mobileHomeKicker: '手机设置',
-  mobileHomeTitle: '4 项手机入口',
-  mobileHomeDescription: '只保留总览、API 设置、消耗账单和系统错误日志这 4 个入口。',
-  mobileUsageLabel: '消耗账单',
-  mobileErrorsLabel: '系统错误日志',
-  mobileErrorsDescription: '排查运行异常、错误和警告。',
-  currentEntryKicker: '当前入口',
-  closeSettingsLabel: '关闭设置',
-  backToHomeLabel: '返回手机设置首页',
-  dashboardTitle: '设置工作台',
-  dashboardDescription: '先看状态，再进入具体配置。',
-  dashboardPrimaryAction: '配置 API',
-  dashboardStatusSummary: '当前状态',
-  apiTitle: 'API 与模型路由',
-  apiDescription: '集中管理本地 API、供应商、连通性和预算策略。',
-  apiPrimaryAction: '配置本地 API',
-  apiStatusSummary: '路由状态',
-  billingTitle: '计费与账单',
-  billingDescription: '查看消耗、充值和余额变化，快速定位成本波动。',
-  billingPrimaryAction: '查看 API 管理',
-  billingStatusSummary: '账单状态',
-  storageTitle: '存储与缓存',
-  storageDescription: '管理缓存容量、存储模式和资源清理策略。',
-  storagePrimaryAction: '检查存储模式',
-  storageStatusSummary: '存储状态',
-  logsTitle: '系统日志',
-  logsDescription: '集中查看错误、告警和故障来源，快速进入诊断。',
-  logsPrimaryAction: '返回 API 管理',
-  logsStatusSummary: '日志状态',
-  dashboardLabel: '总览',
-  dashboardNavDescription: '查看核心指标、运行状态和最近活动。',
-  apiLabel: 'API 管理',
-  apiNavDescription: '统一管理本地 API、供应商和预算策略。',
-  billingLabel: '消耗账单',
-  billingNavDescription: '查看积分消耗、充值和账单明细。',
-  storageLabel: '存储中心',
-  storageNavDescription: '管理存储模式、缓存压力和资源清理。',
-  logsLabel: '系统错误日志',
-  logsNavDescription: '排查运行异常、错误和警告。',
-  searchApi: '搜索供应商、端点或分组',
-  searchBilling: '搜索账单、充值记录或汇率',
-  searchStorage: '搜索资源、日志或存储实例',
-  searchLogs: '搜索日志来源、关键词或级别',
-  searchDefault: '搜索接口、日志、账单或供应商',
-} as const;
-
-const en = {
-  workspace: 'Workspace',
-  system: 'System',
-  workbenchTitle: 'Settings',
-  workbenchDescription: 'Manage API, billing, and runtime status.',
-  emptySearchLabel: 'No settings matched the current search.',
-  mobileHomeKicker: 'Mobile Settings',
-  mobileHomeTitle: 'Four Mobile Entries',
-  mobileHomeDescription: 'Only Dashboard, API, Billing, and System Error Logs stay on the phone-first home.',
-  mobileUsageLabel: 'Billing Ledger',
-  mobileErrorsLabel: 'System Error Logs',
-  mobileErrorsDescription: 'Inspect runtime errors, warnings, and troubleshooting details.',
-  currentEntryKicker: 'Current Entry',
-  closeSettingsLabel: 'Close settings',
-  backToHomeLabel: 'Back to mobile settings home',
-  dashboardTitle: 'Settings Workbench',
-  dashboardDescription: 'Check the current state before opening a detailed page.',
-  dashboardPrimaryAction: 'Configure API',
-  dashboardStatusSummary: 'Current status',
-  apiTitle: 'API and Model Routing',
-  apiDescription: 'Manage local APIs, providers, connectivity, and budget rules in one place.',
-  apiPrimaryAction: 'Configure local API',
-  apiStatusSummary: 'Route status',
-  billingTitle: 'Billing and Ledger',
-  billingDescription: 'Review spend, recharges, and balance changes to quickly locate cost movement.',
-  billingPrimaryAction: 'Open API Management',
-  billingStatusSummary: 'Billing status',
-  storageTitle: 'Storage and Cache',
-  storageDescription: 'Manage cache capacity, storage mode, and cleanup rules.',
-  storagePrimaryAction: 'Review storage mode',
-  storageStatusSummary: 'Storage status',
-  logsTitle: 'System Logs',
-  logsDescription: 'Inspect errors, warnings, and failure sources in one place.',
-  logsPrimaryAction: 'Back to API Management',
-  logsStatusSummary: 'Log status',
-  dashboardLabel: 'Dashboard',
-  dashboardNavDescription: 'Check key metrics, runtime health, and recent activity.',
-  apiLabel: 'API Management',
-  apiNavDescription: 'Manage local APIs, providers, and budget rules in one place.',
-  billingLabel: 'Billing Ledger',
-  billingNavDescription: 'Review credit spending, recharges, and billing statements.',
-  storageLabel: 'Storage',
-  storageNavDescription: 'Manage storage targets, cache pressure, and cleanup actions.',
-  logsLabel: 'System Error Logs',
-  logsNavDescription: 'Inspect runtime errors, warnings, and troubleshooting details.',
-  searchApi: 'Search providers, endpoints, or groups',
-  searchBilling: 'Search invoices, recharges, or exchange rates',
-  searchStorage: 'Search assets, logs, or storage targets',
-  searchLogs: 'Search log sources, keywords, or levels',
-  searchDefault: 'Search APIs, logs, bills, or providers',
+const SHELL_COPY = {
+  'zh-CN': {
+    workbenchTitle: '设置',
+    workbenchDescription: '用一个统一的工作台管理 API、计费、日志与存储。',
+    emptySearchLabel: '没有匹配当前搜索的设置项。',
+    mobileHomeKicker: '移动设置',
+    mobileHomeTitle: '四个常用入口',
+    mobileHomeDescription: '手机端只保留总览、API、计费和错误四个主入口。',
+    mobileUsageLabel: '计费',
+    mobileErrorsLabel: '错误',
+    mobileErrorsDescription: '系统错误、告警与排障信号。',
+    currentEntryKicker: '当前入口',
+    closeSettingsLabel: '关闭设置',
+    backToHomeLabel: '返回移动设置首页',
+  },
+  'en-US': {
+    workbenchTitle: 'Settings',
+    workbenchDescription: 'Manage API, billing, logs, and storage from one unified workspace.',
+    emptySearchLabel: 'No settings matched the current search.',
+    mobileHomeKicker: 'Mobile Settings',
+    mobileHomeTitle: 'Four common entries',
+    mobileHomeDescription: 'Phone-first settings keep only Overview, API, Billing, and Errors on the home.',
+    mobileUsageLabel: 'Billing',
+    mobileErrorsLabel: 'Errors',
+    mobileErrorsDescription: 'System errors, warnings, and troubleshooting signals.',
+    currentEntryKicker: 'Current Entry',
+    closeSettingsLabel: 'Close settings',
+    backToHomeLabel: 'Back to mobile settings home',
+  },
 } as const;
 
 export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
@@ -227,138 +156,117 @@ export const SETTINGS_LEGACY_ROUTE_REDIRECTS = LEGACY_SETTINGS_ROUTE_REDIRECTS.m
 export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMetaEntry> = {
   dashboard: {
     eyebrow: 'Overview',
-    title: zh.dashboardTitle,
-    description: zh.dashboardDescription,
-    primaryActionLabelZh: zh.dashboardPrimaryAction,
-    primaryActionLabelEn: en.dashboardPrimaryAction,
+    titleZh: '设置总览',
+    titleEn: 'Settings Overview',
+    descriptionZh: '先看系统状态与入口优先级，再进入具体设置页面。',
+    descriptionEn: 'Review system status and entry priority before opening a detailed settings page.',
+    primaryActionLabelZh: '打开 API 工作台',
+    primaryActionLabelEn: 'Open API Workspace',
     primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: zh.dashboardStatusSummary,
-    statusSummaryLabelEn: en.dashboardStatusSummary,
+    statusSummaryLabelZh: '系统状态',
+    statusSummaryLabelEn: 'System status',
   },
   'api-management': {
-    eyebrow: 'API Routes',
-    title: zh.apiTitle,
-    description: zh.apiDescription,
-    primaryActionLabelZh: zh.apiPrimaryAction,
-    primaryActionLabelEn: en.apiPrimaryAction,
+    eyebrow: 'API Workspace',
+    titleZh: 'API 工作台',
+    titleEn: 'API Workspace',
+    descriptionZh: '集中管理本地 API、供应商、连通性与预算规则。',
+    descriptionEn: 'Manage local APIs, providers, connectivity, and budget rules in one place.',
+    primaryActionLabelZh: '配置本地 API',
+    primaryActionLabelEn: 'Configure local API',
     primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: zh.apiStatusSummary,
-    statusSummaryLabelEn: en.apiStatusSummary,
+    statusSummaryLabelZh: '路由状态',
+    statusSummaryLabelEn: 'Route status',
   },
   'consumption-records': {
     eyebrow: 'Billing',
-    title: zh.billingTitle,
-    description: zh.billingDescription,
-    primaryActionLabelZh: zh.billingPrimaryAction,
-    primaryActionLabelEn: en.billingPrimaryAction,
+    titleZh: '计费账本',
+    titleEn: 'Billing',
+    descriptionZh: '查看充值、消耗与账本活动，快速定位成本变化。',
+    descriptionEn: 'Review recharges, spend, and ledger activity to spot cost changes quickly.',
+    primaryActionLabelZh: '查看 API 工作台',
+    primaryActionLabelEn: 'Open API Workspace',
     primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: zh.billingStatusSummary,
-    statusSummaryLabelEn: en.billingStatusSummary,
+    statusSummaryLabelZh: '账本状态',
+    statusSummaryLabelEn: 'Ledger status',
   },
   'storage-settings': {
     eyebrow: 'Storage',
-    title: zh.storageTitle,
-    description: zh.storageDescription,
-    primaryActionLabelZh: zh.storagePrimaryAction,
-    primaryActionLabelEn: en.storagePrimaryAction,
+    titleZh: '存储维护',
+    titleEn: 'Storage',
+    descriptionZh: '管理持久化模式、缓存压力与项目修复动作。',
+    descriptionEn: 'Manage persistence modes, cache pressure, and workspace repair actions.',
+    primaryActionLabelZh: '查看存储模式',
+    primaryActionLabelEn: 'Review storage mode',
     primaryActionTarget: 'storage-settings',
-    statusSummaryLabelZh: zh.storageStatusSummary,
-    statusSummaryLabelEn: en.storageStatusSummary,
+    statusSummaryLabelZh: '存储状态',
+    statusSummaryLabelEn: 'Storage status',
   },
   'system-logs': {
     eyebrow: 'Logs',
-    title: zh.logsTitle,
-    description: zh.logsDescription,
-    primaryActionLabelZh: zh.logsPrimaryAction,
-    primaryActionLabelEn: en.logsPrimaryAction,
+    titleZh: '日志',
+    titleEn: 'Logs',
+    descriptionZh: '集中查看错误、告警和诊断信号，优先处理最重要的问题。',
+    descriptionEn: 'Inspect errors, warnings, and diagnostic signals with the highest-priority issues first.',
+    primaryActionLabelZh: '返回 API 工作台',
+    primaryActionLabelEn: 'Back to API Workspace',
     primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: zh.logsStatusSummary,
-    statusSummaryLabelEn: en.logsStatusSummary,
+    statusSummaryLabelZh: '日志状态',
+    statusSummaryLabelEn: 'Log status',
   },
 };
-
-export const SETTINGS_SHELL_COPY = {
-  zh: {
-    workbenchTitle: zh.workbenchTitle,
-    workbenchDescription: zh.workbenchDescription,
-    emptySearchLabel: zh.emptySearchLabel,
-    mobileHomeKicker: zh.mobileHomeKicker,
-    mobileHomeTitle: zh.mobileHomeTitle,
-    mobileHomeDescription: zh.mobileHomeDescription,
-    mobileUsageLabel: zh.mobileUsageLabel,
-    mobileErrorsLabel: zh.mobileErrorsLabel,
-    mobileErrorsDescription: zh.mobileErrorsDescription,
-    currentEntryKicker: zh.currentEntryKicker,
-    closeSettingsLabel: zh.closeSettingsLabel,
-    backToHomeLabel: zh.backToHomeLabel,
-  },
-  en: {
-    workbenchTitle: en.workbenchTitle,
-    workbenchDescription: en.workbenchDescription,
-    emptySearchLabel: en.emptySearchLabel,
-    mobileHomeKicker: en.mobileHomeKicker,
-    mobileHomeTitle: en.mobileHomeTitle,
-    mobileHomeDescription: en.mobileHomeDescription,
-    mobileUsageLabel: en.mobileUsageLabel,
-    mobileErrorsLabel: en.mobileErrorsLabel,
-    mobileErrorsDescription: en.mobileErrorsDescription,
-    currentEntryKicker: en.currentEntryKicker,
-    closeSettingsLabel: en.closeSettingsLabel,
-    backToHomeLabel: en.backToHomeLabel,
-  },
-} as const;
 
 export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   {
     id: 'dashboard',
     labelZh: '总览',
-    labelEn: 'Dashboard',
-    descriptionZh: '查看核心指标、运行状态和最近活动。',
-    descriptionEn: 'Check key metrics, runtime health, and recent activity.',
+    labelEn: 'Overview',
+    descriptionZh: '查看系统状态、主入口与最近活动。',
+    descriptionEn: 'Review system status, primary entry points, and recent activity.',
     icon: LayoutDashboard,
     section: 'workspace',
     path: SETTINGS_PATHS.dashboard,
   },
   {
     id: 'api-management',
-    labelZh: 'API 管理',
-    labelEn: 'API Management',
-    descriptionZh: '统一管理官方接口、供应商和预算策略。',
-    descriptionEn: 'Manage official endpoints, providers, and budget rules in one place.',
+    labelZh: 'API 工作台',
+    labelEn: 'API Workspace',
+    descriptionZh: '管理本地 API、供应商、预算规则与连通性。',
+    descriptionEn: 'Manage local APIs, providers, budget rules, and connectivity.',
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
   },
   {
     id: 'consumption-records',
-    labelZh: '消耗账单',
-    labelEn: 'Billing Ledger',
-    descriptionZh: '查看积分消耗、充值和账单明细。',
-    descriptionEn: 'Review credit spending, recharges, and billing statements.',
+    labelZh: '计费账本',
+    labelEn: 'Billing',
+    descriptionZh: '查看充值、消耗与账本活动。',
+    descriptionEn: 'Review recharges, spend, and ledger activity.',
     icon: Coins,
     section: 'workspace',
     path: SETTINGS_PATHS['consumption-records'],
     featureFlag: 'billing',
   },
   {
-    id: 'storage-settings',
-    labelZh: '存储中心',
-    labelEn: 'Storage',
-    descriptionZh: '管理存储模式、缓存压力和资源清理。',
-    descriptionEn: 'Manage storage targets, cache pressure, and cleanup actions.',
-    icon: HardDrive,
-    section: 'system',
-    path: SETTINGS_PATHS['storage-settings'],
-  },
-  {
     id: 'system-logs',
-    labelZh: '系统错误日志',
-    labelEn: 'System Error Logs',
-    descriptionZh: '排查运行异常、错误和警告。',
-    descriptionEn: 'Inspect runtime errors, warnings, and troubleshooting details.',
+    labelZh: '日志',
+    labelEn: 'Logs',
+    descriptionZh: '优先排查错误、告警与诊断信号。',
+    descriptionEn: 'Inspect errors, warnings, and troubleshooting signals first.',
     icon: ScrollText,
     section: 'system',
     path: SETTINGS_PATHS['system-logs'],
+  },
+  {
+    id: 'storage-settings',
+    labelZh: '存储',
+    labelEn: 'Storage',
+    descriptionZh: '管理持久化模式、缓存压力与清理动作。',
+    descriptionEn: 'Manage persistence modes, cache pressure, and cleanup actions.',
+    icon: HardDrive,
+    section: 'system',
+    path: SETTINGS_PATHS['storage-settings'],
   },
 ];
 
@@ -405,8 +313,14 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
 
 export function getSettingsNavSections(language: AppLanguage): SettingsNavSection[] {
   return [
-    { id: 'workspace', label: pickByLanguage(language, zh.workspace, en.workspace) },
-    { id: 'system', label: pickByLanguage(language, zh.system, en.system) },
+    {
+      id: 'workspace',
+      label: pickByLanguage(language, '主工作区', 'Primary workspace'),
+    },
+    {
+      id: 'system',
+      label: pickByLanguage(language, '系统维护', 'System maintenance'),
+    },
   ];
 }
 
@@ -430,8 +344,8 @@ export function getSettingsViewMeta(
   const meta = SETTINGS_VIEW_META[view];
   return {
     eyebrow: meta.eyebrow,
-    title: pickByLanguage(language, meta.title, SETTINGS_VIEW_META[view].title),
-    description: pickByLanguage(language, meta.description, SETTINGS_VIEW_META[view].description),
+    title: pickByLanguage(language, meta.titleZh, meta.titleEn),
+    description: pickByLanguage(language, meta.descriptionZh, meta.descriptionEn),
     primaryActionLabel: pickByLanguage(language, meta.primaryActionLabelZh, meta.primaryActionLabelEn),
     primaryActionTarget: meta.primaryActionTarget,
     statusSummaryLabel: pickByLanguage(language, meta.statusSummaryLabelZh, meta.statusSummaryLabelEn),
@@ -459,18 +373,27 @@ export function getSettingsStatusSummaryLabel(
 export function getSettingsShellCopy(
   language: AppLanguage = 'zh-CN',
 ): SettingsShellCopy {
-  return language === 'zh-CN' ? SETTINGS_SHELL_COPY.zh : SETTINGS_SHELL_COPY.en;
+  return language === 'zh-CN' ? SHELL_COPY['zh-CN'] : SHELL_COPY['en-US'];
 }
 
 export function getSettingsSearchPlaceholder(
   view: CanonicalSettingsViewId,
   language: AppLanguage,
 ): string {
-  if (view === 'api-management') return pickByLanguage(language, zh.searchApi, en.searchApi);
-  if (view === 'consumption-records') return pickByLanguage(language, zh.searchBilling, en.searchBilling);
-  if (view === 'storage-settings') return pickByLanguage(language, zh.searchStorage, en.searchStorage);
-  if (view === 'system-logs') return pickByLanguage(language, zh.searchLogs, en.searchLogs);
-  return pickByLanguage(language, zh.searchDefault, en.searchDefault);
+  if (view === 'api-management') {
+    return pickByLanguage(language, '搜索路由、供应商或平台入口', 'Search routes, providers, or platform entry');
+  }
+  if (view === 'consumption-records') {
+    return pickByLanguage(language, '搜索充值、账单或消耗记录', 'Search recharges, ledger rows, or spend');
+  }
+  if (view === 'storage-settings') {
+    return pickByLanguage(language, '搜索存储模式、缓存或清理动作', 'Search storage modes, cache, or cleanup actions');
+  }
+  if (view === 'system-logs') {
+    return pickByLanguage(language, '搜索日志来源、级别或关键字', 'Search log sources, levels, or keywords');
+  }
+
+  return pickByLanguage(language, '搜索设置、日志或账本入口', 'Search settings, logs, or billing entries');
 }
 
 export function getSettingsNavItemByPath(

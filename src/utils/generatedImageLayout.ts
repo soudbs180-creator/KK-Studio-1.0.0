@@ -458,7 +458,7 @@ export const buildDockedPromptChildRegroupLayout = ({
     const metrics = items.map(resolveGeneratedImageCardMetrics);
     const defaultColumns = mode === GENERATION_MODE_PPT || isMobile
         ? 1
-        : items.length;
+        : Math.min(items.length, 2);
     const resolvedColumns = Math.min(items.length, Math.max(1, columns ?? defaultColumns));
     const resolvedFastProgress = clampUnitProgress(
         fastRegroupProgress,

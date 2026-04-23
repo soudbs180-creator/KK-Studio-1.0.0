@@ -1,5 +1,12 @@
 import React, { useMemo, useRef } from 'react';
-import { AspectRatio, EcommerceGroupSheet, ImageSize } from '../../types';
+import {
+  AspectRatio,
+  EcommerceAPlusControlMode,
+  EcommerceGroupSheet,
+  EcommerceSheetSetting,
+  EcommerceSheetSettingPatch,
+  ImageSize,
+} from '../../types';
 import { Fullscreen } from 'lucide-react';
 
 interface ImageOptionsPanelProps {
@@ -18,11 +25,18 @@ interface ImageOptionsPanelProps {
   onImageSizeChange: (size: ImageSize) => void;
   availableRatios?: AspectRatio[];
   availableSizes?: ImageSize[];
-  ecommerceSheetSettings?: Record<EcommerceGroupSheet, { aspectRatio: AspectRatio; imageSize: ImageSize }>;
-  onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: { aspectRatio?: AspectRatio; imageSize?: ImageSize }) => void;
+  ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
+  onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch) => void;
   activeEcommerceSheet?: EcommerceGroupSheet;
   onActiveEcommerceSheetChange?: (sheet: EcommerceGroupSheet) => void;
 }
+
+const aPlusControlModeLabels: Record<EcommerceAPlusControlMode, string> = {
+  auto: '自动',
+  '1464x600': '1464x600',
+  '970x600': '970x600',
+  '600x450': '600x450',
+};
 
 const SECTION_STYLE: React.CSSProperties = {
   background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 92%, transparent) 0%, color-mix(in srgb, var(--bg-secondary) 88%, transparent) 100%)',
@@ -322,14 +336,17 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   const ratioLayout = useMemo(() => resolveRatioLayout(availableRatios), [availableRatios]);
   const isEcommercePanel = !!ecommerceSheetSettings && !!onUpdateEcommerceSheetSetting;
   const resolvedEcommerceSheet: EcommerceGroupSheet = activeEcommerceSheet ?? '主图';
+  const isAPlusControlSheet = isEcommercePanel && resolvedEcommerceSheet === 'A+';
   const activeEcommerceSheetSettings = isEcommercePanel
     ? ecommerceSheetSettings[resolvedEcommerceSheet] ?? {
       aspectRatio,
       imageSize,
+      aPlusControlMode: 'auto',
     }
     : {
       aspectRatio,
       imageSize,
+      aPlusControlMode: 'auto',
     };
   const shouldShowThinkingMode = !isEcommercePanel && showThinkingMode;
 
@@ -436,16 +453,42 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
             </section>
           ) : null}
 
-          <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
-            <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-              {resolvedEcommerceSheet} 比例
-            </div>
-            <AspectRatioControlGrid
-              selectedAspectRatio={activeEcommerceSheetSettings.aspectRatio}
-              layout={ratioLayout}
-              onChange={(ratio) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, { aspectRatio: ratio })}
-            />
-          </section>
+          {!isAPlusControlSheet && ratioLayout.uniqueRatios.length > 0 ? (
+            <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+              <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+                主图比例
+              </div>
+              <AspectRatioControlGrid
+                selectedAspectRatio={activeEcommerceSheetSettings.aspectRatio}
+                layout={ratioLayout}
+                onChange={(ratio) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, { aspectRatio: ratio })}
+              />
+            </section>
+          ) : null}
+
+          {isAPlusControlSheet ? (
+            <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+              <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
+                A+ 尺寸档位
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['auto', '1464x600', '970x600', '600x450'] as EcommerceAPlusControlMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onUpdateEcommerceSheetSetting('A+', { aPlusControlMode: mode })}
+                    className="rounded-xl border px-3 py-2 text-sm transition-colors"
+                    style={activeEcommerceSheetSettings.aPlusControlMode === mode ? ACTIVE_BUTTON_STYLE : INACTIVE_BUTTON_STYLE}
+                  >
+                    {aPlusControlModeLabels[mode]}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
+                A+ 生成比例由尺寸档位和提示词控制。自动模式会优先读取需求表中的 1464x600、970x600、600x450；识别不到时默认按 970x600 处理。
+              </div>
+            </section>
+          ) : null}
         </>
       ) : (
         <>

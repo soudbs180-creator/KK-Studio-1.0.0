@@ -438,6 +438,96 @@ async function buildFloatingBetweenRowsWorkbook(): Promise<ArrayBuffer> {
   return zip.generateAsync({ type: 'arraybuffer' });
 }
 
+async function buildFloatingSpacerRowsWorkbook(): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="主图" sheetId="1" r:id="rId1" />
+  </sheets>
+</workbook>`,
+  );
+
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships>
+  <Relationship Id="rId1" Target="worksheets/sheet1.xml" />
+</Relationships>`,
+  );
+
+  zip.file(
+    'xl/worksheets/sheet1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetData>
+    <row r="2"><c r="A2" t="inlineStr"><is><t>需求名称</t></is></c><c r="D2" t="inlineStr"><is><t>隔行浮动主图需求</t></is></c></row>
+    <row r="3"><c r="A3" t="inlineStr"><is><t>产品名称</t></is></c><c r="D3" t="inlineStr"><is><t>空气炸锅</t></is></c></row>
+    <row r="10">
+      <c r="A10" t="inlineStr"><is><t>类型</t></is></c>
+      <c r="B10" t="inlineStr"><is><t>角度</t></is></c>
+      <c r="C10" t="inlineStr"><is><t>卖点</t></is></c>
+      <c r="D10" t="inlineStr"><is><t>设计要求</t></is></c>
+      <c r="E10" t="inlineStr"><is><t>文案</t></is></c>
+    </row>
+    <row r="11">
+      <c r="A11" t="inlineStr"><is><t>蒸烤一体主图</t></is></c>
+      <c r="B11" t="inlineStr"><is><t>正面</t></is></c>
+      <c r="C11" t="inlineStr"><is><t>大容量</t></is></c>
+      <c r="D11" t="inlineStr"><is><t>参考图突出机身正面与厨房场景。</t></is></c>
+      <c r="E11" t="inlineStr"><is><t>Large Capacity</t></is></c>
+    </row>
+    <row r="15">
+      <c r="A15" t="inlineStr"><is><t>配件细节图</t></is></c>
+      <c r="B15" t="inlineStr"><is><t>俯视</t></is></c>
+      <c r="C15" t="inlineStr"><is><t>炸篮结构</t></is></c>
+      <c r="D15" t="inlineStr"><is><t>突出炸篮细节和拆洗方式。</t></is></c>
+      <c r="E15" t="inlineStr"><is><t>Easy Clean Basket</t></is></c>
+    </row>
+  </sheetData>
+  <drawing r:id="rId9" />
+</worksheet>`,
+  );
+
+  zip.file(
+    'xl/worksheets/_rels/sheet1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId9" Target="../drawings/drawing1.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" />
+</Relationships>`,
+  );
+
+  zip.file(
+    'xl/drawings/drawing1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>7</xdr:col><xdr:row>13</xdr:row></xdr:from>
+    <xdr:to><xdr:col>10</xdr:col><xdr:row>19</xdr:row></xdr:to>
+    <xdr:pic>
+      <xdr:nvPicPr><xdr:cNvPr id="1" name="Spacer Rows" /></xdr:nvPicPr>
+      <xdr:blipFill><a:blip r:embed="rId1" /></xdr:blipFill>
+    </xdr:pic>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>`,
+  );
+
+  zip.file(
+    'xl/drawings/_rels/drawing1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Target="../media/spacer-rows.png" />
+</Relationships>`,
+  );
+
+  zip.file('xl/media/spacer-rows.png', TINY_PNG_BASE64, { base64: true });
+
+  return zip.generateAsync({ type: 'arraybuffer' });
+}
+
 describe('ecommerce xlsx parser', () => {
   test('maps WPS cellimages by DISPIMG id instead of media order', async () => {
     const workbook = await buildCellImageWorkbook();
@@ -526,6 +616,19 @@ describe('ecommerce xlsx parser', () => {
 
     assert.equal(analysis.mainImageItems.length, 2);
     assert.equal(parsed.mediaAssets[0].anchorCellRef, 'H12');
+    assert.deepEqual(
+      analysis.mainImageItems.map((item) => item.referenceAssetIds.length),
+      [1, 0],
+    );
+  });
+
+  test('keeps floating references on the preceding populated row even when blank spacer rows make the next row numerically closer', async () => {
+    const workbook = await buildFloatingSpacerRowsWorkbook();
+    const parsed = await parseOpenXmlWorkbook(workbook, 'floating-spacer-rows.xlsx');
+    const analysis = normalizeEcommerceAnalysis(parsed, 'gemini-3.1-flash-image-preview');
+
+    assert.equal(analysis.mainImageItems.length, 2);
+    assert.equal(parsed.mediaAssets[0].anchorCellRef, 'H14');
     assert.deepEqual(
       analysis.mainImageItems.map((item) => item.referenceAssetIds.length),
       [1, 0],

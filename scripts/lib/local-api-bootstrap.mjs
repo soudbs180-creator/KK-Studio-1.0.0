@@ -170,6 +170,11 @@ export async function startLocalApiServer(options = {}) {
   const port = options.port ?? Number(process.env.PORT || 3001);
   const skipConfigCheck = options.skipConfigCheck === true;
 
+  // The local-only bootstrap still needs the canonical env search order so
+  // local auth and encrypted profile storage keep working without the full
+  // server-side Supabase persistence path.
+  applyPrimaryEnvToProcess(repoRoot);
+
   if (!skipConfigCheck) {
     await assertLocalApiConfig({ repoRoot });
   }

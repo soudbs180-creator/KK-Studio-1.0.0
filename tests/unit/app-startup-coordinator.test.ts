@@ -59,7 +59,11 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(authenticatedShellSource, /const CostEstimation = lazy\(\(\) => import\('\.\.\/pages\/CostEstimation'\)\);/);
   assert.match(authenticatedShellSource, /export interface AuthenticatedAppShellProps \{/);
   assert.match(authenticatedShellSource, /AppContentComponent: React\.ComponentType;/);
-  assert.match(authenticatedShellSource, /function getStartupStageMessage\(stage: string, isWorkspaceReady: boolean\)/);
+  assert.match(authenticatedShellSource, /function getStartupStageMessage\(stage: string, isWorkspaceReady: boolean, healthState: 'idle' \| 'checking' \| 'ready'\)/);
+  assert.match(
+    authenticatedShellSource,
+    /case 'profile_ready':\s*return isWorkspaceReady \|\| healthState !== 'checking'\s*\?\s*null\s*:\s*pickByDocumentLanguage\(/,
+  );
   assert.match(
     authenticatedShellSource,
     /case 'workspace_ready':\s*return pickByDocumentLanguage\([\s\S]*'Workspace is ready\. Finishing background warm-up\.\.\.'\);/,
@@ -69,7 +73,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
     /if \(isWorkspaceReady\) \{\s*return null;\s*\}/,
   );
   assert.match(authenticatedShellSource, /export const StartupRuntimeBanner: React\.FC = \(\) => \{/);
-  assert.match(authenticatedShellSource, /const stageMessage = getStartupStageMessage\(stage, isWorkspaceReady\);/);
+  assert.match(authenticatedShellSource, /const stageMessage = getStartupStageMessage\(stage, isWorkspaceReady, healthState\);/);
   assert.match(authenticatedShellSource, /const message = hostedWarning \|\| lastStartupWarning \|\| stageMessage;/);
   assert.match(
     authenticatedShellSource,

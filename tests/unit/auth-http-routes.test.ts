@@ -254,4 +254,40 @@ describe("auth http routes", () => {
     assert.equal(result.statusCode, 400);
     assert.equal(result.body.success, false);
   });
+
+  test("allows local-only register requests without turnstileToken when local bypass is enabled", async () => {
+    const previousLocalOnly = process.env.KKAI_LOCAL_ONLY;
+    const previousTurnstileBypass = process.env.VITE_TURNSTILE_LOCAL_BYPASS;
+    process.env.KKAI_LOCAL_ONLY = "true";
+    process.env.VITE_TURNSTILE_LOCAL_BYPASS = "true";
+
+    try {
+      const authService = new AuthService({
+        verifyTurnstileToken: async () => ({ success: true }),
+        identityStore: new InMemoryAuthIdentityStore(),
+      });
+
+      const result = await handleVersionedRegister(authService, {
+        email: "register-local-bypass@example.com",
+        password: "password-123",
+      }, {
+        "x-request-id": "req-register-local-bypass",
+      }, "127.0.0.1");
+
+      assert.equal(result.statusCode, 201);
+      assert.equal(result.body.success, true);
+    } finally {
+      if (typeof previousLocalOnly === "string") {
+        process.env.KKAI_LOCAL_ONLY = previousLocalOnly;
+      } else {
+        delete process.env.KKAI_LOCAL_ONLY;
+      }
+
+      if (typeof previousTurnstileBypass === "string") {
+        process.env.VITE_TURNSTILE_LOCAL_BYPASS = previousTurnstileBypass;
+      } else {
+        delete process.env.VITE_TURNSTILE_LOCAL_BYPASS;
+      }
+    }
+  });
 });

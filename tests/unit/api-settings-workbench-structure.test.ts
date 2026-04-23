@@ -15,6 +15,13 @@ test('ApiSettingsView list mode exposes a dedicated workspace snapshot section',
   assert.match(source, /Workspace snapshot/);
 });
 
+test('ApiSettingsView keeps the list-mode hero framed as an API Workspace instead of the old generic console label', () => {
+  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+
+  assert.match(source, /API Workspace/);
+  assert.doesNotMatch(source, /API workspace/);
+});
+
 test('ApiSettingsView keeps platform capabilities as a dedicated section instead of mixing them into provider list content', () => {
   const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
@@ -26,10 +33,12 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   const stageSource = readSource('src/components/settings/apiWorkbenchState.ts');
   const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
   const cardsSource = readSource('src/components/settings/apiWorkbenchCards.tsx');
+  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
 
   assert.match(viewSource, /from '\.\/apiWorkbenchState';/);
   assert.match(viewSource, /from '\.\/apiWorkbenchSections';/);
   assert.match(viewSource, /from '\.\/apiWorkbenchCards';/);
+  assert.match(scaffoldSource, /surface\?: 'card' \| 'plain';/);
 
   assert.match(stageSource, /export type ApiSettingsWorkbenchStage = UserApiWorkbenchStage;/);
   assert.match(stageSource, /export function resolveApiWorkbenchDiagnosticsAvailability/);
@@ -43,6 +52,12 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(sectionsSource, /Current view/);
   assert.match(sectionsSource, /Status and next step/);
   assert.match(sectionsSource, /Diagnostics view/);
+  assert.match(sectionsSource, /surface="plain"/);
+  assert.match(sectionsSource, /testId="settings-workbench-diagnostics"[\s\S]*surface="plain"/);
+  assert.match(sectionsSource, /className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"/);
+  assert.match(sectionsSource, /className="min-w-0 flex-1 space-y-2 text-left"/);
+  assert.doesNotMatch(sectionsSource, /label=\{pick\('当前阶段', 'Stage'\)/);
+  assert.doesNotMatch(sectionsSource, /testId="settings-workbench-current-view"[\s\S]*rounded-\[24px\] border p-4/);
   assert.match(cardsSource, /export const ConsoleEndpointCard/);
 
   assert.doesNotMatch(viewSource, /const InfoCell:/);
@@ -66,4 +81,12 @@ test('ApiSettingsView surfaces local APIs as the primary BYOK path and avoids du
 
   assert.equal(createOfficialButtonUsages.length, 1, 'Expected only the empty state to keep a direct local API create button');
   assert.equal(createProviderButtonUsages.length, 1, 'Expected only the empty state to keep a direct provider create button');
+});
+
+test('ApiSettingsView keeps diagnostics and section actions owned by shared modules instead of hidden duplicate controls', () => {
+  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+
+  assert.doesNotMatch(viewSource, /data-testid="api-workbench-diagnostics-toggle"/);
+  assert.doesNotMatch(viewSource, /className="hidden"[^\\n]*beginCreateOfficial/);
+  assert.doesNotMatch(viewSource, /className="hidden"[^\\n]*beginCreateProvider/);
 });

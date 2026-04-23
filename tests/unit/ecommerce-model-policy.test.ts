@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import {
+  classifyEcommerceAPlusSizeTier,
   getEcommerceAllowedModels,
   isEcommerceAllowedModel,
   normalizeEcommerceModelId,
+  resolveEcommercePromptBarAspectContext,
+  resolveEffectiveEcommerceAPlusPolicy,
   resolveEcommerceAspectPolicy,
 } from '../../src/services/ecommerce/ecommerceModelPolicy.ts';
 
@@ -32,9 +35,18 @@ describe('ecommerce model policy', () => {
     });
 
     assert.equal(policy.sizePolicy, 'main-default');
+    assert.equal(policy.sizeTier, undefined);
     assert.equal(policy.defaultAspectRatio, '1:1');
     assert.deepEqual(policy.allowedAspectRatios, ['1:1', '3:4']);
     assert.equal(policy.mobileAspectRatio, undefined);
+  });
+
+  test('classifies declared A+ business size tiers before ratio inference', () => {
+    assert.equal(classifyEcommerceAPlusSizeTier('1464*600'), '1464x600');
+    assert.equal(classifyEcommerceAPlusSizeTier('1460×600'), '1464x600');
+    assert.equal(classifyEcommerceAPlusSizeTier('970 x 600'), '970x600');
+    assert.equal(classifyEcommerceAPlusSizeTier('600*450'), '600x450');
+    assert.equal(classifyEcommerceAPlusSizeTier('1200*628'), 'unknown');
   });
 
   test('treats explicit sheet dimensions like 970*600 as single-stage A+ requirements', () => {
@@ -42,26 +54,170 @@ describe('ecommerce model policy', () => {
       kind: 'a-plus-module',
       modelId: 'gemini-3-pro-image-preview',
       declaredDimensions: '970*600',
-      designRequirements: '冰川背景，参考图1排版',
+      designRequirements: 'single-stage desktop-only aplus module',
     });
 
     assert.equal(policy.sizePolicy, 'sheet-native');
+    assert.equal(policy.sizeTier, '970x600');
     assert.equal(policy.defaultAspectRatio, '16:9');
     assert.deepEqual(policy.allowedAspectRatios, ['16:9']);
     assert.equal(policy.mobileAspectRatio, undefined);
   });
 
-  test('detects desktop/mobile staged A+ requirements from bilingual hints', () => {
+  test('treats 1464*600 and 1460*600 as the same staged A+ desktop-to-mobile requirement', () => {
     const policy = resolveEcommerceAspectPolicy({
       kind: 'a-plus-module',
       modelId: 'gemini-3.1-flash-image-preview',
-      designRequirements: '先生成电脑端横幅，确认后再出手机端版本',
+      declaredDimensions: '1460*600',
+      designRequirements: 'desktop hero banner first',
+    });
+
+    assert.equal(policy.sizePolicy, 'desktop-then-mobile');
+    assert.equal(policy.sizeTier, '1464x600');
+    assert.equal(policy.defaultAspectRatio, '21:9');
+    assert.deepEqual(policy.allowedAspectRatios, ['21:9']);
+    assert.equal(policy.mobileAspectRatio, '4:3');
+  });
+
+  test('treats direct 600*450 requirements as a single-stage compact delivery with a 4:3 target', () => {
+    const policy = resolveEcommerceAspectPolicy({
+      kind: 'a-plus-module',
+      modelId: 'gemini-3.1-flash-image-preview',
+      declaredDimensions: '600*450',
+      designRequirements: 'final mobile deliverable 600 by 450',
+    });
+
+    assert.equal(policy.sizePolicy, 'sheet-native');
+    assert.equal(policy.sizeTier, '600x450');
+    assert.equal(policy.defaultAspectRatio, '4:3');
+    assert.deepEqual(policy.allowedAspectRatios, ['4:3']);
+    assert.equal(policy.mobileAspectRatio, undefined);
+  });
+
+  test('detects desktop/mobile staged A+ requirements from bilingual hints when no business size exists', () => {
+    const policy = resolveEcommerceAspectPolicy({
+      kind: 'a-plus-module',
+      modelId: 'gemini-3.1-flash-image-preview',
+      designRequirements: 'desktop banner first and then mobile crop',
       copyText: 'desktop hero first, then mobile crop',
     });
 
     assert.equal(policy.sizePolicy, 'desktop-then-mobile');
+    assert.equal(policy.sizeTier, 'unknown');
     assert.equal(policy.defaultAspectRatio, '21:9');
     assert.deepEqual(policy.allowedAspectRatios, ['21:9']);
     assert.equal(policy.mobileAspectRatio, '4:3');
+  });
+
+  test('uses auto A+ control mode to prefer detected business tiers and fallback to 970x600 when unknown', () => {
+    assert.deepEqual(
+      resolveEffectiveEcommerceAPlusPolicy({
+        detectedSizeTier: '1464x600',
+        controlMode: 'auto',
+      }),
+      {
+        detectedSizeTier: '1464x600',
+        effectiveSizeTier: '1464x600',
+        effectiveSizePolicy: 'desktop-then-mobile',
+        allowedAspectRatios: ['21:9'],
+        defaultAspectRatio: '21:9',
+        runtimeAspectRatio: '21:9',
+        mobileAspectRatio: '4:3',
+      },
+    );
+
+    assert.deepEqual(
+      resolveEffectiveEcommerceAPlusPolicy({
+        detectedSizeTier: 'unknown',
+        controlMode: 'auto',
+      }),
+      {
+        detectedSizeTier: 'unknown',
+        effectiveSizeTier: '970x600',
+        effectiveSizePolicy: 'sheet-native',
+        allowedAspectRatios: ['16:9'],
+        defaultAspectRatio: '16:9',
+        runtimeAspectRatio: '16:9',
+        mobileAspectRatio: undefined,
+      },
+    );
+  });
+
+  test('lets the global A+ control mode override the detected tier without changing main-image constraints', () => {
+    const policy = resolveEffectiveEcommerceAPlusPolicy({
+      detectedSizeTier: '1464x600',
+      controlMode: '600x450',
+    });
+
+    assert.equal(policy.detectedSizeTier, '1464x600');
+    assert.equal(policy.effectiveSizeTier, '600x450');
+    assert.equal(policy.effectiveSizePolicy, 'sheet-native');
+    assert.equal(policy.runtimeAspectRatio, '4:3');
+    assert.deepEqual(policy.allowedAspectRatios, ['4:3']);
+    assert.equal(policy.mobileAspectRatio, undefined);
+  });
+
+  test('resolves prompt bar aspect context to the main-image policy when no ecommerce sheet is active', () => {
+    assert.deepEqual(
+      resolveEcommercePromptBarAspectContext({}),
+      {
+        activeSheet: 'ä¸»å›¾',
+        allowedAspectRatios: ['1:1', '3:4'],
+        defaultAspectRatio: '1:1',
+      },
+    );
+  });
+
+  test('resolves prompt bar aspect context to the active A+ sheet settings when no task override exists', () => {
+    assert.deepEqual(
+      resolveEcommercePromptBarAspectContext({
+        activeSheet: 'A+',
+        sheetSettings: {
+          'A+': {
+            aspectRatio: '16:9',
+            imageSize: '4K',
+            aPlusControlMode: '970x600',
+          },
+        },
+      }),
+      {
+        activeSheet: 'A+',
+        allowedAspectRatios: ['16:9'],
+        defaultAspectRatio: '16:9',
+      },
+    );
+  });
+
+  test('resolves prompt bar aspect context to the active A+ task override before applying generic ecommerce guards', () => {
+    assert.deepEqual(
+      resolveEcommercePromptBarAspectContext({
+        activeTask: {
+          sourceSheet: 'A+',
+          sizeTier: '1464x600',
+          sizeControlOverride: '600x450',
+        },
+      }),
+      {
+        activeSheet: 'A+',
+        allowedAspectRatios: ['4:3'],
+        defaultAspectRatio: '4:3',
+      },
+    );
+
+    assert.deepEqual(
+      resolveEcommercePromptBarAspectContext({
+        activeTask: {
+          sourceSheet: 'A+',
+          sizeTier: '1464x600',
+          sizeControlOverride: null,
+        },
+        ratioOverride: ['21:9'],
+      }),
+      {
+        activeSheet: 'A+',
+        allowedAspectRatios: ['21:9'],
+        defaultAspectRatio: '21:9',
+      },
+    );
   });
 });

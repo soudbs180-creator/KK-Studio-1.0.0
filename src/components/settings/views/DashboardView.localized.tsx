@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -43,15 +43,20 @@ interface DashboardViewProps {
   onNavigate: (view: string) => void;
 }
 
+type DashboardIdleWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 const isSameLocalDay = (value?: string | null) => {
   if (!value) return false;
   const target = new Date(value);
   if (Number.isNaN(target.getTime())) return false;
   const today = new Date();
   return (
-    target.getFullYear() === today.getFullYear() &&
-    target.getMonth() === today.getMonth() &&
-    target.getDate() === today.getDate()
+    target.getFullYear() === today.getFullYear()
+    && target.getMonth() === today.getMonth()
+    && target.getDate() === today.getDate()
   );
 };
 
@@ -76,8 +81,7 @@ const DashboardActivityRow: React.FC<{
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
         style={{
           border: '1px solid var(--settings-border-subtle)',
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-surface-overlay)',
+          background: 'var(--settings-surface-overlay)',
           color: 'var(--text-primary)',
         }}
       >
@@ -159,7 +163,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [storageMode, setStorageMode] = useState<StorageMode | null>(null);
   const [storageUsageMb, setStorageUsageMb] = useState(0);
   const [storedImages, setStoredImages] = useState(0);
+  const [storageSnapshotPending, setStorageSnapshotPending] = useState(true);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
+  const storageSnapshotTimerRef = useRef<number | null>(null);
+  const storageSnapshotIdleRef = useRef<number | null>(null);
 
   useEffect(() => {
     void fetchLogs();
@@ -197,15 +204,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     return pick('未设置', 'Unassigned');
   };
 
-  const refreshDashboard = async () => {
+  const cancelScheduledStorageSnapshotRefresh = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const idleWindow = window as DashboardIdleWindow;
+
+    if (storageSnapshotTimerRef.current !== null) {
+      window.clearTimeout(storageSnapshotTimerRef.current);
+      storageSnapshotTimerRef.current = null;
+    }
+
+    if (storageSnapshotIdleRef.current !== null && typeof idleWindow.cancelIdleCallback === 'function') {
+      idleWindow.cancelIdleCallback(storageSnapshotIdleRef.current);
+      storageSnapshotIdleRef.current = null;
+    }
+  }, []);
+
+  const refreshStorageSnapshot = useCallback(async () => {
+    setStorageSnapshotPending(true);
+
+    const [usageBytes, imageIds] = await Promise.all([
+      getStorageUsage().catch(() => 0),
+      getAllImageIds().catch(() => []),
+    ]);
+
+    setStorageUsageMb(usageBytes / (1024 * 1024));
+    setStoredImages(imageIds.length);
+    setStorageSnapshotPending(false);
+  }, []);
+
+  const scheduleStorageSnapshotRefresh = useCallback(() => {
+    if (typeof window === 'undefined') {
+      void refreshStorageSnapshot();
+      return;
+    }
+
+    cancelScheduledStorageSnapshotRefresh();
+    setStorageSnapshotPending(true);
+
+    const idleWindow = window as DashboardIdleWindow;
+    const runRefresh = () => {
+      storageSnapshotTimerRef.current = null;
+      storageSnapshotIdleRef.current = null;
+      void refreshStorageSnapshot();
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      storageSnapshotIdleRef.current = idleWindow.requestIdleCallback(runRefresh, { timeout: 300 });
+      return;
+    }
+
+    storageSnapshotTimerRef.current = window.setTimeout(runRefresh, 120);
+  }, [cancelScheduledStorageSnapshotRefresh, refreshStorageSnapshot]);
+
+  const refreshDashboard = useCallback(async () => {
     const nextStats = keyManager.getStats();
     const allSlots = keyManager.getSlots();
     const providers = keyManager.getProviders();
     const cost = getTodayCosts();
-    const [nextStorageMode, usageBytes, imageIds] = await Promise.all([
+    const [nextStorageMode] = await Promise.all([
       getStorageMode(),
-      getStorageUsage().catch(() => 0),
-      getAllImageIds().catch(() => []),
     ]);
 
     const official = allSlots.filter((slot) => {
@@ -221,21 +281,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     setProviderCount(providers.length);
     setActiveProviderCount(providers.filter((item) => item.isActive).length);
     setStorageMode(nextStorageMode);
-    setStorageUsageMb(usageBytes / (1024 * 1024));
-    setStoredImages(imageIds.length);
-  };
+    scheduleStorageSnapshotRefresh();
+  }, [scheduleStorageSnapshotRefresh]);
 
   useEffect(() => {
     void refreshDashboard();
     const unsubscribe = keyManager.subscribe(() => void refreshDashboard());
     return unsubscribe;
-  }, [billingLogs.length, usageLogs.length, billingLoading]);
+  }, [billingLogs.length, usageLogs.length, billingLoading, refreshDashboard]);
 
   useEffect(() => {
     setLogs(getTodayLogs());
     const unsubscribe = subscribeToLogs((next) => setLogs(next));
     return unsubscribe;
   }, []);
+
+  useEffect(() => () => {
+    cancelScheduledStorageSnapshotRefresh();
+  }, [cancelScheduledStorageSnapshotRefresh]);
 
   const todayUsageLogs = useMemo(
     () => usageLogs.filter((log) => isSameLocalDay(log.created_at)),
@@ -246,9 +309,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () =>
       logs.filter(
         (item) =>
-          item.level === LogLevel.WARNING ||
-          item.level === LogLevel.ERROR ||
-          item.level === LogLevel.CRITICAL,
+          item.level === LogLevel.WARNING
+          || item.level === LogLevel.ERROR
+          || item.level === LogLevel.CRITICAL,
       ),
     [logs],
   );
@@ -271,10 +334,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         icon: <Activity size={18} />,
         title: pick('最近请求', 'Recent requests'),
         summary:
-          latestUsage?.model_name ||
-          latestUsage?.model_id ||
-          latestUsage?.description ||
-          pick('今天还没有模型请求。', 'No model request has been recorded today.'),
+          latestUsage?.model_name
+          || latestUsage?.model_id
+          || latestUsage?.description
+          || pick('今天还没有模型请求。', 'No model request has been recorded today.'),
         meta: latestUsage
           ? formatDateTime(latestUsage.created_at)
           : pick('等待新的调用事件', 'Waiting for a new request event'),
@@ -293,13 +356,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           ? pick(`今天新增 ${todayRechargeCount} 条充值`, `${todayRechargeCount} recharges today`)
           : pick('今天没有充值记录', 'No recharge activity today'),
         value: remainingBalanceDisplay,
-        status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('账单', 'Billing')}</SettingsBadge>,
+        status: <SettingsBadge tone={todayRechargeCount > 0 ? 'emerald' : 'neutral'}>{pick('账本', 'Billing')}</SettingsBadge>,
         onClick: () => onNavigate('consumption-records'),
       },
       {
         key: 'logs',
         icon: <ScrollText size={18} />,
-        title: pick('系统日志', 'System logs'),
+        title: pick('日志信号', 'Log signals'),
         summary: latestLog?.message || pick('当前没有需要优先处理的告警。', 'No warning or error logs are blocking the system right now.'),
         meta: latestLog ? `${formatDateTime(latestLog.timestamp)} · ${latestLog.source}` : pick('日志流稳定', 'Live log stream is stable'),
         value: importantLogCount > 0 ? pick(`${importantLogCount} 条`, `${importantLogCount} items`) : pick('稳定', 'Stable'),
@@ -314,7 +377,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       {
         key: 'channels',
         icon: <KeyRound size={18} />,
-        title: pick('链路状态', 'Route status'),
+        title: pick('路由状态', 'Route status'),
         summary: hasAvailableRoute
           ? pick(`${channelCount} 条链路可用。`, `${channelCount} active routes are ready.`)
           : pick('还没有可用链路，建议先配置 API。', 'No ready route was detected. Configure API first.'),
@@ -372,7 +435,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       {
         label: pick('存储', 'Storage'),
         value: storageModeLabel,
-        helper: pick(`${formatNumber(storedImages)} 张图片 · ${storageUsageMb.toFixed(0)} MB`, `${formatNumber(storedImages)} images · ${storageUsageMb.toFixed(0)} MB`),
+        helper: storageSnapshotPending
+          ? pick('正在整理图片与容量统计…', 'Updating image and storage totals…')
+          : pick(`${formatNumber(storedImages)} 张图片 · ${storageUsageMb.toFixed(0)} MB`, `${formatNumber(storedImages)} images · ${storageUsageMb.toFixed(0)} MB`),
       },
     ],
     [
@@ -407,8 +472,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           eyebrow={pick('高级设置', 'Advanced settings')}
           title={dashboardMeta.title}
           description={pick(
-            '把 API、账单、日志和存储留在第一屏，先看状态，再进入具体配置。',
-            'Keep API, billing, logs, and storage on the first screen before opening a detailed page.',
+            '先看系统状态、主入口和最近活动，再进入具体工作台或维护页面。',
+            'Review system status, primary entry points, and recent activity before opening a detailed workspace.',
           )}
           badge={<SettingsBadge tone={statusTone}>{statusLabel}</SettingsBadge>}
           actions={(
@@ -423,37 +488,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         />
 
         <SettingsSection
-          title={pick('快捷入口', 'Quick access')}
-          eyebrow={pick('一键入口', 'Direct actions')}
+          title={pick('主路由', 'Primary routes')}
+          eyebrow={pick('优先入口', 'Priority entry points')}
           description={pick(
-            '常用操作直接放前面，避免在设置里反复切换。',
-            'Keep the common actions upfront so the workbench stays quick to use.',
+            '把最常用的 API、计费和日志入口放在第一层，先处理主要工作流。',
+            'Keep API, billing, and logs as the first-layer destinations for the main workflows.',
           )}
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <QuickActionCard
               title={pick('配置 API', 'Configure API')}
-              description={pick('本地、官方和供应商', 'Local, official, and provider routes')}
+              description={pick('本地、官方和供应商路由', 'Local, official, and provider routes')}
               icon={<KeyRound size={18} />}
               onClick={() => onNavigate('api-management')}
             />
             <QuickActionCard
-              title={pick('账单与余额', 'Billing')}
-              description={pick('查看消耗、充值和余额', 'Review spend, recharges, and balance')}
+              title={pick('计费账本', 'Billing')}
+              description={pick('查看充值、消耗和账本活动', 'Review recharges, spend, and ledger activity')}
               icon={<Coins size={18} />}
               onClick={() => onNavigate('consumption-records')}
             />
             <QuickActionCard
-              title={pick('系统日志', 'System logs')}
-              description={pick('优先排查错误和警告', 'Inspect errors and warnings first')}
+              title={pick('日志', 'Logs')}
+              description={pick('优先排查错误与告警', 'Inspect errors and warnings first')}
               icon={<ScrollText size={18} />}
               onClick={() => onNavigate('system-logs')}
             />
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title={pick('维护', 'Maintenance')}
+          eyebrow={pick('系统保养', 'System maintenance')}
+          description={pick(
+            '把低频但必要的维护动作单独放到第二层，避免和主工作流混在一起。',
+            'Keep lower-frequency maintenance tasks separate from the primary workflow destinations.',
+          )}
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2">
             <QuickActionCard
-              title={pick('存储设置', 'Storage')}
-              description={pick('查看模式、缓存和容量', 'Review mode, cache, and capacity')}
+              title={pick('存储维护', 'Storage maintenance')}
+              description={pick('查看模式、缓存压力和项目修复动作', 'Review modes, cache pressure, and workspace repair actions')}
               icon={<HardDrive size={18} />}
               onClick={() => onNavigate('storage-settings')}
+            />
+            <QuickActionCard
+              title={pick('错误排查', 'Error triage')}
+              description={pick('先看最高优先级的错误与告警摘要', 'Focus on the highest-priority errors and warning signals')}
+              icon={<ScrollText size={18} />}
+              onClick={() => onNavigate('system-logs')}
             />
           </div>
         </SettingsSection>

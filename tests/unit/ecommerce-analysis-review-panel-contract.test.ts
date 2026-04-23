@@ -25,6 +25,7 @@ test('ecommerce analysis review panel keeps the full task editor scoped to the a
 
 test('ecommerce analysis review panel exposes active detail prompt, reference galleries, and per-item manual upload controls', () => {
   const source = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const taskEditorSource = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
 
   assert.match(source, /extractEcommerceManualReferenceBindings/);
   assert.match(source, /data-testid="ecommerce-review-active-detail"/);
@@ -32,6 +33,22 @@ test('ecommerce analysis review panel exposes active detail prompt, reference ga
   assert.match(source, /data-testid="ecommerce-review-reference-upload"/);
   assert.match(source, /data-testid="ecommerce-review-manual-reference-remove"/);
   assert.match(source, /accept="image\/\*"/);
-  assert.match(source, /activeTaskState\?\.resolvedPromptPreview \|\| activeReviewItem\.promptDraft/);
+  assert.match(source, /activeTaskState\?\.promptOverride \|\| activeTaskState\?\.resolvedPromptPreview \|\| activeReviewItem\.promptDraft/);
+  assert.match(source, /识别档位|sizeTier/);
+  assert.match(source, /实际采用档位|effectiveSizeTier/);
   assert.match(source, /onTaskStateChange=\{\(taskId, updater\) => onTaskStateChange\(activeTaskState\.taskId === taskId \? taskId : activeTaskState\.taskId, updater\)\}/);
+  assert.match(taskEditorSource, /提示词改写|实际提示词/);
+  assert.match(taskEditorSource, /promptOverride/);
+});
+
+test('ecommerce analysis review panel keeps global product uploads visible and disables confirm while building cards', () => {
+  const source = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+
+  assert.match(source, /globalProductFiles\?: File\[];/);
+  assert.match(source, /globalExtraReferenceFiles\?: File\[];/);
+  assert.match(source, /isConfirming\?: boolean;/);
+  assert.match(source, /renderUploadGallery\(\s*'全局产品图'/);
+  assert.match(source, /renderUploadGallery\(\s*'全局补充参考图'/);
+  assert.match(source, /disabled=\{isConfirming\}/);
+  assert.match(source, /isConfirming \? '建卡中…' : '确认并建卡'/);
 });

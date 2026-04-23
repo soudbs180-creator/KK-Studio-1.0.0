@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Activity, FolderOpen, HardDrive, Layers3, RefreshCw, Trash2 } from 'lucide-react';
 import { useCanvas } from '../../../context/CanvasContext';
 import { useLocale } from '../../../context/LocaleContext';
@@ -392,7 +392,7 @@ export const StorageSettingsView: React.FC = () => {
         <div className="settings-reference-page-header">
           <div className="settings-reference-page-header__lead">
             <div className="settings-reference-page-header__eyebrow">{pick('高级设置', 'Advanced Settings')}</div>
-            <h2>{pick('存储管理', 'Storage Management')}</h2>
+            <h2>{pick('存储管理', 'Storage')}</h2>
             <p>
               {pick(
                 '把存储目标、缓存压力和项目维护整合到同一页，避免在不同面板之间来回切换。',

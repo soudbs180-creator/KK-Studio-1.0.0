@@ -1,5 +1,5 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0\.."
-powershell -ExecutionPolicy Bypass -File scripts/dev-status.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-status.ps1
 pause

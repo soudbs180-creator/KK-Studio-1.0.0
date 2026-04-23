@@ -1,6 +1,6 @@
 import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
-import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
+import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, ModelType, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
 import { modelRegistry, ActiveModel } from '../../services/model/modelRegistry';
 import { keyManager, getModelMetadata } from '../../services/auth/keyManager'; // Added getter
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -35,7 +35,12 @@ import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommerce
 import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
-import { isEcommerceAllowedModel, resolveEcommerceAspectPolicy, resolvePreferredEcommerceImageSize } from '../../services/ecommerce/ecommerceModelPolicy.ts';
+import {
+    isEcommerceAllowedModel,
+    resolveEcommerceAspectPolicy,
+    resolveEcommercePromptBarAspectContext,
+    resolvePreferredEcommerceImageSize,
+} from '../../services/ecommerce/ecommerceModelPolicy.ts';
 import type { EcommerceAnalysisResult } from '../../services/ecommerce/types.ts';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
 
@@ -306,6 +311,7 @@ interface CreditSendButtonProps {
     colorEnd?: string;
     textColor?: 'white' | 'black';
     className?: string;
+    ecommerceConfirmedMode?: boolean;
     onClick: () => void;
 }
 
@@ -319,6 +325,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     colorEnd,
     textColor = 'white',
     className = '',
+    ecommerceConfirmedMode = false,
     onClick
 }) => {
     // 判断积分是否不足
@@ -468,7 +475,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                         </div>
                     ) : (
                         <span className={`text-sm font-bold tracking-[0.01em] ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black drop-shadow-[0_1px_10px_rgba(0,0,0,0.28)]' : 'text-white drop-shadow-[0_1px_10px_rgba(255,255,255,0.28)]'}`}>
-                            发送
+                            {ecommerceConfirmedMode ? '补充修改' : '发送'}
                         </span>
                     )}
                 </div>
@@ -530,10 +537,11 @@ interface PromptBarProps {
     ecommerceTaskStates?: Record<string, EcommerceEditableTaskState | undefined>;
     ecommerceGroupSlots?: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
     ecommerceActiveTaskState?: EcommerceEditableTaskState | null;
-    ecommerceSheetSettings?: Record<EcommerceGroupSheet, { aspectRatio: AspectRatio; imageSize: ImageSize }>;
-    ecommerceAnalysisConfirmed?: boolean;
-    ecommerceActiveGroupSheet?: EcommerceGroupSheet | null;
-    ecommerceAnalyzing?: boolean;
+     ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
+     ecommerceAnalysisConfirmed?: boolean;
+     ecommerceConfirmingAnalysis?: boolean;
+     ecommerceActiveGroupSheet?: EcommerceGroupSheet | null;
+     ecommerceAnalyzing?: boolean;
     onPickEcommerceRequirementFile?: (files: FileList | File[]) => void;
     onPickEcommerceProductFiles?: (files: FileList | File[]) => void;
     onPickEcommerceExtraReferenceFiles?: (files: FileList | File[]) => void;
@@ -549,7 +557,7 @@ interface PromptBarProps {
     onActivateEcommerceTaskBySourceKey?: (sourceKey: string) => void;
     onUpdateEcommerceSheetSetting?: (
         sheet: EcommerceGroupSheet,
-        patch: { aspectRatio?: AspectRatio; imageSize?: ImageSize },
+        patch: EcommerceSheetSettingPatch,
     ) => void;
     onChangeEcommerceTaskState?: (
         taskId: string,
@@ -861,6 +869,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     ecommerceActiveTaskState = null,
     ecommerceSheetSettings,
     ecommerceAnalysisConfirmed = false,
+    ecommerceConfirmingAnalysis = false,
     ecommerceActiveGroupSheet = null,
     ecommerceAnalyzing = false,
     onPickEcommerceRequirementFile,
@@ -1428,6 +1437,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
         };
     }, [filteredDisplayModels, isMobile, modelListWindowStart]);
 
+    const ecommerceAspectContext = useMemo(() => resolveEcommercePromptBarAspectContext({
+        activeTask: ecommerceActiveTaskState
+            ? {
+                sourceSheet: ecommerceActiveTaskState.sourceSheet,
+                sizeTier: ecommerceActiveTaskState.sizeTier,
+                sizeControlOverride: ecommerceActiveTaskState.sizeControlOverride ?? null,
+            }
+            : null,
+        activeSheet: ecommerceActiveGroupSheet,
+        sheetSettings: ecommerceSheetSettings,
+        ratioOverride: ecommerceRatioOverride,
+    }), [ecommerceActiveGroupSheet, ecommerceActiveTaskState, ecommerceRatioOverride, ecommerceSheetSettings]);
+
     const getDefaultImageSizeForModel = useCallback((modelId: string): ImageSize => {
         if (config.mode === GenerationMode.ECOMMERCE) {
             return resolvePreferredEcommerceImageSize(modelId) as ImageSize;
@@ -1441,14 +1463,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const getDefaultAspectForModel = useCallback((modelId: string): AspectRatio => {
         if (config.mode === GenerationMode.ECOMMERCE) {
-            return AspectRatio.SQUARE;
+            return ecommerceAspectContext.defaultAspectRatio;
         }
         const caps = getModelCapabilities(modelId);
         const supported = caps?.supportedRatios;
         if (!supported || supported.length === 0) return AspectRatio.AUTO;
         if (supported.includes(AspectRatio.AUTO)) return AspectRatio.AUTO;
         return supported[0];
-    }, [config.mode]);
+    }, [config.mode, ecommerceAspectContext.defaultAspectRatio]);
 
     // 🚀 [增强版模型自动选择逻辑]
     // 逻辑：1. 如果当前选中的模型已失效（不在当前可用列表中），则必须重新选一个。
@@ -1491,13 +1513,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const availableRatios = useMemo(() => {
         if (config.mode === GenerationMode.ECOMMERCE) {
-            const policy = resolveEcommerceAspectPolicy({
-                kind: 'main-image',
-                modelId: config.model,
-            });
-            const ratioWhitelist = ecommerceRatioOverride && ecommerceRatioOverride.length > 0
-                ? ecommerceRatioOverride
-                : policy.allowedAspectRatios;
+            const ratioWhitelist = ecommerceAspectContext.allowedAspectRatios;
             const ratioWhitelistSet = new Set<string>(ratioWhitelist.map((ratio) => String(ratio)));
             const supportedRatios = modelCaps?.supportedRatios && modelCaps.supportedRatios.length > 0
                 ? modelCaps.supportedRatios
@@ -1506,7 +1522,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         }
         const ratios = modelCaps?.supportedRatios;
         return ratios && ratios.length > 0 ? ratios : Object.values(AspectRatio);
-    }, [config.mode, config.model, ecommerceRatioOverride, modelCaps]);
+    }, [config.mode, ecommerceAspectContext.allowedAspectRatios, modelCaps]);
 
     const availableSizes = useMemo(() => {
         const sizes = modelCaps?.supportedSizes;
@@ -2803,6 +2819,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             groupSlots={ecommerceGroupSlots}
             activeTaskState={ecommerceActiveTaskState}
             analysisConfirmed={ecommerceAnalysisConfirmed}
+            confirmingAnalysis={ecommerceConfirmingAnalysis}
             activeGroupSheet={ecommerceActiveGroupSheet}
             ecommerceAnalyzing={ecommerceAnalyzing}
             onPickRequirementFile={onPickEcommerceRequirementFile}
@@ -2868,7 +2885,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 }}
                 onCompositionStart={() => { isComposingRef.current = true; }}
                 onCompositionEnd={handleCompositionEnd}
-                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
+                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令，将应用到当前选中的电商任务..." : "上传运营需求文件后，在这里补充额外的电商要求...") : "描述你想要生成的图片..."}
                 className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
                 style={{
                     color: 'var(--text-primary)',
@@ -2895,6 +2912,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const activeEcommerceSheetSetting = ecommerceSheetSettings?.[activeEcommerceFooterSheet];
     const activeEcommerceAspectRatio = activeEcommerceSheetSetting?.aspectRatio || config.aspectRatio;
     const activeEcommerceImageSize = activeEcommerceSheetSetting?.imageSize || config.imageSize;
+    const activeAPlusControlModeLabel = activeEcommerceSheetSetting?.aPlusControlMode === '1464x600'
+        ? '1464x600'
+        : activeEcommerceSheetSetting?.aPlusControlMode === '970x600'
+            ? '970x600'
+            : activeEcommerceSheetSetting?.aPlusControlMode === '600x450'
+                ? '600x450'
+                : '自动';
     const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
             {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => (
@@ -2991,7 +3015,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         />
     );
     const mobileAdvancedSummaryText = config.mode === GenerationMode.ECOMMERCE
-        ? `${displayModelLabel} · ${activeEcommerceFooterSheet} · ${activeEcommerceAspectRatio === AspectRatio.AUTO ? '自动比例' : activeEcommerceAspectRatio} · ${activeEcommerceImageSize}`
+        ? `${displayModelLabel} · ${activeEcommerceFooterSheet} · ${activeEcommerceFooterSheet === 'A+' ? `尺寸 ${activeAPlusControlModeLabel}` : (activeEcommerceAspectRatio === AspectRatio.AUTO ? '自动比例' : activeEcommerceAspectRatio)} · ${activeEcommerceImageSize}`
         : `${displayModelLabel} · ${config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · ${config.imageSize}`;
     const dragOverlayLabel = config.mode === GenerationMode.ECOMMERCE && !ecommerceAnalysisConfirmed
         ? '释放导入需求单或产品图'
@@ -3593,6 +3617,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             groupSlots={ecommerceGroupSlots}
                             activeTaskState={ecommerceActiveTaskState}
                             analysisConfirmed={ecommerceAnalysisConfirmed}
+                            confirmingAnalysis={ecommerceConfirmingAnalysis}
                             activeGroupSheet={ecommerceActiveGroupSheet}
                             ecommerceAnalyzing={ecommerceAnalyzing}
                             onPickRequirementFile={onPickEcommerceRequirementFile}
@@ -3657,7 +3682,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 }}
                                 onCompositionStart={() => { isComposingRef.current = true; }}
                                 onCompositionEnd={handleCompositionEnd}
-                                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? "上传运营需求文件后，在这里补充额外的电商要求..." : "描述你想要生成的图片..."}
+                                placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令，将应用到当前选中的电商任务..." : "上传运营需求文件后，在这里补充额外的电商要求...") : "描述你想要生成的图片..."}
                                 className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
                                 style={{
                                     color: 'var(--text-primary)', // 使用 CSS 变量适配主题
@@ -4007,10 +4032,20 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 ) : undefined}
                                 />
                             )}
+                        </div>
 
+                        {isEmbeddedMobileComposer ? (
+                            <MobileEmbeddedAdvancedDrawer
+                                summaryText={mobileAdvancedSummaryText}
+                                promptTools={mobileAdvancedPromptToolsNode}
+                                modePanel={mobileAdvancedModePanelNode}
+                            />
+                        ) : null}
+
+                        <div className={`flex items-center gap-2 shrink-0 ${isMobile ? '' : 'ml-auto'}`}>
                             {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
                             {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
-                                <div className="prompt-bar-liquid-group ml-auto flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0">
+                                <div className="prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0">
                                     {/* Parallel Count */}
                                     <div className="relative h-full w-[58px]">
                                         <button
@@ -4181,15 +4216,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </div>
                                 </div>
                             )}
-                        </div>
-                        {isEmbeddedMobileComposer ? (
-                            <MobileEmbeddedAdvancedDrawer
-                                summaryText={mobileAdvancedSummaryText}
-                                promptTools={mobileAdvancedPromptToolsNode}
-                                modePanel={mobileAdvancedModePanelNode}
-                            />
-                        ) : null}
-                        <div className={isMobile ? '' : 'ml-2 flex-shrink-0'}>
+                        <div className={isMobile ? '' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}
@@ -4200,6 +4227,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 colorStart={currentModel?.colorStart}
                                 colorEnd={currentModel?.colorEnd}
                                 textColor={currentModel?.textColor}
+                                ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
                                 className={isMobile ? '' : 'prompt-bar-liquid-button prompt-bar-liquid-send'}
                                 onClick={() => {
                                     if (isSystemCreditModel && authLoading) {
@@ -4219,6 +4247,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onGenerate(promptDraftRef.current);
                                 }}
                             />
+                        </div>
                         </div>
                     </PromptBarFooter>
                 </div>

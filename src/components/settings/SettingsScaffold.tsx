@@ -98,9 +98,9 @@ const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties
   },
   primary: {
     borderColor: 'transparent',
-    background: 'var(--settings-button-primary-bg)',
-    color: 'var(--settings-button-primary-text)',
-    boxShadow: 'var(--settings-button-primary-shadow)',
+    background: '#0071e3' /* Apple Blue */,
+    color: '#ffffff',
+    boxShadow: '0 4px 14px rgba(0, 113, 227, 0.24)',
   },
   danger: {
     borderColor: 'var(--settings-button-danger-border)',
@@ -110,18 +110,21 @@ const buttonToneStyles: Record<'secondary' | 'primary' | 'danger', CSSProperties
 };
 
 export const SETTINGS_PANEL_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
+  borderColor: 'transparent',
   background: 'var(--settings-section-bg)',
+  boxShadow: 'var(--shadow-sm)',
 } as const;
 
 export const SETTINGS_ELEVATED_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
+  borderColor: 'transparent',
   background: 'var(--settings-surface-elevated)',
+  boxShadow: 'var(--shadow-md)',
 } as const;
 
 export const SETTINGS_OVERLAY_STYLE = {
-  borderColor: 'var(--settings-border-subtle)',
+  borderColor: 'transparent',
   background: 'var(--settings-surface-overlay)',
+  boxShadow: 'var(--shadow-lg)',
 } as const;
 
 export const SETTINGS_SUCCESS_STYLE = {
@@ -314,6 +317,7 @@ type SettingsSectionProps = {
   eyebrow?: string;
   action?: ReactNode;
   testId?: string;
+  surface?: 'card' | 'plain';
   children: ReactNode;
 };
 
@@ -323,6 +327,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   eyebrow,
   action,
   testId,
+  surface = 'card',
   children,
 }) => (
   <section className="space-y-3" data-testid={testId}>
@@ -335,9 +340,13 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       </h3>
       {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
     </div>
-    <div className="settings-reference-card settings-reference-card--elevated p-5" style={SETTINGS_PANEL_STYLE}>
-      {children}
-    </div>
+    {surface === 'card' ? (
+      <div className="settings-reference-card settings-reference-card--elevated p-5" style={SETTINGS_PANEL_STYLE}>
+        {children}
+      </div>
+    ) : (
+      children
+    )}
     {description ? (
       <p
         className="settings-ios-footer break-words px-1"
@@ -376,7 +385,7 @@ export const SettingsActionButton: React.FC<SettingsActionButtonProps> = ({
     type={type}
     className={`inline-flex max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden border text-left font-medium leading-tight transition-opacity duration-150 hover:opacity-70 active:opacity-50 disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap ${size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2'} ${className}`.trim()}
     style={{
-      borderRadius: size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)',
+      borderRadius: tone === 'primary' ? '980px' : (size === 'sm' ? 'var(--radius-control-sm)' : 'var(--radius-control-md)'),
       fontSize: size === 'sm' ? 'var(--type-caption)' : 'var(--type-body-2)',
       minHeight: size === 'sm' ? 'var(--ui-control-height-compact)' : 'var(--ui-control-height-default)',
       ...buttonToneStyles[tone],

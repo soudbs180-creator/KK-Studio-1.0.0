@@ -1,7 +1,7 @@
 import {
   assertLocalApiConfig,
   startLocalApiServer,
-} from "./lib/local-api-bootstrap.mjs";
+} from "../lib/local-api-bootstrap.mjs";
 
 await assertLocalApiConfig();
 

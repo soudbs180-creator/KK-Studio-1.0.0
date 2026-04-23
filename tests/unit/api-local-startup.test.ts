@@ -6,7 +6,7 @@ import { test } from "node:test";
 const ROOT_DIR = process.cwd();
 
 test("run-api-local exists as a standalone local-only startup entry", () => {
-  const scriptPath = path.join(ROOT_DIR, "scripts", "run-api-local.mjs");
+  const scriptPath = path.join(ROOT_DIR, "scripts", "dev", "run-api-local.mjs");
   assert.equal(existsSync(scriptPath), true);
 
   if (!existsSync(scriptPath)) {

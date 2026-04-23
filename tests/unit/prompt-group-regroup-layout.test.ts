@@ -40,17 +40,17 @@ test("docked regroup layout keeps child cards under the parent with a compact do
   assert.deepEqual(
     layouts.map((layout) => layout.dockedPosition),
     [
-      { x: 196, y: 676 },
-      { x: 500, y: 676 },
-      { x: 804, y: 676 },
+      { x: 348, y: 676 },
+      { x: 652, y: 676 },
+      { x: 500, y: 1020 },
     ],
   );
   assert.deepEqual(
     layouts.map((layout) => layout.settledPosition),
     [
-      { x: 188, y: 676 },
-      { x: 500, y: 676 },
-      { x: 812, y: 676 },
+      { x: 344, y: 676 },
+      { x: 656, y: 676 },
+      { x: 500, y: 1028 },
     ],
   );
   assert.deepEqual(

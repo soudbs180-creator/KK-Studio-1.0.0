@@ -1,5 +1,5 @@
 import React from 'react';
-import { Coins, KeyRound, LayoutDashboard, ScrollText } from 'lucide-react';
+import { AlertTriangle, Coins, KeyRound, LayoutDashboard } from 'lucide-react';
 
 import type { MobileSettingsSection } from '../../../types';
 
@@ -16,27 +16,27 @@ const ENTRIES: Array<{
 }> = [
   {
     id: 'dashboard',
-    label: 'Dashboard',
-    description: '总览、核心指标与最近异常',
+    label: 'Overview',
+    description: 'System status, route priority, and recent activity',
     icon: LayoutDashboard,
   },
   {
     id: 'api-management',
     label: 'API',
-    description: '官方接口与第三方供应商设置',
+    description: 'Local routes, providers, diagnostics, and platform entry',
     icon: KeyRound,
   },
   {
     id: 'consumption-records',
-    label: 'Usage',
-    description: '使用日志与消耗记录',
+    label: 'Billing',
+    description: 'Recharge history, spend, and ledger activity',
     icon: Coins,
   },
   {
     id: 'system-logs',
     label: 'Errors',
-    description: '系统错误日志与故障排查',
-    icon: ScrollText,
+    description: 'System errors, warnings, and troubleshooting signals',
+    icon: AlertTriangle,
   },
 ];
 
@@ -46,15 +46,15 @@ const MobileSettingsHome: React.FC<MobileSettingsHomeProps> = ({
 }) => {
   return (
     <section data-testid="mobile-settings-home" className="space-y-4">
-      <div className="rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/90 p-4">
+      <div className="rounded-[24px] border border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] px-4 py-4">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
           Four Mobile Entries
         </div>
         <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">
-          Dashboard / API / Usage / Errors
+          Overview / API / Billing / Errors
         </div>
         <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-          Only the focused mobile entries are kept here for the phone-first settings experience.
+          The home stays focused on the four highest-priority settings destinations for phone workflows.
         </div>
       </div>
 
@@ -69,17 +69,31 @@ const MobileSettingsHome: React.FC<MobileSettingsHomeProps> = ({
               type="button"
               data-testid={`mobile-settings-entry-${entry.id}`}
               onClick={() => onSelectSection(entry.id)}
-              className={`rounded-[24px] border px-4 py-4 text-left transition ${
-                isActive ? 'border-blue-400/50 bg-blue-500/10' : 'border-[var(--border-light)] bg-[var(--bg-secondary)]/90'
-              }`}
+              className="rounded-[24px] border px-4 py-4 text-left transition"
+              style={{
+                borderColor: isActive ? 'var(--settings-nav-active-border)' : 'var(--settings-border-subtle)',
+                background: isActive ? 'var(--settings-nav-active-bg)' : 'var(--settings-section-bg)',
+              }}
             >
               <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                  style={{
+                    background: isActive
+                      ? 'rgb(var(--settings-accent-rgb) / 0.12)'
+                      : 'var(--settings-surface-overlay)',
+                    color: isActive ? 'rgb(var(--settings-accent-rgb))' : 'var(--text-primary)',
+                  }}
+                >
                   <Icon size={18} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{entry.label}</span>
-                  <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{entry.description}</span>
+                  <span className="block text-sm font-semibold text-[var(--text-primary)]">
+                    {entry.label}
+                  </span>
+                  <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">
+                    {entry.description}
+                  </span>
                 </span>
               </div>
             </button>

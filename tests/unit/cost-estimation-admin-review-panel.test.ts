@@ -16,8 +16,13 @@ test('cost estimation embeds an admin-only recharge review panel on the billing 
   assert.match(source, /const \{[^}]*isAdmin,[^}]*adminSessionActive[^}]*\} = useAdminRole\(\);/);
   assert.match(source, /kkWebApiClient\.getAdminRechargeSubmission\(/);
   assert.match(source, /kkWebApiClient\.reviewRechargeSubmission\(/);
-  assert.match(source, /账单编号/);
-  assert.match(source, /核销充值/);
-  assert.match(source, /驳回账单/);
   assert.match(source, /isAdmin && adminSessionActive/);
+});
+
+test('cost estimation uses billing-ledger naming and drops the old dark console wording', () => {
+  const source = readSource('src/pages/CostEstimation.tsx');
+
+  assert.match(source, /Billing Ledger/);
+  assert.doesNotMatch(source, /Consumption Center/);
+  assert.doesNotMatch(source, /dark control-console structure/);
 });

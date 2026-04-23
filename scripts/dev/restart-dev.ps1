@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $projectRoot
 
 $viteCachePath = Join-Path $projectRoot 'node_modules/.vite'
@@ -10,4 +10,4 @@ if (Test-Path $viteCachePath) {
 }
 
 Write-Host "[RESTART] Restarting KK Studio dev services ..."
-powershell -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'scripts/dev-launch.ps1') -Restart
+powershell -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'scripts/dev/dev-launch.ps1') -Restart

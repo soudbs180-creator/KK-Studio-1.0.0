@@ -1,5 +1,8 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { readdir, stat } from "node:fs/promises";
+import { runBrowserPreflight } from './browser-preflight.mjs';
+import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, ".tmp-playwright", "prompt-group-drag");
@@ -97,10 +100,80 @@ function ensureArtifactsDir() {
   }
 }
 
-async function resolvePlaywrightModuleUrl() {
-  const { readdir } = await import("node:fs/promises");
-  const { stat } = await import("node:fs/promises");
+function readSource(relativePath) {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
 
+function isBrowserLaunchUnavailable(error) {
+  const message = String(error?.message || error || '');
+  return /spawn EPERM/i.test(message)
+    || /Playwright npx cache directory not found/i.test(message)
+    || /Playwright module was not found/i.test(message)
+    || /process-spawn-blocked/i.test(message);
+}
+
+async function assertHttpHtml(url) {
+  const response = await fetch(url, { redirect: 'manual' });
+  if (!response.ok) {
+    throw new Error(`Expected ${url} to respond successfully, got ${response.status}.`);
+  }
+
+  const html = await response.text();
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected ${url} to return HTML content.`);
+  }
+
+  return {
+    url,
+    status: response.status,
+    length: html.length,
+  };
+}
+
+function verifyPromptGroupSourceContracts() {
+  const appSource = readSource('src/App.tsx');
+  const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const imageSource = readSource('src/components/image/ImageCard2.tsx');
+
+  const checks = [
+    { source: appSource, pattern: /commitPromptGroupDrag\(/, label: 'App prompt-group drag commit wiring' },
+    { source: appSource, pattern: /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/, label: 'App live-drag regroup wiring' },
+    { source: promptSource, pattern: /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Prompt card bottom-center transform origin' },
+    { source: imageSource, pattern: /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Image card bottom-center transform origin' },
+  ];
+
+  for (const check of checks) {
+    if (!check.pattern.test(check.source)) {
+      throw new Error(`Prompt-group source contract missing: ${check.label}`);
+    }
+  }
+}
+
+async function runFallbackVerification(error, browserPreflight) {
+  verifyPromptGroupSourceContracts();
+
+  const routes = await Promise.all([
+    assertHttpHtml(TARGET_URL),
+  ]);
+
+  const summary = {
+    mode: 'fallback',
+    reason: String(error?.message || error),
+    browserPreflight,
+    routes,
+    artifactDir: ARTIFACT_DIR,
+  };
+
+  writeFileSync(
+    path.join(ARTIFACT_DIR, 'prompt-group-drag-fallback.json'),
+    JSON.stringify(summary, null, 2),
+    'utf8',
+  );
+
+  console.log(JSON.stringify(summary, null, 2));
+}
+
+async function resolvePlaywrightModuleUrl() {
   const npxCacheRoot = path.join(process.env.LOCALAPPDATA || "", "npm-cache", "_npx");
   if (!npxCacheRoot || !existsSync(npxCacheRoot)) {
     throw new Error("Playwright npx cache directory not found. Run `cmd /c npx playwright --version` once first.");
@@ -214,15 +287,26 @@ async function measureScene(page) {
   });
 }
 
-const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
-const { chromium } = await import(playwrightModuleUrl);
-
 ensureArtifactsDir();
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+let browser;
+let viteServer;
+let browserPreflight = null;
 
 try {
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  viteServer = ensured.server;
+  browserPreflight = await runBrowserPreflight();
+
+  if (!browserPreflight.ok) {
+    throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);
+  }
+
+  const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
+  const { chromium } = await import(playwrightModuleUrl);
+  browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+
   await gotoWithRetry(page, TARGET_URL);
   await page.waitForTimeout(1000);
   await dismissStorageModalIfPresent(page);
@@ -339,7 +423,17 @@ try {
   if (!childConnectorFollows) {
     throw new Error(`Child-card connector did not stay aligned with the dragged image: ${JSON.stringify(result)}`);
   }
+} catch (error) {
+  if (isBrowserLaunchUnavailable(error)) {
+    await runFallbackVerification(error, browserPreflight);
+  } else {
+    throw error;
+  }
 } finally {
-  await page.close().catch(() => {});
-  await browser.close().catch(() => {});
+  if (browser) {
+    await browser.close().catch(() => {});
+  }
+  if (viteServer) {
+    await viteServer.close();
+  }
 }

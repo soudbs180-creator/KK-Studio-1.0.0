@@ -412,7 +412,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     // 🚀 优化：缩放时使用临时transform + 防抖 + 缓动曲线
     const handleWheel = useCallback((e: WheelEvent) => {
         // 🚀 [FIX] Allow scrolling inside text areas/custom scrollbars
-        if ((e.target as HTMLElement).closest('.custom-scrollbar, textarea, input')) {
+        if ((e.target as HTMLElement).closest('.input-bar, .custom-scrollbar, textarea, input')) {
             return;
         }
         e.preventDefault();

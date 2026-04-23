@@ -14,6 +14,7 @@ interface EcommerceCardActionsProps {
       | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
   ) => void;
   onToggleSelected: (node: PromptNode, selected: boolean) => void;
+  onSetGroupSelection?: (node: PromptNode, selected: boolean) => void;
   onGenerateNode: (node: PromptNode) => void;
   onGenerateGroup: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
   onConfirmDesktop: (node: PromptNode) => void;
@@ -29,6 +30,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   onActivateTask,
   onTaskStateChange,
   onToggleSelected,
+  onSetGroupSelection,
   onGenerateNode,
   onGenerateGroup,
   onConfirmDesktop,
@@ -40,15 +42,24 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   const selected = ecommerce.selectedForGeneration !== false;
   const isModule = ecommerce.kind === 'a-plus-module';
   const isGroup = ecommerce.kind === 'a-plus-group';
-  const isDesktopThenMobile = ecommerce.sizePolicy === 'desktop-then-mobile';
+  const effectiveSizePolicy = ecommerce.effectiveSizePolicy || ecommerce.sizePolicy;
+  const effectiveSizeTier = ecommerce.effectiveSizeTier || ecommerce.sizeTier;
+  const isDesktopThenMobile = effectiveSizePolicy === 'desktop-then-mobile';
   const desktopReadyToConfirm = ecommerce.desktopStage === 'generated';
   const mobileReady = ecommerce.desktopStage === 'confirmed';
+  const mobileActionLabel = effectiveSizeTier === '1464x600'
+    ? '转 600×450 手机端'
+    : effectiveSizeTier === '600x450'
+      ? '生成 600×450 手机端'
+      : '生成手机端';
   const resolvedTaskState = taskState ?? ecommerce.editableTask;
   const taskIsActive = Boolean(
-    resolvedTaskState &&
-      activeTaskState &&
-      (activeTaskState.taskId === resolvedTaskState.taskId ||
-        activeTaskState.sourceRowKey === ecommerce.sourceRowKey),
+    resolvedTaskState
+      && activeTaskState
+      && (
+        activeTaskState.taskId === resolvedTaskState.taskId
+        || activeTaskState.sourceRowKey === ecommerce.sourceRowKey
+      ),
   );
 
   return (
@@ -67,7 +78,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onToggleSelected(node, !selected);
           }}
         >
-          {selected ? '已勾选生成' : '跳过此卡'}
+          {selected ? '取消确认' : '确认生成'}
         </button>
       ) : null}
 
@@ -105,20 +116,47 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
       ) : null}
 
       {isGroup ? (
-        ecommerce.sourceSheet === '主图' ? (
-          <button
-            type="button"
-            className={actionClass}
-            style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
-            onClick={(event) => {
-              event.stopPropagation();
-              onGenerateGroup(node, 'desktop');
-            }}
-          >
-            批量生成主图
-          </button>
-        ) : (
-          <>
+        <>
+          {onSetGroupSelection ? (
+            <>
+              <button
+                type="button"
+                className={actionClass}
+                style={{ borderColor: 'rgba(59, 130, 246, 0.35)', color: 'var(--text-primary)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSetGroupSelection(node, true);
+                }}
+              >
+                全选此组
+              </button>
+              <button
+                type="button"
+                className={actionClass}
+                style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSetGroupSelection(node, false);
+                }}
+              >
+                全不选
+              </button>
+            </>
+          ) : null}
+          {ecommerce.sourceSheet === '主图' ? (
+            <button
+              type="button"
+              className={actionClass}
+              style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onGenerateGroup(node, 'desktop');
+              }}
+            >
+              批量生成主图
+            </button>
+          ) : (
+            <>
             <button
               type="button"
               className={actionClass}
@@ -139,10 +177,11 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                 onGenerateGroup(node, 'mobile');
               }}
             >
-              批量生成手机版
+              批量生成手机端
             </button>
-          </>
-        )
+            </>
+          )}
+        </>
       ) : null}
 
       {isModule ? (
@@ -182,7 +221,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onGenerateMobile(node);
                 }}
               >
-                生成手机版
+                {mobileActionLabel}
               </button>
             </>
           ) : null}

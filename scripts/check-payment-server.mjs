@@ -1,11 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import vm from "node:vm";
 
 const root = process.cwd();
 const paymentServerRoot = path.join(root, "payment-server");
 const excludedSegments = new Set(["node_modules"]);
 const supportedExtensions = new Set([".js", ".cjs", ".mjs"]);
+
+function checkWithVm(file) {
+  const source = fs.readFileSync(file, "utf8");
+  new vm.Script(source, { filename: file });
+}
 
 function collectJavaScriptFiles(relativeDir) {
   const absoluteDir = path.join(root, relativeDir);
@@ -50,6 +56,16 @@ for (const file of files) {
     cwd: root,
     encoding: "utf8",
   });
+
+  if (result.error?.code === "EPERM") {
+    try {
+      checkWithVm(file);
+      continue;
+    } catch (error) {
+      process.stderr.write(String(error?.stack || error?.message || error));
+      process.exit(1);
+    }
+  }
 
   if (result.status !== 0) {
     process.stderr.write(result.stderr || result.stdout || `[payment-server:check] node --check failed for ${file}\n`);

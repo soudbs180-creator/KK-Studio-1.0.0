@@ -37,6 +37,8 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
     const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
     const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
+    const groupGlassFill = highlighted ? 'rgba(99, 102, 241, 0.10)' : isDragging ? 'rgba(20, 20, 24, 0.18)' : 'rgba(0, 0, 0, 0.10)';
+    const groupHeaderGlassFill = highlighted ? 'rgba(99, 102, 241, 0.15)' : isDragging ? 'rgba(20, 20, 24, 0.62)' : 'rgba(20, 20, 24, 0.45)';
 
     // Direct DOM Refs
     const containerRef = useRef<HTMLDivElement>(null);
@@ -196,10 +198,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`absolute border-2 rounded-xl group-container
+                className={`absolute border rounded-[32px] group-container backdrop-blur-[20px] transition-colors
                     ${highlighted
-                        ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_30px_rgba(99,102,241,0.3)] z-10'
-                        : 'border-dashed border-zinc-400/30 bg-zinc-400/5 hover:border-zinc-400/50 hover:bg-zinc-400/10 dark:border-white/20 dark:bg-white/5 dark:hover:border-white/30 dark:hover:bg-white/10'
+                        ? 'border-indigo-500/50 shadow-[0_0_40px_rgba(99,102,241,0.2)] z-10'
+                        : 'border-white/5 hover:border-white/10'
                     } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 style={{
                     left: 0,
@@ -209,7 +211,8 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     transform: `translate(${bounds.x}px, ${bounds.y}px)`,
                     zIndex: effectiveStackZIndex,
                     pointerEvents: 'auto',
-                    willChange: isDragging ? 'transform' : 'auto',
+                    backgroundColor: groupGlassFill,
+                    willChange: isDragging ? 'width, height' : 'auto',
                     // Disable transition during drag to prevent rubber-banding
                     transition: isDragging ? 'none' : 'box-shadow 0.3s ease, transform 0.1s linear, width 0.1s linear, height 0.1s linear',
                     contain: 'layout style'
@@ -219,10 +222,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             >
                 {/* Header / Drag Handle */}
                 <div
-                    className="absolute -top-8 left-0 flex items-center gap-2 px-2 py-1 rounded-t-lg border-t border-l border-r transition-opacity opacity-100 backdrop-blur"
+                    className="absolute -top-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-opacity opacity-100 backdrop-blur-[24px]"
                     style={{
-                        backgroundColor: highlighted ? 'rgba(99,102,241,0.12)' : 'var(--bg-tertiary)',
-                        borderColor: highlighted ? 'rgba(99,102,241,0.35)' : 'var(--border-light)'
+                        backgroundColor: groupHeaderGlassFill,
+                        borderColor: highlighted ? 'rgba(99,102,241,0.3)' : 'rgba(255, 255, 255, 0.05)'
                     }}
                 >
                     <GripHorizontal size={14} style={{ color: highlighted ? 'var(--accent-indigo)' : 'var(--text-tertiary)' }} />

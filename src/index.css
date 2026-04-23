@@ -7,15 +7,15 @@
    ============================================ */
 :root {
   /* ===== 背景层级 - 亮色模式 ===== */
-  --bg-base: #f5f7fb;
+  --bg-base: #f5f5f7;
   --bg-elevated: #ffffff;
   --bg-surface: #ffffff;
   --bg-overlay: #ffffff;
   --bg-input: #ffffff;
   --bg-hover: #eef2f7;
-  --bg-canvas: #f6f8fc;
+  --bg-canvas: #f5f5f7;
 
-  /* 兼容旧变量*/
+  /* 兼容旧变*/
   --bg-primary: var(--bg-base);
   --bg-secondary: var(--bg-surface);
   --bg-tertiary: var(--bg-elevated);
@@ -34,7 +34,7 @@
   --border-default: rgba(15, 23, 42, 0.12);
   --border-strong: rgba(15, 23, 42, 0.18);
   --border-focus: rgba(59, 130, 246, 0.5);
-  /* 兼容旧变量*/
+  /* 兼容旧变*/
   --border-light: var(--border-subtle);
   --border-medium: var(--border-default);
 
@@ -47,8 +47,8 @@
   --text-color: var(--text-primary);
   --text-inverse: #ffffff;
 
-  /* ===== 强调色 ===== */
-  --accent-blue: #2563eb;
+  /* ===== 强调?===== */
+  --accent-blue: #0071e3;
   --accent-green: #16a34a;
   --accent-red: #dc2626;
   --accent-gold: #d97706;
@@ -100,7 +100,7 @@
   --floating-shell-border-strong: rgba(15, 23, 42, 0.12);
   --floating-shell-shadow: 0 16px 36px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.92);
 
-  /* ===== Prompt Bar 专用白色系表面 ===== */
+  /* ===== Prompt Bar 专用白色系表?===== */
   --prompt-bar-glass-bg: rgba(248, 250, 252, 0.88);
   --prompt-bar-glass-bg-supported: rgba(248, 250, 252, 0.72);
   --prompt-bar-shell-bg: rgba(248, 250, 252, 0.98);
@@ -123,7 +123,7 @@
   /* ===== 阴影 ===== */
   --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 16px 34px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 24px 52px rgba(15, 23, 42, 0.1);
+  --shadow-lg: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
   --shadow-xl: 0 34px 72px rgba(15, 23, 42, 0.12);
   --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --shadow-glow: var(--glow-blue);
@@ -150,7 +150,7 @@
   --duration-slow: 400ms;
   --duration-slower: 600ms;
 
-  /* 兼容旧变量*/
+  /* 兼容旧变*/
   --transition-fast: var(--duration-fast) var(--ease-default);
   --transition-normal: var(--duration-normal) var(--ease-default);
   --transition-slow: var(--duration-slow) var(--ease-default);
@@ -159,14 +159,14 @@
   /* ===== 网格 ===== */
   --grid-dot: rgba(148, 163, 184, 0.18);
 
-  /* ===== 字体系统 - 统一字体栈 ===== */
-  --font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* ===== 字体系统 - 统一字体?===== */
+  --font-sans: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
 
   /* ===== 字体大小系统 ===== */
   /* 标题层级 */
   --text-h1: 28px;
-  /* 大标题：页面标题、Hero 区*/
+  /* 大标题：页面标题、Hero */
   --text-h2: 22px;
   /* 中标题：区块标题 */
   --text-h3: 18px;
@@ -176,7 +176,7 @@
   --text-body-lg: 16px;
   /* 大正文：重要内容 */
   --text-body-md: 14px;
-  /* 中正文：默认内容（最常用）*/
+  /* 中正文：默认内容（最常用*/
   --text-body-sm: 13px;
   /* 小正文：紧凑内容 */
 
@@ -186,7 +186,7 @@
   --text-2xs: 11px;
   /* 中标注：辅助文字 */
   --text-3xs: 10px;
-  /* 小标注：最小文字*/
+  /* 小标注：最小文*/
 
   /* ===== Premium UI type scale ===== */
   --ui-text-display: 32px;
@@ -243,9 +243,9 @@
   --font-normal: 400;
   /* 正文 */
   --font-medium: 500;
-  /* 强调正文、按钮*/
+  /* 强调正文、按*/
   --font-semibold: 600;
-  /* 标题、重要文字*/
+  /* 标题、重要文*/
   --font-bold: 700;
   /* 特别强调 */
 
@@ -434,7 +434,7 @@
   appearance: none;
   width: 44px;
   height: 26px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 999px;
   background: var(--settings-surface-overlay);
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.08);
@@ -523,7 +523,7 @@ body {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 为所有可能受主题影响的属性添加过渡*/
+/* 为所有可能受主题影响的属性添加过*/
 * {
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: 0.25s;
@@ -539,25 +539,25 @@ iframe {
   transition: none !important;
 }
 
-/* ===== 暗色模式 - 深灰主题 (提亮版) ===== */
+/* ===== 暗色模式 - 深灰主题 (提亮? ===== */
 body.dark-mode {
   /* 背景层级 - 深灰色，便于区分（进一步提亮） */
-  --bg-base: #141516;
-  --bg-elevated: #1d2022;
-  --bg-surface: #262b2f;
-  --bg-overlay: #2d3338;
+  --bg-base: #000000;
+  --bg-elevated: #1d1d1f;
+  --bg-surface: #272729;
+  --bg-overlay: #2a2a2d;
   --bg-input: #343b40;
   --bg-hover: #3d454b;
-  --bg-canvas: #101112;
+  --bg-canvas: #05070c;
 
-  /* 兼容旧变量*/
+  /* 兼容旧变*/
   --bg-primary: var(--bg-base);
   --bg-secondary: var(--bg-surface);
   --bg-tertiary: var(--bg-overlay);
   --bg-color: var(--bg-surface);
   --menu-bg: var(--bg-overlay);
 
-  /* Toolbar & Glass - 提亮版 */
+  /* Toolbar & Glass - 提亮?*/
   --toolbar-bg: rgba(29, 32, 34, 0.84);
   --toolbar-bg-dark: rgba(38, 43, 47, 0.9);
   --toolbar-hover: rgba(255, 255, 255, 0.08);
@@ -581,8 +581,8 @@ body.dark-mode {
   --text-color: var(--text-primary);
   --text-inverse: #ffffff;
 
-  /* 强调色 - 暗色模式略微调亮 */
-  --accent-blue: #3b82f6;
+  /* 强调?- 暗色模式略微调亮 */
+  --accent-blue: #0071e3;
   --accent-green: #22c55e;
   --accent-red: #ef4444;
   --accent-gold: #f59e0b;
@@ -652,13 +652,13 @@ body.dark-mode {
   /* 阴影 - 暗色模式更深 */
   --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.24);
   --shadow-md: 0 16px 34px rgba(0, 0, 0, 0.32);
-  --shadow-lg: 0 24px 52px rgba(0, 0, 0, 0.4);
+  --shadow-lg: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
   --shadow-xl: 0 34px 72px rgba(0, 0, 0, 0.48);
   --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --shadow-glow: var(--glow-blue);
 
   /* 网格 */
-  --grid-dot: rgba(255, 255, 255, 0.08);
+  --grid-dot: rgba(255, 255, 255, 0.14);
 }
 
 /* ============================================
@@ -684,7 +684,7 @@ body.dark-mode {
   --mobile-glass-shadow: 0 16px 45px rgba(0, 0, 0, 0.36);
   --mobile-motion-spring: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* 移动端间距*/
+  /* 移动端间*/
   --mobile-margin-xs: 12px;
   --mobile-margin-sm: 16px;
   --mobile-margin-md: 20px;
@@ -712,7 +712,7 @@ body.dark-mode {
     --radius-xl: 20px;
     --radius-2xl: 28px;
 
-    /* 移动端边距*/
+    /* 移动端边*/
     --mobile-margin: 16px;
     --mobile-header-height: 56px;
     --mobile-project-strip-height: 52px;
@@ -777,7 +777,7 @@ body.dark-mode {
   }
 }
 
-/* 缩放退出*/
+/* 缩放退*/
 @keyframes scaleOut {
   from {
     opacity: 1;
@@ -803,7 +803,7 @@ body.dark-mode {
   }
 }
 
-/* 弹窗退出*/
+/* 弹窗退*/
 @keyframes modalOut {
   from {
     opacity: 1;
@@ -901,7 +901,7 @@ body.dark-mode {
   }
 }
 
-/* 生成中流光 - 黑白灰扫光效果*/
+/* 生成中流?- 黑白灰扫光效*/
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -982,7 +982,7 @@ body.dark-mode {
   }
 }
 
-/* 🚀 边框白光往中间靠拢 - 弥散动画 (优化版: 使用 opacity 避免重绘) */
+/* 🚀 边框白光往中间靠拢 - 弥散动画 (优化? 使用 opacity 避免重绘) */
 @keyframes shimmerInward {
   0% {
     opacity: 0.3;
@@ -997,7 +997,7 @@ body.dark-mode {
   }
 }
 
-/* 🚀 高性能加载 shimmer - 使用 transform 和 opacity */
+/* 🚀 高性能加载 shimmer - 使用 transform ?opacity */
 @keyframes shimmerInwardGPU {
   0% {
     transform: translateX(-100%);
@@ -1012,7 +1012,7 @@ body.dark-mode {
   }
 }
 
-/* 外边框柔和呼吸*/
+/* 外边框柔和呼*/
 @keyframes borderGlowPulse {
 
   0%,
@@ -1099,7 +1099,7 @@ body,
   background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
-  /* 快速过渡*/
+  /* 快速过*/
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 1;
 }
@@ -1266,12 +1266,12 @@ input[type=number] {
    ============================================ */
 
 /* 
- * 仅为关键元素添加快速过渡
+ * 仅为关键元素添加快速过?
  * 200ms 快速响应，避免卡顿
  * 移除全局规则以提升性能
  */
 
-/* 拖拽时禁用所有过渡*/
+/* 拖拽时禁用所有过*/
 .dragging,
 .dragging * {
   transition: none !important;
@@ -1281,7 +1281,7 @@ input[type=number] {
    iOS Style Animations & Interactions (Apple HIG)
    ============================================ */
 
-/* 🚀 触控目标 - Apple HIG 推荐最小 44x44pt */
+/* 🚀 触控目标 - Apple HIG 推荐最?44x44pt */
 .touch-target {
   min-height: 44px;
   min-width: 44px;
@@ -1321,7 +1321,7 @@ button:active {
   transition-duration: 100ms;
 }
 
-/* 覆盖 Tailwind 默认的 transition-all，使其也带弹簧感*/
+/* 覆盖 Tailwind 默认?transition-all，使其也带弹簧感*/
 .transition-all {
   transition-property: all;
   transition-timing-function: var(--ease-spring);
@@ -1339,7 +1339,7 @@ button:active {
   transition: all 500ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-/* 🚀 iOS 弹性过渡*/
+/* 🚀 iOS 弹性过*/
 .ios-spring {
   transition: all 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -1407,7 +1407,7 @@ button:active {
   margin: 10px auto 0;
 }
 
-/* 🚀 移动端涟漪效果*/
+/* 🚀 移动端涟漪效*/
 .ripple {
   position: relative;
   overflow: hidden;
@@ -1431,10 +1431,10 @@ button:active {
   transition: 0s;
 }
 
-/* 🚀 移动端按钮增大*/
+/* 🚀 移动端按钮增*/
 @media (max-width: 768px) {
 
-  /* 所有按钮增大触控区域*/
+  /* 所有按钮增大触控区*/
   button,
   [role="button"] {
     min-height: 44px;
@@ -1450,7 +1450,7 @@ button:active {
     min-height: 44px;
   }
 
-  /* 卡片内按钮紧凑模式*/
+  /* 卡片内按钮紧凑模*/
   .card-btn-compact {
     min-height: 32px;
     padding: 6px 8px;
@@ -1983,7 +1983,7 @@ body.dark-mode .zoom-slider {
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* 支持 backdrop-filter 时使用更透明的背景*/
+/* 支持 backdrop-filter 时使用更透明的背*/
 @supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
   .input-bar {
     background: var(--prompt-bar-glass-bg-supported);
@@ -3553,7 +3553,7 @@ body.dark-mode .input-bar {
   line-height: var(--leading-normal);
 }
 
-/* 兼容旧类名*/
+/* 兼容旧类*/
 .text-sm {
   font-size: var(--text-body-sm);
   line-height: var(--leading-normal);
@@ -4042,7 +4042,23 @@ body:not(.dark-mode) textarea {
   border-color: var(--border-default);
 }
 
-/* Dark mode scrollbar for light mode compatibility */
+body.dark-mode .settings-shell-mobile,
+body.dark-mode .settings-shell-nav,
+body.dark-mode .settings-shell-main {
+  border: none;
+  background: rgba(25, 25, 25, 0.68);
+}
+
+body.dark-mode .settings-shell-mobile__hero,
+body.dark-mode .settings-shell-mobile__tabs,
+body.dark-mode .settings-shell-nav__summary,
+body.dark-mode .settings-shell-nav__footer,
+body.dark-mode .settings-shell-loading-card {
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+
 body:not(.dark-mode) ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.2);
 }
@@ -4103,6 +4119,7 @@ body.dark-mode .settings-shell-backdrop {
 body.dark-mode .settings-shell-mobile,
 body.dark-mode .settings-shell-nav,
 body.dark-mode .settings-shell-main {
+  border: none;
   background:
     linear-gradient(180deg, rgba(38, 38, 42, 0.92) 0%, rgba(24, 24, 28, 0.94) 100%);
 }
@@ -4760,11 +4777,11 @@ iframe,
    iOS-Style Advanced Settings
    ============================================ */
 .settings-panel {
-  /* iOS 系统蓝 */
+  /* iOS 系统?*/
   --settings-accent-rgb: 0 122 255;
   --settings-accent-soft-rgb: 50 173 255;
 
-  /* 背景层级 — iOS 亮色 */
+  /* 背景层级 ?iOS 亮色 */
   --settings-layer-base: #F2F2F7;
   --settings-layer-surface: #FFFFFF;
   --settings-layer-emphasis: #FFFFFF;
@@ -4779,11 +4796,11 @@ iframe,
   --settings-surface-overlay: #F2F2F7;
   --settings-surface-muted: #F2F2F7;
 
-  /* 输入框 */
+  /* 输入?*/
   --settings-input-bg: #FFFFFF;
   --settings-input-border: rgba(60, 60, 67, 0.12);
 
-  /* 边框 — iOS 分隔线 */
+  /* 边框 ?iOS 分隔?*/
   --settings-border-subtle: rgba(60, 60, 67, 0.12);
   --settings-border-strong: rgba(60, 60, 67, 0.18);
 
@@ -4791,7 +4808,7 @@ iframe,
   --settings-focus-border: rgba(0, 122, 255, 0.5);
   --settings-focus-ring: rgba(0, 122, 255, 0.2);
 
-  /* 文字 — iOS 系统色 */
+  /* 文字 ?iOS 系统?*/
   --settings-text-main: #000000;
   --settings-text-sub: #3C3C43;
   --settings-text-muted: rgba(60, 60, 67, 0.6);
@@ -4800,7 +4817,7 @@ iframe,
   --settings-icon-main: rgba(60, 60, 67, 0.6);
   --settings-icon-accent: rgb(var(--settings-accent-rgb));
 
-  /* 按钮 — iOS 扁平风格 */
+  /* 按钮 ?iOS 扁平风格 */
   --settings-button-primary-bg: rgb(var(--settings-accent-rgb));
   --settings-button-primary-bg-hover: rgb(0, 100, 220);
   --settings-button-primary-text: #FFFFFF;
@@ -4824,7 +4841,7 @@ iframe,
   --settings-muted-surface: #F2F2F7;
   --settings-muted-surface-strong: #E5E5EA;
 
-  /* 阴影 — iOS 极简 */
+  /* 阴影 ?iOS 极简 */
   --settings-panel-shadow: none;
   --settings-card-shadow: none;
   --settings-shell-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -4853,7 +4870,7 @@ iframe,
   --text-tertiary: var(--settings-text-muted);
   --text-muted: rgba(60, 60, 67, 0.3);
 
-  /* 状态色 — iOS 语义色 */
+  /* 状态色 ?iOS 语义?*/
   --state-success-bg: rgba(52, 199, 89, 0.12);
   --state-success-border: rgba(52, 199, 89, 0.24);
   --state-success-text: #248A3D;
@@ -4876,11 +4893,11 @@ iframe,
 }
 
 body.dark-mode .settings-panel {
-  /* iOS 暗色蓝 */
+  /* iOS 暗色?*/
   --settings-accent-rgb: 10 132 255;
   --settings-accent-soft-rgb: 100 210 255;
 
-  /* 背景层级 — iOS 暗色 */
+  /* 背景层级 ?iOS 暗色 */
   --settings-layer-base: #151B23;
   --settings-layer-surface: #1D2530;
   --settings-layer-emphasis: #1D2530;
@@ -4895,7 +4912,7 @@ body.dark-mode .settings-panel {
   --settings-surface-overlay: #202935;
   --settings-surface-muted: #1A222D;
 
-  /* 输入框 */
+  /* 输入?*/
   --settings-input-bg: #222C38;
   --settings-input-border: rgba(255, 255, 255, 0.1);
 
@@ -4969,7 +4986,7 @@ body.dark-mode .settings-panel {
   --text-tertiary: var(--settings-text-muted);
   --text-muted: rgba(235, 235, 245, 0.18);
 
-  /* 状态色 — iOS 暗色 */
+  /* 状态色 ?iOS 暗色 */
   --state-success-bg: rgba(48, 209, 88, 0.15);
   --state-success-border: rgba(48, 209, 88, 0.3);
   --state-success-text: #30D158;
@@ -5001,7 +5018,7 @@ body.dark-mode .settings-panel {
 
 .settings-panel.apple-glass-card,
 .settings-panel .apple-glass-card {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   background: var(--settings-shell-bg);
   box-shadow: none;
   backdrop-filter: none;
@@ -5094,7 +5111,7 @@ body.dark-mode .settings-panel {
 .settings-shell-mobile,
 .settings-shell-nav,
 .settings-shell-main {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   background: var(--settings-shell-bg);
 }
 
@@ -5113,7 +5130,7 @@ body.dark-mode .settings-panel {
 .settings-shell-mobile__topbar,
 .settings-shell-mobile__tabs,
 .settings-shell-loading-card {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   background: var(--settings-muted-surface);
   box-shadow: var(--settings-inset-shadow);
 }
@@ -5233,6 +5250,9 @@ body.dark-mode .settings-panel {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  background: var(--settings-nav-glass-bg);
+  border: 1px solid var(--settings-nav-glass-border);
+  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .settings-shell-mobile__title-wrap {
@@ -5957,7 +5977,7 @@ body:not(.dark-mode) .settings-panel .settings-sidebar-item.active .settings-sid
   /* 移除: overflow, animation, will-change */
 }
 
-/* Light Mode: 纯色不透明背景 - 浅灰色*/
+/* Light Mode: 纯色不透明背景 - 浅灰*/
 body:not(.dark-mode) .generating-flow-bg {
   background-color: #f3f4f6;
   /* 不透明灰色 */
@@ -5968,7 +5988,7 @@ body:not(.dark-mode) .generating-flow-bg {
   color: #000000;
 }
 
-/* Dark Mode: 纯色不透明背景 - 深灰色*/
+/* Dark Mode: 纯色不透明背景 - 深灰*/
 body.dark-mode .generating-flow-bg {
   background-color: #1f2937;
   /* 不透明深灰 */
@@ -5981,7 +6001,7 @@ body.dark-mode .generating-flow-bg {
 
 
 /* Sweep Removed for Softness */
-/* 添加到 index.css 末尾的新动画 */
+/* 添加?index.css 末尾的新动画 */
 
 /* 呼吸效果（慢速脉冲） */
 @keyframes pulse-slow {
@@ -6032,7 +6052,7 @@ body.dark-mode .generating-flow-bg {
 }
 
 /* ==============================================
-   占位态 - 呼吸光晕动画（黑白灰主题适配）
+   占位?- 呼吸光晕动画（黑白灰主题适配?
    ============================================== */
 @keyframes breatheGlow {
 
@@ -6078,7 +6098,7 @@ body.dark-mode .placeholder-breathe {
   border-radius: 50%;
 }
 
-/* Hover 时加速动画 - 充能效果 */
+/* Hover 时加速动?- 充能效果 */
 .group:hover .uiverse .circle {
   animation-duration: calc(var(--duration) / 3) !important;
 }
@@ -6095,7 +6115,7 @@ body.dark-mode .placeholder-breathe {
   opacity: 1;
 }
 
-/* 12 个渐变圆球 - 不同的颜色和动画参数 */
+/* 12 个渐变圆?- 不同的颜色和动画参数 */
 .uiverse .circle-1 {
   --circle-color: 67, 56, 202;
   --circle-color-alt: 109, 40, 217;
@@ -6224,7 +6244,7 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 GPU 加速基础
- * 使用 translateZ(0) / translate3d() 强制创建 GPU 合成层
+ * 使用 translateZ(0) / translate3d() 强制创建 GPU 合成?
  * 适用于：需要频繁变换的元素（拖拽、动画、滚动）
  */
 .gpu-accelerated {
@@ -6254,7 +6274,7 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 画布专用 GPU 优化
- * 针对 InfiniteCanvas 的无限拖拽场景
+ * 针对 InfiniteCanvas 的无限拖拽场?
  */
 .gpu-canvas {
   transform: translate3d(var(--canvas-x, 0), var(--canvas-y, 0), 0) scale(var(--canvas-scale, 1));
@@ -6265,8 +6285,8 @@ body.dark-mode .placeholder-breathe {
 }
 
 /**
- * 🚀 图片 GPU 加速
- * 优化图片渲染性能，减少重绘
+ * 🚀 图片 GPU 加?
+ * 优化图片渲染性能，减少重?
  */
 .gpu-image {
   transform: translateZ(0);
@@ -6277,7 +6297,7 @@ body.dark-mode .placeholder-breathe {
 }
 
 /**
- * 🚀 动画专用 GPU 加速
+ * 🚀 动画专用 GPU 加?
  * 用于有动画的元素
  */
 .gpu-animate {
@@ -6288,8 +6308,8 @@ body.dark-mode .placeholder-breathe {
 }
 
 /**
- * 🚀 虚拟化容器优化
- * 使用 content-visibility 实现虚拟化渲染
+ * 🚀 虚拟化容器优?
+ * 使用 content-visibility 实现虚拟化渲?
  */
 .gpu-virtualize {
   content-visibility: auto;
@@ -6298,7 +6318,7 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 滚动容器优化
- * 平滑滚动 + GPU 加速
+ * 平滑滚动 + GPU 加?
  */
 .gpu-scroll {
   transform: translateZ(0);
@@ -6321,7 +6341,7 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 卡片 GPU 优化
- * 用于可拖拽、可交互的卡片
+ * 用于可拖拽、可交互的卡?
  */
 .gpu-card {
   transform: translateZ(0);
@@ -6332,7 +6352,7 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 粒子/特效 GPU 优化
- * 用于粒子效果、背景动画
+ * 用于粒子效果、背景动?
  */
 .gpu-particle {
   transform: translate3d(0, 0, 0);
@@ -6344,14 +6364,14 @@ body.dark-mode .placeholder-breathe {
 
 /**
  * 🚀 清除 will-change (性能优化)
- * 动画结束后应移除 will-change 以释放 GPU 内存
+ * 动画结束后应移除 will-change 以释?GPU 内存
  */
 .gpu-idle {
   will-change: auto;
 }
 
 /**
- * 🚀 高性能选择器
+ * 🚀 高性能选择?
  * 批量应用 GPU 加速到常用动画元素
  */
 .animate-fadeIn,
@@ -6367,13 +6387,13 @@ body.dark-mode .placeholder-breathe {
   -webkit-backface-visibility: hidden;
 }
 
-/* 🚀 拖拽状态优化 - 禁用过渡提升性能 */
+/* 🚀 拖拽状态优?- 禁用过渡提升性能 */
 .is-dragging,
 .is-dragging * {
   transition: none !important;
 }
 
-/* 🚀 缩放状态优化*/
+/* 🚀 缩放状态优*/
 .is-zooming {
   transition: none !important;
 }
@@ -6385,13 +6405,12 @@ body.dark-mode .placeholder-breathe {
   will-change: transform !important;
 }
 
-.canvas-container.is-dragging [data-canvas-surface],
 .canvas-container.is-zooming [data-canvas-surface] {
   filter: none !important;
   backdrop-filter: none !important;
 }
 
-/* 🚀 降低动画复杂度（省电模式 / 低性能设备） */
+/* 🚀 降低动画复杂度（省电模式 / 低性能设备?*/
 @media (prefers-reduced-motion: reduce) {
 
   *,
@@ -6441,7 +6460,7 @@ body.dark-mode .placeholder-breathe {
 
 
 
-/* 🚀 优化后的内发光动画（Opacity based, GPU friendly） */
+/* 🚀 优化后的内发光动画（Opacity based, GPU friendly?*/
 .shimmer-static-glow {
   box-shadow: inset 0 0 60px 20px rgba(255, 255, 255, 0.15),
     inset 0 0 100px 40px rgba(255, 255, 255, 0.08);
@@ -6475,7 +6494,7 @@ body.dark-mode .placeholder-breathe {
 }
 
 /* ==============================================
-   生成态连接线（脉冲线）
+   生成态连接线（脉冲线?
    ============================================== */
 @keyframes connector-dot-pulse {
 
@@ -6562,7 +6581,7 @@ a {
   }
 }
 
-/* 搜索高亮类 */
+/* 搜索高亮?*/
 .animate-pulse-highlight {
   animation: pulse-highlight 1.5s ease-in-out 2;
 }
@@ -7069,7 +7088,7 @@ body.dark-mode .credit-advanced-note svg {
 .settings-panel.apple-glass-card,
 .settings-panel .apple-glass-card {
   background: var(--settings-shell-bg);
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   box-shadow: var(--settings-shell-shadow), var(--settings-inset-shadow);
   backdrop-filter: blur(18px);
 }
@@ -7338,7 +7357,7 @@ body.dark-mode .settings-panel .apple-glass-card {
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.05) 0%, transparent 34%),
@@ -7636,7 +7655,7 @@ body.dark-mode .settings-panel .apple-glass-card {
 .settings-panel .api-settings-provider-budget {
   grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   background: var(--settings-surface-overlay);
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
 }
 
 .settings-panel .api-settings-provider-budget-item {
@@ -7697,7 +7716,7 @@ body.dark-mode .settings-panel .apple-glass-card {
 
 .settings-panel .settings-quiet-meta__item {
   min-width: 0;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 14px;
   padding: 10px 12px;
   background: var(--settings-surface-elevated);
@@ -9385,16 +9404,18 @@ body.dark-mode .settings-panel .apple-glass-card {
 
 /* Advanced settings refactor */
 .settings-panel {
-  --settings-accent-rgb: 130 135 145;
-  --settings-accent-soft-rgb: 168 172 180;
+  --settings-accent-rgb: 0 113 227;
+  --settings-accent-soft-rgb: 41 151 255;
   --settings-success-rgb: 52 211 153;
+  --settings-sidebar-width: 292px;
+  --settings-radius-unified: 20px;
   --settings-shell-bg:
     linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(243 245 248 / 0.98) 100%);
   --settings-sidebar-bg:
     linear-gradient(180deg, rgb(255 255 255 / 0.99) 0%, rgb(245 247 250 / 0.99) 100%);
   --settings-canvas-bg:
     linear-gradient(180deg, rgb(249 250 252 / 1) 0%, rgb(239 242 246 / 1) 100%);
-  --settings-page-bg: #EEF1F4;
+  --settings-page-bg: #f5f5f7;
   --settings-section-bg: rgb(255 255 255 / 1);
   --settings-surface-elevated: rgb(255 255 255 / 1);
   --settings-surface-overlay: rgb(246 247 249 / 0.98);
@@ -9445,12 +9466,12 @@ body.dark-mode .settings-panel .apple-glass-card {
 }
 
 body.dark-mode .settings-panel {
-  --settings-accent-rgb: 148 152 161;
-  --settings-accent-soft-rgb: 116 120 128;
+  --settings-accent-rgb: 41 151 255;
+  --settings-accent-soft-rgb: 0 113 227;
   --settings-canvas-bg:
     linear-gradient(180deg, rgb(30 32 36 / 1) 0%, rgb(25 27 31 / 1) 100%);
-  --settings-page-bg: #24272C;
-  --settings-shell-bg: #1B1D21;
+  --settings-page-bg: #0f0f10;
+  --settings-shell-bg: #000000;
   --settings-section-bg: rgb(36 39 44 / 0.98);
   --settings-surface-elevated: rgb(41 44 49 / 0.98);
   --settings-surface-overlay: rgb(33 36 41 / 0.96);
@@ -9512,10 +9533,13 @@ body.dark-mode .settings-panel {
 
 .settings-shell-desktop {
   display: grid;
-  grid-template-columns: 256px minmax(0, 1fr);
+  grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
   gap: 0;
   width: min(1480px, calc(100vw - 48px));
   height: min(calc(100dvh - 48px), 920px);
+  isolation: isolate;
+  border-radius: var(--settings-radius-unified);
+  overflow: hidden;
 }
 
 .settings-shell-nav,
@@ -9526,7 +9550,6 @@ body.dark-mode .settings-panel {
   box-shadow:
     0 0 0 1px rgb(255 255 255 / 0.025),
     var(--settings-card-shadow);
-  backdrop-filter: blur(28px) saturate(150%);
 }
 
 .settings-shell-nav {
@@ -9535,6 +9558,8 @@ body.dark-mode .settings-panel {
   min-width: 0;
   padding: 18px 14px 14px;
   border-radius: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .settings-shell-nav__hero {
@@ -9550,7 +9575,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-shell-kicker {
-  color: var(--text-tertiary);
+  color: var(--settings-nav-text-tertiary);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
@@ -9561,7 +9586,7 @@ body.dark-mode .settings-panel {
 .settings-shell-main__title,
 .settings-shell-mobile__title,
 .settings-hero-card__title {
-  color: var(--text-primary);
+  color: var(--settings-nav-text-primary);
   font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -9574,7 +9599,7 @@ body.dark-mode .settings-panel {
 .settings-shell-toolbar__description,
 .settings-hero-card__description,
 .settings-section-card__description {
-  color: var(--text-secondary);
+  color: var(--settings-nav-text-secondary);
   font-size: 15px;
   line-height: 1.7;
   text-align: left;
@@ -9723,6 +9748,7 @@ body.dark-mode .settings-panel {
   overflow: hidden;
   position: relative;
   border-radius: 0;
+  z-index: 1;
 }
 
 .settings-shell-main::before {
@@ -10022,7 +10048,7 @@ body.dark-mode .settings-panel {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 18px;
 }
 
@@ -10044,7 +10070,7 @@ body.dark-mode .settings-panel {
   flex-direction: column;
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 18px;
 }
 
@@ -10097,17 +10123,17 @@ body.dark-mode .settings-panel {
 
 
 /* ============================================
-   iOS 补充样式 — 分组列表与行
+   iOS 补充样式 ?分组列表与行
    ============================================ */
 
-/* iOS 风格分隔线 */
+/* iOS 风格分隔?*/
 .settings-panel .settings-ios-separator {
   height: 0.5px;
   background: var(--settings-border-subtle);
   margin-left: 16px;
 }
 
-/* iOS 风格列表行 */
+/* iOS 风格列表?*/
 .settings-panel .settings-ios-row {
   display: flex;
   align-items: center;
@@ -10125,7 +10151,7 @@ body.dark-mode .settings-panel {
   padding: 6px 16px 0;
 }
 
-/* 统一所有设置面板内的圆角 */
+/* 统一所有设置面板内的圆?*/
 .settings-panel .rounded-2xl,
 .settings-panel .rounded-\[18px\],
 .settings-panel .rounded-\[20px\],
@@ -10141,7 +10167,7 @@ body.dark-mode .settings-panel {
   box-shadow: none !important;
 }
 
-/* iOS checkbox 保持原有的 toggle 样式但使用 iOS 绿色 */
+/* iOS checkbox 保持原有?toggle 样式但使?iOS 绿色 */
 .settings-panel .api-settings-view input[type="checkbox"]:checked {
   background: #34C759;
   border-color: #34C759;
@@ -10157,11 +10183,11 @@ body.dark-mode .settings-panel {
 
 
 /* ============================================
-   高级设置面板 — 统一使用 app 全局设计 tokens
-   参考: VideoOptionsPanel (--bg-secondary / --bg-tertiary / --border-light)
+   高级设置面板 ?统一使用 app 全局设计 tokens
+   参? VideoOptionsPanel (--bg-secondary / --bg-tertiary / --border-light)
    ============================================ */
 
-/* === 卡片/分组 — 使用 app 的 --bg-secondary + 微弱边框 === */
+/* === 卡片/分组 ?使用 app ?--bg-secondary + 微弱边框 === */
 .settings-panel .settings-hero-card,
 .settings-panel .settings-section-card,
 .settings-panel .apple-soft-card,
@@ -10172,31 +10198,31 @@ body.dark-mode .settings-panel {
   backdrop-filter: blur(8px);
 }
 
-/* === MetricCard — 使用稍深一层的 --bg-tertiary === */
+/* === MetricCard ?使用稍深一层的 --bg-tertiary === */
 .settings-panel .settings-metric-card {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-light);
   border-radius: 12px;
 }
 
-/* === DangerZone — 保持警告色调 === */
+/* === DangerZone ?保持警告色调 === */
 .settings-panel .settings-danger-zone {
   border: 1px solid var(--border-light);
   border-radius: 16px;
 }
 
-/* === 侧边栏壳体 — 加微弱边框 === */
+/* === 侧边栏壳??加微弱边?=== */
 .settings-shell-nav {
   border-right: 1px solid var(--border-light) !important;
 }
 
-/* === 内容区 — 保持 app 全局背景 === */
+/* === 内容??保持 app 全局背景 === */
 .settings-panel .settings-shell-page,
 .settings-panel .settings-shell-main {
   background: transparent;
 }
 
-/* === API 管理 section — 统一卡片风格 === */
+/* === API 管理 section ?统一卡片风格 === */
 .settings-panel .api-settings-view > section,
 .settings-panel .api-settings-view > div > section {
   background-color: var(--bg-secondary);
@@ -10214,7 +10240,7 @@ body.dark-mode .settings-panel {
   backdrop-filter: blur(8px);
 }
 
-/* === 供应商卡片 — 比卡片层级更深 === */
+/* === 供应商卡??比卡片层级更?=== */
 .settings-panel .api-settings-provider-item {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-light);
@@ -10225,7 +10251,7 @@ body.dark-mode .settings-panel {
   background-color: color-mix(in srgb, var(--bg-tertiary) 85%, white 15%);
 }
 
-/* === 输入框 — 用 --bg-tertiary 背景 + --border-light === */
+/* === 输入???--bg-tertiary 背景 + --border-light === */
 .settings-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
 .settings-panel textarea,
 .settings-panel select {
@@ -10241,24 +10267,24 @@ body.dark-mode .settings-panel {
   box-shadow: 0 0 0 2px rgba(var(--accent-blue), 0.15);
 }
 
-/* === Badge/Tag — 微弱边框 === */
+/* === Badge/Tag ?微弱边框 === */
 .settings-panel .api-settings-status-badge {
   border: 1px solid var(--border-light);
 }
 
-/* === 按钮 — secondary 用 --bg-tertiary === */
+/* === 按钮 ?secondary ?--bg-tertiary === */
 .settings-panel .apple-button-secondary,
 .settings-panel .apple-icon-button {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-light);
 }
 
-/* === primary 按钮 — 不变，保持原有强调色 === */
+/* === primary 按钮 ?不变，保持原有强调色 === */
 .settings-panel .apple-button-primary {
   border: none;
 }
 
-/* === 搜索框 === */
+/* === 搜索?=== */
 .settings-panel .settings-shell-nav__search {
   background-color: var(--bg-tertiary) !important;
   border: 1px solid var(--border-light) !important;
@@ -10282,14 +10308,14 @@ body.dark-mode .settings-panel {
   border-bottom: 1px solid var(--border-light) !important;
 }
 
-/* === 卡片内阴影 — 与参数面板一致的微弱阴影 === */
+/* === 卡片内阴??与参数面板一致的微弱阴影 === */
 .settings-panel .settings-hero-card,
 .settings-panel .settings-section-card,
 .settings-panel .apple-soft-card {
   box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.15);
 }
 
-/* === 移动端壳体 === */
+/* === 移动端壳?=== */
 .settings-panel .settings-shell-mobile {
   border: 1px solid var(--border-light);
 }
@@ -10312,7 +10338,7 @@ body.dark-mode .settings-panel {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%),
     var(--settings-section-bg);
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 24px;
   backdrop-filter: blur(22px) saturate(140%);
   box-shadow: 0 22px 54px rgb(2 6 23 / 0.16);
@@ -10330,7 +10356,7 @@ body.dark-mode .settings-panel {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.025) 0%, transparent 100%),
     var(--settings-surface-elevated);
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 22px;
   box-shadow: none;
 }
@@ -10351,7 +10377,7 @@ body.dark-mode .settings-panel {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.025) 0%, transparent 100%),
     var(--settings-section-bg);
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 24px;
   backdrop-filter: blur(18px) saturate(140%);
   padding: 20px;
@@ -10364,7 +10390,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .api-settings-secondary-nav__inner {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%),
     var(--settings-surface-overlay);
@@ -10403,7 +10429,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .api-settings-status-badge {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
 }
 
 .settings-panel .apple-button-secondary,
@@ -10419,6 +10445,34 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-shell-nav__search {
   background-color: var(--settings-search-bg) !important;
   border: 1px solid var(--settings-search-border) !important;
+  border-radius: var(--settings-radius-unified) !important;
+}
+
+.settings-panel .settings-sidebar-item {
+  border-radius: var(--settings-radius-unified) !important;
+}
+
+.settings-panel .settings-reference-card {
+  border-radius: var(--settings-radius-unified) !important;
+}
+
+.settings-panel .settings-sidebar-item,
+.settings-panel .settings-reference-card,
+.settings-panel .settings-reference-list-item,
+.settings-panel .settings-reference-mini-metric,
+.settings-panel .settings-reference-ring-row,
+.settings-panel .settings-hero-card,
+.settings-panel .settings-section-card,
+.settings-panel .settings-metric-card,
+.settings-panel .settings-dashboard-card,
+.settings-panel .settings-dashboard-priority,
+.settings-panel .settings-dashboard-log,
+.settings-panel .settings-dashboard-row,
+.settings-panel .settings-dashboard-quiet,
+.settings-panel .settings-exchange-card,
+.settings-panel .api-settings-view > section,
+.settings-panel .api-settings-view > div > section {
+  border-radius: var(--settings-radius-unified) !important;
 }
 
 .settings-panel .settings-sidebar-item.active {
@@ -10509,29 +10563,19 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-reference-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%),
-    var(--settings-section-bg);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.025),
-    0 0 0 1px rgb(255 255 255 / 0.015),
-    0 24px 64px rgb(2 6 23 / 0.16);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--settings-section-bg);
+  box-shadow: var(--settings-card-shadow);
   padding: 22px;
 }
 
 .settings-panel .settings-reference-card--soft {
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.035) 0%, transparent 100%),
-    var(--settings-surface-overlay);
+  background: var(--settings-surface-overlay);
 }
 
 .settings-panel .settings-reference-card--elevated {
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%),
-    var(--settings-surface-elevated);
+  background: var(--settings-surface-elevated);
 }
 
 .settings-panel .settings-reference-card__header {
@@ -10587,13 +10631,11 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-reference-mini-metric {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 20px;
   padding: 14px 16px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, transparent 100%),
-    var(--settings-surface-elevated);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
+  background: var(--settings-surface-elevated);
+  box-shadow: none;
 }
 
 .settings-panel .settings-reference-mini-metric__label {
@@ -10673,7 +10715,7 @@ body.dark-mode .settings-panel {
   display: flex;
   align-items: center;
   gap: 16px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 22px;
   padding: 14px 16px;
   background:
@@ -10741,13 +10783,11 @@ body.dark-mode .settings-panel {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 22px;
   padding: 15px 16px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.025) 0%, transparent 100%),
-    var(--settings-surface-elevated);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
+  background: var(--settings-surface-elevated);
+  box-shadow: none;
 }
 
 .settings-panel .settings-reference-list-item__title {
@@ -10784,8 +10824,8 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-reference-segment.is-active {
-  background: linear-gradient(90deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%);
-  box-shadow: 0 0 20px rgb(var(--settings-accent-rgb) / 0.24);
+  background: rgb(var(--settings-accent-rgb));
+  box-shadow: none;
 }
 
 .settings-panel .settings-reference-toolbar {
@@ -10819,7 +10859,7 @@ body.dark-mode .settings-panel {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 20px;
   padding: 13px 14px;
   background:
@@ -10841,7 +10881,7 @@ body.dark-mode .settings-panel {
   min-height: 320px;
   flex-direction: column;
   gap: 18px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 28px;
   padding: 20px;
   background:
@@ -10895,7 +10935,7 @@ body.dark-mode .settings-panel {
   align-items: center;
   justify-content: center;
   border-radius: 18px;
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.025) 0%, transparent 100%),
     var(--settings-surface-overlay);
@@ -10951,7 +10991,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-provider-card__metric {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 18px;
   padding: 12px 14px;
   background:
@@ -11060,7 +11100,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-log-entry {
-  border: 1px solid var(--settings-border-subtle);
+  border: none; /* Ƴɱ߿ */
   border-radius: 22px;
   padding: 14px 16px;
   background:
@@ -11257,33 +11297,30 @@ body:not(.dark-mode) {
 }
 
 .settings-panel {
-  --settings-accent-rgb: 130 135 145;
-  --settings-accent-soft-rgb: 168 172 180;
+  --settings-accent-rgb: 0 113 227;
+  --settings-accent-soft-rgb: 41 151 255;
   --settings-success-rgb: 22 163 74;
-  --settings-shell-bg:
-    linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(243 245 248 / 0.98) 100%);
-  --settings-sidebar-bg:
-    linear-gradient(180deg, rgb(255 255 255 / 0.99) 0%, rgb(245 247 250 / 0.99) 100%);
-  --settings-canvas-bg:
-    linear-gradient(180deg, rgb(249 250 252 / 1) 0%, rgb(239 242 246 / 1) 100%);
-  --settings-page-bg: #EEF1F4;
-  --settings-section-bg: rgb(255 255 255 / 1);
-  --settings-surface-elevated: rgb(255 255 255 / 1);
-  --settings-surface-overlay: rgb(246 247 249 / 0.98);
-  --settings-shell-header-bg:
-    linear-gradient(180deg, rgb(255 255 255 / 0.96) 0%, rgb(248 250 252 / 0.92) 100%),
-    rgb(255 255 255 / 0.92);
-  --settings-shell-border: rgba(15, 23, 42, 0.08);
-  --settings-sidebar-border: rgba(15, 23, 42, 0.06);
-  --settings-border-subtle: rgba(15, 23, 42, 0.08);
-  --settings-card-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
-  --settings-shell-shadow: 0 28px 80px rgba(15, 23, 42, 0.14);
-  --settings-sidebar-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.04), 16px 0 32px rgba(15, 23, 42, 0.06);
-  --settings-focus-border: rgba(120, 126, 138, 0.42);
-  --settings-focus-ring: rgba(120, 126, 138, 0.14);
-  --settings-state-info-bg: rgba(148, 163, 184, 0.08);
-  --settings-state-info-border: rgba(148, 163, 184, 0.16);
-  --settings-state-info-text: #64748b;
+  --settings-shell-bg: #ffffff;
+  --settings-page-bg: #f5f5f7;
+  --settings-canvas-bg: #f5f5f7;
+  --settings-section-bg: #ffffff;
+  --settings-surface-elevated: #ffffff;
+  --settings-surface-overlay: #fbfbfd;
+  --settings-nav-glass-bg: rgba(29, 29, 31, 0.78);
+  --settings-nav-glass-border: rgba(255, 255, 255, 0.12);
+  --settings-shell-header-bg: var(--settings-nav-glass-bg);
+  --settings-sidebar-bg: var(--settings-nav-glass-bg);
+  --settings-shell-border: rgba(29, 29, 31, 0.08);
+  --settings-sidebar-border: var(--settings-nav-glass-border);
+  --settings-border-subtle: rgba(29, 29, 31, 0.08);
+  --settings-card-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
+  --settings-shell-shadow: 0 28px 72px rgba(0, 0, 0, 0.12);
+  --settings-sidebar-shadow: none;
+  --settings-focus-border: rgba(0, 113, 227, 0.48);
+  --settings-focus-ring: rgba(0, 113, 227, 0.14);
+  --settings-state-info-bg: rgba(0, 113, 227, 0.08);
+  --settings-state-info-border: rgba(0, 113, 227, 0.16);
+  --settings-state-info-text: #0066cc;
   --settings-state-success-bg: rgba(22, 163, 74, 0.1);
   --settings-state-success-border: rgba(22, 163, 74, 0.16);
   --settings-state-success-text: #047857;
@@ -11293,90 +11330,89 @@ body:not(.dark-mode) {
   --settings-state-danger-bg: rgba(239, 68, 68, 0.08);
   --settings-state-danger-border: rgba(239, 68, 68, 0.16);
   --settings-state-danger-text: #b91c1c;
-  --text-primary: #111827;
-  --text-secondary: rgba(17, 24, 39, 0.76);
-  --text-tertiary: rgba(55, 65, 81, 0.68);
-  --text-muted: rgba(107, 114, 128, 0.58);
+  --text-primary: #1d1d1f;
+  --text-secondary: rgba(29, 29, 31, 0.72);
+  --text-tertiary: rgba(29, 29, 31, 0.52);
+  --text-muted: rgba(29, 29, 31, 0.32);
+  --settings-nav-text-primary: #ffffff;
+  --settings-nav-text-secondary: rgba(255, 255, 255, 0.74);
+  --settings-nav-text-tertiary: rgba(255, 255, 255, 0.52);
   --text-inverse: var(--settings-button-primary-text);
   --error: var(--settings-button-danger-text);
-  --settings-input-bg: rgb(255 255 255 / 1);
-  --settings-input-border: rgba(15, 23, 42, 0.14);
-  --settings-input-shadow: 0 1px 0 rgb(255 255 255 / 0.98), 0 12px 24px rgba(15, 23, 42, 0.06);
-  --settings-search-bg: linear-gradient(180deg, rgb(255 255 255 / 0.96) 0%, rgb(248 250 252 / 0.92) 100%);
-  --settings-search-border: rgba(15, 23, 42, 0.1);
-  --settings-segment-shell-bg: linear-gradient(180deg, rgb(244 247 251 / 1) 0%, rgb(236 240 245 / 1) 100%);
-  --settings-segment-shell-border: rgba(15, 23, 42, 0.1);
-  --settings-segment-shell-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
-  --settings-segment-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(251 252 254 / 1) 100%);
-  --settings-segment-active-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(242 247 255 / 1) 100%);
-  --settings-segment-border: rgba(15, 23, 42, 0.12);
-  --settings-segment-active-border: rgb(var(--settings-accent-rgb) / 0.24);
-  --settings-segment-active-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
+  --settings-input-bg: #ffffff;
+  --settings-input-border: rgba(29, 29, 31, 0.12);
+  --settings-input-shadow: none;
+  --settings-search-bg: rgba(255, 255, 255, 0.08);
+  --settings-search-border: rgba(255, 255, 255, 0.12);
+  --settings-segment-shell-bg: #f3f3f5;
+  --settings-segment-shell-border: rgba(29, 29, 31, 0.08);
+  --settings-segment-shell-shadow: none;
+  --settings-segment-bg: #f3f3f5;
+  --settings-segment-active-bg: #ffffff;
+  --settings-segment-border: rgba(29, 29, 31, 0.08);
+  --settings-segment-active-border: rgba(29, 29, 31, 0.08);
+  --settings-segment-active-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
   --settings-option-bg: #ffffff;
-  --settings-option-text: #111827;
+  --settings-option-text: #1d1d1f;
   --bg-secondary: var(--settings-section-bg);
   --bg-tertiary: var(--settings-surface-elevated);
   --border-light: var(--settings-border-subtle);
-  --settings-button-primary-bg: linear-gradient(135deg, #A4A9B2 0%, #7F8590 100%);
+  --settings-button-primary-bg: rgb(var(--settings-accent-rgb));
   --settings-button-primary-text: #ffffff;
-  --settings-button-primary-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
-  --settings-button-secondary-bg: linear-gradient(180deg, rgb(255 255 255 / 1) 0%, rgb(252 253 255 / 1) 100%);
-  --settings-button-secondary-border: rgba(15, 23, 42, 0.1);
-  --settings-button-secondary-text: var(--text-primary);
+  --settings-button-primary-shadow: none;
+  --settings-button-secondary-bg: #ffffff;
+  --settings-button-secondary-border: rgba(29, 29, 31, 0.12);
+  --settings-button-secondary-text: #1d1d1f;
   --settings-button-danger-bg: rgb(239 68 68 / 0.08);
   --settings-button-danger-border: rgb(239 68 68 / 0.16);
   --settings-button-danger-text: #c62828;
-  --settings-nav-hover-bg: rgba(15, 23, 42, 0.04);
-  --settings-nav-active-bg:
-    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.12) 0%, rgb(var(--settings-accent-soft-rgb) / 0.05) 100%),
-    rgb(255 255 255 / 0.98);
-  --settings-nav-active-border: rgb(var(--settings-accent-rgb) / 0.18);
-  --settings-status-bg: linear-gradient(180deg, rgb(22 163 74 / 0.14) 0%, rgb(22 163 74 / 0.08) 100%);
+  --settings-nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --settings-nav-active-bg: rgba(255, 255, 255, 0.12);
+  --settings-nav-active-border: rgba(255, 255, 255, 0.16);
+  --settings-status-bg: rgba(22, 163, 74, 0.12);
   --settings-status-border: rgb(22 163 74 / 0.18);
   --settings-status-text: #047857;
-  --settings-avatar-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.14) 0%, rgb(var(--settings-accent-soft-rgb) / 0.08) 100%);
-  --settings-avatar-border: rgb(var(--settings-accent-rgb) / 0.12);
-  --settings-avatar-text: #4b5563;
+  --settings-avatar-bg: rgba(255, 255, 255, 0.14);
+  --settings-avatar-border: rgba(255, 255, 255, 0.16);
+  --settings-avatar-text: #ffffff;
   --settings-notification-dot-border: #ffffff;
-  --settings-backdrop-bg: rgb(244 247 251 / 0.76);
-  --settings-subcard-shadow: 0 16px 34px rgba(15, 23, 42, 0.1), 0 4px 10px rgba(15, 23, 42, 0.05);
-  --settings-subcard-hover-shadow: 0 22px 44px rgba(15, 23, 42, 0.14), 0 6px 14px rgba(15, 23, 42, 0.06);
-  --settings-chart-bg: linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.96) 100%);
-  --settings-chart-border: rgba(15, 23, 42, 0.08);
-  --settings-chart-grid: rgba(148, 163, 184, 0.3);
-  --settings-log-details-bg: rgb(248 250 252 / 0.96);
-  --settings-log-details-border: rgba(15, 23, 42, 0.08);
-  --settings-track-bg: rgba(148, 163, 184, 0.22);
-  --settings-ring-track: rgba(148, 163, 184, 0.2);
+  --settings-backdrop-bg: rgba(245, 245, 247, 0.86);
+  --settings-subcard-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  --settings-subcard-hover-shadow: 0 16px 32px rgba(0, 0, 0, 0.12);
+  --settings-chart-bg: #ffffff;
+  --settings-chart-border: rgba(29, 29, 31, 0.08);
+  --settings-chart-grid: rgba(29, 29, 31, 0.08);
+  --settings-log-details-bg: #fbfbfd;
+  --settings-log-details-border: rgba(29, 29, 31, 0.08);
+  --settings-track-bg: rgba(29, 29, 31, 0.1);
+  --settings-ring-track: rgba(29, 29, 31, 0.08);
 }
 
 body.dark-mode .settings-panel {
-  --settings-accent-rgb: 148 152 161;
-  --settings-accent-soft-rgb: 116 120 128;
+  --settings-accent-rgb: 41 151 255;
+  --settings-accent-soft-rgb: 0 113 227;
   --settings-success-rgb: 52 211 153;
-  --settings-shell-bg: #1B1D21;
-  --settings-page-bg: #24272C;
-  --settings-sidebar-bg:
-    linear-gradient(180deg, rgb(34 37 42 / 0.98) 0%, rgb(29 32 37 / 1) 100%);
-  --settings-canvas-bg:
-    linear-gradient(180deg, rgb(40 43 48 / 1) 0%, rgb(34 37 42 / 1) 100%);
-  --settings-section-bg: rgb(36 39 44 / 0.98);
-  --settings-surface-elevated: rgb(41 44 49 / 0.98);
-  --settings-surface-overlay: rgb(33 36 41 / 0.96);
-  --settings-shell-header-bg:
-    linear-gradient(180deg, rgb(255 255 255 / 0.02) 0%, rgb(255 255 255 / 0.008) 100%),
-    rgb(31 34 39 / 0.96);
-  --settings-shell-border: rgb(255 255 255 / 0.12);
-  --settings-sidebar-border: rgb(255 255 255 / 0.08);
+  --settings-shell-bg: #000000;
+  --settings-page-bg: #0f0f10;
+  --settings-canvas-bg: #0f0f10;
+  --settings-section-bg: #1d1d1f;
+  --settings-surface-elevated: #1d1d1f;
+  --settings-surface-overlay: #161618;
+  --settings-nav-glass-bg: rgba(29, 29, 31, 0.78);
+  --settings-nav-glass-border: rgba(255, 255, 255, 0.12);
+  --settings-shell-header-bg: var(--settings-nav-glass-bg);
+  --settings-sidebar-bg: var(--settings-nav-glass-bg);
+  --settings-shell-border: rgba(255, 255, 255, 0.12);
+  --settings-sidebar-border: var(--settings-nav-glass-border);
   --settings-border-subtle: rgb(255 255 255 / 0.1);
   --settings-card-shadow: 0 20px 44px rgb(0 0 0 / 0.16);
   --settings-shell-shadow: 0 28px 72px rgb(0 0 0 / 0.26);
-  --settings-sidebar-shadow: inset -1px 0 0 rgb(255 255 255 / 0.035), 18px 0 36px rgb(0 0 0 / 0.14);
-  --settings-focus-border: rgba(172, 176, 184, 0.38);
-  --settings-focus-ring: rgba(172, 176, 184, 0.12);
-  --settings-state-info-bg: rgba(148, 163, 184, 0.16);
-  --settings-state-info-border: rgba(148, 163, 184, 0.28);
-  --settings-state-info-text: #e2e8f0;
+  --settings-sidebar-shadow: none;
+  --settings-focus-border: rgba(41, 151, 255, 0.48);
+  --settings-focus-ring: rgba(41, 151, 255, 0.16);
+  --settings-state-info-bg: rgba(41, 151, 255, 0.16);
+  --settings-state-info-border: rgba(41, 151, 255, 0.24);
+  --settings-state-info-text: #7cc2ff;
   --settings-state-success-bg: rgba(52, 211, 153, 0.16);
   --settings-state-success-border: rgba(52, 211, 153, 0.26);
   --settings-state-success-text: #bbf7d0;
@@ -11387,55 +11423,57 @@ body.dark-mode .settings-panel {
   --settings-state-danger-border: rgba(248, 113, 113, 0.26);
   --settings-state-danger-text: #fecaca;
   --text-primary: #fbfdff;
-  --text-secondary: rgb(226 232 240 / 0.8);
-  --text-tertiary: rgb(148 163 184 / 0.78);
-  --text-muted: rgb(148 163 184 / 0.6);
+  --text-secondary: rgba(255, 255, 255, 0.74);
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-muted: rgba(255, 255, 255, 0.32);
+  --settings-nav-text-primary: #ffffff;
+  --settings-nav-text-secondary: rgba(255, 255, 255, 0.74);
+  --settings-nav-text-tertiary: rgba(255, 255, 255, 0.52);
   --text-inverse: var(--settings-button-primary-text);
   --error: var(--settings-button-danger-text);
-  --settings-input-bg: rgb(28 35 46 / 0.98);
-  --settings-input-border: rgb(255 255 255 / 0.12);
+  --settings-input-bg: #161618;
+  --settings-input-border: rgba(255, 255, 255, 0.12);
   --settings-input-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
-  --settings-search-bg: linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, rgb(255 255 255 / 0.015) 100%);
-  --settings-search-border: rgb(255 255 255 / 0.11);
-  --settings-segment-shell-bg: linear-gradient(180deg, rgb(19 26 34 / 0.98) 0%, rgb(16 22 29 / 1) 100%);
-  --settings-segment-shell-border: rgb(255 255 255 / 0.08);
-  --settings-segment-shell-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
-  --settings-segment-bg: linear-gradient(180deg, rgb(33 41 52 / 0.96) 0%, rgb(27 34 44 / 0.98) 100%);
-  --settings-segment-active-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.24) 0%, rgb(var(--settings-accent-soft-rgb) / 0.1) 100%);
-  --settings-segment-border: rgb(255 255 255 / 0.1);
-  --settings-segment-active-border: rgb(var(--settings-accent-rgb) / 0.34);
-  --settings-segment-active-shadow: 0 14px 30px rgb(0 0 0 / 0.24);
+  --settings-search-bg: rgba(255, 255, 255, 0.08);
+  --settings-search-border: rgba(255, 255, 255, 0.12);
+  --settings-segment-shell-bg: #161618;
+  --settings-segment-shell-border: rgba(255, 255, 255, 0.08);
+  --settings-segment-shell-shadow: none;
+  --settings-segment-bg: #161618;
+  --settings-segment-active-bg: #2a2a2d;
+  --settings-segment-border: rgba(255, 255, 255, 0.08);
+  --settings-segment-active-border: rgba(255, 255, 255, 0.1);
+  --settings-segment-active-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   --settings-option-bg: #1b2430;
   --settings-option-text: #f8fafc;
   --bg-secondary: var(--settings-section-bg);
   --bg-tertiary: var(--settings-surface-elevated);
   --border-light: var(--settings-border-subtle);
-  --settings-button-primary-bg: linear-gradient(135deg, #9A9FA8 0%, #777D87 100%);
-  --settings-button-primary-shadow: 0 16px 30px rgb(0 0 0 / 0.18);
-  --settings-button-secondary-bg: linear-gradient(180deg, rgb(43 46 51 / 0.94) 0%, rgb(35 38 43 / 0.98) 100%);
-  --settings-button-secondary-border: rgb(255 255 255 / 0.12);
+  --settings-button-primary-bg: rgb(var(--settings-accent-rgb));
+  --settings-button-primary-shadow: none;
+  --settings-button-secondary-bg: #1d1d1f;
+  --settings-button-secondary-border: rgba(255, 255, 255, 0.12);
+  --settings-button-secondary-text: #ffffff;
   --settings-button-danger-bg: rgb(255 84 84 / 0.11);
   --settings-button-danger-border: rgb(255 110 110 / 0.22);
   --settings-button-danger-text: #ff9a9a;
   --settings-nav-hover-bg: rgb(255 255 255 / 0.04);
-  --settings-nav-active-bg:
-    linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.14) 0%, rgb(var(--settings-accent-soft-rgb) / 0.05) 100%),
-    rgb(35 38 43 / 0.99);
-  --settings-nav-active-border: rgb(var(--settings-accent-rgb) / 0.18);
+  --settings-nav-active-bg: rgba(255, 255, 255, 0.12);
+  --settings-nav-active-border: rgba(255, 255, 255, 0.16);
   --settings-status-bg: linear-gradient(180deg, rgb(16 185 129 / 0.18) 0%, rgb(16 185 129 / 0.1) 100%);
   --settings-status-border: rgb(16 185 129 / 0.26);
   --settings-status-text: #97f5d0;
-  --settings-avatar-bg: linear-gradient(135deg, rgb(var(--settings-accent-rgb) / 0.26) 0%, rgb(var(--settings-accent-soft-rgb) / 0.12) 100%);
-  --settings-avatar-border: rgb(var(--settings-accent-rgb) / 0.18);
+  --settings-avatar-bg: rgba(255, 255, 255, 0.14);
+  --settings-avatar-border: rgba(255, 255, 255, 0.16);
   --settings-avatar-text: #f3f4f6;
   --settings-notification-dot-border: rgb(6 10 16);
   --settings-backdrop-bg: rgb(2 3 5 / 0.84);
-  --settings-subcard-shadow: 0 16px 36px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.12);
-  --settings-subcard-hover-shadow: 0 22px 48px rgba(0, 0, 0, 0.24), 0 6px 14px rgba(0, 0, 0, 0.16);
-  --settings-chart-bg: linear-gradient(180deg, rgb(18 22 30 / 0.88) 0%, rgb(11 14 20 / 0.94) 100%);
+  --settings-subcard-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+  --settings-subcard-hover-shadow: 0 22px 48px rgba(0, 0, 0, 0.24);
+  --settings-chart-bg: #161618;
   --settings-chart-border: rgb(255 255 255 / 0.08);
   --settings-chart-grid: rgb(255 255 255 / 0.08);
-  --settings-log-details-bg: rgb(9 12 18 / 0.6);
+  --settings-log-details-bg: rgba(255, 255, 255, 0.04);
   --settings-log-details-border: rgb(255 255 255 / 0.06);
   --settings-track-bg: rgb(255 255 255 / 0.08);
   --settings-ring-track: rgb(255 255 255 / 0.08);
@@ -11562,4 +11600,26 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-provider-card--return-focus {
   animation: settings-provider-card-return-focus 1.4s ease-out;
+}
+
+/* Partial redraw blur overlay (lightbox) */
+.partial-redraw-blur-overlay {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  pointer-events: none;
+  transition: opacity 0.4s ease-out;
+}
+
+.partial-redraw-blur-overlay--exiting {
+  opacity: 0;
+}
+
+.partial-redraw-fade-in {
+  animation: partialRedrawFadeIn 0.5s ease-out;
+}
+
+@keyframes partialRedrawFadeIn {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
 }

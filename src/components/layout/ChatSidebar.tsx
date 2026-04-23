@@ -1,4 +1,4 @@
-﻿
+
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, Loader2, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
@@ -53,7 +53,7 @@ const ChatSidebarModelMenuButton = React.memo(function ChatSidebarModelMenuButto
         <button
             onClick={() => onSelect(model)}
             onContextMenu={(event) => onOpenContextMenu(event, model.id)}
-            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selected ? 'bg-white/10 ring-1 ring-white/20' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] border border-transparent'}`}
+            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selected ? 'bg-white/5 dark:bg-white/10 shadow-sm' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
         >
             <span className="mt-0.5 relative shrink-0 inline-flex h-5 w-5 items-center justify-center">
                 <ModelLogo
@@ -1767,9 +1767,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     }}
                     onMouseDown={registerActivity}
                     onWheel={registerActivity}
-                    className={`fixed z-[100] flex flex-col bg-[var(--bg-secondary)] backdrop-blur-2xl border-[var(--border-light)] shadow-[var(--shadow-lg)] overflow-hidden ${isMobile
-                        ? 'left-2 right-2 rounded-[24px] border pb-0'
-                        : 'top-0 right-0 bottom-0 border-l border-t-0 border-r-0 border-b-0'
+                    className={`fixed z-[100] flex flex-col bg-[var(--toolbar-bg)] backdrop-blur-[40px] border-[var(--border-subtle)] shadow-[var(--shadow-lg)] overflow-hidden ${isMobile
+                        ? 'left-2 right-2 rounded-[32px] border pb-0'
+                        : 'top-0 right-0 bottom-0 border-l'
                         }`}
                     style={isMobile ? {
                         top: 'calc(env(safe-area-inset-top, 0px) + var(--mobile-header-height, 56px) + 10px)',
@@ -1942,9 +1942,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                     e.preventDefault();
                                                     setSessionContextMenu({ x: e.clientX, y: e.clientY, sessionId: row.session.id });
                                                 }}
-                                                className={`flex-1 flex flex-col text-left px-2 py-1.5 min-w-0 rounded-lg border border-transparent transition-colors ${row.session.id === activeSessionId
-                                                    ? 'bg-[var(--primary-light)] text-[var(--primary)] border-[var(--primary)]/30'
-                                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                                                className={`flex-1 flex flex-col text-left px-2 py-1.5 min-w-0 rounded-lg transition-colors ${row.session.id === activeSessionId
+                                                    ? 'bg-[var(--primary-light)] text-[var(--primary)]'
+                                                    : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'
                                                     }`}
                                             >
                                                 <div className="truncate text-xs font-medium">

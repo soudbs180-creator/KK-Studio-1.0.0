@@ -2,9 +2,14 @@ import fs from 'fs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import path from 'path';
-import { defineConfig, loadEnv, Plugin } from 'vite';
-import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo';
-import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, loadEnv } from 'vite';
+import type { Plugin } from 'vite';
+import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo.ts';
+import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const VERSION_MANIFEST_FILENAME = 'app-version.json';
 const TURNSTILE_DIAGNOSTIC_ENTRY = path.resolve(__dirname, 'turnstile-diagnostic.html');

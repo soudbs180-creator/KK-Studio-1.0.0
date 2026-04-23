@@ -255,3 +255,148 @@ test('buildEcommerceRenderTask emits normalized asset roles and business display
   assert.deepEqual(renderTask.taskState.consistencyChecks, renderTask.consistencyChecks);
   assert.notEqual(renderTask.taskState, taskState);
 });
+
+test('buildEcommerceRenderTask includes staged A+ business size constraints in the prompt body', () => {
+  const taskState = mergeEcommerceTaskState({
+    baseTask: createTaskState({
+      taskId: 'task-aplus-1464',
+      sourceKind: 'a-plus-module',
+      sourceSheet: 'A+',
+      sourceRowKey: 'aplus-1464',
+      theme: 'Hero banner module',
+      outputTypeLabel: 'A+',
+      declaredSizeText: '1464*600',
+      sizeTier: '1464x600',
+      displayLabel: 'A+ 21:9 4K',
+    }),
+    seriesTemplate: createSeriesTemplate(),
+    sparseIntent: 'desktop hero first, keep room for later mobile compaction',
+    productName: 'Portable Air Cooler',
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '21:9',
+    imageSize: '4K',
+  });
+
+  assert.match(renderTask.prompt, /Business size/i);
+  assert.match(renderTask.prompt, /1464\*600/);
+  assert.match(renderTask.prompt, /600\*450/i);
+  assert.match(renderTask.prompt, /mobile/i);
+});
+
+test('buildEcommerceRenderTask prefers effective A+ size constraints over detected size tiers when the global control overrides them', () => {
+  const taskState = mergeEcommerceTaskState({
+    baseTask: createTaskState({
+      taskId: 'task-aplus-override',
+      sourceKind: 'a-plus-module',
+      sourceSheet: 'A+',
+      sourceRowKey: 'aplus-override',
+      theme: 'Shared banner module',
+      outputTypeLabel: 'A+',
+      declaredSizeText: '1464*600',
+      sizeTier: '1464x600',
+      effectiveSizeTier: '970x600',
+      effectiveSizePolicy: 'sheet-native',
+      displayLabel: 'A+ 16:9 4K',
+    }),
+    seriesTemplate: createSeriesTemplate(),
+    sparseIntent: 'single desktop and mobile shared composition',
+    productName: 'Portable Air Cooler',
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '16:9',
+    imageSize: '4K',
+  });
+
+  assert.match(renderTask.prompt, /970\*600/);
+  assert.doesNotMatch(renderTask.prompt, /1464\*600[^]*600\*450/i);
+  assert.match(renderTask.prompt, /single desktop\/mobile shared composition/i);
+});
+
+test('buildEcommerceRenderTask keeps product-first prompt framing before background and style constraints', () => {
+  const taskState = mergeEcommerceTaskState({
+    baseTask: createTaskState({
+      taskId: 'task-main-product-first',
+      copy: {
+        headline: 'Fast Cooling',
+        subheadline: 'Portable tower fan',
+        highlight: '16.5Gal',
+        featureTags: ['Ice Wind', 'Low Noise'],
+        cta: '',
+      },
+      style: {
+        tone: '清新轻盈',
+        atmosphere: '卧室午后',
+        effect: '柔光氛围',
+        backgroundType: '明亮家居背景',
+      },
+    }),
+    seriesTemplate: createSeriesTemplate(),
+    sparseIntent: '产品主体是上传的冷风机，背景是卧室午后，要求清新轻盈',
+    productName: 'Portable Air Cooler',
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '1:1',
+    imageSize: '4K',
+  });
+
+  const productIndex = renderTask.prompt.indexOf('产品图');
+  const styleIndex = renderTask.prompt.indexOf('风格要求');
+
+  assert.notEqual(productIndex, -1);
+  assert.notEqual(styleIndex, -1);
+  assert.ok(productIndex < styleIndex);
+  assert.match(renderTask.prompt, /背景：明亮家居背景/);
+});
+
+test('buildEcommerceRenderTask surfaces unified figure aliases for the current item materials', () => {
+  const taskState = createTaskState({
+    assetRoles: [
+      {
+        assetId: 'ref-1',
+        role: 'reference',
+        label: '参考图1',
+        normalizedLabel: '参考图1',
+        aliasLabel: '图1',
+        source: 'analysis',
+      },
+      {
+        assetId: 'ref-2',
+        role: 'reference',
+        label: '参考图2',
+        normalizedLabel: '参考图2',
+        aliasLabel: '图2',
+        source: 'analysis',
+      },
+      {
+        assetId: 'product-1',
+        role: 'product',
+        label: '产品图1',
+        normalizedLabel: '产品图',
+        aliasLabel: '图3',
+        source: 'upload',
+      },
+    ],
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '1:1',
+    imageSize: '4K',
+  });
+
+  assert.match(renderTask.prompt, /参考图：图1（参考图1）/);
+  assert.match(renderTask.prompt, /参考图：图2（参考图2）/);
+  assert.match(renderTask.prompt, /产品图：图3（产品图1）/);
+  assert.match(renderTask.prompt, /优先展示：图3（产品图1）/);
+});

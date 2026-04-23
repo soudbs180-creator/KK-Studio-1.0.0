@@ -1,9 +1,14 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { readdir, stat } from 'node:fs/promises';
+import { runBrowserPreflight } from './browser-preflight.mjs';
+import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'mobile-settings-smoke');
 const TARGET_URL = 'http://127.0.0.1:3000';
+const SETTINGS_HOME_PATH = '/settings';
+const SETTINGS_API_PATH = '/settings/api-management';
 const STORAGE_KEY = 'kk_studio_canvas_state';
 
 const tinyPng =
@@ -141,9 +146,18 @@ function ensureArtifactsDir() {
   }
 }
 
-async function resolvePlaywrightModuleUrl() {
-  const { readdir, stat } = await import('node:fs/promises');
+function readSource(relativePath) {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
 
+function isBrowserLaunchUnavailable(error) {
+  const message = String(error?.message || error || '');
+  return /spawn EPERM/i.test(message)
+    || /Playwright npx cache directory not found/i.test(message)
+    || /Playwright module was not found/i.test(message);
+}
+
+async function resolvePlaywrightModuleUrl() {
   const npxCacheRoot = path.join(process.env.LOCALAPPDATA || '', 'npm-cache', '_npx');
   if (!npxCacheRoot || !existsSync(npxCacheRoot)) {
     throw new Error('Playwright npx cache directory not found. Run `cmd /c npx playwright --version` once first.');
@@ -183,7 +197,7 @@ async function gotoWithRetry(page, url) {
 }
 
 async function dismissStorageModalIfPresent(page) {
-  const saveSettingsButton = page.getByRole('button', { name: /保存设置|Save settings/i });
+  const saveSettingsButton = page.getByRole('button', { name: /Save settings/i });
   if (await saveSettingsButton.isVisible().catch(() => false)) {
     await saveSettingsButton.click();
     await page.waitForTimeout(1200);
@@ -191,7 +205,7 @@ async function dismissStorageModalIfPresent(page) {
 }
 
 async function dismissSettingsPanelIfPresent(page) {
-  const closeButton = page.getByRole('button', { name: /关闭设置|Close settings|关闭/i }).first();
+  const closeButton = page.getByRole('button', { name: /Close settings|Close/i }).first();
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();
     await page.waitForTimeout(800);
@@ -205,19 +219,118 @@ async function assertVisible(locator, message) {
   }
 }
 
-const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
-const { chromium } = await import(playwrightModuleUrl);
+async function assertHttpHtml(url) {
+  const response = await fetch(url, { redirect: 'manual' });
+  if (!response.ok) {
+    throw new Error(`Expected ${url} to respond successfully, got ${response.status}.`);
+  }
+
+  const html = await response.text();
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected ${url} to return HTML content.`);
+  }
+
+  return {
+    url,
+    status: response.status,
+    length: html.length,
+  };
+}
+
+function verifyMobileSourceContracts() {
+  const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
+  const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
+  const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
+  const settingsHomeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
+  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
+
+  const checks = [
+    /data-testid="mobile-header-menu-button"/,
+    /data-testid="mobile-more-menu-settings"/,
+    /data-testid="mobile-more-sheet"/,
+    /data-testid=\{`mobile-result-tile-\$\{entry\.id\}`\}/,
+    /data-testid=\{`mobile-settings-entry-\$\{entry\.id\}`\}/,
+    /Overview \/ API \/ Billing \/ Errors/,
+    /SettingsBadge/,
+    /testId\?: string;/,
+    /data-testid=\{testId\}/,
+    /testId="settings-workbench-overview"/,
+    /testId="settings-workbench-current-view"/,
+    /testId="settings-workbench-stage"/,
+    /testId="settings-workbench-diagnostics"/,
+    /testId="settings-workbench-platform"/,
+  ];
+
+  const sources = [
+    mobileHeaderSource,
+    mobileSurfaceSource,
+    mobileTileSource,
+    settingsHomeSource,
+    workbenchSectionsSource,
+    scaffoldSource,
+  ];
+
+  for (const pattern of checks) {
+    if (!sources.some((source) => pattern.test(source))) {
+      throw new Error(`Mobile settings source contract missing pattern: ${pattern}`);
+    }
+  }
+}
+
+async function runFallbackVerification(error, browserPreflight) {
+  verifyMobileSourceContracts();
+
+  const routes = await Promise.all([
+    assertHttpHtml(TARGET_URL),
+    assertHttpHtml(`${TARGET_URL}${SETTINGS_HOME_PATH}`),
+    assertHttpHtml(`${TARGET_URL}${SETTINGS_API_PATH}`),
+  ]);
+
+  const summary = {
+    mode: 'fallback',
+    reason: String(error?.message || error),
+    browserPreflight,
+    routes,
+    artifactDir: ARTIFACT_DIR,
+    seededCanvasState: {
+      activeCanvasId: seededCanvasState.activeCanvasId,
+      canvasCount: seededCanvasState.canvases.length,
+      promptNodeCount: seededCanvasState.canvases[0]?.promptNodes.length || 0,
+      imageNodeCount: seededCanvasState.canvases[0]?.imageNodes.length || 0,
+    },
+  };
+
+  writeFileSync(
+    path.join(ARTIFACT_DIR, 'mobile-settings-fallback.json'),
+    JSON.stringify(summary, null, 2),
+    'utf8',
+  );
+
+  console.log(JSON.stringify(summary, null, 2));
+}
 
 ensureArtifactsDir();
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: 430, height: 932 },
-  isMobile: true,
-  hasTouch: true,
-});
+let browser;
+let viteServer;
+let browserPreflight = null;
 
 try {
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  viteServer = ensured.server;
+  browserPreflight = await runBrowserPreflight();
+
+  const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
+  const { chromium } = await import(playwrightModuleUrl);
+
+  browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({
+    viewport: { width: 430, height: 932 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
   await gotoWithRetry(page, TARGET_URL);
   await page.waitForTimeout(1000);
   await dismissStorageModalIfPresent(page);
@@ -260,7 +373,7 @@ try {
     fullPage: true,
   });
 
-  await page.getByRole('button', { name: /关闭结果详情|Close result detail/i }).click();
+  await page.getByRole('button', { name: /鍏抽棴缁撴灉璇︽儏|Close result detail/i }).click();
   await detailScreen.waitFor({ state: 'hidden', timeout: 10000 });
   await assertVisible(resultTile, 'Mobile result tile did not reappear after closing detail view.');
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
@@ -305,7 +418,7 @@ try {
   await assertVisible(workbenchStage, 'Settings workbench stage section did not render.');
   await assertVisible(workbenchPlatform, 'Settings workbench platform section did not render.');
 
-  await workbenchStage.getByRole('button', { name: /查看诊断|Show diagnostics/i }).click();
+  await workbenchStage.getByRole('button', { name: /鏌ョ湅璇婃柇|Show diagnostics/i }).click();
 
   const workbenchDiagnostics = page.getByTestId('settings-workbench-diagnostics');
   await assertVisible(workbenchDiagnostics, 'Settings workbench diagnostics section did not appear after toggling.');
@@ -316,6 +429,8 @@ try {
   });
 
   console.log(JSON.stringify({
+    mode: 'browser',
+    browserPreflight,
     mobileHome: {
       shellVisible: true,
       tileVisible: true,
@@ -334,6 +449,17 @@ try {
     },
     artifactDir: ARTIFACT_DIR,
   }, null, 2));
+} catch (error) {
+  if (isBrowserLaunchUnavailable(error)) {
+    await runFallbackVerification(error, browserPreflight);
+  } else {
+    throw error;
+  }
 } finally {
-  await browser.close();
+  if (browser) {
+    await browser.close();
+  }
+  if (viteServer) {
+    await viteServer.close();
+  }
 }

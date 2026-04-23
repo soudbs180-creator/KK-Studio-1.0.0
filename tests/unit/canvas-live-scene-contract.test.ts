@@ -149,4 +149,14 @@ describe('canvas live scene contract', () => {
     assert.match(imageSource, /onDragCommit\?:/)
     assert.match(imageSource, /onDragCommitRef\.current\?\.\(/)
   })
+
+  test('draggable card surfaces scale from the bottom-center anchor to keep drag alignment stable', () => {
+    const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx')
+    const imageSource = readSource('src/components/image/ImageCard2.tsx')
+
+    assert.match(promptSource, /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 100%'/)
+    assert.match(imageSource, /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 100%'/)
+    assert.doesNotMatch(promptSource, /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 50%'/)
+    assert.doesNotMatch(imageSource, /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 50%'/)
+  })
 })

@@ -36,6 +36,7 @@ test("hosted preflight checks verify auth prerequisites and keep local API fallb
 
 test("hosted release workflow pushes migrations before deploying edge functions and frontend", () => {
   const source = readSource("scripts/release-hosted.mjs");
+  const movedSource = readSource("scripts/release/release-hosted.mjs");
 
   assert.match(source, /const skipMigrations = args\.has\("--skip-migrations"\);/);
   assert.match(source, /const productionProjectRef =/);
@@ -49,6 +50,7 @@ test("hosted release workflow pushes migrations before deploying edge functions 
   assert.match(source, /runStep\("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models"\);/);
   assert.match(source, /runStep\("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth"\);/);
   assert.match(source, /npx vercel deploy --prod -y/);
+  assert.match(movedSource, /import "\.\.\/release-hosted\.mjs";/);
 });
 
 test("cloud auto deploy waits for Supabase functions before Vercel and includes user-route-proxy", () => {

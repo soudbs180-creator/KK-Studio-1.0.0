@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Clock3,
@@ -499,11 +499,11 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
             <div className="settings-reference-page-header__eyebrow">
               {pick('高级设置', 'Advanced Settings')}
             </div>
-            <h2>{pick('计费中心', 'Consumption Center')}</h2>
+            <h2>{pick('计费中心', 'Billing Ledger')}</h2>
             <p>
               {pick(
                 '这里统一查看 API 账单和积分消耗，界面与仪表盘和 API 页面保持同一套深色控制台结构。通过模式切换，你可以直接比较上游 API 花费和站内积分消耗。',
-                'Billing and credit history now follow the same dark control-console structure as the dashboard and API pages. Use the mode switch to compare direct API spend against internal credit consumption.'
+                'Review direct API spend and internal credit usage from one Apple-style billing ledger with a shared settings surface.'
               )}
             </p>
           </div>
@@ -547,7 +547,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
               </div>
             </div>
             <SettingsBadge tone="neutral">
-              {pick('统一计费界面', 'Unified Billing UI')}
+              {pick('统一计费界面', 'Unified Billing Ledger')}
             </SettingsBadge>
           </div>
 

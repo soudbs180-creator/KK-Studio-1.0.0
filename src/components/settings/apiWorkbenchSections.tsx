@@ -9,7 +9,6 @@ import {
   SettingsBadge,
   SettingsSection,
 } from './SettingsScaffold';
-import { SegmentedControl } from './ui/index';
 import type { ApiSettingsWorkbenchStage, ApiSettingsWorkbenchTone } from './apiWorkbenchState';
 
 type LocalePick = (zhText: string, enText: string) => string;
@@ -62,7 +61,7 @@ export const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProp
 }) => (
   <div className="rounded-[24px] border p-4 md:p-5" style={SETTINGS_ELEVATED_STYLE}>
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 flex-1 space-y-2 text-left">
         <div
           className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]"
           style={SETTINGS_OVERLAY_STYLE}
@@ -72,18 +71,13 @@ export const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProp
         </div>
         <div className="text-[18px] font-semibold text-[var(--text-primary)]">{title}</div>
         <div className="max-w-3xl text-[13px] leading-6 text-[var(--text-secondary)]">{description}</div>
+        <div className="text-[13px] leading-6 text-[var(--text-secondary)]">{entryActionHelper}</div>
       </div>
 
-      <div className="w-full max-w-[320px] rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
-        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-          {entryContextLabel}
-        </div>
-        <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{entryActionHelper}</div>
-        <div className="mt-3">
-          <SettingsActionButton icon={Wand2} tone="secondary" onClick={onOpen}>
-            {entryActionLabel}
-          </SettingsActionButton>
-        </div>
+      <div className="flex shrink-0 items-center justify-end">
+        <SettingsActionButton icon={Wand2} tone="secondary" onClick={onOpen}>
+          {entryActionLabel}
+        </SettingsActionButton>
       </div>
     </div>
 
@@ -195,56 +189,67 @@ type ApiWorkbenchCurrentViewSectionProps = {
 export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSectionProps> = ({
   pick,
   activeTab,
-  onChangeTab,
   latencyCards,
   formatLatency,
-}) => (
-  <SettingsSection
-    testId="settings-workbench-current-view"
-    title={pick('当前视图', 'Current view')}
-    eyebrow={pick('链路面板', 'Routing panel')}
-    description={pick(
-      '先决定你当前要看的是本地 API 还是第三方供应商，再进入对应卡片和编辑器。',
-      'Choose whether you want to inspect local APIs or third-party providers, then move into the matching cards and editor.',
-    )}
-    action={(
-      <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
-        {activeTab === 'official' ? pick('本地 API 视图', 'Local API view') : pick('第三方供应商视图', 'Third-party provider view')}
-      </SettingsBadge>
-    )}
-  >
-    <div className="space-y-4">
-      <SegmentedControl
-        options={[
-          { value: 'official', label: pick('本地 API', 'Local APIs') },
-          { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
-        ]}
-        value={activeTab}
-        onChange={(value) => onChangeTab(value as TabType)}
-      />
+}) => {
+  const currentViewOptions = [
+    { value: 'official', label: pick('本地 API', 'Local APIs') },
+    { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
+  ];
+  const activeOption = currentViewOptions.find((option) => option.value === activeTab);
 
-      {latencyCards.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {latencyCards.map((item) => (
-            <InfoCell key={item.id} label={item.label} value={formatLatency(item.latency)} helper={item.helper} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+  return (
+    <SettingsSection
+      testId="settings-workbench-current-view"
+      title={pick('当前视图', 'Current view')}
+      eyebrow={pick('链路面板', 'Routing panel')}
+      surface="plain"
+      description={pick(
+        '先决定你当前要看的是本地 API 还是第三方供应商，再进入对应卡片和编辑器。',
+        'Choose whether you want to inspect local APIs or third-party providers, then move into the matching cards and editor.',
+      )}
+      action={(
+        <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
+          {activeTab === 'official' ? pick('本地 API 视图', 'Local API view') : pick('第三方供应商视图', 'Third-party provider view')}
+        </SettingsBadge>
+      )}
+    >
+      <div className="space-y-4">
+        <div className="px-1 text-left">
           <div className="text-[15px] font-semibold text-[var(--text-primary)]">
-            {pick('全局延迟概览', 'Global latency summary')}
+            {activeOption?.label || pick('本地 API', 'Local APIs')}
           </div>
           <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
             {pick(
-              '暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。',
-              'No recent latency checks are available yet. Use Refresh on any card to re-check connectivity, models, and latency.',
+              '上方主切换决定当前焦点，这里直接展示当前视图下最需要看的延迟摘要。',
+              'The main switch above sets the active focus, and the latency summary below stays scoped to that view.',
             )}
           </div>
         </div>
-      )}
-    </div>
-  </SettingsSection>
-);
+
+        {latencyCards.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {latencyCards.map((item) => (
+              <InfoCell key={item.id} label={item.label} value={formatLatency(item.latency)} helper={item.helper} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[18px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="text-[15px] font-semibold text-[var(--text-primary)]">
+              {pick('全局延迟概览', 'Global latency summary')}
+            </div>
+            <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+              {pick(
+                '暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。',
+                'No recent latency checks are available yet. Use Refresh on any card to re-check connectivity, models, and latency.',
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+};
 
 type ApiWorkbenchStageSectionProps = {
   pick: LocalePick;
@@ -289,6 +294,7 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
     testId="settings-workbench-stage"
     title={pick('状态与下一步', 'Status and next step')}
     eyebrow={pick('阶段工作流', 'Stage workflow')}
+    surface="plain"
     description={stageDescription}
     action={(
       <div className="flex flex-wrap items-center gap-2">
@@ -307,33 +313,33 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
   >
     <div className="space-y-4">
       <div className="rounded-[22px] border px-4 py-4" style={stageBannerStyle}>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-2 text-left">
             <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
               {pick('当前阶段', 'Current stage')}
             </div>
             <div className="mt-2 text-[17px] font-semibold text-[var(--text-primary)]">
               {stageTitle}
             </div>
+            <div className="text-[13px] leading-6 text-[var(--text-secondary)]">
+              {stageDescription}
+            </div>
           </div>
-        <SettingsActionButton
-          data-testid={primaryActionTestId}
-          icon={primaryActionIcon}
-          tone={primaryActionTone}
-          onClick={onPrimaryAction}
-            loading={primaryActionLoading}
-          >
-            {stageNextActionLabel}
-          </SettingsActionButton>
+          <div className="flex shrink-0 items-center justify-end">
+            <SettingsActionButton
+              data-testid={primaryActionTestId}
+              icon={primaryActionIcon}
+              tone={primaryActionTone}
+              onClick={onPrimaryAction}
+              loading={primaryActionLoading}
+            >
+              {stageNextActionLabel}
+            </SettingsActionButton>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <InfoCell
-          label={pick('当前阶段', 'Stage')}
-          value={stageTitle}
-          helper={stageDescription}
-        />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <InfoCell
           label={pick('编辑策略', 'Edit policy')}
           value={stageInteractionLabel}
@@ -440,6 +446,7 @@ export const ApiWorkbenchPlatformSection: React.FC<ApiWorkbenchPlatformSectionPr
     testId="settings-workbench-platform"
     title={pick('平台入口', 'Platform entry')}
     eyebrow={pick('独立入口', 'Separate entry')}
+    surface="plain"
     description={pick(
       '平台侧能力单独放在这里，不和你的本地 API 配置混排。',
       'Keep platform-managed capabilities separate from your local API configuration.',

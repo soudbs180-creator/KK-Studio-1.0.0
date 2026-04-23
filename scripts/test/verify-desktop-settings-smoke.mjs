@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
+import { runBrowserPreflight } from './browser-preflight.mjs';
+import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'desktop-settings-smoke');
@@ -12,6 +14,17 @@ function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
   }
+}
+
+function readSource(relativePath) {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
+function isBrowserLaunchUnavailable(error) {
+  const message = String(error?.message || error || '');
+  return /spawn EPERM/i.test(message)
+    || /Playwright npx cache directory not found/i.test(message)
+    || /Playwright module was not found/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {
@@ -61,25 +74,114 @@ async function assertVisible(locator, message) {
   }
 }
 
-const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
-const { chromium } = await import(playwrightModuleUrl);
+async function assertHttpHtml(url) {
+  const response = await fetch(url, { redirect: 'manual' });
+  if (!response.ok) {
+    throw new Error(`Expected ${url} to respond successfully, got ${response.status}.`);
+  }
+
+  const html = await response.text();
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected ${url} to return HTML content.`);
+  }
+
+  return {
+    url,
+    status: response.status,
+    length: html.length,
+  };
+}
+
+function verifyDesktopSourceContracts() {
+  const appSource = readSource('src/App.tsx');
+  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+
+  const checks = [
+    /data-testid="desktop-user-menu-trigger"/,
+    /data-testid="desktop-user-menu-settings"/,
+    /data-testid="settings-page-root"/,
+    /sections=\{sections\}/,
+    /Overview \/ API \/ Billing \/ Errors/,
+    /API Workspace/,
+    /data-testid="api-official-editor-back"/,
+    /testId="settings-workbench-stage"/,
+    /testId="settings-workbench-diagnostics"/,
+    /testId="settings-workbench-platform"/,
+    /Primary routes/,
+    /Maintenance/,
+  ];
+
+  const sources = [
+    appSource,
+    settingsPanelSource,
+    apiSettingsViewSource,
+    workbenchSectionsSource,
+    dashboardSource,
+  ];
+
+  for (const pattern of checks) {
+    if (!sources.some((source) => pattern.test(source))) {
+      throw new Error(`Desktop settings source contract missing pattern: ${pattern}`);
+    }
+  }
+}
+
+async function runFallbackVerification(error, browserPreflight) {
+  verifyDesktopSourceContracts();
+
+  const routes = await Promise.all([
+    assertHttpHtml(`${TARGET_URL}${SETTINGS_HOME_PATH}`),
+    assertHttpHtml(`${TARGET_URL}${SETTINGS_API_PATH}`),
+    assertHttpHtml(TARGET_URL),
+  ]);
+
+  const summary = {
+    mode: 'fallback',
+    reason: String(error?.message || error),
+    browserPreflight,
+    routes,
+    artifactDir: ARTIFACT_DIR,
+  };
+
+  writeFileSync(
+    path.join(ARTIFACT_DIR, 'desktop-settings-fallback.json'),
+    JSON.stringify(summary, null, 2),
+    'utf8',
+  );
+
+  console.log(JSON.stringify(summary, null, 2));
+}
 
 ensureArtifactsDir();
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: 1600, height: 980 },
-});
-
-await page.addInitScript(() => {
-  window.localStorage.setItem('theme', 'dark');
-  window.localStorage.setItem('kk_theme', 'dark');
-  window.localStorage.setItem('kk_language', 'en-US');
-  window.localStorage.setItem('kk_studio_storage_mode', 'browser');
-  window.localStorage.setItem('kk_tutorial_seen', 'true');
-});
+let browser;
+let viteServer;
+let browserPreflight = null;
 
 try {
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  viteServer = ensured.server;
+  browserPreflight = await runBrowserPreflight();
+
+  const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
+  const { chromium } = await import(playwrightModuleUrl);
+
+  browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({
+    viewport: { width: 1600, height: 980 },
+  });
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem('theme', 'dark');
+    window.localStorage.setItem('kk_theme', 'dark');
+    window.localStorage.setItem('kk_language', 'en-US');
+    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+    window.localStorage.setItem('kk_tutorial_seen', 'true');
+  });
+
   await gotoWithRetry(page, `${TARGET_URL}${SETTINGS_HOME_PATH}`);
 
   const settingsPageRoot = page.getByTestId('settings-page-root');
@@ -133,6 +235,23 @@ try {
     path: path.join(ARTIFACT_DIR, 'settings-overlay-from-workspace.png'),
     fullPage: true,
   });
+
+  console.log(JSON.stringify({
+    mode: 'browser',
+    browserPreflight,
+    artifactDir: ARTIFACT_DIR,
+  }, null, 2));
+} catch (error) {
+  if (isBrowserLaunchUnavailable(error)) {
+    await runFallbackVerification(error, browserPreflight);
+  } else {
+    throw error;
+  }
 } finally {
-  await browser.close();
+  if (browser) {
+    await browser.close();
+  }
+  if (viteServer) {
+    await viteServer.close();
+  }
 }

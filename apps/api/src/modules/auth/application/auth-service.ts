@@ -64,6 +64,19 @@ function createDefaultIdentityStore(): AuthIdentityStore {
   }
 }
 
+function isTruthyEnvValue(value: string | undefined): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
+function isLocalTurnstileBypassActive(): boolean {
+  return isTruthyEnvValue(process.env.KKAI_LOCAL_ONLY)
+    && isTruthyEnvValue(process.env.VITE_TURNSTILE_LOCAL_BYPASS);
+}
+
 export class AuthService {
   private readonly verifyTurnstileToken: TurnstileVerifier;
   private readonly rateLimiter: InMemoryRateLimiter;
@@ -82,7 +95,9 @@ export class AuthService {
     input: RegisterRequestDto,
     context: AuthRequestContext,
   ): Promise<AuthHandlerResult<RegisterResponseDto>> {
-    if (!input.email || !input.password || !input.turnstileToken) {
+    const requireTurnstileToken = !isLocalTurnstileBypassActive();
+
+    if (!input.email || !input.password || (requireTurnstileToken && !input.turnstileToken)) {
       return this.badRequest("Missing required fields: email, password, turnstileToken.");
     }
 
@@ -99,9 +114,11 @@ export class AuthService {
       return this.rateLimited("Too many register attempts for this email.");
     }
 
-    const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken, context.ip);
-    if (!turnstileResult.success) {
-      return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
+    if (input.turnstileToken || requireTurnstileToken) {
+      const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken || "", context.ip);
+      if (!turnstileResult.success) {
+        return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
+      }
     }
 
     const registered = this.identityStore.registerPasswordUser(

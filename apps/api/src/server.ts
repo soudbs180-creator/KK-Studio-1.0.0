@@ -860,7 +860,11 @@ function buildRuntimePersistenceState(
   serverSupabaseConfig: ServerSupabaseConfig,
   repositoryModes: RepositoryModeMap,
   persistenceProbe?: ServerSupabasePersistenceProbe,
+  options: {
+    localOnly?: boolean;
+  } = {},
 ): RuntimePersistenceState {
+  const localOnly = options.localOnly === true;
   const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig, {
     persistenceProbe,
   });
@@ -875,7 +879,9 @@ function buildRuntimePersistenceState(
       {
         configReady: configSummary.hasUserApiEncryptionSecret,
         readyBackends: {
-          authData: ["supabase", "postgres", "local-file"],
+          authData: localOnly
+            ? ["supabase", "postgres", "local-file", "memory"]
+            : ["supabase", "postgres"],
         },
         structuralBlockers: [],
       },
@@ -885,12 +891,14 @@ function buildRuntimePersistenceState(
       { authData: repositoryModes.authData },
       configSummary,
       { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
-      [persistenceProbe?.checks.guestSessions],
+      localOnly ? [] : [persistenceProbe?.checks.guestSessions],
       [],
       {
         configReady: true,
         readyBackends: {
-          authData: ["supabase", "local-file"],
+          authData: localOnly
+            ? ["supabase", "postgres", "local-file", "memory"]
+            : ["supabase", "postgres"],
         },
         structuralBlockers: [],
       },
@@ -900,12 +908,14 @@ function buildRuntimePersistenceState(
       { workspaceLayout: repositoryModes.workspaceLayout },
       configSummary,
       { workspaceLayout: "WORKSPACE_LAYOUT_REPOSITORY_DEGRADED" },
-      [persistenceProbe?.checks.workspaceLayout],
+      localOnly ? [] : [persistenceProbe?.checks.workspaceLayout],
       [],
       {
         configReady: true,
         readyBackends: {
-          workspaceLayout: ["supabase", "postgres"],
+          workspaceLayout: localOnly
+            ? ["supabase", "postgres", "memory"]
+            : ["supabase", "postgres"],
         },
         structuralBlockers: [],
       },
@@ -921,13 +931,17 @@ function buildRuntimePersistenceState(
         creditAccounts: "CREDIT_ACCOUNT_REPOSITORY_DEGRADED",
         creditExchangeRates: "CREDIT_EXCHANGE_RATE_REPOSITORY_DEGRADED",
       },
-      [persistenceProbe?.checks.billing],
+      localOnly ? [] : [persistenceProbe?.checks.billing],
       [],
       {
         configReady: true,
         readyBackends: {
-          creditAccounts: ["supabase", "local-file"],
-          creditExchangeRates: ["supabase", "local-file"],
+          creditAccounts: localOnly
+            ? ["supabase", "postgres", "local-file"]
+            : ["supabase", "postgres"],
+          creditExchangeRates: localOnly
+            ? ["supabase", "postgres", "local-file"]
+            : ["supabase", "postgres"],
         },
         structuralBlockers: [],
       },
@@ -937,12 +951,14 @@ function buildRuntimePersistenceState(
       { creditProviders: repositoryModes.creditProviders },
       configSummary,
       { creditProviders: "CREDIT_PROVIDER_REPOSITORY_DEGRADED" },
-      [persistenceProbe?.checks.creditProviders],
+      localOnly ? [] : [persistenceProbe?.checks.creditProviders],
       [],
       {
         configReady: true,
         readyBackends: {
-          creditProviders: ["supabase", "postgres"],
+          creditProviders: localOnly
+            ? ["supabase", "postgres", "memory"]
+            : ["supabase", "postgres"],
         },
         structuralBlockers: [],
       },
@@ -1128,6 +1144,7 @@ function buildApiServer(
       authDataRepository,
       InMemoryAuthDataRepository,
       SupabaseAuthDataRepository,
+      PostgresAuthDataRepository,
       FileBackedAuthDataRepository,
     ),
     creditAccounts: resolveRepositoryBackend(
@@ -1135,12 +1152,14 @@ function buildApiServer(
       InMemoryCreditAccountRepository,
       SupabaseCreditAccountRepository,
       PostgresCreditAccountRepository,
+      FileBackedCreditAccountRepository,
     ),
     creditExchangeRates: resolveRepositoryBackend(
       creditExchangeRateRepository,
       InMemoryCreditExchangeRateRepository,
       SupabaseCreditExchangeRateRepository,
       PostgresCreditExchangeRateRepository,
+      FileBackedCreditExchangeRateRepository,
     ),
     creditProviders: resolveRepositoryBackend(
       creditProviderRepository,
@@ -1202,12 +1221,14 @@ function buildApiServer(
         const persistenceProbe = shouldProbePersistence
           ? await getPersistenceProbe()
           : cachedPersistenceProbe;
+        const runtimePersistenceState = buildRuntimePersistenceState(serverSupabaseConfig, repositoryModes, persistenceProbe, {
+          localOnly: kkaiLocalOnly,
+        });
         const {
           configSummary,
           criticalPersistence,
           runtimeBlockers,
-        } = buildRuntimePersistenceState(serverSupabaseConfig, repositoryModes, persistenceProbe);
-
+        } = runtimePersistenceState;
         if (pathname === "/healthz") {
           const overallStatus = Object.values(criticalPersistence).every((state) => state.ready)
             ? "ok"

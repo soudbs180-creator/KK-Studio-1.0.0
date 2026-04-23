@@ -7,8 +7,8 @@ const ROOT_DIR = process.cwd();
 
 test("run-api-dev only uses primary env files and fails fast on missing canonical Supabase config", () => {
   const bootstrapSource = readFileSync(path.join(ROOT_DIR, "scripts", "lib", "local-api-bootstrap.mjs"), "utf-8");
-  const cliSource = readFileSync(path.join(ROOT_DIR, "scripts", "run-api-dev.mjs"), "utf-8");
-  const localOnlyCliSource = readFileSync(path.join(ROOT_DIR, "scripts", "run-api-local.mjs"), "utf-8");
+  const cliSource = readFileSync(path.join(ROOT_DIR, "scripts", "dev", "run-api-dev.mjs"), "utf-8");
+  const localOnlyCliSource = readFileSync(path.join(ROOT_DIR, "scripts", "dev", "run-api-local.mjs"), "utf-8");
 
   assert.match(bootstrapSource, /applyPrimaryEnvToProcess\(repoRoot\)/);
   assert.match(bootstrapSource, /describeSupabaseServerKey/);
@@ -24,11 +24,11 @@ test("run-api-dev only uses primary env files and fails fast on missing canonica
   assert.match(bootstrapSource, /applyLocalApiBodyLimitDefaults\(\)/);
   assert.doesNotMatch(bootstrapSource, /server", "\.env/);
 
-  assert.match(cliSource, /from "\.\/lib\/local-api-bootstrap\.mjs"/);
+  assert.match(cliSource, /from "\.\.\/lib\/local-api-bootstrap\.mjs"/);
   assert.match(cliSource, /await assertLocalApiConfig\(\)/);
   assert.match(cliSource, /await startLocalApiServer\(\{ skipConfigCheck: true \}\)/);
 
-  assert.match(localOnlyCliSource, /from "\.\/lib\/local-api-bootstrap\.mjs"/);
+  assert.match(localOnlyCliSource, /from "\.\.\/lib\/local-api-bootstrap\.mjs"/);
   assert.match(localOnlyCliSource, /process\.env\.KKAI_LOCAL_ONLY = "true"/);
   assert.doesNotMatch(localOnlyCliSource, /assertLocalApiConfig/);
   assert.match(localOnlyCliSource, /await startLocalApiServer\(\{ skipConfigCheck: true \}\)/);

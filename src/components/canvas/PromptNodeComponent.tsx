@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
 import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
@@ -105,6 +105,24 @@ const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
 
 type EcommercePromptBadge = { label: string; tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'neutral' };
 
+const getEcommerceAssetPreviewLabel = (
+    binding?: EcommerceEditableTaskState['assetRoles'][number],
+): string => {
+    if (!binding) return '';
+
+    const roleLabelMap: Record<string, string> = {
+        product: '产品图',
+        reference: '参考图',
+        'extra-reference': '补充参考图',
+        accessory: '配件图',
+        'series-template': '模板图',
+    };
+
+    const primaryLabel = binding.aliasLabel || binding.label;
+    const roleLabel = roleLabelMap[binding.role] || binding.role;
+    return `${primaryLabel} · ${roleLabel}`;
+};
+
 const getEcommerceSelectionBadges = (
     node: PromptNode,
     activeTaskState?: EcommerceEditableTaskState | null,
@@ -209,6 +227,7 @@ interface PromptNodeProps {
     onRetryPptPage?: (node: PromptNode, pageIndex: number) => void;
     onExportPptPage?: (node: PromptNode, pageIndex: number) => void;
     onToggleEcommerceSelected?: (node: PromptNode, selected: boolean) => void;
+    onSetEcommerceGroupSelection?: (node: PromptNode, selected: boolean) => void;
     onGenerateEcommerceNode?: (node: PromptNode) => void;
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
     onConfirmEcommerceDesktop?: (node: PromptNode) => void;
@@ -247,8 +266,9 @@ interface PromptNodeProps {
 // [FIX] Self-healing thumbnail component that recovers data from IDB if missing
 const ReferenceThumbnail: React.FC<{
     image: { id: string, data?: string, mimeType?: string },
+    label?: string,
     onClick?: (e: React.MouseEvent) => void
-}> = ({ image, onClick }) => {
+}> = ({ image, label, onClick }) => {
     const [data, setData] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(true);
 
@@ -349,6 +369,11 @@ const ReferenceThumbnail: React.FC<{
                     )}
                 </div>
             )}
+            {label ? (
+                <div className="absolute left-0.5 top-0.5 max-w-[calc(100%-4px)] rounded bg-black/70 px-1 py-0.5 text-[7px] font-medium leading-none text-white">
+                    <span className="block truncate">{label}</span>
+                </div>
+            ) : null}
         </div>
 
     );
@@ -451,6 +476,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onRetryPptPage,
     onExportPptPage,
     onToggleEcommerceSelected,
+    onSetEcommerceGroupSelection,
     onGenerateEcommerceNode,
     onGenerateEcommerceGroup,
     onConfirmEcommerceDesktop,
@@ -483,9 +509,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     // }
 
     const [isDragging, setIsDragging] = useState(false);
+    const isDraggingRef = useRef(false);
     const [cardHeight, setCardHeight] = useState(200); // 默认高度??00px,会在渲染后更??
-    const borderScale = zoomScale || 1;
-    const adaptiveBorderWidth = Math.max(1, 1.5 / borderScale);
     const baseCardWidth = 320;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
     const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
@@ -538,7 +563,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     // Sync ref when node.position updates externally (and not dragging)
     // 🚀 [Fix] 使用更宽松的条件，避免拖动结束后位置回弹
     useEffect(() => {
-        if (!isDragging && !isChatMode) {
+        if (!isDragging && !isDraggingRef.current && !isChatMode) {
             localPosRef.current = node.position;
             // 🚀 [Fix] 只在位置差异较大时才强制更新 DOM，避免微小更新导致的抖动
             if (containerRef.current) {
@@ -546,9 +571,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 const currentTop = parseFloat(containerRef.current.style.top) || 0;
                 const targetLeft = snapCanvasCoordinate(node.position.x - cardWidth / 2, zoomScale || 1) - originX;
                 const targetTop = snapCanvasCoordinate(node.position.y - cardHeight, zoomScale || 1) - originY;
-                
-                // 只在差异超过 2px 时才更新，避免微小抖动
-                if (Math.abs(currentLeft - targetLeft) > 2 || Math.abs(currentTop - targetTop) > 2) {
+
+                // 只在差异超过 5px 时才更新，避免微小抖动
+                if (Math.abs(currentLeft - targetLeft) > 5 || Math.abs(currentTop - targetTop) > 5) {
                     containerRef.current.style.left = `${targetLeft}px`;
                     containerRef.current.style.top = `${targetTop}px`;
                     containerRef.current.style.transform = 'translate3d(0, 0, 0)';
@@ -773,6 +798,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         dragStartCanvasPos.current = { x: node.position.x, y: node.position.y };
         localPosRef.current = node.position;
 
+        isDraggingRef.current = true;
         setIsDragging(true);
         onDragStateChange?.(true);
         hasMoved.current = false;
@@ -783,7 +809,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
     // 🚀 Simple drag - just update React state on every move
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-        if (!isDragging) return;
+        if (!isDraggingRef.current) return;
 
         // Prevent scrolling/panning while dragging card
         if (e.cancelable) e.preventDefault();
@@ -829,7 +855,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     };
 
     const handleMouseUp = () => {
-        if (isDragging) {
+        if (isDraggingRef.current) {
+            isDraggingRef.current = false;
             const finalPos = localPosRef.current;
             const totalDelta = {
                 x: finalPos.x - dragStartCanvasPos.current.x,
@@ -916,19 +943,13 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         : isSelected
             ? getCanvasCardShadow({ accent: 'blue', boost: shadowBoost, zoomScale })
             : getCanvasCardShadow({ boost: shadowBoost, zoomScale });
-    const promptCardBorderColor = showError
-        ? 'rgba(239, 68, 68, 0.5)'
-        : isSelected
-            ? 'rgba(59, 130, 246, 0.78)'
-            : highlighted
-                ? 'rgba(59, 130, 246, 0.44)'
-                : 'var(--border-light)';
     const promptCardScale = isDragging
         ? 1
         : isSelected
             ? 1.016
             : (highlighted ? 1.01 : 1);
     const promptCardTransform = `scale(${promptCardScale})`;
+    const promptGlassFill = isDragging ? 'rgba(20, 20, 24, 0.62)' : 'rgba(20, 20, 24, 0.45)';
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
@@ -947,7 +968,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     top: renderTop - originY,
                     opacity: 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    willChange: isDragging ? 'transform, left, top' : 'auto',
+                    willChange: isDragging ? 'left, top' : 'auto',
                     transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                     pointerEvents: 'auto',
                     touchAction: 'none'
@@ -958,15 +979,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 <div
                     ref={cardRef}
                     data-canvas-surface="prompt"
-                    className={`relative flex flex-col rounded-2xl border overflow-hidden ${isThumbnailShell ? 'backdrop-blur-sm' : ''}`}
+                    className={`relative flex flex-col rounded-2xl border border-white/5 overflow-hidden backdrop-blur-[24px]`}
                     style={{
                         width: isChatMode ? '100%' : cardWidth,
                         maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
-                        backgroundColor: 'var(--bg-overlay)',
-                        borderColor: promptCardBorderColor,
+                        backgroundColor: promptGlassFill,
                         boxShadow: shellCardShadow,
                         transform: promptCardTransform,
-                        transformOrigin: '50% 50%',
+                        transformOrigin: '50% 100%',
                         zIndex: cardSurfaceZIndex,
                         transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                         transitionProperty: 'transform, box-shadow, border-color',
@@ -1096,7 +1116,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 zIndex: effectiveStackZIndex,
                 opacity: 1,
                 cursor: isDragging ? 'grabbing' : 'grab',
-                willChange: isDragging ? 'transform, left, top' : 'auto', // 🚀 [性能优化] 拖拽时启用GPU加速
+                willChange: isDragging ? 'left, top' : 'auto',
                 transition: isDragging ? 'none' : 'box-shadow 0.2s ease',
                 pointerEvents: 'auto',
                 touchAction: 'none'
@@ -1108,15 +1128,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             <div
                 ref={cardRef}
                 data-canvas-surface="prompt"
-                className="relative flex flex-col rounded-2xl border transition-all"
+                className="relative flex flex-col rounded-2xl border border-white/5 transition-all backdrop-blur-[24px]"
                 style={{
                     width: isChatMode ? '100%' : cardWidth,
                     maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
-                    backgroundColor: 'var(--bg-overlay)',
-                    borderColor: promptCardBorderColor,
+                    backgroundColor: promptGlassFill,
                     boxShadow: mainCardShadow,
                     transform: promptCardTransform,
-                    transformOrigin: '50% 50%',
+                    transformOrigin: '50% 100%',
                     zIndex: cardSurfaceZIndex,
                     transitionDuration: isDragging ? '0ms' : 'var(--duration-normal)',
                     transitionProperty: 'transform, box-shadow, border-color',
@@ -1318,6 +1337,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <ReferenceThumbnail
                                     key={img.id || idx}
                                     image={img}
+                                    label={getEcommerceAssetPreviewLabel(node.ecommerce?.editableTask?.assetRoles?.[idx])}
                                     onClick={(e) => {
                                         const refThumb = e.currentTarget.querySelector('img');
                                         if (refThumb) {
@@ -1581,6 +1601,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 onActivateTask={onActivateEcommerceTask}
                                 onTaskStateChange={onEcommerceTaskStateChange}
                                 onToggleSelected={onToggleEcommerceSelected}
+                                onSetGroupSelection={onSetEcommerceGroupSelection}
                                 onGenerateNode={onGenerateEcommerceNode}
                                 onGenerateGroup={onGenerateEcommerceGroup}
                                 onConfirmDesktop={onConfirmEcommerceDesktop}

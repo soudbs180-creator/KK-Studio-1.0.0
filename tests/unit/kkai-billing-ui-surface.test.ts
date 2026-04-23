@@ -49,5 +49,5 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(settingsPanelSource, /export \{ default \} from '\.\/SettingsPanel\.localized';/);
   assert.match(settingsPanelSource, /export type \{ SettingsViewId \} from '\.\/settingsRegistry';/);
   assert.doesNotMatch(settingsPanelSource, /lazy\(\(\) => import\('\.\/views\/DashboardView\.localized\.tsx'\)\)/);
-  assert.match(localizedSettingsPanelSource, /CostEstimation embedded/);
+  assert.doesNotMatch(localizedSettingsPanelSource, /CostEstimation embedded/);
 });

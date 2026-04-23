@@ -38,3 +38,22 @@ test("prompt-group browser verification script checks both regrouping and connec
   assert.match(source, /throw new Error\(`Main-card drag did not regroup child cards under the parent:/);
   assert.match(source, /throw new Error\(`Child-card connector did not stay aligned with the dragged image:/);
 });
+
+test("prompt-group browser verification script uses browser preflight and fallback verification when browser spawn is unavailable", () => {
+  const source = readSource("scripts/test/verify-prompt-group-drag.mjs");
+
+  assert.match(source, /import \{ runBrowserPreflight \} from '\.\/browser-preflight\.mjs';/);
+  assert.match(source, /import \{ ensureLocalViteServer \} from '\.\/ensure-local-vite-server\.mjs';/);
+  assert.match(source, /function isBrowserLaunchUnavailable\(error\)/);
+  assert.match(source, /await runFallbackVerification\(error, browserPreflight\);/);
+  assert.match(source, /mode: 'fallback'/);
+  assert.match(source, /prompt-group-drag-fallback\.json/);
+});
+
+test("browser preflight detects generic child-process spawn restrictions before probing Playwright browsers", () => {
+  const source = readSource("scripts/test/browser-preflight.mjs");
+
+  assert.match(source, /spawn\('cmd\.exe', \['\/c', 'echo', 'spawn-probe'\]/);
+  assert.match(source, /reason: 'process-spawn-blocked'/);
+  assert.match(source, /reason: 'process-spawn-check-threw'/);
+});

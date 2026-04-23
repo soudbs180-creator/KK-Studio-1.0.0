@@ -1,6 +1,7 @@
 import type { EcommerceEditableTaskState, EcommerceTaskAssetRoleBinding } from '../../../types.ts';
 import { resolveEcommerceAspectPolicy } from '../ecommerceModelPolicy.ts';
 import { buildEcommerceRenderTask } from '../renderTaskBuilder.ts';
+import { buildEcommerceAssetRoleBindings } from '../assetRoleBindings.ts';
 import { extractSeriesTemplateFromAnalysis } from '../seriesTemplateExtractor.ts';
 import { mergeEcommerceTaskState } from '../taskMerger.ts';
 import type {
@@ -272,24 +273,15 @@ function extractProjectMeta(parseResult: OpenXmlWorkbookParseResult) {
   };
 }
 
-function resolveNearestRowIndex(targetRowIndex: number, candidateRowIndices: number[]): number | undefined {
+function resolveOwningRowIndex(targetRowIndex: number, candidateRowIndices: number[]): number | undefined {
   if (candidateRowIndices.length === 0) return undefined;
 
-  let bestRowIndex = candidateRowIndices[0];
-  let bestDistance = Math.abs(candidateRowIndices[0] - targetRowIndex);
-
-  for (const candidateRowIndex of candidateRowIndices.slice(1)) {
-    const distance = Math.abs(candidateRowIndex - targetRowIndex);
-    if (
-      distance < bestDistance
-      || (distance === bestDistance && candidateRowIndex < bestRowIndex)
-    ) {
-      bestRowIndex = candidateRowIndex;
-      bestDistance = distance;
-    }
+  const precedingCandidates = candidateRowIndices.filter((candidateRowIndex) => candidateRowIndex <= targetRowIndex);
+  if (precedingCandidates.length > 0) {
+    return precedingCandidates[precedingCandidates.length - 1];
   }
 
-  return bestRowIndex;
+  return candidateRowIndices[0];
 }
 
 function resolveAssetRowAssignments(
@@ -316,9 +308,9 @@ function resolveAssetRowAssignments(
     const anchorRowIndex = asset.anchorRowIndex ?? asset.rowIndex;
     if (!anchorRowIndex) continue;
 
-    const nearestRowIndex = resolveNearestRowIndex(anchorRowIndex, sortedRowIndices);
-    if (nearestRowIndex !== undefined) {
-      assignments.set(asset.assetId, nearestRowIndex);
+    const owningRowIndex = resolveOwningRowIndex(anchorRowIndex, sortedRowIndices);
+    if (owningRowIndex !== undefined) {
+      assignments.set(asset.assetId, owningRowIndex);
     }
   }
 
@@ -421,30 +413,15 @@ function extractAPlusRowCandidates(sheet: OpenXmlParsedSheet | undefined): APlus
 
 function buildTaskAssetRoles(params: {
   rowAssets: EcommerceAnalysisAsset[];
-  referenceMentions: Array<{ assetId: string; mentionTokens: string[]; notes?: string }>;
+  referenceMentions: Array<{ assetId: string; label: string; mentionTokens: string[]; notes?: string }>;
 }): EcommerceTaskAssetRoleBinding[] {
-  const productRole: EcommerceTaskAssetRoleBinding = {
-    assetId: 'product-upload',
-    role: 'product',
-    label: '产品图',
-    normalizedLabel: '产品图',
-    source: 'upload',
-  };
-
-  const referenceRoles = params.rowAssets.map((asset, index) => {
-    const mention = params.referenceMentions.find((item) => item.assetId === asset.assetId) || params.referenceMentions[index];
-    return {
-      assetId: asset.assetId,
-      role: 'reference' as const,
-      label: asset.label,
-      normalizedLabel: asset.label || `参考图${index + 1}`,
-      source: 'analysis' as const,
-      note: mention?.notes,
-      mentionTokens: mention?.mentionTokens,
-    };
+  return buildEcommerceAssetRoleBindings({
+    rowAssets: params.rowAssets,
+    rowMentions: params.referenceMentions,
+    manualReferences: [],
+    productReferences: [{ id: 'product-upload', storageId: 'product-upload' }],
+    extraReferences: [],
   });
-
-  return [productRole, ...referenceRoles];
 }
 
 function buildBaseTaskState(params: {
@@ -454,6 +431,8 @@ function buildBaseTaskState(params: {
   sourceRowKey: string;
   theme: string;
   outputTypeLabel: string;
+  declaredSizeText?: string;
+  sizeTier?: EcommerceEditableTaskState['sizeTier'];
   sparseIntent: string;
   assetRoles: EcommerceTaskAssetRoleBinding[];
   seriesTemplate: EcommerceAnalysisResult['seriesTemplate'];
@@ -467,6 +446,8 @@ function buildBaseTaskState(params: {
       sourceRowKey: params.sourceRowKey,
       theme: params.theme,
       outputTypeLabel: params.outputTypeLabel,
+      declaredSizeText: params.declaredSizeText,
+      sizeTier: params.sizeTier,
       imageRoleSummary: params.assetRoles.map((item) => item.normalizedLabel),
       sparseUserIntent: params.sparseIntent,
       copy: {
@@ -694,6 +675,8 @@ function normalizeMainImageItems(
         sourceRowKey: candidate.itemKey,
         theme: candidate.theme || candidate.type,
         outputTypeLabel: '主图',
+        declaredSizeText: undefined,
+        sizeTier: undefined,
         sparseIntent: [candidate.copyText, candidate.designRequirements].filter(Boolean).join('；'),
         assetRoles: buildTaskAssetRoles({
           rowAssets,
@@ -719,6 +702,7 @@ function normalizeMainImageItems(
         designRequirements: candidate.designRequirements,
         copyText: candidate.copyText,
         sizePolicy: policy.sizePolicy,
+        sizeTier: policy.sizeTier,
         referenceAssetIds: rowAssets.map((asset) => asset.assetId),
         referenceMentions: binding.mentions,
         productAssetRequired: true,
@@ -776,6 +760,8 @@ function normalizeAPlusModules(
         sourceRowKey: candidate.moduleKey,
         theme: candidate.moduleName,
         outputTypeLabel: 'A+',
+        declaredSizeText: candidate.declaredSizeText,
+        sizeTier: policy.sizeTier,
         sparseIntent: [candidate.copyText, candidate.designRequirements].filter(Boolean).join('；'),
         assetRoles: buildTaskAssetRoles({
           rowAssets,
@@ -802,6 +788,7 @@ function normalizeAPlusModules(
         designRequirements: candidate.designRequirements,
         copyText: candidate.copyText,
         sizePolicy: policy.sizePolicy,
+        sizeTier: policy.sizeTier,
         referenceAssetIds: rowAssets.map((asset) => asset.assetId),
         referenceMentions: binding.mentions,
         productAssetRequired: true,

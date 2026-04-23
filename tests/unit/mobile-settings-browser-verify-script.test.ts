@@ -48,6 +48,10 @@ test('mobile settings smoke verification uses stable selectors for the mobile sh
   assert.match(scriptSource, /settings-workbench-overview/);
   assert.match(scriptSource, /settings-workbench-diagnostics/);
   assert.match(scriptSource, /settings-workbench-platform/);
+  assert.match(scriptSource, /mode: 'fallback'/);
+  assert.match(scriptSource, /assertHttpHtml/);
+  assert.match(scriptSource, /browserPreflight/);
+  assert.match(scriptSource, /runBrowserPreflight/);
 
   assert.match(mobileHeaderSource, /data-testid="mobile-header-menu-button"/);
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-menu-settings"/);
@@ -80,6 +84,10 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /api-workbench-diagnostics-toggle/);
   assert.match(scriptSource, /api-workbench-primary-action/);
   assert.match(scriptSource, /api-official-editor-back/);
+  assert.match(scriptSource, /mode: 'fallback'/);
+  assert.match(scriptSource, /assertHttpHtml/);
+  assert.match(scriptSource, /browserPreflight/);
+  assert.match(scriptSource, /runBrowserPreflight/);
   assert.match(scriptSource, /officialEditorBack/);
   assert.match(scriptSource, /waitFor\(\{ state: 'hidden', timeout: 15000 \}\)/);
   assert.doesNotMatch(scriptSource, /waitForPathname\(page, '\/settings\/api-management\/official\/new'\)/);

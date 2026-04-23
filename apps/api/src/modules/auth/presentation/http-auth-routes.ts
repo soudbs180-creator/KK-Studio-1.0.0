@@ -22,6 +22,19 @@ interface HttpAuthRouteResult<T> {
   body: ApiResponse<T>;
 }
 
+function isTruthyEnvValue(value: string | undefined): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
+function isLocalTurnstileBypassActive(): boolean {
+  return isTruthyEnvValue(process.env.KKAI_LOCAL_ONLY)
+    && isTruthyEnvValue(process.env.VITE_TURNSTILE_LOCAL_BYPASS);
+}
+
 function toRequestContext(ip: string): AuthRequestContext {
   return { ip };
 }
@@ -77,6 +90,7 @@ function buildErrorEnvelope<T>(
 
 function validateRegisterRequest(body: RegisterRequestDto): ApiErrorDetail[] {
   const details: ApiErrorDetail[] = [];
+  const requireTurnstileToken = !isLocalTurnstileBypassActive();
 
   if (!body || typeof body !== "object") {
     return [{ field: "body", reason: "Request body must be an object." }];
@@ -97,7 +111,7 @@ function validateRegisterRequest(body: RegisterRequestDto): ApiErrorDetail[] {
     details.push({ field: "password", reason: "password must be at least 8 characters." });
   }
 
-  if (!body.turnstileToken || typeof body.turnstileToken !== "string") {
+  if (requireTurnstileToken && (!body.turnstileToken || typeof body.turnstileToken !== "string")) {
     details.push({ field: "turnstileToken", reason: "turnstileToken is required." });
   }
 

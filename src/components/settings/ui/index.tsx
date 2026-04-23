@@ -265,9 +265,7 @@ export const SettingToggle: React.FC<{
         disabled={disabled}
         className="relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
         style={{
-          background: checked
-            ? 'linear-gradient(90deg, rgb(var(--settings-accent-rgb)) 0%, rgb(var(--settings-accent-soft-rgb)) 100%)'
-            : 'var(--settings-surface-overlay)',
+          background: checked ? 'rgb(var(--settings-accent-rgb))' : 'var(--settings-surface-overlay)',
           borderColor: checked ? 'rgb(var(--settings-accent-rgb) / 0.35)' : 'var(--settings-border-subtle)',
         }}
       >
@@ -425,11 +423,11 @@ export const MetricCard: React.FC<{
   tone?: 'indigo' | 'emerald' | 'amber' | 'rose' | 'neutral';
 }> = ({ value, label, helper, tone = 'indigo' }) => {
   const toneColors = {
-    indigo: { text: '#60a5fa' },
-    emerald: { text: '#34d399' },
-    amber: { text: '#fbbf24' },
-    rose: { text: '#f87171' },
-    neutral: { text: '#94a3b8' },
+    indigo: { text: 'var(--settings-state-info-text)' },
+    emerald: { text: 'var(--settings-state-success-text)' },
+    amber: { text: 'var(--settings-state-warning-text)' },
+    rose: { text: 'var(--settings-state-danger-text)' },
+    neutral: { text: 'var(--text-secondary)' },
   };
 
   const color = toneColors[tone];
@@ -494,10 +492,10 @@ export const ProgressBar: React.FC<{
   showLabel?: boolean;
 }> = ({ progress, tone = 'indigo', showLabel = true }) => {
   const toneColors = {
-    indigo: 'linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%)',
-    emerald: 'linear-gradient(90deg, #34d399 0%, #10b981 100%)',
-    amber: 'linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)',
-    rose: 'linear-gradient(90deg, #fb7185 0%, #ef4444 100%)',
+    indigo: 'var(--settings-state-info-text)',
+    emerald: 'var(--settings-state-success-text)',
+    amber: 'var(--settings-state-warning-text)',
+    rose: 'var(--settings-state-danger-text)',
   };
 
   return (
@@ -511,7 +509,7 @@ export const ProgressBar: React.FC<{
           style={{
             width: `${Math.max(0, Math.min(100, progress))}%`,
             background: toneColors[tone],
-            boxShadow: '0 0 20px rgb(96 165 250 / 0.18)',
+            boxShadow: 'none',
           }}
         />
       </div>

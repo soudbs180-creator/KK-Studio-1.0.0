@@ -15,6 +15,8 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   const envSource = readSource("scripts/vps/kk-vps.env.example");
   const apiEntrySource = readSource("scripts/run-api-vps.mjs");
   const paymentEntrySource = readSource("scripts/run-payment-sidecar-vps.mjs");
+  const movedApiEntrySource = readSource("scripts/dev/run-api-vps.mjs");
+  const movedPaymentEntrySource = readSource("scripts/dev/run-payment-sidecar-vps.mjs");
   const apiServiceSource = readSource("deploy/systemd/kk-api.service");
   const paymentServiceSource = readSource("deploy/systemd/kk-payment-sidecar.service");
   const nginxSource = readSource("deploy/nginx/kk-vps.conf");
@@ -34,6 +36,8 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   assert.match(envSource, /WECHAT_OPEN_APP_ID=/);
   assert.match(apiEntrySource, /startApiServer/);
   assert.match(paymentEntrySource, /createPaymentSidecarServer/);
+  assert.match(movedApiEntrySource, /from "\.\.\/\.\.\/apps\/api\/src\/server\.ts";/);
+  assert.match(movedPaymentEntrySource, /from "\.\.\/\.\.\/apps\/payment-sidecar\/src\/server\.ts";/);
   assert.match(apiServiceSource, /scripts\/run-api-vps\.mjs/);
   assert.match(paymentServiceSource, /scripts\/run-payment-sidecar-vps\.mjs/);
   assert.match(nginxSource, /server_name app\.example\.com/);

@@ -32,12 +32,19 @@ test('premium settings tokens expose shared typography, radius, and motion scale
   assert.match(cssSource, /--settings-state-success-bg:/);
   assert.match(cssSource, /--settings-state-warning-bg:/);
   assert.match(cssSource, /--settings-state-danger-bg:/);
+  assert.match(cssSource, /--settings-nav-glass-bg:/);
+  assert.match(cssSource, /--settings-nav-glass-border:/);
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-page-bg: #f5f5f7;/);
+  assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-accent-rgb: 0 113 227;/);
+  assert.match(cssSource, /body\.dark-mode \.settings-panel \{[\s\S]*--settings-accent-rgb: 41 151 255;/);
+  assert.doesNotMatch(cssSource, /\.settings-panel \{[\s\S]*--settings-accent-rgb: 130 135 145;/);
 });
 
-test('shared settings primitives consume the premium token contract instead of hard-coded sizes', () => {
+test('shared settings primitives consume the Apple token contract instead of hard-coded panel styling', () => {
   const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
   const uiSource = readSource('src/components/settings/ui/index.tsx');
   const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
   assert.match(scaffoldSource, /var\(--radius-control-md\)/);
   assert.match(scaffoldSource, /var\(--settings-state-info-bg\)/);
@@ -45,8 +52,10 @@ test('shared settings primitives consume the premium token contract instead of h
   assert.match(scaffoldSource, /var\(--settings-state-danger-bg\)/);
   assert.match(uiSource, /var\(--radius-control-md\)/);
   assert.match(uiSource, /var\(--type-body-2\)/);
-  assert.match(headerSource, /var\(--type-title-1\)/);
-  assert.match(headerSource, /var\(--type-caption\)/);
+  assert.match(headerSource, /var\(--settings-shell-header-bg\)/);
+  assert.match(headerSource, /var\(--settings-nav-glass-border\)/);
+  assert.match(sidebarSource, /var\(--settings-nav-glass-bg\)/);
   assert.doesNotMatch(uiSource, /rounded-\[16px\]/);
   assert.doesNotMatch(headerSource, /text-\[28px\]/);
+  assert.doesNotMatch(headerSource, /backdropFilter:/);
 });

@@ -9,19 +9,21 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('settings routes and panel use billing-focused naming for consumption records', () => {
+test('settings routes and panel use Apple-style billing naming for consumption records', () => {
   const routesSource = readSource('src/routes/settingsRoutes.tsx');
   const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const homeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
 
   assert.match(routesSource, /getSettingsNavItems\('zh-CN'\)/);
-  assert.match(registrySource, /labelZh:\s*'消耗账单'/);
-  assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'消耗账单',\s*'Billing Ledger'\)/);
+  assert.match(registrySource, /labelZh:\s*'计费账本'/);
+  assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'计费',\s*'Billing'\)/);
+  assert.match(homeSource, /description: 'Recharge history, spend, and ledger activity'/);
 });
 
-test('mobile settings navigation keeps system logs scoped to troubleshooting copy', () => {
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+test('mobile settings navigation keeps the logs entry framed as concise error triage', () => {
+  const homeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
 
-  assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'系统错误日志',\s*'System Error Logs'\)/);
-  assert.match(settingsPanelSource, /pickByLanguage\(language,\s*'排查运行异常、错误和警告',\s*'Inspect runtime errors, warnings, and troubleshooting details\.'\)/);
+  assert.match(homeSource, /label: 'Errors'/);
+  assert.match(homeSource, /description: 'System errors, warnings, and troubleshooting signals'/);
 });

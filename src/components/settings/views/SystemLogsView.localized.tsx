@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Pause, Play, ScrollText, ShieldAlert, Trash2 } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
@@ -233,7 +233,7 @@ export const SystemLogsView: React.FC = () => {
         <div className="settings-reference-page-header">
           <div className="settings-reference-page-header__lead">
             <div className="settings-reference-page-header__eyebrow">{pick('高级设置', 'Advanced Settings')}</div>
-            <h2>{pick('系统日志', 'System Logs')}</h2>
+            <h2>{pick('系统日志', 'Logs')}</h2>
             <p>
               {pick(
                 '这里集中查看实时日志流、过滤条件和高优先级告警，方便快速排查运行风险。',

@@ -62,11 +62,24 @@ function formatRoleLine(binding: EcommerceTaskAssetRoleBinding): string {
 
   const roleLabel = roleLabelMap[binding.role] || binding.role;
   const note = cleanText(binding.note || '');
-  return `${roleLabel}：${binding.label}${note ? `（${note}）` : ''}`;
+  const displayLabel = binding.aliasLabel
+    ? `${binding.aliasLabel}（${binding.label}）`
+    : binding.label;
+  return `${roleLabel}：${displayLabel}${note ? `（${note}）` : ''}`;
 }
 
 function buildAssetSummary(assetRoles: EcommerceTaskAssetRoleBinding[]): string {
   const ordered = [...assetRoles].sort((left, right) => {
+    const parseAliasOrder = (binding: EcommerceTaskAssetRoleBinding): number | null => {
+      const match = cleanText(binding.aliasLabel || '').match(/^图(\d+)$/);
+      return match ? Number(match[1]) : null;
+    };
+    const leftAliasOrder = parseAliasOrder(left);
+    const rightAliasOrder = parseAliasOrder(right);
+    if (leftAliasOrder !== null && rightAliasOrder !== null) {
+      return leftAliasOrder - rightAliasOrder;
+    }
+
     const rank = (role: EcommerceTaskAssetRoleBinding['role']): number => {
       switch (role) {
         case 'product':
@@ -107,6 +120,45 @@ function buildConsistencyChecks(
   ]);
 }
 
+function resolveBusinessSizeTier(taskState: EcommerceEditableTaskState) {
+  return taskState.effectiveSizeTier || taskState.sizeTier;
+}
+
+function buildBusinessSizeLines(taskState: EcommerceEditableTaskState): string[] {
+  const declaredSizeText = cleanText(taskState.declaredSizeText || '');
+  const businessSizeTier = resolveBusinessSizeTier(taskState);
+
+  if (taskState.sourceKind !== 'a-plus-module') {
+    return declaredSizeText ? [`- Business size: ${declaredSizeText}`] : [];
+  }
+
+  if (businessSizeTier === '1464x600') {
+    return [
+      `- Business size: ${declaredSizeText || '1464*600'}`,
+      '- Delivery flow: stage the desktop master first and preserve safe composition room for a later 600*450 mobile version.',
+      '- Layout rule: keep the same product focus, copy hierarchy, and brand atmosphere after mobile compaction.',
+    ];
+  }
+
+  if (businessSizeTier === '970x600') {
+    return [
+      '- Business size: 970*600',
+      '- Delivery flow: output a single desktop/mobile shared composition without a separate mobile conversion step.',
+    ];
+  }
+
+  if (businessSizeTier === '600x450') {
+    return [
+      '- Business size: 600*450',
+      '- Delivery flow: the final composition is 600*450 and should stay compact and visually consistent with the desktop master logic.',
+    ];
+  }
+
+  return declaredSizeText
+    ? [`- Business size: ${declaredSizeText}`]
+    : [];
+}
+
 function buildPrompt(params: {
   taskState: EcommerceEditableTaskState;
   seriesTemplate?: EcommerceSeriesTemplate;
@@ -115,11 +167,24 @@ function buildPrompt(params: {
   imageSize: EcommerceImageSize;
   copy: EcommerceCopyTaskState;
   consistencyChecks: string[];
+  productName?: string;
 }): string {
+  const promptOverride = cleanText(params.taskState.promptOverride || '');
+  if (promptOverride) {
+    return promptOverride;
+  }
+
   const styleTone = cleanText(params.taskState.style.tone || params.seriesTemplate?.styleProfile.tone);
   const atmosphere = cleanText(params.taskState.style.atmosphere || params.seriesTemplate?.styleProfile.atmosphere);
   const effect = cleanText(params.taskState.style.effect || params.seriesTemplate?.styleProfile.effectStyle);
   const background = cleanText(params.taskState.style.backgroundType || params.seriesTemplate?.styleProfile.backgroundStyle);
+  const primaryProductAsset = params.taskState.assetRoles.find((binding) => binding.role === 'product');
+  const primaryProductLabel = cleanText(
+    primaryProductAsset?.aliasLabel
+      ? `${primaryProductAsset.aliasLabel}（${primaryProductAsset.label || params.productName || '上传的产品图'}）`
+      : (primaryProductAsset?.label || params.productName || '上传的产品图'),
+  );
+  const sparseUserIntent = cleanText(params.taskState.sparseUserIntent);
 
   return [
     `电商渲染任务：${params.displayLabel}`,
@@ -127,8 +192,17 @@ function buildPrompt(params: {
     `输出类型：${params.taskState.outputTypeLabel}`,
     `画幅：${params.aspectRatio}，尺寸：${params.imageSize}`,
     '',
+    '产品主体：',
+    `- 优先展示：${primaryProductLabel}`,
+    '- 保持产品主体真实清晰，不能替换成其他产品或错误品类。',
+    '',
     '素材角色：',
     buildAssetSummary(params.taskState.assetRoles),
+    '',
+    '背景与需求：',
+    `- 背景：${background || 'clean branded background'}`,
+    `- 氛围：${atmosphere || '干净明亮'}`,
+    `- 需求说明：${sparseUserIntent || '按照需求单与当前任务字段执行，不擅自扩展画面元素。'}`,
     '',
     '文案要求：',
     `- 标题：${params.copy.headline || '无'}`,
@@ -138,14 +212,22 @@ function buildPrompt(params: {
     '',
     '风格要求：',
     `- 色调：${styleTone || '保持清晰商业风格'}`,
-    `- 氛围：${atmosphere || '干净明亮'}`,
     `- 效果：${effect || 'minimal'}`,
-    `- 背景：${background || 'clean branded background'}`,
+    `- 统一性：${params.taskState.inherit.keepSeriesStyle ? '延续同系列视觉语言' : '允许按当前任务重新建立风格'}`,
     '',
     '版式要求：',
     `- 产品尺寸：${params.taskState.layout.productSize}`,
     `- 文本位置：${params.taskState.layout.textPosition}`,
     `- 配件策略：${params.taskState.layout.accessoryPolicy}`,
+    ...(
+      buildBusinessSizeLines(params.taskState).length > 0
+        ? [
+            '',
+            '业务尺寸要求：',
+            ...buildBusinessSizeLines(params.taskState),
+          ]
+        : []
+    ),
     '',
     '一致性检查：',
     ...params.consistencyChecks.map((item) => `- ${item}`),
@@ -182,6 +264,7 @@ export function buildEcommerceRenderTask(input: BuildEcommerceRenderTaskInput): 
     imageSize: input.imageSize,
     copy,
     consistencyChecks,
+    productName: input.productName,
   });
 
   return {

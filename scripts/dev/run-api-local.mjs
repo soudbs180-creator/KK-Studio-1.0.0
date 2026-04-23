@@ -1,6 +1,6 @@
 import {
   startLocalApiServer,
-} from "./lib/local-api-bootstrap.mjs";
+} from "../lib/local-api-bootstrap.mjs";
 
 process.env.KKAI_LOCAL_ONLY = "true";
 
