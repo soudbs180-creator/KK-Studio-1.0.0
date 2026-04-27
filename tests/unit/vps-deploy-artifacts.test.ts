@@ -20,6 +20,7 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   const apiServiceSource = readSource("deploy/systemd/kk-api.service");
   const paymentServiceSource = readSource("deploy/systemd/kk-payment-sidecar.service");
   const nginxSource = readSource("deploy/nginx/kk-vps.conf");
+  const postgresAccessSource = readSource("scripts/vps/repair-postgres-client-access.sh");
 
   assert.match(bootstrapSource, /bootstrap-kk-vps\.sql/);
   assert.match(bootstrapSource, /postgresql/);
@@ -43,4 +44,9 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   assert.match(nginxSource, /server_name app\.example\.com/);
   assert.match(nginxSource, /server_name admin\.example\.com/);
   assert.match(nginxSource, /server_name api\.example\.com/);
+  assert.match(postgresAccessSource, /KK_PG_CLIENT_CIDR/);
+  assert.match(postgresAccessSource, /hostssl\s+\$\{POSTGRES_DB\}\s+\$\{POSTGRES_USER\}/);
+  assert.match(postgresAccessSource, /DRY_RUN/);
+  assert.match(postgresAccessSource, /cp\s+-p\s+"\$\{HBA_FILE\}"/);
+  assert.match(postgresAccessSource, /pg_reload_conf/);
 });

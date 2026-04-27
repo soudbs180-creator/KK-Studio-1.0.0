@@ -1,6 +1,6 @@
 # KK Studio Recovery Convergence Plan
 
-Last updated: 2026-04-27
+Last updated: 2026-04-28
 Branch: `codex/kk-studio-recovery-convergence`
 
 ## Summary
@@ -182,6 +182,28 @@ Validation:
 - `npm.cmd run typecheck`
 - `npm.cmd run build`
 - `npm.cmd run governance:agent-docs`
+- `npm.cmd run check:encoding`
+
+### 8. VPS PostgreSQL Client Access Repair
+
+Goal: finish the live login path by allowing the intended API/client source to reach the VPS PostgreSQL database through a narrow `pg_hba.conf` rule.
+
+Scope:
+- Keep application-side PostgreSQL SSL behavior intact for public `DATABASE_URL` hosts.
+- Add a dry-run-first VPS helper for inspecting and appending a scoped `hostssl` rule.
+- Require an explicit client CIDR and an explicit apply flag before modifying `pg_hba.conf`.
+- Re-run the local API startup probe after the VPS server-side rule is repaired.
+
+Acceptance:
+- `scripts/vps/repair-postgres-client-access.sh` defaults to dry-run and refuses to run without `KK_PG_CLIENT_CIDR`.
+- The proposed rule targets `kkstudio` / `kkstudio_app` by default and can be overridden by env.
+- The script backs up `pg_hba.conf` before appending and reloads PostgreSQL through `pg_reload_conf()`.
+- `node scripts/dev/run-api-dev.mjs --check` passes after the remote PostgreSQL access rule is applied.
+
+Validation:
+- `node --test --test-isolation=none "tests/unit/vps-deploy-artifacts.test.ts"`
+- `node --test --test-isolation=none "tests/unit/vps-deploy-contract.test.ts" "tests/unit/vps-postgres-audit-contract.test.ts" "tests/unit/server-runtime-config.test.ts"`
+- `node scripts/dev/run-api-dev.mjs --check` after VPS access-control repair.
 - `npm.cmd run check:encoding`
 
 ## Final Gate

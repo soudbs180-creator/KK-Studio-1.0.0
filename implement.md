@@ -1,6 +1,6 @@
 # KK Studio Recovery Implementation Rules
 
-Last updated: 2026-04-27
+Last updated: 2026-04-28
 
 ## Operating Mode
 
@@ -63,6 +63,12 @@ Prior sessions may have exposed server, API, or tunnel credentials. Do not write
 - remove or ignore local temporary key files,
 - keep sample env files placeholder-only,
 - verify sensitive boundaries through existing governance checks.
+
+## Remote System Changes
+
+- Read-only VPS checks may inspect PostgreSQL configuration and runtime health when a usable shell is available.
+- Do not append `pg_hba.conf` rules, reload PostgreSQL, or otherwise change remote access control without action-time confirmation.
+- Any PostgreSQL client access repair must dry-run first and use a narrow confirmed CIDR, not a broad `0.0.0.0/0` rule.
 
 ## Context Exhaustion Protocol
 

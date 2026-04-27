@@ -248,32 +248,6 @@ npm.cmd run verify:desktop-settings-smoke
 npm.cmd run check:encoding
 ```
 
-## VPS PostgreSQL Login Probe And Client Access Repair
-
-Run these when touching VPS PostgreSQL connection behavior, deployment scripts, or the login persistence probe:
-
-```powershell
-node --test --test-isolation=none "tests/unit/vps-deploy-artifacts.test.ts"
-node --test --test-isolation=none `
-  "tests/unit/vps-deploy-contract.test.ts" `
-  "tests/unit/vps-postgres-audit-contract.test.ts" `
-  "tests/unit/server-runtime-config.test.ts"
-node scripts/dev/run-api-dev.mjs --check
-npm.cmd run check:encoding
-```
-
-After a VPS shell is available and the remote access-control change is confirmed, dry-run first:
-
-```bash
-KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" scripts/vps/repair-postgres-client-access.sh
-```
-
-Apply only after reviewing the proposed `hostssl` rule:
-
-```bash
-KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" KK_APPLY_PG_CLIENT_ACCESS=true scripts/vps/repair-postgres-client-access.sh
-```
-
 ## Final Gate
 
 Before declaring the recovery complete:
