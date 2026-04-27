@@ -1,8 +1,8 @@
 # KK Studio 数据规格书
 
-文档状态：Draft Frozen v1  
-目标数据库：VPS PostgreSQL  
-数据库命名：`snake_case`  
+文档状态：Draft Frozen v1
+目标数据库：VPS PostgreSQL
+数据库命名：`snake_case`
 API 字段命名：`camelCase`
 
 ## 1. 总体原则

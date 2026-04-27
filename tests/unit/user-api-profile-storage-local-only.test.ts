@@ -155,7 +155,8 @@ test('treats local-file credit storage as readable billing persistence', () => {
 test('saveUserApiEntries surfaces local API failures instead of bypassing them through Supabase profile writes', async () => {
   delete process.env.VITE_KK_API_BASE_URL;
   locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-  mockAuthenticatedUser();
+  mockAuthenticatedUser();
+
   legacyWebApiClient.getKeyManagerCloudState = async () => ({
     success: true,
     data: {

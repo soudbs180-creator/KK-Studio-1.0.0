@@ -73,4 +73,3 @@ If context becomes low, update `status.md` first. Then provide a resume prompt t
 - last validation command and result,
 - uncommitted files touched by this session,
 - next exact command or file to edit.
-

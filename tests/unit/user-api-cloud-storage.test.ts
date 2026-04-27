@@ -680,7 +680,8 @@ describe('user api cloud storage helpers', () => {
   test('throws when both typed auth endpoints fail instead of bypassing the API layer', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    mockAuthenticatedUser();
+    mockAuthenticatedUser();
+
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: false,
       error: {
@@ -1048,7 +1049,8 @@ describe('user api cloud storage helpers', () => {
   test('does not bypass typed auth write failures through a Supabase profile fallback', async () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
-    mockAuthenticatedUser();
+    mockAuthenticatedUser();
+
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: true,
       data: {

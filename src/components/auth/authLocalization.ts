@@ -210,7 +210,8 @@ export function mapAuthErrorMessage(
 
   if (message.includes(HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE)) {
     return pick(
-      language,      "????????????????? KK API ?????????",
+      language,
+      "托管密码登录接口不可用，请检查 KK API 登录路由是否可用。",
       "The hosted password login route is unavailable. Check whether the KK API sign-in route is available.",
     );
   }

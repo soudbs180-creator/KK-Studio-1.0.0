@@ -157,4 +157,3 @@ npm.cmd run build
 npm.cmd run test:unit
 npm.cmd run check:encoding
 ```
-
