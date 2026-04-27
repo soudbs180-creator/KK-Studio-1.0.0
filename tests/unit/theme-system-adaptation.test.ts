@@ -35,7 +35,7 @@ test('theme-aware shells use resolved theme when preference is set to system', (
   assert.match(sidebarSource, /const isDarkMode = resolvedTheme === 'dark';/);
   assert.match(sidebarSource, /const isLightMode = resolvedTheme === 'light';/);
   assert.match(sidebarSource, /backgroundColor: isLightMode \? 'rgba\(255, 255, 255, 0.98\)' : 'var\(--toolbar-bg-dark\)'/);
-  assert.match(sidebarSource, /border: isLightMode \? '2px solid rgba\(0, 0, 0, 0.15\)' : '1px solid var\(--border-light\)'/);
+  assert.match(sidebarSource, /border: isLightMode \? '2px solid rgba\(0, 0, 0, 0.15\)' : '1px solid rgba\(255, 255, 255, 0.05\)'/);
   assert.match(sidebarSource, /boxShadow: isLightMode \? '0 8px 32px rgba\(0, 0, 0, 0.15\)' : 'var\(--shadow-xl\)'/);
   assert.match(sidebarSource, /title=\{isDarkMode \? '切换到亮色模式' : '切换到暗色模式'\}/);
   assert.match(sidebarSource, /\{isDarkMode \? \(/);

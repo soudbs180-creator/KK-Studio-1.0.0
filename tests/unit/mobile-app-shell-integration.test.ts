@@ -11,9 +11,12 @@ function readSource(relativePath: string): string {
 
 test('App delegates mobile rendering to MobileWorkspaceSurface instead of assembling mobile header/feed/composer inline', () => {
   const appSource = readSource('src/App.tsx');
+  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
 
-  assert.match(appSource, /MobileWorkspaceSurface/);
-  assert.match(appSource, /<MobileWorkspaceSurface/);
+  assert.match(appSource, /import AppMobileWorkspace from '\.\/app\/AppMobileWorkspace';/);
+  assert.match(appSource, /<AppMobileWorkspace/);
+  assert.match(appMobileWorkspaceSource, /import \{ MobileWorkspaceSurface \} from '\.\.\/components\/mobile';/);
+  assert.match(appMobileWorkspaceSource, /<MobileWorkspaceSurface/);
   assert.doesNotMatch(appSource, /const mobileHeader = isMobile \?/);
   assert.doesNotMatch(appSource, /const mobileFeed = isMobile \?/);
   assert.doesNotMatch(appSource, /const mobileComposer = isMobile \?/);
@@ -26,14 +29,14 @@ test('mobile component barrel exports the dedicated mobile surface entry', () =>
 });
 
 test('App prepares mobile result entries before the blocking hydration guard to keep hook order stable', () => {
-  const appSource = readSource('src/App.tsx');
-  const guardIndex = appSource.indexOf('if (!isReady) {');
-  const mobileResultEntriesIndex = appSource.indexOf('const mobileResultEntries = React.useMemo<MobileResultEntry[]>(');
+  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const guardIndex = appMobileWorkspaceSource.indexOf('if (!isMobile) {');
+  const mobileResultEntriesIndex = appMobileWorkspaceSource.indexOf('const resultEntries = React.useMemo<MobileResultEntry[]>(');
 
   assert.notEqual(guardIndex, -1);
   assert.notEqual(mobileResultEntriesIndex, -1);
   assert.ok(
     mobileResultEntriesIndex < guardIndex,
-    'mobileResultEntries useMemo must be declared before the blocking hydration guard',
+    'resultEntries useMemo must be declared before the mobile shell short-circuit guard',
   );
 });

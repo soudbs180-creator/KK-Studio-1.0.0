@@ -1,6 +1,11 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
+import { runBrowserPreflight } from './browser-preflight.mjs';
+import {
+  closeLocalViteServer,
+  ensureLocalViteServer,
+} from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'startup-runtime-banner-centering');
@@ -13,6 +18,62 @@ const MAX_CENTER_DELTA_PX = 4;
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
+  }
+}
+
+function readSource(relativePath) {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
+function isBrowserLaunchUnavailable(error) {
+  const message = String(error?.message || error || '');
+  return /spawn EPERM/i.test(message)
+    || /Playwright npx cache directory not found/i.test(message)
+    || /Playwright module was not found/i.test(message);
+}
+
+async function assertHttpHtml(url) {
+  const response = await fetch(url, { redirect: 'manual' });
+  if (!response.ok) {
+    throw new Error(`Expected ${url} to respond successfully, got ${response.status}.`);
+  }
+
+  const html = await response.text();
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected ${url} to return HTML content.`);
+  }
+
+  return {
+    url,
+    status: response.status,
+    length: html.length,
+  };
+}
+
+function verifyBannerSourceContracts() {
+  const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const appSource = readSource('src/App.tsx');
+
+  const checks = [
+    /data-testid="startup-runtime-banner"/,
+    /PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container'/,
+    /PROMPT_BAR_TEXTAREA_SELECTOR = 'textarea\.input-bar-textarea, textarea'/,
+    /transform: 'translateX\(-50%\)'/,
+    /showStartupBanner\?: boolean;/,
+    /showStartupBanner = true/,
+    /\{showStartupBanner(?:\s*&&\s*!showWorkspaceStartupSkeleton)?\s*\?\s*<StartupRuntimeBanner\s*\/>\s*:\s*null\}/,
+    /showStartupBanner=\{rootMode === 'workspace'\}/,
+    /id="prompt-bar-container"/,
+    /className=\{`input-bar-textarea/,
+  ];
+
+  const sources = [shellSource, promptBarSource, appSource];
+
+  for (const pattern of checks) {
+    if (!sources.some((source) => pattern.test(source))) {
+      throw new Error(`Startup runtime banner source contract missing pattern: ${pattern}`);
+    }
   }
 }
 
@@ -121,40 +182,77 @@ function assertCentered(result, label) {
   }
 }
 
-const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
-const { chromium } = await import(playwrightModuleUrl);
-
 ensureArtifactsDir();
 
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: 1600, height: 980 },
-});
+async function runFallbackVerification(error, browserPreflight, targetUrl) {
+  verifyBannerSourceContracts();
 
-await page.addInitScript(() => {
-  const originalSetTimeout = window.setTimeout.bind(window);
+  const routes = await Promise.all([
+    assertHttpHtml(targetUrl),
+    assertHttpHtml(`${targetUrl}/settings`),
+  ]);
 
-  window.setTimeout = ((handler, timeout = 0, ...args) => {
-    const handlerSource = typeof handler === 'function'
-      ? Function.prototype.toString.call(handler)
-      : String(handler);
-    const isStartupAdvanceTimer = handlerSource.includes('profile_ready')
-      || handlerSource.includes('workspace_ready')
-      || handlerSource.includes('background_ready');
-    const nextDelay = isStartupAdvanceTimer ? 60_000 : timeout;
-    return originalSetTimeout(handler, nextDelay, ...args);
-  });
+  const summary = {
+    mode: 'fallback',
+    reason: String(error?.message || error),
+    browserPreflight,
+    routes,
+    sourceContractsVerified: true,
+    artifactDir: ARTIFACT_DIR,
+  };
 
-  window.localStorage.setItem('theme', 'dark');
-  window.localStorage.setItem('kk_theme', 'dark');
-  window.localStorage.setItem('kk_language', 'zh-CN');
-  window.localStorage.setItem('kk_studio_storage_mode', 'browser');
-  window.localStorage.setItem('kk_tutorial_seen', 'true');
-  window.localStorage.setItem('kk_has_logged_in', 'true');
-});
+  writeFileSync(
+    path.join(ARTIFACT_DIR, 'startup-runtime-banner-fallback.json'),
+    JSON.stringify(summary, null, 2),
+    'utf8',
+  );
+
+  console.log(JSON.stringify(summary, null, 2));
+}
+
+let browser;
+let page;
+let viteServer;
+let browserPreflight = null;
+let targetUrl = TARGET_URL;
 
 try {
-  await gotoWithRetry(page, TARGET_URL);
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  viteServer = ensured.server;
+  targetUrl = ensured.url || TARGET_URL;
+  browserPreflight = await runBrowserPreflight();
+
+  const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
+  const { chromium } = await import(playwrightModuleUrl);
+
+  browser = await chromium.launch({ headless: true });
+  page = await browser.newPage({
+    viewport: { width: 1600, height: 980 },
+  });
+
+  await page.addInitScript(() => {
+    const originalSetTimeout = window.setTimeout.bind(window);
+
+    window.setTimeout = ((handler, timeout = 0, ...args) => {
+      const handlerSource = typeof handler === 'function'
+        ? Function.prototype.toString.call(handler)
+        : String(handler);
+      const isStartupAdvanceTimer = handlerSource.includes('profile_ready')
+        || handlerSource.includes('workspace_ready')
+        || handlerSource.includes('background_ready');
+      const nextDelay = isStartupAdvanceTimer ? 60_000 : timeout;
+      return originalSetTimeout(handler, nextDelay, ...args);
+    });
+
+    window.localStorage.setItem('theme', 'dark');
+    window.localStorage.setItem('kk_theme', 'dark');
+    window.localStorage.setItem('kk_language', 'zh-CN');
+    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+    window.localStorage.setItem('kk_tutorial_seen', 'true');
+    window.localStorage.setItem('kk_has_logged_in', 'true');
+  });
+
+  await gotoWithRetry(page, targetUrl);
 
   const promptBar = page.locator(`#${PROMPT_BAR_CONTAINER_ID}`);
   const banner = page.getByTestId(BANNER_TEST_ID);
@@ -183,11 +281,26 @@ try {
   });
 
   console.log(JSON.stringify({
+    mode: 'browser',
+    browserPreflight,
     initialResult,
     resizedResult,
     artifactDir: ARTIFACT_DIR,
   }, null, 2));
+} catch (error) {
+  if (isBrowserLaunchUnavailable(error)) {
+    await runFallbackVerification(error, browserPreflight, targetUrl);
+  } else {
+    throw error;
+  }
 } finally {
-  await page.close().catch(() => {});
-  await browser.close().catch(() => {});
+  if (page) {
+    await page.close().catch(() => {});
+  }
+  if (browser) {
+    await browser.close().catch(() => {});
+  }
+  if (viteServer) {
+    await closeLocalViteServer(viteServer);
+  }
 }

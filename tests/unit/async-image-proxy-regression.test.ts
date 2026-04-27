@@ -64,7 +64,7 @@ test("async image transports expose task metadata through contracts, client prox
 
 test("local and hosted proxies keep async-image as a first-class execution path instead of collapsing it into sync image routes", () => {
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
+  const localSystemProxySource = readSource("apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts");
 
   assert.match(localProxySource, /type LocalResolvedImageSurface = "chat-image" \| "provider-images" \| "gemini-native-image" \| "async-image";/);
   assert.match(localProxySource, /return "async-image";/);
@@ -74,12 +74,9 @@ test("local and hosted proxies keep async-image as a first-class execution path 
   assert.match(localProxySource, /private async invokeDirectImageTaskRoute\(/);
   assert.match(localProxySource, /\/v1\/images\/async\/generations\/\$\{encodeURIComponent\(upstreamTaskId\)\}/);
 
-  assert.match(secureProxySource, /'image' \| 'system-image'/);
-  assert.match(secureProxySource, /'user-video' \| 'user-image'/);
-  assert.match(secureProxySource, /type CreditRouteSurface = 'provider-images' \| 'gemini-native-image' \| 'async-image';/);
-  assert.match(secureProxySource, /function inferCreditRouteSurface\(endpoint: string \| null \| undefined\): CreditRouteSurface \{/);
-  assert.match(secureProxySource, /const requestSurface = inferCreditRouteSurface\(creditModel\.endpoint_type\);/);
-  assert.match(secureProxySource, /\/v1\/images\/async\/generations/);
-  assert.match(secureProxySource, /kind: 'image',/);
-  assert.match(secureProxySource, /kind: 'user-image',/);
+  assert.match(localSystemProxySource, /function inferSystemImageSurface\(endpointType: string \| undefined\): LocalResolvedImageSurface \{/);
+  assert.match(localSystemProxySource, /return "async-image";/);
+  assert.match(localSystemProxySource, /imageSurface: inferSystemImageSurface\(picked\.route\.endpointType\),/);
+  assert.match(localSystemProxySource, /imageSurface: input\.mode === "image" \? selected\.imageSurface : undefined,/);
+  assert.match(localSystemProxySource, /kind: "image",/);
 });

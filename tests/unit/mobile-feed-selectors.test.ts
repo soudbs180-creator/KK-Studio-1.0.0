@@ -209,6 +209,31 @@ describe('selectMobileFeedResults', () => {
     assert.equal(resultById.get('image-ecom')?.displayLabel, '主图 1:1 4K');
     assert.equal(resultById.get('image-redraw')?.displayLabel, 'A+ 21:9 4K');
   });
+  test('does not project follow-up ecommerce actions for framework prompt cards', () => {
+    const frameworkPrompt = createPromptNode({
+      id: 'prompt-framework',
+      prompt: 'Framework prompt',
+      ecommerce: {
+        kind: 'framework',
+        sourceSheet: '涓诲浘',
+        sourceRowKey: 'framework-root',
+        displayLabel: 'Framework root',
+        stage: 'ready',
+        desktopStage: 'not_applicable',
+        mobileStage: 'not_applicable',
+      } as PromptNode['ecommerce'],
+    });
+    const frameworkImage = createImage({
+      id: 'image-framework',
+      parentPromptId: 'prompt-framework',
+      displayLabel: 'Framework image',
+    });
+
+    const [result] = selectMobileFeedResults([frameworkPrompt], [frameworkImage]);
+
+    assert.equal(result.ecommerceContinuation, undefined);
+  });
+
   test('projects ecommerce continuation metadata for mobile detail follow-up actions', () => {
     const taskState = {
       taskId: 'task-a-plus-1',

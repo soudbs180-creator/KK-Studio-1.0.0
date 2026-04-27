@@ -14,4 +14,3 @@ export {
 // Re-export existing services
 export { keyManager } from './auth/keyManager';
 export { notify } from './system/notificationService';
-export { supabase } from '../lib/supabase';

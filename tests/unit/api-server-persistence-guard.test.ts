@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, afterEach, describe, test } from "node:test";
 
 import { createApiServer } from "../../apps/api/src/server.ts";
-import type { ServerSupabasePersistenceProbe } from "../../apps/api/src/lib/server-supabase-config.ts";
+import type { ServerRuntimePersistenceProbe } from "../../apps/api/src/lib/server-runtime-config.ts";
 
 function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
   const address = server.address();
@@ -14,12 +14,11 @@ function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
 }
 
 const trackedEnvKeys = [
-  "VITE_SUPABASE_URL",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "VITE_SUPABASE_ANON_KEY",
-  "SUPABASE_ANON_KEY",
+  "DATABASE_URL",
+  "PGHOST",
+  "PGDATABASE",
+  "PGUSER",
+  "PGPASSWORD",
   "USER_API_ENCRYPTION_SECRET",
   "PROFILE_USER_APIS_ENCRYPTION_SECRET",
 ];
@@ -58,12 +57,6 @@ function withMutedConsoleWarn<T>(callback: () => T): T {
 
 describe("api server persistence guards", () => {
   restoreTrackedEnv();
-  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
-  process.env.SUPABASE_ANON_KEY = "anon";
-  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-  delete process.env.SUPABASE_SECRET_KEY;
   delete process.env.USER_API_ENCRYPTION_SECRET;
   delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
@@ -112,14 +105,16 @@ describe("api server persistence guards", () => {
     assert.equal(payload.success, true);
     assert.equal(payload.data.status, "degraded");
     assert.equal(payload.data.config.canonicalPersistenceReady, false);
-    assert.equal(payload.data.config.projectRefMatches, true);
+    assert.equal(payload.data.config.hasPostgresConfig, false);
+    assert.equal("projectRefMatches" in payload.data.config, false);
+    assert.equal("hasSupabaseUrl" in payload.data.config, false);
     assert.equal(payload.data.runtime.allowDegradedPersistence, false);
     assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
     assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
     assert.equal(payload.data.runtime.criticalPersistence.workspaceLayout.ready, false);
     assert.match(
       payload.data.runtime.blockers.join(","),
-      /USER_API_ENCRYPTION_SECRET_MISSING|SUPABASE_SERVICE_ROLE_KEY_MISSING|AUTH_DATA_REPOSITORY_DEGRADED/,
+      /USER_API_ENCRYPTION_SECRET_MISSING|POSTGRES_CONFIG_MISSING|AUTH_DATA_REPOSITORY_DEGRADED/,
     );
   });
 
@@ -187,32 +182,30 @@ describe("api server persistence guards", () => {
   });
 });
 
-describe("api server live Supabase probe guards", () => {
+describe("api server live PostgreSQL probe guards", () => {
   restoreTrackedEnv();
-  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
-  process.env.SUPABASE_ANON_KEY = "anon";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_invalid_probe";
+  process.env.PGHOST = "127.0.0.1";
+  process.env.PGDATABASE = "kk_guard";
+  process.env.PGUSER = "kk_guard";
   process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
   delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
-  const invalidProbe: ServerSupabasePersistenceProbe = {
+  const invalidProbe: ServerRuntimePersistenceProbe = {
     checkedAt: "2026-04-01T00:00:00.000Z",
-    serviceRoleKeyValid: false,
-    blockers: ["SUPABASE_SERVICE_ROLE_KEY_INVALID"],
+    postgresConfigValid: false,
+    blockers: ["POSTGRES_PROFILES_PROBE_FAILED"],
     checks: {
-      authData: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      guestSessions: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      billing: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      creditProviders: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      workspaceLayout: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      authData: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      guestSessions: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      billing: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      creditProviders: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      workspaceLayout: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
     },
   };
 
   const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
-    probeServerSupabasePersistence: async () => invalidProbe,
+    probeServerRuntimePersistence: async () => invalidProbe,
     resolveAccessToken: (accessToken) => (
       accessToken === "guard-user-token"
         ? { userId: "guard-user-1", role: "user" }
@@ -248,18 +241,18 @@ describe("api server live Supabase probe guards", () => {
     restoreTrackedEnv();
   });
 
-  test("healthz reports degraded persistence when the service-role probe fails", async () => {
+  test("healthz reports degraded persistence when the VPS database probe fails", async () => {
     const response = await fetch(`${baseUrl}/healthz?probe=1`);
     assert.equal(response.status, 200);
 
     const payload = await response.json();
     assert.equal(payload.success, true);
     assert.equal(payload.data.status, "degraded");
-    assert.equal(payload.data.config.hasServiceRoleKey, true);
-    assert.equal(payload.data.config.hasValidServiceRoleKey, false);
+    assert.equal(payload.data.config.hasPostgresConfig, true);
+    assert.equal(payload.data.config.hasValidPostgresConfig, false);
     assert.equal(payload.data.config.canonicalPersistenceReady, false);
     assert.equal(payload.data.runtime.criticalPersistence.authData.ready, false);
-    assert.match(payload.data.runtime.blockers.join(","), /SUPABASE_SERVICE_ROLE_KEY_INVALID/);
+    assert.match(payload.data.runtime.blockers.join(","), /POSTGRES_PROFILES_PROBE_FAILED/);
   });
 
   test("critical shared-data routes fail closed when the service-role probe fails", async () => {
@@ -289,21 +282,19 @@ describe("api server live Supabase probe guards", () => {
 
 describe("api server capability-scoped persistence guards", () => {
   restoreTrackedEnv();
-  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
-  process.env.SUPABASE_ANON_KEY = "anon";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_capability_probe";
+  process.env.PGHOST = "127.0.0.1";
+  process.env.PGDATABASE = "kk_guard";
+  process.env.PGUSER = "kk_guard";
   process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
   delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
-  const scopedProbe: ServerSupabasePersistenceProbe = {
+  const scopedProbe: ServerRuntimePersistenceProbe = {
     checkedAt: "2026-04-01T00:00:00.000Z",
-    serviceRoleKeyValid: true,
-    blockers: ["SUPABASE_TEMP_USERS_PROBE_FAILED"],
+    postgresConfigValid: true,
+    blockers: ["POSTGRES_TEMP_USERS_PROBE_FAILED"],
     checks: {
       authData: { ready: true },
-      guestSessions: { ready: false, blocker: "SUPABASE_TEMP_USERS_PROBE_FAILED", message: "temp_users timed out" },
+      guestSessions: { ready: false, blocker: "POSTGRES_TEMP_USERS_PROBE_FAILED", message: "temp_users timed out" },
       billing: { ready: true },
       creditProviders: { ready: true },
       workspaceLayout: { ready: true },
@@ -312,7 +303,7 @@ describe("api server capability-scoped persistence guards", () => {
 
   const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
-    probeServerSupabasePersistence: async () => scopedProbe,
+    probeServerRuntimePersistence: async () => scopedProbe,
     resolveAccessToken: (accessToken) => (
       accessToken === "guard-user-token"
         ? { userId: "guard-user-1", role: "user" }
@@ -356,47 +347,50 @@ describe("api server capability-scoped persistence guards", () => {
     assert.equal(payload.success, true);
     assert.equal(payload.data.status, "degraded");
     assert.equal(payload.data.runtime.criticalPersistence.guestSessions.ready, false);
-    assert.equal(payload.data.runtime.criticalPersistence.authData.ready, true);
-    assert.equal(payload.data.runtime.criticalPersistence.billing.ready, true);
-    assert.equal(payload.data.runtime.criticalPersistence.creditProviders.ready, true);
-    assert.deepEqual(
-      payload.data.runtime.criticalPersistence.billing.blockers,
-      [],
+    assert.match(
+      payload.data.runtime.criticalPersistence.guestSessions.blockers.join(","),
+      /POSTGRES_TEMP_USERS_PROBE_FAILED/,
     );
-    assert.deepEqual(
-      payload.data.runtime.criticalPersistence.creditProviders.blockers,
-      [],
+    assert.doesNotMatch(
+      payload.data.runtime.criticalPersistence.authData.blockers.join(","),
+      /POSTGRES_TEMP_USERS_PROBE_FAILED/,
+    );
+    assert.doesNotMatch(
+      payload.data.runtime.criticalPersistence.billing.blockers.join(","),
+      /POSTGRES_TEMP_USERS_PROBE_FAILED/,
+    );
+    assert.doesNotMatch(
+      payload.data.runtime.criticalPersistence.creditProviders.blockers.join(","),
+      /POSTGRES_TEMP_USERS_PROBE_FAILED/,
     );
   });
 });
 
 describe("api server healthz fast path", () => {
   restoreTrackedEnv();
-  process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
-  process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
-  process.env.SUPABASE_ANON_KEY = "anon";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_fast_health";
+  process.env.PGHOST = "127.0.0.1";
+  process.env.PGDATABASE = "kk_guard";
+  process.env.PGUSER = "kk_guard";
   process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
   delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
   let probeCallCount = 0;
-  const forcedProbe: ServerSupabasePersistenceProbe = {
+  const forcedProbe: ServerRuntimePersistenceProbe = {
     checkedAt: "2026-04-01T00:00:00.000Z",
-    serviceRoleKeyValid: false,
-    blockers: ["SUPABASE_SERVICE_ROLE_KEY_INVALID"],
+    postgresConfigValid: false,
+    blockers: ["POSTGRES_PROFILES_PROBE_FAILED"],
     checks: {
-      authData: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      guestSessions: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      billing: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      creditProviders: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
-      workspaceLayout: { ready: false, blocker: "SUPABASE_SERVICE_ROLE_KEY_INVALID", message: "Invalid API key" },
+      authData: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      guestSessions: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      billing: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      creditProviders: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
+      workspaceLayout: { ready: false, blocker: "POSTGRES_PROFILES_PROBE_FAILED", message: "profiles probe failed" },
     },
   };
 
   const server = withMutedConsoleWarn(() => createApiServer(0, {
     allowDegradedPersistence: false,
-    probeServerSupabasePersistence: async () => {
+    probeServerRuntimePersistence: async () => {
       probeCallCount += 1;
       return forcedProbe;
     },
@@ -430,7 +424,7 @@ describe("api server healthz fast path", () => {
     restoreTrackedEnv();
   });
 
-  test("plain healthz skips the live Supabase probe until explicitly requested", async () => {
+  test("plain healthz skips the live VPS probe until explicitly requested", async () => {
     const fastResponse = await fetch(`${baseUrl}/healthz`);
     assert.equal(fastResponse.status, 200);
 

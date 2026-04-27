@@ -35,6 +35,7 @@ test('startup runtime banner browser verification uses stable selectors and chec
   const scriptSource = readSource('scripts/test/verify-startup-runtime-banner-centering.mjs');
   const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const appSource = readSource('src/App.tsx');
 
   assert.match(scriptSource, /startup-runtime-banner/);
   assert.match(scriptSource, /prompt-bar-container/);
@@ -42,10 +43,15 @@ test('startup runtime banner browser verification uses stable selectors and chec
   assert.match(scriptSource, /deltaX/);
   assert.match(scriptSource, /setViewportSize/);
   assert.match(scriptSource, /throw new Error\(`Startup runtime banner is not centered to the prompt input/);
+  assert.match(scriptSource, /runFallbackVerification/);
+  assert.match(scriptSource, /sourceContractsVerified: true/);
 
   assert.match(shellSource, /data-testid="startup-runtime-banner"/);
   assert.match(shellSource, /PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container'/);
   assert.match(shellSource, /PROMPT_BAR_TEXTAREA_SELECTOR = 'textarea\.input-bar-textarea, textarea'/);
+  assert.doesNotMatch(shellSource, /attributeFilter: \['class', 'style'\]/);
+  assert.doesNotMatch(shellSource, /attributes: true/);
   assert.match(promptBarSource, /id="prompt-bar-container"/);
   assert.match(promptBarSource, /className=\{`input-bar-textarea/);
+  assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
 });

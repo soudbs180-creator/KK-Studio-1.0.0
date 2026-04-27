@@ -2,7 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { runBrowserPreflight } from './browser-preflight.mjs';
-import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
+import {
+  closeLocalViteServer,
+  ensureLocalViteServer,
+} from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, ".tmp-playwright", "prompt-group-drag");
@@ -132,12 +135,14 @@ async function assertHttpHtml(url) {
 
 function verifyPromptGroupSourceContracts() {
   const appSource = readSource('src/App.tsx');
+  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
   const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const imageSource = readSource('src/components/image/ImageCard2.tsx');
 
   const checks = [
-    { source: appSource, pattern: /commitPromptGroupDrag\(/, label: 'App prompt-group drag commit wiring' },
-    { source: appSource, pattern: /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/, label: 'App live-drag regroup wiring' },
+    { source: appSource, pattern: /usePromptGroupDragHandlers\(/, label: 'App prompt-group drag hook wiring' },
+    { source: dragHookSource, pattern: /commitPromptGroupDrag\([\s\S]*shouldAutoRegroupPromptGroup/, label: 'Hook prompt-group drag commit wiring' },
+    { source: dragHookSource, pattern: /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/, label: 'Hook live-drag regroup wiring' },
     { source: promptSource, pattern: /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Prompt card bottom-center transform origin' },
     { source: imageSource, pattern: /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 100%'/, label: 'Image card bottom-center transform origin' },
   ];
@@ -434,6 +439,6 @@ try {
     await browser.close().catch(() => {});
   }
   if (viteServer) {
-    await viteServer.close();
+    await closeLocalViteServer(viteServer);
   }
 }

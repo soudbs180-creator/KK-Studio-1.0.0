@@ -1,13 +1,9 @@
 process.env.KK_LOG_LEVEL ??= "WARN";
-process.env.KK_SUPPRESS_SUPABASE_PUBLIC_CONFIG_LOGS ??= "true";
 
 const originalConsoleWarn = console.warn.bind(console);
 const originalConsoleError = console.error.bind(console);
 
-const suppressedTextFragments = [
-  "[Supabase] Public client config is unavailable.",
-  "[Supabase] Missing Supabase public config",
-];
+const suppressedTextFragments = [];
 
 const suppressedStructuredWarningMessages = new Set([
   "Falling back to file-backed local auth data repository",
@@ -20,7 +16,7 @@ const suppressedStructuredWarningMessages = new Set([
   "Using file-backed credit account repository for KKAI local-only runtime",
   "Using file-backed credit exchange-rate repository for KKAI local-only runtime",
   "Using in-memory credit provider repository for KKAI local-only runtime",
-  "WeChat auth service is disabled because Supabase admin config is unavailable.",
+  "WeChat auth service is disabled because the PostgreSQL WeChat repository is unavailable.",
   "WeChat auth service is disabled because WeChat env vars are incomplete.",
   "Failed to persist user API entries to the cloud mirror.",
   "Rejected WeChat callback before code exchange",
