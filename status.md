@@ -7,10 +7,10 @@ Last updated: 2026-04-28
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: VPS PostgreSQL login probe repair.
+- Current milestone: VPS PostgreSQL client access repair is code-complete locally; remote apply is blocked on usable VPS shell access and action-time confirmation.
 - Milestones 1, 2, 3, 4, 5, and 6 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
-- Publish status: local `main` is ahead of `origin/main` by 17 commits after the 2026-04-28 Turnstile repair commit.
+- Publish status: local `main` is ahead of `origin/main`; latest observed count after local follow-up commits was 22 commits.
 
 ## Recovered Sources
 
@@ -103,6 +103,24 @@ Risk classes observed:
 - Switched the compact result feed from fixed grid rows to adaptive CSS columns driven by the shared responsive column utility.
 - Made the standard/detail mode switch available on phone-sized result feeds instead of hiding it below the `sm` breakpoint.
 - Updated the milestone validation matrix with the additional responsive, shell, and billing-header contract tests used for this follow-up.
+
+## Completed In 2026-04-28 Settings Smoke And Admin Recharge Follow-Up
+
+- Updated desktop and mobile settings smoke scripts to seed a temporary browser session before opening authenticated settings routes.
+- Expanded smoke coverage for direct `/settings`, direct `/settings/api-management`, local API editor open/back navigation, advanced mode, diagnostics, and workspace settings entry.
+- Fixed the desktop diagnostics smoke path by relying on the API settings view's diagnostics toggle to open the advanced details area, and by using exact button names for advanced-mode locators.
+- Kept API setup in simple mode by default while auto-expanding advanced details when diagnostics are requested.
+- Tightened third-party provider and capability-card density for the settings API workbench.
+- Updated the admin recharge submissions page to group paying, credited, expired, and rejected submissions, highlight paid submissions, and expose direct credit/reject actions.
+- Hardened the local Vite smoke helper with fetch abort timeouts and made the admin Vite config ESM-safe.
+
+## Completed In 2026-04-28 Local API Settings Add-Entry Follow-Up
+
+- Collapsed the local API quick-start surface to one visible `Add new provider` entry instead of separate Google/OpenAI preset cards.
+- Preserved the existing local API editor flow so the provider is chosen inside the form, with Google/OpenAI still available there.
+- Restored capability toggle containment inside inner overlay containers.
+- Updated desktop and mobile settings smoke scripts for the current default simple API view, then opened advanced mode before checking workbench stage/diagnostics surfaces.
+- Changed the diagnostics toggle behavior so opening diagnostics also expands the advanced details area, giving the click a visible result.
 
 ## Validation Results
 
@@ -238,24 +256,47 @@ Final gate:
 - Passed: `npm.cmd run check:encoding`
 - Passed: `npm.cmd run build`
 
+2026-04-28 settings smoke and admin recharge follow-up validation:
+
+- Red/green verified: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-settings-browser-verify-script.test.ts`
+- Passed: related admin/settings/smoke source contracts (`9/9` tests):
+  - `tests/unit/admin-credit-lookup-contract.test.ts`
+  - `tests/unit/api-settings-provider-compact-ui-contract.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+- Passed: `npm.cmd run verify:mobile-settings-smoke`
+- Passed: `npm.cmd run verify:desktop-settings-smoke`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run admin:build`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `npm.cmd run check:encoding`
+
+2026-04-28 local API settings add-entry follow-up validation:
+
+- Passed: targeted settings/API tests (`16/16` tests):
+  - `tests/unit/api-settings-local-preset-entry.test.ts`
+  - `tests/unit/api-settings-workbench-structure.test.ts`
+  - `tests/unit/api-settings-capability-layout-regression.test.ts`
+  - `tests/unit/api-settings-stage-semantics.test.ts`
+  - `tests/unit/api-settings-simple-mode-contract.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run verify:mobile-settings-smoke`
+- Passed: `npm.cmd run verify:desktop-settings-smoke`
+- Passed: `npm.cmd run check:encoding`
+
 ## In Progress
 
+- Settings smoke and admin recharge follow-up is committed locally.
+- VPS PostgreSQL client-access helper is committed locally.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper.
 - Remote PostgreSQL access-control repair remains blocked because the existing temporary SSH key files cannot be read under the current Windows ACLs and the askpass-based SSH attempt did not establish a shell.
-- Existing unrelated settings/API, admin/API, mobile, and CSS dirty files remain outside this auth/PostgreSQL scope.
 
 ## Known Risks And Blockers To Verify
 
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
-- Unrelated dirty files are present and must not be staged in the VPS PostgreSQL login probe commit unless explicitly requested. Currently observed examples:
-  - `apps/admin/src/pages/RechargeSubmissionsPage.tsx`
-  - `src/components/mobile/MobileResultDetailScreen.tsx`
-  - `src/components/mobile/MobileResultFeed.tsx`
-  - `src/components/settings/ApiSettingsView.tsx`
-  - `src/components/settings/apiWorkbenchSections.tsx`
-  - `src/index.css`
+- No unrelated tracked source changes are currently expected after the local follow-up commits; re-check `git status --short` before any next commit.
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `13.208.210.0`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
@@ -265,4 +306,4 @@ Final gate:
 1. Get a usable VPS shell, then run `KK_PG_CLIENT_CIDR="<client-cidr>" scripts/vps/repair-postgres-client-access.sh` as a dry-run.
 2. After reviewing the proposed `hostssl` rule and receiving action-time confirmation, run the same script with `KK_APPLY_PG_CLIENT_ACCESS=true`.
 3. Rerun `node scripts/dev/run-api-dev.mjs --check` and `http://127.0.0.1:3001/healthz?probe=1` after the server-side rule is fixed.
-4. Keep unrelated dirty files out of the auth/PostgreSQL commit unless explicitly requested.
+4. Push local `main` when publishing these commits is desired.
