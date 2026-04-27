@@ -667,8 +667,9 @@ if ($vitePid -and -not (Test-UrlReady -Url $viteUrl)) {
 if (-not $vitePid) {
     Clear-KnownDevPortConflicts -Port 3000
     Assert-PortAvailable -Port 3000
-    $vitePid = Start-DetachedPowerShellScript `
-        -ScriptPath $viteRunnerScript `
+    $vitePid = Start-DetachedNodeProcess `
+        -NodeExe $nodeExe `
+        -NodeArguments @($viteCli, '--configLoader', 'native') `
         -WorkingDirectory $projectRoot `
         -PidFile $vitePidFile `
         -StdOutLog $viteOutLog `

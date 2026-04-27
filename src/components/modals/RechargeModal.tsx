@@ -20,10 +20,12 @@ import {
   listRechargePaymentChannels,
   markRechargeSubmissionPaid,
   normalizeRechargeBillSnapshot,
+  submitRechargeProof,
   type RechargeBillSnapshot,
   type RechargePaymentChannelConfig,
 } from '../../services/billing/rechargeSubmissionService';
 import { notify } from '../../services/system/notificationService';
+import { localizeUserFacingText } from '../../utils/localeText';
 
 type ReservedChannel = 'dynamic-alipay' | 'dynamic-wechat' | 'international' | 'manual';
 type ManualProvider = 'alipay' | 'wechat';
@@ -95,6 +97,7 @@ const RechargeModal: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<ReservedChannel>('manual');
   const [manualProvider, setManualProvider] = useState<ManualProvider>('alipay');
   const [billSnapshot, setBillSnapshot] = useState<RechargeBillSnapshot | null>(null);
+  const [transferReferenceLast4, setTransferReferenceLast4] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [creating, setCreating] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
@@ -160,6 +163,7 @@ const RechargeModal: React.FC = () => {
       setSelectedChannel('manual');
       setManualProvider('alipay');
       setBillSnapshot(null);
+      setTransferReferenceLast4('');
       setMessage('');
       setCreating(false);
       setMarkingPaid(false);
@@ -227,7 +231,8 @@ const RechargeModal: React.FC = () => {
       setMessage('订单已创建，请按实付金额扫码付款。');
       notify.success('订单已创建', '人工充值较慢，请等待 1-5 分钟。');
     } catch (error) {
-      const text = error instanceof Error ? error.message : '创建人工充值订单失败，请稍后重试。';
+      const text = localizeUserFacingText(error instanceof Error ? error.message : '')
+        || '创建人工充值订单失败，请稍后重试。';
       setMessage(text);
       notify.error('创建失败', text);
     } finally {
@@ -242,22 +247,55 @@ const RechargeModal: React.FC = () => {
 
     setMarkingPaid(true);
     try {
-      const response = await markRechargeSubmissionPaid(
-        billSnapshot.submissionId,
+      const normalizedReference = transferReferenceLast4.trim().toUpperCase();
+      if (!/^[0-9A-Z]{4}$/.test(normalizedReference)) {
+        throw new Error('请填写转账流水后四位。');
+      }
+
+      const response = await submitRechargeProof(
+        {
+          submissionId: billSnapshot.submissionId,
+          billNumber: billSnapshot.billNumber,
+          amount: billSnapshot.amount,
+          currencyCode: billSnapshot.currencyCode,
+          paymentChannel: billSnapshot.paymentChannel,
+          transferReferenceLast4: normalizedReference,
+          note: billSnapshot.note,
+        },
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
       if (!response.success) {
+        if (response.error?.code === 'HTTP_404') {
+          const paidResponse = await markRechargeSubmissionPaid(
+            billSnapshot.submissionId,
+            { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
+          );
+          if (paidResponse.success) {
+            const fallbackBill = normalizeRechargeBillSnapshot({ submission: paidResponse.data.submission }, {
+              ...billSnapshot,
+              transferReferenceLast4: normalizedReference,
+            });
+            setBillSnapshot(fallbackBill);
+            setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
+            notify.success('已通知管理员', '管理员处理后积分会自动到账。');
+            await refreshBilling({ includeTransactions: true });
+            return;
+          }
+        }
         throw new Error(getRechargeSubmissionErrorMessage(response, '标记已支付失败，请联系客服处理。'));
       }
 
-      setBillSnapshot((current) => current
-        ? normalizeRechargeBillSnapshot({ submission: response.data.submission }, current)
-        : current);
+      const nextBill = normalizeRechargeBillSnapshot(response.data, {
+        ...billSnapshot,
+        transferReferenceLast4: normalizedReference,
+      });
+      setBillSnapshot(nextBill);
       setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
       notify.success('已通知管理员', '管理员处理后积分会自动到账。');
-      void refreshBilling?.();
+      await refreshBilling({ includeTransactions: true });
     } catch (error) {
-      const text = error instanceof Error ? error.message : '标记已支付失败，请联系客服处理。';
+      const text = localizeUserFacingText(error instanceof Error ? error.message : '')
+        || '标记已支付失败，请联系客服处理。';
       setMessage(text);
       notify.error('提交失败', text);
     } finally {
@@ -398,10 +436,24 @@ const RechargeModal: React.FC = () => {
               </div>
             ) : null}
 
+            {billSnapshot ? (
+              <label className="block rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm">
+                <span className="mb-2 block text-xs text-slate-400">转账流水后四位</span>
+                <input
+                  value={transferReferenceLast4}
+                  onChange={(event) => setTransferReferenceLast4(
+                    event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(-4),
+                  )}
+                  placeholder="例如 8X9Z"
+                  className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+                />
+              </label>
+            ) : null}
+
             <button
               type="button"
               onClick={billSnapshot ? handleMarkPaid : handleCreateOrder}
-              disabled={creating || markingPaid || isExpired}
+              disabled={creating || markingPaid || isExpired || (Boolean(billSnapshot) && transferReferenceLast4.trim().length !== 4)}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-600"
             >
               {creating || markingPaid ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}

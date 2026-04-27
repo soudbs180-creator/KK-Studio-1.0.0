@@ -65,15 +65,16 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                     <button
                         type="button"
                         onClick={handleRechargeClick}
+                        data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="flex min-w-[92px] shrink-0 flex-col items-start justify-center rounded-[20px] border border-white/10 bg-white/6 px-3 py-2 text-left text-white transition-all active:scale-95 disabled:opacity-55"
+                        className="inline-flex min-w-[92px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[20px] border border-white/10 bg-white/6 px-3 py-2 text-left text-white transition-all active:scale-95 disabled:opacity-55"
                         disabled={!handleRechargeClick}
                     >
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">
                             <Sparkles size={12} className="text-amber-300" />
                             {'\u79ef\u5206'}
                         </span>
-                        <span className="mt-1 text-[15px] font-semibold leading-none">{balanceDisplay}</span>
+                        <span className="text-[15px] font-semibold leading-none">{balanceDisplay}</span>
                     </button>
 
                     <button

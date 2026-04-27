@@ -1,4 +1,4 @@
-import { getOcrServiceSettings } from './ocrServiceSettings';
+import { getOcrServiceSettings } from './ocrServiceSettings.ts';
 
 export type NutrientDocumentOperation = 'convert-to-pdf' | 'extract-text' | 'ocr-to-pdf';
 

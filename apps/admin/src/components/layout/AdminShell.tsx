@@ -11,6 +11,7 @@ export default function AdminShell() {
         <Link to="/">Dashboard</Link>
         <Link to="/exchange-rates">Exchange Rates</Link>
         <Link to="/providers">Providers</Link>
+        <Link to="/recharge-submissions">Recharge Submissions</Link>
         <Link to="/users/credits">User Credits</Link>
         <button type="button" onClick={signOut}>Sign out</button>
       </aside>

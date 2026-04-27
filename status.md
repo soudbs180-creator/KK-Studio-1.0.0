@@ -7,8 +7,8 @@ Last updated: 2026-04-27
 - Branch: `codex/kk-studio-recovery-convergence`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Milestone 6, responsive and mobile result flow.
-- Milestones 1, 2, 3, 4, and 5 are complete.
+- Current milestone: Complete, final gate passed.
+- Milestones 1, 2, 3, 4, 5, and 6 are complete.
 
 ## Recovered Sources
 
@@ -90,11 +90,26 @@ Milestone 5:
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/ppt-deck-single-container-contract.test.ts"`
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run check:encoding`
+- Committed: `edbc09aa docs: record ppt deck milestone validation`
+
+Milestone 6:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/responsive-surface.test.ts" "tests/unit/mobile-result-feed-detail-contract.test.ts" "tests/unit/mobile-result-feed-app-contract.test.ts" "tests/unit/mobile-workspace-surface-contract.test.ts" "tests/unit/mobile-feed-selectors.test.ts"`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed after fixing legacy unit blockers: `npm.cmd run test:unit`
+- Passed: `npm.cmd run check:encoding`
+
+Final gate:
+
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit`
+- Passed: `npm.cmd run check:encoding`
 
 ## In Progress
 
-- Validate and commit Milestone 6 responsive/mobile result-flow files.
-- GPT-5.5 xhigh subagents are checking Milestone 5/6 next-step boundaries in parallel.
+- Commit Milestone 6 / final-gate blocker fixes.
 
 ## Known Risks And Blockers To Verify
 
@@ -105,5 +120,5 @@ Milestone 5:
 
 ## Next Steps
 
-1. Validate and commit Milestone 6 responsive/mobile files.
-2. Run final gate and merge the branch.
+1. Commit Milestone 6 / final-gate blocker fixes.
+2. Keep local secret/tunnel files out of Git and rotate previously exposed credentials outside source control.

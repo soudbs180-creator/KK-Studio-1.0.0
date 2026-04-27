@@ -2904,7 +2904,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <div className="settings-provider-grid">
               {thirdPartyProviders.map((provider) => {
                 const status = getProviderStatus(provider);
-                const compactMetrics: ConsoleEndpointCardMetric[] = [];
+                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [];
 
                 const avatar = (
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
@@ -2923,7 +2923,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     avatar={avatar}
                     badges={null}
                     status={status}
-                    metrics={compactMetrics}
+                    metrics={prioritizedMetrics}
                     progress={undefined}
                     error={null}
                     footer={null}
