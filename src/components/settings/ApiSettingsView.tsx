@@ -2,6 +2,7 @@
 import {
   Activity,
   ArrowLeft,
+  ChevronDown,
   Clock3,
   Edit3,
   Globe,
@@ -17,9 +18,15 @@ import {
   Wand2,
 } from 'lucide-react';
 import { MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { Provider } from '../../types';
+import type { CapabilityRole, Provider } from '../../types';
 import type { ApiProtocolFormat } from '../../services/api/apiConfig';
-import { kkWebApiClient } from '../../services/api/kkApiClient';
+import type { ChannelConfig } from '../../services/api/channelConfig';
+import {
+  getCapabilityRouteAssignments,
+  subscribeCapabilityRouteAssignments,
+  upsertCapabilityRouteAssignment,
+} from '../../services/api/capabilityRouteAssignments';
+import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../../services/api/kkApiClient';
 import {
   getKkApiServerHealth,
   isKkApiUserDataPersistedInCloudFromHealth,
@@ -72,16 +79,24 @@ import {
   SettingToggle,
 } from './ui/index';
 import {
+  getOcrServiceSettings,
+  subscribeOcrServiceSettings,
+  updateOcrServiceSettings,
+} from '../../services/document/ocrServiceSettings';
+import {
   buildApiManagementListState,
   readApiManagementListState,
   type ApiManagementTab,
 } from './apiManagementRouteState';
 import { ConsoleEndpointCard, type ConsoleEndpointCardMetric } from './apiWorkbenchCards';
 import {
+  ApiWorkbenchCapabilitySection,
   ApiWorkbenchCurrentViewSection,
   ApiWorkbenchDiagnosticsSection,
+  ApiWorkbenchOcrSection,
   ApiWorkbenchOverviewSection,
   ApiWorkbenchPlatformSection,
+  ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,
   InfoCell,
 } from './apiWorkbenchSections';
@@ -134,6 +149,12 @@ const officialDefaults: OfficialForm = {
   value: '',
 };
 
+const buildOfficialDraft = (provider: OfficialProvider = 'Google'): OfficialForm => ({
+  ...officialDefaults,
+  provider,
+  name: provider,
+});
+
 const providerDefaults: ProviderForm = {
   name: '',
   baseUrl: '',
@@ -152,6 +173,57 @@ const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com';
 const USER_API_VIEW_SNAPSHOT_PREFIX = 'kk_user_api_view_snapshot:';
 const USER_API_VIEW_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
+const CAPABILITY_ROLE_META: Array<{
+  role: CapabilityRole;
+  titleZh: string;
+  titleEn: string;
+  descriptionZh: string;
+  descriptionEn: string;
+}> = [
+  {
+    role: 'image_generation',
+    titleZh: '图片生成',
+    titleEn: 'Image generation',
+    descriptionZh: '图片生成默认走这里的主链路与模型。',
+    descriptionEn: 'Primary route and model for image generation.',
+  },
+  {
+    role: 'ppt_generation',
+    titleZh: 'PPT 生成',
+    titleEn: 'PPT generation',
+    descriptionZh: 'PPT 主题、页面描述和单页重生使用这条能力路由。',
+    descriptionEn: 'Route used by PPT topic, page description, and per-page regeneration.',
+  },
+  {
+    role: 'ecommerce_generation',
+    titleZh: '电商生成',
+    titleEn: 'Ecommerce generation',
+    descriptionZh: '电商模块、组图与框架补图优先走这里。',
+    descriptionEn: 'Preferred route for ecommerce cards, groups, and framework fills.',
+  },
+  {
+    role: 'assistant',
+    titleZh: 'AI 助手',
+    titleEn: 'AI assistant',
+    descriptionZh: '聊天侧或平台辅助 AI 统一读这里的主链路。',
+    descriptionEn: 'Shared assistant route for chat and platform assistant AI.',
+  },
+  {
+    role: 'prompt_optimizer',
+    titleZh: '全局提示词优化',
+    titleEn: 'Global prompt optimizer',
+    descriptionZh: '关闭时保持本地 skills 提示词体系；开启后才调用 AI 优化。',
+    descriptionEn: 'Disabled keeps local skills-based prompt shaping. Enable it to use AI optimization.',
+  },
+  {
+    role: 'ocr_document',
+    titleZh: 'OCR 文档处理',
+    titleEn: 'OCR document processing',
+    descriptionZh: '保留能力占位，真实密钥和语言配置在下方 OCR 卡。',
+    descriptionEn: 'Reserved capability role. The actual OCR key and language live below.',
+  },
+];
+
 const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
 const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
@@ -166,6 +238,11 @@ const buildProviderEditorPath = (providerId?: string | null) =>
   providerId
     ? `/settings/api-management/provider/${encodeURIComponent(providerId)}`
     : '/settings/api-management/provider/new';
+
+const buildDefaultProviderPricingEndpoint = (baseUrl?: string) => {
+  const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
+  return normalized ? `${normalized}/models` : '';
+};
 
 const decodeRouteParam = (value?: string) => {
   if (!value) return '';
@@ -269,6 +346,14 @@ function normalizeOfficialProvider(value: unknown): Provider {
   if (normalized === 'openai') return 'OpenAI' as Provider;
   if (normalized === 'google' || normalized === 'gemini') return 'Google' as Provider;
   return (normalizeString(value) || 'Google') as Provider;
+}
+
+function getRouteLabel(channel: ChannelConfig) {
+  return `${channel.name} · ${channel.providerFamily}`;
+}
+
+function normalizeOfficialProviderChoice(value: unknown): OfficialProvider {
+  return normalizeOfficialProvider(value) === 'OpenAI' ? 'OpenAI' : 'Google';
 }
 
 function normalizeOptionalTimestamp(value: unknown): number | null {
@@ -709,6 +794,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   }>();
   const [slots, setSlots] = useState<KeySlot[]>(() => keyManager.getSlots());
   const [providers, setProviders] = useState<ThirdPartyProvider[]>(() => keyManager.getProviders());
+  const [capabilityAssignments, setCapabilityAssignments] = useState(() => getCapabilityRouteAssignments());
+  const [ocrSettings, setOcrSettings] = useState(() => getOcrServiceSettings());
   const initialUserApiViewSnapshot = !isTempUser ? readUserApiViewSnapshot(user?.id || null) : null;
   const [activeTab, setActiveTab] = useState<TabType>('official');
   const [officialForm, setOfficialForm] = useState<OfficialForm>(officialDefaults);
@@ -716,6 +803,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [editingOfficialId, setEditingOfficialId] = useState<string | null>(null);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAdvancedWorkbench, setShowAdvancedWorkbench] = useState(false);
+  const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
+  const [providerPricingEndpointDraft, setProviderPricingEndpointDraft] = useState('');
+  const [showPricingEndpointOverride, setShowPricingEndpointOverride] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
   const [returnHighlight, setReturnHighlight] = useState<{
@@ -741,16 +832,31 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
   const isUserApiPersistenceDegraded = isUserApiPersistenceDegradedFromHealth(apiHealth);
+  const hasSessionlessLocalWorkbench = isTempUser || shouldUseLegacyWebApiFallback();
+  const canUseSessionlessLocalApiBridge =
+    hasSessionlessLocalWorkbench
+    && apiHealth?.reachable === true
+    && !isUserApiPersistenceDegraded;
   const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
-  const isAuthenticated = Boolean(authenticatedUserId);
+  const hasAuthenticatedUser = Boolean(authenticatedUserId);
+  const canUseSessionlessLocalDraftStorage =
+    hasSessionlessLocalWorkbench
+    && !hasAuthenticatedUser
+    && (apiHealth?.reachable !== true || isUserApiPersistenceDegraded);
+  const canMutateSessionlessLocalWorkbench =
+    canUseSessionlessLocalApiBridge
+    || canUseSessionlessLocalDraftStorage;
+  const hasWorkbenchAccess = hasAuthenticatedUser || hasSessionlessLocalWorkbench;
   const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
   const userApiViewState = resolveUserApiViewState({
     hasReadonlySnapshot,
+    hasSessionlessWorkbenchAccess: hasSessionlessLocalWorkbench,
     isApiReachable: apiHealth?.reachable,
-    isAuthenticated,
+    isAuthenticated: hasAuthenticatedUser,
     isPersistenceDegraded: isUserApiPersistenceDegraded,
     runtimeOfficialCount: runtimeOfficialSlots.length,
     runtimeProviderCount: runtimeThirdPartyProviders.length,
+    sessionlessWorkbenchActionsEnabled: canMutateSessionlessLocalWorkbench,
   });
   const shouldUseReadonlyProfileFallback = userApiViewState.shouldUseReadonlyProfileFallback;
   const isHydratingRuntimeUserApis = userApiViewState.isHydratingRuntimeUserApis;
@@ -778,6 +884,13 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_OFFICIAL_PREFIX.length));
   }, [location.pathname, officialId]);
+  const routePresetOfficialProvider = useMemo(() => {
+    if (!isRecord(location.state) || !('presetOfficialProvider' in location.state)) {
+      return 'Google' as OfficialProvider;
+    }
+
+    return normalizeOfficialProviderChoice(location.state.presetOfficialProvider);
+  }, [location.state]);
   const routeProviderId = useMemo(() => {
     const routeValue = decodeRouteParam(providerId || legacySupplierId);
     if (routeValue) {
@@ -819,7 +932,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const workbenchStatusLabel = isUsingReadonlyProfileFallback
     ? pick('来自云端记录的只读回显', 'Read-only data from cloud record')
     : isUserApiPersistenceDegraded
-      ? pick('本地 API 未连接云端持久化', 'Local API is not using cloud persistence')
+      ? pick('本地 API 内存模式', 'Local API memory mode')
       : connectedChannels > 0
         ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
         : pick('尚未接入链路', 'No routes connected yet');
@@ -830,15 +943,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     if (!apiHealth.reachable) {
       return pick(
-        '当前本地 API 服务不可用。已登录用户的 BYOK 配置仍然会保存在账号云端记录里，页面会优先回显云端数据，等本地服务恢复后再重新接管完整能力。',
-        'The local API server is unavailable. Signed-in BYOK settings now fall back to the account-backed Supabase record, so existing providers can still be shown and new changes can still sync to the user profile.',
+        '本地 API 当前离线。现有配置会先保留在当前工作区里，等服务恢复后再继续检测和同步。',
+        'The local API is offline. Current settings stay available here until the local service recovers.',
       );
     }
 
     if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
       return pick(
-        '当前本地 API 仍在内存模式，但已登录用户的 BYOK 修改会直接写入账号云端记录，并在本地服务恢复后继续同步。',
-        'The local API server is still running in memory mode, but signed-in BYOK changes now write straight to the account-backed cloud record and will sync back once the local service recovers.',
+        '本地 API 处于内存模式。当前修改会先保留，等服务恢复后再继续同步。',
+        'The local API is running in memory mode. Current edits will be kept and synced after recovery.',
       );
     }
 
@@ -851,26 +964,26 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     if (!apiHealth.reachable) {
       return pick(
-        '本地 API 恢复后会重新接管服务端仓库；在这之前，当前页面会继续优先使用云端同步结果。',
-        'Until the local API comes back, BYOK reads and writes fall back to the authenticated Supabase profile so you can keep working from the account-backed record.',
+        '恢复本地 API 后，会继续完成检测和同步。',
+        'Checks and sync resume after the local API comes back.',
       );
     }
 
-    if (!apiHealth.config.hasServiceRoleKey) {
+    if (!apiHealth.config.hasPostgresConfig) {
       return pick(
-        '如果你想让本地 API 也恢复完整的服务端持久化能力，再补上 SUPABASE_SERVICE_ROLE_KEY 并重启本地服务；普通用户 BYOK 云端同步本身不依赖它。',
-        'If you want the local API to regain full server-side persistence, add SUPABASE_SERVICE_ROLE_KEY and restart it. Basic BYOK cloud sync for signed-in users does not depend on that key.',
+        '补全服务端持久化后，可恢复完整同步能力。',
+        'Restore server-side persistence to regain full sync behavior.',
       );
     }
 
     return pick(
-      '本地与云端会在服务恢复后继续对齐；当前页面已经优先保证云端记录不丢失。',
-      'Local and cloud state will realign once the service recovers. The page now prioritizes keeping the cloud record intact.',
+      '服务恢复后，当前状态会继续自动对齐。',
+      'State will realign automatically after recovery.',
     );
   }, [apiHealth, pick]);
   const snapshotHydrationHelper = pick(
-    '当前先展示的是本地快照，正在同步最新云端配置。请稍候片刻后再编辑。',
-    'Showing the cached snapshot while the latest cloud configuration syncs. Please wait a moment before editing.',
+    '正在同步最新配置，请稍候再编辑。',
+    'Syncing the latest configuration. Wait a moment before editing.',
   );
   const userApiActionsDisabled = userApiViewState.userApiActionsDisabled;
   const providerActionsDisabled = userApiViewState.providerActionsDisabled;
@@ -879,37 +992,57 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;
   const backendUnavailableHelper = apiHealth?.reachable === false
     ? pick(
-        '本地 API 当前不可用。请先恢复服务，再新增、编辑或删除 BYOK 配置。',
-        'The local API server is unavailable. The page will fall back to the current account-backed Supabase profile, so you can still edit and save this BYOK configuration.',
+        '本地 API 当前离线。请先恢复服务，再继续编辑。',
+        'The local API is offline. Restore it before editing.',
       )
     : null;
-  const userApiActionHelper = backendUnavailableHelper ?? (!isAuthenticated
+  const sessionlessLocalPersistenceHelper = hasSessionlessLocalWorkbench
+    && apiHealth
+    && !canMutateSessionlessLocalWorkbench
     ? pick(
-        '登录后才能管理 BYOK 路由。前端匿名态不会保存密钥，也不会直接调用供应商接口。',
-        'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
+        'Local BYOK persistence is not ready yet. Start the local API and enable writable local-file or backend-backed user API storage before editing.',
+        'Local BYOK persistence is not ready yet. Start the local API and enable writable local-file or backend-backed user API storage before editing.',
       )
+    : null;
+  const sessionlessLocalDraftHelper = canUseSessionlessLocalDraftStorage
+    ? pick(
+        '本地 API 当前离线。新的配置会先保存在当前浏览器会话里，服务恢复后再继续检测。',
+        'The local API is offline. New settings stay in this browser session until the service comes back.',
+      )
+    : null;
+  const userApiActionHelper = (canUseSessionlessLocalDraftStorage ? sessionlessLocalDraftHelper : backendUnavailableHelper) ?? (!hasAuthenticatedUser
+    ? hasSessionlessLocalWorkbench
+      ? sessionlessLocalPersistenceHelper
+      : pick(
+          'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
+          'Sign in before managing BYOK routes. Anonymous key storage and direct provider calls are disabled in the frontend.',
+        )
     : isHydratingRuntimeUserApis
       ? snapshotHydrationHelper
       : null);
   const providerActionHelper = userApiActionHelper;
   const userApiEditorReadOnlyHelper = userApiEditorReadOnly
     ? userApiActionHelper
+    : canUseSessionlessLocalDraftStorage
+      ? sessionlessLocalDraftHelper
     : apiHealth?.reachable === false
       ? backendUnavailableHelper
       : isUserApiPersistenceDegraded
       ? pick(
-          '当前处于云端直写模式。你保存的本地 API 会直接进入账号云端记录，并在本地服务恢复后继续同步。',
-          'Cloud-backed write mode is active. Saved local APIs will go straight to the account-backed cloud record and sync back once the local service recovers.',
+          '当前保存的配置会先保留，等本地服务恢复后继续同步。',
+          'Saved changes will be kept and synced after the local service recovers.',
         )
       : null;
   const providerEditorReadOnlyHelper = providerEditorReadOnly
     ? providerActionHelper
+    : canUseSessionlessLocalDraftStorage
+      ? sessionlessLocalDraftHelper
     : apiHealth?.reachable === false
       ? backendUnavailableHelper
       : isUserApiPersistenceDegraded
       ? pick(
-          '当前处于云端直写模式。你保存的供应商会直接进入账号云端记录，并在本地服务恢复后继续同步。',
-          'Cloud-backed write mode is active. Saved providers will go straight to the account-backed cloud record and sync back once the local service recovers.',
+          '当前保存的供应商会先保留，等本地服务恢复后继续同步。',
+          'Saved providers will be kept and synced after the local service recovers.',
         )
       : null;
   const browserDirectChecksDisabled = false;
@@ -918,13 +1051,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     'Browser-side diagnostics are disabled. Save the route to your account and use the local backend or secure cloud proxy path instead.',
   );
   const useCloudBackedUserApiWrites =
-    isAuthenticated
+    hasAuthenticatedUser
     && !isTempUser
     && (isUserApiPersistenceDegraded || apiHealth?.reachable === false);
+  const shouldUseDirectUserApiRecordWrites =
+    useCloudBackedUserApiWrites
+    || shouldUseReadonlySnapshotForDisplay
+    || canUseSessionlessLocalApiBridge;
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
   const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability({
-    isAuthenticated,
+    hasWorkbenchAccess,
     isApiReachable: apiHealth?.reachable,
   });
   const diagnosticsRefreshDisabled = diagnosticsAvailability.refreshDisabled;
@@ -935,14 +1072,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         'This page now prioritizes preserving the account-backed cloud record and will realign local state after the local service recovers.',
       )
     : null;
+  const canMutateWorkbenchActions = hasAuthenticatedUser || canMutateSessionlessLocalWorkbench;
   const ensureUserApiActionsAllowed = (): boolean => {
-    if (!isAuthenticated) {
-      notify.warning(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
+    if (!canMutateWorkbenchActions) {
+      notify.warning(
+        hasSessionlessLocalWorkbench
+          ? pick('Local API not ready', 'Local API not ready')
+          : pick('Sign in required', 'Sign in required'),
+        userApiActionHelper || snapshotHydrationHelper,
+      );
       return false;
     }
 
-    if (apiHealth?.reachable === false && !useCloudBackedUserApiWrites) {
-      notify.warning(pick('本地 API 不可用', 'Local API unavailable'), userApiActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
+    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage) {
+      notify.warning(pick('Local API unavailable', 'Local API unavailable'), userApiActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
 
@@ -951,20 +1094,25 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     if (isHydratingRuntimeUserApis) {
-      notify.warning(pick('正在同步配置', 'Still syncing'), snapshotHydrationHelper);
+      notify.warning(pick('Still syncing', 'Still syncing'), snapshotHydrationHelper);
       return false;
     }
 
     return true;
   };
   const ensureProviderActionsAllowed = (): boolean => {
-    if (!isAuthenticated) {
-      notify.warning(pick('请先登录', 'Sign in required'), providerActionHelper || snapshotHydrationHelper);
+    if (!canMutateWorkbenchActions) {
+      notify.warning(
+        hasSessionlessLocalWorkbench
+          ? pick('Local API not ready', 'Local API not ready')
+          : pick('Sign in required', 'Sign in required'),
+        providerActionHelper || snapshotHydrationHelper,
+      );
       return false;
     }
 
-    if (apiHealth?.reachable === false && !useCloudBackedUserApiWrites) {
-      notify.warning(pick('本地 API 不可用', 'Local API unavailable'), providerActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
+    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage) {
+      notify.warning(pick('Local API unavailable', 'Local API unavailable'), providerActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
 
@@ -973,7 +1121,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     if (isHydratingRuntimeUserApis) {
-      notify.warning(pick('正在同步配置', 'Still syncing'), snapshotHydrationHelper);
+      notify.warning(pick('Still syncing', 'Still syncing'), snapshotHydrationHelper);
       return false;
     }
 
@@ -1013,6 +1161,163 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       .sort((a, b) => Number(a.latency) - Number(b.latency))
       .slice(0, 4);
   }, [getOfficialDisplayName, officialSlots, thirdPartyProviders]);
+
+  const allChannelConfigs = useMemo(
+    () => keyManager.getChannelConfigs({ includeDisabled: true, includeProviders: true }),
+    [slots, providers],
+  );
+
+  const capabilityRouteOptions = useMemo(
+    () => [
+      { value: '', label: pick('自动选择', 'Automatic') },
+      ...allChannelConfigs.map((channel) => ({
+        value: channel.id,
+        label: getRouteLabel(channel),
+      })),
+    ],
+    [allChannelConfigs, pick],
+  );
+
+  const getRouteModelOptions = useCallback((routeId: string, role: CapabilityRole) => {
+    if (role === 'ocr_document') {
+      return [{ value: '', label: pick('由 OCR 服务卡管理', 'Managed by OCR service') }];
+    }
+
+    const routeIdKey = String(routeId || '').trim();
+    if (!routeIdKey) {
+      return [
+        { value: '', label: pick('自动选择', 'Automatic') },
+        ...keyManager.getGlobalModelList().map((model) => ({
+          value: model.id,
+          label: model.name || model.id,
+        })),
+      ];
+    }
+
+    const slot = keyManager.getKey(routeIdKey);
+    if (slot) {
+      const linkedProvider = keyManager.getProviderForKeySlot(routeIdKey);
+      const models = resolveEffectiveProviderModels({
+        provider: linkedProvider?.name || slot.provider,
+        baseUrl: linkedProvider?.baseUrl || slot.baseUrl,
+        format: linkedProvider?.format || slot.format,
+        models: linkedProvider?.models || slot.supportedModels,
+      }).map((modelId) => ({
+        value: modelId,
+        label: modelId,
+      }));
+
+      return [{ value: '', label: pick('自动选择', 'Automatic') }, ...models];
+    }
+
+    const provider = keyManager.getProvider(routeIdKey);
+    const providerModels = (provider?.models || []).map((modelId) => ({
+      value: modelId,
+      label: modelId,
+    }));
+    return [{ value: '', label: pick('自动选择', 'Automatic') }, ...providerModels];
+  }, [pick]);
+
+  const routePoolItems = useMemo(() => (
+    allChannelConfigs.map((channel) => {
+      const slot = keyManager.getKey(channel.id);
+      const provider = keyManager.getProvider(channel.id);
+      const statusLabel = slot
+        ? (slot.disabled
+            ? pick('已停用', 'Paused')
+            : slot.status === 'invalid'
+              ? pick('异常', 'Error')
+              : slot.status === 'rate_limited'
+                ? pick('限流', 'Rate limited')
+                : pick('可用', 'Ready'))
+        : (provider
+            ? (!provider.isActive
+                ? pick('已停用', 'Paused')
+                : provider.status === 'error'
+                  ? pick('异常', 'Error')
+                  : provider.status === 'checking'
+                    ? pick('检测中', 'Checking')
+                    : pick('可用', 'Ready'))
+            : pick('可用', 'Ready'));
+      const billingSummary = slot
+        ? (slot.tokenLimit && slot.tokenLimit > 0
+            ? `${pick('词元上限', 'Token limit')} ${slot.tokenLimit}`
+            : slot.budgetLimit > 0
+              ? `${pick('预算', 'Budget')} ${slot.budgetLimit}`
+              : pick('不限额', 'Unlimited'))
+        : (provider?.customCostMode === 'tokens'
+            ? `${pick('词元上限', 'Token limit')} ${provider.customCostValue || provider.tokenLimit || 0}`
+            : provider?.customCostMode === 'amount'
+              ? `${pick('预算', 'Budget')} ${provider.customCostValue || provider.budgetLimit || 0}`
+              : pick('不限额', 'Unlimited'));
+
+      return {
+        id: channel.id,
+        name: channel.name,
+        routeKind: slot?.type === 'official'
+          ? pick('官方直连', 'Official direct')
+          : slot
+            ? pick('中转链路', 'Proxy route')
+            : pick('供应商池', 'Provider pool'),
+        protocolLabel: channel.protocolHint || 'auto',
+        statusLabel,
+        modelSummary: channel.capabilities.modelDiscovery
+          ? pick(`自动获取模型 · ${channel.supportedModels.length} 个候选`, `Model discovery · ${channel.supportedModels.length} candidates`)
+          : pick(`手动模型 · ${channel.supportedModels.length} 个候选`, `Manual models · ${channel.supportedModels.length} candidates`),
+        billingSummary,
+        baseUrlLabel: slot?.type === 'official' && !channel.baseUrl
+          ? pick('官方 Google / OpenAI 默认地址', 'Official Google / OpenAI default endpoint')
+          : String(channel.baseUrl || '').trim() || pick('由运行时补全', 'Resolved by runtime'),
+      };
+    })
+  ), [allChannelConfigs, pick]);
+
+  const updateCapabilityAssignment = useCallback((
+    role: CapabilityRole,
+    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string }>,
+  ) => {
+    upsertCapabilityRouteAssignment(role, patch);
+    setCapabilityAssignments(getCapabilityRouteAssignments());
+  }, []);
+
+  const capabilityCards = useMemo(() => (
+    CAPABILITY_ROLE_META.map((meta) => {
+      const assignment = capabilityAssignments.find((item) => item.role === meta.role);
+      return {
+        role: meta.role,
+        title: pick(meta.titleZh, meta.titleEn),
+        description: pick(meta.descriptionZh, meta.descriptionEn),
+        enabled: assignment?.enabled !== false,
+        primaryRouteId: assignment?.primaryRouteId || '',
+        primaryModelId: assignment?.primaryModelId || '',
+        fallbackRouteId: assignment?.fallbackRouteId || '',
+        routeOptions: capabilityRouteOptions,
+        modelOptions: getRouteModelOptions(assignment?.primaryRouteId || '', meta.role),
+        onEnabledChange: (enabled: boolean) => updateCapabilityAssignment(meta.role, { enabled }),
+        onPrimaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: value }),
+        onPrimaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryModelId: value }),
+        onFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: value }),
+      };
+    })
+  ), [capabilityAssignments, capabilityRouteOptions, getRouteModelOptions, pick, updateCapabilityAssignment]);
+
+  const ocrKeySourceLabel = useMemo(() => {
+    if (ocrSettings.keySource === 'environment') {
+      return pick('服务端环境变量', 'Server environment');
+    }
+    if (ocrSettings.keySource === 'user') {
+      return pick('本地 OCR 配置', 'Local OCR config');
+    }
+    return pick('缺少密钥', 'Missing key');
+  }, [ocrSettings.keySource, pick]);
+
+  const ocrHealthLabel = useMemo(() => (
+    ocrSettings.healthState === 'configured'
+      ? pick('已配置', 'Configured')
+      : ocrSettings.healthState === 'missing_key'
+        ? pick('缺少密钥', 'Missing key')
+        : pick('待检测', 'Unknown')
+  ), [ocrSettings.healthState, pick]);
 
   const refresh = useCallback(() => {
     setSlots(keyManager.getSlots());
@@ -1087,8 +1392,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
   }, [authenticatedUserId, pick, refresh, refreshApiHealth]);
   const refreshAfterCloudUserApiMutation = useCallback(async () => {
-    await refreshCloudData(true);
-  }, [refreshCloudData]);
+    if (hasAuthenticatedUser) {
+      await refreshCloudData(true);
+      return;
+    }
+
+    await refreshApiHealth(true);
+    await refreshReadonlyProfileFallback();
+  }, [hasAuthenticatedUser, refreshApiHealth, refreshCloudData, refreshReadonlyProfileFallback]);
 
   useEffect(() => {
     refresh();
@@ -1096,6 +1407,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     void refreshCloudData(true);
     return keyManager.subscribe(refresh);
   }, [refresh, refreshApiHealth, refreshCloudData]);
+
+  useEffect(() => {
+    setCapabilityAssignments(getCapabilityRouteAssignments());
+    return subscribeCapabilityRouteAssignments(() => {
+      setCapabilityAssignments(getCapabilityRouteAssignments());
+    });
+  }, []);
+
+  useEffect(() => {
+    setOcrSettings(getOcrServiceSettings());
+    return subscribeOcrServiceSettings(() => {
+      setOcrSettings(getOcrServiceSettings());
+    });
+  }, []);
 
   useEffect(() => {
     if (runtimeOfficialSlots.length === 0 && runtimeThirdPartyProviders.length === 0) {
@@ -1136,13 +1461,31 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   }, [refreshReadonlyProfileFallback, shouldUseReadonlySnapshotForDisplay]);
 
   useEffect(() => {
+    if (hasAuthenticatedUser || !hasSessionlessLocalWorkbench) {
+      return;
+    }
+
+    if (runtimeOfficialSlots.length > 0 || runtimeThirdPartyProviders.length > 0) {
+      return;
+    }
+
+    void refreshReadonlyProfileFallback();
+  }, [
+    hasSessionlessLocalWorkbench,
+    hasAuthenticatedUser,
+    refreshReadonlyProfileFallback,
+    runtimeOfficialSlots.length,
+    runtimeThirdPartyProviders.length,
+  ]);
+
+  useEffect(() => {
     if (isOfficialEditorRoute) {
       setActiveTab('official');
 
       if (isCreatingOfficial) {
         setEditingOfficialId(null);
         setEditingProviderId(null);
-        setOfficialForm(officialDefaults);
+        setOfficialForm(buildOfficialDraft(routePresetOfficialProvider));
         return;
       }
 
@@ -1161,6 +1504,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         setEditingProviderId(null);
         setEditingOfficialId(null);
         setProviderForm(initialSupplier ? toProviderFormFromSupplier(initialSupplier) : providerDefaults);
+        setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(initialSupplier?.baseUrl));
+        setShowPricingEndpointOverride(false);
         return;
       }
 
@@ -1168,6 +1513,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         setEditingProviderId(selectedProvider.id);
         setEditingOfficialId(null);
         setProviderForm(toProviderForm(selectedProvider));
+        setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(selectedProvider.baseUrl));
+        setShowPricingEndpointOverride(false);
         return;
       }
 
@@ -1175,6 +1522,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         setEditingProviderId(null);
         setEditingOfficialId(null);
         setProviderForm(toProviderFormFromSupplier(initialSupplier));
+        setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(initialSupplier.baseUrl));
+        setShowPricingEndpointOverride(false);
       }
       return;
     }
@@ -1184,6 +1533,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       setEditingProviderId(null);
       setOfficialForm(officialDefaults);
       setProviderForm(providerDefaults);
+      setProviderPricingEndpointDraft('');
+      setShowPricingEndpointOverride(false);
     }
   }, [
     initialSupplier,
@@ -1192,6 +1543,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     isOfficialEditorRoute,
     isProviderEditorRoute,
     location.pathname,
+    routePresetOfficialProvider,
     selectedOfficialSlot?.id,
     selectedProvider?.id,
   ]);
@@ -1307,7 +1659,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     providerCardRegistryRef.current.delete(id);
   }, []);
 
-  const beginCreateOfficial = () => {
+  const beginCreateOfficial = (provider: OfficialProvider = 'Google') => {
     if (!ensureUserApiActionsAllowed()) {
       return;
     }
@@ -1315,8 +1667,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     setActiveTab('official');
     setEditingOfficialId(null);
     setEditingProviderId(null);
-    setOfficialForm(officialDefaults);
-    navigate(buildOfficialEditorPath());
+    setOfficialForm(buildOfficialDraft(provider));
+    navigate(buildOfficialEditorPath(), {
+      state: {
+        presetOfficialProvider: provider,
+      },
+    });
+  };
+  const handleCreateOfficialAction = () => {
+    beginCreateOfficial();
   };
 
   const beginCreateProvider = () => {
@@ -1328,6 +1687,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     setEditingOfficialId(null);
     setEditingProviderId(null);
     setProviderForm(initialSupplier ? toProviderFormFromSupplier(initialSupplier) : providerDefaults);
+    setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(initialSupplier?.baseUrl));
+    setShowPricingEndpointOverride(false);
     navigate(buildProviderEditorPath());
   };
 
@@ -1352,6 +1713,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     setEditingOfficialId(null);
     setEditingProviderId(provider.id);
     setProviderForm(toProviderForm(provider));
+    setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(provider.baseUrl));
+    setShowPricingEndpointOverride(false);
     navigate(buildProviderEditorPath(provider.id));
   };
 
@@ -1360,6 +1723,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     setEditingProviderId(null);
     setOfficialForm(officialDefaults);
     setProviderForm(providerDefaults);
+    setProviderPricingEndpointDraft('');
+    setShowPricingEndpointOverride(false);
     if (isOfficialEditorRoute) {
       returnToApiManagementList('official', { highlightOfficialId: editingOfficialId });
       return;
@@ -1367,6 +1732,60 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     returnToApiManagementList('third-party', { highlightProviderId: editingProviderId });
   };
+
+  const resetOfficialDraft = () => {
+    setOfficialForm(buildOfficialDraft(officialForm.provider));
+  };
+
+  const resetProviderDraft = () => {
+    setProviderForm(providerDefaults);
+    setProviderPricingEndpointDraft('');
+    setShowPricingEndpointOverride(false);
+  };
+
+  const officialEditorValidationMessage = (() => {
+    if (userApiEditorReadOnly) {
+      return '';
+    }
+
+    const normalizedKey = officialForm.key.trim();
+    const nextKeyValue = normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    if (!nextKeyValue) {
+      return pick('先填写 API Key 才能保存。', 'Enter the API key before saving.');
+    }
+
+    if (isReadonlySecretPlaceholder(officialForm.key) && !canReusePersistedOfficialSecret) {
+      return pick('请重新输入真实 API Key。', 'Re-enter the real API key before saving.');
+    }
+
+    if (officialForm.mode !== 'unlimited' && !positive(officialForm.value)) {
+      return pick('预算值需要大于 0。', 'Budget or token limit must be greater than 0.');
+    }
+
+    return '';
+  })();
+
+  const providerEditorValidationMessage = (() => {
+    if (providerEditorReadOnly) {
+      return '';
+    }
+
+    const normalizedApiKey = providerForm.apiKey.trim();
+    const nextApiKeyValue = normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !nextApiKeyValue) {
+      return pick('补全名称、Base URL 和 API Key 后才能保存。', 'Complete the name, base URL, and API key before saving.');
+    }
+
+    if (isReadonlySecretPlaceholder(providerForm.apiKey) && !canReusePersistedProviderSecret) {
+      return pick('请重新输入真实 API Key。', 'Re-enter the real API key before saving.');
+    }
+
+    if (providerForm.mode !== 'unlimited' && !positive(providerForm.value)) {
+      return pick('预算值需要大于 0。', 'Budget or token limit must be greater than 0.');
+    }
+
+    return '';
+  })();
 
   const saveOfficial = async () => {
     if (!ensureUserApiActionsAllowed()) {
@@ -1413,7 +1832,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     };
 
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         const existingSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
         await upsertUserApiSlotToCloudRecord({
           id: nextSlotId,
@@ -1542,7 +1961,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     };
 
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         await upsertUserApiProviderToCloudRecord({
           id: nextProviderId,
           name: providerForm.name.trim(),
@@ -1613,7 +2032,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     await run(`official-delete:${id}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         await removeUserApiSlotFromCloudRecord(id);
         await refreshAfterCloudUserApiMutation();
       } else {
@@ -1635,7 +2054,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     await run(`provider-delete:${id}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         await removeUserApiProviderFromCloudRecord(id);
         await refreshAfterCloudUserApiMutation();
       } else {
@@ -1658,7 +2077,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     const nextDisabled = !slot.disabled;
     await run(`official-toggle:${slot.id}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         await upsertUserApiSlotToCloudRecord({
           id: slot.id,
           name: slot.name,
@@ -1703,7 +2122,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     const nextActive = !provider.isActive;
     await run(`provider-toggle:${provider.id}`, async () => {
-      if (useCloudBackedUserApiWrites) {
+      if (shouldUseDirectUserApiRecordWrites) {
         await upsertUserApiProviderToCloudRecord({
           id: provider.id,
           name: provider.name,
@@ -1820,14 +2239,19 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
   };
 
-  const syncPricing = async (provider: ThirdPartyProvider) => {
+  const syncPricing = async (provider: ThirdPartyProvider, endpointUrlOverride?: string) => {
     if (!ensureBrowserDirectDiagnosticsAllowed()) {
       return;
     }
 
     await run(`provider-price:${provider.id}`, async () => {
-      const response = await kkWebApiClient.syncUserRoutePricing(provider.id);
+      const trimmedEndpointUrl = String(endpointUrlOverride || '').trim();
+      const response = await kkWebApiClient.syncUserRoutePricing(
+        provider.id,
+        trimmedEndpointUrl ? { endpointUrl: trimmedEndpointUrl } : undefined,
+      );
       if (!response.success) {
+        setShowPricingEndpointOverride(true);
         notify.warning(
           pick('同步失败', 'Sync failed'),
           response.error.message || pick('本地 API 安全代理暂时不可用。', 'The local API secure proxy is unavailable right now.'),
@@ -1855,7 +2279,16 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           pick('同步成功', 'Synced'),
           result.message || pick('价格信息已更新。', 'Pricing information has been updated.'),
         );
+        if (trimmedEndpointUrl) {
+          setProviderPricingEndpointDraft(trimmedEndpointUrl);
+        }
       } else {
+        setShowPricingEndpointOverride(true);
+        setProviderPricingEndpointDraft((current) => (
+          current.trim()
+            || String(result.endpointUrl || '').trim()
+            || buildDefaultProviderPricingEndpoint(provider.baseUrl)
+        ));
         notify.warning(
           pick('同步失败', 'Sync failed'),
           result.message || pick('当前没有可用的价格数据返回。', 'No pricing data is available right now.'),
@@ -1994,8 +2427,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增本地 API', 'Add local API')}
           description={
             editingOfficialId
-              ? pick('当前页面只修改这一条本地 API，保存后返回列表。', 'This page edits one local API at a time and returns to the list after saving.')
-              : pick('在独立页面创建本地 API，避免和列表卡片混在一起。', 'Create a local API in a focused editor instead of mixing it with the list.')
+              ? pick('只编辑当前这条本地 API。', 'Edit only this local API.')
+              : pick('在独立页面新增本地 API。', 'Create a local API in a focused editor.')
           }
           icon={Shield}
           tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'indigo'}
@@ -2062,8 +2495,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           title={editingProviderId ? providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider') : pick('新增供应商', 'New provider')}
           description={
             editingProviderId
-              ? pick('当前页面只修改这一家供应商，保存后返回列表。', 'This page edits one provider at a time and returns to the list after saving.')
-              : pick('在独立页面创建供应商，编辑时不会再和卡片列表混在一起。', 'Create providers in a focused editor instead of mixing them with the list.')
+              ? pick('只编辑当前这家供应商。', 'Edit only this provider.')
+              : pick('在独立页面新增供应商。', 'Create a provider in a focused editor.')
           }
           icon={Globe}
           tone={selectedProvider ? getProviderStatus(selectedProvider).badge : providerForm.isActive ? 'emerald' : 'neutral'}
@@ -2077,26 +2510,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回供应商列表', 'Back to providers')}
               </SettingsActionButton>
-              {selectedProvider ? (
-                <>
-                  <SettingsActionButton
-                    icon={RefreshCw}
-                    disabled={routeDiagnosticsActionDisabled}
-                    loading={busy === `provider-check:${selectedProvider.id}`}
-                    onClick={() => void refreshProvider(selectedProvider)}
-                  >
-                    {pick('刷新连通性', 'Refresh connectivity')}
-                  </SettingsActionButton>
-                  <SettingsActionButton
-                    icon={Wand2}
-                    disabled={routeDiagnosticsActionDisabled}
-                    loading={busy === `provider-price:${selectedProvider.id}`}
-                    onClick={() => void syncPricing(selectedProvider)}
-                  >
-                    {pick('自动获取价格', 'Sync pricing')}
-                  </SettingsActionButton>
-                </>
-              ) : null}
             </>
           }
           metrics={
@@ -2137,11 +2550,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       {activeEditorMode === null ? (
         <>
           <SettingsHero
-        eyebrow={pick('高级设置', 'Advanced settings')}
-        title={pick('API 工作台', 'API Workspace')}
+        eyebrow={pick('简约配置', 'Simple setup')}
+        title={pick('API 配置', 'API setup')}
         description={pick(
-          '把本地 API、第三方供应商和预算规则收在一个页面里，优先保留清晰的入口和最少的操作。',
-          'Keep local APIs, third-party providers, and budget rules in one place with clearer entry points and less clutter.'
+          '默认只显示添加入口和已配置供应商。',
+          'The default view shows only add actions and configured provider cards.'
         )}
         icon={Key}
         tone={workbenchTone}
@@ -2159,20 +2572,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         actions={
           <>
             <SettingsActionButton
+              icon={showAdvancedWorkbench ? Layers3 : Wand2}
+              tone={showAdvancedWorkbench ? 'primary' : 'secondary'}
+              onClick={() => setShowAdvancedWorkbench((current) => !current)}
+            >
+              {showAdvancedWorkbench ? pick('收起高级模式', 'Hide advanced mode') : pick('高级模式', 'Advanced mode')}
+            </SettingsActionButton>
+            <SettingsActionButton
               icon={RefreshCw}
               loading={busy === 'cloud-refresh'}
               onClick={() => void run('cloud-refresh', () => refreshCloudData())}
             >
               {pick('刷新数据', 'Refresh data')}
-            </SettingsActionButton>
-            <SettingsActionButton
-              style={{ display: 'none' }}
-              data-testid="api-workbench-hero-diagnostics-toggle"
-              icon={Activity}
-              tone={showDiagnostics ? 'primary' : 'secondary'}
-              onClick={() => setShowDiagnostics((current) => !current)}
-            >
-              {showDiagnostics ? pick('收起诊断', 'Hide diagnostics') : pick('查看诊断', 'Show diagnostics')}
             </SettingsActionButton>
           </>
         }
@@ -2222,98 +2633,180 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         }
       />
 
-      <ApiWorkbenchOverviewSection
-        pick={pick}
-        workbenchStatusLabel={workbenchStatusLabel}
-        workbenchTone={workbenchTone}
-        userApiPersistenceWarning={userApiPersistenceWarning}
-        isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
-        snapshotHydrationHelper={snapshotHydrationHelper}
-        attentionCount={attentionCount}
-        connectedChannels={connectedChannels}
-        officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
-        activeProviders={activeProviders}
-        budgetCount={budgetCount}
-        activeTab={activeTab}
-      />
+      {showAdvancedWorkbench ? (
+        <>
+          <ApiWorkbenchOverviewSection
+            pick={pick}
+            workbenchStatusLabel={workbenchStatusLabel}
+            workbenchTone={workbenchTone}
+            userApiPersistenceWarning={userApiPersistenceWarning}
+            isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
+            snapshotHydrationHelper={snapshotHydrationHelper}
+            attentionCount={attentionCount}
+            connectedChannels={connectedChannels}
+            officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
+            activeProviders={activeProviders}
+            budgetCount={budgetCount}
+            activeTab={activeTab}
+          />
 
-      <ApiWorkbenchStageSection
-        pick={pick}
-        showDiagnostics={showDiagnostics}
-        onToggleDiagnostics={() => setShowDiagnostics((current) => !current)}
-        stage={userApiWorkbenchStage}
-        stageTone={stageTone}
-        stageTitle={stageTitle}
-        stageDescription={stageDescription}
-        stageInteractionLabel={stageInteractionLabel}
-        stageNextActionLabel={stageNextActionLabel}
-        stageBannerStyle={stageBannerStyle}
-        primaryActionIcon={stagePrimaryActionIcon}
-        primaryActionTone={stagePrimaryActionTone}
-        onPrimaryAction={handleStagePrimaryAction}
-        primaryActionLoading={busy === 'cloud-refresh'}
-        primaryActionTestId="api-workbench-primary-action"
-        isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
-        runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
-      />
+          <ApiWorkbenchStageSection
+            pick={pick}
+            showDiagnostics={showDiagnostics}
+            onToggleDiagnostics={() => setShowDiagnostics((current) => !current)}
+            stage={userApiWorkbenchStage}
+            stageTone={stageTone}
+            stageTitle={stageTitle}
+            stageDescription={stageDescription}
+            stageInteractionLabel={stageInteractionLabel}
+            stageNextActionLabel={stageNextActionLabel}
+            stageBannerStyle={stageBannerStyle}
+            primaryActionIcon={stagePrimaryActionIcon}
+            primaryActionTone={stagePrimaryActionTone}
+            onPrimaryAction={handleStagePrimaryAction}
+            primaryActionLoading={busy === 'cloud-refresh'}
+            primaryActionTestId="api-workbench-primary-action"
+            isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
+            runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
+          />
 
-      {showDiagnostics ? (
-        <ApiWorkbenchDiagnosticsSection
-          pick={pick}
-          diagnosticsActionDisabled={diagnosticsRefreshDisabled}
-          onRefreshDiagnostics={() => void refreshApiHealth(true)}
-          apiReachable={apiHealth?.reachable}
-          apiErrorMessage={apiHealth?.errorMessage}
-          persistenceWritable={Boolean(apiHealth?.persistence.userApiKeys)}
-          isAuthenticated={isAuthenticated}
-          hasReadonlySnapshot={hasReadonlySnapshot}
-        />
+          <ApiWorkbenchRoutePoolSection
+            pick={pick}
+            items={routePoolItems}
+          />
+
+          <ApiWorkbenchCapabilitySection
+            pick={pick}
+            items={capabilityCards}
+          />
+
+          <SettingsSection
+            title={pick('更多高级项', 'More advanced items')}
+            eyebrow={pick('高级分层', 'Advanced layers')}
+            description={pick(
+              '诊断、OCR 和平台入口收在这里，避免默认高级模式过于拥挤。',
+              'Diagnostics, OCR, and platform tools stay here so advanced mode remains focused.',
+            )}
+            action={(
+              <SettingsActionButton
+                icon={showAdvancedDetails ? Layers3 : ChevronDown}
+                tone={showAdvancedDetails ? 'primary' : 'secondary'}
+                onClick={() => setShowAdvancedDetails((current) => !current)}
+              >
+                {showAdvancedDetails ? pick('收起更多高级项', 'Hide more advanced items') : pick('更多高级项', 'More advanced items')}
+              </SettingsActionButton>
+            )}
+          >
+            {showAdvancedDetails ? (
+              <div className="space-y-4">
+                {showDiagnostics ? (
+                  <ApiWorkbenchDiagnosticsSection
+                    pick={pick}
+                    diagnosticsActionDisabled={diagnosticsRefreshDisabled}
+                    onRefreshDiagnostics={() => void refreshApiHealth(true)}
+                    apiReachable={apiHealth?.reachable}
+                    apiErrorMessage={apiHealth?.errorMessage}
+                    persistenceWritable={Boolean(apiHealth?.persistence.userApiKeys)}
+                    isAuthenticated={hasAuthenticatedUser}
+                    hasReadonlySnapshot={hasReadonlySnapshot}
+                  />
+                ) : null}
+
+                <ApiWorkbenchOcrSection
+                  pick={pick}
+                  enabled={ocrSettings.enabled}
+                  defaultLanguage={ocrSettings.defaultLanguage}
+                  apiKey={ocrSettings.apiKey || ''}
+                  keySourceLabel={ocrKeySourceLabel}
+                  healthLabel={ocrHealthLabel}
+                  onEnabledChange={(enabled) => setOcrSettings(updateOcrServiceSettings({ enabled }))}
+                  onDefaultLanguageChange={(defaultLanguage) => setOcrSettings(updateOcrServiceSettings({ defaultLanguage }))}
+                  onApiKeyChange={(apiKey) => setOcrSettings(updateOcrServiceSettings({ apiKey }))}
+                />
+
+                <ApiWorkbenchPlatformSection
+                  pick={pick}
+                  onOpenPlatformAssistant={handleOpenPlatformAssistant}
+                />
+
+                <ApiWorkbenchCurrentViewSection
+                  pick={pick}
+                  activeTab={activeTab}
+                  onChangeTab={(value) => setActiveTab(value)}
+                  latencyCards={latencyCards}
+                  formatLatency={formatLatency}
+                />
+
+                <SegmentedControl
+                  options={[
+                    { value: 'official', label: pick('本地 API', 'Local APIs') },
+                    { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
+                  ]}
+                  value={activeTab}
+                  onChange={(value) => setActiveTab(value as TabType)}
+                />
+              </div>
+            ) : (
+              <div className="text-[13px] text-[var(--text-secondary)]">
+                {pick('需要时再展开诊断、OCR 和平台配置。', 'Expand this only when you need diagnostics, OCR, or platform-level controls.')}
+              </div>
+            )}
+          </SettingsSection>
+        </>
       ) : null}
-
-      <ApiWorkbenchPlatformSection
-        pick={pick}
-        onOpenPlatformAssistant={handleOpenPlatformAssistant}
-      />
-
-      <ApiWorkbenchCurrentViewSection
-        pick={pick}
-        activeTab={activeTab}
-        onChangeTab={(value) => setActiveTab(value)}
-        latencyCards={latencyCards}
-        formatLatency={formatLatency}
-      />
-
-      <SegmentedControl
-        options={[
-          { value: 'official', label: pick('本地 API', 'Local APIs') },
-          { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
-        ]}
-        value={activeTab}
-        onChange={(value) => setActiveTab(value as TabType)}
-      />
 
       {activeTab === 'official' ? (
         <SettingsSection
           title={pick('本地 API', 'Local APIs')}
           eyebrow={pick('本地直连', 'Local direct routes')}
           description={pick(
-            '把你自己的直连 OpenAI 和 Gemini 配置收在这里。',
-            'Manage your own direct OpenAI and Gemini routes here.'
+            '管理本地直连接口。',
+            'Manage your local direct routes.'
           )}
           action={
-            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}>
+            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={userApiActionsDisabled} onClick={handleCreateOfficialAction}>
               {pick('新增', 'Add')}
             </SettingsActionButton>
           }
         >
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <button
+                type="button"
+                data-testid="api-official-provider-add"
+                disabled={userApiActionsDisabled}
+                onClick={handleCreateOfficialAction}
+                className="group flex min-h-[132px] w-full items-center justify-between gap-4 rounded-[var(--radius-surface-md)] border p-5 text-left transition-transform duration-200 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                style={SETTINGS_OVERLAY_STYLE}
+              >
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-control-md)] border text-[var(--text-primary)] transition-colors group-hover:border-[var(--settings-focus-ring)]" style={SETTINGS_OVERLAY_STYLE}>
+                    <Plus size={20} />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <div className="text-[16px] font-semibold text-[var(--text-primary)]">
+                      {pick('添加新的供应商', 'Add new provider')}
+                    </div>
+                    <div className="max-w-[620px] text-[13px] leading-6 text-[var(--text-secondary)]">
+                      {pick('统一从这里新增本地 API，再在表单里选择 Google 或 OpenAI。', 'Create a local API here, then choose Google or OpenAI in the form.')}
+                    </div>
+                  </div>
+                </div>
+                <SettingsBadge tone="emerald">
+                  {pick('新增', 'Add')}
+                </SettingsBadge>
+              </button>
+
+            </div>
+
           {officialSlots.length === 0 ? (
             <EmptyState
               title={pick('当前还没有本地 API', 'No local APIs yet')}
               description={pick(
-                '先添加一个本地 API，再让它进入调度。',
-                'Add a local API first, then bring it into routing.'
+                '先添加一条本地 API。',
+                'Add a local API first.'
               )}
-              action={<SettingsActionButton data-testid="api-official-empty-create" icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={beginCreateOfficial}>{pick('新增本地 API', 'Add local API')}</SettingsActionButton>}
+              action={<SettingsActionButton data-testid="api-official-empty-create" icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}>{pick('新增本地 API', 'Add local API')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
@@ -2382,14 +2875,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               })}
             </div>
           )}
+          </div>
         </SettingsSection>
       ) : (
         <SettingsSection
           title={pick('第三方供应商', 'Third-party providers')}
           eyebrow={pick('第三方渠道', 'Third-party channels')}
           description={pick(
-            '这里重点处理供应商列表、通信协议和自动价格同步，适合做扩容和多源调度。',
-            'This view focuses on provider lists, protocol settings, and pricing sync for scale-out and multi-source routing.'
+            '管理供应商、协议和价格同步。',
+            'Manage providers, protocols, and pricing sync.'
           )}
           action={
             <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={providerActionsDisabled} onClick={() => beginCreateProvider()}>
@@ -2401,68 +2895,38 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <EmptyState
               title={pick('当前还没有第三方供应商', 'No third-party providers yet')}
               description={pick(
-                '先添加一个供应商，再配置协议、预算和自动价格同步。',
-                'Add a provider first, then configure its protocol, budget, and pricing sync.'
+                '先添加一个供应商。',
+                'Add a provider first.'
               )}
               action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
             />
           ) : (
             <div className="settings-provider-grid">
               {thirdPartyProviders.map((provider) => {
-                const mode = getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited');
                 const status = getProviderStatus(provider);
-                const progress = getProgress(mode, mode === 'amount' ? provider.usage.totalCost : provider.usage.totalTokens, provider.budgetLimit, provider.tokenLimit);
-                const usageSummary = getProviderUsageSummary(provider);
-                const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
-
-                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [
-                  {
-                    label: pick('预算策略', 'Budget rule'),
-                    value: getModeLabel(mode),
-                    helper: getLimitValueLabel(mode, mode === 'amount' ? provider.budgetLimit : provider.tokenLimit),
-                  },
-                  {
-                    label: pick('总使用', 'Total usage'),
-                    value: mode === 'tokens' ? formatTokens(provider.usage.totalTokens) : formatUsd(provider.usage.totalCost),
-                    helper: usageSummary,
-                  },
-                  {
-                    label: pick('支持模型', 'Supported models'),
-                    value: `${provider.models.length}`,
-                    helper:
-                      provider.models.length > 0
-                        ? pick('自动识别的模型典藏', 'Auto detected models list')
-                        : pick('刷新以提取模型', 'Refresh to fetch models'),
-                  },
-                  {
-                    label: pick('最近检测', 'Latest latency'),
-                    value: formatLatency(provider.activitySummary?.lastLatencyMs ?? null),
-                    helper: formatDateTime(provider.lastChecked || provider.updatedAt),
-                  },
-                ];
+                const compactMetrics: ConsoleEndpointCardMetric[] = [];
 
                 const avatar = (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border text-[14px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
                     {provider.name.charAt(0).toUpperCase()}
                   </div>
                 );
 
-                const activityLine = getProviderActivityLine(provider);
-
                 return (
                   <ConsoleEndpointCard
                     key={provider.id}
+                    density="compact"
                     cardRef={(node) => registerProviderCardRef(provider.id, node)}
                     title={provider.name}
-                    subtitle={getProtocolLabel(provider.format)}
-                    meta={<div className="text-[13px] text-[var(--text-secondary)]">{extractDomain(provider.baseUrl)}</div>}
+                    subtitle={undefined}
+                    meta={undefined}
                     avatar={avatar}
-                    badges={provider.group ? <SettingsBadge tone="neutral">{provider.group}</SettingsBadge> : null}
+                    badges={null}
                     status={status}
-                    metrics={prioritizedMetrics}
-                    progress={progressData}
-                    error={provider.lastError || null}
-                    footer={activityLine ? <div className="text-[13px] text-[var(--text-secondary)]">{activityLine}</div> : null}
+                    metrics={compactMetrics}
+                    progress={undefined}
+                    error={null}
+                    footer={null}
                     actions={
                       <>
                         <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
@@ -2470,9 +2934,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                         </SettingsActionButton>
                         <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
                           {pick('刷新', 'Refresh')}
-                        </SettingsActionButton>
-                        <SettingsActionButton icon={Wand2} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-price:${provider.id}`} onClick={() => void syncPricing(provider)}>
-                          {pick('自动获取价格', 'Sync pricing')}
                         </SettingsActionButton>
                         <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
                           {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
@@ -2502,8 +2963,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               : pick('新增本地 API', 'Add local API')
           }
           description={pick(
-            '这里只保存当前本地 API；刷新和启用状态仍然在上面的卡片里操作。',
-            'Save only updates this local API. Refresh and enable states stay on the cards above.'
+            '这里只编辑当前接口。',
+            'Edit one endpoint here.'
           )}
         >
           <div className="space-y-4">
@@ -2591,11 +3052,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton disabled={userApiActionsDisabled} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
+              <PrimaryButton disabled={userApiActionsDisabled || Boolean(officialEditorValidationMessage)} onClick={() => void saveOfficial()} loading={busy === `official-save:${officialForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
                 {editingOfficialId ? pick('保存变更', 'Save changes') : pick('新增本地 API', 'Add local API')}
               </PrimaryButton>
-              <SecondaryButton onClick={cancelEdit}>
+              <SecondaryButton onClick={editingOfficialId ? cancelEdit : resetOfficialDraft}>
                 {editingOfficialId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingOfficialId ? (
@@ -2605,6 +3066,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 </DangerButton>
               ) : null}
             </div>
+            {officialEditorValidationMessage ? (
+              <div className="text-[13px] leading-6 text-[var(--state-warning-text)]">
+                {officialEditorValidationMessage}
+              </div>
+            ) : null}
           </div>
         </SettingsSection>
       ) : null}
@@ -2618,8 +3084,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               : pick('新增供应商', 'Create provider')
           }
           description={pick(
-            '“自动获取价格”只负责同步价格数据，不负责保存当前表单；保存按钮才会提交供应商配置。',
-            'Sync pricing only pulls pricing data. It does not save this form; only Save submits the provider configuration.'
+            '价格同步不会自动保存表单，保存按钮才会提交配置。',
+            'Pricing sync does not save the form. Only Save submits the configuration.'
           )}
         >
           <div className="space-y-4">
@@ -2726,29 +3192,90 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-[15px] font-semibold text-[var(--text-primary)]">{pick('自动获取价格', 'Sync pricing')}</div>
+                  <div className="text-[15px] font-semibold text-[var(--text-primary)]">{pick('高级抓取', 'Advanced fetch tools')}</div>
                   <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
                     {pick(
-                      '这个动作只会尝试从供应商价格端点同步价格数据，不会保存表单。如果当前供应商还没落库，请先点击“保存变更”或“新增供应商”。',
-                      'This action only pulls pricing data from the provider endpoint and does not save the form. Save the provider first before syncing pricing.'
+                      '这里分开处理模型抓取和价格抓取。模型一般自动获取；价格默认按基础地址候选端点抓取，失败后可以直接填写价格地址。',
+                      'Model sync and pricing sync are separated here. Models usually auto-discover; pricing uses default candidate endpoints first, then lets you enter a direct pricing endpoint when needed.'
                     )}
                   </div>
                 </div>
-                {editingProviderId ? (
-                  <SettingsActionButton
-                    icon={Wand2}
-                    disabled={routeDiagnosticsActionDisabled}
-                    loading={busy === `provider-price:${editingProviderId}`}
-                    onClick={() => {
-                      const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                      if (matched) void syncPricing(matched);
-                    }}
-                  >
-                    {pick('自动获取价格', 'Sync pricing')}
-                  </SettingsActionButton>
-                ) : (
-                  <SettingsBadge tone="neutral">{pick('需先保存后可同步', 'Save before syncing')}</SettingsBadge>
-                )}
+                {!editingProviderId ? (
+                  <SettingsBadge tone="neutral">{pick('需先保存后可抓取', 'Save before fetching')}</SettingsBadge>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)]">{pick('自动获取模型', 'Fetch models')}</div>
+                  <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+                    {pick('连通性检测成功后会回填该供应商支持的模型列表。', 'Connectivity refresh fills the supported model list for this provider.')}
+                  </div>
+                  <div className="mt-3">
+                    {editingProviderId ? (
+                      <SettingsActionButton
+                        icon={RefreshCw}
+                        disabled={routeDiagnosticsActionDisabled}
+                        loading={busy === `provider-check:${editingProviderId}`}
+                        onClick={() => {
+                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                          if (matched) void refreshProvider(matched);
+                        }}
+                      >
+                        {pick('自动获取模型', 'Fetch models')}
+                      </SettingsActionButton>
+                    ) : (
+                      <SettingsBadge tone="neutral">{pick('需先保存供应商', 'Save provider first')}</SettingsBadge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)]">{pick('自动获取价格', 'Fetch pricing')}</div>
+                  <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+                    {pick(
+                      '默认会按基础地址尝试价格候选端点。价格地址通常可以是基础地址后接 /models；如果失败，再直接填完整价格地址。',
+                      'Default pricing sync tries candidate endpoints based on the base URL. A common pricing endpoint is the base URL plus /models; if that fails, enter the full pricing endpoint directly.'
+                    )}
+                  </div>
+                  {showPricingEndpointOverride ? (
+                    <div className="mt-3">
+                      <SettingInput
+                        label={pick('价格地址', 'Pricing endpoint URL')}
+                        value={providerPricingEndpointDraft}
+                        onChange={setProviderPricingEndpointDraft}
+                        placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                        helper={pick(
+                          '如果默认价格地址失败，可以在这里输入自定义价格地址。',
+                          'If the default pricing address fails, enter a custom pricing endpoint here.'
+                        )}
+                        disabled={providerEditorReadOnly}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {editingProviderId ? (
+                      <SettingsActionButton
+                        icon={Wand2}
+                        disabled={routeDiagnosticsActionDisabled}
+                        loading={busy === `provider-price:${editingProviderId}`}
+                        onClick={() => {
+                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                          if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                        }}
+                      >
+                        {pick('自动获取价格', 'Fetch pricing')}
+                      </SettingsActionButton>
+                    ) : (
+                      <SettingsBadge tone="neutral">{pick('需先保存供应商', 'Save provider first')}</SettingsBadge>
+                    )}
+                    <SecondaryButton onClick={() => setShowPricingEndpointOverride((current) => !current)}>
+                      {showPricingEndpointOverride
+                        ? pick('收起价格地址', 'Hide pricing endpoint')
+                        : pick('手动价格地址', 'Manual pricing endpoint')}
+                    </SecondaryButton>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2771,11 +3298,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <PrimaryButton disabled={providerActionsDisabled} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
+              <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
                 <Save size={16} className="mr-1" />
                 {editingProviderId ? pick('保存变更', 'Save changes') : pick('新增供应商', 'Create provider')}
               </PrimaryButton>
-              <SecondaryButton onClick={cancelEdit}>
+              <SecondaryButton onClick={editingProviderId ? cancelEdit : resetProviderDraft}>
                 {editingProviderId ? pick('取消', 'Cancel') : pick('清空', 'Reset')}
               </SecondaryButton>
               {editingProviderId ? (
@@ -2785,6 +3312,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 </DangerButton>
               ) : null}
             </div>
+            {providerEditorValidationMessage ? (
+              <div className="text-[13px] leading-6 text-[var(--state-warning-text)]">
+                {providerEditorValidationMessage}
+              </div>
+            ) : null}
           </div>
         </SettingsSection>
       ) : null}

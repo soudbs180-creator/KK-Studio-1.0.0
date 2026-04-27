@@ -31,12 +31,12 @@ test('verify:changes pulls the mobile settings smoke verification into the main 
   assert.equal((verifyChanges.match(/verify:desktop-settings-smoke/g) || []).length, 1);
 });
 
-test('mobile settings smoke verification uses stable selectors for the mobile shell, detail screen, settings home, and workbench sections', () => {
+test('mobile settings smoke verification opens settings directly on overview before entering API workbench', () => {
   const scriptSource = readSource('scripts/test/verify-mobile-settings-smoke.mjs');
   const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
   const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
   const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const settingsHomeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
+  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
   const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
   const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
 
@@ -44,7 +44,10 @@ test('mobile settings smoke verification uses stable selectors for the mobile sh
   assert.match(scriptSource, /mobile-header-menu-button/);
   assert.match(scriptSource, /mobile-result-tile/);
   assert.match(scriptSource, /mobile-result-detail-screen/);
-  assert.match(scriptSource, /mobile-settings-home/);
+  assert.match(scriptSource, /设置总览\|Settings Overview/);
+  assert.match(scriptSource, /打开 API 工作台\|Open API Workspace/);
+  assert.doesNotMatch(scriptSource, /mobile-settings-home/);
+  assert.doesNotMatch(scriptSource, /mobile-settings-entry-api-management/);
   assert.match(scriptSource, /settings-workbench-overview/);
   assert.match(scriptSource, /settings-workbench-diagnostics/);
   assert.match(scriptSource, /settings-workbench-platform/);
@@ -57,7 +60,8 @@ test('mobile settings smoke verification uses stable selectors for the mobile sh
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-menu-settings"/);
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-sheet"/);
   assert.match(mobileTileSource, /data-testid=\{`mobile-result-tile-\$\{entry\.id\}`\}/);
-  assert.match(settingsHomeSource, /data-testid=\{`mobile-settings-entry-\$\{entry\.id\}`\}/);
+  assert.match(dashboardSource, /settings-dashboard-cockpit__node/);
+  assert.match(dashboardSource, /dashboardPrimaryAction\.label/);
   assert.match(scaffoldSource, /testId\?: string;/);
   assert.match(scaffoldSource, /data-testid=\{testId\}/);
   assert.match(workbenchSectionsSource, /testId="settings-workbench-overview"/);
@@ -69,7 +73,7 @@ test('mobile settings smoke verification uses stable selectors for the mobile sh
 
 test('desktop settings smoke verification covers direct settings routes and the in-app settings entry with stable selectors', () => {
   const scriptSource = readSource('scripts/test/verify-desktop-settings-smoke.mjs');
-  const appSource = readSource('src/App.tsx');
+  const desktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
   const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
@@ -96,8 +100,8 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Show diagnostics\/i \}\)/);
   assert.doesNotMatch(scriptSource, /getByRole\('button', \{ name: \/Hide diagnostics\/i \}\)/);
 
-  assert.match(appSource, /data-testid="desktop-user-menu-trigger"/);
-  assert.match(appSource, /data-testid="desktop-user-menu-settings"/);
+  assert.match(desktopChromeSource, /data-testid="desktop-user-menu-trigger"/);
+  assert.match(desktopChromeSource, /testId="desktop-user-menu-settings"/);
   assert.match(settingsPanelSource, /data-testid="settings-page-root"/);
   assert.match(workbenchSectionsSource, /data-testid="api-workbench-diagnostics-toggle"/);
   assert.ok((apiSettingsViewSource.match(/data-testid="api-official-editor-back"/g) || []).length >= 2);

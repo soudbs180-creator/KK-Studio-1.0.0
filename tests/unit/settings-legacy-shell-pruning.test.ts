@@ -12,18 +12,18 @@ function readSource(relativePath: string): string {
 test('settings shell keeps legacy admin and billing aliases canonicalized instead of surfacing them as first-class views', () => {
   const panelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const registrySource = readSource('src/components/settings/settingsRegistry.ts');
-  const routesSource = readSource('src/routes/settingsRoutes.tsx');
+  const routesSource = readSource('src/components/settings/settingsRouteConfig.tsx');
   const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
 
   assert.match(registrySource, /export type LegacySettingsViewId =/);
   assert.match(registrySource, /export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = \{/);
   assert.match(registrySource, /'admin-console': 'api-management',/);
   assert.match(registrySource, /'cost-estimation': 'consumption-records',/);
-  assert.match(panelSource, /navigate\(buildSettingsPath\('api-management'\)\);/);
+  assert.match(panelSource, /navigate\(\s*buildSettingsPath\(view\)(?:,|\s*\))/);
   assert.doesNotMatch(panelSource, /id: 'admin-console',/);
-  assert.match(routesSource, /from '\.\.\/components\/settings\/settingsRegistry';/);
+  assert.match(routesSource, /from '\.\/settingsRegistry';/);
   assert.match(routesSource, /LEGACY_SETTINGS_ROUTE_REDIRECTS/);
-  assert.match(routesSource, /resolveCanonicalSettingsViewId/);
+  assert.match(routesSource, /buildSettingsPath\(target\)/);
   assert.doesNotMatch(routesSource, /const isLegacyAdminSettingsPath =/);
   assert.doesNotMatch(headerSource, /'admin-console': \{/);
 });

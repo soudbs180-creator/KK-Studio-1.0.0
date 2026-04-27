@@ -1,3 +1,5 @@
+import { getOcrServiceSettings } from './ocrServiceSettings';
+
 export type NutrientDocumentOperation = 'convert-to-pdf' | 'extract-text' | 'ocr-to-pdf';
 
 export interface NutrientBinaryResult {
@@ -126,8 +128,12 @@ class NutrientDocumentService {
     ) {
         const upload = createUploadFile(source, options.fileName);
         const formData = new FormData();
+        const ocrSettings = getOcrServiceSettings();
         formData.append('operation', operation);
         formData.append('file', upload, upload.name);
+        if (ocrSettings.apiKey) {
+            formData.append('apiKey', ocrSettings.apiKey);
+        }
 
         if (operation === 'ocr-to-pdf') {
             formData.append('ocrLanguage', options.ocrLanguage || DEFAULT_OCR_LANGUAGE);

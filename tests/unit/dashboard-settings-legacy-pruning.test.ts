@@ -14,10 +14,11 @@ test('DashboardView.localized removes the hidden legacy overview header block af
 
   assert.doesNotMatch(source, /\{false && \(/);
   assert.match(source, /<SettingsHero/);
-  assert.match(source, /Primary routes/);
-  assert.match(source, /Maintenance/);
-  assert.match(source, /Workspace snapshot/);
+  assert.match(source, /Traffic overview/);
+  assert.match(source, /Operational health/);
+  assert.match(source, /Quick routes/);
+  assert.match(source, /Recent signals/);
   assert.doesNotMatch(source, /Quick access/);
-  assert.doesNotMatch(source, /title=\{pick\('状态与下一步', 'Status and next step'\)\}/);
-  assert.doesNotMatch(source, /title=\{pick\('系统概览', 'System overview'\)\}/);
+  assert.doesNotMatch(source, /Status and next step/);
+  assert.doesNotMatch(source, /System overview/);
 });

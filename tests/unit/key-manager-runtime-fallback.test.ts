@@ -23,8 +23,11 @@ test('keyManager reads and writes user slot/provider state through the local API
 test('keyManager no longer skips local fixed users when hydrating or syncing payload state', () => {
   const source = readSource('src/services/auth/keyManager.ts');
 
-  assert.match(source, /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;/);
-  assert.doesNotMatch(source, /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;\s*\s*if \(this\.userId\.startsWith\('dev-user-'\)\) return;/);
+  assert.match(
+    source,
+    /private async loadFromCloud\(\) \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*return;\s*\}\s*if \(!this\.userId\) return;/,
+  );
+  assert.doesNotMatch(source, /private async loadFromCloud\(\) \{[\s\S]*this\.userId\.startsWith\('dev-user-'\)/);
   assert.match(source, /const activeUserId = this\.userId;\s*if \(!activeUserId\) \{/);
   assert.doesNotMatch(source, /const activeUserId = this\.userId;\s*if \(!activeUserId \|\| activeUserId\.startsWith\('dev-user-'\)\) \{/);
 });

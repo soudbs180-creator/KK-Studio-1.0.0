@@ -29,10 +29,20 @@ test("diagnostics mode keeps the underlying workbench stage contract intact", ()
 
 test("diagnostics refresh stays available when runtime is down even though route diagnostics stay locked", () => {
   const availability = resolveApiWorkbenchDiagnosticsAvailability({
-    isAuthenticated: true,
+    hasWorkbenchAccess: true,
     isApiReachable: false,
   });
 
   assert.equal(availability.refreshDisabled, false);
   assert.equal(availability.routeActionsDisabled, true);
+});
+
+test("sessionless local workbench keeps diagnostics available without forcing account sign-in", () => {
+  const availability = resolveApiWorkbenchDiagnosticsAvailability({
+    hasWorkbenchAccess: true,
+    isApiReachable: true,
+  });
+
+  assert.equal(availability.refreshDisabled, false);
+  assert.equal(availability.routeActionsDisabled, false);
 });

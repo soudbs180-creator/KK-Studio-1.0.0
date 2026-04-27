@@ -27,6 +27,7 @@ type ConsoleEndpointCardProps = {
   footer?: React.ReactNode;
   className?: string;
   cardRef?: React.Ref<HTMLElement>;
+  density?: 'normal' | 'compact';
 };
 
 function flattenCardActions(node: React.ReactNode): React.ReactNode[] {
@@ -83,8 +84,14 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
   footer,
   className = '',
   cardRef,
+  density = 'normal',
 }) => {
-  const cardClass = ['settings-provider-card', className].filter(Boolean).join(' ');
+  const isCompact = density === 'compact';
+  const cardClass = [
+    'settings-provider-card',
+    isCompact ? 'settings-provider-card--compact' : '',
+    className,
+  ].filter(Boolean).join(' ');
   const progressPercentage = progress?.percentage ?? 0;
   const progressTone = progressPercentage >= 90 ? 'rose' : progressPercentage >= 70 ? 'amber' : 'indigo';
   const actionItems = flattenCardActions(actions);
@@ -97,6 +104,13 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
     <React.Fragment key={`secondary-action-${index}`}>
       {decorateCardActionNode(action, {
         className: 'settings-provider-card__action-button--wrap',
+      })}
+    </React.Fragment>
+  ));
+  const compactActionNodes = actionItems.map((action, index) => (
+    <React.Fragment key={`compact-action-${index}`}>
+      {decorateCardActionNode(action, {
+        className: 'settings-provider-card__inline-action-button settings-provider-card__action-button--wrap',
       })}
     </React.Fragment>
   ));
@@ -117,7 +131,11 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
         </div>
         <div className="settings-provider-card__header-side">
           <StatusBadge status={status.status} label={status.label} />
-          {primaryActionNode ? (
+          {isCompact && compactActionNodes.length > 0 ? (
+            <div className="settings-provider-card__inline-actions">
+              {compactActionNodes}
+            </div>
+          ) : primaryActionNode ? (
             <div className="settings-provider-card__header-primary-action">
               {primaryActionNode}
             </div>
@@ -125,24 +143,26 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
         </div>
       </div>
 
-      <div className="settings-provider-card__metrics">
-        {metrics.map((metric, index) => (
-          <div
-            key={`${metric.label}-${index}`}
-            className={['settings-provider-card__metric', metric.className].filter(Boolean).join(' ')}
-          >
-            <div className="settings-provider-card__metric-label">{metric.label}</div>
-            <div className={['settings-provider-card__metric-value', metric.valueClassName].filter(Boolean).join(' ')}>
-              {metric.value}
-            </div>
-            {metric.helper ? (
-              <div className={['settings-provider-card__metric-helper', metric.helperClassName].filter(Boolean).join(' ')}>
-                {metric.helper}
+      {metrics.length > 0 ? (
+        <div className="settings-provider-card__metrics">
+          {metrics.map((metric, index) => (
+            <div
+              key={`${metric.label}-${index}`}
+              className={['settings-provider-card__metric', metric.className].filter(Boolean).join(' ')}
+            >
+              <div className="settings-provider-card__metric-label">{metric.label}</div>
+              <div className={['settings-provider-card__metric-value', metric.valueClassName].filter(Boolean).join(' ')}>
+                {metric.value}
               </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
+              {metric.helper ? (
+                <div className={['settings-provider-card__metric-helper', metric.helperClassName].filter(Boolean).join(' ')}>
+                  {metric.helper}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {footer ? <div className="mt-2">{footer}</div> : null}
 
@@ -169,7 +189,7 @@ export const ConsoleEndpointCard: React.FC<ConsoleEndpointCardProps> = ({
         </div>
       ) : null}
 
-      {secondaryActionNodes.length > 0 ? (
+      {!isCompact && secondaryActionNodes.length > 0 ? (
         <div className="settings-provider-card__actions">
           <div className="settings-provider-card__actions-layout">
             <div className="settings-provider-card__actions-secondary">{secondaryActionNodes}</div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 
 import type {
   CanonicalSettingsViewId,
@@ -38,14 +38,14 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
 }) => {
   return (
     <aside
-      className="flex h-full min-h-0 shrink-0 flex-col border-r px-4 py-5"
+      className="settings-shell-nav flex h-full min-h-0 shrink-0 flex-col border-r px-4 py-5"
       style={{
         width: 'var(--settings-sidebar-width)',
         borderColor: 'var(--settings-nav-glass-border)',
         background: 'var(--settings-nav-glass-bg)',
       }}
     >
-      <div className="mb-5 px-1">
+      <div className="settings-shell-nav__title mb-5 px-1">
         <div
           className="text-[11px] font-semibold uppercase tracking-[0.22em]"
           style={{ color: 'var(--settings-nav-text-tertiary)' }}
@@ -67,12 +67,8 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
       </div>
 
       <label
-        className="mb-4 flex items-center gap-3 rounded-[18px] border px-3.5 py-2.5"
-          style={{
-            borderColor: 'var(--settings-search-border)',
-            background: 'var(--settings-search-bg)',
-            color: 'var(--settings-nav-text-tertiary)',
-          }}
+        className="settings-shell-nav__search mb-4 flex items-center gap-3 px-3.5 py-2.5"
+        style={{ color: 'var(--settings-nav-text-tertiary)' }}
       >
         <Search size={14} />
         <input
@@ -96,10 +92,10 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         />
       </label>
 
-      <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+      <nav className="settings-shell-nav__list min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
         {items.length === 0 ? (
           <div
-            className="rounded-[18px] border px-4 py-3 text-[12px] leading-6"
+            className="settings-shell-empty rounded-[18px] border px-4 py-3 text-[12px] leading-6"
             style={{
               borderColor: 'var(--settings-border-subtle)',
               background: 'var(--settings-surface-overlay)',
@@ -116,15 +112,15 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
             }
 
             return (
-              <section key={section.id} className="space-y-2">
+              <section key={section.id} className="settings-shell-nav__group space-y-2">
                 <div
-                  className="px-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
+                  className="settings-shell-nav__group-label px-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
                   style={{ color: 'var(--settings-nav-text-tertiary)' }}
                 >
                   {section.label}
                 </div>
 
-                <div className="space-y-2">
+                <div className="settings-shell-nav__group-list space-y-2">
                   {sectionItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
@@ -134,7 +130,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                         key={item.id}
                         type="button"
                         onClick={() => onNavigate(item.id)}
-                        className="flex w-full items-start gap-3 rounded-[20px] border px-3.5 py-3 text-left transition-colors duration-200"
+                        className={`settings-sidebar-item flex w-full items-start gap-3 border px-3.5 py-3 text-left transition-colors duration-200 ${isActive ? 'active' : ''}`.trim()}
                         style={
                           isActive
                             ? {
@@ -151,7 +147,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                         aria-current={isActive ? 'page' : undefined}
                       >
                         <span
-                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]"
+                          className="settings-sidebar-item__icon mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]"
                           style={{
                             background: isActive
                               ? 'rgb(var(--settings-accent-rgb) / 0.12)'
@@ -159,16 +155,16 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                             color: isActive
                               ? 'rgb(var(--settings-accent-rgb))'
                               : 'var(--settings-nav-text-tertiary)',
-                          }}
+                            }}
                         >
                           <Icon size={16} />
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block min-w-0 truncate text-[14px] font-medium">
+                        <span className="settings-sidebar-item__body min-w-0 flex-1">
+                          <span className="settings-sidebar-item__label block min-w-0 truncate text-[14px] font-medium">
                             {item.label}
                           </span>
                           <span
-                            className="mt-1 block text-[12px] leading-5"
+                            className="settings-sidebar-item__desc mt-1 block text-[12px] leading-5"
                             style={{
                               color: isActive
                                 ? 'var(--settings-nav-text-secondary)'
@@ -177,6 +173,9 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                           >
                             {item.description}
                           </span>
+                        </span>
+                        <span className="settings-sidebar-item__arrow" aria-hidden="true">
+                          <ChevronRight size={16} />
                         </span>
                       </button>
                     );

@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Globe2, X } from 'lucide-react';
 import { MemoryRouter, Routes, useLocation, useNavigate } from 'react-router-dom';
@@ -13,7 +13,6 @@ import {
   deriveApiManagementListStateFromPath,
   isApiManagementEditorRoute,
 } from './apiManagementRouteState';
-import MobileSettingsHome from './mobile/MobileSettingsHome';
 import {
   buildSettingsPath,
   getCurrentSettingsViewId,
@@ -125,7 +124,6 @@ const SettingsDesktopShell: React.FC<{
 }) => {
   const { language, pick } = useLocale();
   const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
-  const navigate = useNavigate();
   const shellCopy = getSettingsShellCopy(language);
   const sections = getSettingsNavSections(language);
 
@@ -160,11 +158,8 @@ const SettingsDesktopShell: React.FC<{
           accountBlock={(
             <div className="space-y-3">
               <SettingsLanguageToggle compact />
-              <button
-                type="button"
-                onClick={() => {
-                  navigate(buildSettingsPath('api-management'));
-                }}
+              <div
+                data-testid="settings-account-block"
                 className="flex w-full items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left"
                 style={{
                   borderColor: 'var(--settings-nav-glass-border)',
@@ -178,7 +173,7 @@ const SettingsDesktopShell: React.FC<{
                   <span className="block truncate text-sm font-semibold text-[var(--settings-nav-text-primary)]">{accountName}</span>
                   <span className="mt-1 block truncate text-xs text-[var(--settings-nav-text-secondary)]">{accountMeta}</span>
                 </span>
-              </button>
+              </div>
             </div>
           )}
         />
@@ -192,10 +187,11 @@ const SettingsDesktopShell: React.FC<{
           />
 
           <main className="settings-shell-page settings-shell-page--desktop">
-            <Suspense key={`${activeView}:${contentRefreshKey}`} fallback={<ViewFallback />}>
+            <Suspense fallback={<ViewFallback />}>
               <Routes>
                 {renderSettingsRouteElements({
                   initialSupplier,
+                  refreshKey: contentRefreshKey,
                   onDashboardNavigate: (view) => onNavigate(resolveCanonicalSettingsViewId(view)),
                 })}
               </Routes>
@@ -213,8 +209,6 @@ const SettingsMobileShell: React.FC<{
   onBackToApiManagement: () => void;
   onClose: () => void;
   initialSupplier: Supplier | null;
-  showHome: boolean;
-  setShowHome: (value: boolean) => void;
   isApiManagementEditorRoute: boolean;
 }> = ({
   activeView,
@@ -222,32 +216,21 @@ const SettingsMobileShell: React.FC<{
   onBackToApiManagement,
   onClose,
   initialSupplier,
-  showHome,
-  setShowHome,
   isApiManagementEditorRoute,
 }) => {
   const { language, pick } = useLocale();
   const items = getSettingsNavItems(language);
-  const shellCopy = getSettingsShellCopy(language);
   const activeNavItem = items.find((item) => item.id === activeView) || items[0];
-
-  const handleNavigate = (view: CanonicalSettingsViewId) => {
-    onNavigate(view);
-    setShowHome(false);
-  };
+  const mobileBillingLabel = pickByLanguage(language, '计费', 'Billing');
+  const activeTitle = activeView === 'consumption-records' ? mobileBillingLabel : activeNavItem.label;
 
   const handleLeadingAction = () => {
-    if (showHome) {
-      onClose();
-      return;
-    }
-
     if (isApiManagementEditorRoute) {
       onBackToApiManagement();
       return;
     }
 
-    setShowHome(true);
+    activeView === 'dashboard' ? onClose() : onNavigate('dashboard');
   };
 
   return (
@@ -258,23 +241,27 @@ const SettingsMobileShell: React.FC<{
             type="button"
             onClick={handleLeadingAction}
             className="apple-icon-button h-11 w-11 shrink-0 rounded-2xl"
-            aria-label={showHome ? pick('关闭设置', 'Close settings') : pick('返回移动设置首页', 'Back to mobile settings home')}
+            aria-label={
+              isApiManagementEditorRoute
+                ? pick('返回 API 管理', 'Back to API management')
+                : activeView === 'dashboard' ? pick('关闭设置', 'Close settings') : pick('返回设置总览', 'Back to settings overview')
+            }
           >
-            {showHome ? <X size={18} /> : <ArrowLeft size={18} />}
+            {activeView === 'dashboard' && !isApiManagementEditorRoute ? <X size={18} /> : <ArrowLeft size={18} />}
           </button>
 
           <div className="settings-shell-mobile__title-wrap">
-            <div className="settings-shell-kicker">{showHome ? shellCopy.mobileHomeKicker : pick('当前入口', 'Current Entry')}</div>
-            <div className="settings-shell-mobile__title">{showHome ? shellCopy.mobileHomeTitle : activeNavItem.label}</div>
+            <div className="settings-shell-kicker">{pick('当前入口', 'Current entry')}</div>
+            <div className="settings-shell-mobile__title">{activeTitle}</div>
             <div className="settings-shell-mobile__description">
-              {showHome ? shellCopy.mobileHomeDescription : activeNavItem.description}
+              {activeNavItem.description}
             </div>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <SettingsLanguageToggle compact />
-          {!showHome ? (
+          {activeView !== 'dashboard' || isApiManagementEditorRoute ? (
             <button
               type="button"
               onClick={onClose}
@@ -288,46 +275,79 @@ const SettingsMobileShell: React.FC<{
       </div>
 
       <div className="settings-shell-page settings-shell-page--mobile">
-        {showHome ? (
-          <div className="space-y-3">
-            <div
-              className="rounded-[24px] border px-4 py-3"
-              style={{
-                borderColor: 'var(--settings-button-secondary-border)',
-                background: 'var(--settings-button-secondary-bg)',
-              }}
-            >
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
-                {shellCopy.mobileHomeKicker}
-              </div>
-              <div className="mt-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Overview / API / Billing / Errors
-              </div>
-              <div className="mt-2 text-xs text-[var(--text-secondary)]">
-                {pickByLanguage(language, '计费', 'Billing')} / {pickByLanguage(language, '错误', 'Errors')}
-              </div>
-              <div className="mt-1 text-xs text-[var(--text-tertiary)]">
-                {pickByLanguage(language, '系统错误、告警与排障信号。', 'System errors, warnings, and troubleshooting signals.')}
-              </div>
-            </div>
-            <MobileSettingsHome
-              activeSection={activeView === 'storage-settings' ? 'dashboard' : activeView}
-              onSelectSection={handleNavigate}
-            />
-          </div>
-        ) : (
-          <Suspense fallback={<ViewFallback />}>
-            <Routes>
-              {renderSettingsRouteElements({
-                initialSupplier,
-                onDashboardNavigate: (view) => handleNavigate(resolveCanonicalSettingsViewId(view)),
-              })}
-            </Routes>
-          </Suspense>
-        )}
+        <Suspense fallback={<ViewFallback />}>
+          <Routes>
+            {renderSettingsRouteElements({
+              initialSupplier,
+              onDashboardNavigate: (view) => onNavigate(resolveCanonicalSettingsViewId(view)),
+            })}
+          </Routes>
+        </Suspense>
       </div>
     </div>
   );
+};
+
+const SettingsPageHistorySync: React.FC<{ enabled: boolean }> = ({ enabled }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const syncedPathRef = useRef('');
+  const initializedRef = useRef(false);
+  const currentRouterPath = `${location.pathname}${location.search}${location.hash}`;
+
+  useEffect(() => {
+    syncedPathRef.current = currentRouterPath;
+  }, [currentRouterPath]);
+
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') {
+      return;
+    }
+
+    const nextWindowPath = currentRouterPath;
+    const currentWindowPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    syncedPathRef.current = nextWindowPath;
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+
+      if (currentWindowPath !== nextWindowPath) {
+        window.history.replaceState(window.history.state, '', nextWindowPath);
+      }
+      return;
+    }
+
+    if (currentWindowPath !== nextWindowPath) {
+      window.history.pushState(window.history.state, '', nextWindowPath);
+    }
+  }, [currentRouterPath, enabled]);
+
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') {
+      return;
+    }
+
+    const handlePopstate = () => {
+      const nextWindowPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+      if (!window.location.pathname.startsWith('/settings')) {
+        window.location.assign(nextWindowPath);
+        return;
+      }
+
+      if (nextWindowPath === syncedPathRef.current) {
+        return;
+      }
+
+      syncedPathRef.current = nextWindowPath;
+      navigate(nextWindowPath, { replace: true });
+    };
+
+    window.addEventListener('popstate', handlePopstate);
+    return () => window.removeEventListener('popstate', handlePopstate);
+  }, [enabled, navigate]);
+
+  return null;
 };
 
 const SettingsRouterShell: React.FC<{
@@ -341,7 +361,6 @@ const SettingsRouterShell: React.FC<{
   const location = useLocation();
   const activeView = getCurrentSettingsViewId(location.pathname);
   const [navQuery, setNavQuery] = useState('');
-  const [showHome, setShowHome] = useState(resolveCanonicalSettingsViewId(initialView) === 'dashboard');
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
   const nestedApiEditorRoute = isApiManagementEditorRoute(location.pathname);
   const nestedApiListState = useMemo(
@@ -351,7 +370,6 @@ const SettingsRouterShell: React.FC<{
   const navItems = useMemo(() => getSettingsNavItems(language), [language]);
 
   useEffect(() => {
-    setShowHome(resolveCanonicalSettingsViewId(initialView) === 'dashboard');
     setNavQuery('');
   }, [initialView]);
 
@@ -363,7 +381,6 @@ const SettingsRouterShell: React.FC<{
     navigate('/settings/api-management', {
       state: nestedApiListState || undefined,
     });
-    setShowHome(false);
   };
 
   return isMobile ? (
@@ -373,8 +390,6 @@ const SettingsRouterShell: React.FC<{
       onBackToApiManagement={handleBackToApiManagement}
       onClose={onClose}
       initialSupplier={initialSupplier}
-      showHome={showHome}
-      setShowHome={setShowHome}
       isApiManagementEditorRoute={nestedApiEditorRoute}
     />
   ) : (
@@ -432,6 +447,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
 
   const shellContent = (
     <MemoryRouter initialEntries={[initialEntry]} key={initialEntry}>
+      <SettingsPageHistorySync enabled={presentation === 'page'} />
       <SettingsRouterShell
         initialSupplier={initialSupplier}
         onClose={onClose}

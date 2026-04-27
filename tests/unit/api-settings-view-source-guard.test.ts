@@ -62,7 +62,7 @@ test('ApiSettingsView keeps its secure proxy client import and route-driven edit
 
   assert.match(
     source,
-    /import \{ kkWebApiClient \} from '\.\.\/\.\.\/services\/api\/kkApiClient';/,
+    /import \{ kkWebApiClient(?:, shouldUseLegacyWebApiFallback)? \} from '\.\.\/\.\.\/services\/api\/kkApiClient';/,
   );
   assert.match(source, /const activeEditorMode: TabType \| null = isOfficialEditorRoute \? 'official' : isProviderEditorRoute \? 'third-party' : null;/);
   assert.match(source, /const showOfficialEditor = activeEditorMode === 'official';/);

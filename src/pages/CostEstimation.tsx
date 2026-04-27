@@ -19,6 +19,9 @@ import { useLocale } from '../context/LocaleContext';
 import {
   SettingsActionButton,
   SettingsBadge,
+  SettingsHero,
+  SettingsMetricCard,
+  SettingsSection,
   SettingsViewShell,
 } from '../components/settings/SettingsScaffold';
 import {
@@ -138,7 +141,9 @@ const ConsumptionModeButton: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className="rounded-full px-4 py-2 text-sm font-medium transition-all"
+    aria-pressed={active}
+    disabled={active}
+    className="rounded-full px-4 py-2 text-sm font-medium transition-all disabled:cursor-default disabled:opacity-100"
     style={
       active
         ? {
@@ -491,15 +496,137 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
     }
   };
 
+  const heroMetrics = activeTab === 'api' ? (
+    <>
+      <SettingsMetricCard
+        label={pick('30 \u5929\u82b1\u8d39', '30-Day Spend')}
+        value={formatUsd(apiOverview.totalCost, locale)}
+        helper={pick('\u6700\u8fd1 30 \u5929 API \u6210\u672c\u3002', 'API spend in the last 30 days.')}
+        icon={DollarSign}
+        tone="emerald"
+      />
+      <SettingsMetricCard
+        label={pick('\u8bf7\u6c42\u6b21\u6570', 'Request Count')}
+        value={formatNumber(apiOverview.totalCount, 0, locale)}
+        helper={pick('\u6700\u8fd1 30 \u5929\u8ba1\u8d39\u4e8b\u4ef6\u6570\u3002', 'Billing events in the last 30 days.')}
+        icon={History}
+        tone="neutral"
+      />
+      <SettingsMetricCard
+        label={pick('\u8bcd\u5143\u603b\u91cf', 'Token Volume')}
+        value={formatNumber(apiOverview.totalTokens, 0, locale)}
+        helper={pick('\u6700\u8fd1 30 \u5929\u8bcd\u5143\u603b\u91cf\u3002', 'Token volume in the last 30 days.')}
+        icon={Layers3}
+        tone="indigo"
+      />
+      <SettingsMetricCard
+        label={pick('\u6700\u8fd1\u8ba1\u8d39', 'Latest Charge')}
+        value={latestApiRecord ? formatDateTime(latestApiRecord.timestamp, locale) : pick('\u6682\u65e0\u8bb0\u5f55', 'No record')}
+        helper={pick('\u6700\u8fd1\u4e00\u6761 API \u8ba1\u8d39\u8bb0\u5f55\u3002', 'Most recent API billing record.')}
+        icon={Clock3}
+        tone="neutral"
+      />
+    </>
+  ) : (
+    <>
+      <SettingsMetricCard
+        label={pick('\u5f53\u524d\u4f59\u989d', 'Current Balance')}
+        value={remainingBalanceDisplay}
+        helper={pick('\u5f53\u524d\u53ef\u7528\u79ef\u5206\u3002', 'Credits currently available.')}
+        icon={Coins}
+        tone="emerald"
+      />
+      <SettingsMetricCard
+        label={pick('\u79ef\u5206\u6a21\u578b\u6570', 'Credit Models')}
+        value={formatNumber(creditModelCount, 0, locale)}
+        helper={pick('\u5f53\u524d\u542f\u7528\u79ef\u5206\u5b9a\u4ef7\u7684\u6a21\u578b\u6570\u3002', 'Models currently using credit pricing.')}
+        icon={Wallet}
+        tone="indigo"
+      />
+      <SettingsMetricCard
+        label={pick('\u5df2\u6d88\u8017\u79ef\u5206', 'Credits Consumed')}
+        value={formatNumber(creditOverview.totalCredits, 0, locale)}
+        helper={pick('\u5f53\u524d\u7d2f\u8ba1\u79ef\u5206\u6d88\u8017\u3002', 'Total recorded credit usage.')}
+        icon={History}
+        tone="amber"
+      />
+      <SettingsMetricCard
+        label={pick('\u6700\u8fd1\u6263\u51cf', 'Latest Deduction')}
+        value={latestCreditRecord ? formatDateTime(latestCreditRecord.timestamp, locale) : pick('\u6682\u65e0\u8bb0\u5f55', 'No record')}
+        helper={pick('\u6700\u8fd1\u4e00\u6761\u79ef\u5206\u6263\u51cf\u8bb0\u5f55\u3002', 'Most recent credit deduction record.')}
+        icon={Clock3}
+        tone="neutral"
+      />
+    </>
+  );
+
   const content = (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">
-              {pick('高级设置', 'Advanced Settings')}
+        <SettingsHero
+          eyebrow={pick('\u9ad8\u7ea7\u8bbe\u7f6e', 'Advanced Settings')}
+          title={pick('\u8ba1\u8d39\u4e2d\u5fc3', 'Billing Ledger')}
+          description={pick(
+            '\u7edf\u4e00\u67e5\u770b API \u82b1\u8d39\u548c\u79ef\u5206\u6d88\u8017\u3002',
+            'Review API spend and internal credit usage in one place.'
+          )}
+          icon={activeTab === 'api' ? DollarSign : Coins}
+          tone={activeTab === 'api' ? 'indigo' : 'emerald'}
+          badge={(
+            <SettingsBadge tone={activeTab === 'api' ? 'amber' : 'emerald'}>
+              {activeTab === 'api'
+                ? pick('API \u6d88\u8017\u89c6\u56fe', 'API Spend View')
+                : pick('\u79ef\u5206\u6d88\u8017\u89c6\u56fe', 'Credit Consumption View')}
+            </SettingsBadge>
+          )}
+          actions={(
+            <>
+              {!embedded && onBack ? (
+                <SettingsActionButton icon={ArrowLeft} onClick={onBack}>
+                  {pick('\u8fd4\u56de', 'Back')}
+                </SettingsActionButton>
+              ) : null}
+              <SettingsActionButton
+                icon={RefreshCw}
+                loading={refreshing}
+                onClick={() => void refreshAll()}
+              >
+                {pick('\u5237\u65b0', 'Refresh')}
+              </SettingsActionButton>
+            </>
+          )}
+          metrics={heroMetrics}
+        />
+
+        <SettingsSection
+          title={pick('\u67e5\u770b\u6a21\u5f0f', 'View mode')}
+          eyebrow={pick('\u4e3b\u5de5\u5177', 'Primary tool')}
+          description={pick(
+            '\u5728 API \u82b1\u8d39\u548c\u79ef\u5206\u8d26\u672c\u4e4b\u95f4\u5207\u6362\u3002',
+            'Switch between API spend and the internal credit ledger.'
+          )}
+          action={<SettingsBadge tone="neutral">{pick('\u7edf\u4e00\u8ba1\u8d39\u754c\u9762', 'Unified Billing Ledger')}</SettingsBadge>}
+        >
+          <div className="flex flex-wrap gap-2">
+            <ConsumptionModeButton
+              active={activeTab === 'api'}
+              label={pick('API \u6d88\u8017', 'API Spend')}
+              onClick={() => setActiveTab('api')}
+            />
+            <ConsumptionModeButton
+              active={activeTab === 'credits'}
+              label={pick('\u79ef\u5206\u6d88\u8017', 'Credit Consumption')}
+              onClick={() => setActiveTab('credits')}
+            />
+          </div>
+        </SettingsSection>
+
+        <div className="hidden">
+          <div className="hidden">
+            <div className="hidden">
+              {pick('\u9ad8\u7ea7\u8bbe\u7f6e', 'Advanced Settings')}
             </div>
-            <h2>{pick('计费中心', 'Billing Ledger')}</h2>
+            <h2>{pick('\u8ba1\u8d39\u4e2d\u5fc3', 'Billing Ledger')}</h2>
             <p>
               {pick(
                 '这里统一查看 API 账单和积分消耗，界面与仪表盘和 API 页面保持同一套深色控制台结构。通过模式切换，你可以直接比较上游 API 花费和站内积分消耗。',
@@ -510,12 +637,12 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
           <div className="settings-reference-actions">
             <SettingsBadge tone={activeTab === 'api' ? 'amber' : 'emerald'}>
               {activeTab === 'api'
-                ? pick('API 消耗视图', 'API Spend View')
-                : pick('积分消耗视图', 'Credit Consumption View')}
+                ? pick('API \u6d88\u8017\u89c6\u56fe', 'API Spend View')
+                : pick('\u79ef\u5206\u6d88\u8017\u89c6\u56fe', 'Credit Consumption View')}
             </SettingsBadge>
             {!embedded && onBack ? (
               <SettingsActionButton icon={ArrowLeft} onClick={onBack}>
-                {pick('返回', 'Back')}
+                {pick('\u8fd4\u56de', 'Back')}
               </SettingsActionButton>
             ) : null}
             <SettingsActionButton
@@ -523,16 +650,16 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
               loading={refreshing}
               onClick={() => void refreshAll()}
             >
-              {pick('刷新', 'Refresh')}
+              {pick('\u5237\u65b0', 'Refresh')}
             </SettingsActionButton>
           </div>
         </div>
 
-        <section className="settings-reference-card settings-reference-card--soft">
+        <section className="hidden">
           <div className="settings-reference-card__header">
             <div>
               <div className="settings-reference-card__eyebrow">
-                {pick('查看模式', 'View Mode')}
+                {pick('\u67e5\u770b\u6a21\u5f0f', 'View Mode')}
               </div>
               <div className="settings-reference-card__title">
                 {activeTab === 'api'
@@ -547,19 +674,19 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
               </div>
             </div>
             <SettingsBadge tone="neutral">
-              {pick('统一计费界面', 'Unified Billing Ledger')}
+              {pick('\u7edf\u4e00\u8ba1\u8d39\u754c\u9762', 'Unified Billing Ledger')}
             </SettingsBadge>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
             <ConsumptionModeButton
               active={activeTab === 'api'}
-              label={pick('API 消耗', 'API Spend')}
+              label={pick('API \u6d88\u8017', 'API Spend')}
               onClick={() => setActiveTab('api')}
             />
             <ConsumptionModeButton
               active={activeTab === 'credits'}
-              label={pick('积分消耗', 'Credit Consumption')}
+              label={pick('\u79ef\u5206\u6d88\u8017', 'Credit Consumption')}
               onClick={() => setActiveTab('credits')}
             />
           </div>
@@ -567,28 +694,28 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
 
         {activeTab === 'api' ? (
           <>
-            <div className="settings-reference-grid-4">
+            <div className="hidden">
               <ConsumptionMetricCard
-                label={pick('30 天花费', '30-Day Spend')}
+                label={pick('30 \u5929\u82b1\u8d39', '30-Day Spend')}
                 value={formatUsd(apiOverview.totalCost, locale)}
-                helper={pick('最近 API 台账中累计记录的上游成本。', 'Aggregated upstream cost captured in the recent API ledger.')}
+                helper={pick('\u6700\u8fd1 API \u53f0\u8d26\u4e2d\u7d2f\u8ba1\u8bb0\u5f55\u7684\u4e0a\u6e38\u6210\u672c\u3002', 'Aggregated upstream cost captured in the recent API ledger.')}
                 badge={<DollarSign size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('请求次数', 'Request Count')}
+                label={pick('\u8bf7\u6c42\u6b21\u6570', 'Request Count')}
                 value={formatNumber(apiOverview.totalCount, 0, locale)}
-                helper={pick('当前窗口内记录到的 API 计费事件总数。', 'Total recorded API charge events in the current window.')}
+                helper={pick('\u5f53\u524d\u7a97\u53e3\u5185\u8bb0\u5f55\u5230\u7684 API \u8ba1\u8d39\u4e8b\u4ef6\u603b\u6570\u3002', 'Total recorded API charge events in the current window.')}
                 badge={<History size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('词元总量', 'Token Volume')}
+                label={pick('\u8bcd\u5143\u603b\u91cf', 'Token Volume')}
                 value={formatNumber(apiOverview.totalTokens, 0, locale)}
                 helper={pick('最近 API 记录中的词元使用总量。', 'Combined token activity across the recent API records.')}
                 badge={<Wallet size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('最近计费', 'Latest Charge')}
-                value={latestApiRecord ? formatDateTime(latestApiRecord.timestamp, locale) : pick('暂无记录', 'No record')}
+                label={pick('\u6700\u8fd1\u8ba1\u8d39', 'Latest Charge')}
+                value={latestApiRecord ? formatDateTime(latestApiRecord.timestamp, locale) : pick('\u6682\u65e0\u8bb0\u5f55', 'No record')}
                 helper={pick('本地最近一次写入的 API 计费时间。', 'Timestamp of the latest API billing event written locally.')}
                 badge={<Clock3 size={18} className="text-[var(--text-primary)]" />}
               />
@@ -1115,33 +1242,33 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
           </>
         ) : (
           <>
-            <div className="settings-reference-grid-4">
+            <div className="hidden">
               <ConsumptionMetricCard
-                label={pick('当前余额', 'Current Balance')}
+                label={pick('\u5f53\u524d\u4f59\u989d', 'Current Balance')}
                 value={remainingBalanceDisplay}
-                helper={pick('当前工作区可立即使用的积分。', 'Credits immediately available to the current workspace.')}
+                helper={pick('\u5f53\u524d\u5de5\u4f5c\u533a\u53ef\u7acb\u5373\u4f7f\u7528\u7684\u79ef\u5206\u3002', 'Credits immediately available to the current workspace.')}
                 badge={<Coins size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('积分模型数', 'Credit Models')}
+                label={pick('\u79ef\u5206\u6a21\u578b\u6570', 'Credit Models')}
                 value={formatNumber(creditModelCount, 0, locale)}
-                helper={pick('当前可参与调度且启用了积分定价的模型数量。', 'Pricing-enabled admin models currently available for dispatch.')}
+                helper={pick('\u5f53\u524d\u53ef\u53c2\u4e0e\u8c03\u5ea6\u4e14\u542f\u7528\u4e86\u79ef\u5206\u5b9a\u4ef7\u7684\u6a21\u578b\u6570\u91cf\u3002', 'Pricing-enabled admin models currently available for dispatch.')}
                 badge={<Wallet size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('已消耗积分', 'Credits Consumed')}
+                label={pick('\u5df2\u6d88\u8017\u79ef\u5206', 'Credits Consumed')}
                 value={formatNumber(creditOverview.totalCredits, 0, locale)}
-                helper={pick('当前积分消耗台账中的累计用量。', 'Total credit usage across the recorded consumption ledger.')}
+                helper={pick('\u5f53\u524d\u79ef\u5206\u6d88\u8017\u53f0\u8d26\u4e2d\u7684\u7d2f\u8ba1\u7528\u91cf\u3002', 'Total credit usage across the recorded consumption ledger.')}
                 badge={<History size={18} className="text-[var(--text-primary)]" />}
               />
               <ConsumptionMetricCard
-                label={pick('最近扣减', 'Latest Deduction')}
+                label={pick('\u6700\u8fd1\u6263\u51cf', 'Latest Deduction')}
                 value={
                   latestCreditRecord
                     ? formatDateTime(latestCreditRecord.timestamp, locale)
-                    : pick('暂无记录', 'No record')
+                    : pick('\u6682\u65e0\u8bb0\u5f55', 'No record')
                 }
-                helper={pick('最近一次写入日志的积分扣减时间。', 'Most recent credit-consumption event written to the log.')}
+                helper={pick('\u6700\u8fd1\u4e00\u6b21\u5199\u5165\u65e5\u5fd7\u7684\u79ef\u5206\u6263\u51cf\u65f6\u95f4\u3002', 'Most recent credit-consumption event written to the log.')}
                 badge={<Clock3 size={18} className="text-[var(--text-primary)]" />}
               />
             </div>
@@ -1412,3 +1539,4 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
 };
 
 export default CostEstimation;
+

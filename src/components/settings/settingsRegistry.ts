@@ -93,28 +93,28 @@ interface SettingsNavItemDefinition {
 const SHELL_COPY = {
   'zh-CN': {
     workbenchTitle: '设置',
-    workbenchDescription: '用一个统一的工作台管理 API、计费、日志与存储。',
-    emptySearchLabel: '没有匹配当前搜索的设置项。',
+    workbenchDescription: '统一管理 API、计费、日志和存储。',
+    emptySearchLabel: '没有匹配的导航入口。',
     mobileHomeKicker: '移动设置',
-    mobileHomeTitle: '四个常用入口',
-    mobileHomeDescription: '手机端只保留总览、API、计费和错误四个主入口。',
+    mobileHomeTitle: '四个核心入口',
+    mobileHomeDescription: '保留总览、API、计费和错误四个入口。',
     mobileUsageLabel: '计费',
     mobileErrorsLabel: '错误',
-    mobileErrorsDescription: '系统错误、告警与排障信号。',
+    mobileErrorsDescription: '错误、告警与排障信号。',
     currentEntryKicker: '当前入口',
     closeSettingsLabel: '关闭设置',
     backToHomeLabel: '返回移动设置首页',
   },
   'en-US': {
     workbenchTitle: 'Settings',
-    workbenchDescription: 'Manage API, billing, logs, and storage from one unified workspace.',
-    emptySearchLabel: 'No settings matched the current search.',
+    workbenchDescription: 'Manage API, billing, logs, and storage from one place.',
+    emptySearchLabel: 'No navigation entries matched.',
     mobileHomeKicker: 'Mobile Settings',
-    mobileHomeTitle: 'Four common entries',
-    mobileHomeDescription: 'Phone-first settings keep only Overview, API, Billing, and Errors on the home.',
+    mobileHomeTitle: 'Four core entries',
+    mobileHomeDescription: 'Keep Overview, API, Billing, and Errors on the phone home.',
     mobileUsageLabel: 'Billing',
     mobileErrorsLabel: 'Errors',
-    mobileErrorsDescription: 'System errors, warnings, and troubleshooting signals.',
+    mobileErrorsDescription: 'Errors, warnings, and triage signals.',
     currentEntryKicker: 'Current Entry',
     closeSettingsLabel: 'Close settings',
     backToHomeLabel: 'Back to mobile settings home',
@@ -158,8 +158,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Overview',
     titleZh: '设置总览',
     titleEn: 'Settings Overview',
-    descriptionZh: '先看系统状态与入口优先级，再进入具体设置页面。',
-    descriptionEn: 'Review system status and entry priority before opening a detailed settings page.',
+    descriptionZh: '先看状态，再进入具体设置页。',
+    descriptionEn: 'Review status before opening a detailed settings page.',
     primaryActionLabelZh: '打开 API 工作台',
     primaryActionLabelEn: 'Open API Workspace',
     primaryActionTarget: 'api-management',
@@ -170,8 +170,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'API Workspace',
     titleZh: 'API 工作台',
     titleEn: 'API Workspace',
-    descriptionZh: '集中管理本地 API、供应商、连通性与预算规则。',
-    descriptionEn: 'Manage local APIs, providers, connectivity, and budget rules in one place.',
+    descriptionZh: '管理本地 API、供应商和预算。',
+    descriptionEn: 'Manage local APIs, providers, and budgets.',
     primaryActionLabelZh: '配置本地 API',
     primaryActionLabelEn: 'Configure local API',
     primaryActionTarget: 'api-management',
@@ -182,8 +182,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Billing',
     titleZh: '计费账本',
     titleEn: 'Billing',
-    descriptionZh: '查看充值、消耗与账本活动，快速定位成本变化。',
-    descriptionEn: 'Review recharges, spend, and ledger activity to spot cost changes quickly.',
+    descriptionZh: '查看充值、消耗和账本。',
+    descriptionEn: 'Review recharges, spend, and ledger activity.',
     primaryActionLabelZh: '查看 API 工作台',
     primaryActionLabelEn: 'Open API Workspace',
     primaryActionTarget: 'api-management',
@@ -194,8 +194,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Storage',
     titleZh: '存储维护',
     titleEn: 'Storage',
-    descriptionZh: '管理持久化模式、缓存压力与项目修复动作。',
-    descriptionEn: 'Manage persistence modes, cache pressure, and workspace repair actions.',
+    descriptionZh: '管理模式、容量和修复动作。',
+    descriptionEn: 'Manage modes, capacity, and repair actions.',
     primaryActionLabelZh: '查看存储模式',
     primaryActionLabelEn: 'Review storage mode',
     primaryActionTarget: 'storage-settings',
@@ -206,8 +206,8 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     eyebrow: 'Logs',
     titleZh: '日志',
     titleEn: 'Logs',
-    descriptionZh: '集中查看错误、告警和诊断信号，优先处理最重要的问题。',
-    descriptionEn: 'Inspect errors, warnings, and diagnostic signals with the highest-priority issues first.',
+    descriptionZh: '查看错误、告警和诊断信号。',
+    descriptionEn: 'Inspect errors, warnings, and diagnostic signals.',
     primaryActionLabelZh: '返回 API 工作台',
     primaryActionLabelEn: 'Back to API Workspace',
     primaryActionTarget: 'api-management',
@@ -221,8 +221,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'dashboard',
     labelZh: '总览',
     labelEn: 'Overview',
-    descriptionZh: '查看系统状态、主入口与最近活动。',
-    descriptionEn: 'Review system status, primary entry points, and recent activity.',
+    descriptionZh: '状态、入口、活动。',
+    descriptionEn: 'Status, entries, activity.',
     icon: LayoutDashboard,
     section: 'workspace',
     path: SETTINGS_PATHS.dashboard,
@@ -231,8 +231,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'api-management',
     labelZh: 'API 工作台',
     labelEn: 'API Workspace',
-    descriptionZh: '管理本地 API、供应商、预算规则与连通性。',
-    descriptionEn: 'Manage local APIs, providers, budget rules, and connectivity.',
+    descriptionZh: '本地 API、供应商、预算。',
+    descriptionEn: 'Local APIs, providers, budgets.',
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
@@ -241,8 +241,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'consumption-records',
     labelZh: '计费账本',
     labelEn: 'Billing',
-    descriptionZh: '查看充值、消耗与账本活动。',
-    descriptionEn: 'Review recharges, spend, and ledger activity.',
+    descriptionZh: '充值、消耗、账本。',
+    descriptionEn: 'Recharge, spend, ledger.',
     icon: Coins,
     section: 'workspace',
     path: SETTINGS_PATHS['consumption-records'],
@@ -252,8 +252,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'system-logs',
     labelZh: '日志',
     labelEn: 'Logs',
-    descriptionZh: '优先排查错误、告警与诊断信号。',
-    descriptionEn: 'Inspect errors, warnings, and troubleshooting signals first.',
+    descriptionZh: '错误、告警、排障。',
+    descriptionEn: 'Errors, warnings, triage.',
     icon: ScrollText,
     section: 'system',
     path: SETTINGS_PATHS['system-logs'],
@@ -262,8 +262,8 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     id: 'storage-settings',
     labelZh: '存储',
     labelEn: 'Storage',
-    descriptionZh: '管理持久化模式、缓存压力与清理动作。',
-    descriptionEn: 'Manage persistence modes, cache pressure, and cleanup actions.',
+    descriptionZh: '模式、容量、清理。',
+    descriptionEn: 'Modes, capacity, cleanup.',
     icon: HardDrive,
     section: 'system',
     path: SETTINGS_PATHS['storage-settings'],
@@ -381,19 +381,19 @@ export function getSettingsSearchPlaceholder(
   language: AppLanguage,
 ): string {
   if (view === 'api-management') {
-    return pickByLanguage(language, '搜索路由、供应商或平台入口', 'Search routes, providers, or platform entry');
+    return pickByLanguage(language, '筛选 API、供应商或平台入口', 'Filter API, provider, or platform entries');
   }
   if (view === 'consumption-records') {
-    return pickByLanguage(language, '搜索充值、账单或消耗记录', 'Search recharges, ledger rows, or spend');
+    return pickByLanguage(language, '筛选计费入口', 'Filter billing entries');
   }
   if (view === 'storage-settings') {
-    return pickByLanguage(language, '搜索存储模式、缓存或清理动作', 'Search storage modes, cache, or cleanup actions');
+    return pickByLanguage(language, '筛选存储与清理入口', 'Filter storage and cleanup entries');
   }
   if (view === 'system-logs') {
-    return pickByLanguage(language, '搜索日志来源、级别或关键字', 'Search log sources, levels, or keywords');
+    return pickByLanguage(language, '筛选日志入口或级别', 'Filter log entries or levels');
   }
 
-  return pickByLanguage(language, '搜索设置、日志或账本入口', 'Search settings, logs, or billing entries');
+  return pickByLanguage(language, '筛选设置导航', 'Filter settings navigation');
 }
 
 export function getSettingsNavItemByPath(

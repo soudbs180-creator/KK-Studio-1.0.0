@@ -3,6 +3,10 @@
  * 设置页面UI组件库 - iOS风格设计系统
  */
 import React from 'react';
+import {
+  SETTINGS_INPUT_CLASSNAME,
+  SETTINGS_LABEL_CLASSNAME,
+} from '../SettingsScaffold';
 
 // SettingCard 组件
 export const SettingCard: React.FC<{
@@ -199,8 +203,7 @@ export const SettingInput: React.FC<{
   return (
     <label className="block">
       <div
-        className="mb-2 break-words font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]"
-        style={{ fontSize: 'var(--type-micro)' }}
+        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
       >
         {label}
       </div>
@@ -210,15 +213,8 @@ export const SettingInput: React.FC<{
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full border px-4 py-2.5 text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-        style={{
-          borderColor: 'var(--settings-input-border)',
-          background: 'var(--settings-input-bg)',
-          boxShadow: 'var(--settings-input-shadow)',
-          borderRadius: 'var(--radius-control-md)',
-          fontSize: 'var(--type-body-2)',
-          minHeight: 'var(--ui-control-height-default)',
-        }}
+        className={`${SETTINGS_INPUT_CLASSNAME} px-4`.trim()}
+        style={{ boxShadow: 'var(--settings-input-shadow)' }}
       />
       {helper && (
         <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
@@ -263,14 +259,14 @@ export const SettingToggle: React.FC<{
           }
         }}
         disabled={disabled}
-        className="relative h-7 w-12 shrink-0 rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className="settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           background: checked ? 'rgb(var(--settings-accent-rgb))' : 'var(--settings-surface-overlay)',
           borderColor: checked ? 'rgb(var(--settings-accent-rgb) / 0.35)' : 'var(--settings-border-subtle)',
         }}
       >
         <span
-          className="absolute top-0.5 h-6 w-6 rounded-full bg-[var(--text-inverse)] shadow-sm transition-transform duration-200"
+          className="settings-toggle-button__thumb absolute top-0.5 h-6 w-6 rounded-full bg-[var(--text-inverse)] shadow-sm transition-transform duration-200"
           style={{
             transform: checked ? 'translateX(22px)' : 'translateX(2px)',
           }}
@@ -292,8 +288,7 @@ export const SettingSelect: React.FC<{
   return (
     <label className="block">
       <div
-        className="mb-2 break-words font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]"
-        style={{ fontSize: 'var(--type-micro)' }}
+        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
       >
         {label}
       </div>
@@ -301,15 +296,8 @@ export const SettingSelect: React.FC<{
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full border px-4 py-2.5 text-[var(--text-primary)] transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-        style={{
-          borderColor: 'var(--settings-input-border)',
-          background: 'var(--settings-input-bg)',
-          boxShadow: 'var(--settings-input-shadow)',
-          borderRadius: 'var(--radius-control-md)',
-          fontSize: 'var(--type-body-2)',
-          minHeight: 'var(--ui-control-height-default)',
-        }}
+        className={`${SETTINGS_INPUT_CLASSNAME} px-4`.trim()}
+        style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
         {options.map((option) => (
           <option

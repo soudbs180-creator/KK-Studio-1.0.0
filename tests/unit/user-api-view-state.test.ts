@@ -25,11 +25,13 @@ test("readonly snapshot hydration stays interactive when display data exists", (
 test("unauthenticated users still stay blocked", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: true,
+    hasSessionlessWorkbenchAccess: false,
     isApiReachable: true,
     isAuthenticated: false,
     isPersistenceDegraded: false,
     runtimeOfficialCount: 0,
     runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: false,
   });
 
   assert.equal(viewState.userApiActionsDisabled, true);
@@ -42,11 +44,13 @@ test("unauthenticated users still stay blocked", () => {
 test("authenticated users stay editable when the API server is unreachable but readonly snapshots are available", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: true,
+    hasSessionlessWorkbenchAccess: false,
     isApiReachable: false,
     isAuthenticated: true,
     isPersistenceDegraded: true,
     runtimeOfficialCount: 0,
     runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: false,
   });
 
   assert.equal(viewState.userApiActionsDisabled, false);
@@ -60,11 +64,13 @@ test("authenticated users stay editable when the API server is unreachable but r
 test("authenticated users remain editable during degraded persistence when the API server is still reachable", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: false,
+    hasSessionlessWorkbenchAccess: false,
     isApiReachable: true,
     isAuthenticated: true,
     isPersistenceDegraded: true,
     runtimeOfficialCount: 1,
     runtimeProviderCount: 1,
+    sessionlessWorkbenchActionsEnabled: false,
   });
 
   assert.equal(viewState.userApiActionsDisabled, false);
@@ -78,15 +84,72 @@ test("authenticated users remain editable during degraded persistence when the A
 test("authenticated users enter local-api-unavailable mode when runtime is down and no readonly snapshot exists", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: false,
+    hasSessionlessWorkbenchAccess: false,
     isApiReachable: false,
     isAuthenticated: true,
     isPersistenceDegraded: true,
     runtimeOfficialCount: 0,
     runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: false,
   });
 
   assert.equal(viewState.stage, "local-api-unavailable");
   assert.equal(viewState.userApiActionsDisabled, false);
   assert.equal(viewState.providerActionsDisabled, false);
   assert.equal(viewState.shouldUseReadonlySnapshotForDisplay, false);
+});
+
+test("sessionless local workbench stays editable without a signed-in account when the local API can persist user data", () => {
+  const viewState = resolveUserApiViewState({
+    hasReadonlySnapshot: false,
+    hasSessionlessWorkbenchAccess: true,
+    isApiReachable: true,
+    isAuthenticated: false,
+    isPersistenceDegraded: false,
+    runtimeOfficialCount: 0,
+    runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: true,
+  });
+
+  assert.equal(viewState.stage, "editable");
+  assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.providerActionsDisabled, false);
+  assert.equal(viewState.userApiEditorDisabled, false);
+  assert.equal(viewState.providerEditorReadOnly, false);
+});
+
+test("sessionless local workbench reports local runtime outages instead of sign-in requirements", () => {
+  const viewState = resolveUserApiViewState({
+    hasReadonlySnapshot: false,
+    hasSessionlessWorkbenchAccess: true,
+    isApiReachable: false,
+    isAuthenticated: false,
+    isPersistenceDegraded: true,
+    runtimeOfficialCount: 0,
+    runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: false,
+  });
+
+  assert.equal(viewState.stage, "local-api-unavailable");
+  assert.equal(viewState.userApiActionsDisabled, true);
+  assert.equal(viewState.providerActionsDisabled, true);
+});
+
+test("sessionless local workbench stays editable when loopback mode keeps a local browser draft buffer available", () => {
+  const viewState = resolveUserApiViewState({
+    hasReadonlySnapshot: false,
+    hasSessionlessWorkbenchAccess: true,
+    isApiReachable: false,
+    isAuthenticated: false,
+    isPersistenceDegraded: true,
+    runtimeOfficialCount: 0,
+    runtimeProviderCount: 0,
+    sessionlessWorkbenchActionsEnabled: true,
+  });
+
+  assert.equal(viewState.stage, "editable");
+  assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.providerActionsDisabled, false);
+  assert.equal(viewState.userApiEditorDisabled, false);
+  assert.equal(viewState.providerEditorReadOnly, false);
 });

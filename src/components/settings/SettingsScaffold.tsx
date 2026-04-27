@@ -199,57 +199,58 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
   const toneStyle = toneStyles[tone];
 
   return (
-    <section className={`space-y-5 ${className}`.trim()}>
-      <div className="settings-reference-page-header">
-        <div className="settings-reference-page-header__lead">
-          {eyebrow ? (
-            <div className="settings-reference-page-header__eyebrow">
-              {eyebrow}
+    <section
+      className={`settings-reference-card settings-reference-card--elevated settings-hero-card space-y-5 p-6 ${className}`.trim()}
+      style={SETTINGS_ELEVATED_STYLE}
+    >
+      <div className="settings-hero-card__header flex flex-wrap items-start justify-between gap-5">
+        <div className="settings-hero-card__lead flex min-w-0 flex-1 items-start gap-4">
+          {Icon ? (
+            <div
+              className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center border"
+              style={{
+                ...toneStyle.iconStyle,
+                borderRadius: 'var(--radius-surface-md)',
+              }}
+            >
+              <Icon size={17} />
             </div>
           ) : null}
-          <div className="flex min-w-0 items-start gap-4">
-            {Icon ? (
-              <div
-                className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center border"
-                style={{
-                  ...toneStyle.iconStyle,
-                  borderRadius: 'var(--radius-surface-md)',
-                }}
-              >
-                <Icon size={17} />
+          <div className="settings-hero-card__title-wrap min-w-0 flex-1">
+            {eyebrow ? (
+              <div className="settings-reference-page-header__eyebrow">
+                {eyebrow}
               </div>
             ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2
-                  className="min-w-0 break-words"
-                  style={{
-                    overflowWrap: 'anywhere',
-                    fontSize: 'var(--type-title-1)',
-                    lineHeight: 'var(--ui-line-height-tight)',
-                  }}
-                >
-                  {title}
-                </h2>
-                {badge}
-              </div>
-              {description ? (
-                <p
-                  className="mt-2 max-w-3xl break-words"
-                  style={{
-                    color: 'var(--text-secondary)',
-                    overflowWrap: 'anywhere',
-                    fontSize: 'var(--type-body-2)',
-                    lineHeight: 'var(--ui-line-height-relaxed)',
-                  }}
-                >
-                  {description}
-                </p>
-              ) : null}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h2
+                className="min-w-0 break-words"
+                style={{
+                  overflowWrap: 'anywhere',
+                  fontSize: 'var(--type-title-1)',
+                  lineHeight: 'var(--ui-line-height-tight)',
+                }}
+              >
+                {title}
+              </h2>
+              {badge}
             </div>
+            {description ? (
+              <p
+                className="mt-3 max-w-3xl break-words"
+                style={{
+                  color: 'var(--text-secondary)',
+                  overflowWrap: 'anywhere',
+                  fontSize: 'var(--type-body-2)',
+                  lineHeight: 'var(--ui-line-height-relaxed)',
+                }}
+              >
+                {description}
+              </p>
+            ) : null}
           </div>
         </div>
-        {actions ? <div className="settings-reference-actions">{actions}</div> : null}
+        {actions ? <div className="settings-hero-card__actions settings-reference-actions">{actions}</div> : null}
       </div>
       {metrics ? <div className="settings-reference-grid-4">{metrics}</div> : null}
     </section>
@@ -331,35 +332,91 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   children,
 }) => (
   <section className="space-y-3" data-testid={testId}>
-    <div className="flex items-start justify-between gap-3 px-1">
-      <h3
-        className="text-left font-semibold uppercase tracking-[0.18em]"
-        style={{ color: 'var(--text-tertiary)', fontSize: 'var(--type-caption)' }}
-      >
-        {eyebrow || title}
-      </h3>
-      {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
-    </div>
     {surface === 'card' ? (
-      <div className="settings-reference-card settings-reference-card--elevated p-5" style={SETTINGS_PANEL_STYLE}>
-        {children}
+      <div className="settings-section-card settings-reference-card settings-reference-card--elevated p-5" style={SETTINGS_PANEL_STYLE}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            {eyebrow ? (
+              <div
+                className="mb-2 text-left font-semibold uppercase tracking-[0.18em]"
+                style={{ color: 'var(--text-tertiary)', fontSize: 'var(--type-caption)' }}
+              >
+                {eyebrow}
+              </div>
+            ) : null}
+            <h3
+              className="break-words text-left"
+              style={{
+                color: 'var(--text-primary)',
+                overflowWrap: 'anywhere',
+                fontSize: 'var(--type-title-3)',
+                fontWeight: 600,
+                lineHeight: 'var(--ui-line-height-tight)',
+              }}
+            >
+              {title}
+            </h3>
+            {description ? (
+              <p
+                className="mt-2 break-words"
+                style={{
+                  color: 'var(--text-secondary)',
+                  overflowWrap: 'anywhere',
+                  fontSize: 'var(--type-body-2)',
+                  lineHeight: 'var(--ui-line-height-relaxed)',
+                }}
+              >
+                {description}
+              </p>
+            ) : null}
+          </div>
+          {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
+        </div>
+        <div className="mt-5">{children}</div>
       </div>
     ) : (
-      children
+      <>
+        <div className="flex flex-wrap items-start justify-between gap-4 px-1">
+          <div className="min-w-0 flex-1">
+            {eyebrow ? (
+              <div
+                className="mb-2 text-left font-semibold uppercase tracking-[0.18em]"
+                style={{ color: 'var(--text-tertiary)', fontSize: 'var(--type-caption)' }}
+              >
+                {eyebrow}
+              </div>
+            ) : null}
+            <h3
+              className="break-words text-left"
+              style={{
+                color: 'var(--text-primary)',
+                overflowWrap: 'anywhere',
+                fontSize: 'var(--type-title-3)',
+                fontWeight: 600,
+                lineHeight: 'var(--ui-line-height-tight)',
+              }}
+            >
+              {title}
+            </h3>
+            {description ? (
+              <p
+                className="mt-2 break-words"
+                style={{
+                  color: 'var(--text-secondary)',
+                  overflowWrap: 'anywhere',
+                  fontSize: 'var(--type-body-2)',
+                  lineHeight: 'var(--ui-line-height-relaxed)',
+                }}
+              >
+                {description}
+              </p>
+            ) : null}
+          </div>
+          {action ? <div className="flex flex-shrink-0 items-center gap-2">{action}</div> : null}
+        </div>
+        {children}
+      </>
     )}
-    {description ? (
-      <p
-        className="settings-ios-footer break-words px-1"
-        style={{
-          color: 'var(--text-secondary)',
-          overflowWrap: 'anywhere',
-          fontSize: 'var(--type-body-2)',
-          lineHeight: 'var(--ui-line-height-relaxed)',
-        }}
-      >
-        {description}
-      </p>
-    ) : null}
   </section>
 );
 

@@ -34,8 +34,14 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.match(shellSource, /pick\('当前账户', 'Current account'\)/);
   assert.match(shellSource, /pick\('管理员', 'Administrator'\)/);
   assert.match(shellSource, /pick\('标准账户', 'Standard account'\)/);
+  assert.match(shellSource, /data-testid="settings-account-block"/);
+  assert.doesNotMatch(shellSource, /navigate\(buildSettingsPath\('api-management'\)\);/);
   assert.match(shellSource, /renderSettingsRouteElements\(/);
+  assert.match(shellSource, /refreshKey:\s*contentRefreshKey/);
+  assert.doesNotMatch(shellSource, /<Suspense key=\{`\$\{activeView\}:\$\{contentRefreshKey\}`\}/);
   assert.doesNotMatch(shellSource, /<Route path="\/settings\/api-management"/);
+  assert.match(routeConfigSource, /refreshKey\?: number;/);
+  assert.match(routeConfigSource, /const routeRefreshKey = `\$\{definition\.kind\}:\$\{definition\.path \|\| 'dashboard'\}:\$\{options\.refreshKey \|\| 0\}`;/);
   assert.match(routeConfigSource, /export function renderSettingsRouteElements/);
   assert.doesNotMatch(shellSource, /settings-toolbar-search/);
   assert.doesNotMatch(shellSource, /System Active/);

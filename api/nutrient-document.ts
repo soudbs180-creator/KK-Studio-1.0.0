@@ -107,18 +107,20 @@ export default async function handler(request: Request) {
     return jsonResponse({ error: 'Only POST requests are supported.' }, 405);
   }
 
-  const apiKey = process.env.NUTRIENT_API_KEY || process.env.NUTRIENT_DWS_API_KEY;
-  if (!apiKey) {
-    return jsonResponse(
-      {
-        error: 'Missing NUTRIENT_API_KEY or NUTRIENT_DWS_API_KEY.',
-      },
-      500,
-    );
-  }
-
   try {
     const formData = await request.formData();
+    const apiKey = process.env.NUTRIENT_API_KEY
+      || process.env.NUTRIENT_DWS_API_KEY
+      || String(formData.get('apiKey') || '').trim();
+    if (!apiKey) {
+      return jsonResponse(
+        {
+          error: 'Missing NUTRIENT_API_KEY or NUTRIENT_DWS_API_KEY.',
+        },
+        500,
+      );
+    }
+
     const operationValue = String(formData.get('operation') || '').trim();
     const upload = formData.get('file');
     const requestedLanguage = String(formData.get('ocrLanguage') || '').trim();

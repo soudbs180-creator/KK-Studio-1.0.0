@@ -36,7 +36,7 @@ export interface ResolveApiWorkbenchStageMetaInput {
 }
 
 export interface ResolveApiWorkbenchDiagnosticsAvailabilityInput {
-  isAuthenticated: boolean;
+  hasWorkbenchAccess: boolean;
   isApiReachable?: boolean;
 }
 
@@ -49,8 +49,8 @@ export function resolveApiWorkbenchDiagnosticsAvailability(
   input: ResolveApiWorkbenchDiagnosticsAvailabilityInput,
 ): ApiWorkbenchDiagnosticsAvailability {
   return {
-    refreshDisabled: !input.isAuthenticated,
-    routeActionsDisabled: !input.isAuthenticated || input.isApiReachable === false,
+    refreshDisabled: !input.hasWorkbenchAccess,
+    routeActionsDisabled: !input.hasWorkbenchAccess || input.isApiReachable === false,
   };
 }
 

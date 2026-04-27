@@ -11,16 +11,19 @@ function readSource(relativePath: string): string {
 
 test('production settings entry delegates to the localized router-backed workbench shell', () => {
   const appSource = readSource('src/App.tsx');
+  const settingsPageRootSource = readSource('src/app/SettingsPageRoot.tsx');
   const settingsEntrySource = readSource('src/components/settings/SettingsPanel.tsx');
 
-  assert.match(appSource, /const SettingsPanel = lazy\(\(\) => import\('\.\/components\/settings\/SettingsPanel'\)\);/);
+  assert.match(appSource, /import SettingsPageRoot from '\.\/app\/SettingsPageRoot';/);
+  assert.match(appSource, /AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}/);
+  assert.match(settingsPageRootSource, /const SettingsPanel = lazy\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
+  assert.match(settingsPageRootSource, /presentation="page"/);
+  assert.match(settingsPageRootSource, /initialPathname=\{window\.location\.pathname\}/);
   assert.doesNotMatch(appSource, /const MobileApiSettingsView = lazy\(\(\) => import\('\.\/components\/settings\/ApiSettingsView'\)\);/);
   assert.doesNotMatch(appSource, /const MobileSystemLogsView = lazy\(\(\) => import\('\.\/components\/settings\/views\/SystemLogsView\.localized\.tsx'\)\);/);
   assert.doesNotMatch(appSource, /const MobileUsageView = lazy\(\(\) => import\('\.\/pages\/CostEstimation'\)\);/);
   assert.doesNotMatch(appSource, /const mobileSettingsHomeContent = isMobile \?/);
   assert.doesNotMatch(appSource, /const mobileSettingsPageContent = isMobile \?/);
-  assert.doesNotMatch(appSource, /showSettingsPanel && !isMobile/);
-  assert.match(appSource, /showSettingsPanel && \(/);
   assert.match(
     settingsEntrySource,
     /SettingsWorkbenchPanel[\s\S]*<SettingsWorkbenchPanel \{\.\.\.props\} \/>/,
@@ -31,10 +34,10 @@ test('production settings entry delegates to the localized router-backed workben
 
 test('settings routing metadata is owned by a shared registry instead of duplicated across shell and route modules', () => {
   const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const routesSource = readSource('src/routes/settingsRoutes.tsx');
+  const routesSource = readSource('src/components/settings/settingsRouteConfig.tsx');
 
   assert.match(localizedShellSource, /from '\.\/settingsRegistry';/);
-  assert.match(routesSource, /from '\.\.\/components\/settings\/settingsRegistry';/);
+  assert.match(routesSource, /from '\.\/settingsRegistry';/);
   assert.doesNotMatch(localizedShellSource, /const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = \{/);
   assert.doesNotMatch(localizedShellSource, /const getNavItems = \(language: AppLanguage\): NavItem\[] => \[/);
   assert.doesNotMatch(routesSource, /const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = \{/);
@@ -48,4 +51,14 @@ test('settings workbench self-hosts a MemoryRouter because the app root does not
   assert.doesNotMatch(mainSource, /<BrowserRouter/);
   assert.match(localizedShellSource, /import \{ MemoryRouter, Routes, useLocation, useNavigate \} from 'react-router-dom';/);
   assert.match(localizedShellSource, /<MemoryRouter initialEntries=\{\[initialEntry\]\} key=\{initialEntry\}>[\s\S]*<SettingsRouterShell/);
+});
+
+test('page-mode settings navigation syncs the browser URL while overlay mode stays isolated from app routes', () => {
+  const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+
+  assert.match(localizedShellSource, /presentation === 'page'/);
+  assert.match(localizedShellSource, /window\.history\.pushState\(/);
+  assert.match(localizedShellSource, /window\.history\.replaceState\(/);
+  assert.match(localizedShellSource, /window\.addEventListener\('popstate', handlePopstate\)/);
+  assert.match(localizedShellSource, /window\.location\.assign\(nextWindowPath\)/);
 });

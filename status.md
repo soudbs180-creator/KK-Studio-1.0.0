@@ -7,8 +7,8 @@ Last updated: 2026-04-27
 - Branch: `codex/kk-studio-recovery-convergence`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Milestone 2, login, VPS PostgreSQL, self-hosted runtime, and manual recharge.
-- Milestone 1 recovery ledger is complete.
+- Current milestone: Milestone 3, settings UI and API configuration architecture.
+- Milestones 1 and 2 are complete.
 
 ## Recovered Sources
 
@@ -70,11 +70,16 @@ Milestone 2:
 - Passed: mobile contract compatibility tests required to unblock global typecheck.
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run check:encoding`
+- Committed: `e27ba63a feat: converge self-hosted auth runtime and recharge`
+
+Milestone 3:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/settings-workbench-ui-refit.test.ts" "tests/unit/api-settings-capability-routing-contract.test.ts" "tests/unit/api-settings-provider-compact-ui-contract.test.ts" "tests/unit/api-settings-capability-layout-regression.test.ts" "tests/unit/ocr-service-settings-contract.test.ts" "tests/unit/prompt-optimizer-capability-route-contract.test.ts"`
 
 ## In Progress
 
-- Stage and commit Milestone 2 only.
-- Prepare worker tasks for Milestones 3-6 with disjoint write scopes.
+- Stage and commit Milestone 3 settings/API files.
+- Worker agents are checking M3-M6 narrow scopes in parallel.
 
 ## Known Risks And Blockers To Verify
 
@@ -85,7 +90,8 @@ Milestone 2:
 
 ## Next Steps
 
-1. Commit Milestone 2.
-2. Start Milestone 3 with settings/API capability persistence and runtime-route tests first.
-3. Keep local secret/tunnel files out of staging.
-4. Preserve existing dirty worktree changes while using path-limited staging for each milestone.
+1. Commit Milestone 3.
+2. Commit Milestone 4 ecommerce framework/runtime files.
+3. Commit Milestone 5 PPT deck files.
+4. Commit Milestone 6 responsive/mobile files.
+5. Run final gate and merge the branch.

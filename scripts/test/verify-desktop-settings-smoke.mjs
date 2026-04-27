@@ -2,11 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
-import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
+import {
+  closeLocalViteServer,
+  ensureLocalViteServer,
+} from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'desktop-settings-smoke');
-const TARGET_URL = 'http://127.0.0.1:3000';
+const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
 const SETTINGS_API_PATH = '/settings/api-management';
 
@@ -94,6 +97,7 @@ async function assertHttpHtml(url) {
 
 function verifyDesktopSourceContracts() {
   const appSource = readSource('src/App.tsx');
+  const appDesktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
   const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
@@ -101,21 +105,23 @@ function verifyDesktopSourceContracts() {
 
   const checks = [
     /data-testid="desktop-user-menu-trigger"/,
-    /data-testid="desktop-user-menu-settings"/,
+    /desktop-user-menu-settings/,
     /data-testid="settings-page-root"/,
     /sections=\{sections\}/,
-    /Overview \/ API \/ Billing \/ Errors/,
-    /API Workspace/,
+    /settings-dashboard-cockpit__node/,
+    /API setup/,
     /data-testid="api-official-editor-back"/,
     /testId="settings-workbench-stage"/,
     /testId="settings-workbench-diagnostics"/,
     /testId="settings-workbench-platform"/,
-    /Primary routes/,
-    /Maintenance/,
+    /Traffic overview/,
+    /Operational health/,
+    /Quick routes/,
   ];
 
   const sources = [
     appSource,
+    appDesktopChromeSource,
     settingsPanelSource,
     apiSettingsViewSource,
     workbenchSectionsSource,
@@ -129,13 +135,13 @@ function verifyDesktopSourceContracts() {
   }
 }
 
-async function runFallbackVerification(error, browserPreflight) {
+async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyDesktopSourceContracts();
 
   const routes = await Promise.all([
-    assertHttpHtml(`${TARGET_URL}${SETTINGS_HOME_PATH}`),
-    assertHttpHtml(`${TARGET_URL}${SETTINGS_API_PATH}`),
-    assertHttpHtml(TARGET_URL),
+    assertHttpHtml(`${targetUrl}${SETTINGS_HOME_PATH}`),
+    assertHttpHtml(`${targetUrl}${SETTINGS_API_PATH}`),
+    assertHttpHtml(targetUrl),
   ]);
 
   const summary = {
@@ -160,10 +166,12 @@ ensureArtifactsDir();
 let browser;
 let viteServer;
 let browserPreflight = null;
+let targetUrl = DEFAULT_TARGET_URL;
 
 try {
-  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
   viteServer = ensured.server;
+  targetUrl = ensured.url || DEFAULT_TARGET_URL;
   browserPreflight = await runBrowserPreflight();
 
   const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
@@ -182,7 +190,7 @@ try {
     window.localStorage.setItem('kk_tutorial_seen', 'true');
   });
 
-  await gotoWithRetry(page, `${TARGET_URL}${SETTINGS_HOME_PATH}`);
+  await gotoWithRetry(page, `${targetUrl}${SETTINGS_HOME_PATH}`);
 
   const settingsPageRoot = page.getByTestId('settings-page-root');
 
@@ -193,7 +201,7 @@ try {
     fullPage: true,
   });
 
-  await gotoWithRetry(page, `${TARGET_URL}${SETTINGS_API_PATH}`);
+  await gotoWithRetry(page, `${targetUrl}${SETTINGS_API_PATH}`);
 
   const workbenchStage = page.getByTestId('settings-workbench-stage');
   const diagnosticsToggle = page.getByTestId('api-workbench-diagnostics-toggle');
@@ -221,7 +229,7 @@ try {
     fullPage: true,
   });
 
-  await gotoWithRetry(page, TARGET_URL);
+  await gotoWithRetry(page, targetUrl);
 
   const desktopUserMenuTrigger = page.getByTestId('desktop-user-menu-trigger');
   await assertVisible(desktopUserMenuTrigger, 'Desktop user menu trigger did not render on the workspace.');
@@ -243,7 +251,7 @@ try {
   }, null, 2));
 } catch (error) {
   if (isBrowserLaunchUnavailable(error)) {
-    await runFallbackVerification(error, browserPreflight);
+    await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
     throw error;
   }
@@ -252,6 +260,6 @@ try {
     await browser.close();
   }
   if (viteServer) {
-    await viteServer.close();
+    await closeLocalViteServer(viteServer);
   }
 }

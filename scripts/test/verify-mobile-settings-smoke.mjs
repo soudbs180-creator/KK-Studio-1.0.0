@@ -2,11 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { runBrowserPreflight } from './browser-preflight.mjs';
-import { ensureLocalViteServer } from './ensure-local-vite-server.mjs';
+import {
+  closeLocalViteServer,
+  ensureLocalViteServer,
+} from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
 const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'mobile-settings-smoke');
-const TARGET_URL = 'http://127.0.0.1:3000';
+const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
 const SETTINGS_API_PATH = '/settings/api-management';
 const STORAGE_KEY = 'kk_studio_canvas_state';
@@ -241,7 +244,7 @@ function verifyMobileSourceContracts() {
   const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
   const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
   const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const settingsHomeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
+  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
   const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
   const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
 
@@ -250,9 +253,8 @@ function verifyMobileSourceContracts() {
     /data-testid="mobile-more-menu-settings"/,
     /data-testid="mobile-more-sheet"/,
     /data-testid=\{`mobile-result-tile-\$\{entry\.id\}`\}/,
-    /data-testid=\{`mobile-settings-entry-\$\{entry\.id\}`\}/,
-    /Overview \/ API \/ Billing \/ Errors/,
-    /SettingsBadge/,
+    /settings-dashboard-cockpit__node/,
+    /dashboardPrimaryAction\.label/,
     /testId\?: string;/,
     /data-testid=\{testId\}/,
     /testId="settings-workbench-overview"/,
@@ -266,7 +268,7 @@ function verifyMobileSourceContracts() {
     mobileHeaderSource,
     mobileSurfaceSource,
     mobileTileSource,
-    settingsHomeSource,
+    dashboardSource,
     workbenchSectionsSource,
     scaffoldSource,
   ];
@@ -278,13 +280,13 @@ function verifyMobileSourceContracts() {
   }
 }
 
-async function runFallbackVerification(error, browserPreflight) {
+async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyMobileSourceContracts();
 
   const routes = await Promise.all([
-    assertHttpHtml(TARGET_URL),
-    assertHttpHtml(`${TARGET_URL}${SETTINGS_HOME_PATH}`),
-    assertHttpHtml(`${TARGET_URL}${SETTINGS_API_PATH}`),
+    assertHttpHtml(targetUrl),
+    assertHttpHtml(`${targetUrl}${SETTINGS_HOME_PATH}`),
+    assertHttpHtml(`${targetUrl}${SETTINGS_API_PATH}`),
   ]);
 
   const summary = {
@@ -315,10 +317,12 @@ ensureArtifactsDir();
 let browser;
 let viteServer;
 let browserPreflight = null;
+let targetUrl = DEFAULT_TARGET_URL;
 
 try {
-  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
+  const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
   viteServer = ensured.server;
+  targetUrl = ensured.url || DEFAULT_TARGET_URL;
   browserPreflight = await runBrowserPreflight();
 
   const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
@@ -331,7 +335,7 @@ try {
     hasTouch: true,
   });
 
-  await gotoWithRetry(page, TARGET_URL);
+  await gotoWithRetry(page, targetUrl);
   await page.waitForTimeout(1000);
   await dismissStorageModalIfPresent(page);
 
@@ -395,14 +399,14 @@ try {
 
   await settingsEntry.click();
 
-  const settingsHome = page.getByTestId('mobile-settings-home');
-  const apiEntry = page.getByTestId('mobile-settings-entry-api-management');
+  const settingsOverviewHeading = page.getByRole('heading', { name: /设置总览|Settings Overview/i });
+  const apiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace/i });
 
-  await assertVisible(settingsHome, 'Mobile settings home did not open.');
-  await assertVisible(apiEntry, 'Mobile settings API entry did not render.');
+  await assertVisible(settingsOverviewHeading, 'Mobile settings overview did not open by default.');
+  await assertVisible(apiEntry, 'Mobile settings overview API action did not render.');
 
   await page.screenshot({
-    path: path.join(ARTIFACT_DIR, 'settings-home.png'),
+    path: path.join(ARTIFACT_DIR, 'settings-overview.png'),
     fullPage: true,
   });
 
@@ -440,7 +444,7 @@ try {
       continuationVisible: true,
     },
     settingsWorkbench: {
-      settingsHomeVisible: true,
+      settingsOverviewVisible: true,
       overviewVisible: true,
       currentViewVisible: true,
       stageVisible: true,
@@ -451,7 +455,7 @@ try {
   }, null, 2));
 } catch (error) {
   if (isBrowserLaunchUnavailable(error)) {
-    await runFallbackVerification(error, browserPreflight);
+    await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
     throw error;
   }
@@ -460,6 +464,6 @@ try {
     await browser.close();
   }
   if (viteServer) {
-    await viteServer.close();
+    await closeLocalViteServer(viteServer);
   }
 }
