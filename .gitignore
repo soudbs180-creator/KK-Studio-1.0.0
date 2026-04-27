@@ -81,6 +81,8 @@ settings-panel-current.png
 
 # Local release artifacts
 release/
+!scripts/release/
+!scripts/release/**
 workspace/
 
 # Payment sidecar local files
