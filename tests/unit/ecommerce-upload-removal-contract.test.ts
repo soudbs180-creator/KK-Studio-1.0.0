@@ -11,6 +11,7 @@ function readSource(relativePath: string): string {
 
 test('ecommerce upload removal flows from App state down to the import panel actions', () => {
   const appSource = readSource('src/App.tsx');
+  const promptBarHookSource = readSource('src/app/useAppPromptBarProps.ts');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const importPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
@@ -18,9 +19,12 @@ test('ecommerce upload removal flows from App state down to the import panel act
   assert.match(appSource, /const handleClearEcommerceRequirementFile = useCallback\(\(\) => \{/);
   assert.match(appSource, /const handleRemoveEcommerceProductFile = useCallback\(\(index: number\) => \{/);
   assert.match(appSource, /const handleRemoveEcommerceExtraReferenceFile = useCallback\(\(index: number\) => \{/);
-  assert.match(appSource, /onClearEcommerceRequirementFile=\{handleClearEcommerceRequirementFile\}/);
-  assert.match(appSource, /onRemoveEcommerceProductFile=\{handleRemoveEcommerceProductFile\}/);
-  assert.match(appSource, /onRemoveEcommerceExtraReferenceFile=\{handleRemoveEcommerceExtraReferenceFile\}/);
+  assert.match(appSource, /onClearEcommerceRequirementFile: handleClearEcommerceRequirementFile,/);
+  assert.match(appSource, /onRemoveEcommerceProductFile: handleRemoveEcommerceProductFile,/);
+  assert.match(appSource, /onRemoveEcommerceExtraReferenceFile: handleRemoveEcommerceExtraReferenceFile,/);
+  assert.match(promptBarHookSource, /onClearEcommerceRequirementFile,/);
+  assert.match(promptBarHookSource, /onRemoveEcommerceProductFile,/);
+  assert.match(promptBarHookSource, /onRemoveEcommerceExtraReferenceFile,/);
 
   assert.match(promptBarSource, /onClearEcommerceRequirementFile\?: \(\) => void;/);
   assert.match(promptBarSource, /onRemoveEcommerceProductFile\?: \(index: number\) => void;/);

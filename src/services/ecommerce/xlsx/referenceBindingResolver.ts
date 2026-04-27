@@ -7,12 +7,13 @@ export function resolveReferenceBindings(params: {
   assets: OpenXmlWorkbookAsset[];
   designRequirements?: string;
   copyText?: string;
+  referenceNotes?: string;
 }): {
   mentions: EcommerceReferenceMention[];
   needsReview: boolean;
   reviewWarnings: string[];
 } {
-  const combined = `${params.designRequirements || ''} ${params.copyText || ''}`;
+  const combined = `${params.designRequirements || ''} ${params.copyText || ''} ${params.referenceNotes || ''}`;
   const mentions: EcommerceReferenceMention[] = [];
   const reviewWarnings: string[] = [];
   let explicitMentionCount = 0;

@@ -1182,7 +1182,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       当前安全状态
                     </div>
                     <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      启用后可用于敏感操作二次校验，也能为后续 Supabase MFA 强化做好准备。
+                      启用后可用于敏感操作二次校验，也能为后续自托管 MFA 强化做好准备。
                     </div>
                   </div>
 
@@ -1251,7 +1251,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </button>
 
                 <p className="mt-3 text-[11px] text-amber-200">
-                  完成验证后，Supabase 会提升当前会话到 `aal2`，并让其它旧会话重新登录。
+                  完成验证后，KK API 会提升当前会话到 `aal2`，并让其它旧会话重新登录。
                 </p>
 
                 {mfaEnrollment && (

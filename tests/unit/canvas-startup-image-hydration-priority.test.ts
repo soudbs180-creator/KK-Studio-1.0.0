@@ -12,8 +12,8 @@ function readSource(relativePath: string): string {
 test('Canvas startup begins preview hydration before local folder restore work', () => {
   const source = readSource('src/context/CanvasContext.tsx');
 
-  const hydrationIndex = source.indexOf('const startupImageHydrationPromise = hydrateStartupPreviewImages(startupState);');
-  const folderRestoreIndex = source.indexOf('const handle = await getLocalFolderHandle();');
+  const hydrationIndex = source.indexOf("const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState));");
+  const folderRestoreIndex = source.indexOf("const handle = await traceLocalPerformance('canvas-startup.restore-folder-handle', () => getLocalFolderHandle());");
 
   assert.notEqual(hydrationIndex, -1);
   assert.notEqual(folderRestoreIndex, -1);

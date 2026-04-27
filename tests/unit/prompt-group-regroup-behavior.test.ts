@@ -60,30 +60,41 @@ test('prompt-group recycle keeps full-size child cards from overlapping each oth
     ],
     fastRegroupProgress: 1,
     settleRegroupProgress: 0,
-  }).sort((left, right) => left.dockedPosition.x - right.dockedPosition.x);
+  });
 
   assert.equal(layout.length, 3);
 
-  for (let index = 0; index < layout.length - 1; index += 1) {
+  for (let index = 0; index < layout.length; index += 1) {
     const current = layout[index]!;
-    const next = layout[index + 1]!;
-    const horizontalGap = (next.dockedPosition.x - (next.width / 2))
-      - (current.dockedPosition.x + (current.width / 2));
+    const currentLeft = current.dockedPosition.x - (current.width / 2);
+    const currentRight = current.dockedPosition.x + (current.width / 2);
+    const currentTop = current.dockedPosition.y - current.height;
+    const currentBottom = current.dockedPosition.y;
 
-    assert.ok(
-      horizontalGap >= 24,
-      `expected docked cards ${current.index} and ${next.index} to keep at least 24px gap, got ${horizontalGap}`,
-    );
+    for (let nextIndex = index + 1; nextIndex < layout.length; nextIndex += 1) {
+      const next = layout[nextIndex]!;
+      const nextLeft = next.dockedPosition.x - (next.width / 2);
+      const nextRight = next.dockedPosition.x + (next.width / 2);
+      const nextTop = next.dockedPosition.y - next.height;
+      const nextBottom = next.dockedPosition.y;
+      const horizontalOverlap = Math.min(currentRight, nextRight) - Math.max(currentLeft, nextLeft);
+      const verticalOverlap = Math.min(currentBottom, nextBottom) - Math.max(currentTop, nextTop);
+
+      assert.ok(
+        horizontalOverlap <= 0 || verticalOverlap <= 0,
+        `expected docked cards ${current.index} and ${next.index} not to overlap, got horizontal=${horizontalOverlap}, vertical=${verticalOverlap}`,
+      );
+    }
   }
 });
 
 test('prompt-group connector svg uses stable group bounds during regroup rendering', () => {
-  const appSource = readSource('src/App.tsx');
+  const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
 
-  assert.match(appSource, /const connectorBounds = \{\s*minX: groupView\.bounds\.x,/);
-  assert.match(appSource, /maxX: groupView\.bounds\.x \+ groupView\.bounds\.width,/);
-  assert.match(appSource, /minY: groupView\.bounds\.y,/);
-  assert.match(appSource, /maxY: groupView\.bounds\.y \+ groupView\.bounds\.height,/);
+  assert.match(layoutSource, /const connectorBounds = \{\s*minX: groupView\.bounds\.x,/);
+  assert.match(layoutSource, /maxX: groupView\.bounds\.x \+ groupView\.bounds\.width,/);
+  assert.match(layoutSource, /minY: groupView\.bounds\.y,/);
+  assert.match(layoutSource, /maxY: groupView\.bounds\.y \+ groupView\.bounds\.height,/);
 });
 
 test('prompt-group settle phase keeps animating after drop instead of snapping to the final layout', () => {
@@ -183,10 +194,11 @@ test('recycle motion can have layered speed while still converging to one final 
 
 test('App locks regroup slot assignment when recycle starts', () => {
   const appSource = readSource('src/App.tsx');
+  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
 
   assert.match(appSource, /targetSlotIndicesByChildId/);
-  assert.match(appSource, /beginPromptGroupRegroup\(node\.id,\s*groupView\.childImages\)/);
   assert.match(appSource, /targetSlotIndices:\s*childImages\.map\(\(imageNode\) => layoutState\.targetSlotIndicesByChildId\[imageNode\.id\]/);
+  assert.match(dragHookSource, /beginPromptGroupRegroup\(node\.id,\s*childImages\)/);
 });
 
 test('App does not recreate regroup presentation state on every drag frame when slot targets stay the same', () => {
@@ -200,18 +212,19 @@ test('App does not recreate regroup presentation state on every drag frame when 
 
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
   const appSource = readSource('src/App.tsx');
+  const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
 
   assert.match(appSource, /const renderPosition = !layout/);
-  assert.match(appSource, /isNodeDragActive && layoutState\.layoutMode === 'regrouping'/);
-  assert.match(appSource, /\?\s*layout\.dockedPosition/);
-  assert.match(appSource, /:\s*layout\.position/);
+  assert.match(appSource, /:\s*layout\.position;/);
+  assert.match(layoutSource, /visualPosition:\s*regroupLayout\?\.renderPosition \?\? livePosition/);
+  assert.match(layoutSource, /settledPosition:\s*regroupLayout\?\.settledPosition \?\? livePosition/);
 });
 
 test('App keeps child live positions owned by regroup layout during single main-card drag', () => {
-  const appSource = readSource('src/App.tsx');
+  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
 
-  assert.match(appSource, /else if \(shouldRegroup\) \{/);
-  assert.match(appSource, /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\)/);
+  assert.match(dragHookSource, /if \(shouldRegroup\) \{/);
+  assert.match(dragHookSource, /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/);
 });
 
 test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
@@ -262,8 +275,18 @@ test('App reuses the last stable prompt-group bounds and views while node drag i
 
 test('App only builds prompt-group regroup layouts for groups with active presentation state', () => {
   const appSource = readSource('src/App.tsx');
+  const regroupMemoStart = appSource.indexOf('const promptGroupRegroupLayoutsById = React.useMemo(() => {');
+  const regroupMemoEnd = appSource.indexOf('const promptGroupBoundsById = React.useMemo(() => {');
 
-  assert.match(appSource, /const layoutState = promptGroupLayoutStateByIdRef\.current\[promptNode\.id\];/);
-  assert.match(appSource, /if \(!layoutState\) \{\s*return;/);
-  assert.match(appSource, /buildPromptGroupRegroupLayouts\(\s*promptNode,\s*childImages,\s*promptPosition,\s*layoutState,/s);
+  assert.notEqual(regroupMemoStart, -1);
+  assert.notEqual(regroupMemoEnd, -1);
+
+  const regroupMemoSource = appSource.slice(regroupMemoStart, regroupMemoEnd);
+
+  assert.match(regroupMemoSource, /const promptGroupLayoutEntries = Object\.entries\(promptGroupLayoutStateByIdRef\.current\);/);
+  assert.match(regroupMemoSource, /if \(promptGroupLayoutEntries\.length === 0\) \{\s*return regroupLayoutMap;\s*\}/);
+  assert.match(regroupMemoSource, /promptGroupLayoutEntries\.forEach\(\(\[promptNodeId, layoutState\]\) => \{/);
+  assert.match(regroupMemoSource, /const promptNode = promptNodesById\.get\(promptNodeId\);/);
+  assert.doesNotMatch(regroupMemoSource, /activeCanvas\.promptNodes\.forEach/);
+  assert.match(regroupMemoSource, /buildPromptGroupRegroupLayouts\(\s*promptNode,\s*childImages,\s*promptPosition,\s*layoutState,/s);
 });

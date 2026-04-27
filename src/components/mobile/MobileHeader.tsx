@@ -35,7 +35,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
     return (
-        <div className="w-full md:hidden">
+        <div className="w-full lg:hidden">
             <div className="ios-mobile-header-glass rounded-[30px] border border-white/10 bg-[rgba(15,18,28,0.88)] px-3 py-3 shadow-[0_22px_44px_rgba(2,6,23,0.28)] backdrop-blur-2xl">
                 <div className="flex items-center gap-2.5">
                     <button

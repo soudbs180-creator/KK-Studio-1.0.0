@@ -22,7 +22,9 @@ const ECOMMERCE_ALLOWED_MODELS = [
   'gemini-3-pro-image-preview',
 ] as const;
 
-type EcommerceAspectRatio = '1:1' | '3:4' | '4:3' | '16:9' | '21:9';
+type EcommerceAspectRatio = 'auto' | '1:1' | '3:4' | '4:3' | '16:9' | '21:9';
+
+const MAIN_IMAGE_ALLOWED_ASPECT_RATIOS: EcommerceAspectRatio[] = ['auto', '1:1', '3:4'];
 
 export interface EcommerceAspectPolicyInput {
   kind: 'main-image' | 'a-plus-module';
@@ -252,6 +254,10 @@ export function resolveEcommercePromptBarAspectContext(
       })
     : null;
 
+  const mainImageAllowedAspectRatios = activeSheetSetting?.aspectRatio && activeSheetSetting.aspectRatio !== AspectRatio.AUTO
+    ? [activeSheetSetting.aspectRatio]
+    : (mainImagePolicy.allowedAspectRatios as AspectRatio[]);
+
   const allowedAspectRatios = input.activeTask && input.ratioOverride?.length
     ? input.ratioOverride
     : activeSheet === 'A+'
@@ -259,11 +265,7 @@ export function resolveEcommercePromptBarAspectContext(
           (activeAPlusPolicy?.allowedAspectRatios as AspectRatio[] | undefined)
           || (activeSheetSetting?.aspectRatio ? [activeSheetSetting.aspectRatio] : [AspectRatio.LANDSCAPE_16_9])
         )
-      : (
-          activeSheetSetting?.aspectRatio
-            ? [activeSheetSetting.aspectRatio]
-            : (mainImagePolicy.allowedAspectRatios as AspectRatio[])
-        );
+      : mainImageAllowedAspectRatios;
 
   const defaultAspectRatio = activeSheet === 'A+'
     ? (
@@ -287,8 +289,8 @@ export function resolveEcommerceAspectPolicy(input: EcommerceAspectPolicyInput):
   if (input.kind === 'main-image') {
     return {
       sizePolicy: 'main-default',
-      allowedAspectRatios: ['1:1', '3:4'],
-      defaultAspectRatio: '1:1',
+      allowedAspectRatios: MAIN_IMAGE_ALLOWED_ASPECT_RATIOS,
+      defaultAspectRatio: 'auto',
     };
   }
 

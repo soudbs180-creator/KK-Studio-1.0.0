@@ -12,6 +12,7 @@ import { saveImage, getImage } from '../../services/storage/imageStorage'; // [N
 import { blobToDataURL } from '../../services/storage/blobUtils';
 import { fileSystemService } from '../../services/storage/fileSystemService'; // 🚀 参考图持久化
 import { notify } from '../../services/system/notificationService';
+import { traceLocalPerformance } from '../../services/system/localPerformanceTrace';
 import ImageOptionsPanel from '../image/ImageOptionsPanel';
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
@@ -99,11 +100,19 @@ const ReferenceThumbnail = React.memo(({
         }
 
         // Try to recover from IDB
+        const storageId = image.storageId;
+        if (!storageId) {
+            return;
+        }
+
         let active = true;
         setLoading(true);
         setError(false);
 
-        getImage(image.storageId)
+        traceLocalPerformance('prompt-bar.reference-thumbnail-hydrate', () => getImage(storageId), {
+            imageId: image.id,
+            storageId,
+        })
             .then(cached => {
                 if (active) {
                     if (cached) {
@@ -152,8 +161,16 @@ const ReferenceThumbnail = React.memo(({
 
     if (loading || !data) {
         return (
-            <div className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--bg-tertiary)] flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full border-2 border-white/85 border-t-transparent animate-spin" />
+            <div
+                className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center"
+                aria-label="reference-thumbnail-skeleton"
+            >
+                <div className="h-full w-full animate-pulse bg-[linear-gradient(135deg,rgba(255,255,255,0.10),rgba(255,255,255,0.04))] flex items-center justify-center">
+                    <div className="flex flex-col gap-1.5 opacity-70">
+                        <div className="h-1.5 w-6 rounded-full bg-white/20" />
+                        <div className="h-1.5 w-4 rounded-full bg-white/12" />
+                    </div>
+                </div>
             </div>
         );
     }
@@ -533,13 +550,27 @@ interface PromptBarProps {
          assetRole: EcommerceTaskAssetRoleBinding;
      }>>;
      ecommerceAnalysis?: EcommerceAnalysisResult | null;
-    ecommerceSelection?: Record<string, boolean>;
-    ecommerceTaskStates?: Record<string, EcommerceEditableTaskState | undefined>;
-    ecommerceGroupSlots?: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
-    ecommerceActiveTaskState?: EcommerceEditableTaskState | null;
-     ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
-     ecommerceAnalysisConfirmed?: boolean;
-     ecommerceConfirmingAnalysis?: boolean;
+     ecommerceSelection?: Record<string, boolean>;
+     ecommerceTaskStates?: Record<string, EcommerceEditableTaskState | undefined>;
+     ecommerceGroupSlots?: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
+     ecommerceActiveTaskState?: EcommerceEditableTaskState | null;
+     ecommerceActiveFrameworkId?: string | null;
+     ecommerceFrameworkSummary?: {
+         frameworkId: string;
+         activeSheet: EcommerceGroupSheet;
+         paused: boolean;
+         frameworkLabel: string;
+         queued: number;
+         dispatching: number;
+         running: number;
+         completed: number;
+         failed: number;
+         pausedItems: number;
+         total: number;
+     };
+      ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
+      ecommerceAnalysisConfirmed?: boolean;
+      ecommerceConfirmingAnalysis?: boolean;
      ecommerceActiveGroupSheet?: EcommerceGroupSheet | null;
      ecommerceAnalyzing?: boolean;
     onPickEcommerceRequirementFile?: (files: FileList | File[]) => void;
@@ -867,6 +898,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     ecommerceTaskStates = {},
     ecommerceGroupSlots = { '主图': [], 'A+': [] },
     ecommerceActiveTaskState = null,
+    ecommerceActiveFrameworkId = null,
+    ecommerceFrameworkSummary,
     ecommerceSheetSettings,
     ecommerceAnalysisConfirmed = false,
     ecommerceConfirmingAnalysis = false,
@@ -973,6 +1006,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [pptOutlineDraft, setPptOutlineDraft] = useState('');
     const [pptDragIndex, setPptDragIndex] = useState<number | null>(null);
     const [pptDropIndex, setPptDropIndex] = useState<number | null>(null);
+    const pptOutlineImportInputRef = useRef<HTMLInputElement | null>(null);
     const [isInputAreaHovered, setIsInputAreaHovered] = useState(false); // Phase 3: hover state
     const [uploadingCount, setUploadingCount] = useState(0); // [NEW] Uploading indicator count
     const pendingReferenceUploads = useMemo(() => {
@@ -1513,12 +1547,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const availableRatios = useMemo(() => {
         if (config.mode === GenerationMode.ECOMMERCE) {
-            const ratioWhitelist = ecommerceAspectContext.allowedAspectRatios;
-            const ratioWhitelistSet = new Set<string>(ratioWhitelist.map((ratio) => String(ratio)));
-            const supportedRatios = modelCaps?.supportedRatios && modelCaps.supportedRatios.length > 0
-                ? modelCaps.supportedRatios
-                : Object.values(AspectRatio);
-            return supportedRatios.filter((ratio) => ratioWhitelistSet.has(String(ratio)));
+            return ecommerceAspectContext.allowedAspectRatios;
         }
         const ratios = modelCaps?.supportedRatios;
         return ratios && ratios.length > 0 ? ratios : Object.values(AspectRatio);
@@ -1526,8 +1555,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const availableSizes = useMemo(() => {
         const sizes = modelCaps?.supportedSizes;
-        return sizes && sizes.length > 0 ? sizes : Object.values(ImageSize);
-    }, [modelCaps]);
+        const baseSizes = sizes && sizes.length > 0 ? sizes : Object.values(ImageSize);
+        if (config.mode === GenerationMode.ECOMMERCE && !baseSizes.includes(ImageSize.SIZE_4K)) {
+            return [...baseSizes, ImageSize.SIZE_4K];
+        }
+        return baseSizes;
+    }, [config.mode, modelCaps]);
 
     const groundingSupported = useMemo(() => {
         return modelSupportsGrounding(config.model);
@@ -1571,13 +1604,21 @@ const PromptBar: React.FC<PromptBarProps> = ({
     // Auto-adjust ratio/size if current selection not available
     useEffect(() => {
         if (!availableRatios.includes(config.aspectRatio) && availableRatios.length > 0) {
-            setConfig(prev => ({ ...prev, aspectRatio: availableRatios[0] }));
+            setConfig(prev => (
+                availableRatios.includes(prev.aspectRatio)
+                    ? prev
+                    : { ...prev, aspectRatio: availableRatios[0] }
+            ));
         }
     }, [availableRatios, config.aspectRatio, setConfig]);
 
     useEffect(() => {
         if (!availableSizes.includes(config.imageSize) && availableSizes.length > 0) {
-            setConfig(prev => ({ ...prev, imageSize: availableSizes[0] }));
+            setConfig(prev => (
+                availableSizes.includes(prev.imageSize)
+                    ? prev
+                    : { ...prev, imageSize: availableSizes[0] }
+            ));
         }
     }, [availableSizes, config.imageSize, setConfig]);
 
@@ -2142,6 +2183,57 @@ const PromptBar: React.FC<PromptBarProps> = ({
         URL.revokeObjectURL(url);
     }, [parsePptSlides, pptOutlineDraft, promptDraft]);
 
+    const importPptOutlinePayload = useCallback(async (file: File) => {
+        const raw = await file.text();
+        const trimmed = raw.trim();
+        let slides: string[] = [];
+
+        if (file.name.toLowerCase().endsWith('.json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                const pageEntries = Array.isArray(parsed?.pages) ? parsed.pages : [];
+                slides = pageEntries
+                    .map((entry: { text?: string; outline?: string; title?: string }) => String(entry?.text || entry?.outline || entry?.title || '').trim())
+                    .filter(Boolean)
+                    .slice(0, 20);
+            } catch {
+                slides = [];
+            }
+        }
+
+        if (slides.length === 0) {
+            slides = raw
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .map((line) => line.replace(/^#{1,6}\s*/, '').replace(/^[-*]\s*/, '').replace(/^\d+[.)、]\s*/, '').trim())
+                .filter(Boolean)
+                .slice(0, 20);
+        }
+
+        if (slides.length === 0) {
+            notify.warning('导入失败', '没有识别到可用的 PPT 页纲内容');
+            return;
+        }
+
+        setPptOutlineDraft(slides.join('\n'));
+        notify.success('已导入页纲', `已载入 ${slides.length} 页的 Markdown / JSON 页纲`);
+    }, []);
+
+    const handlePptOutlineImportFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) {
+            return;
+        }
+
+        await importPptOutlinePayload(file);
+    }, [importPptOutlinePayload]);
+
+    const openPptOutlineImport = useCallback(() => {
+        pptOutlineImportInputRef.current?.click();
+    }, []);
+
     const movePptSlide = useCallback((index: number, direction: -1 | 1) => {
         const slides = parsePptSlides(pptOutlineDraft);
         const target = index + direction;
@@ -2673,8 +2765,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
                         <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
                             <div className="flex items-center justify-between gap-2 mb-2">
-                                <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
+                                <div>
+                                    <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
+                                    <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">主题 → 大纲 → 页面描述 → 生成前检查</div>
+                                </div>
                                 <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
+                            </div>
+                            <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                                <div>Markdown / JSON 页纲导入</div>
+                                <div className="mt-1">页面描述列表会直接进入 deck 模块，生成前检查会同步页数、风格锁定和主题一致性。</div>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
                                 <button
@@ -2768,6 +2867,20 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </div>
                             )}
                             <div className="flex items-center gap-1 mt-2">
+                                <input
+                                    ref={pptOutlineImportInputRef}
+                                    type="file"
+                                    accept=".json,.md,.markdown,.txt"
+                                    className="hidden"
+                                    onChange={handlePptOutlineImportFile}
+                                />
+                                <button
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    onClick={openPptOutlineImport}
+                                >
+                                    导入 Markdown / JSON
+                                </button>
                                 <button
                                     className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
                                     style={{ color: 'var(--text-secondary)' }}
@@ -2794,7 +2907,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     style={{ color: '#38bdf8' }}
                                     onClick={applyPptOutlineDraft}
                                 >
-                                    应用页纲
+                                    生成前检查
                                 </button>
                             </div>
                         </div>
@@ -2818,6 +2931,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
             taskStates={ecommerceTaskStates}
             groupSlots={ecommerceGroupSlots}
             activeTaskState={ecommerceActiveTaskState}
+            activeFrameworkId={ecommerceActiveFrameworkId}
+            frameworkSummary={ecommerceFrameworkSummary}
             analysisConfirmed={ecommerceAnalysisConfirmed}
             confirmingAnalysis={ecommerceConfirmingAnalysis}
             activeGroupSheet={ecommerceActiveGroupSheet}
@@ -3256,8 +3371,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
                                     <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                        <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
+                                        <div>
+                                            <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
+                                            <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">主题 → 大纲 → 页面描述 → 生成前检查</div>
+                                        </div>
                                         <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
+                                    </div>
+                                    <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                                        <div>Markdown / JSON 页纲导入</div>
+                                        <div className="mt-1">页面描述列表会直接进入 deck 模块，生成前检查会同步页数、风格锁定和主题一致性。</div>
                                     </div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <button
@@ -3351,6 +3473,20 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </div>
                                     )}
                                     <div className="flex items-center gap-1 mt-2">
+                                        <input
+                                            ref={pptOutlineImportInputRef}
+                                            type="file"
+                                            accept=".json,.md,.markdown,.txt"
+                                            className="hidden"
+                                            onChange={handlePptOutlineImportFile}
+                                        />
+                                        <button
+                                            className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                            style={{ color: 'var(--text-secondary)' }}
+                                            onClick={openPptOutlineImport}
+                                        >
+                                            导入 Markdown / JSON
+                                        </button>
                                         <button
                                             className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
                                             style={{ color: 'var(--text-secondary)' }}
@@ -3377,7 +3513,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             style={{ color: '#38bdf8' }}
                                             onClick={applyPptOutlineDraft}
                                         >
-                                            应用页纲
+                                            生成前检查
                                         </button>
                                     </div>
                                     </div>
@@ -3616,6 +3752,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             taskStates={ecommerceTaskStates}
                             groupSlots={ecommerceGroupSlots}
                             activeTaskState={ecommerceActiveTaskState}
+                            activeFrameworkId={ecommerceActiveFrameworkId}
+                            frameworkSummary={ecommerceFrameworkSummary}
                             analysisConfirmed={ecommerceAnalysisConfirmed}
                             confirmingAnalysis={ecommerceConfirmingAnalysis}
                             activeGroupSheet={ecommerceActiveGroupSheet}

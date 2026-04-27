@@ -38,6 +38,6 @@ test('prompt bar ecommerce ratio guards follow the active task or sheet context 
   );
   assert.match(
     promptBarSource,
-    /const ratioWhitelist = ecommerceAspectContext\.allowedAspectRatios;/,
+    /return ecommerceAspectContext\.allowedAspectRatios;/,
   );
 });

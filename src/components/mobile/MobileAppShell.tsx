@@ -24,7 +24,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   return (
     <div
       data-testid="mobile-app-shell"
-      className="relative isolate grid min-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] md:hidden"
+      className="relative isolate grid min-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] lg:hidden"
       style={shellStyle}
     >
       <div

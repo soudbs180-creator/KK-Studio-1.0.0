@@ -9,6 +9,7 @@ import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobU
 import { calculateImageHash } from '../utils/imageUtils';
 import { getCardDimensions } from '../utils/styleUtils';
 import { notificationService, notify } from '../services/system/notificationService';
+import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import { logError, logInfo } from '../services/system/systemLogService';
 import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
 import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
@@ -35,6 +36,7 @@ import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
+import { migrateLegacyEcommerceFrameworkCanvas } from '../services/ecommerce/frameworkRuntime.ts';
 import {
     buildImageResultIdentity,
     buildTaskResultIdentity,
@@ -184,7 +186,9 @@ const DEFAULT_STATE: CanvasState = {
 };
 
 const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
-    syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph);
+    migrateLegacyEcommerceFrameworkCanvas(
+        syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph)
+    );
 
 type LocalMediaCacheEntry = {
     url?: string;
@@ -1118,23 +1122,24 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isShellReady) return;
 
         const init = async () => {
-            const restoredState = restoreCanvasStateFromLocalStorage(STORAGE_KEY);
-            const startupState = restoredState
-                ? normalizeRestoredCanvasState(restoredState as CanvasState)
-                : DEFAULT_STATE;
+            await traceLocalPerformance('canvas-startup.restore-total', async () => {
+                const restoredState = traceLocalPerformance('canvas-startup.restore-local-state', () => restoreCanvasStateFromLocalStorage(STORAGE_KEY));
+                const startupState = restoredState
+                    ? normalizeRestoredCanvasState(restoredState as CanvasState)
+                    : DEFAULT_STATE;
 
-            if (restoredState) {
-                startTransition(() => {
-                    setState(startupState);
-                });
-            }
+                if (restoredState) {
+                    startTransition(() => {
+                        setState(startupState);
+                    });
+                }
 
-            const startupImageHydrationPromise = hydrateStartupPreviewImages(startupState);
+                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState));
 
             try {
                 // 1. Restore Local Folder Handle (Fix for 0B issue)
                 try {
-                    const handle = await getLocalFolderHandle();
+                    const handle = await traceLocalPerformance('canvas-startup.restore-folder-handle', () => getLocalFolderHandle());
                     if (handle) {
                         // Verify permission before setting state (Cloud/Web requirement)
                         // @ts-ignore
@@ -1146,8 +1151,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             // This overrides localStorage state with the true file state
                             try {
                                 logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
-                                const projectLoadPromise = fileSystemService.loadProjectWithThumbs(handle);
-                                const referenceImageLoadPromise = fileSystemService.loadAllReferenceImages(handle);
+                                const projectLoadPromise = traceLocalPerformance('canvas-startup.disk-project-load', () => fileSystemService.loadProjectWithThumbs(handle));
+                                const referenceImageLoadPromise = traceLocalPerformance('canvas-startup.reference-image-load', () => fileSystemService.loadAllReferenceImages(handle));
                                 const [{ canvases, images, activeCanvasId: savedActiveCanvasId }, refUrls] = await Promise.all([
                                     projectLoadPromise,
                                     referenceImageLoadPromise,
@@ -1240,6 +1245,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
                 setIsLoading(false);
             }
+            });
         };
 
         init();
@@ -4200,7 +4206,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }));
 
         // 3. Notify
-        notify.success('已切换到临时模式', '项目数据已保留。');
+        if (stateRef.current.fileSystemHandle || stateRef.current.folderName) {
+            notify.success('已切换到临时模式', '项目数据已保留。');
+        }
 
     }, [state.canvases, state.activeCanvasId]);
 

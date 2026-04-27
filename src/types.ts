@@ -1,32 +1,34 @@
-﻿export enum AspectRatio {
-  AUTO = 'auto', // 自动匹配
-  SQUARE = '1:1',
-  PORTRAIT_1_8 = '1:8', // 🎯 New: Nano Banana 2 & Pro
-  PORTRAIT_1_4 = '1:4', // 🎯 New: Nano Banana 2 & Pro
-  PORTRAIT_3_4 = '3:4',
-  PORTRAIT_4_5 = '4:5', // Gemini 3 Pro支持
-  PORTRAIT_9_16 = '9:16',
-  PORTRAIT_9_21 = '9:21', // Flux Mobile
-  PORTRAIT_2_3 = '2:3',
-  LANDSCAPE_4_3 = '4:3',
-  LANDSCAPE_5_4 = '5:4', // Gemini 3 Pro支持
-  LANDSCAPE_16_9 = '16:9',
-  LANDSCAPE_21_9 = '21:9',
-  LANDSCAPE_4_1 = '4:1', // 🎯 New: Nano Banana 2 & Pro
-  LANDSCAPE_8_1 = '8:1', // 🎯 New: Nano Banana 2 & Pro
-  LANDSCAPE_3_2 = '3:2',
-  STANDARD_2_3 = '2:3', // Alias/Legacy
-  STANDARD_3_2 = '3:2', // Alias/Legacy
-}
+export const AspectRatio = {
+  AUTO: 'auto', // Auto match
+  SQUARE: '1:1',
+  PORTRAIT_1_8: '1:8', // New: Nano Banana 2 & Pro
+  PORTRAIT_1_4: '1:4', // New: Nano Banana 2 & Pro
+  PORTRAIT_3_4: '3:4',
+  PORTRAIT_4_5: '4:5', // Gemini 3 Pro
+  PORTRAIT_9_16: '9:16',
+  PORTRAIT_9_21: '9:21', // Flux Mobile
+  PORTRAIT_2_3: '2:3',
+  LANDSCAPE_4_3: '4:3',
+  LANDSCAPE_5_4: '5:4', // Gemini 3 Pro
+  LANDSCAPE_16_9: '16:9',
+  LANDSCAPE_21_9: '21:9',
+  LANDSCAPE_4_1: '4:1', // New: Nano Banana 2 & Pro
+  LANDSCAPE_8_1: '8:1', // New: Nano Banana 2 & Pro
+  LANDSCAPE_3_2: '3:2',
+  STANDARD_2_3: '2:3', // Alias/Legacy
+  STANDARD_3_2: '3:2', // Alias/Legacy
+} as const;
+export type AspectRatio = typeof AspectRatio[keyof typeof AspectRatio];
 
 
 
-export enum ImageSize {
-  SIZE_05K = '0.5K', // 512px - Gemini 3.1 Flash Image 支持
-  SIZE_1K = '1K',
-  SIZE_2K = '2K',
-  SIZE_4K = '4K',
-}
+export const ImageSize = {
+  SIZE_05K: '0.5K', // 512px - Gemini 3.1 Flash Image
+  SIZE_1K: '1K',
+  SIZE_2K: '2K',
+  SIZE_4K: '4K',
+} as const;
+export type ImageSize = typeof ImageSize[keyof typeof ImageSize];
 
 // Model IDs are now dynamic strings, but keeping this for legacy ref if needed
 // or just deprecated it completely.
@@ -38,6 +40,10 @@ export type AppSurface = 'workspace' | 'library' | 'chat' | 'settings' | 'profil
 export type WorkspacePanel = 'history' | 'chat' | null;
 
 export type MobilePrimaryTab = 'create' | 'library' | 'chat' | 'me';
+
+export type ResponsiveSurface = 'phone' | 'tablet' | 'desktop';
+
+export type ResultViewMode = 'standard' | 'detail';
 
 export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet';
 
@@ -55,7 +61,7 @@ export interface MobileEcommerceContinuation {
   promptNodeId: string | null;
   taskId?: string;
   sourceSheet: EcommerceGroupSheet;
-  kind: Exclude<EcommercePromptKind, 'a-plus-group'>;
+  kind: Exclude<EcommercePromptKind, 'a-plus-group' | 'framework'>;
   sourceRowKey: string;
   outputTypeLabel: string;
   displayLabel: string;
@@ -71,6 +77,25 @@ export interface MobileEcommerceContinuation {
   canConfirmDesktop: boolean;
   canGenerateMobile: boolean;
   canToggleSelection: boolean;
+  frameworkId?: string;
+  frameworkLabel?: string;
+  frameworkStatus?: {
+    activeSheet: EcommerceGroupSheet;
+    paused: boolean;
+    queued: number;
+    dispatching: number;
+    running: number;
+    completed: number;
+    failed: number;
+    pausedItems: number;
+    total: number;
+  };
+}
+
+export interface MobileResultLayout {
+  aspectRatio: number;
+  aspectCategory: 'portrait' | 'square' | 'landscape' | 'wide';
+  emphasis: 'compact' | 'standard' | 'wide';
 }
 
 export type EcommerceGroupSheet = '主图' | 'A+';
@@ -107,9 +132,7 @@ export interface MobileResultEntry {
   actions: MobileResultActions;
   primaryImageSource?: string | null;
   ecommerceContinuation?: MobileEcommerceContinuation;
-  mobileTileSpan: 2 | 3 | 6;
-  mobileTileEmphasis: 'compact' | 'standard' | 'hero';
-  mobileAspectCategory: 'portrait' | 'square' | 'landscape' | 'wide';
+  mobileLayout: MobileResultLayout;
   detailEntryId?: string;
   detailEntry?: {
     imageId: string;
@@ -147,31 +170,32 @@ export const KnownModel = {
   MIDJOURNEY: 'midjourney',
 }
 
-export enum GenerationMode {
-  IMAGE = 'image',
-  VIDEO = 'video',
-  ECOMMERCE = 'ecommerce',
-  AUDIO = 'audio',  // 🎯 Audio Generation Mode
-  PPT = 'ppt',      // 🎯 PPT Batch Image Mode
-  EDIT = 'edit',    // 🎯 General Edit Mode (Recraft style transfer, Ideogram text editing)
-  INPAINT = 'inpaint', // 🎯 Specific Mask-based Inpaint Mode
-  REDRAW = 'redraw', // 🎯 Crop-based partial redraw mode
-}
+export const GenerationMode = {
+  IMAGE: 'image',
+  VIDEO: 'video',
+  ECOMMERCE: 'ecommerce',
+  AUDIO: 'audio',  // Audio generation mode
+  PPT: 'ppt',      // PPT batch image mode
+  EDIT: 'edit',    // General edit mode
+  INPAINT: 'inpaint', // Mask-based inpaint mode
+  REDRAW: 'redraw', // Partial redraw mode
+} as const;
+export type GenerationMode = typeof GenerationMode[keyof typeof GenerationMode];
 
 // ============================================
 // 聊天模型类型
 // 参考: https://ai.google.dev/gemini-api/docs/pricing?hl=zh-cn
 // ============================================
-export enum ChatModelType {
-  // Gemini 2.5 系列 - 性价比较高
-  GEMINI_2_5_PRO = 'gemini-2.5-pro',
-  GEMINI_2_5_FLASH = 'gemini-2.5-flash',
-  GEMINI_2_5_FLASH_LITE = 'gemini-2.5-flash-lite',
-
-  // Gemini 3 系列 - 智能能力更强
-  GEMINI_3_PRO = 'gemini-3-pro-preview',
-  GEMINI_3_FLASH = 'gemini-3-flash-preview',
-}
+export const ChatModelType = {
+  // Gemini 2.5 series
+  GEMINI_2_5_PRO: 'gemini-2.5-pro',
+  GEMINI_2_5_FLASH: 'gemini-2.5-flash',
+  GEMINI_2_5_FLASH_LITE: 'gemini-2.5-flash-lite',
+  // Gemini 3 series
+  GEMINI_3_PRO: 'gemini-3-pro-preview',
+  GEMINI_3_FLASH: 'gemini-3-flash-preview',
+} as const;
+export type ChatModelType = typeof ChatModelType[keyof typeof ChatModelType];
 
 export interface ReferenceImage {
   id: string;
@@ -375,6 +399,76 @@ export interface PptEditablePage {
   layers: PptEditableLayer[];
 }
 
+export type PptDeckStage =
+  | 'outline'
+  | 'descriptions'
+  | 'generating'
+  | 'ready'
+  | 'failed'
+  | 'exported';
+
+export type PptDeckPageGenerationStatus =
+  | 'idle'
+  | 'queued'
+  | 'generating'
+  | 'ready'
+  | 'error';
+
+export interface PptDeckPageModule {
+  pageIndex: number;
+  pageNumber: number;
+  title: string;
+  outlineText: string;
+  pageDescription: string;
+  imageId?: string;
+  editablePageId?: string;
+  thumbnailUrl?: string;
+  generationStatus: PptDeckPageGenerationStatus;
+  error?: string;
+  version: number;
+  updatedAt?: number;
+  exportStatus?: 'idle' | 'exported';
+}
+
+export interface PptDeckModuleState {
+  stage: PptDeckStage;
+  title: string;
+  pageCount: number;
+  styleLocked: boolean;
+  pages: PptDeckPageModule[];
+  lastThumbnailUrl?: string;
+  exportStatus: 'idle' | 'ready' | 'exported';
+  source: 'derived-legacy' | 'native';
+  updatedAt: number;
+}
+
+export type CapabilityRole =
+  | 'image_generation'
+  | 'ppt_generation'
+  | 'ecommerce_generation'
+  | 'assistant'
+  | 'prompt_optimizer'
+  | 'ocr_document';
+
+export interface CapabilityRouteAssignment {
+  role: CapabilityRole;
+  primaryRouteId?: string;
+  primaryModelId?: string;
+  fallbackRouteId?: string;
+  enabled: boolean;
+  updatedAt: number;
+}
+
+export interface OcrServiceSettings {
+  provider: 'nutrient';
+  enabled: boolean;
+  defaultLanguage: string;
+  apiKey?: string;
+  keySource: 'environment' | 'user' | 'missing';
+  healthState: 'configured' | 'missing_key' | 'unknown';
+  updatedAt: number;
+}
+
 export type TaskProviderType = 'generic' | 'midjourney';
 
 export interface PromptPendingSyncRequest {
@@ -410,13 +504,65 @@ export interface PromptGenerationMetadata {
   [key: string]: unknown;
 }
 
-export type EcommercePromptKind = 'main-image' | 'a-plus-group' | 'a-plus-module';
+export type EcommercePromptKind = 'framework' | 'main-image' | 'a-plus-group' | 'a-plus-module';
 
 export type EcommerceSizePolicy = 'main-default' | 'sheet-native' | 'desktop-then-mobile';
 
 export type EcommerceAPlusSizeTier = '1464x600' | '970x600' | '600x450' | 'unknown';
 
 export type EcommerceSlotDeliveryKind = 'default' | 'desktop' | 'mobile';
+
+export type EcommerceFrameworkQueueStatus = 'queued' | 'dispatching' | 'running' | 'completed' | 'failed' | 'paused';
+
+export type EcommerceFrameworkQueuePhase = 'sheet' | 'desktop' | 'mobile';
+
+export type EcommerceFrameworkQueueLaneType = 'local' | 'remote';
+
+export interface EcommerceFrameworkSchedulerConfig {
+  maxLocalConcurrency: number;
+  maxRemoteConcurrency: number;
+}
+
+export interface EcommerceFrameworkQueueItem {
+  queueId: string;
+  frameworkId: string;
+  nodeId: string;
+  phase: EcommerceFrameworkQueuePhase;
+  laneKey: string;
+  laneType: EcommerceFrameworkQueueLaneType;
+  sourceSheet: EcommerceGroupSheet;
+  status: EcommerceFrameworkQueueStatus;
+  enqueuedAt: number;
+  startedAt?: number;
+  finishedAt?: number;
+  error?: string;
+}
+
+export interface EcommerceFrameworkQueueCounts {
+  queued: number;
+  dispatching: number;
+  running: number;
+  completed: number;
+  failed: number;
+  paused: number;
+  total: number;
+}
+
+export interface EcommerceFrameworkRuntimeState {
+  frameworkId: string;
+  activeSheet: EcommerceGroupSheet;
+  paused: boolean;
+  config: EcommerceFrameworkSchedulerConfig;
+  queue: EcommerceFrameworkQueueItem[];
+  lastUpdatedAt: number;
+}
+
+export interface EcommerceFrameworkMeta {
+  activeSheet: EcommerceGroupSheet;
+  groupIds?: Partial<Record<EcommerceGroupSheet, string>>;
+  taskNodeIds?: string[];
+  schedulerConfig?: EcommerceFrameworkSchedulerConfig;
+}
 
 export type EcommercePromptStage =
   | 'analysis_pending'
@@ -570,7 +716,7 @@ export interface EcommerceSparseIntentPatch {
 export interface EcommerceEditableTaskState {
   taskId: string;
   templateId?: string;
-  sourceKind: Exclude<EcommercePromptKind, 'a-plus-group'>;
+  sourceKind: Exclude<EcommercePromptKind, 'a-plus-group' | 'framework'>;
   sourceSheet: EcommerceGroupSheet;
   sourceRowKey: string;
   theme: string;
@@ -601,6 +747,8 @@ export interface EcommercePromptState {
   sourceSheet: EcommerceGroupSheet;
   sourceRowKey: string;
   groupId?: string;
+  frameworkId?: string;
+  parentNodeId?: string;
   selectedForGeneration?: boolean;
   productImageRef?: EcommerceImageRef;
   referenceBindings?: EcommerceReferenceBinding[];
@@ -627,6 +775,12 @@ export interface EcommercePromptState {
   seriesTemplate?: EcommerceSeriesTemplate;
   editableTask?: EcommerceEditableTaskState;
   displayLabel?: string;
+  frameworkMeta?: {
+    activeSheet: EcommerceGroupSheet;
+    groupIds?: Partial<Record<EcommerceGroupSheet, string>>;
+    taskNodeIds?: string[];
+    schedulerConfig?: EcommerceFrameworkSchedulerConfig;
+  };
 }
 
 export interface PromptNode {
@@ -688,6 +842,7 @@ export interface PromptNode {
   height?: number; // Dynamic height for connection line anchoring
   tags?: string[]; // Search tags
   isDraft?: boolean; // Preview/Draft state
+  hiddenInCanvas?: boolean; // Keep runtime-owned helper nodes off the infinite canvas surface
   orphaned?: boolean; // 孤立主卡（由 pending 卡转换而来）
   userMoved?: boolean; // 🎯 [New] 是否被用户手动移动过（用于智能归位逻辑）
 
@@ -703,6 +858,7 @@ export interface PromptNode {
   audioLyrics?: string;     // custom lyrics for music generation
   pptSlides?: string[];
   pptEditablePages?: PptEditablePage[];
+  pptDeck?: PptDeckModuleState;
   pptStyleLocked?: boolean;
 
   // 🎯 Image Editing specific properties

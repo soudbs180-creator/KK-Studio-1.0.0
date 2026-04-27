@@ -185,19 +185,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
               pointerEvents: isDesktopPanelClosing ? 'none' : 'auto',
             }}
           >
-            <div
-              ref={optionsPanelRef}
-              className="rounded-[26px] border p-2 shadow-2xl"
-              style={{
-                background: 'color-mix(in srgb, var(--bg-overlay) 96%, transparent)',
-                borderColor: 'var(--border-medium)',
-                boxShadow: 'var(--shadow-xl), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent)',
-                backdropFilter: 'blur(22px) saturate(165%)',
-                WebkitBackdropFilter: 'blur(22px) saturate(165%)',
-              }}
-            >
-              {optionsPanelContent}
-            </div>
+            <div ref={optionsPanelRef}>{optionsPanelContent}</div>
           </div>
         ) : null}
       </div>

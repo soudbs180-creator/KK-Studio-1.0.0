@@ -6,6 +6,8 @@ import type {
   MobileResultEntry,
   MobileSurfaceScreen,
   PartialRedrawRequest,
+  ResponsiveSurface,
+  ResultViewMode,
 } from '../../types';
 import MobileAppShell from './MobileAppShell';
 import MobileHeader from './MobileHeader';
@@ -14,6 +16,7 @@ import MobileResultFeed from './MobileResultFeed';
 
 export interface MobileWorkspaceSurfaceProps {
   activeScreen: MobileSurfaceScreen;
+  surface: ResponsiveSurface;
   onScreenChange: (screen: MobileSurfaceScreen) => void;
   onOpenSettings: () => void;
   title?: string;
@@ -52,6 +55,7 @@ const moreSheetActionClass =
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
+  surface,
   onScreenChange,
   onOpenSettings: openSettings,
   title = 'KK Studio',
@@ -85,6 +89,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
   const [showProjectList, setShowProjectList] = useState(false);
+  const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
   const activeEntryIndex = useMemo(
     () => resultEntries.findIndex((entry) => entry.id === activeEntryId),
     [activeEntryId, resultEntries],
@@ -132,7 +137,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         resultEntries={resultEntries}
         activeEntryId={activeEntryId}
         activeSourceImage={activeSourceImage}
+        surface={surface}
+        viewMode={resultViewMode}
+        onViewModeChange={setResultViewMode}
         onEntryOpen={onEntryOpen}
+        onUseAsSource={onUseResultAsSource}
       />
     </div>
   );

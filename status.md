@@ -7,8 +7,8 @@ Last updated: 2026-04-27
 - Branch: `codex/kk-studio-recovery-convergence`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Milestone 3, settings UI and API configuration architecture.
-- Milestones 1 and 2 are complete.
+- Current milestone: Milestone 5, PPT deck container.
+- Milestones 1, 2, 3, and 4 are complete.
 
 ## Recovered Sources
 
@@ -75,23 +75,30 @@ Milestone 2:
 Milestone 3:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/settings-workbench-ui-refit.test.ts" "tests/unit/api-settings-capability-routing-contract.test.ts" "tests/unit/api-settings-provider-compact-ui-contract.test.ts" "tests/unit/api-settings-capability-layout-regression.test.ts" "tests/unit/ocr-service-settings-contract.test.ts" "tests/unit/prompt-optimizer-capability-route-contract.test.ts"`
+- Committed: `ba91977e feat: unify settings API capability workbench`
+
+Milestone 4:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/ecommerce-framework-contract.test.ts" "tests/unit/ecommerce-framework-runtime.test.ts" "tests/unit/ecommerce-framework-runtime-order.test.ts" "tests/unit/ecommerce-confirm-build-flow.test.ts" "tests/unit/ecommerce-composer-scroll-regression.test.ts" "tests/unit/ecommerce-xlsx-parser.test.ts" "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts"`
+- Passed after fixing remote provider lane fairness in `resolveEcommerceFrameworkDispatchPlan`.
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
 
 ## In Progress
 
-- Stage and commit Milestone 3 settings/API files.
-- Worker agents are checking M3-M6 narrow scopes in parallel.
+- Stage and commit Milestone 4 ecommerce framework/runtime files.
+- GPT-5.5 xhigh subagents are checking Milestone 4 root cause and Milestone 5/6 next-step boundaries in parallel.
 
 ## Known Risks And Blockers To Verify
 
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Existing dirty worktree already includes broad feature edits; future commits must use path-limited staging.
-- Current validation state is not yet known for this branch. Milestone 1 validation is pending.
+- The current branch is validating milestone-by-milestone; run the final gate after Milestone 6.
 
 ## Next Steps
 
-1. Commit Milestone 3.
-2. Commit Milestone 4 ecommerce framework/runtime files.
-3. Commit Milestone 5 PPT deck files.
-4. Commit Milestone 6 responsive/mobile files.
-5. Run final gate and merge the branch.
+1. Commit Milestone 4 ecommerce framework/runtime files.
+2. Validate and commit Milestone 5 PPT deck files.
+3. Validate and commit Milestone 6 responsive/mobile files.
+4. Run final gate and merge the branch.

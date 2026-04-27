@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import { isKkApiSelfHostedCoreReadyFromHealth } from '../../src/services/api/kkApiServerHealth.ts';
+
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
@@ -33,11 +35,14 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(startupSource, /keyManager\.setStartupStage\(nextStage\);/);
   assert.match(startupSource, /adminModelService\.setStartupStage\(nextStage\);/);
   assert.match(appSource, /const init = async \(\) => \{\s*advanceTo\('session_ready'\);[\s\S]*try \{/);
+  assert.match(appSource, /const startupAuthenticatedUserId = user && !isTempUser \? user\.id : null;/);
+  assert.match(appSource, /\}, \[advanceTo, authLoading, startupAuthenticatedUserId\]\);/);
+  assert.doesNotMatch(appSource, /\}, \[advanceTo, authLoading, isTempUser, user\]\);/);
   assert.match(appSource, /\} catch \(error\) \{\s*console\.error\('\[App\] Startup bootstrap failed:', error\);\s*\} finally \{/);
   assert.match(appSource, /finally \{\s*if \(!active\) return;[\s\S]*advanceTo\('workspace_ready'\);/);
-  assert.match(healthSource, /export function isKkApiCanonicalCloudReadyFromHealth\(/);
-  assert.match(startupSource, /isKkApiCanonicalCloudReadyFromHealth\(health\)/);
-  assert.match(startupSource, /KK API canonical billing\/model persistence is not fully configured\./);
+  assert.match(healthSource, /export function isKkApiSelfHostedCoreReadyFromHealth\(/);
+  assert.match(startupSource, /isKkApiSelfHostedCoreReadyFromHealth\(health\)/);
+  assert.match(startupSource, /KK API self-hosted core persistence is not fully configured\./);
   assert.doesNotMatch(
     startupSource,
     /return \(\) => \{\s*cancelled = true;\s*clearScheduledWork\(\);\s*applyServiceStage\('signed_out'\);\s*\};/,
@@ -48,7 +53,11 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(appSource, /import \{ AppStartupProvider, useAppStartup \} from '\.\/context\/AppStartupContext';/);
   assert.match(appSource, /import \{ AuthenticatedAppShell \} from '\.\/app\/AuthenticatedAppShell';/);
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
-  assert.match(appSource, /<AuthenticatedAppShell\s+showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}\s+onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}\s+AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}\s*\/>/);
+  assert.match(appSource, /<AuthenticatedAppShell/);
+  assert.match(appSource, /showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}/);
+  assert.match(appSource, /onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}/);
+  assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
+  assert.match(appSource, /AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}/);
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);
   assert.doesNotMatch(appSource, /import \{ AppStartupScreen \} from '\.\/components\/common\/AppStartupScreen';/);
@@ -59,6 +68,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(authenticatedShellSource, /const CostEstimation = lazy\(\(\) => import\('\.\.\/pages\/CostEstimation'\)\);/);
   assert.match(authenticatedShellSource, /export interface AuthenticatedAppShellProps \{/);
   assert.match(authenticatedShellSource, /AppContentComponent: React\.ComponentType;/);
+  assert.match(authenticatedShellSource, /showStartupBanner\?: boolean;/);
   assert.match(authenticatedShellSource, /function getStartupStageMessage\(stage: string, isWorkspaceReady: boolean, healthState: 'idle' \| 'checking' \| 'ready'\)/);
   assert.match(
     authenticatedShellSource,
@@ -77,15 +87,44 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(authenticatedShellSource, /const message = hostedWarning \|\| lastStartupWarning \|\| stageMessage;/);
   assert.match(
     authenticatedShellSource,
-    /export const AuthenticatedAppShell: React\.FC<AuthenticatedAppShellProps> = \(\{[\s\S]*showCostEstimation,[\s\S]*onExitCostEstimation,[\s\S]*AppContentComponent,[\s\S]*\}\) =>/,
+    /export const AuthenticatedAppShell: React\.FC<AuthenticatedAppShellProps> = \(\{[\s\S]*showCostEstimation,[\s\S]*onExitCostEstimation,[\s\S]*AppContentComponent,[\s\S]*showStartupBanner = true,[\s\S]*\}\) =>/,
   );
+  assert.match(authenticatedShellSource, /if \(loading\) \{\s*return <AppStartupScreen stage="session_ready" warning=\{sessionRecoveryWarning\} \/>\s*;\s*\}/);
   assert.match(authenticatedShellSource, /<CostEstimation onBack=\{onExitCostEstimation\} \/>/);
-  assert.match(authenticatedShellSource, /<StartupRuntimeBanner \/>/);
+  assert.doesNotMatch(authenticatedShellSource, /showWorkspaceStartupSkeleton/);
+  assert.match(authenticatedShellSource, /const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;/);
+  assert.match(authenticatedShellSource, /showStartupRuntimeBanner \? <StartupRuntimeBanner \/> : null/);
   assert.match(authenticatedShellSource, /<NotificationToast \/>/);
   assert.match(authenticatedShellSource, /<AppContentComponent \/>/);
-  assert.doesNotMatch(authenticatedShellSource, /AppStartupScreen/);
+  assert.doesNotMatch(authenticatedShellSource, /WorkspaceStartupSkeleton/);
   assert.doesNotMatch(startupSource, /session\?\.access_token/);
   assert.match(appSource, /advanceTo\('background_ready'\);/);
 
   assert.match(appSource, /<AppStartupProvider>\s*<BillingProvider>\s*<CanvasProvider>/);
+});
+
+test('self-hosted core readiness ignores missing phase-2 billing persistence', () => {
+  assert.equal(isKkApiSelfHostedCoreReadyFromHealth({
+    reachable: true,
+    verified: true,
+    status: 'degraded',
+    selfHostedCoreReady: true,
+    repositories: {
+      adminConsole: 'postgres',
+      authData: 'postgres',
+      creditAccounts: 'memory',
+      creditProviders: 'memory',
+      workspaceLayout: 'postgres',
+    },
+    persistence: {
+      userApiKeys: true,
+      keyManager: true,
+      authData: true,
+      authSessions: true,
+      tempUsers: true,
+      credits: false,
+      creditProviders: false,
+      workspaceLayout: true,
+    },
+  } as any), true);
 });

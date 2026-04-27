@@ -11,11 +11,13 @@ function readSource(relativePath: string) {
 
 test("prompt-group drag keeps child cards on their live positions", () => {
   const appSource = readSource("src/App.tsx");
+  const renderLayoutSource = readSource("src/app/promptGroupRenderLayout.ts");
 
   assert.match(appSource, /const promptGroupRegroupLayoutsById = React\.useMemo/);
   assert.match(appSource, /regroupLayoutMap\.set\(/);
-  assert.match(appSource, /const regroupLayoutsById = promptGroupRegroupLayoutsById\.get\(node\.id\) \?\? new Map\(\)/);
-  assert.match(appSource, /visualPosition: regroupLayout\?\.renderPosition \?\? livePosition/);
+  assert.match(appSource, /regroupLayoutsById: promptGroupRegroupLayoutsById\.get\(node\.id\) \?\? new Map\(\)/);
+  assert.match(renderLayoutSource, /const regroupLayout = regroupLayoutsById\.get\(childNode\.id\);/);
+  assert.match(renderLayoutSource, /visualPosition: regroupLayout\?\.renderPosition \?\? livePosition/);
   assert.doesNotMatch(appSource, /collapseTargetPosition/);
   assert.doesNotMatch(appSource, /collapseThreshold/);
   assert.doesNotMatch(appSource, /promptDragDistance/);
@@ -47,9 +49,9 @@ test("main-card regroup is not blocked by previously moved child cards", () => {
 });
 
 test("child-card drag clears regroup presentation state so connectors follow live positions", () => {
-  const appSource = readSource("src/App.tsx");
+  const dragHandlerSource = readSource("src/app/usePromptGroupDragHandlers.ts");
 
-  assert.ok((appSource.match(/clearPromptGroupRegroup\(node\.id\);/g)?.length ?? 0) >= 4);
+  assert.ok((dragHandlerSource.match(/clearPromptGroupRegroup\((node\.id|groupId)\);/g)?.length ?? 0) >= 4);
 });
 
 test("viewport position resolver is declared after the live node ref is initialized", () => {

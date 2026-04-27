@@ -39,7 +39,16 @@ type DrawingAnchorBinding = {
 };
 
 function decodeXml(value: string): string {
-  return value.replace(/&(amp|lt|gt|quot|apos);/g, (match) => XML_ENTITY_MAP[match] || match);
+  return value
+    .replace(/&#(x?[0-9a-fA-F]+);/g, (match, code) => {
+      const radix = String(code).toLowerCase().startsWith('x') ? 16 : 10;
+      const rawCodePoint = String(code).toLowerCase().startsWith('x')
+        ? String(code).slice(1)
+        : String(code);
+      const codePoint = Number.parseInt(rawCodePoint, radix);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    })
+    .replace(/&(amp|lt|gt|quot|apos);/g, (match) => XML_ENTITY_MAP[match] || match);
 }
 
 function stripXmlNamespaces(xml: string): string {
@@ -59,6 +68,17 @@ function extractTagText(xml: string, tagName: string): string[] {
 
 function removeXmlMarkup(xml: string): string {
   return decodeXml(xml.replace(/<[^>]+>/g, ''));
+}
+
+function parseXmlAttributes(attributeText: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  const attrRegex = /([\w:.-]+)="([^"]*)"/g;
+  let match = attrRegex.exec(attributeText);
+  while (match) {
+    attributes[match[1]] = decodeXml(match[2]);
+    match = attrRegex.exec(attributeText);
+  }
+  return attributes;
 }
 
 function inferMimeType(fileName: string): string {
@@ -175,13 +195,18 @@ function parseSharedStrings(xml: string): string[] {
 function parseWorkbookRelationships(relsXml: string): WorkbookRelationship[] {
   const cleanedRels = stripXmlNamespaces(relsXml);
   const relationships: WorkbookRelationship[] = [];
-  const relRegex = /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"(?:[^>]*Type="([^"]+)")?[^>]*\/?>/g;
+  const relRegex = /<Relationship\b([^>]*)\/?>/g;
   let relMatch = relRegex.exec(cleanedRels);
   while (relMatch) {
+    const attributes = parseXmlAttributes(relMatch[1]);
+    if (!attributes.Id || !attributes.Target) {
+      relMatch = relRegex.exec(cleanedRels);
+      continue;
+    }
     relationships.push({
-      id: relMatch[1],
-      target: relMatch[2],
-      type: relMatch[3],
+      id: attributes.Id,
+      target: attributes.Target,
+      type: attributes.Type,
     });
     relMatch = relRegex.exec(cleanedRels);
   }
@@ -193,12 +218,14 @@ function parseWorkbookSheetEntries(workbookXml: string, relationships: WorkbookR
   const relMap = new Map(relationships.map((item) => [item.id, item.target]));
 
   const sheets: Array<{ name: string; path: string }> = [];
-  const sheetRegex = /<sheet[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\/?>/g;
+  const sheetRegex = /<sheet\b([^>]*)\/?>/g;
   let match = sheetRegex.exec(cleanedWorkbook);
   while (match) {
-    const target = relMap.get(match[2]);
+    const attributes = parseXmlAttributes(match[1]);
+    const relationshipId = attributes['r:id'] || attributes.id;
+    const target = relationshipId ? relMap.get(relationshipId) : undefined;
     if (target) {
-      sheets.push({ name: decodeXml(match[1]), path: `xl/${target.replace(/^\/+/, '')}` });
+      sheets.push({ name: attributes.name || '', path: resolveZipPath('xl/workbook.xml', target) });
     }
     match = sheetRegex.exec(cleanedWorkbook);
   }

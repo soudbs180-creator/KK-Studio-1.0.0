@@ -10,14 +10,23 @@ function readSource(relativePath: string): string {
 }
 
 test('App passes reusable result actions into MobileWorkspaceSurface for preview, continue-create, redraw, download, and delete', () => {
-  const source = readSource('src/App.tsx');
+  const appSource = readSource('src/App.tsx');
+  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
 
-  assert.match(source, /const handleMobileUseImageAsSource = useCallback/);
-  assert.match(source, /const handlePartialRedrawRequest = useCallback/);
-  assert.match(source, /const handleOpenPreview = useCallback/);
-  assert.match(source, /<MobileWorkspaceSurface/);
-  assert.match(source, /onPreviewImage=\{handleOpenPreview\}/);
-  assert.match(source, /onUseResultAsSource=\{handleMobileUseImageAsSource\}/);
-  assert.match(source, /onPartialRedraw=\{handlePartialRedrawRequest\}/);
-  assert.match(source, /onDeleteImage=\{deleteImageNode\}/);
+  assert.match(appSource, /const handleMobileUseImageAsSource = useCallback/);
+  assert.match(appSource, /const handlePartialRedrawRequest = useCallback/);
+  assert.match(appSource, /const handleMobileResultPartialRedraw = useCallback/);
+  assert.match(appSource, /const handleOpenPreview = useCallback/);
+  assert.match(appSource, /<AppMobileWorkspace/);
+  assert.match(appSource, /surface=\{responsiveSurface\}/);
+  assert.match(appSource, /onPreviewImage=\{handleOpenPreview\}/);
+  assert.match(appSource, /onUseResultAsSource=\{handleMobileUseImageAsSource\}/);
+  assert.match(appSource, /onPartialRedraw=\{handleMobileResultPartialRedraw\}/);
+  assert.match(appSource, /onDeleteImage=\{deleteImageNode\}/);
+  assert.match(appMobileWorkspaceSource, /<MobileWorkspaceSurface/);
+  assert.match(appMobileWorkspaceSource, /surface=\{surface\}/);
+  assert.match(appMobileWorkspaceSource, /onPreviewImage=\{onPreviewImage\}/);
+  assert.match(appMobileWorkspaceSource, /onUseResultAsSource=\{onUseResultAsSource\}/);
+  assert.match(appMobileWorkspaceSource, /onPartialRedraw=\{onPartialRedraw\}/);
+  assert.match(appMobileWorkspaceSource, /onDeleteImage=\{onDeleteImage\}/);
 });

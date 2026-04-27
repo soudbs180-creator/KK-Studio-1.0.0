@@ -21,3 +21,15 @@ test('ecommerce confirm flow caches shared upload references and exposes confirm
   assert.match(promptBarSource, /confirmingAnalysis\?: boolean;/);
   assert.match(promptBarSource, /isConfirming=\{confirmingAnalysis\}/);
 });
+
+test('ecommerce confirm flow builds one visible framework card that contains the whole requirement summary', () => {
+  const appSource = readSource('src/App.tsx');
+
+  assert.match(appSource, /const buildEcommerceFrameworkNode = useCallback\(\(\s*analysis: EcommerceAnalysisResult,/);
+  assert.match(appSource, /const summary = \[/);
+  assert.match(appSource, /analysis\.mainImageItems\.map/);
+  assert.match(appSource, /analysis\.aPlusGroup\.modules\.map/);
+  assert.match(appSource, /prompt: summary/);
+  assert.match(appSource, /originalPrompt: summary/);
+  assert.match(appSource, /const frameworkNode = buildEcommerceFrameworkNode\(analysis,/);
+});

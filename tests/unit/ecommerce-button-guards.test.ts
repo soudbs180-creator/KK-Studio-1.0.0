@@ -18,14 +18,14 @@ test('ecommerce workbench only shows current-version preview when a slot has a c
 test('ecommerce batch generation warns instead of silently no-oping when no eligible cards remain', () => {
   const appSource = readSource('src/App.tsx');
 
-  assert.match(appSource, /if \(targetModules\.length === 0\) \{/);
-  assert.match(appSource, /notify\.warning\('无可生成卡片',/);
+  assert.match(appSource, /const queuedCount = enqueueEcommerceFrameworkNodes\(node\.id, targetNodes\);/);
+  assert.match(appSource, /if \(queuedCount === 0\) \{/);
+  assert.match(appSource, /notify\.warning\('No eligible cards', 'There are no ecommerce cards ready to enqueue\.'\);/);
 });
 
 test('ecommerce card selection button labels describe the next action instead of the current state', () => {
   const actionSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
 
-  assert.match(actionSource, /\{selected \? '取消确认' : '确认生成'\}/);
-  assert.doesNotMatch(actionSource, /已勾选生成/);
-  assert.doesNotMatch(actionSource, /跳过此卡/);
+  assert.match(actionSource, /\{selected \? 'Skip' : 'Include'\}/);
+  assert.doesNotMatch(actionSource, /\{selected \? 'Selected' : 'Skipped'\}/);
 });

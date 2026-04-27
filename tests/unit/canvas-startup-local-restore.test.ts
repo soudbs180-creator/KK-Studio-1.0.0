@@ -18,5 +18,5 @@ test("canvas startup restore runs after the initial state initializer", () => {
   assert.match(source, /const \[state, setState\] = useState<CanvasState>\(DEFAULT_STATE\);/);
   assert.doesNotMatch(source, /const \[state, setState\] = useState<CanvasState>\(\(\) => \{/);
   assert.match(source, /if \(!isShellReady\) return;/);
-  assert.match(source, /const restoredState = restoreCanvasStateFromLocalStorage\(STORAGE_KEY\);/);
+  assert.match(source, /const restoredState = traceLocalPerformance\('canvas-startup\.restore-local-state', \(\) => restoreCanvasStateFromLocalStorage\(STORAGE_KEY\)\);/);
 });

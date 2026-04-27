@@ -41,13 +41,25 @@ test("prompt-group browser verification script checks both regrouping and connec
 
 test("prompt-group browser verification script uses browser preflight and fallback verification when browser spawn is unavailable", () => {
   const source = readSource("scripts/test/verify-prompt-group-drag.mjs");
+  const viteHelperSource = readSource("scripts/test/ensure-local-vite-server.mjs");
 
   assert.match(source, /import \{ runBrowserPreflight \} from '\.\/browser-preflight\.mjs';/);
-  assert.match(source, /import \{ ensureLocalViteServer \} from '\.\/ensure-local-vite-server\.mjs';/);
+  assert.match(source, /import \{\s*closeLocalViteServer,\s*ensureLocalViteServer,\s*\} from '\.\/ensure-local-vite-server\.mjs';/);
   assert.match(source, /function isBrowserLaunchUnavailable\(error\)/);
   assert.match(source, /await runFallbackVerification\(error, browserPreflight\);/);
   assert.match(source, /mode: 'fallback'/);
   assert.match(source, /prompt-group-drag-fallback\.json/);
+  assert.match(source, /await closeLocalViteServer\(viteServer\);/);
+  assert.match(viteHelperSource, /export async function closeLocalViteServer\(server\)/);
+  assert.match(viteHelperSource, /server\.waitForRequestsIdle\(\)/);
+  assert.match(viteHelperSource, /setTimeout\(resolve, 5000\)/);
+});
+
+test("prompt-group browser verification script accepts hook-based drag wiring contracts", () => {
+  const source = readSource("scripts/test/verify-prompt-group-drag.mjs");
+
+  assert.match(source, /const dragHookSource = readSource\('src\/app\/usePromptGroupDragHandlers\.ts'\);/);
+  assert.match(source, /source:\s*dragHookSource,\s*pattern:\s*\/commitPromptGroupDrag[\s\S]*shouldAutoRegroupPromptGroup/);
 });
 
 test("browser preflight detects generic child-process spawn restrictions before probing Playwright browsers", () => {

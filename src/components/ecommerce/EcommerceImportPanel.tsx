@@ -29,13 +29,14 @@ interface EcommerceImportPanelProps {
 }
 
 const MAX_VISIBLE_PREVIEWS = 4;
+const EMPTY_FILES: File[] = [];
 
 function useFilePreviewUrls(files: File[]): string[] {
   const [urls, setUrls] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-      setUrls([]);
+    if (files.length === 0 || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+      setUrls((current) => (current.length === 0 ? current : []));
       return undefined;
     }
 
@@ -59,8 +60,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
   requirementFileName,
   productFileCount,
   extraReferenceCount,
-  productFiles = [],
-  extraReferenceFiles = [],
+  productFiles = EMPTY_FILES,
+  extraReferenceFiles = EMPTY_FILES,
   analyzedProductName,
   isAnalyzing,
   hasAnalysis,
@@ -76,8 +77,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
   const productInputRef = React.useRef<HTMLInputElement>(null);
   const extraReferenceInputRef = React.useRef<HTMLInputElement>(null);
 
-  const resolvedProductFiles = productFiles.slice(0, MAX_VISIBLE_PREVIEWS);
-  const resolvedExtraReferenceFiles = extraReferenceFiles.slice(0, MAX_VISIBLE_PREVIEWS);
+  const resolvedProductFiles = React.useMemo(() => productFiles.slice(0, MAX_VISIBLE_PREVIEWS), [productFiles]);
+  const resolvedExtraReferenceFiles = React.useMemo(() => extraReferenceFiles.slice(0, MAX_VISIBLE_PREVIEWS), [extraReferenceFiles]);
   const resolvedProductCount = Math.min(productFiles.length || productFileCount, MAX_VISIBLE_PREVIEWS);
   const resolvedExtraReferenceCount = Math.min(extraReferenceFiles.length || extraReferenceCount, MAX_VISIBLE_PREVIEWS);
   const hasRequirementFile = Boolean(requirementFileName);
