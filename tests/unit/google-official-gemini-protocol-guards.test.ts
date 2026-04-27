@@ -10,31 +10,24 @@ function readSource(relativePath: string): string {
 }
 
 test("Google Gemini video polling uses the current operation payload shape", () => {
-  const userProxySource = readSource("supabase/functions/user-route-proxy/index.ts");
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
+  const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
 
-  assert.match(userProxySource, /generateVideoResponse\?\.generatedSamples/);
-  assert.match(secureProxySource, /generateVideoResponse\?\.generatedSamples/);
-  assert.doesNotMatch(userProxySource, /fetchPredictOperationResult/);
-  assert.doesNotMatch(secureProxySource, /fetchPredictOperationResult/);
+  assert.match(localProxySource, /generateVideoResponse\?\.generatedSamples/);
+  assert.doesNotMatch(localProxySource, /fetchPredictOperationResult/);
 });
 
 test("Google Gemini audio generation uses speechConfig and inline audio parts", () => {
   const adapterSource = readSource("src/services/llm/GoogleAdapter.ts");
-  const userProxySource = readSource("supabase/functions/user-route-proxy/index.ts");
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
+  const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
 
   assert.match(adapterSource, /speechConfig:\s*\{\s*voiceConfig/);
-  assert.match(userProxySource, /speechConfig:\s*\{\s*voiceConfig/);
-  assert.match(secureProxySource, /speechConfig:\s*\{\s*voiceConfig/);
+  assert.match(localProxySource, /createAudioAdapter/);
 
   assert.match(adapterSource, /responseModalities:\s*\["AUDIO", "TEXT"\]/);
-  assert.match(userProxySource, /responseModalities:\s*\['AUDIO', 'TEXT'\]/);
-  assert.match(secureProxySource, /responseModalities:\s*\['AUDIO', 'TEXT'\]/);
+  assert.match(localProxySource, /generateAudio\(/);
 
   assert.doesNotMatch(adapterSource, /audioConfig:\s*\{\s*voiceConfig/);
-  assert.doesNotMatch(userProxySource, /audioConfig:\s*\{\s*voiceConfig/);
-  assert.doesNotMatch(secureProxySource, /audioConfig:\s*\{\s*voiceConfig/);
+  assert.doesNotMatch(localProxySource, /audioConfig:\s*\{\s*voiceConfig/);
 });
 
 test("Google TTS presets and routing heuristics include current official model ids", () => {

@@ -18,10 +18,15 @@ test('mobile workspace surface exposes the planned mobile screen contract', () =
   const source = readSource(MOBILE_SURFACE_PATH);
   const typesSource = readSource('src/types.ts');
   const headerSource = readSource('src/components/mobile/MobileHeader.tsx');
+  const appShellSource = readSource('src/components/mobile/MobileAppShell.tsx');
 
   assert.match(typesSource, /export type MobileSurfaceScreen = 'home' \| 'detail' \| 'more-sheet';/);
+  assert.match(typesSource, /export type ResponsiveSurface = 'phone' \| 'tablet' \| 'desktop';/);
+  assert.match(typesSource, /export type ResultViewMode = 'standard' \| 'detail';/);
   assert.match(typesSource, /export type MobileSettingsSection = 'dashboard' \| 'api-management' \| 'consumption-records' \| 'system-logs';/);
   assert.match(source, /interface MobileWorkspaceSurfaceProps\s*\{/);
+  assert.match(source, /surface:\s*ResponsiveSurface;/);
+  assert.match(source, /const \[resultViewMode, setResultViewMode\] = useState<ResultViewMode>\('standard'\);/);
   assert.match(source, /activeScreen:\s*MobileSurfaceScreen;/);
   assert.match(source, /onScreenChange:\s*\(screen: MobileSurfaceScreen\) => void;/);
   assert.match(source, /onOpenSettings:\s*\(\) => void;/);
@@ -30,6 +35,8 @@ test('mobile workspace surface exposes the planned mobile screen contract', () =
   assert.match(source, /data-testid="mobile-workspace-surface"/);
   assert.match(source, /<MobileAppShell/);
   assert.doesNotMatch(headerSource, /fixed top-0 left-0 right-0/);
+  assert.match(headerSource, /lg:hidden/);
+  assert.match(appShellSource, /lg:hidden/);
 });
 
 test('mobile workspace delegates scrolling to a single shell-owned feed scrollport', () => {

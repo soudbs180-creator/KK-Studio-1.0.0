@@ -49,6 +49,20 @@ async function withLocalOnlyEnv<T>(callback: () => Promise<T>): Promise<T> {
   }
 }
 
+async function withHostedRuntimeEnv<T>(callback: () => Promise<T>): Promise<T> {
+  const previousVercel = process.env.VERCEL;
+  process.env.VERCEL = "1";
+  try {
+    return await callback();
+  } finally {
+    if (typeof previousVercel === "undefined") {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = previousVercel;
+    }
+  }
+}
+
 function getBaseUrl(server: Awaited<ReturnType<typeof startApiServer>>): string {
   const address = server.address();
   assert.ok(address && typeof address !== "string");
@@ -97,6 +111,18 @@ test("startApiServer rejects cleanly when the port is already in use", async () 
     })),
     /EADDRINUSE|address already in use/,
   );
+});
+
+test("hosted runtime can still start in degraded test mode without Supabase canonical persistence", async () => {
+  await withHostedRuntimeEnv(async () => {
+    const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+      allowDegradedPersistence: true,
+      verifyTurnstileToken: async () => ({ success: true }),
+    }));
+    trackedServers.add(server);
+
+    assert.equal(server.listening, true);
+  });
 });
 
 test("profile auth-data routes stay guarded without KKAI_LOCAL_ONLY when canonical persistence is unavailable", async () => {
@@ -190,7 +216,9 @@ test("local-only mode keeps guest sessions, workspace layout, and active credit 
     const healthPayload = await healthResponse.json() as {
       success: boolean;
       data?: {
+        selfHostedCoreReady?: boolean;
         persistence?: {
+          authSessions?: boolean;
           tempUsers?: boolean;
           workspaceLayout?: boolean;
           creditProviders?: boolean;
@@ -199,6 +227,8 @@ test("local-only mode keeps guest sessions, workspace layout, and active credit 
       };
     };
     assert.equal(healthPayload.success, true);
+    assert.equal(healthPayload.data?.selfHostedCoreReady, true);
+    assert.equal(healthPayload.data?.persistence?.authSessions, true);
     assert.equal(healthPayload.data?.persistence?.tempUsers, true);
     assert.equal(healthPayload.data?.persistence?.workspaceLayout, true);
     assert.equal(healthPayload.data?.persistence?.creditProviders, true);
@@ -324,7 +354,7 @@ test("repeated degraded startup warnings are emitted once per unique startup con
     line.includes("Falling back to file-backed local auth data repository"),
   ).length;
   const wechatDisabledCount = warnings.filter((line) =>
-    line.includes("WeChat auth service is disabled because Supabase admin config is unavailable."),
+    line.includes("WeChat auth service is disabled because the PostgreSQL WeChat repository is unavailable."),
   ).length;
 
   assert.equal(fileBackedAuthFallbackCount, 1);

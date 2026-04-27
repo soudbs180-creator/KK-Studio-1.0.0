@@ -67,18 +67,17 @@ Use this table when deciding which runtime path is canonical versus transitional
 | `apps/payment-sidecar/` | `canonical` | Main payment runtime | Owns checkout, callback handling, and settlement write-back. |
 | `server/` | `bridge` | Transitional wrapper only | Keeps old local/server entrypoints alive by mounting migrated `apps/api` route modules. Do not add new primary logic here. |
 | `payment-server/` | `bridge` | Transitional wrapper only | Forwards legacy payment-server flows into `apps/payment-sidecar`. Hosted deployments must not treat it as a second primary payment writer. |
-| `api/auth-password-login.ts` | `local-only` | Disabled by default | Same-origin password proxy for local or explicit fallback scenarios only. Hosted browser auth should stay Supabase-first and must not rely on this path by default. |
 
 ### Hosted default
 
-- Hosted/Web must default to `apps/api` + Supabase Edge Functions + `apps/payment-sidecar`.
-- `server/`, `payment-server/`, and `api/auth-password-login.ts` are not canonical Hosted entrypoints.
+- Hosted/Web must default to `apps/api` + PostgreSQL-backed hosted session/auth + `apps/payment-sidecar`.
+- `server/` and `payment-server/` are not canonical Hosted entrypoints.
 - If a hosted environment re-enables one of these paths, treat it as an explicit migration override and document it in the release runbook before shipping.
 
 ## Web boundary
 
 - Web code must call backend behavior through typed contracts.
-- Web code must not directly access Supabase business tables or RPCs.
+- Web code must not directly access runtime business tables or database RPCs.
 - Web code must not import API or payment implementation files.
 
 ## Service boundary

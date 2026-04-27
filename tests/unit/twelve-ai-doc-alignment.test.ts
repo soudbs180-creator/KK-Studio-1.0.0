@@ -60,21 +60,14 @@ test("12AI model discovery falls back to documented presets instead of a remote 
 test("12AI Gemini-native chat and proxy layers keep snake_case request fields on 12AI gateways", () => {
   const geminiAdapterSource = readSource("src/services/llm/GeminiNativeAdapter.ts");
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
-  const userProxySource = readSource("supabase/functions/user-route-proxy/index.ts");
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
 
   assert.match(geminiAdapterSource, /const useSnakeCase = runtime\.strategyId === '12ai';/);
   assert.match(geminiAdapterSource, /payload\[useSnakeCase \? 'system_instruction' : 'systemInstruction'\]/);
   assert.match(geminiAdapterSource, /buildInlineImagePart\(media\.data, media\.mimeType, useSnakeCase\)/);
 
   assert.match(localProxySource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localProxySource, /payload\[useSnakeCase \? "system_instruction" : "systemInstruction"\]/);
   assert.match(localProxySource, /toInlineImagePartWithFormat\(ref, useSnakeCase\)/);
-
-  assert.match(userProxySource, /payload\[useSnakeCase \? 'system_instruction' : 'systemInstruction'\]/);
-  assert.match(userProxySource, /toInlineImagePart\(ref, useSnakeCase\)/);
-
-  assert.match(secureProxySource, /payload\[useSnakeCase \? 'system_instruction' : 'systemInstruction'\]/);
-  assert.match(secureProxySource, /toInlineImagePart\(ref, useSnakeCase\)/);
 });
 
 test("12AI diagnostics probe uses action endpoints and 12AI auth rules instead of a models listing endpoint", () => {
@@ -89,17 +82,12 @@ test("12AI diagnostics probe uses action endpoints and 12AI auth rules instead o
 });
 
 test("proxy chat layers can switch response-only models to /v1/responses", () => {
-  const userProxySource = readSource("supabase/functions/user-route-proxy/index.ts");
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
+  const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
 
-  assert.match(userProxySource, /const RESPONSE_ONLY_MODEL_PATTERNS = \[/);
-  assert.match(userProxySource, /const responsesAuth = buildOpenAICompatAuth\(`\$\{baseUrl\}\/v1\/responses`, route\);/);
-  assert.match(userProxySource, /shouldRetryWithResponsesApi\(status, message\)/);
-  assert.match(userProxySource, /extractTextFromResponsesPayload\(result\)/);
-
-  assert.match(secureProxySource, /const RESPONSE_ONLY_MODEL_PATTERNS = \[/);
-  assert.match(secureProxySource, /const responsesAuth = buildOpenAICompatAuth\(`\$\{baseUrl\}\/v1\/responses`, userRoute\);/);
-  assert.match(secureProxySource, /const responsesUrl = `\$\{baseUrl\}\/v1\/responses`;/);
-  assert.match(secureProxySource, /shouldRetryWithResponsesApi\(status, message\)/);
-  assert.match(secureProxySource, /extractTextFromResponsesPayload\(result\)/);
+  assert.match(localProxySource, /function localModelPrefersResponsesApi\(modelId\?: string\): boolean \{/);
+  assert.match(localProxySource, /const responsesRequestBody = buildLocalResponsesPayload\(\{/);
+  assert.match(localProxySource, /endpointPath: "chat\/completions" \| "responses"/);
+  assert.match(localProxySource, /await executeOpenAIRequest\("responses", responsesRequestBody\)/);
+  assert.match(localProxySource, /shouldRetryWithLocalResponsesApi\(error\.statusCode, error\.message\)/);
+  assert.match(localProxySource, /content: extractLocalOpenAITextPayload\(result\)/);
 });

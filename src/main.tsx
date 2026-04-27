@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 // import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css';
@@ -6,6 +6,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
 import { initializeThemeOnBoot } from './context/ThemeContext';
+import { isLoopbackHostname, isPrivateNetworkHostname } from './services/api/kkApiBaseUrl';
 import { disableVercelToolbar } from './utils/disableVercelToolbar';
 import {
   DEFAULT_LANGUAGE,
@@ -98,13 +99,17 @@ function normalizeError(error: unknown): FatalError {
 
 function getDeploymentHints(): string[] {
   const hints: string[] = [];
+  const hostname = typeof window !== 'undefined'
+    ? String(window.location.hostname || '').trim()
+    : '';
 
-  if (!import.meta.env.VITE_SUPABASE_URL) {
-    hints.push(pickStartupText('缺少 `VITE_SUPABASE_URL` 环境变量', 'Missing `VITE_SUPABASE_URL` environment variable'));
-  }
-
-  if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
-    hints.push(pickStartupText('缺少 `VITE_SUPABASE_ANON_KEY` 环境变量', 'Missing `VITE_SUPABASE_ANON_KEY` environment variable'));
+  if (
+    !import.meta.env.VITE_KK_API_BASE_URL
+    && hostname
+    && !isLoopbackHostname(hostname)
+    && !isPrivateNetworkHostname(hostname)
+  ) {
+    hints.push(pickStartupText('缺少 VITE_KK_API_BASE_URL 环境变量', 'Missing VITE_KK_API_BASE_URL environment variable'));
   }
 
   return hints;

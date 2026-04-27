@@ -124,6 +124,7 @@ test("runtime-truth docs distinguish live runtimes from target architecture", ()
   const rootGuide = readSource("PROJECT_ROOT_GUIDE.md");
   const projectStructure = readSource("docs/PROJECT_STRUCTURE.md");
   const handoff = readSource("docs/development/session-handoff.md");
+  const hostedReleaseRunbook = readSource("docs/development/hosted-release-runbook.md");
 
   assert.match(readme, /Current runtime truth/i);
   assert.match(readme, /`src\/` remains the live web runtime/i);
@@ -132,9 +133,12 @@ test("runtime-truth docs distinguish live runtimes from target architecture", ()
   assert.match(rootGuide, /`apps\/web\/`: target web runtime under migration/i);
   assert.match(projectStructure, /Current runtime truth/i);
   assert.match(projectStructure, /`payment-server\/` \| `bridge`/i);
+  assert.doesNotMatch(projectStructure, /`api\/auth-password-login\.ts` \| `local-only`/i);
   assert.match(handoff, /当前在线前端运行时：根目录 `src\/`/i);
   assert.match(handoff, /`src\/` remains the live frontend runtime/i);
   assert.match(handoff, /`apps\/payment-sidecar\/` is the canonical payment runtime/i);
+  assert.doesNotMatch(hostedReleaseRunbook, /api\/auth-password-login\.ts/i);
+  assert.doesNotMatch(hostedReleaseRunbook, /Supabase-first/i);
 });
 
 test("compatibility layer registry tracks the required migration files", () => {
@@ -151,9 +155,7 @@ test("compatibility layer registry tracks the required migration files", () => {
     "apps/api/src/modules/auth/presentation/mount-legacy-auth-routes.ts",
     "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts",
     "apps/api/src/modules/billing/infrastructure/legacy-billing-router-adapter.ts",
-    "payment-server/runtime_payment_bridge.js",
-    "payment-server/sidecar_compat_bridge.js",
-    "payment-server/settlement_bridge.js"
+    "payment-server/sidecar_compat_bridge.js"
   ];
 
   for (const requiredEntry of requiredEntries) {
@@ -165,6 +167,22 @@ test("compatibility layer registry tracks the required migration files", () => {
       assert.equal(existsSync(path.join(ROOT_DIR, regressionTest)), true, `${requiredEntry} references a missing regression test: ${regressionTest}`);
     }
   }
+
+  assert.equal(
+    registry.entries.some((entry) => entry.path === "payment-server/runtime_payment_bridge.js"),
+    false,
+    "payment-server/runtime_payment_bridge.js should be removed from the compatibility registry once the sidecar path is canonical",
+  );
+  assert.equal(
+    registry.entries.some((entry) => entry.path === "payment-server/settlement_bridge.js"),
+    false,
+    "payment-server/settlement_bridge.js should be removed from the compatibility registry once the sidecar path is canonical",
+  );
+  assert.equal(
+    registry.entries.some((entry) => entry.path === "api/auth-password-login.ts"),
+    false,
+    "api/auth-password-login.ts should be removed from the compatibility registry once the hosted password proxy is deleted",
+  );
 });
 
 test("migration allowlist registry tracks every approved architecture exception with ownership metadata", () => {
@@ -183,7 +201,7 @@ test("migration allowlist registry tracks every approved architecture exception 
       regressionTests: string[];
       removalCondition: string;
     }>;
-    frontendSupabaseAccess: Array<{
+    frontendDirectDataAccess: Array<{
       path: string;
       reason: string;
       regressionTests: string[];
@@ -232,9 +250,9 @@ test("migration allowlist registry tracks every approved architecture exception 
   }
 
   assert.deepEqual(
-    registry.frontendSupabaseAccess,
+    registry.frontendDirectDataAccess,
     [],
-    "frontend Supabase migration allowlist should be empty once browser data access is fully routed through typed APIs",
+    "frontend direct data access migration allowlist should be empty once browser data access is fully routed through typed APIs",
   );
 });
 
@@ -318,6 +336,10 @@ test("cross-package imports use public package index entrypoints instead of deep
 test("payment-server legacy shell delegates order creation through the sidecar compatibility bridge while billing fallback stays health-gated", () => {
   const paymentServerSource = readSource("payment-server/index.js");
   const paymentWebhookSource = readSource("payment-server/webhook.js");
+  const paymentServerPackageSource = readSource("payment-server/package.json");
+  const paymentServerEnvExampleSource = readSource("payment-server/.env.example");
+  const paymentSidecarReadmeSource = readSource("apps/payment-sidecar/README.md");
+  const viteConfigSource = readSource("vite.config.ts");
   const billingContextSource = readSource("src/context/BillingContext.tsx");
 
   assert.match(paymentServerSource, /require\('\.\/sidecar_compat_bridge'\)/);
@@ -325,9 +347,24 @@ test("payment-server legacy shell delegates order creation through the sidecar c
   assert.match(paymentServerSource, /handleLegacyRedirectThroughSidecar/);
   assert.doesNotMatch(paymentServerSource, /persistLegacyPaymentOrder/);
   assert.doesNotMatch(paymentServerSource, /persistLegacyOrderSnapshot/);
+  assert.doesNotMatch(paymentServerSource, /SUPABASE_URL/);
+  assert.doesNotMatch(paymentServerSource, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(paymentServerSource, /runtime_payment_bridge/);
+  assert.doesNotMatch(paymentServerSource, /settlement_bridge/);
   assert.match(paymentWebhookSource, /require\('\.\/sidecar_compat_bridge'\)/);
   assert.match(paymentWebhookSource, /handleLegacyPaymentCallbackThroughSidecar/);
   assert.doesNotMatch(paymentWebhookSource, /require\('\.\/runtime_payment_bridge'\)/);
+  assert.doesNotMatch(paymentWebhookSource, /SUPABASE_URL/);
+  assert.doesNotMatch(paymentWebhookSource, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(paymentServerPackageSource, /@supabase\/supabase-js/);
+  assert.doesNotMatch(paymentServerEnvExampleSource, /SUPABASE_URL/);
+  assert.doesNotMatch(paymentServerEnvExampleSource, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(paymentServerEnvExampleSource, /DATABASE_URL=/);
+  assert.doesNotMatch(paymentSidecarReadmeSource, /Supabase/i);
+  assert.match(paymentSidecarReadmeSource, /PostgreSQL/i);
+  assert.doesNotMatch(viteConfigSource, /function authPasswordProxyPlugin\(\): Plugin \{/);
+  assert.doesNotMatch(viteConfigSource, /requestPath !== '\/api\/auth-password-login'/);
+  assert.doesNotMatch(viteConfigSource, /await import\('\.\/api\/auth-password-login\.ts'\)/);
   assert.match(billingContextSource, /import \{ kkWebApiClient \} from '\.\.\/services\/api\/kkApiClient';/);
   assert.match(billingContextSource, /kkWebApiClient\.getCreditBalance\(\)/);
   assert.match(billingContextSource, /kkWebApiClient\.debitCredits\(\{/);

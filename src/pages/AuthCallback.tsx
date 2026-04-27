@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { setStoredKkApiAccessToken } from '@/services/api/authAccessToken';
 import { kkWebApiClient } from '@/services/api/kkApiClient';
 import { emitAuthSessionChange } from '@/services/auth/authSessionEvents';
+import { restoreHostedSessionFromServer } from '@/services/auth/kkApiSessionBootstrap.ts';
 import {
   resolveBindCallbackProvider,
   resolveBindFailureMessage,
@@ -112,6 +113,16 @@ export default function AuthCallback() {
           finishWithRedirect(
             'success',
             bindFlow ? resolveBindSuccessMessage(bindProvider) : '认证回调已完成，已切换到 KK API 本地运行时会话。',
+            1200,
+          );
+          return;
+        }
+
+        const restoredHostedSession = await restoreHostedSessionFromServer();
+        if (restoredHostedSession) {
+          finishWithRedirect(
+            'success',
+            bindFlow ? resolveBindSuccessMessage(bindProvider) : 'Authentication callback completed and the VPS session was restored.',
             1200,
           );
           return;

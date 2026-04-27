@@ -75,14 +75,8 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
   assert.match(authContextSource, /subscribeAuthSessionInvalidationRequest\(\(\) => \{/);
   assert.match(authContextSource, /tempUserService\.clearCachedTempUser\(\);/);
   assert.match(authContextSource, /setStoredKkApiAccessToken\(undefined\);/);
-  assert.match(
-    localProxySource,
-    /function isHostedSecureProxyTransportFailure\(error: unknown\): boolean \{[\s\S]*if \(error instanceof LocalUserRouteProxyError\) \{[\s\S]*return error\.statusCode === 401 \|\| error\.statusCode >= 500;[\s\S]*\}/,
-  );
-  assert.match(localProxySource, /retrying image generation directly against the user route/);
-  assert.match(localProxySource, /retrying chat generation directly against the user route/);
-  assert.match(localProxySource, /retrying video generation directly against the user route/);
-  assert.match(localProxySource, /retrying audio generation directly against the user route/);
+  assert.doesNotMatch(localProxySource, /function isHostedSecureProxyTransportFailure\(/);
+  assert.doesNotMatch(localProxySource, /retrying (image|chat|video|audio) generation directly against the user route/);
   assert.match(localProxySource, /private async invokeDirectChatRoute\(/);
   assert.match(localProxySource, /private async invokeDirectVideoRoute\(/);
   assert.match(localProxySource, /private async invokeDirectAudioRoute\(/);
@@ -90,8 +84,10 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
   assert.match(localProxySource, /const auth = buildGeminiAuth\(`\$\{baseUrl\}\/v1beta\/models\/\$\{modelId\}:generateContent`, routeConfig\);/);
 });
 
-test("hosted release workflow deploys the dedicated user-route proxy before the credit-model proxy", () => {
+test("hosted release workflow deploys the VPS API instead of Supabase edge proxies", () => {
   const source = readSource("scripts/release-hosted.mjs");
 
-  assert.match(source, /runStep\("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy"\);/);
+  assert.match(source, /runStep\("Deploy VPS API", vpsDeployCommand\);/);
+  assert.doesNotMatch(source, /supabase:functions:deploy/);
+  assert.doesNotMatch(source, /user-route-proxy/);
 });

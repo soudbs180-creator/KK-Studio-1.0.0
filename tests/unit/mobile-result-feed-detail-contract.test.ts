@@ -17,12 +17,18 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.doesNotMatch(feedSource, /PartialRedrawModal/);
   assert.doesNotMatch(feedSource, /activeDetailResult/);
   assert.match(feedSource, /onEntryOpen/);
+  assert.match(feedSource, /viewMode:\s*ResultViewMode;/);
+  assert.match(feedSource, /onViewModeChange:\s*\(viewMode: ResultViewMode\) => void;/);
+  assert.match(feedSource, /surface:\s*ResponsiveSurface;/);
+  assert.match(feedSource, /getAdaptiveResultColumnCount/);
   assert.match(feedSource, /import MobileResultTile from '\.\/MobileResultTile';/);
   assert.match(feedSource, /<MobileResultTile/);
   assert.match(tileSource, /interface MobileResultTileProps/);
   assert.match(tileSource, /onEntryOpen: \(entryId: string\) => void;/);
-  assert.match(tileSource, /mobileTileSpan/);
-  assert.match(tileSource, /mobileTileEmphasis/);
+  assert.match(tileSource, /onUseAsSource: \(imageId: string\) => void;/);
+  assert.match(tileSource, /viewMode:\s*ResultViewMode;/);
+  assert.match(tileSource, /mobileLayout/);
+  assert.doesNotMatch(tileSource, /mobileTileSpan/);
 
   assert.match(detailSource, /data-testid="mobile-result-detail-screen"/);
   assert.match(detailSource, /fullPrompt/);
@@ -32,6 +38,8 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(detailSource, /onPartialRedraw/);
   assert.match(detailSource, /onDownload/);
   assert.match(detailSource, /onDelete/);
+  assert.match(detailSource, /data-testid="mobile-result-secondary-actions"/);
+  assert.match(detailSource, /showSecondaryActions/);
   assert.match(detailSource, /onPrevious/);
   assert.match(detailSource, /onNext/);
 });

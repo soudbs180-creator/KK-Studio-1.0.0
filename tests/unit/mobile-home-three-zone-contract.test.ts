@@ -55,7 +55,7 @@ describe('mobile home three-zone contract', () => {
     assert.doesNotMatch(surfaceSource, /grid-cols-\[minmax\(0,1fr\)_56px\]/);
   });
 
-  test('mobile feed selector computes adaptive tile metadata from exact dimensions and aspect ratio', () => {
+  test('mobile feed selector computes ratio metadata instead of fixed mobile spans', () => {
     const prompt = createPromptNode({ id: 'prompt-home' });
     const entries = selectMobileFeedResults(
       [prompt],
@@ -83,12 +83,13 @@ describe('mobile home three-zone contract', () => {
     const square = entries.find((entry) => entry.id === 'square-compact');
     const portrait = entries.find((entry) => entry.id === 'portrait-standard');
 
-    assert.equal(wide?.mobileTileSpan, 6);
-    assert.equal(wide?.mobileTileEmphasis, 'hero');
-    assert.equal(square?.mobileTileSpan, 2);
-    assert.equal(square?.mobileTileEmphasis, 'compact');
-    assert.equal(portrait?.mobileTileSpan, 3);
-    assert.equal(portrait?.mobileTileEmphasis, 'standard');
+    assert.equal(wide?.mobileLayout.aspectCategory, 'wide');
+    assert.equal(wide?.mobileLayout.emphasis, 'wide');
+    assert.equal(wide?.mobileLayout.aspectRatio, 2);
+    assert.equal(square?.mobileLayout.aspectCategory, 'square');
+    assert.equal(square?.mobileLayout.emphasis, 'compact');
+    assert.equal(portrait?.mobileLayout.aspectCategory, 'portrait');
+    assert.equal(portrait?.mobileLayout.emphasis, 'standard');
   });
 
   test('embedded mobile composer exposes dedicated mode, input, and advanced-drawer sections', () => {
