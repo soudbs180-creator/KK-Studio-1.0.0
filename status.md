@@ -7,8 +7,8 @@ Last updated: 2026-04-27
 - Branch: `codex/kk-studio-recovery-convergence`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Milestone 5, PPT deck container.
-- Milestones 1, 2, 3, and 4 are complete.
+- Current milestone: Milestone 6, responsive and mobile result flow.
+- Milestones 1, 2, 3, 4, and 5 are complete.
 
 ## Recovered Sources
 
@@ -83,11 +83,18 @@ Milestone 4:
 - Passed after fixing remote provider lane fairness in `resolveEcommerceFrameworkDispatchPlan`.
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run check:encoding`
+- Committed: `17b4b573 feat: add ecommerce framework runtime`
+
+Milestone 5:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/ppt-deck-single-container-contract.test.ts"`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
 
 ## In Progress
 
-- Stage and commit Milestone 4 ecommerce framework/runtime files.
-- GPT-5.5 xhigh subagents are checking Milestone 4 root cause and Milestone 5/6 next-step boundaries in parallel.
+- Validate and commit Milestone 6 responsive/mobile result-flow files.
+- GPT-5.5 xhigh subagents are checking Milestone 5/6 next-step boundaries in parallel.
 
 ## Known Risks And Blockers To Verify
 
@@ -98,7 +105,5 @@ Milestone 4:
 
 ## Next Steps
 
-1. Commit Milestone 4 ecommerce framework/runtime files.
-2. Validate and commit Milestone 5 PPT deck files.
-3. Validate and commit Milestone 6 responsive/mobile files.
-4. Run final gate and merge the branch.
+1. Validate and commit Milestone 6 responsive/mobile files.
+2. Run final gate and merge the branch.
