@@ -6,6 +6,7 @@ import {
   Download,
   Eye,
   FileText,
+  MoreHorizontal,
   Sparkles,
   Trash2,
   Wand2,
@@ -179,7 +180,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   const previewLabel = entry.hasOriginal ? '原图' : '无原图';
   const ecommerceRequirementText = normalizeText(ecommerceContinuation?.taskPrompt, fullPrompt);
   const frameworkStatus = ecommerceContinuation?.frameworkStatus;
-  const showSecondaryActions = true;
+  const [showSecondaryActions, setShowSecondaryActions] = React.useState(false);
 
   return (
     <section
@@ -358,41 +359,8 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {ecommerceContinuation.canToggleSelection ? (
-                <ActionButton
-                  label={ecommerceContinuation.selectedForGeneration ? '取消确认生成' : '确认生成'}
-                  icon={<CheckCircle2 size={15} />}
-                  tone={ecommerceContinuation.selectedForGeneration ? 'default' : 'primary'}
-                  onClick={() =>
-                    onToggleEcommerceSelected(entry, !ecommerceContinuation.selectedForGeneration)
-                  }
-                />
-              ) : null}
-              {ecommerceContinuation.canEditTask ? (
-                <ActionButton
-                  label="编辑任务"
-                  icon={<FileText size={15} />}
-                  tone="primary"
-                  onClick={() => onEditEcommerceTask(entry)}
-                />
-              ) : null}
-              {ecommerceContinuation.kind === 'a-plus-module' ? (
-                <>
-                  <ActionButton
-                    label="确认桌面版"
-                    icon={<CheckCircle2 size={15} />}
-                    disabled={!ecommerceContinuation.canConfirmDesktop}
-                    onClick={() => onConfirmEcommerceDesktop(entry)}
-                  />
-                  <ActionButton
-                    label="生成手机版"
-                    icon={<Sparkles size={15} />}
-                    disabled={!ecommerceContinuation.canGenerateMobile}
-                    onClick={() => onGenerateEcommerceMobile(entry)}
-                  />
-                </>
-              ) : null}
+            <div className="mt-3 text-xs leading-5 text-[var(--text-tertiary)]">
+              编辑、确认生成和后续电商动作已收进底部更多菜单，避免详情首层按钮拥挤。
             </div>
           </div>
         ) : null}
@@ -433,7 +401,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
 
       <div className="sticky bottom-0 border-t border-[var(--border-light)] bg-[var(--bg-overlay)]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-xl">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] gap-2">
           <ActionButton
             label="继续创作"
             icon={<Sparkles size={15} />}
@@ -441,32 +409,77 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             onClick={() => onUseAsSource(entry.imageId)}
           />
           <ActionButton
-            label="局部重绘"
-            icon={<Wand2 size={15} />}
-            tone="primary"
-            onClick={() => onPartialRedraw(entry, noopPartialRedrawRequest(entry))}
-          />
-        </div>
-
-        <div data-testid="mobile-result-secondary-actions" className="mt-2 grid grid-cols-3 gap-2">
-          <ActionButton
             label={previewLabel}
             icon={<Eye size={15} />}
             disabled={!entry.hasOriginal}
             onClick={() => onPreviewOriginal(entry.imageId)}
           />
-          <ActionButton
-            label="下载"
-            icon={<Download size={15} />}
-            onClick={() => onDownload(entry)}
-          />
-          <ActionButton
-            label="删除"
-            icon={<Trash2 size={15} />}
-            tone="danger"
-            onClick={() => onDelete(entry.imageId)}
-          />
+          <button
+            type="button"
+            onClick={() => setShowSecondaryActions((next) => !next)}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-primary)] transition active:scale-[0.99]"
+            aria-label="更多操作"
+            aria-expanded={showSecondaryActions}
+          >
+            <MoreHorizontal size={18} />
+          </button>
         </div>
+
+        {showSecondaryActions ? (
+          <div data-testid="mobile-result-secondary-actions" className="mt-2 grid grid-cols-2 gap-2">
+            <ActionButton
+              label="局部重绘"
+              icon={<Wand2 size={15} />}
+              tone="primary"
+              onClick={() => onPartialRedraw(entry, noopPartialRedrawRequest(entry))}
+            />
+            <ActionButton
+              label="下载"
+              icon={<Download size={15} />}
+              onClick={() => onDownload(entry)}
+            />
+            {ecommerceContinuation?.canToggleSelection ? (
+              <ActionButton
+                label={ecommerceContinuation.selectedForGeneration ? '取消确认生成' : '确认生成'}
+                icon={<CheckCircle2 size={15} />}
+                tone={ecommerceContinuation.selectedForGeneration ? 'default' : 'primary'}
+                onClick={() =>
+                  onToggleEcommerceSelected(entry, !ecommerceContinuation.selectedForGeneration)
+                }
+              />
+            ) : null}
+            {ecommerceContinuation?.canEditTask ? (
+              <ActionButton
+                label="编辑任务"
+                icon={<FileText size={15} />}
+                tone="primary"
+                onClick={() => onEditEcommerceTask(entry)}
+              />
+            ) : null}
+            {ecommerceContinuation?.kind === 'a-plus-module' ? (
+              <>
+                <ActionButton
+                  label="确认桌面版"
+                  icon={<CheckCircle2 size={15} />}
+                  disabled={!ecommerceContinuation.canConfirmDesktop}
+                  onClick={() => onConfirmEcommerceDesktop(entry)}
+                />
+                <ActionButton
+                  label="生成手机版"
+                  icon={<Sparkles size={15} />}
+                  disabled={!ecommerceContinuation.canGenerateMobile}
+                  onClick={() => onGenerateEcommerceMobile(entry)}
+                />
+              </>
+            ) : null}
+            <ActionButton
+              label="删除"
+              icon={<Trash2 size={15} />}
+              tone="danger"
+              onClick={() => onDelete(entry.imageId)}
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );

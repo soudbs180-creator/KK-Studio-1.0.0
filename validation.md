@@ -121,9 +121,12 @@ Targeted tests:
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/responsive-surface.test.ts" `
+  "tests/unit/mobile-home-three-zone-contract.test.ts" `
   "tests/unit/mobile-result-feed-detail-contract.test.ts" `
   "tests/unit/mobile-result-feed-app-contract.test.ts" `
   "tests/unit/mobile-workspace-surface-contract.test.ts" `
+  "tests/unit/app-shell-surface-hook.test.ts" `
+  "tests/unit/billing-remaining-balance-contract.test.ts" `
   "tests/unit/mobile-feed-selectors.test.ts"
 ```
 

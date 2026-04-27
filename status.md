@@ -96,6 +96,14 @@ Risk classes observed:
 - Confirmed the live probe now reaches PostgreSQL with SSL but is still rejected by server-side `pg_hba.conf` access control for the current client source.
 - Attempted read-only SSH inspection of the VPS, but the existing local temporary SSH key files are unreadable by the current Windows ACLs.
 
+## Completed In 2026-04-28 Responsive Result Flow Follow-Up
+
+- Moved detail-screen low-frequency actions behind a secondary more menu so the first row stays focused on continue-create and original preview.
+- Moved ecommerce edit/confirm/follow-up actions out of the detail content stack and into the same secondary action area.
+- Switched the compact result feed from fixed grid rows to adaptive CSS columns driven by the shared responsive column utility.
+- Made the standard/detail mode switch available on phone-sized result feeds instead of hiding it below the `sm` breakpoint.
+- Updated the milestone validation matrix with the additional responsive, shell, and billing-header contract tests used for this follow-up.
+
 ## Validation Results
 
 Milestone 1:

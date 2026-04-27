@@ -61,8 +61,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             Tap any result to inspect the full prompt and actions.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-1 text-[11px] font-medium text-[var(--text-secondary)] sm:flex">
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-1 text-[11px] font-medium text-[var(--text-secondary)]">
             {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
               <button
                 key={mode}
@@ -72,7 +72,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'text-[var(--text-secondary)]'
                 }`}
               >
-                {mode === 'detail' ? 'Detail' : 'Standard'}
+                {mode === 'detail' ? '详细' : '标准'}
               </button>
             ))}
           </div>
@@ -95,8 +95,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       ) : (
         <div className="min-h-0 flex-1">
           <div
-            className="grid gap-3 pb-1 [grid-auto-flow:dense]"
-            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+            className="pb-1"
+            style={{ columnCount, columnGap: '0.75rem' }}
           >
             {resultEntries.map((entry) => (
               <MobileResultTile
