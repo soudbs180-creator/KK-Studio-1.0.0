@@ -219,6 +219,10 @@ Final gate:
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run check:encoding`
 - Live VPS probe: SSL is now enabled by app config, but PostgreSQL still rejects the client via `pg_hba.conf`; remote access-control repair remains blocked on usable VPS SSH access.
+- Added dry-run-first helper `scripts/vps/repair-postgres-client-access.sh` for inspecting and appending a narrow `hostssl` client rule after a VPS shell is available.
+- Red/green verified: `node --test --test-isolation=none tests/unit/vps-deploy-artifacts.test.ts`
+- Passed: `node --test --test-isolation=none tests/unit/vps-deploy-contract.test.ts tests/unit/vps-postgres-audit-contract.test.ts tests/unit/server-runtime-config.test.ts` (`17/17` tests)
+- Attempted a read-only SSH check through the existing local askpass helper without reading its contents; no usable VPS shell was established.
 
 2026-04-28 responsive result flow follow-up validation:
 
@@ -236,8 +240,8 @@ Final gate:
 
 ## In Progress
 
-- VPS PostgreSQL login probe repair is code-complete locally.
-- Remote PostgreSQL access-control repair remains blocked because the existing temporary SSH key files cannot be read under the current Windows ACLs.
+- VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper.
+- Remote PostgreSQL access-control repair remains blocked because the existing temporary SSH key files cannot be read under the current Windows ACLs and the askpass-based SSH attempt did not establish a shell.
 - Existing unrelated settings/API, admin/API, mobile, and CSS dirty files remain outside this auth/PostgreSQL scope.
 
 ## Known Risks And Blockers To Verify
@@ -253,11 +257,12 @@ Final gate:
   - `src/components/settings/apiWorkbenchSections.tsx`
   - `src/index.css`
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
-- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`.
+- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `13.208.210.0`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
 
-1. Repair VPS PostgreSQL access control on the server, or provide usable SSH access so the `pg_hba.conf` change and PostgreSQL reload can be applied.
-2. Rerun `node scripts/dev/run-api-dev.mjs --check` and `http://127.0.0.1:3001/healthz?probe=1` after the server-side rule is fixed.
-3. Keep unrelated dirty files out of the auth/PostgreSQL commit unless explicitly requested.
+1. Get a usable VPS shell, then run `KK_PG_CLIENT_CIDR="<client-cidr>" scripts/vps/repair-postgres-client-access.sh` as a dry-run.
+2. After reviewing the proposed `hostssl` rule and receiving action-time confirmation, run the same script with `KK_APPLY_PG_CLIENT_ACCESS=true`.
+3. Rerun `node scripts/dev/run-api-dev.mjs --check` and `http://127.0.0.1:3001/healthz?probe=1` after the server-side rule is fixed.
+4. Keep unrelated dirty files out of the auth/PostgreSQL commit unless explicitly requested.

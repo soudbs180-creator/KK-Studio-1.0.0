@@ -328,11 +328,54 @@ try {
   const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
   const { chromium } = await import(playwrightModuleUrl);
 
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, timeout: 15000 });
   const page = await browser.newPage({
     viewport: { width: 430, height: 932 },
     isMobile: true,
     hasTouch: true,
+  });
+
+  await page.addInitScript(() => {
+    const now = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000;
+    const createdAtIso = new Date(now).toISOString();
+    const tempUser = {
+      id: 'mobile-smoke-temp-user',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'mobile-smoke-temp-user@temp.local',
+      phone: '',
+      created_at: createdAtIso,
+      updated_at: createdAtIso,
+      confirmed_at: createdAtIso,
+      last_sign_in_at: createdAtIso,
+      app_metadata: {
+        isTempUser: true,
+        provider: 'temp',
+      },
+      user_metadata: {
+        avatar_url: 'preset-default-local',
+        full_name: 'Mobile Smoke Temp User',
+        isTempUser: true,
+      },
+    };
+
+    window.localStorage.setItem('theme', 'dark');
+    window.localStorage.setItem('kk_theme', 'dark');
+    window.localStorage.setItem('kk_language', 'en-US');
+    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+    window.localStorage.setItem('kk_tutorial_seen', 'true');
+    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+      user: tempUser,
+      createdAt: now,
+      expiresAt,
+      isTempUser: true,
+    }));
+    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+      user: tempUser,
+      isTempUser: true,
+      tempUserExpiry: expiresAt,
+    }));
   });
 
   await gotoWithRetry(page, targetUrl);
@@ -412,20 +455,35 @@ try {
 
   await apiEntry.click();
 
+  const addProviderEntry = page.getByTestId('api-official-provider-add');
+  const officialEditorBack = page.getByTestId('api-official-editor-back');
+  const advancedModeToggle = page.getByRole('button', { name: 'Advanced mode' });
+  const hideAdvancedModeToggle = page.getByRole('button', { name: 'Hide advanced mode' });
   const workbenchOverview = page.getByTestId('settings-workbench-overview');
   const workbenchCurrentView = page.getByTestId('settings-workbench-current-view');
   const workbenchStage = page.getByTestId('settings-workbench-stage');
   const workbenchPlatform = page.getByTestId('settings-workbench-platform');
 
-  await assertVisible(workbenchOverview, 'Settings workbench overview section did not render.');
-  await assertVisible(workbenchCurrentView, 'Settings workbench current-view section did not render.');
-  await assertVisible(workbenchStage, 'Settings workbench stage section did not render.');
-  await assertVisible(workbenchPlatform, 'Settings workbench platform section did not render.');
+  await assertVisible(addProviderEntry, 'Mobile API local add entry did not render.');
+  await addProviderEntry.click();
+  await assertVisible(officialEditorBack, 'Mobile local API editor did not open.');
+  await officialEditorBack.click();
+  await assertVisible(addProviderEntry, 'Mobile API local add entry did not return after closing the editor.');
 
-  await workbenchStage.getByRole('button', { name: /鏌ョ湅璇婃柇|Show diagnostics/i }).click();
+  await assertVisible(advancedModeToggle, 'Mobile API advanced mode toggle did not render.');
+  await advancedModeToggle.click();
+  await assertVisible(hideAdvancedModeToggle, 'Mobile API advanced mode did not expand.');
+  await assertVisible(workbenchOverview, 'Settings workbench overview section did not render.');
+  await assertVisible(workbenchStage, 'Settings workbench stage section did not render.');
+
+  const diagnosticsToggle = page.getByTestId('api-workbench-diagnostics-toggle');
+  await assertVisible(diagnosticsToggle, 'Mobile diagnostics toggle did not render.');
+  await diagnosticsToggle.click();
 
   const workbenchDiagnostics = page.getByTestId('settings-workbench-diagnostics');
   await assertVisible(workbenchDiagnostics, 'Settings workbench diagnostics section did not appear after toggling.');
+  await assertVisible(workbenchCurrentView, 'Settings workbench current-view section did not render.');
+  await assertVisible(workbenchPlatform, 'Settings workbench platform section did not render.');
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-workbench.png'),

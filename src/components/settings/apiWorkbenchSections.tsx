@@ -588,14 +588,14 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
             </div>
             <div className="settings-capability-card__toggle-wrap">
               <div className="settings-capability-card__toggle" style={SETTINGS_OVERLAY_STYLE}>
-              <SettingToggle
-                label={pick('启用', 'Enabled')}
-                checked={item.enabled}
-                onChange={item.onEnabledChange}
-                helper={item.role === 'prompt_optimizer'
-                  ? pick('默认关闭时走本地 skills 提示词体系，开启后才走 AI 优化能力。', 'Disabled keeps local skills-based prompt shaping. Enable it to use AI prompt optimization.')
-                  : undefined}
-              />
+                <SettingToggle
+                  label={pick('启用', 'Enabled')}
+                  checked={item.enabled}
+                  onChange={item.onEnabledChange}
+                  helper={item.role === 'prompt_optimizer'
+                    ? pick('默认关闭时走本地 skills 提示词体系，开启后才走 AI 优化能力。', 'Disabled keeps local skills-based prompt shaping. Enable it to use AI prompt optimization.')
+                    : undefined}
+                />
               </div>
             </div>
           </div>

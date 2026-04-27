@@ -14,6 +14,7 @@ test('provider list cards stay compact and keep only edit, refresh, and pause ac
   const cardSource = readSource('src/components/settings/apiWorkbenchCards.tsx');
 
   assert.match(source, /title=\{provider\.name\}/);
+  assert.match(source, /title=\{pick\('第三方供应商', 'Third-party providers'\)\}[\s\S]*className="settings-provider-grid settings-provider-grid--compact"/);
   assert.match(source, /density="compact"/);
   assert.match(cardSource, /settings-provider-card--compact/);
   assert.match(cardSource, /settings-provider-card__inline-actions/);

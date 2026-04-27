@@ -46,8 +46,13 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /mobile-result-detail-screen/);
   assert.match(scriptSource, /设置总览\|Settings Overview/);
   assert.match(scriptSource, /打开 API 工作台\|Open API Workspace/);
+  assert.match(scriptSource, /api-official-provider-add/);
+  assert.match(scriptSource, /api-official-editor-back/);
+  assert.match(scriptSource, /Advanced mode/);
+  assert.match(scriptSource, /Hide advanced mode/);
   assert.doesNotMatch(scriptSource, /mobile-settings-home/);
   assert.doesNotMatch(scriptSource, /mobile-settings-entry-api-management/);
+  assert.doesNotMatch(scriptSource, /鏌ョ湅璇婃柇/);
   assert.match(scriptSource, /settings-workbench-overview/);
   assert.match(scriptSource, /settings-workbench-diagnostics/);
   assert.match(scriptSource, /settings-workbench-platform/);
@@ -55,6 +60,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /assertHttpHtml/);
   assert.match(scriptSource, /browserPreflight/);
   assert.match(scriptSource, /runBrowserPreflight/);
+  assert.match(scriptSource, /temp_user_session_v1/);
+  assert.match(scriptSource, /mobile-smoke-temp-user/);
 
   assert.match(mobileHeaderSource, /data-testid="mobile-header-menu-button"/);
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-menu-settings"/);
@@ -83,16 +90,23 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(scriptSource, /desktop-user-menu-trigger/);
   assert.match(scriptSource, /desktop-user-menu-settings/);
   assert.match(scriptSource, /settings-page-root/);
+  assert.match(scriptSource, /api-official-provider-add/);
+  assert.match(scriptSource, /Advanced mode/);
+  assert.match(scriptSource, /Hide advanced mode/);
+  assert.match(scriptSource, /SETTINGS_API_PATH\}\/official\/new/);
   assert.match(scriptSource, /settings-workbench-stage/);
   assert.match(scriptSource, /settings-workbench-diagnostics/);
   assert.match(scriptSource, /api-workbench-diagnostics-toggle/);
-  assert.match(scriptSource, /api-workbench-primary-action/);
+  assert.match(scriptSource, /Hide more advanced items/);
+  assert.match(scriptSource, /name: 'Hide more advanced items', exact: true/);
   assert.match(scriptSource, /api-official-editor-back/);
   assert.match(scriptSource, /mode: 'fallback'/);
   assert.match(scriptSource, /assertHttpHtml/);
   assert.match(scriptSource, /browserPreflight/);
   assert.match(scriptSource, /runBrowserPreflight/);
   assert.match(scriptSource, /officialEditorBack/);
+  assert.match(scriptSource, /temp_user_session_v1/);
+  assert.match(scriptSource, /smoke-temp-user/);
   assert.match(scriptSource, /waitFor\(\{ state: 'hidden', timeout: 15000 \}\)/);
   assert.doesNotMatch(scriptSource, /waitForPathname\(page, '\/settings\/api-management\/official\/new'\)/);
   assert.doesNotMatch(scriptSource, /settings-shell-desktop/);

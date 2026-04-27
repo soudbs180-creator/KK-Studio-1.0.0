@@ -2344,6 +2344,12 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         notify.info(pick('请先登录', 'Sign in required'), userApiActionHelper || snapshotHydrationHelper);
     }
   };
+  const handleToggleDiagnostics = () => {
+    if (!showDiagnostics) {
+      setShowAdvancedDetails(true);
+    }
+    setShowDiagnostics((current) => !current);
+  };
 
   if (officialRouteMissing) {
     return (
@@ -2653,7 +2659,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           <ApiWorkbenchStageSection
             pick={pick}
             showDiagnostics={showDiagnostics}
-            onToggleDiagnostics={() => setShowDiagnostics((current) => !current)}
+            onToggleDiagnostics={handleToggleDiagnostics}
             stage={userApiWorkbenchStage}
             stageTone={stageTone}
             stageTitle={stageTitle}
@@ -2901,7 +2907,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
             />
           ) : (
-            <div className="settings-provider-grid">
+            <div className="settings-provider-grid settings-provider-grid--compact">
               {thirdPartyProviders.map((provider) => {
                 const status = getProviderStatus(provider);
                 const prioritizedMetrics: ConsoleEndpointCardMetric[] = [];

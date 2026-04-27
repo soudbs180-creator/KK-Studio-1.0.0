@@ -190,6 +190,90 @@ npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 ```
 
+## VPS PostgreSQL Login Probe And Client Access Repair
+
+Run these when touching VPS PostgreSQL connection behavior, deployment scripts, or the login persistence probe:
+
+```powershell
+node --test --test-isolation=none "tests/unit/vps-deploy-artifacts.test.ts"
+node --test --test-isolation=none `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/vps-postgres-audit-contract.test.ts" `
+  "tests/unit/server-runtime-config.test.ts"
+node scripts/dev/run-api-dev.mjs --check
+npm.cmd run check:encoding
+```
+
+After a VPS shell is available and the remote access-control change is confirmed, dry-run first:
+
+```bash
+KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" scripts/vps/repair-postgres-client-access.sh
+```
+
+Apply only after reviewing the proposed `hostssl` rule:
+
+```bash
+KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" KK_APPLY_PG_CLIENT_ACCESS=true scripts/vps/repair-postgres-client-access.sh
+```
+
+## Settings Smoke And Admin Recharge Follow-Up
+
+Run these when touching settings direct routes, API simple/advanced mode, settings browser smoke scripts, or the admin recharge review surface:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/admin-credit-lookup-contract.test.ts" `
+  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
+  "tests/unit/mobile-settings-browser-verify-script.test.ts"
+npm.cmd run verify:mobile-settings-smoke
+npm.cmd run verify:desktop-settings-smoke
+npm.cmd run typecheck
+npm.cmd run admin:build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
+
+For local API settings add-entry changes without admin recharge changes, use this narrower gate:
+
+```powershell
+node "tests/unit/api-settings-local-preset-entry.test.ts"
+node "tests/unit/api-settings-workbench-structure.test.ts"
+node "tests/unit/api-settings-capability-layout-regression.test.ts"
+node "tests/unit/api-settings-stage-semantics.test.ts"
+node "tests/unit/api-settings-simple-mode-contract.test.ts"
+node "tests/unit/mobile-settings-browser-verify-script.test.ts"
+npm.cmd run typecheck
+npm.cmd run verify:mobile-settings-smoke
+npm.cmd run verify:desktop-settings-smoke
+npm.cmd run check:encoding
+```
+
+## VPS PostgreSQL Login Probe And Client Access Repair
+
+Run these when touching VPS PostgreSQL connection behavior, deployment scripts, or the login persistence probe:
+
+```powershell
+node --test --test-isolation=none "tests/unit/vps-deploy-artifacts.test.ts"
+node --test --test-isolation=none `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/vps-postgres-audit-contract.test.ts" `
+  "tests/unit/server-runtime-config.test.ts"
+node scripts/dev/run-api-dev.mjs --check
+npm.cmd run check:encoding
+```
+
+After a VPS shell is available and the remote access-control change is confirmed, dry-run first:
+
+```bash
+KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" scripts/vps/repair-postgres-client-access.sh
+```
+
+Apply only after reviewing the proposed `hostssl` rule:
+
+```bash
+KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" KK_APPLY_PG_CLIENT_ACCESS=true scripts/vps/repair-postgres-client-access.sh
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:

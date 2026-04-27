@@ -177,17 +177,52 @@ try {
   const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
   const { chromium } = await import(playwrightModuleUrl);
 
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, timeout: 15000 });
   const page = await browser.newPage({
     viewport: { width: 1600, height: 980 },
   });
 
   await page.addInitScript(() => {
+    const now = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000;
+    const createdAtIso = new Date(now).toISOString();
+    const tempUser = {
+      id: 'smoke-temp-user',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'smoke-temp-user@temp.local',
+      phone: '',
+      created_at: createdAtIso,
+      updated_at: createdAtIso,
+      confirmed_at: createdAtIso,
+      last_sign_in_at: createdAtIso,
+      app_metadata: {
+        isTempUser: true,
+        provider: 'temp',
+      },
+      user_metadata: {
+        avatar_url: 'preset-default-local',
+        full_name: 'Smoke Temp User',
+        isTempUser: true,
+      },
+    };
+
     window.localStorage.setItem('theme', 'dark');
     window.localStorage.setItem('kk_theme', 'dark');
     window.localStorage.setItem('kk_language', 'en-US');
     window.localStorage.setItem('kk_studio_storage_mode', 'browser');
     window.localStorage.setItem('kk_tutorial_seen', 'true');
+    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+      user: tempUser,
+      createdAt: now,
+      expiresAt,
+      isTempUser: true,
+    }));
+    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+      user: tempUser,
+      isTempUser: true,
+      tempUserExpiry: expiresAt,
+    }));
   });
 
   await gotoWithRetry(page, `${targetUrl}${SETTINGS_HOME_PATH}`);
@@ -203,26 +238,36 @@ try {
 
   await gotoWithRetry(page, `${targetUrl}${SETTINGS_API_PATH}`);
 
+  const addProviderEntry = page.getByTestId('api-official-provider-add');
+  const officialEditorBack = page.getByTestId('api-official-editor-back');
+  const advancedModeToggle = page.getByRole('button', { name: 'Advanced mode', exact: true });
+  const hideAdvancedModeToggle = page.getByRole('button', { name: 'Hide advanced mode', exact: true });
+  const hideMoreAdvancedItemsToggle = page.getByRole('button', { name: 'Hide more advanced items', exact: true });
   const workbenchStage = page.getByTestId('settings-workbench-stage');
   const diagnosticsToggle = page.getByTestId('api-workbench-diagnostics-toggle');
   const diagnosticsPanel = page.getByTestId('settings-workbench-diagnostics');
-  const officialEditorBack = page.getByTestId('api-official-editor-back');
 
+  await assertVisible(addProviderEntry, 'Local API add entry did not render.');
+  await addProviderEntry.click();
+  await page.waitForURL(`${targetUrl}${SETTINGS_API_PATH}/official/new`, { timeout: 15000, waitUntil: 'domcontentloaded' });
+  await assertVisible(officialEditorBack, 'Local API editor did not open.');
+  await officialEditorBack.click();
+  await page.waitForURL(`${targetUrl}${SETTINGS_API_PATH}`, { timeout: 15000, waitUntil: 'domcontentloaded' });
+  await assertVisible(addProviderEntry, 'Local API add entry did not return after closing the editor.');
+
+  await assertVisible(advancedModeToggle, 'Advanced mode toggle did not render.');
+  await advancedModeToggle.click();
+  await assertVisible(hideAdvancedModeToggle, 'Advanced mode did not switch into the expanded state.');
   await assertVisible(workbenchStage, 'API Management stage section did not render.');
   await assertVisible(diagnosticsToggle, 'Diagnostics toggle did not render.');
   await diagnosticsToggle.click();
+  await assertVisible(hideMoreAdvancedItemsToggle, 'Diagnostics did not expand the advanced details section.');
   await assertVisible(diagnosticsPanel, 'Diagnostics section did not open.');
   await diagnosticsToggle.click();
   await diagnosticsPanel.waitFor({ state: 'hidden', timeout: 15000 });
-  const emptyCreateButton = page.getByTestId('api-official-empty-create');
-  if (await emptyCreateButton.isVisible().catch(() => false)) {
-    await emptyCreateButton.click();
-  } else {
-    await page.getByTestId('api-workbench-primary-action').click();
-  }
-  await assertVisible(officialEditorBack, 'Local API editor did not open.');
-  await officialEditorBack.click();
-  await assertVisible(workbenchStage, 'API Management did not return from the local API editor.');
+  await hideMoreAdvancedItemsToggle.click();
+  await hideAdvancedModeToggle.click();
+  await workbenchStage.waitFor({ state: 'hidden', timeout: 15000 });
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-direct-api-management.png'),

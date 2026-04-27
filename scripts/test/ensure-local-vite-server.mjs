@@ -1,11 +1,19 @@
 import { createServer as createViteServer } from 'vite';
 
-async function isUrlReady(url) {
+async function isUrlReady(url, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const response = await fetch(url, { redirect: 'manual' });
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: controller.signal,
+    });
     return response.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

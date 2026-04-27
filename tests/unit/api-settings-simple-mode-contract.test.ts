@@ -20,6 +20,9 @@ test('ApiSettingsView defaults to a simple list mode and gates workbench section
   assert.match(viewSource, /showAdvancedWorkbench \? pick\('收起高级模式', 'Hide advanced mode'\) : pick\('高级模式', 'Advanced mode'\)/);
   assert.match(viewSource, /showAdvancedWorkbench \? \(/);
   assert.match(viewSource, /showAdvancedDetails \? pick\('收起更多高级项', 'Hide more advanced items'\) : pick\('更多高级项', 'More advanced items'\)/);
+  assert.match(viewSource, /const handleToggleDiagnostics = \(\) => \{/);
+  assert.match(viewSource, /if \(!showDiagnostics\) \{\s*setShowAdvancedDetails\(true\);/);
+  assert.match(viewSource, /onToggleDiagnostics=\{handleToggleDiagnostics\}/);
   assert.match(viewSource, /<ApiWorkbenchOverviewSection/);
   assert.match(viewSource, /<ApiWorkbenchRoutePoolSection/);
   assert.match(viewSource, /<ApiWorkbenchCapabilitySection/);
