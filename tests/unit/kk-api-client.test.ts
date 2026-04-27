@@ -809,6 +809,51 @@ describe("kk api client", () => {
     });
   });
 
+  test("passes an optional pricing endpoint override when syncing provider pricing", async () => {
+    const requests: Array<{ method?: string; url: string; body?: string }> = [];
+    const client = createKkApiClient({
+      baseUrl: "http://127.0.0.1:3001",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            routeId: "provider-2",
+            ok: false,
+            count: 0,
+            pricingData: [],
+            groupRatio: {},
+          },
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    await client.syncUserRoutePricing("provider-2", {
+      endpointUrl: "https://pricing.example.com/custom",
+    });
+
+    assert.equal(requests.length, 1);
+    assert.equal(
+      requests[0].url,
+      "http://127.0.0.1:3001/api/v1/profile/user-routes/provider-2/pricing-sync",
+    );
+    assert.equal(requests[0].method, "POST");
+    assert.equal(
+      requests[0].body,
+      JSON.stringify({ endpointUrl: "https://pricing.example.com/custom" }),
+    );
+  });
+
   test("builds profile user-api and guest temp-user requests with the expected paths", async () => {
     const requests: Array<{ method?: string; url: string; body?: string }> = [];
     const client = createKkApiClient({

@@ -12,7 +12,7 @@ function getRequestIp(req: any): string {
 function buildLegacyAuthDisabledResponse() {
   return {
     success: false,
-    error: "Legacy password auth routes are disabled. Use the hosted Supabase auth flow instead.",
+    error: "Legacy password auth routes are disabled. Use the VPS-backed session auth flow instead.",
   };
 }
 

@@ -30,6 +30,7 @@ import type {
   UpdatePasswordRequestDto,
   UpdatePasswordResponseDto,
   UserRouteConnectivityCheckDto,
+  UserRoutePricingSyncRequestDto,
   UserRoutePricingSyncDto,
   UpdateProfileRequestDto,
   UserApiEntryListDto,
@@ -49,7 +50,9 @@ import type {
     DebitCreditsRequestDto,
     DebitCreditsResponseDto,
     GetAdminRechargeSubmissionResponseDto,
+    ListAdminRechargeSubmissionsResponseDto,
     ListCreditTransactionsQueryDto,
+    MarkRechargeSubmissionPaidResponseDto,
     RechargePaymentChannelConfigListDto,
     RefundCreditsRequestDto,
     RefundCreditsResponseDto,
@@ -189,6 +192,7 @@ export interface KkApiClient {
   ): Promise<ApiResponse<UserRouteConnectivityCheckDto>>;
   syncUserRoutePricing(
     routeId: string,
+    input?: UserRoutePricingSyncRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserRoutePricingSyncDto>>;
   createTempUser(
@@ -255,6 +259,13 @@ export interface KkApiClient {
     input: SubmitRechargeProofRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<SubmitRechargeProofResponseDto>>;
+  markRechargeSubmissionPaid(
+    submissionId: string,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<MarkRechargeSubmissionPaidResponseDto>>;
+  listAdminRechargeSubmissions(
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<ListAdminRechargeSubmissionsResponseDto>>;
   getAdminRechargeSubmission(
     submissionId: string,
     options?: ApiClientRequestOptions,
@@ -390,6 +401,13 @@ function normalizeHeaders(
   return normalized;
 }
 
+function shouldIncludeBrowserCredentials(path: string): boolean {
+  return path === "api/v1/auth/login"
+    || path === "api/v1/auth/session"
+    || path === "api/v1/auth/refresh"
+    || path === "api/v1/auth/logout";
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
   const raw = await response.text();
   if (!raw.trim()) {
@@ -523,6 +541,7 @@ async function requestJson<TResponse>(
       const response = await fetchImpl(new URL(path, normalizeBaseUrl(config.baseUrl)), {
         ...init,
         headers,
+        credentials: shouldIncludeBrowserCredentials(path) ? "include" : init.credentials,
         signal: options?.signal,
       });
 
@@ -827,12 +846,13 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
-    syncUserRoutePricing(routeId, options) {
+    syncUserRoutePricing(routeId, input, options) {
       return requestJson<UserRoutePricingSyncDto>(
         config,
         `api/v1/profile/user-routes/${encodeURIComponent(routeId)}/pricing-sync`,
         {
           method: "POST",
+          body: input ? JSON.stringify(input) : undefined,
         },
         options,
       );
@@ -1044,6 +1064,28 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         {
           method: "POST",
           body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    markRechargeSubmissionPaid(submissionId, options) {
+      return requestJson<MarkRechargeSubmissionPaidResponseDto>(
+        config,
+        `api/v1/billing/recharge-submissions/${encodeURIComponent(submissionId)}/mark-paid`,
+        {
+          method: "POST",
+        },
+        options,
+      );
+    },
+
+    listAdminRechargeSubmissions(options) {
+      return requestJson<ListAdminRechargeSubmissionsResponseDto>(
+        config,
+        "api/v1/admin/billing/recharge-submissions",
+        {
+          method: "GET",
         },
         options,
       );

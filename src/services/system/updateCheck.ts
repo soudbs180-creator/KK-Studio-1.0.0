@@ -195,7 +195,7 @@ export function isUpdateAvailable(): boolean {
 
 /**
  * Refresh the page to get the new version
- * Data is preserved because we save to IndexedDB/localStorage/Supabase
+ * Data is preserved because runtime state is saved to IndexedDB, localStorage, and the KK API.
  */
 export function applyUpdate(): void {
     if (isUpdateCheckDisabled()) {

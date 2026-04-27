@@ -11,7 +11,7 @@ import {
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import type { AuthDataRepository } from "../infrastructure/in-memory-auth-data-repository.ts";
-import type { UserScopedAuthDataMirror } from "../infrastructure/supabase-user-scoped-auth-data-mirror.ts";
+import type { UserScopedAuthDataMirror } from "../infrastructure/user-scoped-auth-data-mirror.ts";
 import {
   extractKeyManagerCloudSlots,
   extractUserApiEntriesFromPayload,
@@ -463,7 +463,7 @@ export class AuthDataService {
           await this.cloudMirror!.saveUserApisPayload(resolvedAccessToken, userId, email, localPayload);
         }
       } catch (error) {
-        this.logger.warn("Failed to reconcile local auth data with the user-scoped Supabase mirror.", {
+        this.logger.warn("Failed to reconcile local auth data with the user-scoped cloud mirror.", {
           userId,
           error: error instanceof Error ? error.message : String(error),
         });

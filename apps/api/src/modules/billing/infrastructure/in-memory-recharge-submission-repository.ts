@@ -4,11 +4,15 @@ export interface RechargeSubmissionRepository {
   save(submission: RechargeSubmissionRecord): Promise<RechargeSubmissionRecord>;
   findById(submissionId: string): Promise<RechargeSubmissionRecord | undefined>;
   listByUserId(userId: string): Promise<RechargeSubmissionRecord[]>;
+  listRecent(sinceIso?: string): Promise<RechargeSubmissionRecord[]>;
 }
 
 function cloneSubmission(submission: RechargeSubmissionRecord): RechargeSubmissionRecord {
   return {
     ...submission,
+    expiresAt: submission.expiresAt ?? null,
+    paymentMarkedAt: submission.paymentMarkedAt ?? null,
+    submittedAt: submission.submittedAt ?? null,
     reviewedAt: submission.reviewedAt ?? null,
   };
 }
@@ -40,6 +44,14 @@ export class InMemoryRechargeSubmissionRepository implements RechargeSubmissionR
     return submissionIds
       .map((submissionId) => this.submissions.get(submissionId))
       .filter((submission): submission is RechargeSubmissionRecord => Boolean(submission))
+      .map((submission) => cloneSubmission(submission));
+  }
+
+  async listRecent(sinceIso?: string): Promise<RechargeSubmissionRecord[]> {
+    const sinceTime = sinceIso ? new Date(sinceIso).getTime() : Number.NEGATIVE_INFINITY;
+    return Array.from(this.submissions.values())
+      .filter((submission) => new Date(submission.createdAt).getTime() >= sinceTime)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
       .map((submission) => cloneSubmission(submission));
   }
 }

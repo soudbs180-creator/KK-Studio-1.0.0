@@ -133,6 +133,9 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.ok(profileModalSource.includes('const remainingBalanceHint = latestRecharge'));
   assert.ok(profileModalSource.includes('个人 API 不扣积分'));
   assert.ok(profileModalSource.includes("void refreshBilling({ includeTransactions: true });"));
+  assert.match(mobileHeaderSource, /data-testid="mobile-header-credit-chip"/);
+  assert.match(mobileHeaderSource, /whitespace-nowrap/);
+  assert.doesNotMatch(mobileHeaderSource, /flex-col items-start justify-center/);
 
   assert.ok(costEstimationSource.includes('const { balance, loading: billingLoading, usageLogs, refreshBilling, fetchLogs } = useBilling();'));
   assert.ok(costEstimationSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);"));
@@ -154,13 +157,13 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('const stagePrimaryActionIcon = stageMeta.primaryActionKind === \'create-official\' || stageMeta.primaryActionKind === \'create-provider\''));
   assert.ok(apiSettingsViewSource.includes('const handleStagePrimaryAction = () => {'));
   assert.ok(apiSettingsViewSource.includes('onPrimaryAction={handleStagePrimaryAction}'));
-  assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled} onClick={beginCreateOfficial}'));
+  assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerEditorReadOnly}'));
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotToCloudRecord({'));
   assert.ok(apiSettingsViewSource.includes('await removeUserApiSlotFromCloudRecord(id);'));
-  assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={() => void saveProvider()}'));
-  assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)}'));
+  assert.ok(apiSettingsViewSource.includes('<PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()}'));
+  assert.ok(apiSettingsViewSource.includes('<DangerButton disabled={providerActionsDisabled} onClick={() => void deleteProvider(editingProviderId)}'));
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiProviderToCloudRecord({'));
   assert.ok(apiSettingsViewSource.includes('await removeUserApiProviderFromCloudRecord(id);'));
 

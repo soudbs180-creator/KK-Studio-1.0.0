@@ -36,7 +36,7 @@ export async function handleInvokeLocalSystemProxy(
   }
 
   try {
-    const result = await service.invoke(headers, body);
+    const result = await service.invoke(userId, body);
     return {
       statusCode: 200,
       body: {

@@ -1,5 +1,3 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
 export interface PaymentCreditAmountResolverInput {
   amount: string;
   currency: string;
@@ -12,11 +10,6 @@ export interface PaymentCreditAmountResolver {
 interface CreditExchangeRateRow {
   credits_per_unit: string | number;
   is_active: boolean;
-}
-
-export interface SupabasePaymentCreditAmountResolverOptions {
-  supabaseUrl?: string;
-  serviceRoleKey?: string;
 }
 
 const DEFAULT_CREDITS_PER_UNIT = {
@@ -52,48 +45,11 @@ function toCreditsPerUnit(value: string | number | undefined, fallback: number):
   return fallback;
 }
 
-export class SupabasePaymentCreditAmountResolver implements PaymentCreditAmountResolver {
-  private readonly client?: SupabaseClient;
-
-  constructor(options: SupabasePaymentCreditAmountResolverOptions = {}) {
-    if (options.supabaseUrl && options.serviceRoleKey) {
-      this.client = createClient(options.supabaseUrl, options.serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
-    }
-  }
-
+export class StaticPaymentCreditAmountResolver implements PaymentCreditAmountResolver {
   async resolve(input: PaymentCreditAmountResolverInput): Promise<number> {
     const amount = parseAmount(input.amount);
     const currencyCode = normalizeCurrencyCode(input.currency);
-    const creditsPerUnit = await this.loadCreditsPerUnit(currencyCode);
+    const creditsPerUnit = DEFAULT_CREDITS_PER_UNIT[currencyCode];
     return Math.max(1, Math.round(amount * creditsPerUnit));
-  }
-
-  private async loadCreditsPerUnit(currencyCode: keyof typeof DEFAULT_CREDITS_PER_UNIT): Promise<number> {
-    const fallback = DEFAULT_CREDITS_PER_UNIT[currencyCode];
-    if (!this.client) {
-      return fallback;
-    }
-
-    try {
-      const { data, error } = await this.client
-        .from("credit_exchange_rates")
-        .select("credits_per_unit,is_active")
-        .eq("currency_code", currencyCode)
-        .eq("is_active", true)
-        .maybeSingle<CreditExchangeRateRow>();
-
-      if (error || !data || data.is_active === false) {
-        return fallback;
-      }
-
-      return toCreditsPerUnit(data.credits_per_unit, fallback);
-    } catch {
-      return fallback;
-    }
   }
 }

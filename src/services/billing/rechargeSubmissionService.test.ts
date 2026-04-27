@@ -42,13 +42,33 @@ test('buildRechargeBillRequest normalizes amount and note without requiring a tr
       amount: 88,
       currencyCode: 'CNY',
       paymentChannel: 'wechat',
+      manualProvider: 'wechat',
       note: '  reserve balance top-up  ',
     }),
     {
       amount: 88,
       currencyCode: 'CNY',
       paymentChannel: 'wechat',
+      manualProvider: 'wechat',
       note: 'reserve balance top-up',
+    },
+  );
+});
+
+test('buildRechargeBillRequest supports manual recharge provider selection', () => {
+  assert.deepEqual(
+    buildRechargeBillRequest({
+      amount: 20,
+      currencyCode: 'CNY',
+      paymentChannel: 'manual',
+      manualProvider: 'alipay',
+    }),
+    {
+      amount: 20,
+      currencyCode: 'CNY',
+      paymentChannel: 'manual',
+      manualProvider: 'alipay',
+      note: undefined,
     },
   );
 });
@@ -116,6 +136,8 @@ test('getRechargeSubmissionStatusLabel exposes stable Chinese labels', () => {
   assert.equal(getRechargeSubmissionStatusLabel('bill_created'), '\u5f85\u8f6c\u8d26');
   assert.equal(getRechargeSubmissionStatusLabel('proof_submitted'), '\u5f85\u5ba1\u6838');
   assert.equal(getRechargeSubmissionStatusLabel('pending'), '\u7b49\u5f85\u5ba1\u6838');
+  assert.equal(getRechargeSubmissionStatusLabel('paying'), '\u652f\u4ed8\u4e2d');
+  assert.equal(getRechargeSubmissionStatusLabel('expired'), '\u652f\u4ed8\u5931\u8d25');
   assert.equal(getRechargeSubmissionStatusLabel('approved'), '\u5ba1\u6838\u901a\u8fc7');
   assert.equal(getRechargeSubmissionStatusLabel('rejected'), '\u5ba1\u6838\u9a73\u56de');
   assert.equal(getRechargeSubmissionStatusLabel('credited'), '\u5df2\u5165\u8d26');
@@ -133,9 +155,18 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
           amount: 88,
           currencyCode: 'CNY',
           paymentChannel: 'alipay',
+          manualProvider: 'alipay',
+          baseAmount: 88,
+          serviceFee: 0.21,
+          payableAmount: 88.21,
+          baseCredits: 880,
+          bonusCredits: 2,
+          creditAmount: 882,
           estimatedCredits: 880,
           transferReferenceLast4: '8X9Z',
           status: 'proof_submitted',
+          expiresAt: '2026-04-27T08:05:00.000Z',
+          paymentMarkedAt: '2026-04-27T08:01:00.000Z',
           qrDisplay: {
             title: 'Static QR',
             helperText: 'Upload payment proof after the transfer is complete.',
@@ -155,11 +186,20 @@ test('normalizeRechargeBillSnapshot supports future bill payloads and legacy sub
       amount: 88,
       currencyCode: 'CNY',
       paymentChannel: 'alipay',
+      manualProvider: 'alipay',
+      baseAmount: 88,
+      serviceFee: 0.21,
+      payableAmount: 88.21,
+      baseCredits: 880,
+      bonusCredits: 2,
+      creditAmount: 882,
       estimatedCredits: 880,
       transferReferenceLast4: '8X9Z',
       note: undefined,
       status: 'proof_submitted',
       statusLabel: '\u5f85\u5ba1\u6838',
+      expiresAt: '2026-04-27T08:05:00.000Z',
+      paymentMarkedAt: '2026-04-27T08:01:00.000Z',
       qrDisplay: {
         title: 'Static QR',
         helperText: 'Upload payment proof after the transfer is complete.',
@@ -220,7 +260,7 @@ test('getRechargeSubmissionErrorMessage surfaces missing runtime support clearly
         error: {
           code: 'SERVER_PERSISTENCE_REQUIRED',
           message:
-            'Billing and credit persistence require the API server to use the canonical Supabase backend.',
+            'Billing and credit persistence require the API server to use the VPS PostgreSQL backend.',
         },
       },
       'fallback',

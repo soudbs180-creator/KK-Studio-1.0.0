@@ -37,6 +37,9 @@ function isPersistedState(value: unknown): value is PersistedRechargeSubmissionS
 function cloneSubmission(submission: RechargeSubmissionRecord): RechargeSubmissionRecord {
   return {
     ...submission,
+    expiresAt: submission.expiresAt ?? null,
+    paymentMarkedAt: submission.paymentMarkedAt ?? null,
+    submittedAt: submission.submittedAt ?? null,
     reviewedAt: submission.reviewedAt ?? null,
   };
 }
@@ -87,6 +90,15 @@ export class FileBackedRechargeSubmissionRepository implements RechargeSubmissio
     return (state.submissionsByUserId[userId] || [])
       .map((submissionId) => state.submissions[submissionId])
       .filter((submission): submission is RechargeSubmissionRecord => Boolean(submission))
+      .map((submission) => cloneSubmission(submission));
+  }
+
+  async listRecent(sinceIso?: string): Promise<RechargeSubmissionRecord[]> {
+    const state = await this.store.readState();
+    const sinceTime = sinceIso ? new Date(sinceIso).getTime() : Number.NEGATIVE_INFINITY;
+    return Object.values(state.submissions)
+      .filter((submission) => new Date(submission.createdAt).getTime() >= sinceTime)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
       .map((submission) => cloneSubmission(submission));
   }
 }

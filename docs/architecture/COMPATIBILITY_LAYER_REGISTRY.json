@@ -117,20 +117,6 @@
       "removalCondition": "Delete once the migrated billing module no longer needs legacy router behavior translation."
     },
     {
-      "path": "payment-server/runtime_payment_bridge.js",
-      "role": "compatibility-layer",
-      "currentPurpose": "Legacy runtime bridge for payment server flows during sidecar migration.",
-      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
-      "downstreamDependents": [
-        "payment-server/index.js"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/payment-server-runtime-payment-bridge.test.ts"
-      ],
-      "removalCondition": "Delete once the legacy payment server no longer serves production checkout requests."
-    },
-    {
       "path": "payment-server/sidecar_compat_bridge.js",
       "role": "compatibility-layer",
       "currentPurpose": "Routes legacy payment-server create/status/redirect flows into the sidecar payment module while Express and Alipay SDK runtime remain in place.",
@@ -144,20 +130,6 @@
         "tests/unit/governance-contract.test.ts"
       ],
       "removalCondition": "Delete once payment-server/index.js no longer serves checkout/status requests and the legacy shell is reduced to a thin runtime wrapper or removed."
-    },
-    {
-      "path": "payment-server/settlement_bridge.js",
-      "role": "compatibility-layer",
-      "currentPurpose": "Legacy settlement write-back bridge for the payment server during sidecar migration.",
-      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
-      "downstreamDependents": [
-        "payment-server/index.js"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/payment-server-settlement-bridge.test.ts"
-      ],
-      "removalCondition": "Delete once settlement write-back only occurs through the typed internal payment-settlement contract."
     },
     {
       "path": "server/index.ts",
@@ -190,7 +162,7 @@
         "tests/unit/auth-http-routes.test.ts",
         "tests/unit/runtime-legacy-fallback-guards.test.ts"
       ],
-      "removalCondition": "Delete once no caller depends on the legacy server auth route mount and hosted/browser auth stays on the Supabase-first path only."
+      "removalCondition": "Delete once no caller depends on the legacy server auth route mount and hosted/browser auth stays on the hosted session/API path only."
     },
     {
       "path": "server/billing_routes.ts",
@@ -207,22 +179,6 @@
         "tests/unit/runtime-legacy-fallback-guards.test.ts"
       ],
       "removalCondition": "Delete once local and hosted runtimes stop exposing the legacy billing mount and only the typed /api/v1/billing surface remains."
-    },
-    {
-      "path": "api/auth-password-login.ts",
-      "role": "compatibility-layer",
-      "runtimeStatus": "local-only",
-      "currentPurpose": "Local-only same-origin password proxy that can bridge browser network failures into Supabase auth during explicitly allowed fallback scenarios.",
-      "upstreamCanonicalSource": "supabase.auth.signInWithPassword",
-      "downstreamDependents": [
-        "src/services/auth/passwordSignIn.ts"
-      ],
-      "riskLevel": "medium",
-      "regressionTests": [
-        "tests/unit/password-sign-in-fallback.test.ts",
-        "tests/unit/hosted-release-guardrails.test.ts"
-      ],
-      "removalCondition": "Delete once hosted and local password login flows no longer require a same-origin proxy fallback and Supabase-first auth is stable everywhere."
     },
     {
       "path": "src/services/ecommerce/text/fallbackTextAnalysis.ts",

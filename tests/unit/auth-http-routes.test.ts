@@ -69,7 +69,7 @@ describe("auth http routes", () => {
       identityStore: new InMemoryAuthIdentityStore(),
     });
 
-    const login = authService.issueLoginSession("profile@example.com");
+    const login = await authService.issueLoginSession("profile@example.com");
 
     const profile = await handleGetProfile(authService, {
       authorization: `Bearer ${login.accessToken}`,

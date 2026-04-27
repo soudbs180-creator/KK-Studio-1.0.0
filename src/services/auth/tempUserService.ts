@@ -1,4 +1,4 @@
-import { kkWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getDefaultPresetAvatarId } from '../../utils/presetAvatars';
 import type { RuntimeAuthUser } from './runtimeAuthTypes.ts';
 
@@ -18,6 +18,14 @@ function buildTempEmail(tempUserId: string): string {
 
 function buildTempNickname(tempUserId: string): string {
   return `Guest_${tempUserId.replace(/-/g, '').slice(0, 8)}`;
+}
+
+function generateTempUserId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `temp-${crypto.randomUUID()}`;
+  }
+
+  return `temp-${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function buildTempUser(input: {
@@ -80,12 +88,40 @@ class TempUserService {
     localStorage.removeItem(TEMP_USER_STORAGE_KEY);
   }
 
+  private createLocalFallbackSession(reason: string): TempUserSession {
+    const createdAt = Date.now();
+    const expiresAt = createdAt + TEMP_USER_EXPIRY_MS;
+    const userId = generateTempUserId();
+    const createdAtIso = new Date(createdAt).toISOString();
+
+    console.warn('[TempUser] Falling back to a local temp user session:', reason);
+
+    const session: TempUserSession = {
+      user: buildTempUser({
+        userId,
+        email: buildTempEmail(userId),
+        nickname: buildTempNickname(userId),
+        createdAtIso,
+      }),
+      createdAt,
+      expiresAt,
+      isTempUser: true,
+    };
+
+    this.cacheTempUser(session);
+    return session;
+  }
+
   async createTempUser(): Promise<TempUserSession> {
     try {
       const response = await kkWebApiClient.createTempUser();
       if (!response.success) {
         console.error('[TempUser] Failed to create temp user session via API:', response.error);
-        throw new Error(response.error.message || 'Failed to create guest session.');
+        const message = response.error.message || 'Failed to create guest session.';
+        if (shouldUseLegacyWebApiFallback()) {
+          return this.createLocalFallbackSession(message);
+        }
+        throw new Error(message);
       }
 
       const legacyCreatedAt = Date.parse(response.data.createdAt) || Date.now();
@@ -113,6 +149,9 @@ class TempUserService {
       const message = error instanceof Error && error.message
         ? error.message
         : 'Failed to create guest session.';
+      if (shouldUseLegacyWebApiFallback()) {
+        return this.createLocalFallbackSession(message);
+      }
       throw new Error(message);
     }
   }

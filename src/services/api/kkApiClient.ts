@@ -13,6 +13,13 @@ import {
   setStoredKkApiAccessToken,
 } from "./authAccessToken.ts";
 import { getStoredAdminSessionToken } from "./adminSession.ts";
+import {
+  isHostedRuntime,
+  isLoopbackHostname,
+  isPrivateNetworkHostname,
+  resolveKkApiBaseUrl,
+  resolveOriginHostname,
+} from "./kkApiBaseUrl.ts";
 
 const TEMP_USER_STORAGE_KEY = "temp_user_session_v1";
 
@@ -55,56 +62,6 @@ function readStoredTempUserId(): string | undefined {
     return userId || undefined;
   } catch {
     return undefined;
-  }
-}
-
-export function isLoopbackHostname(hostname: string): boolean {
-  const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
-  return normalized === "localhost"
-    || normalized === "::1"
-    || normalized.startsWith("127.");
-}
-
-export function isPrivateNetworkHostname(hostname: string): boolean {
-  const normalized = String(hostname || "").trim().toLowerCase().replace(/^\[|\]$/g, "");
-  return /^10\./.test(normalized)
-    || /^192\.168\./.test(normalized)
-    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
-}
-
-function resolveOriginHostname(origin?: string): string | undefined {
-  const normalizedOrigin = String(origin || "").trim();
-  if (!normalizedOrigin) {
-    return undefined;
-  }
-
-  try {
-    return new URL(normalizedOrigin).hostname;
-  } catch {
-    return undefined;
-  }
-}
-
-function shouldPreferRuntimeOriginForLocalApi(
-  configuredBaseUrl: string,
-  runtimeOrigin?: string,
-): boolean {
-  if (!runtimeOrigin) {
-    return false;
-  }
-
-  try {
-    const configuredUrl = new URL(configuredBaseUrl);
-    const runtimeUrl = new URL(runtimeOrigin);
-    const configuredPort = configuredUrl.port || (configuredUrl.protocol === "https:" ? "443" : "80");
-    const runtimePort = runtimeUrl.port || (runtimeUrl.protocol === "https:" ? "443" : "80");
-
-    return (isLoopbackHostname(configuredUrl.hostname) || isPrivateNetworkHostname(configuredUrl.hostname))
-      && configuredPort === "3001"
-      && (isLoopbackHostname(runtimeUrl.hostname) || isPrivateNetworkHostname(runtimeUrl.hostname))
-      && runtimePort === "3000";
-  } catch {
-    return false;
   }
 }
 
@@ -157,28 +114,6 @@ export function getLegacyWebApiFallbackState(): LegacyWebApiFallbackState {
   };
 }
 
-export function isHostedRuntime(): boolean {
-  const hostname = resolveOriginHostname(readRuntimeOrigin()) || "";
-  return !isLoopbackHostname(hostname) && !isPrivateNetworkHostname(hostname);
-}
-
-export function resolveKkApiBaseUrl(): string {
-  const configuredBaseUrl = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
-  const runtimeOrigin = readRuntimeOrigin();
-  if (configuredBaseUrl) {
-    if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
-      return runtimeOrigin!;
-    }
-    return configuredBaseUrl;
-  }
-
-  if (runtimeOrigin) {
-    return runtimeOrigin;
-  }
-
-  return "http://127.0.0.1:3001";
-}
-
 export function shouldUseLegacyWebApiFallback(): boolean {
   return getLegacyWebApiFallbackState().enabled;
 }
@@ -206,3 +141,11 @@ export function createLegacyWebApiClient(): KkApiClient {
 
 export const kkWebApiClient = createKkWebApiClient();
 export const legacyWebApiClient = kkWebApiClient;
+
+export {
+  isHostedRuntime,
+  isLoopbackHostname,
+  isPrivateNetworkHostname,
+  resolveKkApiBaseUrl,
+  resolveOriginHostname,
+};

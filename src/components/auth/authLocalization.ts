@@ -3,7 +3,7 @@ import {
   pickByResolvedLanguage,
   type ResolvedLanguage,
 } from "../../utils/localeText.ts";
-import { HOSTED_PASSWORD_PROXY_DISABLED_CODE } from "../../services/auth/passwordSignIn.ts";
+import { HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE } from "../../services/auth/passwordSignIn.ts";
 
 export type AuthView = "login" | "register" | "forgot-password";
 
@@ -208,11 +208,10 @@ export function mapAuthErrorMessage(
     return pick(language, "操作过于频繁，请稍后再试。", "Too many attempts. Please try again later.");
   }
 
-  if (message.includes(HOSTED_PASSWORD_PROXY_DISABLED_CODE)) {
+  if (message.includes(HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE)) {
     return pick(
-      language,
-      "浏览器端已不再回退到旧的 Supabase 密码代理，请直接检查 KK API 登录路由是否可用。",
-      "The browser no longer falls back to the old Supabase password proxy. Check whether the KK API sign-in route is available.",
+      language,      "????????????????? KK API ?????????",
+      "The hosted password login route is unavailable. Check whether the KK API sign-in route is available.",
     );
   }
 

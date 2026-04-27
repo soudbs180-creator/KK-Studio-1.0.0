@@ -16,7 +16,7 @@ const requiredPaths = [
   "packages/contracts/src/index.ts",
   "packages/domain/src/index.ts",
   "packages/shared/src/index.ts",
-  "infra/supabase/README.md",
+  "scripts/postgres/bootstrap-kk-vps.sql",
   "tests/unit/README.md",
   "tests/contract/README.md",
   "tests/e2e/README.md",

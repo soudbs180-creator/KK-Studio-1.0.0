@@ -61,5 +61,5 @@
       "removalCondition": "Delete once the legacy server bootstrap no longer mounts billing routes directly."
     }
   ],
-  "frontendSupabaseAccess": []
+  "frontendDirectDataAccess": []
 }

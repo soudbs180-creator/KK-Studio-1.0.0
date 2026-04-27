@@ -73,7 +73,7 @@ describe("http auth routes", () => {
     assert.match(loginData.refreshToken, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     assert.equal(loginData.profile.email, "route-user@example.com");
     assert.equal(
-      authService.getProfile({ authorization: `Bearer ${loginData.accessToken}` })?.id,
+      (await authService.getProfile({ authorization: `Bearer ${loginData.accessToken}` }))?.id,
       loginData.profile.id,
     );
     assert.equal(loginResult.body.meta.requestId, "req-auth-module-login");

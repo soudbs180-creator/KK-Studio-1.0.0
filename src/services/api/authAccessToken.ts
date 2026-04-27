@@ -2,10 +2,17 @@ import {
   getLatestAuthSessionChange,
   subscribeAuthSessionChange,
 } from "../auth/authSessionEvents.ts";
+import {
+  applyHostedSessionToRuntime,
+  clearHostedSessionRuntime,
+  refreshHostedSessionFromServer,
+  restoreHostedSessionFromServer,
+} from "../auth/kkApiSessionBootstrap.ts";
 
 const accessTokenStorageKey = "kk.api.access_token";
 let inMemoryCompatibilityAccessToken: string | undefined;
 let stopAccessTokenSessionSync: (() => void) | null = null;
+let hostedRefreshPromise: Promise<string | undefined> | null = null;
 
 function normalizeHostname(value: unknown): string | undefined {
   const normalized = typeof value === "string" ? value.trim().toLowerCase().replace(/^\[|\]$/g, "") : "";
@@ -160,8 +167,32 @@ function syncFromLatestAuthSessionChange(): string | undefined {
   return getStoredKkApiAccessToken();
 }
 
-export async function syncStoredKkApiAccessTokenWithSupabaseSession(): Promise<string | undefined> {
-  return syncFromLatestAuthSessionChange();
+function isHostedSessionAuthFailureCode(code: unknown): boolean {
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  return normalizedCode === "AUTH_REQUIRED"
+    || normalizedCode === "HTTP_401"
+    || normalizedCode === "HTTP_403"
+    || normalizedCode === "SESSION_REAUTH_REQUIRED";
+}
+
+export async function syncStoredKkApiAccessTokenWithHostedSession(): Promise<string | undefined> {
+  const latestSessionChange = getLatestAuthSessionChange();
+  if (
+    latestSessionChange?.hasSession
+    && !latestSessionChange.isTempUser
+    && !String(latestSessionChange.accessToken || "").trim()
+  ) {
+    const restoredSession = await restoreHostedSessionFromServer();
+    return restoredSession?.accessToken || getStoredKkApiAccessToken();
+  }
+
+  const currentToken = syncFromLatestAuthSessionChange();
+  if (currentToken) {
+    return currentToken;
+  }
+
+  const restoredSession = await restoreHostedSessionFromServer();
+  return restoredSession?.accessToken;
 }
 
 export async function getPreferredKkApiAccessToken(): Promise<string | undefined> {
@@ -169,7 +200,29 @@ export async function getPreferredKkApiAccessToken(): Promise<string | undefined
 }
 
 export async function refreshPreferredKkApiAccessToken(): Promise<string | undefined> {
-  return syncFromLatestAuthSessionChange();
+  if (hostedRefreshPromise) {
+    return hostedRefreshPromise;
+  }
+
+  hostedRefreshPromise = refreshHostedSessionFromServer()
+    .then((response) => {
+      if (!response.success) {
+        if (isHostedSessionAuthFailureCode(response.error?.code)) {
+          clearHostedSessionRuntime();
+          return undefined;
+        }
+
+        return getStoredKkApiAccessToken();
+      }
+
+      applyHostedSessionToRuntime(response.data);
+      return response.data.accessToken;
+    })
+    .finally(() => {
+      hostedRefreshPromise = null;
+    });
+
+  return hostedRefreshPromise;
 }
 
 export function startKkApiAccessTokenSessionSync(): () => void {

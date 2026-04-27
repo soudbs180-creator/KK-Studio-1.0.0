@@ -41,17 +41,19 @@ export interface PersistedAuthIdentityState {
   sessions: Record<string, StoredSession>;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface AuthIdentityStore {
-  registerPasswordUser(email: string, password: string): { created: boolean; profile: ProfileDto };
-  authenticatePassword(email: string, password: string): LoginResponseDto | undefined;
-  createRegisteredUser(email: string): { created: boolean; profile: ProfileDto };
-  issueLoginSession(email: string): LoginResponseDto;
-  issuePasswordChangeCode(userId: string): { code: string; expiresAt: string; profile: ProfileDto } | undefined;
-  changePassword(userId: string, currentPassword: string, newPassword: string): ProfileDto | undefined;
-  changePasswordWithCode(userId: string, verificationCode: string, newPassword: string): ProfileDto | undefined;
-  resolveAccessToken(accessToken: string): ProfileDto | undefined;
-  resolveProfile(headers: Record<string, string>): ProfileDto | undefined;
-  updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): ProfileDto | undefined;
+  registerPasswordUser(email: string, password: string): MaybePromise<{ created: boolean; profile: ProfileDto }>;
+  authenticatePassword(email: string, password: string): MaybePromise<LoginResponseDto | undefined>;
+  createRegisteredUser(email: string): MaybePromise<{ created: boolean; profile: ProfileDto }>;
+  issueLoginSession(email: string): MaybePromise<LoginResponseDto>;
+  issuePasswordChangeCode(userId: string): MaybePromise<{ code: string; expiresAt: string; profile: ProfileDto } | undefined>;
+  changePassword(userId: string, currentPassword: string, newPassword: string): MaybePromise<ProfileDto | undefined>;
+  changePasswordWithCode(userId: string, verificationCode: string, newPassword: string): MaybePromise<ProfileDto | undefined>;
+  resolveAccessToken(accessToken: string): MaybePromise<ProfileDto | undefined>;
+  resolveProfile(headers: Record<string, string>): MaybePromise<ProfileDto | undefined>;
+  updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): MaybePromise<ProfileDto | undefined>;
 }
 
 const sessionTtlSeconds = 60 * 60;

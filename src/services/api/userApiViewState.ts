@@ -7,11 +7,13 @@ export type UserApiWorkbenchStage =
 
 export interface UserApiViewStateInput {
   hasReadonlySnapshot: boolean;
+  hasSessionlessWorkbenchAccess?: boolean;
   isApiReachable?: boolean;
   isAuthenticated: boolean;
   isPersistenceDegraded: boolean;
   runtimeOfficialCount: number;
   runtimeProviderCount: number;
+  sessionlessWorkbenchActionsEnabled?: boolean;
 }
 
 export interface UserApiViewState {
@@ -28,6 +30,9 @@ export interface UserApiViewState {
 export function resolveUserApiViewState(
   input: UserApiViewStateInput,
 ): UserApiViewState {
+  const hasWorkbenchAccess =
+    input.isAuthenticated
+    || input.hasSessionlessWorkbenchAccess === true;
   const shouldUseReadonlyProfileFallback =
     input.hasReadonlySnapshot
     && input.runtimeOfficialCount === 0
@@ -48,16 +53,24 @@ export function resolveUserApiViewState(
       )
     );
 
-  const actionsDisabled = !input.isAuthenticated;
+  const actionsDisabled =
+    !input.isAuthenticated
+    && input.sessionlessWorkbenchActionsEnabled !== true;
   const runtimeUnavailable = input.isApiReachable === false;
+  const sessionlessLocalDraftMode =
+    !input.isAuthenticated
+    && input.hasSessionlessWorkbenchAccess === true
+    && input.sessionlessWorkbenchActionsEnabled === true;
   let stage: UserApiWorkbenchStage;
 
-  if (!input.isAuthenticated) {
+  if (!hasWorkbenchAccess) {
     stage = 'unauthenticated';
   } else if (shouldUseReadonlySnapshotForDisplay && runtimeUnavailable) {
     stage = 'readonly-fallback';
   } else if (isHydratingRuntimeUserApis) {
     stage = 'syncing';
+  } else if (sessionlessLocalDraftMode) {
+    stage = 'editable';
   } else if (runtimeUnavailable && !shouldUseReadonlySnapshotForDisplay) {
     stage = 'local-api-unavailable';
   } else {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { buildRequestMeta } from "../../../../../../packages/contracts/src/index.ts";
+import type { UserRoutePricingSyncRequestDto } from "../../../../../../packages/contracts/src/index.ts";
 import {
   resolveAuthenticatedUserEmail,
   resolveAuthenticatedUserId,
@@ -99,6 +100,7 @@ export async function handleSyncUserRoutePricing(
   service: UserRouteDiagnosticsService,
   routeId: string,
   headers: Record<string, string>,
+  input?: UserRoutePricingSyncRequestDto,
 ) {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
@@ -114,6 +116,7 @@ export async function handleSyncUserRoutePricing(
       resolveAuthenticatedUserEmail(headers),
       routeId,
       resolveBearerAccessToken(headers),
+      input,
     );
 
     return {

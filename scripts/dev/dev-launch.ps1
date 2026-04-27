@@ -37,15 +37,87 @@ function Start-DetachedPowerShellScript {
     param(
         [string]$ScriptPath,
         [string]$WorkingDirectory,
-        [string]$PidFile
+        [string]$PidFile,
+        [string[]]$ScriptArguments = @(),
+        [string]$StdOutLog,
+        [string]$StdErrLog
     )
 
-    $process = Start-Process `
-        -FilePath 'powershell' `
-        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) `
-        -WorkingDirectory $WorkingDirectory `
-        -WindowStyle Hidden `
-        -PassThru
+    $startProcessParams = @{
+        FilePath = 'powershell'
+        ArgumentList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
+        WorkingDirectory = $WorkingDirectory
+        WindowStyle = 'Hidden'
+        PassThru = $true
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($StdOutLog)) {
+        Reset-LogFile -Path $StdOutLog
+        $startProcessParams.RedirectStandardOutput = $StdOutLog
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($StdErrLog)) {
+        Reset-LogFile -Path $StdErrLog
+        $startProcessParams.RedirectStandardError = $StdErrLog
+    }
+
+    $process = Start-Process @startProcessParams
+
+    Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
+    return $process.Id
+}
+
+function Start-DetachedNodeProcess {
+    param(
+        [string]$NodeExe,
+        [string[]]$NodeArguments,
+        [string]$WorkingDirectory,
+        [string]$PidFile,
+        [string]$StdOutLog,
+        [string]$StdErrLog
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($StdOutLog)) {
+        Reset-LogFile -Path $StdOutLog
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($StdErrLog)) {
+        Reset-LogFile -Path $StdErrLog
+    }
+
+    $startProcessParams = @{
+        FilePath = $NodeExe
+        ArgumentList = $NodeArguments
+        WorkingDirectory = $WorkingDirectory
+        WindowStyle = 'Hidden'
+        PassThru = $true
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($StdOutLog)) {
+        $startProcessParams.RedirectStandardOutput = $StdOutLog
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($StdErrLog)) {
+        $startProcessParams.RedirectStandardError = $StdErrLog
+    }
+
+    $originalPathUpper = [string]$env:PATH
+    $originalPathMixed = [string]$env:Path
+    try {
+        if ($originalPathUpper -and $originalPathMixed) {
+            Remove-Item Env:PATH -ErrorAction SilentlyContinue
+        }
+
+        $process = Start-Process @startProcessParams
+    } finally {
+        if ($originalPathUpper) {
+            $env:PATH = $originalPathUpper
+        }
+
+        if ($originalPathMixed) {
+            $env:Path = $originalPathMixed
+        }
+    }
 
     Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
     return $process.Id
@@ -96,6 +168,14 @@ function Stop-ProcessTree {
     }
 
     & taskkill /PID $ProcessId /T /F | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        return
+    }
+
+    try {
+        Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+    } catch {
+    }
 }
 
 function Get-ProcessCommandLine {
@@ -108,10 +188,58 @@ function Get-ProcessCommandLine {
     }
 }
 
+function Get-ListeningConnectionRecords {
+    $netTcpRecords = @()
+
+    try {
+        $netTcpRecords = @(Get-NetTCPConnection -State Listen -ErrorAction Stop |
+            Select-Object LocalPort, OwningProcess -Unique)
+    } catch {
+        $netTcpRecords = @()
+    }
+
+    if ($netTcpRecords.Count -gt 0) {
+        return $netTcpRecords
+    }
+
+    $netstatRecords = @()
+    try {
+        $netstatLines = @(cmd /c netstat -ano -p tcp | Select-String 'LISTENING')
+        foreach ($lineMatch in $netstatLines) {
+            $normalizedLine = ([string]$lineMatch.Line -replace '\s+', ' ').Trim()
+            if ([string]::IsNullOrWhiteSpace($normalizedLine)) {
+                continue
+            }
+
+            $parts = $normalizedLine.Split(' ')
+            if ($parts.Length -lt 5) {
+                continue
+            }
+
+            $localPort = 0
+            $owningProcess = 0
+            $localPortText = [string](($parts[1] -split ':')[-1])
+            $localPortText = $localPortText.Trim()
+            $owningProcessText = [string]$parts[4]
+
+            if ([int]::TryParse($localPortText, [ref]$localPort) -and [int]::TryParse($owningProcessText, [ref]$owningProcess)) {
+                $netstatRecords += [pscustomobject]@{
+                    LocalPort = $localPort
+                    OwningProcess = $owningProcess
+                }
+            }
+        }
+    } catch {
+        $netstatRecords = @()
+    }
+
+    return @($netstatRecords | Sort-Object LocalPort, OwningProcess -Unique)
+}
+
 function Get-ListeningPortsForProcess {
     param([int]$ProcessId)
 
-    return @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    return @(Get-ListeningConnectionRecords |
         Where-Object { $_.OwningProcess -eq $ProcessId } |
         Select-Object -ExpandProperty LocalPort -Unique)
 }
@@ -119,7 +247,7 @@ function Get-ListeningPortsForProcess {
 function Get-ListeningProcessIdByPort {
     param([int]$Port)
 
-    $ownerPids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+    $ownerPids = @(Get-ListeningConnectionRecords | Where-Object { $_.LocalPort -eq $Port } |
         Select-Object -ExpandProperty OwningProcess -Unique)
 
     $resolvedOwnerPids = @()
@@ -174,6 +302,10 @@ function Is-KnownDevProcess {
 
     $commandLine = [string](Get-ProcessCommandLine -ProcessId $ProcessId)
     $listeningPorts = @(Get-ListeningPortsForProcess -ProcessId $ProcessId)
+
+    if ($Port -in $listeningPorts) {
+        return $true
+    }
 
     if ($process.ProcessName -eq 'node' -and 3000 -in $listeningPorts -and 3001 -in $listeningPorts) {
         return $true
@@ -326,7 +458,7 @@ function Assert-PortAvailable {
         [int[]]$AllowedProcessIds = @()
     )
 
-    $listenerIds = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+    $listenerIds = @(Get-ListeningConnectionRecords | Where-Object { $_.LocalPort -eq $Port } |
         Select-Object -ExpandProperty OwningProcess -Unique)
 
     if (-not $listenerIds.Count) {
@@ -349,65 +481,6 @@ function Reset-LogFile {
     }
 }
 
-function Start-DetachedNodeProcess {
-    param(
-        [string[]]$Arguments,
-        [string]$WorkingDirectory,
-        [string]$PidFile,
-        [string]$StdOutLog,
-        [string]$StdErrLog
-    )
-
-    $originalCi = [string]$env:CI
-    $originalPathUpper = [string]$env:PATH
-    $originalPathMixed = [string]$env:Path
-
-    try {
-        if ($originalPathUpper -and $originalPathMixed) {
-            Remove-Item Env:PATH -ErrorAction SilentlyContinue
-        }
-
-        $env:CI = 'true'
-
-        $startProcessParams = @{
-            FilePath = $script:nodeExe
-            ArgumentList = $Arguments
-            WorkingDirectory = $WorkingDirectory
-            WindowStyle = 'Hidden'
-            PassThru = $true
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($StdOutLog)) {
-            Reset-LogFile -Path $StdOutLog
-            $startProcessParams.RedirectStandardOutput = $StdOutLog
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($StdErrLog)) {
-            Reset-LogFile -Path $StdErrLog
-            $startProcessParams.RedirectStandardError = $StdErrLog
-        }
-
-        $process = Start-Process @startProcessParams
-    } finally {
-        if ($originalCi) {
-            $env:CI = $originalCi
-        } else {
-            Remove-Item Env:CI -ErrorAction SilentlyContinue
-        }
-
-        if ($originalPathUpper) {
-            $env:PATH = $originalPathUpper
-        }
-
-        if ($originalPathMixed) {
-            $env:Path = $originalPathMixed
-        }
-    }
-
-    Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
-    return $process.Id
-}
-
 function Sync-PidFileToPortOwner {
     param(
         [string]$PidFile,
@@ -427,16 +500,16 @@ function Start-ApiProcess {
         [bool]$UseWatch = $true
     )
 
-    $arguments = if ($UseWatch) {
-        @('--watch', $ApiScript)
-    } else {
-        @($ApiScript)
+    $runnerArguments = @('-ApiScript', $ApiScript)
+    if ($UseWatch) {
+        $runnerArguments += '-UseWatch'
     }
 
-    return Start-DetachedNodeProcess `
-        -Arguments $arguments `
+    return Start-DetachedPowerShellScript `
+        -ScriptPath $apiRunnerScript `
         -WorkingDirectory $projectRoot `
         -PidFile $apiPidFile `
+        -ScriptArguments $runnerArguments `
         -StdOutLog $apiOutLog `
         -StdErrLog $apiErrLog
 }
@@ -446,6 +519,7 @@ $viteCli = Join-Path $projectRoot 'node_modules\vite\bin\vite.js'
 $viteRunnerScript = Join-Path $projectRoot 'scripts\dev\run-vite-dev.ps1'
 $apiDevScript = Join-Path $projectRoot 'scripts\dev\run-api-dev.mjs'
 $apiLocalScript = Join-Path $projectRoot 'scripts\dev\run-api-local.mjs'
+$apiRunnerScript = Join-Path $projectRoot 'scripts\dev\run-api-runner.ps1'
 $apiScript = $apiDevScript
 $apiMode = 'canonical'
 
@@ -463,6 +537,10 @@ if (-not (Test-Path -LiteralPath $apiDevScript)) {
 
 if (-not (Test-Path -LiteralPath $apiLocalScript)) {
     throw "API local-only fallback script was not found at $apiLocalScript."
+}
+
+if (-not (Test-Path -LiteralPath $apiRunnerScript)) {
+    throw "API runner script was not found at $apiRunnerScript."
 }
 
 Reset-LogFile -Path $apiOutLog
@@ -592,7 +670,9 @@ if (-not $vitePid) {
     $vitePid = Start-DetachedPowerShellScript `
         -ScriptPath $viteRunnerScript `
         -WorkingDirectory $projectRoot `
-        -PidFile $vitePidFile
+        -PidFile $vitePidFile `
+        -StdOutLog $viteOutLog `
+        -StdErrLog $viteErrLog
 }
 
 if (-not (Wait-UrlReadyOrExit -Url $viteUrl -ProcessId $vitePid -Attempts 80 -DelayMilliseconds 500)) {

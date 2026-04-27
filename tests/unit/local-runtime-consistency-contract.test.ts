@@ -12,15 +12,18 @@ function readSource(relativePath: string): string {
 test('server local-file readiness contract keeps auth and billing capabilities available', () => {
   const serverSource = readSource('apps/api/src/server.ts');
   const authRoutesSource = readSource('apps/api/src/modules/auth/presentation/http-auth-routes.ts');
+  const healthSource = readSource('src/services/api/kkApiServerHealth.ts');
 
   assert.match(
     serverSource,
-    /authData:\s*buildCriticalPersistenceState\([\s\S]*authData: \["supabase", "local-file"\]/,
+    /authData:\s*localOnly\s*\?\s*\["postgres", "local-file", "memory"\]\s*:\s*\["postgres"\]/,
   );
   assert.match(
     serverSource,
-    /billing:\s*buildCriticalPersistenceState\([\s\S]*creditAccounts: \["supabase", "local-file"\][\s\S]*creditExchangeRates: \["supabase", "local-file"\]/,
+    /creditAccounts:\s*localOnly\s*\?\s*\["postgres", "local-file"\]\s*:\s*\["postgres"\][\s\S]*creditExchangeRates:\s*localOnly\s*\?\s*\["postgres", "local-file"\]\s*:\s*\["postgres"\]/,
   );
+  assert.match(healthSource, /health\.repositories\.authData === 'local-file'/);
+  assert.match(healthSource, /health\.repositories\.creditAccounts === 'local-file'/);
   assert.match(serverSource, /req\.method === "POST" && pathname === "\/api\/v1\/profile\/password"/);
   assert.match(authRoutesSource, /AUTH_ROUTE_DISABLED/);
 });
@@ -54,6 +57,6 @@ test('local runtime UI keeps billing management surfaces behind the feature flag
   assert.doesNotMatch(profileModalSource, /const passwordChangeEnabled = false;/);
   assert.match(
     routeConfigSource,
-    /case 'billing':[\s\S]*return KKAI_FEATURE_FLAGS\.billing \? <CostEstimation embedded \/> : <Navigate to=\{\(options\.dashboardBasePath \|\| '\/settings'\)\} replace \/>;/,
+    /case 'billing':[\s\S]*return KKAI_FEATURE_FLAGS\.billing[\s\S]*<CostEstimation key=\{routeRefreshKey\} embedded \/>[\s\S]*<Navigate to=\{\(options\.dashboardBasePath \|\| '\/settings'\)\} replace \/>;/,
   );
 });

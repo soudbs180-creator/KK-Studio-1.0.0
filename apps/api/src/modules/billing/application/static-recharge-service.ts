@@ -4,6 +4,8 @@ import {
   type CreateRechargeSubmissionRequestDto,
   type CreateRechargeSubmissionResponseDto,
   type GetAdminRechargeSubmissionResponseDto,
+  type ListAdminRechargeSubmissionsResponseDto,
+  type MarkRechargeSubmissionPaidResponseDto,
   type ReviewRechargeSubmissionDecisionDto,
   type ReviewRechargeSubmissionRequestDto,
   type ReviewRechargeSubmissionResponseDto,
@@ -18,10 +20,14 @@ import type { RechargeSubmissionRepository } from "../infrastructure/in-memory-r
 import {
   buildStaticRechargeDescription,
   createRechargeSubmission,
+  isRechargeSubmissionExpired,
+  markRechargeSubmissionPaid,
   markRechargeSubmissionRejected,
   markRechargeSubmissionCredited,
+  RechargeSubmissionExpiredError,
   RechargeSubmissionNotCreatedError,
   RechargeSubmissionNotPendingError,
+  RechargeSubmissionNotPayingError,
   resolveRechargeRate,
   roundRechargeAmount,
   submitRechargeSubmissionProof,
@@ -35,17 +41,26 @@ export interface StaticRechargeServiceOptions {
   submissionRepository: RechargeSubmissionRepository;
   exchangeRateRepository: CreditExchangeRateRepository;
   creditAccountService: CreditAccountService;
+  manualRechargeFeeGenerator?: () => number;
+  nowProvider?: () => Date;
 }
 
 export class StaticRechargeService {
   private readonly submissionRepository: RechargeSubmissionRepository;
   private readonly exchangeRateRepository: CreditExchangeRateRepository;
   private readonly creditAccountService: CreditAccountService;
+  private readonly manualRechargeFeeGenerator: () => number;
+  private readonly nowProvider: () => Date;
 
   constructor(options: StaticRechargeServiceOptions) {
     this.submissionRepository = options.submissionRepository;
     this.exchangeRateRepository = options.exchangeRateRepository;
     this.creditAccountService = options.creditAccountService;
+    this.manualRechargeFeeGenerator = options.manualRechargeFeeGenerator || (() => {
+      const cents = Math.floor(Math.random() * 40) + 1;
+      return cents / 100;
+    });
+    this.nowProvider = options.nowProvider || (() => new Date());
   }
 
   private buildRechargeConfigUnavailable(
@@ -111,6 +126,32 @@ export class StaticRechargeService {
     };
   }
 
+  private buildRechargeSubmissionExpired(
+    requestId: string,
+    clientVersion?: string,
+  ): ApiResponse<never> {
+    return {
+      success: false,
+      error: {
+        code: "RECHARGE_SUBMISSION_EXPIRED",
+        message: "The requested recharge submission has expired.",
+      },
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  private now(): Date {
+    return this.nowProvider();
+  }
+
+  private nowIso(): string {
+    return this.now().toISOString();
+  }
+
+  private buildManualRechargeExpiresAt(now: Date): string {
+    return new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+  }
+
   async createRechargeSubmission(
     userId: string,
     input: CreateRechargeSubmissionRequestDto,
@@ -129,13 +170,17 @@ export class StaticRechargeService {
       return this.buildRechargeAmountOutOfRange(rate, requestId, clientVersion);
     }
 
-    const submission = createRechargeSubmission(userId, input, rate, new Date().toISOString());
+    const now = this.now();
+    const submission = createRechargeSubmission(userId, input, rate, now.toISOString(), {
+      serviceFee: this.manualRechargeFeeGenerator(),
+      expiresAt: this.buildManualRechargeExpiresAt(now),
+    });
     const persistedSubmission = await this.submissionRepository.save(submission);
 
     return {
       success: true,
       data: {
-        submission: toRechargeSubmissionDto(persistedSubmission),
+        submission: toRechargeSubmissionDto(persistedSubmission, { now }),
       },
       meta: buildRequestMeta(requestId, clientVersion),
     };
@@ -161,14 +206,14 @@ export class StaticRechargeService {
       const updatedSubmission = submitRechargeSubmissionProof(
         submission,
         input,
-        new Date().toISOString(),
+        this.nowIso(),
       );
       const persistedSubmission = await this.submissionRepository.save(updatedSubmission);
 
       return {
         success: true,
         data: {
-          submission: toRechargeSubmissionDto(persistedSubmission),
+          submission: toRechargeSubmissionDto(persistedSubmission, { now: this.now() }),
         },
         meta: buildRequestMeta(requestId, clientVersion),
       };
@@ -247,6 +292,85 @@ export class StaticRechargeService {
     };
   }
 
+  async listAdminRechargeSubmissions(
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<ListAdminRechargeSubmissionsResponseDto>> {
+    const since = new Date(this.now().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const submissions = await this.submissionRepository.listRecent(since);
+    const now = this.now();
+    const items = submissions
+      .map((submission) => toAdminRechargeSubmissionDto(submission, { now }))
+      .sort((left, right) => {
+        const leftPaid = left.status === "paying" && Boolean(left.paymentMarkedAt);
+        const rightPaid = right.status === "paying" && Boolean(right.paymentMarkedAt);
+        if (leftPaid !== rightPaid) {
+          return leftPaid ? -1 : 1;
+        }
+
+        const leftPaying = left.status === "paying";
+        const rightPaying = right.status === "paying";
+        if (leftPaying !== rightPaying) {
+          return leftPaying ? -1 : 1;
+        }
+
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      });
+
+    return {
+      success: true,
+      data: {
+        items,
+      },
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async markRechargeSubmissionPaid(
+    userId: string,
+    submissionId: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<MarkRechargeSubmissionPaidResponseDto>> {
+    const submission = await this.submissionRepository.findById(submissionId);
+    if (!submission) {
+      return this.buildRechargeSubmissionNotFound(requestId, clientVersion);
+    }
+
+    if (submission.userId !== userId) {
+      return this.buildRechargeSubmissionForbidden(requestId, clientVersion);
+    }
+
+    if (isRechargeSubmissionExpired(submission, this.now())) {
+      return this.buildRechargeSubmissionExpired(requestId, clientVersion);
+    }
+
+    try {
+      const updatedSubmission = markRechargeSubmissionPaid(submission, this.nowIso());
+      const persistedSubmission = await this.submissionRepository.save(updatedSubmission);
+      return {
+        success: true,
+        data: {
+          submission: toRechargeSubmissionDto(persistedSubmission, { now: this.now() }),
+        },
+        meta: buildRequestMeta(requestId, clientVersion),
+      };
+    } catch (error) {
+      if (error instanceof RechargeSubmissionNotPayingError) {
+        return {
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+          meta: buildRequestMeta(requestId, clientVersion),
+        };
+      }
+
+      throw error;
+    }
+  }
+
   async reviewRechargeSubmission(
     submissionId: string,
     input: ReviewRechargeSubmissionRequestDto | ReviewRechargeSubmissionDecisionDto,
@@ -266,7 +390,7 @@ export class StaticRechargeService {
         const rejectedSubmission = markRechargeSubmissionRejected(
           submission,
           actorUserId,
-          new Date().toISOString(),
+          this.nowIso(),
         );
         const persistedSubmission = await this.submissionRepository.save(rejectedSubmission);
 
@@ -281,9 +405,14 @@ export class StaticRechargeService {
         };
       }
 
-      const recharge = await this.creditAccountService.adminRechargeCredits({
-        identity: submission.userId,
+      if (isRechargeSubmissionExpired(submission, this.now())) {
+        throw new RechargeSubmissionExpiredError(submission.submissionId);
+      }
+
+      const recharge = await this.creditAccountService.adminApplyManualRecharge({
+        userId: submission.userId,
         creditAmount: submission.creditAmount,
+        submissionId: submission.submissionId,
         description: buildStaticRechargeDescription(submission),
       }, actorUserId, requestId, clientVersion);
 
@@ -298,7 +427,7 @@ export class StaticRechargeService {
       const creditedSubmission = markRechargeSubmissionCredited(
         submission,
         actorUserId,
-        new Date().toISOString(),
+        submission.reviewedAt ?? this.nowIso(),
       );
       const persistedSubmission = await this.submissionRepository.save(creditedSubmission);
 
@@ -321,6 +450,10 @@ export class StaticRechargeService {
           },
           meta: buildRequestMeta(requestId, clientVersion),
         };
+      }
+
+      if (error instanceof RechargeSubmissionExpiredError) {
+        return this.buildRechargeSubmissionExpired(requestId, clientVersion);
       }
 
       throw error;

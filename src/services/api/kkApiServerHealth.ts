@@ -1,12 +1,13 @@
-import { resolveKkApiBaseUrl } from './kkApiClient.ts';
+import { resolveKkApiBaseUrl } from './kkApiBaseUrl.ts';
 
-export type KkApiRepositoryBackend = 'supabase' | 'postgres' | 'memory' | 'local-file' | 'custom' | 'unknown';
+export type KkApiRepositoryBackend = 'postgres' | 'memory' | 'local-file' | 'custom' | 'unknown';
 
 interface RawHealthEnvelope {
   success?: boolean;
   data?: {
     service?: unknown;
     status?: unknown;
+    selfHostedCoreReady?: unknown;
     config?: Record<string, unknown> | null;
     repositories?: Record<string, unknown> | null;
     persistence?: Record<string, unknown> | null;
@@ -18,12 +19,11 @@ export interface KkApiServerHealth {
   verified: boolean;
   service: string;
   status: string;
+  selfHostedCoreReady: boolean;
   config: {
-    hasSupabaseUrl: boolean;
-    hasServiceRoleKey: boolean;
+    hasPostgresConfig: boolean;
     hasAuthKey: boolean;
     hasUserApiEncryptionSecret: boolean;
-    usingPublicUrlFallback: boolean;
   };
   repositories: {
     adminConsole: KkApiRepositoryBackend;
@@ -35,6 +35,9 @@ export interface KkApiServerHealth {
   persistence: {
     userApiKeys: boolean;
     keyManager: boolean;
+    authData: boolean;
+    authSessions: boolean;
+    tempUsers: boolean;
     credits: boolean;
     creditProviders: boolean;
     workspaceLayout: boolean;
@@ -54,7 +57,7 @@ function normalizeBoolean(value: unknown): boolean {
 }
 
 function normalizeBackend(value: unknown): KkApiRepositoryBackend {
-  return value === 'supabase' || value === 'postgres' || value === 'memory' || value === 'local-file' || value === 'custom'
+  return value === 'postgres' || value === 'memory' || value === 'local-file' || value === 'custom'
     ? value
     : 'unknown';
 }
@@ -65,12 +68,11 @@ function createUnavailableHealth(message: string): KkApiServerHealth {
     verified: false,
     service: 'kk-studio-api',
     status: 'unavailable',
+    selfHostedCoreReady: false,
     config: {
-      hasSupabaseUrl: false,
-      hasServiceRoleKey: false,
+      hasPostgresConfig: false,
       hasAuthKey: false,
       hasUserApiEncryptionSecret: false,
-      usingPublicUrlFallback: false,
     },
     repositories: {
       adminConsole: 'unknown',
@@ -82,6 +84,9 @@ function createUnavailableHealth(message: string): KkApiServerHealth {
     persistence: {
       userApiKeys: false,
       keyManager: false,
+      authData: false,
+      authSessions: false,
+      tempUsers: false,
       credits: false,
       creditProviders: false,
       workspaceLayout: false,
@@ -115,17 +120,19 @@ function normalizeHealthPayload(payload: unknown): KkApiServerHealth {
     verified,
     service: typeof data.service === 'string' && data.service.trim() ? data.service : 'kk-studio-api',
     status: typeof data.status === 'string' && data.status.trim() ? data.status : 'ok',
+    selfHostedCoreReady: normalizeBoolean(data.selfHostedCoreReady),
     config: {
-      hasSupabaseUrl: normalizeBoolean(config.hasSupabaseUrl),
-      hasServiceRoleKey: normalizeBoolean(config.hasServiceRoleKey),
+      hasPostgresConfig: normalizeBoolean(config.hasPostgresConfig),
       hasAuthKey: normalizeBoolean(config.hasAuthKey),
       hasUserApiEncryptionSecret: normalizeBoolean(config.hasUserApiEncryptionSecret),
-      usingPublicUrlFallback: normalizeBoolean(config.usingPublicUrlFallback),
     },
     repositories: normalizedRepositories,
     persistence: {
       userApiKeys: normalizeBoolean(persistence.userApiKeys),
       keyManager: normalizeBoolean(persistence.keyManager),
+      authData: normalizeBoolean(persistence.authData),
+      authSessions: normalizeBoolean(persistence.authSessions),
+      tempUsers: normalizeBoolean(persistence.tempUsers),
       credits: normalizeBoolean(persistence.credits),
       creditProviders: normalizeBoolean(persistence.creditProviders),
       workspaceLayout: normalizeBoolean(persistence.workspaceLayout),
@@ -220,7 +227,7 @@ export function isKkApiUserDataPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && (health.repositories.authData === 'supabase' || health.repositories.authData === 'postgres')
+    && health.repositories.authData === 'postgres'
     && health.persistence.userApiKeys
     && health.persistence.keyManager
     && health.config.hasUserApiEncryptionSecret,
@@ -235,8 +242,7 @@ export function isKkApiUserDataWritableFromHealth(
     && health.reachable
     && health.verified
     && (
-      health.repositories.authData === 'supabase'
-      || health.repositories.authData === 'postgres'
+      health.repositories.authData === 'postgres'
       || health.repositories.authData === 'local-file'
     )
     && health.persistence.userApiKeys
@@ -252,7 +258,7 @@ export function isKkApiBillingPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && (health.repositories.creditAccounts === 'supabase' || health.repositories.creditAccounts === 'postgres')
+    && health.repositories.creditAccounts === 'postgres'
     && health.persistence.credits,
   );
 }
@@ -265,8 +271,7 @@ export function isKkApiBillingAvailableFromHealth(
     && health.reachable
     && health.verified
     && (
-      health.repositories.creditAccounts === 'supabase'
-      || health.repositories.creditAccounts === 'postgres'
+      health.repositories.creditAccounts === 'postgres'
       || health.repositories.creditAccounts === 'local-file'
     )
     && health.persistence.credits,
@@ -280,7 +285,7 @@ export function isKkApiCreditProviderCatalogPersistedInCloudFromHealth(
     health
     && health.reachable
     && health.verified
-    && (health.repositories.creditProviders === 'supabase' || health.repositories.creditProviders === 'postgres')
+    && health.repositories.creditProviders === 'postgres'
     && health.persistence.creditProviders,
   );
 }
@@ -293,10 +298,31 @@ export function isKkApiCanonicalCloudReadyFromHealth(
     && health.reachable
     && health.verified
     && health.status === 'ok'
-    && health.config.hasSupabaseUrl
-    && health.config.hasServiceRoleKey
+    && health.config.hasPostgresConfig
     && isKkApiBillingPersistedInCloudFromHealth(health)
     && isKkApiCreditProviderCatalogPersistedInCloudFromHealth(health),
+  );
+}
+
+export function isKkApiSelfHostedCoreReadyFromHealth(
+  health: KkApiServerHealth | null | undefined,
+): boolean {
+  return Boolean(
+    health
+    && health.reachable
+    && health.verified
+    && (
+      health.selfHostedCoreReady
+      || (
+        health.repositories.adminConsole === 'postgres'
+        && health.repositories.authData === 'postgres'
+        && health.repositories.workspaceLayout === 'postgres'
+        && health.persistence.authData
+        && health.persistence.authSessions
+        && health.persistence.tempUsers
+        && health.persistence.workspaceLayout
+      )
+    )
   );
 }
 

@@ -42,8 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - verify
-      - deploy-supabase-functions
-    if: ${{ needs.deploy-supabase-functions.result == 'success' && secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+      - deploy-vps-api
+    if: ${{ needs.deploy-vps-api.result == 'success' && secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -70,36 +70,18 @@ jobs:
       - name: Deploy to Vercel
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
-  deploy-supabase-functions:
+  deploy-vps-api:
     runs-on: ubuntu-latest
     needs: verify
-    if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF != '' }}
+    if: ${{ secrets.KK_VPS_DEPLOY_COMMAND != '' }}
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      KK_VPS_DEPLOY_COMMAND: ${{ secrets.KK_VPS_DEPLOY_COMMAND }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
-
-      - name: Deploy user-route-proxy Edge Function
-        run: supabase functions deploy user-route-proxy
-
-      - name: Deploy secure-model-proxy Edge Function
-        run: supabase functions deploy secure-model-proxy
-
-      - name: Deploy admin-credit-models Edge Function
-        run: supabase functions deploy admin-credit-models --no-verify-jwt
-
-      - name: Deploy wechat-auth Edge Function
-        run: supabase functions deploy wechat-auth --no-verify-jwt
+      - name: Run VPS deploy command
+        run: bash -lc "$KK_VPS_DEPLOY_COMMAND"
 
   deploy-netlify:
     runs-on: ubuntu-latest

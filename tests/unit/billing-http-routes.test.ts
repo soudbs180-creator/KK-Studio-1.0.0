@@ -31,6 +31,8 @@ import {
 import {
   handleCreateRechargeSubmission,
   handleGetAdminRechargeSubmission,
+  handleListAdminRechargeSubmissions,
+  handleMarkRechargeSubmissionPaid,
   handleReviewRechargeSubmission,
   handleSubmitRecharge,
   handleSubmitRechargeProof,
@@ -404,6 +406,106 @@ describe("billing http routes", () => {
     }
 
     assert.equal(balance.body.data.balance, 66);
+  });
+
+  test("manual recharge handlers mark paid orders, list paid orders first, and credit by bound user id", async () => {
+    const fixture = createStaticRechargeFixture();
+    const userHeaders = {
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-manual-1",
+      "x-request-id": "req-billing-manual-create",
+    };
+    const secondUserHeaders = {
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-manual-2",
+      "x-request-id": "req-billing-manual-create-2",
+    };
+    const adminHeaders = {
+      [AUTHENTICATED_USER_ID_HEADER]: "admin-billing-manual-1",
+      [AUTHENTICATED_USER_ROLE_HEADER]: "admin",
+      [AUTHENTICATED_ADMIN_SESSION_HEADER]: "true",
+      "x-request-id": "req-billing-manual-admin",
+    };
+
+    const first = await handleCreateRechargeSubmission(fixture.service, {
+      amount: 20,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+      manualProvider: "alipay",
+    }, userHeaders);
+    const second = await handleCreateRechargeSubmission(fixture.service, {
+      amount: 20,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+      manualProvider: "wechat",
+    }, secondUserHeaders);
+
+    assert.equal(first.statusCode, 200);
+    assert.equal(second.statusCode, 200);
+    assert.equal(first.body.success, true);
+    assert.equal(second.body.success, true);
+    if (!first.body.success || !second.body.success) {
+      return;
+    }
+
+    assert.equal(first.body.data.submission.status, "paying");
+    assert.equal(first.body.data.submission.userId, undefined);
+    assert.equal(first.body.data.submission.manualProvider, "alipay");
+    assert.equal(typeof first.body.data.submission.serviceFee, "number");
+    assert.equal(first.body.data.submission.creditAmount, first.body.data.submission.baseCredits! + first.body.data.submission.bonusCredits!);
+
+    const marked = await handleMarkRechargeSubmissionPaid(
+      fixture.service,
+      second.body.data.submission.submissionId,
+      {
+        ...secondUserHeaders,
+        "x-request-id": "req-billing-manual-paid",
+      },
+    );
+    assert.equal(marked.statusCode, 200);
+    assert.equal(marked.body.success, true);
+    if (!marked.body.success) {
+      return;
+    }
+    assert.equal(marked.body.data.submission.status, "paying");
+    assert.equal(typeof marked.body.data.submission.paymentMarkedAt, "string");
+
+    const list = await handleListAdminRechargeSubmissions(fixture.service, adminHeaders);
+    assert.equal(list.statusCode, 200);
+    assert.equal(list.body.success, true);
+    if (!list.body.success) {
+      return;
+    }
+    assert.equal(list.body.data.items[0].submissionId, second.body.data.submission.submissionId);
+    assert.equal(list.body.data.items[0].paymentMarkedAt, marked.body.data.submission.paymentMarkedAt);
+    assert.equal(list.body.data.items[0].userId, "user-billing-manual-2");
+
+    const reviewed = await handleReviewRechargeSubmission(
+      fixture.service,
+      second.body.data.submission.submissionId,
+      { decision: "credit" },
+      {
+        ...adminHeaders,
+        "x-request-id": "req-billing-manual-review",
+      },
+    );
+    const duplicate = await handleReviewRechargeSubmission(
+      fixture.service,
+      second.body.data.submission.submissionId,
+      { decision: "credit" },
+      {
+        ...adminHeaders,
+        "x-request-id": "req-billing-manual-review-duplicate",
+      },
+    );
+
+    assert.equal(reviewed.statusCode, 200);
+    assert.equal(duplicate.statusCode, 200);
+    assert.equal(reviewed.body.success, true);
+    assert.equal(duplicate.body.success, true);
+    if (!reviewed.body.success || !duplicate.body.success) {
+      return;
+    }
+    assert.equal(reviewed.body.data.recharge?.identity, "user-billing-manual-2");
+    assert.equal(duplicate.body.data.recharge?.balanceAfter, reviewed.body.data.recharge?.balanceAfter);
   });
 
   test("api server registers split recharge submission routes and keeps the legacy submit route compatible", async () => {

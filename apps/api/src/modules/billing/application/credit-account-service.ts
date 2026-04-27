@@ -17,7 +17,9 @@ import {
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import {
   applyDebitCredits,
+  applyManualRechargeCredits,
   applyPaymentSettlementCredits,
+  buildManualRechargeApplied,
   buildPaymentSettlementApplied,
   buildBillingCreditDebitedEvent,
 } from "../domain/credit-account.ts";
@@ -226,6 +228,53 @@ export class CreditAccountService {
     return {
       success: true,
       data: result,
+      meta: buildRequestMeta(requestId, clientVersion),
+    };
+  }
+
+  async adminApplyManualRecharge(
+    input: {
+      userId: string;
+      creditAmount: number;
+      submissionId: string;
+      description?: string;
+    },
+    actorUserId: string,
+    requestId: string,
+    clientVersion?: string,
+  ): Promise<ApiResponse<AdminRechargeCreditsResponseDto>> {
+    const existing = await this.repository.findRechargeByIdempotencyKey(input.userId, input.submissionId);
+    if (existing) {
+      return {
+        success: true,
+        data: buildManualRechargeApplied(input.userId, input.creditAmount, existing),
+        meta: buildRequestMeta(requestId, clientVersion),
+      };
+    }
+
+    const account = await this.repository.getOrCreate(input.userId);
+    const recharge = applyManualRechargeCredits(account, {
+      submissionId: input.submissionId,
+      creditAmount: input.creditAmount,
+    }, new Date().toISOString());
+    const persisted = await this.repository.saveRecharge(recharge.account, {
+      ...recharge.ledger,
+      businessRefType: "manual_recharge",
+      businessRefId: input.submissionId,
+    });
+
+    this.logger.info("Manual recharge applied by migrated billing module", {
+      actorUserId,
+      identity: input.userId,
+      subjectId: input.userId,
+      creditedAmount: input.creditAmount,
+      balanceAfter: persisted.ledger.balanceAfter,
+      submissionId: input.submissionId,
+    });
+
+    return {
+      success: true,
+      data: buildManualRechargeApplied(input.userId, input.creditAmount, persisted),
       meta: buildRequestMeta(requestId, clientVersion),
     };
   }

@@ -4,15 +4,11 @@ import { fileURLToPath } from "url";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
-const productionProjectRef =
-  process.env.SUPABASE_PROJECT_REF_PRODUCTION
-  || process.env.SUPABASE_PROJECT_REF;
-const previewProjectRef = process.env.SUPABASE_PROJECT_REF_PREVIEW;
+const vpsDeployCommand = process.env.KK_VPS_DEPLOY_COMMAND;
 
 const args = new Set(process.argv.slice(2));
 const skipCheck = args.has("--skip-check");
-const skipSupabase = args.has("--skip-supabase");
-const skipMigrations = args.has("--skip-migrations");
+const skipVps = args.has("--skip-vps");
 const skipVercel = args.has("--skip-vercel");
 const preview = args.has("--preview");
 const help = args.has("--help") || args.has("-h");
@@ -42,15 +38,17 @@ function runStep(title, command) {
 }
 
 function printUsage() {
-  console.log(`Usage: node scripts/release-hosted.mjs [--preview] [--skip-check] [--skip-supabase] [--skip-migrations] [--skip-vercel]
+  console.log(`Usage: node scripts/release-hosted.mjs [--preview] [--skip-check] [--skip-vps] [--skip-vercel]
 
 Options:
-  --preview        Deploy Vercel as a preview instead of production.
-  --skip-check     Skip the hosted preflight check.
-  --skip-supabase  Skip Supabase link + Edge Function deploy steps.
-  --skip-migrations  Skip \`npx supabase db push\` after linking the project.
-  --skip-vercel    Skip Vercel deployment.
-  --help, -h       Show this help message.`);
+  --preview      Deploy Vercel as a preview instead of production.
+  --skip-check   Skip the hosted preflight check.
+  --skip-vps     Skip the VPS API/payment-sidecar deploy step.
+  --skip-vercel  Skip Vercel deployment.
+  --help, -h     Show this help message.
+
+Environment:
+  KK_VPS_DEPLOY_COMMAND  Command that deploys PostgreSQL migrations, apps/api, and apps/payment-sidecar on the VPS.`);
 }
 
 function main() {
@@ -59,39 +57,18 @@ function main() {
     return;
   }
 
-  if (previewProjectRef && productionProjectRef && previewProjectRef === productionProjectRef) {
-    throw new Error("SUPABASE_PROJECT_REF_PREVIEW must differ from production to keep preview and production data isolated.");
-  }
-
-  const supabaseProjectRef = preview
-    ? previewProjectRef
-    : productionProjectRef;
-
-  if (!supabaseProjectRef) {
-    throw new Error(
-      preview
-        ? "Missing SUPABASE_PROJECT_REF_PREVIEW for preview releases."
-        : "Missing SUPABASE_PROJECT_REF_PRODUCTION or SUPABASE_PROJECT_REF for production releases."
-    );
-  }
-
   console.log("[release:hosted] Starting hosted release workflow");
   console.log(`[release:hosted] repo: ${repoRoot}`);
-  console.log(`[release:hosted] supabase project ref: ${supabaseProjectRef}`);
 
   if (!skipCheck) {
     runStep("Hosted preflight check", "npm run release:hosted:check");
   }
 
-  if (!skipSupabase) {
-    runStep("Link Supabase project", `npx supabase link --project-ref ${supabaseProjectRef}`);
-    if (!skipMigrations) {
-      runStep("Push Supabase migrations", "npx supabase db push");
+  if (!skipVps) {
+    if (!vpsDeployCommand) {
+      throw new Error("Missing KK_VPS_DEPLOY_COMMAND. Set it to the VPS deployment command or pass --skip-vps.");
     }
-    runStep("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy");
-    runStep("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy");
-    runStep("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models");
-    runStep("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth");
+    runStep("Deploy VPS API", vpsDeployCommand);
   }
 
   if (!skipVercel) {
@@ -102,8 +79,8 @@ function main() {
   }
 
   console.log("\n[release:hosted] Workflow finished.");
-  console.log("[release:hosted] Reminder: keep VITE_KK_API_BASE_URL and VITE_ENABLE_LEGACY_WEB_API_FALLBACK out of Vercel hosted env.");
-  console.log("[release:hosted] Reminder: confirm WeChat secrets exist in Supabase before validating hosted auth.");
+  console.log("[release:hosted] Reminder: confirm VITE_KK_API_BASE_URL points at the VPS API before validating hosted auth.");
+  console.log("[release:hosted] Reminder: confirm VPS PostgreSQL, payment, Google, and WeChat secrets exist before smoke tests.");
 }
 
 try {

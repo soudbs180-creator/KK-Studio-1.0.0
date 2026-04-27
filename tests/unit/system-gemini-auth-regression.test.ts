@@ -9,35 +9,31 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
 
-test("secure-model-proxy keeps provider-aware auth selection for system Gemini-compatible routes", () => {
-  const secureProxySource = readSource("supabase/functions/secure-model-proxy/index.ts");
+test("VPS local proxy keeps provider-aware auth selection for system Gemini-compatible routes", () => {
+  const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
 
   assert.match(
-    secureProxySource,
-    /function isBearerGeminiCompatProvider\(providerId: string \| undefined, baseUrl: string \| undefined\): boolean \{/,
+    localProxySource,
+    /function isBearerGeminiCompatRoute\(routeConfig: SecureProxyUserRouteConfigDto\): boolean \{/,
   );
   assert.match(
-    secureProxySource,
-    /function isWuyinGeminiCompatProvider\(providerId: string \| undefined, baseUrl: string \| undefined\): boolean \{/,
+    localProxySource,
+    /function isWuyinGeminiRoute\(routeConfig: SecureProxyUserRouteConfigDto\): boolean \{/,
   );
   assert.match(
-    secureProxySource,
-    /function buildSystemGeminiAuth\(url: string, providerId: string \| undefined, baseUrl: string, apiKey: string\): \{ url: string; headers: HeadersInit \} \{/,
+    localProxySource,
+    /function buildGeminiAuth\(\s*url: string,\s*routeConfig: SecureProxyUserRouteConfigDto,\s*\): \{ url: string; headers: Record<string, string> \} \{/,
   );
   assert.match(
-    secureProxySource,
-    /if \(isBearerGeminiCompatProvider\(providerId, baseUrl\)\) \{/,
+    localProxySource,
+    /if \(isWuyinGeminiRoute\(routeConfig\) \|\| isBearerGeminiCompatRoute\(routeConfig\)\) \{/,
   );
   assert.match(
-    secureProxySource,
-    /if \(isWuyinGeminiCompatProvider\(providerId, baseUrl\)\) \{/,
+    localProxySource,
+    /const auth = buildGeminiAuth\(`\$\{apiBase\}\/\$\{upstreamTaskId\}`,\s*routeConfig\);/,
   );
   assert.match(
-    secureProxySource,
-    /const geminiAuth = buildSystemGeminiAuth\(/,
-  );
-  assert.match(
-    secureProxySource,
-    /await tryDeleteUpstreamVideoTask\(taskPayload\.endpointType, baseUrl, selectedKey, taskPayload\.operationName, taskPayload\.providerId\);/,
+    localProxySource,
+    /await this\.tryDeleteDirectVideoTask\(routeConfig, endpointType, baseUrl, upstreamTaskId\);/,
   );
 });

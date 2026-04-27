@@ -16,12 +16,12 @@ import type {
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import type { KeySlot } from "../../../../../../src/services/auth/keyManager.ts";
 import type { AudioGenerationOptions, VideoGenerationOptions } from "../../../../../../src/services/llm/LLMAdapter.ts";
-import type { ServerSupabaseConfig } from "../../../lib/server-supabase-config.ts";
+import type { ServerRuntimeConfig } from "../../../lib/server-runtime-config.ts";
 import type { AuthDataService } from "../../auth/index.ts";
 
-const INTERNAL_ROUTE_SECRET_HEADER = "x-kk-internal-route-secret";
 const LOCAL_PROXY_TASK_PREFIX = "local_proxy:";
 const CLIENT_VISIBLE_SECRET_PLACEHOLDER = "sk-readonly-0000";
+const DEFAULT_LOCAL_ROUTE_TASK_SECRET = "kkai-local-route-task-secret";
 
 type LocalUserRouteProxyMode =
   | "chat"
@@ -160,45 +160,6 @@ export class LocalUserRouteProxyError extends Error {
   }
 }
 
-function isHostedSecureProxyTransportFailure(error: unknown): boolean {
-  if (error instanceof LocalUserRouteProxyError) {
-    return error.statusCode === 401 || error.statusCode >= 500;
-  }
-
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  const message = String(error.message || "").trim().toLowerCase();
-  return (
-    message.includes("fetch failed")
-    || message.includes("network")
-    || message.includes("timeout")
-    || message.includes("socket")
-    || message.includes("econnrefused")
-    || message.includes("enotfound")
-    || message.includes("aborted")
-  );
-}
-
-function wrapDirectFallbackError(
-  mode: LocalUserRouteProxyMode,
-  error: unknown,
-): LocalUserRouteProxyError {
-  if (error instanceof LocalUserRouteProxyError) {
-    return error;
-  }
-
-  const message = error instanceof Error ? error.message : String(error || "Unknown error.");
-  return new LocalUserRouteProxyError(
-    `Local direct ${mode} route failed after hosted secure-model-proxy fallback: ${message}`,
-    {
-      code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
-      statusCode: 502,
-    },
-  );
-}
-
 function toBase64Url(input: Buffer | string): string {
   return Buffer.from(input)
     .toString("base64")
@@ -232,7 +193,12 @@ type LocalResolvedRouteEndpointType = "openai" | "gemini" | "claude";
 type LocalResolvedRouteFormat = "openai" | "gemini" | "claude";
 type LocalResolvedAuthMethod = "query" | "header";
 type LocalAuthorizationValueFormat = "bearer" | "raw";
-type LocalResolvedImageSurface = "chat-image" | "provider-images" | "gemini-native-image" | "async-image";
+export type LocalResolvedImageSurface = "chat-image" | "provider-images" | "gemini-native-image" | "async-image";
+
+interface InvokeResolvedRouteOptions {
+  taskMode?: "image" | "video";
+  imageSurface?: LocalResolvedImageSurface;
+}
 
 function normalizeRouteString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -1028,6 +994,77 @@ function normalizeAsyncTaskStatus(data: any): "pending" | "success" | "failed" {
   return "pending";
 }
 
+function extractDirectVideoUrl(data: any): string {
+  const candidates = [
+    data?.video_url,
+    data?.url,
+    data?.video?.url,
+    data?.data?.video_url,
+    data?.data?.output,
+    data?.content_url,
+    data?.data?.content_url,
+    Array.isArray(data?.data?.outputs) ? data.data.outputs[0] : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
+}
+
+function extractGeminiVideoTaskErrorMessage(data: any): string {
+  const candidates = [
+    data?.error?.message,
+    data?.response?.error?.message,
+    data?.response?.generateVideoResponse?.error?.message,
+    data?.response?.generateVideoResponse?.error,
+    data?.message,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
+}
+
+function extractGeminiVideoUri(data: any): string {
+  const candidates = [
+    data?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri,
+    data?.response?.generatedSamples?.[0]?.video?.uri,
+    data?.response?.video?.uri,
+    data?.response?.result?.video?.uri,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
+}
+
+async function downloadBinaryAsDataUrl(
+  url: string,
+  headers: HeadersInit,
+  fallbackMimeType: string,
+): Promise<string> {
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`Failed to download generated content: HTTP ${response.status}`);
+  }
+
+  const mimeType = String(response.headers.get("content-type") || "").trim() || fallbackMimeType;
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
+
 function toAsyncImageReference(ref: string | { data: string; mimeType?: string }): string | null {
   if (typeof ref === "string") {
     const normalized = ref.trim();
@@ -1219,18 +1256,14 @@ async function toInlineImagePartWithFormat(
 export class LocalUserRouteProxyService {
   private readonly logger = consoleLogger.child({ module: "local-user-route-proxy" });
   private readonly authDataService: AuthDataService;
-  private readonly supabaseUrl?: string;
-  private readonly authKey?: string;
-  private readonly sharedSecret?: string;
+  private readonly sharedSecret: string;
 
   constructor(
     authDataService: AuthDataService,
-    config: ServerSupabaseConfig,
+    config: ServerRuntimeConfig,
   ) {
     this.authDataService = authDataService;
-    this.supabaseUrl = config.supabaseUrl;
-    this.authKey = config.authKey;
-    this.sharedSecret = config.userApiEncryptionSecret;
+    this.sharedSecret = String(config.userApiEncryptionSecret || "").trim() || DEFAULT_LOCAL_ROUTE_TASK_SECRET;
   }
 
   private async createVideoAdapter() {
@@ -1254,13 +1287,6 @@ export class LocalUserRouteProxyService {
       throw new LocalUserRouteProxyError("Authentication is required for local user-route proxy calls.", {
         code: "AUTH_REQUIRED",
         statusCode: 401,
-      });
-    }
-
-    if (!this.supabaseUrl || !this.authKey || !this.sharedSecret) {
-      throw new LocalUserRouteProxyError("The local user-route proxy is not fully configured on this API server.", {
-        code: "LOCAL_USER_ROUTE_PROXY_UNAVAILABLE",
-        statusCode: 503,
       });
     }
 
@@ -1308,118 +1334,18 @@ export class LocalUserRouteProxyService {
       );
     }
 
-    if ((effectiveMode === "task_status" || effectiveMode === "download_task") && decodedTask?.mode === "image") {
-      return this.invokeDirectImageTaskRoute(
-        routeConfig,
-        effectiveMode,
-        upstreamTaskId,
+    const response = await this.invokeResolvedRoute(
+      routeConfig,
+      {
+        ...input,
+        taskId: upstreamTaskId || input.taskId,
         requestId,
         attemptId,
-      );
-    }
-
-    const payload: Record<string, unknown> = {
-      mode: effectiveMode,
-      routeConfig,
-    };
-
-    if (effectiveMode === "chat") {
-      payload.modelId = String(input.modelId || "").trim();
-      payload.messages = Array.isArray(input.messages) ? input.messages : [];
-      payload.temperature = input.temperature;
-      payload.maxTokens = input.maxTokens;
-      payload.stream = Boolean(input.stream);
-    } else if (effectiveMode === "image") {
-      payload.modelId = String(input.modelId || "").trim();
-      payload.prompt = String(input.prompt || "");
-      payload.aspectRatio = input.aspectRatio;
-      payload.imageSize = input.imageSize;
-      payload.imageCount = input.imageCount;
-      payload.referenceImages = Array.isArray(input.referenceImages) ? input.referenceImages : [];
-    } else if (effectiveMode === "video") {
-      payload.modelId = String(input.modelId || "").trim();
-      payload.prompt = String(input.prompt || "");
-      payload.aspectRatio = input.aspectRatio;
-      payload.resolution = input.resolution;
-      payload.duration = input.duration;
-      payload.videoDuration = input.videoDuration;
-      payload.imageUrl = input.imageUrl;
-      payload.imageTailUrl = input.imageTailUrl;
-    } else if (effectiveMode === "audio") {
-      payload.modelId = String(input.modelId || "").trim();
-      payload.prompt = String(input.prompt || "");
-    } else {
-      payload.taskId = upstreamTaskId;
-    }
-
-    if (requestId) {
-      payload.requestId = requestId;
-    }
-
-    if (attemptId) {
-      payload.attemptId = attemptId;
-    }
-
-    let response: LocalUserRouteProxyTransport;
-    try {
-      response = await this.invokeSecureProxy(accessToken, payload);
-    } catch (error) {
-      if (isHostedSecureProxyTransportFailure(error)) {
-        if (effectiveMode === "image") {
-          console.warn(
-            "[local-user-route-proxy] Hosted secure-model-proxy failed, retrying image generation directly against the user route.",
-            { routeId, provider: routeConfig.provider, modelId: input.modelId },
-          );
-          response = await this.invokeDirectImageRoute(routeConfig, input).catch((directError) => {
-            throw wrapDirectFallbackError(effectiveMode, directError);
-          });
-        } else if (effectiveMode === "chat") {
-          console.warn(
-            "[local-user-route-proxy] Hosted secure-model-proxy failed, retrying chat generation directly against the user route.",
-            { routeId, provider: routeConfig.provider, modelId: input.modelId },
-          );
-          response = await this.invokeDirectChatRoute(routeConfig, input).catch((directError) => {
-            throw wrapDirectFallbackError(effectiveMode, directError);
-          });
-        } else if (effectiveMode === "video") {
-          console.warn(
-            "[local-user-route-proxy] Hosted secure-model-proxy failed, retrying video generation directly against the user route.",
-            { routeId, provider: routeConfig.provider, modelId: input.modelId },
-          );
-          response = await this.invokeDirectVideoRoute(routeConfig, input).catch((directError) => {
-            throw wrapDirectFallbackError(effectiveMode, directError);
-          });
-        } else if (effectiveMode === "audio") {
-          console.warn(
-            "[local-user-route-proxy] Hosted secure-model-proxy failed, retrying audio generation directly against the user route.",
-            { routeId, provider: routeConfig.provider, modelId: input.modelId },
-          );
-          response = await this.invokeDirectAudioRoute(routeConfig, input).catch((directError) => {
-            throw wrapDirectFallbackError(effectiveMode, directError);
-          });
-        } else {
-          throw error instanceof LocalUserRouteProxyError
-            ? error
-            : new LocalUserRouteProxyError(
-              `Hosted secure-model-proxy request failed: ${error instanceof Error ? error.message : String(error || "Unknown error.")}`,
-              {
-                code: "LOCAL_USER_ROUTE_PROXY_UNAVAILABLE",
-                statusCode: 502,
-              },
-            );
-        }
-      } else if (error instanceof LocalUserRouteProxyError) {
-        throw error;
-      } else {
-        throw new LocalUserRouteProxyError(
-          `Hosted secure-model-proxy request failed: ${error instanceof Error ? error.message : String(error || "Unknown error.")}`,
-          {
-            code: "LOCAL_USER_ROUTE_PROXY_UNAVAILABLE",
-            statusCode: 502,
-          },
-        );
-      }
-    }
+      },
+      {
+        taskMode: decodedTask?.mode,
+      },
+    );
 
     if (effectiveMode === "image") {
       const imageResponse = response as SecureModelProxyImageTransportDto;
@@ -1492,6 +1418,65 @@ export class LocalUserRouteProxyService {
     }
 
     return response;
+  }
+
+  async invokeResolvedRoute(
+    routeConfig: SecureProxyUserRouteConfigDto,
+    input: LocalUserRouteProxyRequest,
+    options: InvokeResolvedRouteOptions = {},
+  ): Promise<LocalUserRouteProxyTransport> {
+    const effectiveMode = input.mode;
+    const requestId = String(input.requestId || "").trim() || undefined;
+    const attemptId = String(input.attemptId || "").trim() || undefined;
+    const upstreamTaskId = String(input.taskId || "").trim();
+
+    if ((effectiveMode === "task_status" || effectiveMode === "download_task") && options.taskMode === "image") {
+      return this.invokeDirectImageTaskRoute(
+        routeConfig,
+        effectiveMode,
+        upstreamTaskId,
+        requestId,
+        attemptId,
+      );
+    }
+
+    if (
+      (effectiveMode === "task_status"
+        || effectiveMode === "cancel_task"
+        || effectiveMode === "delete_task"
+        || effectiveMode === "download_task")
+      && options.taskMode === "video"
+    ) {
+      return this.invokeDirectVideoTaskRoute(
+        routeConfig,
+        effectiveMode,
+        upstreamTaskId,
+        String(input.modelId || "").trim(),
+        requestId,
+        attemptId,
+      );
+    }
+
+    if (effectiveMode === "image") {
+      return this.invokeDirectImageRoute(routeConfig, input, options.imageSurface);
+    }
+
+    if (effectiveMode === "chat") {
+      return this.invokeDirectChatRoute(routeConfig, input);
+    }
+
+    if (effectiveMode === "video") {
+      return this.invokeDirectVideoRoute(routeConfig, input);
+    }
+
+    if (effectiveMode === "audio") {
+      return this.invokeDirectAudioRoute(routeConfig, input);
+    }
+
+    throw new LocalUserRouteProxyError("The local user-route proxy cannot resolve this task operation.", {
+      code: "LOCAL_USER_ROUTE_PROXY_UNAVAILABLE",
+      statusCode: 503,
+    });
   }
 
   private buildDirectRouteKeySlot(
@@ -1777,7 +1762,7 @@ export class LocalUserRouteProxyService {
     const resolvedUrl = String(result.url || "").trim();
     if (resolvedUrl.startsWith("blob:")) {
       throw new LocalUserRouteProxyError(
-        "The upstream video route returned a local blob URL that cannot be served back through the local API. Please retry after restoring the hosted secure-model-proxy or switch to a provider that returns a public video URL.",
+        "The upstream video route returned a local blob URL that cannot be served back through the local API. Switch to a provider that returns a public video URL.",
         {
           code: "LOCAL_USER_ROUTE_PROXY_UNSUPPORTED_VIDEO_CONTENT",
           statusCode: 502,
@@ -1830,54 +1815,13 @@ export class LocalUserRouteProxyService {
     };
   }
 
-  private async invokeSecureProxy(
-    accessToken: string,
-    payload: Record<string, unknown>,
-  ): Promise<LocalUserRouteProxyTransport> {
-    const endpoint = `${this.supabaseUrl!.replace(/\/+$/, "")}/functions/v1/secure-model-proxy`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: this.authKey!,
-        Authorization: `Bearer ${accessToken}`,
-        [INTERNAL_ROUTE_SECRET_HEADER]: this.sharedSecret!,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    let responseBody: any = null;
-    try {
-      responseBody = await response.json();
-    } catch {
-      responseBody = null;
-    }
-
-    if (!response.ok || !responseBody?.success) {
-      const errorMessage =
-        typeof responseBody?.error === "string"
-          ? responseBody.error
-          : typeof responseBody?.error?.message === "string"
-            ? responseBody.error.message
-            : `Local user-route proxy request failed with status ${response.status}`;
-      throw new LocalUserRouteProxyError(errorMessage, {
-        code:
-          typeof responseBody?.error === "object" && typeof responseBody?.error?.code === "string"
-            ? responseBody.error.code
-            : "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
-        statusCode: response.status || 502,
-      });
-    }
-
-    return responseBody as LocalUserRouteProxyTransport;
-  }
-
   private async invokeDirectImageRoute(
     routeConfig: SecureProxyUserRouteConfigDto,
     input: LocalUserRouteProxyRequest,
+    imageSurfaceOverride?: LocalResolvedImageSurface,
   ): Promise<SecureModelProxyImageTransportDto> {
     const endpointType = resolveLocalRouteEndpointType(routeConfig);
-    const imageSurface = resolveLocalImageSurface(routeConfig, input.modelId, input.imageCount);
+    const imageSurface = imageSurfaceOverride || resolveLocalImageSurface(routeConfig, input.modelId, input.imageCount);
     const routeStrategy = detectLocalRouteStrategy(routeConfig);
     const modelId = getUpstreamModelId(String(input.modelId || ""));
     if (!modelId) {
@@ -2232,11 +2176,343 @@ export class LocalUserRouteProxyService {
     };
   }
 
+  private async invokeDirectVideoTaskRoute(
+    routeConfig: SecureProxyUserRouteConfigDto,
+    mode: "task_status" | "cancel_task" | "delete_task" | "download_task",
+    upstreamTaskId: string,
+    modelId: string,
+    requestId?: string,
+    attemptId?: string,
+  ): Promise<SecureModelProxyTaskTransportDto | SecureModelProxyDownloadTransportDto> {
+    const endpointType = resolveLocalRouteEndpointType(routeConfig);
+    const keySlot = this.buildDirectRouteKeySlot(routeConfig, modelId);
+    const baseUrl = normalizeRouteString(routeConfig.baseUrl).replace(/\/+$/, "");
+
+    if (!upstreamTaskId) {
+      throw new LocalUserRouteProxyError("taskId is required.", {
+        code: "INVALID_REQUEST",
+        statusCode: 400,
+      });
+    }
+
+    if (mode === "delete_task") {
+      await this.tryDeleteDirectVideoTask(routeConfig, endpointType, baseUrl, upstreamTaskId);
+      return {
+        success: true,
+        status: "success",
+        deducted: false,
+        requestId,
+        attemptId,
+      };
+    }
+
+    if (mode === "cancel_task") {
+      if (endpointType === "gemini") {
+        const apiBase = baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
+        const auth = buildGeminiAuth(`${apiBase}/${upstreamTaskId}:cancel`, routeConfig);
+        const response = await fetch(auth.url, {
+          method: "POST",
+          headers: auth.headers,
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new LocalUserRouteProxyError(`Cancel failed: ${response.status} ${errorText}`, {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+            statusCode: response.status || 502,
+          });
+        }
+      } else {
+        const openaiBase = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
+        const candidateUrls = [
+          `${openaiBase}/videos/${encodeURIComponent(upstreamTaskId)}`,
+          `${openaiBase}/videos/generations/${encodeURIComponent(upstreamTaskId)}`,
+        ];
+        let cancelled = false;
+        for (const candidateUrl of candidateUrls) {
+          const auth = buildOpenAICompatAuth(candidateUrl, routeConfig, "openai");
+          const response = await fetch(auth.url, {
+            method: "DELETE",
+            headers: auth.headers,
+          }).catch(() => null);
+          if (response && (response.ok || response.status === 404 || response.status === 409)) {
+            cancelled = true;
+            break;
+          }
+        }
+
+        if (!cancelled) {
+          throw new LocalUserRouteProxyError("Unable to cancel upstream video task.", {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+            statusCode: 502,
+          });
+        }
+      }
+
+      return {
+        success: true,
+        status: "failed",
+        deducted: false,
+        requestId,
+        attemptId,
+      };
+    }
+
+    if (endpointType === "gemini") {
+      const apiBase = baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
+      const auth = buildGeminiAuth(`${apiBase}/${upstreamTaskId}`, routeConfig);
+      const response = await fetch(auth.url, {
+        headers: auth.headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new LocalUserRouteProxyError(`Status polling failed: ${response.status} ${errorText}`, {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: response.status || 502,
+        });
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      const taskErrorMessage = extractGeminiVideoTaskErrorMessage(payload);
+      if (taskErrorMessage) {
+        return {
+          success: true,
+          status: "failed",
+          deducted: false,
+          requestId,
+          attemptId,
+        };
+      }
+
+      const videoUri = extractGeminiVideoUri(payload);
+      if (!videoUri) {
+        return mode === "download_task"
+          ? {
+              success: false,
+              error: "Task content is not ready yet",
+              deducted: false,
+              requestId,
+              attemptId,
+            }
+          : {
+              success: true,
+              status: "pending",
+              deducted: false,
+              requestId,
+              attemptId,
+            };
+      }
+
+      const mediaAuth = buildGeminiAuth(videoUri, routeConfig);
+      let dataUrl = "";
+      try {
+        dataUrl = await downloadBinaryAsDataUrl(mediaAuth.url, mediaAuth.headers, "video/mp4");
+      } catch {
+        return mode === "download_task"
+          ? {
+              success: false,
+              error: "Task content is not ready yet",
+              deducted: false,
+              requestId,
+              attemptId,
+            }
+          : {
+              success: true,
+              status: "pending",
+              deducted: false,
+              requestId,
+              attemptId,
+            };
+      }
+
+      return mode === "download_task"
+        ? {
+            success: true,
+            url: dataUrl,
+            deducted: false,
+            requestId,
+            attemptId,
+          }
+        : {
+            success: true,
+            status: "success",
+            url: dataUrl,
+            deducted: false,
+            requestId,
+            attemptId,
+          };
+    }
+
+    const openAiStatus = await this.fetchDirectOpenAiVideoTaskStatus(routeConfig, upstreamTaskId);
+    const normalizedStatus = normalizeAsyncTaskStatus(openAiStatus.payload);
+    const directUrl = extractDirectVideoUrl(openAiStatus.payload);
+    if (directUrl) {
+      return mode === "download_task"
+        ? {
+            success: true,
+            url: directUrl,
+            deducted: false,
+            requestId,
+            attemptId,
+          }
+        : {
+            success: true,
+            status: "success",
+            url: directUrl,
+            deducted: false,
+            requestId,
+            attemptId,
+          };
+    }
+
+    if (normalizedStatus === "success") {
+      const contentUrls = [
+        `${openAiStatus.baseUrl}/videos/${encodeURIComponent(upstreamTaskId)}/content`,
+        `${openAiStatus.baseUrl}/videos/generations/${encodeURIComponent(upstreamTaskId)}/content`,
+        String(
+          (openAiStatus.payload as { content_url?: unknown })?.content_url
+            || ((openAiStatus.payload as { data?: { content_url?: unknown } })?.data?.content_url)
+            || "",
+        ).trim(),
+      ].filter((value) => Boolean(value));
+
+      for (const contentUrl of contentUrls) {
+        const auth = buildOpenAICompatAuth(contentUrl, routeConfig, "openai");
+        try {
+          const dataUrl = await downloadBinaryAsDataUrl(auth.url, auth.headers, "video/mp4");
+          return mode === "download_task"
+            ? {
+                success: true,
+                url: dataUrl,
+                deducted: false,
+                requestId,
+                attemptId,
+              }
+            : {
+                success: true,
+                status: "success",
+                url: dataUrl,
+                deducted: false,
+                requestId,
+                attemptId,
+              };
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    if (normalizedStatus === "failed") {
+      return {
+        success: true,
+        status: "failed",
+        deducted: false,
+        requestId,
+        attemptId,
+      };
+    }
+
+    return mode === "download_task"
+      ? {
+          success: false,
+          error: "Task content is not ready yet",
+          deducted: false,
+          requestId,
+          attemptId,
+        }
+      : {
+          success: true,
+          status: "pending",
+          deducted: false,
+          requestId,
+          attemptId,
+        };
+  }
+
+  private async fetchDirectOpenAiVideoTaskStatus(
+    routeConfig: SecureProxyUserRouteConfigDto,
+    upstreamTaskId: string,
+  ): Promise<{ payload: Record<string, unknown>; baseUrl: string }> {
+    const baseUrl = normalizeRouteString(routeConfig.baseUrl).replace(/\/+$/, "");
+    const openAiBase = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
+    const candidateUrls = [
+      `${openAiBase}/videos/${encodeURIComponent(upstreamTaskId)}`,
+      `${openAiBase}/videos/generations/${encodeURIComponent(upstreamTaskId)}`,
+    ];
+
+    let lastFailureMessage = "Task status lookup failed.";
+    for (const candidateUrl of candidateUrls) {
+      const auth = buildOpenAICompatAuth(candidateUrl, routeConfig, "openai");
+      const response = await fetch(auth.url, {
+        headers: auth.headers,
+      }).catch(() => null);
+      if (!response) {
+        lastFailureMessage = `Task status lookup failed for ${candidateUrl}.`;
+        continue;
+      }
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        lastFailureMessage = `Status polling failed: ${response.status} ${errorText}`;
+        if (response.status >= 500 || response.status === 404) {
+          continue;
+        }
+        throw new LocalUserRouteProxyError(lastFailureMessage, {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: response.status || 502,
+        });
+      }
+
+      return {
+        payload: await response.json().catch(() => ({})),
+        baseUrl: openAiBase,
+      };
+    }
+
+    throw new LocalUserRouteProxyError(lastFailureMessage, {
+      code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+      statusCode: 502,
+    });
+  }
+
+  private async tryDeleteDirectVideoTask(
+    routeConfig: SecureProxyUserRouteConfigDto,
+    endpointType: LocalResolvedRouteEndpointType,
+    baseUrl: string,
+    upstreamTaskId: string,
+  ): Promise<void> {
+    try {
+      if (endpointType === "gemini") {
+        const apiBase = baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
+        const auth = buildGeminiAuth(`${apiBase}/${upstreamTaskId}`, routeConfig);
+        await fetch(auth.url, {
+          method: "DELETE",
+          headers: auth.headers,
+        }).catch(() => undefined);
+        return;
+      }
+
+      const openaiBase = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
+      const candidateUrls = [
+        `${openaiBase}/videos/${encodeURIComponent(upstreamTaskId)}`,
+        `${openaiBase}/videos/generations/${encodeURIComponent(upstreamTaskId)}`,
+      ];
+      for (const candidateUrl of candidateUrls) {
+        const auth = buildOpenAICompatAuth(candidateUrl, routeConfig, "openai");
+        await fetch(auth.url, {
+          method: "DELETE",
+          headers: auth.headers,
+        }).catch(() => undefined);
+      }
+    } catch {
+      // Best-effort cleanup only.
+    }
+  }
+
   private encodeLocalTaskToken(payload: LocalTaskPayload): string {
     const serialized = JSON.stringify(payload);
     const encodedPayload = toBase64Url(serialized);
     const signature = toBase64Url(
-      createHmac("sha256", this.sharedSecret!)
+      createHmac("sha256", this.sharedSecret)
         .update(encodedPayload)
         .digest(),
     );
@@ -2264,7 +2540,7 @@ export class LocalUserRouteProxyService {
     const encodedPayload = signedPayload.slice(0, separatorIndex);
     const providedSignature = signedPayload.slice(separatorIndex + 1);
     const expectedSignature = toBase64Url(
-      createHmac("sha256", this.sharedSecret!)
+      createHmac("sha256", this.sharedSecret)
         .update(encodedPayload)
         .digest(),
     );

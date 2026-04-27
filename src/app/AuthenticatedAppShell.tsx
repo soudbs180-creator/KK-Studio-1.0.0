@@ -1,6 +1,10 @@
 import React, { Suspense, lazy, useLayoutEffect, useState } from 'react';
 
+import LoginScreen from '../components/auth/LoginScreen';
+import AdminRechargeFloatingPanel from '../components/admin/AdminRechargeFloatingPanel';
+import { AppStartupScreen } from '../components/common/AppStartupScreen';
 import NotificationToast from '../components/common/NotificationToast';
+import { useAuth } from '../context/AuthContext';
 import { useAppStartup } from '../context/AppStartupContext';
 import { pickByDocumentLanguage } from '../utils/localeText';
 
@@ -32,6 +36,7 @@ export interface AuthenticatedAppShellProps {
   showCostEstimation: boolean;
   onExitCostEstimation: () => void;
   AppContentComponent: React.ComponentType;
+  showStartupBanner?: boolean;
 }
 
 function getStartupStageMessage(stage: string, isWorkspaceReady: boolean, healthState: 'idle' | 'checking' | 'ready') {
@@ -150,8 +155,6 @@ export const StartupRuntimeBanner: React.FC = () => {
     mutationObserver?.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style'],
     });
 
     scheduleSync();
@@ -200,18 +203,36 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
   showCostEstimation,
   onExitCostEstimation,
   AppContentComponent,
-}) => (
-  <>
-    {showCostEstimation ? (
-      <Suspense fallback={null}>
-        <CostEstimation onBack={onExitCostEstimation} />
-      </Suspense>
-    ) : (
-      <>
-        <StartupRuntimeBanner />
-        <NotificationToast />
-        <AppContentComponent />
-      </>
-    )}
-  </>
-);
+  showStartupBanner = true,
+}) => {
+  const { session, user, isTempUser, loading, sessionRecoveryWarning } = useAuth();
+  const {
+    isBackgroundReady,
+  } = useAppStartup();
+  const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;
+
+  if (loading) {
+    return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />;
+  }
+
+  if (!user || (!session && !isTempUser)) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <>
+      {showCostEstimation ? (
+        <Suspense fallback={null}>
+          <CostEstimation onBack={onExitCostEstimation} />
+        </Suspense>
+      ) : (
+        <>
+          {showStartupRuntimeBanner ? <StartupRuntimeBanner /> : null}
+          <NotificationToast />
+          <AdminRechargeFloatingPanel />
+          <AppContentComponent />
+        </>
+      )}
+    </>
+  );
+};

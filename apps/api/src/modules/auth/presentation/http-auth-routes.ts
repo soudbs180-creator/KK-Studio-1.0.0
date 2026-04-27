@@ -17,8 +17,9 @@ import {
 import { validateAuthEmail } from "../domain/email-policy.ts";
 import type { AuthRequestContext, AuthService } from "../application/auth-service.ts";
 
-interface HttpAuthRouteResult<T> {
+export interface HttpAuthRouteResult<T> {
   statusCode: number;
+  headers?: Record<string, string | string[]>;
   body: ApiResponse<T>;
 }
 
@@ -35,18 +36,20 @@ function isLocalTurnstileBypassActive(): boolean {
     && isTruthyEnvValue(process.env.VITE_TURNSTILE_LOCAL_BYPASS);
 }
 
-function toRequestContext(ip: string): AuthRequestContext {
-  return { ip };
+function toRequestContext(ip: string, userAgent?: string): AuthRequestContext {
+  return { ip, userAgent };
 }
 
-function buildSuccessEnvelope<T>(
+export function buildSuccessEnvelope<T>(
   requestId: string,
   clientVersion: string | undefined,
   statusCode: number,
   data: T,
+  headers?: Record<string, string | string[]>,
 ): HttpAuthRouteResult<T> {
   return {
     statusCode,
+    ...(headers ? { headers } : {}),
     body: {
       success: true,
       data,
@@ -55,12 +58,13 @@ function buildSuccessEnvelope<T>(
   };
 }
 
-function buildErrorEnvelope<T>(
+export function buildErrorEnvelope<T>(
   requestId: string,
   clientVersion: string | undefined,
   statusCode: number,
   message: string,
   details?: ApiErrorDetail[],
+  headers?: Record<string, string | string[]>,
 ): HttpAuthRouteResult<T> {
   const code = statusCode === 429
     ? "RATE_LIMITED"
@@ -76,6 +80,7 @@ function buildErrorEnvelope<T>(
 
   return {
     statusCode,
+    ...(headers ? { headers } : {}),
     body: {
       success: false,
       error: {
@@ -252,6 +257,7 @@ export async function handleVersionedLogin(
   body: LoginRequestDto,
   headers: Record<string, string>,
   ip: string,
+  userAgent?: string,
 ): Promise<HttpAuthRouteResult<LoginResponseDto>> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
@@ -260,7 +266,7 @@ export async function handleVersionedLogin(
     return buildErrorEnvelope(requestId, clientVersion, 400, "Login request validation failed.", validationErrors);
   }
 
-  const result = await service.login(body, toRequestContext(ip));
+  const result = await service.login(body, toRequestContext(ip, userAgent));
   if (!result.body.success) {
     return buildErrorEnvelope(requestId, clientVersion, result.statusCode, result.body.error || "Login failed.");
   }
@@ -270,6 +276,7 @@ export async function handleVersionedLogin(
     clientVersion,
     result.statusCode,
     result.body.data as LoginResponseDto,
+    result.headers,
   );
 }
 
@@ -279,7 +286,7 @@ export async function handleGetProfile(
 ): Promise<HttpAuthRouteResult<ProfileDto>> {
   const requestId = headers["x-request-id"] || randomUUID();
   const clientVersion = headers["x-client-version"];
-  const profile = service.getProfile(headers);
+  const profile = await service.getProfile(headers);
 
   if (!profile) {
     return buildErrorEnvelope(requestId, clientVersion, 401, "Authentication is required to access the profile.");
@@ -307,7 +314,7 @@ export async function handleUpdateProfile(
     return buildErrorEnvelope(requestId, clientVersion, 400, "Profile request validation failed.", validationErrors);
   }
 
-  const updated = service.updateProfile(headers, body);
+  const updated = await service.updateProfile(headers, body);
   if (!updated) {
     return buildErrorEnvelope(requestId, clientVersion, 401, "Authentication is required to update the profile.");
   }
@@ -334,7 +341,7 @@ export async function handleUpdatePassword(
     return buildErrorEnvelope(requestId, clientVersion, 400, "Password request validation failed.", validationErrors);
   }
 
-  const updated = service.updatePassword(headers, body);
+  const updated = await service.updatePassword(headers, body);
   if (!updated) {
     return buildErrorEnvelope(
       requestId,

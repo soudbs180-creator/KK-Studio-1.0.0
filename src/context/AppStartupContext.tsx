@@ -3,7 +3,7 @@ import React, { createContext, startTransition, useContext, useEffect, useMemo, 
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import {
   getKkApiServerHealth,
-  isKkApiCanonicalCloudReadyFromHealth,
+  isKkApiSelfHostedCoreReadyFromHealth,
   type KkApiServerHealth,
 } from '../services/api/kkApiServerHealth';
 import { getLegacyWebApiFallbackState, isHostedRuntime } from '../services/api/kkApiClient';
@@ -154,17 +154,17 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return;
         }
 
+        if (isKkApiSelfHostedCoreReadyFromHealth(health)) {
+          setLastStartupWarning(null);
+          return;
+        }
+
         if (health.status !== 'ok') {
           setLastStartupWarning(`KK API health is ${health.status}.`);
           return;
         }
 
-        if (!isKkApiCanonicalCloudReadyFromHealth(health)) {
-          setLastStartupWarning('KK API canonical billing/model persistence is not fully configured.');
-          return;
-        }
-
-        setLastStartupWarning(null);
+        setLastStartupWarning('KK API self-hosted core persistence is not fully configured.');
       }).catch((error) => {
         if (cancelled || startupRunIdRef.current !== startupRunId) {
           return;

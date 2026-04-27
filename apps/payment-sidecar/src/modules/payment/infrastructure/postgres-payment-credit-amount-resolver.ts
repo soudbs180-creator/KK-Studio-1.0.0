@@ -3,7 +3,7 @@ import type {
   PaymentCreditAmountResolver,
   PaymentCreditAmountResolverInput,
 } from "./payment-credit-amount-resolver.ts";
-import { SupabasePaymentCreditAmountResolver } from "./payment-credit-amount-resolver.ts";
+import { StaticPaymentCreditAmountResolver } from "./payment-credit-amount-resolver.ts";
 
 interface CreditExchangeRateRow {
   credits_per_unit: string | number;
@@ -92,8 +92,5 @@ export function createPaymentCreditAmountResolverFromEnv(options: {
     return new PostgresPaymentCreditAmountResolver(getSharedPostgresPool());
   }
 
-  return new SupabasePaymentCreditAmountResolver({
-    supabaseUrl: process.env.SUPABASE_URL,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY,
-  });
+  return new StaticPaymentCreditAmountResolver();
 }

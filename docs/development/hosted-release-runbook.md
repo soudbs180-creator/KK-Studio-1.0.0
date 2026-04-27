@@ -2,12 +2,11 @@
 
 ## Goal
 
-Make the hosted Vercel frontend and the Supabase backend behave like the local Supabase-first runtime:
+Make the hosted Vercel frontend and the VPS API/payment runtime behave like the current VPS-backed runtime:
 
 - User-owned API routes must use `userRoute` and must not consume credits.
 - Admin-managed credit models must stay server-side only and must not expose provider `base_url` or `api_keys`.
-- Hosted builds must not fall back to the legacy Web API unless that fallback is intentionally deployed and configured.
-- Hosted browser password login must stay on the Supabase-first path and must not silently depend on `api/auth-password-login.ts`.
+- Hosted browser password login must stay on the direct hosted session/API path and must not depend on any local password proxy.
 - Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable.
 - Legacy `/api/pay*` payment routes stay local-only by default.
 
@@ -15,12 +14,12 @@ Make the hosted Vercel frontend and the Supabase backend behave like the local S
 
 Always release in this order:
 
-1. Supabase database migrations
-2. Supabase Edge Functions
+1. VPS PostgreSQL migrations
+2. VPS API and payment sidecar
 3. Vercel frontend
 4. Smoke tests
 
-Do not deploy the frontend first when the Edge Functions are still on an older runtime contract.
+Do not deploy the frontend first when the VPS API is still on an older runtime contract.
 
 ## Current Hosted Requirements
 
@@ -28,8 +27,8 @@ Do not deploy the frontend first when the Edge Functions are still on an older r
 
 Keep the local runtime split explicit:
 
-- Root `.env` / `.env.local` are for frontend public env such as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and local-only `VITE_KK_API_BASE_URL`.
-- `apps/api/.env.local` is the authoritative local API source for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `USER_API_ENCRYPTION_SECRET`, and `KK_PRIMARY_ADMIN_USER_ID`.
+- Root `.env` / `.env.local` are for frontend public env such as `VITE_KK_API_BASE_URL`.
+- `apps/api/.env.local` is the authoritative local API source for `DATABASE_URL`, `USER_API_ENCRYPTION_SECRET`, and `KK_PRIMARY_ADMIN_USER_ID`.
 - Optional local API JSON body-size overrides also live in `apps/api/.env.local`:
   `KK_API_MAX_JSON_BODY_BYTES`, `KK_API_PROFILE_MAX_JSON_BODY_BYTES`, and `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES`.
 - `server/.env` is legacy-only and is ignored by the current local API startup and diagnostics.
@@ -43,18 +42,11 @@ npm run api:diagnose
 npm run release:hosted:check
 ```
 
-Local default body-size behavior:
-
-- Standard routes stay at `1048576` bytes unless `KK_API_MAX_JSON_BODY_BYTES` overrides them.
-- Profile persistence routes default to `4194304` bytes unless `KK_API_PROFILE_MAX_JSON_BODY_BYTES`
-  or `KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES` overrides them.
-
 ### Vercel frontend
 
 Required:
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_KK_API_BASE_URL`
 
 Recommended:
 
@@ -66,16 +58,16 @@ Optional:
 
 - `VITE_PAYMENT_GATEWAY_URL`
 
-Forbidden on hosted builds unless you intentionally run a compatible public KK API:
+Forbidden on hosted builds:
 
-- `VITE_KK_API_BASE_URL`
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 Why:
 
-- Hosted builds should stay on the Supabase-first runtime by default.
-- A compatible public KK API now requires both `VITE_KK_API_BASE_URL` and `VITE_ENABLE_LEGACY_WEB_API_FALLBACK=true` to re-enable legacy fallback intentionally.
-- `api/auth-password-login.ts` is a local-only escape hatch. If hosted auth ever depends on it, treat that as a migration regression and fix the Supabase-first path instead of normalizing the proxy.
+- Hosted builds should stay on the direct VPS API runtime by default.
+- The browser should receive only the public API origin and public frontend settings, never server secrets.
 
 ### Hosted API owner-admin config
 
@@ -85,7 +77,7 @@ Required:
 
 Why:
 
-- Hosted admin access defaults to one owner Supabase user ID.
+- Hosted admin access defaults to one owner user ID.
 - Delegated `profiles.role = 'admin'` users remain supported, but the owner admin must be configured explicitly.
 
 ### Hosted API social auth config
@@ -117,7 +109,24 @@ Why:
 - Missing Google values surface as `GOOGLE_AUTH_UNAVAILABLE`.
 - Missing WeChat values surface as `WECHAT_AUTH_UNAVAILABLE`.
 - `GOOGLE_ALLOWED_REDIRECT_ORIGINS` and `WECHAT_ALLOWED_REDIRECT_ORIGINS` must include every hosted frontend origin that can start login or account binding.
-- Local examples should use the API callback routes, not legacy Edge Function callback URLs.
+- Local examples should use the API callback routes.
+
+### VPS API and payment config
+
+Required on the VPS runtime:
+
+- `DATABASE_URL`
+- `USER_API_ENCRYPTION_SECRET`
+- `PAYMENT_SIDECAR_INTERNAL_TOKEN`
+- `PAYMENT_SIDECAR_SETTLEMENT_TOKEN`
+- `PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`
+- `PAYMENT_SIDECAR_CALLBACK_TOKEN`
+
+Recommended:
+
+- `KK_INTERNAL_ROUTE_PROXY_SECRET`
+- `SYSTEM_PROXY_TASK_SECRET`
+- `USER_ROUTE_PROXY_TASK_SECRET`
 
 ### Runtime ownership map
 
@@ -127,49 +136,6 @@ Hosted release reviews should use this ownership map:
 - `apps/payment-sidecar/`: canonical Hosted payment runtime
 - `server/`: bridge only, never a Hosted primary
 - `payment-server/`: bridge only, never a Hosted primary
-- `api/auth-password-login.ts`: local-only password proxy, disabled by default in Hosted
-
-### Supabase Edge Function secrets
-
-Functions already receive these defaults in hosted Supabase environments:
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Reference:
-
-- [Supabase Edge Functions Environment Variables](https://supabase.com/docs/guides/functions/secrets)
-
-If you still deploy the legacy `wechat-auth` Edge Function for rollback or compatibility, additionally set:
-
-- `WECHAT_OPEN_APP_ID`
-- `WECHAT_OPEN_APP_SECRET`
-- `WECHAT_OPEN_REDIRECT_URI`
-- `WECHAT_STATE_SIGNING_SECRET`
-- `WECHAT_ALLOWED_REDIRECT_ORIGINS`
-
-Recommended:
-
-- `WECHAT_DEFAULT_REDIRECT_URL`
-
-For `secure-model-proxy`, keep these server-side secrets available when used by the runtime contract:
-
-- `USER_API_ENCRYPTION_SECRET`
-- `KK_INTERNAL_ROUTE_PROXY_SECRET`
-- `SYSTEM_PROXY_TASK_SECRET`
-
-For `user-route-proxy`, keep these server-side secrets available:
-
-- `USER_API_ENCRYPTION_SECRET`
-- `SYSTEM_PROXY_TASK_SECRET`
-- optional: `USER_ROUTE_PROXY_TASK_SECRET`
-
-For payment settlement, keep these server-side secrets available:
-
-- `PAYMENT_SIDECAR_SETTLEMENT_TOKEN`
-- `PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`
-- `PAYMENT_SIDECAR_CALLBACK_TOKEN`
 
 ## Preflight Checklist
 
@@ -180,10 +146,10 @@ You need one of these:
 - `vercel login` completed on the machine that will deploy the frontend
 - or a valid `VERCEL_TOKEN`
 
-You also need one of these:
+You also need a working VPS deployment path:
 
-- `supabase login` completed on the machine that will deploy functions
-- or a valid `SUPABASE_ACCESS_TOKEN`
+- `KK_VPS_DEPLOY_COMMAND` set to the command that deploys migrations, `apps/api`, and `apps/payment-sidecar`
+- or an equivalent manual VPS deployment run before deploying Vercel
 
 ### 2. Repo-level checks
 
@@ -202,72 +168,41 @@ What must be true before release:
 - Local `/healthz` reports `status: ok`
 - `config.canonicalPersistenceReady` is `true`
 - No hosted-required env shows as missing or placeholder in the local snapshot
-- `VITE_KK_API_BASE_URL` is not present in the hosted env plan
+- `VITE_KK_API_BASE_URL` points at the VPS API origin
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` is not present in the hosted env plan
 - Hosted payment runtimes cannot boot in memory-only settlement mode
 - Hosted payment runtimes fail closed instead of booting with in-memory payment storage or missing settlement auth.
 - Build passes
-- The current repo contains the latest `user-route-proxy`, `secure-model-proxy`, and `wechat-auth` code
+- The current repo contains the latest VPS API model-proxy, billing, payment, Google, and WeChat auth code
 
-## Supabase Release Steps
+## VPS Release Steps
 
-### 1. Link the project
+### 1. Apply PostgreSQL migrations
 
-Project ref:
+Run the project-approved migration command on the VPS database before deploying the API process.
 
-- `ovdjhdofjysanamgkfng`
+### 2. Deploy API and payment sidecar
 
-Example:
-
-```bash
-npx supabase link --project-ref ovdjhdofjysanamgkfng
-```
-
-### 2. Push migrations
+Run the configured deployment command:
 
 ```bash
-npx supabase db push
+KK_VPS_DEPLOY_COMMAND="<your deploy command>" npm run release:hosted -- --skip-vercel
 ```
 
-### 3. Set production secrets
+The command must deploy:
 
-Supabase supports setting production secrets from a file or individually:
+- `apps/api`
+- `apps/payment-sidecar`
+- PostgreSQL migrations required by auth, billing, workspace sync, model routing, and payment settlement
 
-```bash
-npx supabase secrets set --env-file supabase/.env.functions.local
-```
+### 3. Verify VPS health
 
-or:
+Confirm:
 
-```bash
-npx supabase secrets set WECHAT_OPEN_APP_ID=... WECHAT_OPEN_APP_SECRET=...
-```
-
-Notes:
-
-- Secrets become available to functions immediately.
-- You do not need to re-deploy just because a secret value changed.
-
-Reference:
-
-- [Supabase Edge Functions Environment Variables](https://supabase.com/docs/guides/functions/secrets)
-
-### 4. Deploy Edge Functions
-
-Deploy in this order:
-
-```bash
-npm run supabase:functions:deploy:user-route-proxy
-npm run supabase:functions:deploy:secure-model-proxy
-npm run supabase:functions:deploy:admin-credit-models
-npm run supabase:functions:deploy:wechat-auth
-```
-
-Why:
-
-- `user-route-proxy` is the hosted-safe path for BYOK/user-owned routes and must be live before frontend smoke tests.
-- `secure-model-proxy` is the critical runtime for user-owned routes versus credit-model routing.
-- `wechat-auth` must stay `--no-verify-jwt` because `start-login` and `/callback` are anonymous entrypoints.
+- `/healthz` returns healthy persistence state
+- login session restore works
+- payment sidecar can reach the API settlement route
+- model proxy can debit and refund credits
 
 ## Vercel Release Steps
 
@@ -281,16 +216,16 @@ The repo should contain:
 
 Before deploying, verify in the Vercel dashboard:
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_KK_API_BASE_URL`
 - `VITE_AUTH_REDIRECT_ORIGIN`
 - `VITE_TURNSTILE_ENABLED`
 - `VITE_TURNSTILE_SITE_KEY`
 
-And confirm that this key is absent:
+And confirm that these keys are absent:
 
-- `VITE_KK_API_BASE_URL`
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 ### 3. Deploy
 
@@ -316,14 +251,12 @@ npx vercel deploy --prod -y
 4. Confirm the request succeeds and the user credit balance does not decrease.
 5. Trigger one generation through an admin-managed credit model.
 6. Confirm the request succeeds and credits do decrease.
+7. Force one failed image generation or failed image fetch path.
+8. Confirm the previously debited credits are refunded.
 
 ### Public model catalog redaction
 
-Check that the public active credit model catalog still redacts provider secrets:
-
-```sql
-select * from public.get_active_credit_models() limit 1;
-```
+Check that the public active credit model catalog still redacts provider secrets.
 
 Expected:
 
@@ -340,10 +273,15 @@ Expected:
 
 ### Hosted runtime parity
 
-Confirm these hosted paths still work:
+Confirm these hosted paths work:
 
+- password login
 - guest login
+- 30-day hosted session restore
 - workspace layout sync
+- user credit balance refresh
+- recharge settlement
+- generation debit/refund
 - cloud cleanup
 
 Confirm these hosted paths stay disabled unless you intentionally re-enable them:
@@ -357,9 +295,17 @@ Confirm these hosted paths stay disabled unless you intentionally re-enable them
 
 Most likely causes:
 
-- Hosted `secure-model-proxy` is still on an older version without `userRoute`
-- Frontend was deployed but the function was not
-- Vercel still has the legacy Web API opt-in env enabled, forcing hosted traffic back onto the old fallback path
+- Hosted API on the VPS is still on an older version without `userRoute`.
+- Frontend was deployed but the VPS API was not.
+- Vercel still has the legacy Web API opt-in env enabled.
+
+### Credit model generation does not refund failed image requests
+
+Most likely causes:
+
+- The VPS API model-proxy did not persist the failed task status.
+- The provider returned a malformed image response that bypassed the refund path.
+- The payment/generation ledger is missing the idempotency key for the failed operation.
 
 ### WeChat login returns setup or availability errors
 
@@ -383,11 +329,5 @@ Most likely causes:
 
 - `VITE_AUTH_REDIRECT_ORIGIN` mismatch
 - Turnstile site key missing in Vercel
-- Supabase auth URL configuration missing the deployed origin
-- A migration-only password proxy or legacy fallback path is masking a Supabase-first auth regression locally
-
-## Database Access Note
-
-The current WeChat function uses Supabase clients built from environment secrets rather than a direct Postgres driver. If you later switch to direct Postgres access inside Edge Functions, follow the official connection guidance here:
-
-- [Connect to Postgres from Supabase Edge Functions](https://supabase.com/docs/guides/functions/connect-to-postgres)
+- Vercel `VITE_KK_API_BASE_URL` points at the wrong VPS API origin
+- A migration-only password proxy or legacy fallback path is masking a hosted session/API auth regression locally

@@ -1,7 +1,9 @@
 import type {
   AuthActionResultDto,
+  AuthSessionDto,
   LoginRequestDto,
   LoginResponseDto,
+  LogoutResponseDto,
   ProfileDto,
   RegisterRequestDto,
   RegisterResponseDto,
@@ -13,6 +15,7 @@ import type {
 } from "../../../../../../packages/contracts/src/index.ts";
 import { consoleLogger } from "../../../../../../packages/shared/src/index.ts";
 import { validateAuthEmail } from "../domain/email-policy.ts";
+import { DEFAULT_SESSION_COOKIE_NAME } from "../domain/browser-session.ts";
 import { FileBackedAuthIdentityStore } from "../infrastructure/file-auth-identity-store.ts";
 import {
   type AuthIdentityStore,
@@ -23,6 +26,8 @@ import {
   createPasswordChangeCodeEmailSenderFromEnv,
   type PasswordChangeCodeEmailSender,
 } from "../infrastructure/password-change-code-email-sender.ts";
+import { createPostgresAuthIdentityStoreFromEnv } from "../infrastructure/postgres-auth-identity-store.ts";
+import type { BrowserSessionService } from "./browser-session-service.ts";
 
 export interface TurnstileVerifier {
   (token: string, ip?: string): Promise<{ success: boolean; error?: string }>;
@@ -33,14 +38,17 @@ export interface AuthServiceDependencies {
   rateLimiter?: InMemoryRateLimiter;
   identityStore?: AuthIdentityStore;
   passwordChangeCodeEmailSender?: PasswordChangeCodeEmailSender;
+  browserSessionService?: BrowserSessionService;
 }
 
 export interface AuthRequestContext {
   ip: string;
+  userAgent?: string;
 }
 
 export interface AuthHandlerResult<T = AuthActionResultDto> {
   statusCode: number;
+  headers?: Record<string, string | string[]>;
   body: {
     success: boolean;
     message?: string;
@@ -57,6 +65,11 @@ const passwordChangeCodeRule: RateLimitRule = { max: 3, windowMs: 15 * 60 * 1000
 const passwordChangeVerifyRule: RateLimitRule = { max: 5, windowMs: 15 * 60 * 1000 };
 
 function createDefaultIdentityStore(): AuthIdentityStore {
+  const postgresStore = createPostgresAuthIdentityStoreFromEnv();
+  if (postgresStore) {
+    return postgresStore;
+  }
+
   try {
     return new FileBackedAuthIdentityStore();
   } catch {
@@ -82,6 +95,7 @@ export class AuthService {
   private readonly rateLimiter: InMemoryRateLimiter;
   private readonly identityStore: AuthIdentityStore;
   private readonly passwordChangeCodeEmailSender: PasswordChangeCodeEmailSender;
+  private readonly browserSessionService?: BrowserSessionService;
   private readonly logger = consoleLogger.child({ module: "auth" });
 
   constructor(dependencies: AuthServiceDependencies) {
@@ -89,6 +103,7 @@ export class AuthService {
     this.rateLimiter = dependencies.rateLimiter || new InMemoryRateLimiter();
     this.identityStore = dependencies.identityStore || createDefaultIdentityStore();
     this.passwordChangeCodeEmailSender = dependencies.passwordChangeCodeEmailSender || createPasswordChangeCodeEmailSenderFromEnv();
+    this.browserSessionService = dependencies.browserSessionService;
   }
 
   async register(
@@ -121,7 +136,7 @@ export class AuthService {
       }
     }
 
-    const registered = this.identityStore.registerPasswordUser(
+    const registered = await this.identityStore.registerPasswordUser(
       emailCheck.normalizedEmail,
       input.password,
     );
@@ -165,7 +180,7 @@ export class AuthService {
       return this.rateLimited("Too many login attempts from this IP.");
     }
 
-    const session = this.identityStore.authenticatePassword(
+    const session = await this.identityStore.authenticatePassword(
       emailCheck.normalizedEmail,
       input.password,
     );
@@ -177,6 +192,26 @@ export class AuthService {
       email: session.profile.email,
       ip: context.ip,
     });
+
+    if (this.browserSessionService) {
+      const browserSession = await this.browserSessionService.issueSession({
+        userId: session.profile.id,
+        email: session.profile.email,
+        role: session.profile.role,
+      }, {
+        ip: context.ip,
+        userAgent: context.userAgent,
+      });
+
+      return this.success(200, {
+        accessToken: browserSession.accessToken,
+        expiresIn: browserSession.expiresIn,
+        sessionExpiresAt: browserSession.sessionExpiresAt,
+        profile: session.profile,
+      }, {
+        "set-cookie": browserSession.setCookie,
+      });
+    }
 
     return this.success(200, session);
   }
@@ -206,14 +241,14 @@ export class AuthService {
     });
 
     return this.routeDisabled(
-      "Verification-code login is not available on the API service. Use the hosted Supabase auth flow instead.",
+      "Verification-code login is not available on the API service. Use the VPS-backed session login flow instead.",
     );
   }
 
   async sendPasswordChangeCode(
     headers: Record<string, string>,
   ): Promise<AuthHandlerResult<SendPasswordChangeCodeResponseDto>> {
-    const profile = this.getProfile(headers);
+    const profile = await this.getProfile(headers);
     if (!profile?.email) {
       return this.unauthorized("Authentication is required before sending a password change code.");
     }
@@ -222,7 +257,7 @@ export class AuthService {
       return this.rateLimited("Too many password change code requests for this email.");
     }
 
-    const issued = this.identityStore.issuePasswordChangeCode(profile.id);
+    const issued = await this.identityStore.issuePasswordChangeCode(profile.id);
     if (!issued) {
       return this.unauthorized("Authentication is required before sending a password change code.");
     }
@@ -246,31 +281,34 @@ export class AuthService {
     });
   }
 
-  registerProfile(email: string): { created: boolean; profile: ProfileDto } {
-    return this.identityStore.createRegisteredUser(email);
+  async registerProfile(email: string): Promise<{ created: boolean; profile: ProfileDto }> {
+    return await this.identityStore.createRegisteredUser(email);
   }
 
-  issueLoginSession(email: string): LoginResponseDto {
-    return this.identityStore.issueLoginSession(email);
+  async issueLoginSession(email: string): Promise<LoginResponseDto> {
+    return await this.identityStore.issueLoginSession(email);
   }
 
-  resolveAccessToken(accessToken: string): ProfileDto | undefined {
-    return this.identityStore.resolveAccessToken(accessToken);
+  async resolveAccessToken(accessToken: string): Promise<ProfileDto | undefined> {
+    return await this.identityStore.resolveAccessToken(accessToken);
   }
 
-  getProfile(headers: Record<string, string>): ProfileDto | undefined {
-    return this.identityStore.resolveProfile(headers);
+  async getProfile(headers: Record<string, string>): Promise<ProfileDto | undefined> {
+    return await this.identityStore.resolveProfile(headers);
   }
 
-  updateProfile(headers: Record<string, string>, input: UpdateProfileRequestDto): ProfileDto | undefined {
-    return this.identityStore.updateProfile(headers, input);
+  async updateProfile(
+    headers: Record<string, string>,
+    input: UpdateProfileRequestDto,
+  ): Promise<ProfileDto | undefined> {
+    return await this.identityStore.updateProfile(headers, input);
   }
 
-  updatePassword(
+  async updatePassword(
     headers: Record<string, string>,
     input: UpdatePasswordRequestDto,
-  ): UpdatePasswordResponseDto | undefined {
-    const profile = this.getProfile(headers);
+  ): Promise<UpdatePasswordResponseDto | undefined> {
+    const profile = await this.getProfile(headers);
     if (!profile || !input.newPassword?.trim()) {
       return undefined;
     }
@@ -278,11 +316,11 @@ export class AuthService {
     const normalizedCurrentPassword = String(input.currentPassword || "").trim();
     const normalizedVerificationCode = String(input.verificationCode || "").trim();
     const updatedProfile = normalizedCurrentPassword
-      ? this.identityStore.changePassword(profile.id, normalizedCurrentPassword, input.newPassword)
+      ? await this.identityStore.changePassword(profile.id, normalizedCurrentPassword, input.newPassword)
       : normalizedVerificationCode
         ? (
           this.rateLimiter.consume("password-change-verify", profile.id, passwordChangeVerifyRule)
-            ? this.identityStore.changePasswordWithCode(profile.id, normalizedVerificationCode, input.newPassword)
+            ? await this.identityStore.changePasswordWithCode(profile.id, normalizedVerificationCode, input.newPassword)
             : undefined
         )
         : undefined;
@@ -296,9 +334,125 @@ export class AuthService {
     };
   }
 
-  private success<T>(statusCode: number, data: T): AuthHandlerResult<T> {
+  async getSession(
+    _headers: Record<string, string>,
+    cookies: Record<string, string>,
+    _context: AuthRequestContext,
+  ): Promise<AuthHandlerResult<AuthSessionDto>> {
+    if (!this.browserSessionService) {
+      return this.routeDisabled("Browser-session auth is not enabled on this runtime.");
+    }
+
+    const refreshToken = String(cookies[this.getBrowserSessionCookieName()] || "").trim();
+    if (!refreshToken) {
+      return this.unauthorized("Authentication is required before restoring a browser session.");
+    }
+
+    try {
+      const session = await this.browserSessionService.resolveSession(refreshToken);
+      const profile = await this.identityStore.resolveAccessToken(session.accessToken);
+      if (!profile) {
+        return this.unauthorized(
+          "Authentication is required before restoring a browser session.",
+          {
+            "set-cookie": this.browserSessionService.buildClearedSessionCookie(),
+          },
+        );
+      }
+
+      return this.success(200, {
+        accessToken: session.accessToken,
+        expiresIn: session.expiresIn,
+        sessionExpiresAt: session.sessionExpiresAt,
+        profile,
+      });
+    } catch {
+      return this.unauthorized(
+        "Authentication is required before restoring a browser session.",
+        {
+          "set-cookie": this.browserSessionService.buildClearedSessionCookie(),
+        },
+      );
+    }
+  }
+
+  async refreshSession(
+    _headers: Record<string, string>,
+    cookies: Record<string, string>,
+    context: AuthRequestContext,
+  ): Promise<AuthHandlerResult<AuthSessionDto>> {
+    if (!this.browserSessionService) {
+      return this.routeDisabled("Browser-session auth is not enabled on this runtime.");
+    }
+
+    const refreshToken = String(cookies[this.getBrowserSessionCookieName()] || "").trim();
+    if (!refreshToken) {
+      return this.unauthorized("Authentication is required before refreshing a browser session.");
+    }
+
+    try {
+      const session = await this.browserSessionService.rotateSession(refreshToken, {
+        ip: context.ip,
+        userAgent: context.userAgent,
+      });
+      const profile = await this.identityStore.resolveAccessToken(session.accessToken);
+      if (!profile) {
+        return this.unauthorized(
+          "Authentication is required before refreshing a browser session.",
+          {
+            "set-cookie": this.browserSessionService.buildClearedSessionCookie(),
+          },
+        );
+      }
+
+      return this.success(200, {
+        accessToken: session.accessToken,
+        expiresIn: session.expiresIn,
+        sessionExpiresAt: session.sessionExpiresAt,
+        profile,
+      }, {
+        "set-cookie": session.setCookie,
+      });
+    } catch {
+      return this.unauthorized(
+        "Authentication is required before refreshing a browser session.",
+        {
+          "set-cookie": this.browserSessionService.buildClearedSessionCookie(),
+        },
+      );
+    }
+  }
+
+  async logoutSession(
+    _headers: Record<string, string>,
+    cookies: Record<string, string>,
+  ): Promise<AuthHandlerResult<LogoutResponseDto>> {
+    if (this.browserSessionService) {
+      const refreshToken = String(cookies[this.getBrowserSessionCookieName()] || "").trim();
+      if (refreshToken) {
+        await this.browserSessionService.revokeSession(refreshToken);
+      }
+
+      return this.success(200, {
+        loggedOut: true,
+      }, {
+        "set-cookie": this.browserSessionService.buildClearedSessionCookie(),
+      });
+    }
+
+    return this.success(200, {
+      loggedOut: true,
+    });
+  }
+
+  private success<T>(
+    statusCode: number,
+    data: T,
+    headers?: Record<string, string | string[]>,
+  ): AuthHandlerResult<T> {
     return {
       statusCode,
+      ...(headers ? { headers } : {}),
       body: {
         success: true,
         data,
@@ -326,9 +480,13 @@ export class AuthService {
     };
   }
 
-  private unauthorized<T>(error: string): AuthHandlerResult<T> {
+  private unauthorized<T>(
+    error: string,
+    headers?: Record<string, string | string[]>,
+  ): AuthHandlerResult<T> {
     return {
       statusCode: 401,
+      ...(headers ? { headers } : {}),
       body: {
         success: false,
         error,
@@ -364,5 +522,10 @@ export class AuthService {
         error,
       },
     };
+  }
+
+  private getBrowserSessionCookieName(): string {
+    const configuredName = String(process.env.KK_SESSION_COOKIE_NAME || "").trim();
+    return configuredName || DEFAULT_SESSION_COOKIE_NAME;
   }
 }

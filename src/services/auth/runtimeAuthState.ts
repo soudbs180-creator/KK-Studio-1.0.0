@@ -4,7 +4,7 @@ import type { RuntimeAuthUser } from "./runtimeAuthTypes.ts";
 import { KKAI_LOCAL_USER_ID } from "../../app/kkaiLocalRuntime.ts";
 
 export interface RuntimeAuthState {
-  user: RuntimeAuthUser;
+  user: RuntimeAuthUser | null;
   isTempUser: boolean;
   tempUserExpiry: number | null;
 }
@@ -89,7 +89,17 @@ function buildUser(input?: RuntimeUserMetadataPatch & { id?: string }): RuntimeA
 
 export function createDefaultRuntimeAuthState(): RuntimeAuthState {
   return {
-    user: buildUser(),
+    user: null,
+    isTempUser: false,
+    tempUserExpiry: null,
+  };
+}
+
+export function createFixedLocalRuntimeAuthState(): RuntimeAuthState {
+  return {
+    user: buildUser({
+      id: KKAI_LOCAL_USER_ID,
+    }),
     isTempUser: false,
     tempUserExpiry: null,
   };
@@ -213,8 +223,8 @@ export function clearPersistedRuntimeAuthState(): RuntimeAuthState {
 
 export function updateRuntimeAuthStateFromProfile(profile: ProfileDto): RuntimeAuthState {
   const currentState = getLatestRuntimeAuthState();
-  const currentMetadata = currentState.user.user_metadata || {};
-  const currentAppMetadata = currentState.user.app_metadata || {};
+  const currentMetadata = currentState.user?.user_metadata || {};
+  const currentAppMetadata = currentState.user?.app_metadata || {};
   const providers = normalizeProviders([
     currentMetadata.auth_provider,
     currentMetadata.provider,
@@ -241,8 +251,8 @@ export function updateRuntimeAuthStateFromProfile(profile: ProfileDto): RuntimeA
 
 export function updateRuntimeUserMetadata(patch: RuntimeUserMetadataPatch): RuntimeAuthState {
   const currentState = getLatestRuntimeAuthState();
-  const currentMetadata = currentState.user.user_metadata || {};
-  const currentAppMetadata = currentState.user.app_metadata || {};
+  const currentMetadata = currentState.user?.user_metadata || {};
+  const currentAppMetadata = currentState.user?.app_metadata || {};
   const providers = normalizeProviders([
     patch.authProvider,
     ...(patch.providers || []),
@@ -257,8 +267,8 @@ export function updateRuntimeUserMetadata(patch: RuntimeUserMetadataPatch): Runt
   return persistRuntimeAuthState({
     ...currentState,
     user: buildUser({
-      id: currentState.user.id,
-      email: patch.email || currentState.user.email || DEFAULT_LOCAL_EMAIL,
+      id: currentState.user?.id || KKAI_LOCAL_USER_ID,
+      email: patch.email || currentState.user?.email || DEFAULT_LOCAL_EMAIL,
       fullName: patch.fullName || patch.displayName || String(currentMetadata.full_name || currentMetadata.display_name || DEFAULT_LOCAL_NAME),
       displayName: patch.displayName || patch.fullName || String(currentMetadata.display_name || currentMetadata.full_name || DEFAULT_LOCAL_NAME),
       avatarUrl: patch.avatarUrl ?? String(currentMetadata.avatar_url || ""),

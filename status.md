@@ -60,10 +60,21 @@ Milestone 1:
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `npm.cmd run check:encoding`
 
+Milestone 2:
+
+- Passed: auth/runtime/recharge target tests:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/workspace-auth-gate.test.ts" "tests/unit/login-screen-auth-actions.test.ts" "tests/unit/kk-api-client-session-cookie.test.ts" "tests/unit/kk-api-session-bootstrap.test.ts" "tests/unit/auth-access-token.test.ts" "tests/unit/billing-http-routes.test.ts" "tests/unit/cost-estimation-admin-review-panel.test.ts"`
+  - `node --test --test-isolation=none "apps/api/src/modules/auth/application/*.test.ts" "apps/api/src/modules/auth/presentation/*.test.ts"`
+  - `node --test --test-isolation=none "apps/api/src/modules/billing/*.test.ts" "apps/api/src/modules/billing/**/*.test.ts"`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/server-runtime-config.test.ts" "tests/unit/kk-api-server-health-vps-contract.test.ts" "tests/unit/vps-postgres-audit-contract.test.ts" "tests/unit/payment-runtime-hardening.test.ts" "tests/unit/payment-server-status-route.test.ts"`
+- Passed: mobile contract compatibility tests required to unblock global typecheck.
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+
 ## In Progress
 
-- Gather explorer reports for Milestone 2.
-- Start Milestone 2 with auth/runtime/recharge tests before production changes.
+- Stage and commit Milestone 2 only.
+- Prepare worker tasks for Milestones 3-6 with disjoint write scopes.
 
 ## Known Risks And Blockers To Verify
 
@@ -74,6 +85,7 @@ Milestone 1:
 
 ## Next Steps
 
-1. Use explorer reports to start Milestone 2 with auth/runtime/recharge tests first.
-2. Keep local secret/tunnel files out of staging.
-3. Preserve existing dirty worktree changes while using path-limited staging for each milestone.
+1. Commit Milestone 2.
+2. Start Milestone 3 with settings/API capability persistence and runtime-route tests first.
+3. Keep local secret/tunnel files out of staging.
+4. Preserve existing dirty worktree changes while using path-limited staging for each milestone.

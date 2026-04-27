@@ -177,8 +177,9 @@ export interface UpsertCreditExchangeRateRequestDto {
   isActive: boolean;
 }
 
-export type RechargeSubmissionStatusDto = "created" | "pending" | "approved" | "rejected" | "credited";
+export type RechargeSubmissionStatusDto = "created" | "pending" | "approved" | "rejected" | "credited" | "paying" | "expired";
 export type RechargePaymentChannelDto = "alipay" | "wechat" | "paypal" | "bank" | "manual";
+export type ManualRechargeProviderDto = "alipay" | "wechat";
 export type ReviewRechargeSubmissionDecisionDto = "credit" | "reject";
 
 export interface RechargePaymentChannelConfigDto {
@@ -198,6 +199,7 @@ export interface CreateRechargeSubmissionRequestDto {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargePaymentChannelDto;
+  manualProvider?: ManualRechargeProviderDto;
   note?: string;
 }
 
@@ -218,12 +220,22 @@ export interface RechargeSubmissionDto {
   submissionId: EntityId;
   userId?: EntityId;
   amount: number;
+  baseAmount?: number;
+  serviceFee?: number;
+  payableAmount?: number;
+  baseCredits?: number;
+  bonusCredits?: number;
+  creditAmount?: number;
+  creditsPerUnit?: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargePaymentChannelDto;
+  manualProvider?: ManualRechargeProviderDto | null;
   transferReferenceLast4?: string | null;
   note?: string;
   status: RechargeSubmissionStatusDto;
   createdAt: string;
+  expiresAt?: string | null;
+  paymentMarkedAt?: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
 }
@@ -249,6 +261,14 @@ export interface SubmitRechargeResponseDto {
 
 export interface GetAdminRechargeSubmissionResponseDto {
   submission: AdminRechargeSubmissionDto;
+}
+
+export interface ListAdminRechargeSubmissionsResponseDto {
+  items: AdminRechargeSubmissionDto[];
+}
+
+export interface MarkRechargeSubmissionPaidResponseDto {
+  submission: RechargeSubmissionDto;
 }
 
 export interface ReviewRechargeSubmissionRequestDto {
