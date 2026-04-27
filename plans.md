@@ -162,6 +162,28 @@ Validation:
 - `npm.cmd run test:unit`
 - `npm.cmd run check:encoding`
 
+### 7. Turnstile Runtime Configuration Repair
+
+Goal: prevent the login/register Turnstile widget from silently using an invalid or domain-bound built-in site key when the deployment has not provided `VITE_TURNSTILE_SITE_KEY`.
+
+Scope:
+- Remove the built-in Turnstile site key fallback from the frontend runtime config.
+- Keep the local bypass opt-in behavior unchanged.
+- Add a source-contract regression test covering explicit site key configuration.
+- Verify the auth and Turnstile test surface after the change.
+
+Acceptance:
+- `TURNSTILE_SITE_KEY` resolves only from explicit runtime configuration.
+- Missing `VITE_TURNSTILE_SITE_KEY` is reported as a configuration problem instead of attempting to render a broken Cloudflare widget.
+- Existing local bypass behavior remains opt-in and local-only.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/turnstile-runtime-config.test.ts" "tests/unit/local-api-turnstile-bypass.test.ts" "tests/unit/auth-http-routes.test.ts" "tests/unit/login-screen-auth-actions.test.ts" "tests/unit/local-env-contract.test.ts"`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run governance:agent-docs`
+- `npm.cmd run check:encoding`
+
 ## Final Gate
 
 After all milestones are complete:

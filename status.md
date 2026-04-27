@@ -7,10 +7,10 @@ Last updated: 2026-04-28
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Complete, final gate passed and post-merge review blockers fixed.
+- Current milestone: Turnstile runtime configuration repair.
 - Milestones 1, 2, 3, 4, 5, and 6 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
-- Publish status: local `main` is ahead of `origin/main` by 16 commits after the 2026-04-28 post-merge review cleanup commit.
+- Publish status: local `main` is ahead of `origin/main` by 17 commits after the 2026-04-28 Turnstile repair commit.
 
 ## Recovered Sources
 
@@ -77,6 +77,14 @@ Risk classes observed:
   - Capability route runtime selection now ignores disabled capability assignments, including stale per-mode key memory and stale assistant `@route` model selections.
   - Additional mojibake/control-character residues were removed from source, tests, release smoke scripts, and credits documentation.
 - Added root ignore rules for `.codex-tmp-*`, `.codex-ssh-*`, and `.tmp/` so local key/tunnel artifacts and planning previews are not accidentally staged.
+
+## Completed In 2026-04-28 Turnstile Repair
+
+- Created local branch `codex/fix-turnstile-widget` from `main`; final commit landed on `main` after the branch context was superseded.
+- Investigated Turnstile widget behavior in `src/config/turnstile.ts`, `src/components/auth/TurnstileWidget.tsx`, and `src/components/auth/LoginScreen.tsx`.
+- Added a failing regression contract showing that `TURNSTILE_SITE_KEY` must come from explicit runtime configuration.
+- Removed the built-in Turnstile site key fallback so missing `VITE_TURNSTILE_SITE_KEY` is surfaced as configuration error instead of rendering a broken Cloudflare widget.
+- Updated `plans.md` and `validation.md` with the Turnstile repair milestone and validation commands.
 
 ## Validation Results
 
@@ -165,20 +173,42 @@ Final gate:
 - Passed: `npm.cmd run build`
 - Passed: `npm.cmd run test:unit` (`936/936` tests)
 
+2026-04-28 Turnstile repair validation:
+
+- Passed: targeted Turnstile/auth tests (`16/16` tests):
+  - `tests/unit/turnstile-runtime-config.test.ts`
+  - `tests/unit/local-api-turnstile-bypass.test.ts`
+  - `tests/unit/auth-http-routes.test.ts`
+  - `tests/unit/login-screen-auth-actions.test.ts`
+  - `tests/unit/local-env-contract.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `npm.cmd run check:encoding`
+
 ## In Progress
 
 - No recovery milestone remains in progress.
-- The post-merge review cleanup has been committed locally; no in-progress engineering task remains.
+- Turnstile repair validation is complete and ready for a scoped commit.
 
 ## Known Risks And Blockers To Verify
 
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
+- Unrelated dirty files are present and must not be staged in the Turnstile commit unless explicitly requested. Currently observed examples:
+  - `apps/admin/src/pages/RechargeSubmissionsPage.tsx`
+  - `apps/api/src/lib/postgres.ts`
+  - `src/components/mobile/MobileResultDetailScreen.tsx`
+  - `src/components/mobile/MobileResultFeed.tsx`
+  - `src/components/settings/ApiSettingsView.tsx`
+  - `src/components/settings/apiWorkbenchSections.tsx`
+  - `src/index.css`
+  - `tests/unit/server-runtime-config.test.ts`
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
 
-1. Keep local secret/tunnel files out of Git and rotate previously exposed credentials outside source control.
-2. Publish local `main` when the user is ready to push the local commits.
+1. Stage only the Turnstile repair files and create the scoped commit.
+2. Keep the unrelated dirty files out of the Turnstile commit unless explicitly requested.

@@ -170,6 +170,23 @@ After `node scripts/release/create-portable-release.mjs`, verify portable paymen
 
 Expected path includes `release\KK-Studio-Portable\app\node_modules\pg\package.json`.
 
+## Turnstile Auth Widget Repair
+
+Run these when touching Turnstile runtime config, auth CAPTCHA handling, or login/register Turnstile UI:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/turnstile-runtime-config.test.ts" `
+  "tests/unit/local-api-turnstile-bypass.test.ts" `
+  "tests/unit/auth-http-routes.test.ts" `
+  "tests/unit/login-screen-auth-actions.test.ts" `
+  "tests/unit/local-env-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:
