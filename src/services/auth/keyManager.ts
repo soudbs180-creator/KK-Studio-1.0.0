@@ -870,7 +870,7 @@ export function appendModelVariantLabel(baseName: string, modelId: string): stri
 }
 
 /**
- * 濡偓闀嗐儲膩閸ㄥ妲搁挅锕€鍑″骞傛暏
+ * Return whether a model is explicitly marked as deprecated.
  */
 export function isDeprecatedModel(modelId: string): boolean {
     return DEPRECATED_MODELS.includes(modelId);
@@ -3015,7 +3015,7 @@ export class KeyManager {
     }
     /**
      * Toggle disabled state for manual pause/resume
-     * 皎睂鍌氫粻闀?key 娴兼氨些皤攧浼淬€庢惔蹇涙Е皤攧妤佹堡鐏?
+     * 切换 Key 的手动暂停/恢复状态。
      */
     toggleKey(keyId: string): void {
         const slot = this.state.slots.find(s => s.id === keyId);
@@ -4505,7 +4505,7 @@ export class KeyManager {
     }
 
     /**
-     * 皤攧鐘绘珟閾惧秴濮熼崯?
+     * 移除第三方供应商配置。
      */
     removeProvider(id: string): boolean {
         this.loadProviders();
@@ -4688,7 +4688,7 @@ export class KeyManager {
     }
 
     /**
-     * 閿风姾娴囬摼宥呭閸熷棗鍨悰?
+     * Normalize stored third-party providers before they enter the workbench.
      */
     private normalizeStoredProviders(rawProviders: unknown): ThirdPartyProvider[] {
         return normalizeStoredProviders<ThirdPartyProvider>(
@@ -4768,7 +4768,7 @@ export class KeyManager {
     }
 
     /**
-     * 娣囸８ｇ摠閾惧秴濮熼崯鍡楀灙鐞?
+     * 保存第三方供应商配置。
      */
     private saveProviders(): void {
         this.persistProvidersLocal();

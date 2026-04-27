@@ -15,7 +15,7 @@ test('prompt optimizer service reads the dedicated prompt_optimizer capability r
 
   assert.match(routingSource, /prompt_optimizer/);
   assert.match(serviceSource, /from '\.\.\/api\/capabilityRouteAssignments';/);
-  assert.match(serviceSource, /resolveCapabilityRouteAssignment\('prompt_optimizer'\)/);
+  assert.match(serviceSource, /resolveEnabledCapabilityRouteAssignment\('prompt_optimizer'\)/);
   assert.match(serviceSource, /preferredKeyId/);
   assert.match(serviceSource, /keyManager\.getGlobalModelList\(\)/);
 });

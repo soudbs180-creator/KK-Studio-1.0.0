@@ -4423,7 +4423,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             switch (mode) {
                 case 'replace':
-                    // 瀹屽叏鏇挎崲閫夋嫨
+                    // Replace the current selection.
                     newSelectedIds = ids;
                     break;
 
@@ -4434,7 +4434,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     break;
 
                 case 'remove':
-                    // 浠庨€夋嫨涓Щ闄わ紙Alt+妗嗛€夛級
+                    // Remove from selection (Alt + marquee).
                     ids.forEach(id => current.delete(id));
                     newSelectedIds = Array.from(current);
                     break;

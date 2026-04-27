@@ -14,6 +14,26 @@ const listeners = new Set<() => void>();
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+const normalizeRouteMatchValue = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
+
+const decodeRouteSuffix = (suffix: string | null | undefined) => {
+  try {
+    return decodeURIComponent(normalizeRouteMatchValue(suffix));
+  } catch {
+    return normalizeRouteMatchValue(suffix);
+  }
+};
+
+const extractRouteTargetFromModelId = (modelId: string | null | undefined) => {
+  const suffix = String(modelId || '').split('@')[1];
+  const decodedSuffix = decodeRouteSuffix(suffix);
+  if (!decodedSuffix) return '';
+  if (decodedSuffix.startsWith('slot_key_')) return decodedSuffix.slice(5);
+  if (decodedSuffix.startsWith('slot_')) return decodedSuffix.slice(5);
+  if (decodedSuffix.startsWith('provider_')) return decodedSuffix;
+  return decodedSuffix;
+};
+
 const buildDefaultAssignments = (): CapabilityRouteAssignment[] => {
   const timestamp = Date.now();
   return CAPABILITY_ROLES.map((role) => ({
@@ -91,6 +111,34 @@ export const getCapabilityRouteAssignments = () => readAssignments();
 
 export const resolveCapabilityRouteAssignment = (role: CapabilityRole) =>
   readAssignments().find((assignment) => assignment.role === role);
+
+export const resolveEnabledCapabilityRouteAssignment = (role: CapabilityRole) => {
+  const assignment = resolveCapabilityRouteAssignment(role);
+  return assignment?.enabled ? assignment : undefined;
+};
+
+export const isCapabilityRouteAssignmentRouteDisabled = (role: CapabilityRole, routeId?: string) => {
+  const normalizedRouteId = normalizeRouteMatchValue(routeId);
+  if (!normalizedRouteId) return false;
+  const assignment = resolveCapabilityRouteAssignment(role);
+  return assignment?.enabled === false
+    && normalizeRouteMatchValue(assignment.primaryRouteId) === normalizedRouteId;
+};
+
+export const isCapabilityRouteAssignmentModelDisabled = (role: CapabilityRole, modelId?: string) => {
+  const normalizedModelId = normalizeRouteMatchValue(modelId);
+  if (!normalizedModelId) return false;
+
+  const assignment = resolveCapabilityRouteAssignment(role);
+  if (!assignment || assignment.enabled !== false) return false;
+
+  const primaryModelId = normalizeRouteMatchValue(assignment.primaryModelId);
+  if (primaryModelId && primaryModelId === normalizedModelId) return true;
+
+  const primaryRouteId = normalizeRouteMatchValue(assignment.primaryRouteId);
+  if (!primaryRouteId) return false;
+  return extractRouteTargetFromModelId(modelId) === primaryRouteId;
+};
 
 export const upsertCapabilityRouteAssignment = (
   role: CapabilityRole,

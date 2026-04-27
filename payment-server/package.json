@@ -19,6 +19,7 @@
     "eventsource": "^4.1.0",
     "express": "^5.2.1",
     "node-fetch": "^3.3.2",
+    "pg": "^8.20.0",
     "wechatpay-node-v3": "^2.2.1"
   },
   "overrides": {

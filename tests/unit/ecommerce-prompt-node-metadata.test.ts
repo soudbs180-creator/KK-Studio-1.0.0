@@ -8,7 +8,7 @@ test('main-image metadata resolves source row key and theme from the main image 
     kind: 'main-image',
     item: {
       itemId: 'main-12',
-      sheet: '涓诲浘',
+      sheet: '主图',
       rowIndex: 12,
       sequence: 1,
       type: 'hero',

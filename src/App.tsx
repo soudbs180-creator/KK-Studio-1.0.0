@@ -244,7 +244,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
       className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
       style={{ backgroundColor: 'var(--bg-secondary)' }}
       onClick={onClick}
-      title="鏂紑杩炴帴"
+      title="断开连接"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -344,7 +344,10 @@ import {
   buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
 } from './services/billing/generationBillingCoordinator';
-import { resolveCapabilityRouteAssignment } from './services/api/capabilityRouteAssignments';
+import {
+  isCapabilityRouteAssignmentRouteDisabled,
+  resolveEnabledCapabilityRouteAssignment,
+} from './services/api/capabilityRouteAssignments';
 
 
 import { saveAs } from 'file-saver';
@@ -774,7 +777,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         list = canvas.imageNodes.filter(n => graphImages.has(n.id))
           .sort((a, b) => a.timestamp - b.timestamp || (a.position.x - b.position.x));
       } else {
-        // 3. 鍏滃簳閫昏緫 (鍗曞紶图片)
+        // 3. 兜底逻辑（单张图片）
         const target = canvas.imageNodes.find(n => n.id === imageId);
         if (target) list = [target];
       }
@@ -1558,12 +1561,19 @@ const AppContent: React.FC<AppContentProps> = () => {
           ? 'image_generation'
           : null;
     const capabilityRouteId = capabilityRole
-      ? resolveCapabilityRouteAssignment(capabilityRole)?.primaryRouteId
+      ? resolveEnabledCapabilityRouteAssignment(capabilityRole)?.primaryRouteId
       : undefined;
     const capabilityKeyId = capabilityRouteId && keyManager.getKey(capabilityRouteId)
       ? capabilityRouteId
       : undefined;
-    return capabilityKeyId || modePreferredKeyMap[m];
+    const rememberedKeyId = modePreferredKeyMap[m];
+    if (
+      capabilityRole
+      && isCapabilityRouteAssignmentRouteDisabled(capabilityRole, rememberedKeyId)
+    ) {
+      return undefined;
+    }
+    return capabilityKeyId || rememberedKeyId;
   }, [modePreferredKeyMap]);
 
   const rememberPreferredKeyForMode = useCallback((mode: GenerationMode | undefined, keySlotId?: string) => {
@@ -1694,7 +1704,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     config.aspectRatio, config.imageSize, config.parallelCount,
     config.model, config.enableGrounding, config.enableImageSearch, config.thinkingMode, config.mode, config.pptSlides, config.pptStyleLocked,
     config.referenceImages, // Add referenceImages to dep array
-    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 🎯 鍏ㄩ噺渚濊禆鐩戝惉
+    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 全量依赖监听
   ]);
 
   // Pending generation state
@@ -3202,7 +3212,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     // We want: targetX * scale + transformX = screenCenterX
     // So: transformX = screenCenterX - targetX * scale
 
-    // User requested "Zoom and Pan" (平移骞剁缉鏀?
+    // User requested "Zoom and Pan" (平移并缩放).
     const targetScale = 1; // Reset to 1:1 view for clarity
 
     const newX = screenCenterX - targetX * targetScale;
@@ -4683,7 +4693,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [config.referenceImages]);
 
-  // 鑷姩鏁寸悊锛氬鎵樼粰 CanvasContext
+  // Auto arrange is delegated to CanvasContext.
   const handleAutoArrange = useCallback(() => {
     arrangeAllNodes();
   }, [arrangeAllNodes]);
@@ -10403,7 +10413,7 @@ ${paragraphs}
               const centerX = rect.width / 2;
               const centerY = rect.height / 2;
 
-              // 计算闇€瑕佺殑transform浣跨洰鏍囧崱鐗囧眳涓?
+              // 计算需要的 transform，使目标卡片居中
               const newX = centerX - targetNode.position.x * canvasTransform.scale;
               const newY = centerY - targetNode.position.y * canvasTransform.scale;
 
@@ -10474,7 +10484,7 @@ ${paragraphs}
                   }
                 }
               }
-              /* 🎯 涓诲崱鍜屽壇鍗′箣闂寸殑杩炵嚎淇濇寔鐧界伆鑹?*/
+              /* Keep parent-child card connectors light gray. */
 
               if (isNaN(imageHeight) || imageHeight <= 0) {
                 imageHeight = theoreticalHeight;

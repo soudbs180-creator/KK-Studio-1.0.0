@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
 import { cp, mkdir, rm, stat, writeFile } from 'fs/promises';
 
 const rootDir = process.cwd();
@@ -19,6 +20,28 @@ const portableAppServerSource = path.join(releaseScriptSourceDir, 'portable-app-
 const portableLaunchSource = path.join(releaseScriptSourceDir, 'portable-launch.ps1');
 const portableStopSource = path.join(releaseScriptSourceDir, 'portable-stop.ps1');
 const updateScriptSource = path.join(releaseScriptSourceDir, 'portable-self-update.ps1');
+const portableRuntimeSourceClosures = [
+  {
+    source: path.join(rootDir, 'apps', 'payment-sidecar', 'src'),
+    target: path.join(appDir, 'apps', 'payment-sidecar', 'src'),
+  },
+  {
+    source: path.join(rootDir, 'apps', 'api', 'src', 'lib', 'request-authenticator.ts'),
+    target: path.join(appDir, 'apps', 'api', 'src', 'lib', 'request-authenticator.ts'),
+  },
+  {
+    source: path.join(rootDir, 'apps', 'api', 'src', 'modules', 'auth', 'infrastructure', 'kk-session-token.ts'),
+    target: path.join(appDir, 'apps', 'api', 'src', 'modules', 'auth', 'infrastructure', 'kk-session-token.ts'),
+  },
+  {
+    source: path.join(rootDir, 'packages', 'contracts', 'src'),
+    target: path.join(appDir, 'packages', 'contracts', 'src'),
+  },
+  {
+    source: path.join(rootDir, 'packages', 'shared', 'src'),
+    target: path.join(appDir, 'packages', 'shared', 'src'),
+  },
+];
 
 function ensureExists(targetPath, message) {
   if (!fs.existsSync(targetPath)) {
@@ -37,6 +60,44 @@ async function copyDirectory(sourcePath, targetPath) {
     recursive: true,
     force: true,
   });
+}
+
+async function runCommand(command, args, options = {}) {
+  await new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd || rootDir,
+      shell: false,
+      stdio: 'inherit',
+      windowsHide: true,
+    });
+
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
+    });
+  });
+}
+
+async function ensurePaymentDependencies() {
+  const paymentTargetNodeModules = path.join(paymentTargetDir, 'node_modules');
+  const appNodeModules = path.join(appDir, 'node_modules');
+  ensureExists(path.join(paymentTargetDir, 'package-lock.json'), 'payment-server/package-lock.json was not found.');
+
+  const npmArgs = ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'];
+  if (process.platform === 'win32') {
+    await runCommand('cmd.exe', ['/d', '/s', '/c', `npm.cmd ${npmArgs.join(' ')}`], {
+      cwd: paymentTargetDir,
+    });
+  } else {
+    await runCommand('npm', npmArgs, {
+      cwd: paymentTargetDir,
+    });
+  }
+  await copyDirectory(paymentTargetNodeModules, appNodeModules);
 }
 
 async function getDirectorySize(targetPath) {
@@ -133,6 +194,13 @@ function buildUpdateConfigExample() {
   }, null, 2)}\r\n`;
 }
 
+function buildAppPackageJson() {
+  return `${JSON.stringify({
+    private: true,
+    type: 'module',
+  }, null, 2)}\r\n`;
+}
+
 async function main() {
   ensureExists(distSourceDir, 'dist/ was not found. Run npm run build first.');
   ensureExists(process.execPath, `node executable was not found: ${process.execPath}`);
@@ -158,7 +226,18 @@ async function main() {
   await writeFile(path.join(releaseRoot, 'Start KK Studio.bat'), buildStartBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'Stop KK Studio.bat'), buildStopBat(), 'utf8');
   await writeFile(path.join(releaseRoot, 'README-PORTABLE.txt'), buildReadme(), 'utf8');
+  await writeFile(path.join(appDir, 'package.json'), buildAppPackageJson(), 'utf8');
   await writeFile(path.join(supportDir, 'update-config.json.example'), buildUpdateConfigExample(), 'utf8');
+
+  for (const runtimeSource of portableRuntimeSourceClosures) {
+    ensureExists(runtimeSource.source, `${path.relative(rootDir, runtimeSource.source)} was not found.`);
+    const sourceStat = await stat(runtimeSource.source);
+    if (sourceStat.isDirectory()) {
+      await copyDirectory(runtimeSource.source, runtimeSource.target);
+    } else {
+      await copyFile(runtimeSource.source, runtimeSource.target);
+    }
+  }
 
   if (fs.existsSync(paymentSourceDir)) {
     const paymentFiles = [
@@ -166,8 +245,7 @@ async function main() {
       'index.js',
       'package-lock.json',
       'package.json',
-      'runtime_payment_bridge.js',
-      'settlement_bridge.js',
+      'sidecar_compat_bridge.js',
       'webhook.js',
     ];
 
@@ -185,10 +263,7 @@ async function main() {
       }
     }
 
-    const paymentNodeModules = path.join(paymentSourceDir, 'node_modules');
-    if (fs.existsSync(paymentNodeModules)) {
-      await copyDirectory(paymentNodeModules, path.join(paymentTargetDir, 'node_modules'));
-    }
+    await ensurePaymentDependencies();
   }
 
   const releaseSize = await getDirectorySize(releaseRoot);

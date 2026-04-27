@@ -1,6 +1,6 @@
 # KK Studio Validation Matrix
 
-Last updated: 2026-04-27
+Last updated: 2026-04-28
 
 Use `npm.cmd` on Windows.
 
@@ -146,6 +146,29 @@ npm.cmd run verify:mobile-settings-smoke
 npm.cmd run verify:desktop-settings-smoke
 npm.cmd run verify:startup-runtime-banner-centering
 ```
+
+## Post-Merge Review Checks
+
+Run these when touching capability runtime routing, portable payment release packaging, or encoding cleanup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/capability-route-runtime-preference-contract.test.ts" `
+  "tests/unit/prompt-optimizer-capability-route-contract.test.ts" `
+  "tests/unit/portable-payment-package-contract.test.ts"
+npm.cmd --prefix payment-server ci --omit=dev --ignore-scripts --no-audit --no-fund --dry-run
+npm.cmd run typecheck:payment-server
+node --test --test-isolation=none "tests/unit/payment-server-compat-bridge.test.ts"
+node scripts/release/create-portable-release.mjs
+```
+
+After `node scripts/release/create-portable-release.mjs`, verify portable payment TypeScript sources can resolve `pg` from the app-level dependency tree:
+
+```powershell
+.\release\KK-Studio-Portable\runtime\node.exe -e "const { createRequire } = require('node:module'); const req = createRequire(require('node:path').resolve('release/KK-Studio-Portable/app/apps/payment-sidecar/src/lib/postgres.ts')); console.log(req.resolve('pg/package.json'));"
+```
+
+Expected path includes `release\KK-Studio-Portable\app\node_modules\pg\package.json`.
 
 ## Final Gate
 

@@ -215,7 +215,7 @@ describe('selectMobileFeedResults', () => {
       prompt: 'Framework prompt',
       ecommerce: {
         kind: 'framework',
-        sourceSheet: '涓诲浘',
+        sourceSheet: '主图',
         sourceRowKey: 'framework-root',
         displayLabel: 'Framework root',
         stage: 'ready',

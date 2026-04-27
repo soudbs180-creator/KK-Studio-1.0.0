@@ -377,7 +377,7 @@ try {
     fullPage: true,
   });
 
-  await page.getByRole('button', { name: /鍏抽棴缁撴灉璇︽儏|Close result detail/i }).click();
+  await page.getByRole('button', { name: /关闭结果详情|Close result detail/i }).click();
   await detailScreen.waitFor({ state: 'hidden', timeout: 10000 });
   await assertVisible(resultTile, 'Mobile result tile did not reappear after closing detail view.');
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));

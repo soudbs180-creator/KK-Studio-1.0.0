@@ -5,7 +5,7 @@ import type {
     EcommerceTaskAssetRoleBinding,
 } from '../../types';
 import { keyManager } from '../auth/keyManager';
-import { resolveCapabilityRouteAssignment } from '../api/capabilityRouteAssignments';
+import { resolveEnabledCapabilityRouteAssignment } from '../api/capabilityRouteAssignments';
 import {
     buildAutomaticOptimizationInstruction,
     resolveAutomaticOptimizationRoute,
@@ -215,9 +215,9 @@ const collectReadableGenericMissingInputs = (
     }
     if (
         mode !== 'ppt'
-        && !/(close-up|wide shot|macro|top view|composition|layout|淇媿|鐗瑰啓|鏋勫浘|闀滃ご|鐗堝紡)/i.test(lowerInput)
+        && !/(close-up|wide shot|macro|top view|composition|layout|俯拍|特写|构图|镜头|版式)/i.test(lowerInput)
     ) {
-        genericMissingInputs.push('鏋勫浘銆侀暅澶存垨鐗堝紡閲嶇偣');
+        genericMissingInputs.push('构图、镜头或版式重点');
     }
 
     return genericMissingInputs;
@@ -596,8 +596,8 @@ const pickOptimizerModel = (preferredModelId?: string): string | null => {
     const models = keyManager.getGlobalModelList().filter((model) => model.type === 'chat' && !model.isSystemInternal);
     if (models.length === 0) return null;
 
-    const capabilityAssignment = resolveCapabilityRouteAssignment('prompt_optimizer');
-    if (capabilityAssignment?.enabled) {
+    const capabilityAssignment = resolveEnabledCapabilityRouteAssignment('prompt_optimizer');
+    if (capabilityAssignment) {
         const routedModelId = resolveModelCandidate(models, capabilityAssignment.primaryModelId);
         if (routedModelId) {
             return routedModelId;
@@ -783,8 +783,8 @@ export const optimizePromptForImage = async (
     }
 
     const modelId = pickOptimizerModel(resolvedOptions.preferredModelId);
-    const optimizerRoute = resolveCapabilityRouteAssignment('prompt_optimizer');
-    const preferredKeyId = optimizerRoute?.enabled && optimizerRoute.primaryRouteId && keyManager.getKey(optimizerRoute.primaryRouteId)
+    const optimizerRoute = resolveEnabledCapabilityRouteAssignment('prompt_optimizer');
+    const preferredKeyId = optimizerRoute?.primaryRouteId && keyManager.getKey(optimizerRoute.primaryRouteId)
         ? optimizerRoute.primaryRouteId
         : undefined;
     if (!modelId) {

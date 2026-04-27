@@ -5,7 +5,11 @@ import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
-import { resolveCapabilityRouteAssignment } from '../../services/api/capabilityRouteAssignments';
+import {
+    isCapabilityRouteAssignmentModelDisabled,
+    resolveEnabledCapabilityRouteAssignment,
+    subscribeCapabilityRouteAssignments,
+} from '../../services/api/capabilityRouteAssignments';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
@@ -404,7 +408,7 @@ Return STRICT JSON only:
     };
 };
 
-const resolveAssistantCapabilityRoute = () => resolveCapabilityRouteAssignment('assistant');
+const resolveAssistantCapabilityRoute = () => resolveEnabledCapabilityRouteAssignment('assistant');
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
@@ -414,31 +418,32 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
     const canBrowseSystemCreditModels = billingUiEnabled;
     const resolveAssistantPreferredModel = useCallback((models: ChatModel[]) => {
+        const selectableModels = models.filter((model) => !isCapabilityRouteAssignmentModelDisabled('assistant', model.id));
         const assignment = resolveAssistantCapabilityRoute();
         const preferredModelId = String(assignment?.primaryModelId || '').trim();
         if (!preferredModelId) {
-            return models[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
+            return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
         }
 
-        const exact = models.find((model) => model.id === preferredModelId);
+        const exact = selectableModels.find((model) => model.id === preferredModelId);
         if (exact) {
             return exact;
         }
 
         const suffix = preferredModelId.split('@')[1];
         if (suffix) {
-            const matched = models.find((model) => model.id.endsWith(`@${suffix}`));
+            const matched = selectableModels.find((model) => model.id.endsWith(`@${suffix}`));
             if (matched) {
                 return matched;
             }
         }
 
-        return models[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
+        return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
     }, []);
     const resolveAssistantPreferredKeyId = useCallback(() => {
         const assignment = resolveAssistantCapabilityRoute();
         const preferredRouteId = String(assignment?.primaryRouteId || '').trim();
-        if (!preferredRouteId || !assignment?.enabled) {
+        if (!preferredRouteId) {
             return undefined;
         }
         return keyManager.getKey(preferredRouteId) ? preferredRouteId : undefined;
@@ -547,7 +552,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             if (models.length > 0) {
                 const assistantPreferredModel = resolveAssistantPreferredModel(models);
                 const exists = models.find(m => m.id === selectedModel.id);
-                if (!exists) {
+                const staleDisabledCapabilityModel = isCapabilityRouteAssignmentModelDisabled('assistant', selectedModel.id);
+                if (!exists || staleDisabledCapabilityModel) {
                     setSelectedModel(assistantPreferredModel);
                 } else {
                     if (exists.name !== selectedModel.name || exists.description !== selectedModel.description) {
@@ -558,8 +564,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         };
 
         updateModels();
-        const unsubscribe = keyManager.subscribe(updateModels);
-        return unsubscribe;
+        const unsubscribeKeys = keyManager.subscribe(updateModels);
+        const unsubscribeAssignments = subscribeCapabilityRouteAssignments(updateModels);
+        return () => {
+            unsubscribeKeys();
+            unsubscribeAssignments();
+        };
     }, [canBrowseSystemCreditModels, resolveAssistantPreferredModel, selectedModel.id]);
 
     const getRequiredCredits = useCallback((model?: ChatModel | null) => {

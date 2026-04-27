@@ -111,7 +111,7 @@ const UI_TOKEN_UNIT_LABEL = '词元';
 const UI_TOKEN_LIMIT_LABEL = '词元上限';
 const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
 const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;
-const suspiciousLocaleCharSet = new Set('鍙闂妫璇淇鏂褰缂閹鏆閲棰渚涘簲鍐娴瀹閫绗鐢浣');
+const suspiciousLocaleCharSet = new Set('\u9359\u95c2\u59ab\u7487\u6dc7\u93c2\u8930\u7f02\u95b9\u93c6\u95b2\u68f0\u6e1a\u6d98\u7c32\u9350\u5a34\u7039\u95ab\u7ed7\u9422\u6d63');
 
 const TOKEN_UNIT_LABEL = '词元';
 const TOKEN_LIMIT_LABEL = '词元上限';

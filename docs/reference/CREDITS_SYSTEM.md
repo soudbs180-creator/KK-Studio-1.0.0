@@ -244,13 +244,13 @@ SELECT * FROM public.profiles WHERE id = '你的用户ID';
   - 已存在时：为 profiles 添加 credits DECIMAL DEFAULT 0 列（若缺失）。
 
 - 触发器与回填
-  - public.handle_new_user()：在 uth.users 插入后为新用户创建 profiles（触发器 on_auth_user_created）。
-  - 迁移末尾有回填脚本：为已有 uth.users 创建缺失的 profiles（credits 默认为 0）。
+  - public.handle_new_user()：在 auth.users 插入后为新用户创建 profiles（触发器 on_auth_user_created）。
+  - 迁移末尾有回填脚本：为已有 auth.users 创建缺失的 profiles（credits 默认为 0）。
 
 - 交易表与索引
-  - 新建 public.credit_transactions：id UUID PK、user_id UUID REFERENCES auth.users(id)、mount DECIMAL、	ype TEXT CHECK(...)、description TEXT、metadata JSONB、created_at TIMESTAMP。
+  - 新建 public.credit_transactions：id UUID PK、user_id UUID REFERENCES auth.users(id)、amount DECIMAL、type TEXT CHECK(...)、description TEXT、metadata JSONB、created_at TIMESTAMP。
   - 启用 RLS 并创建 policy："Users read own transactions"（仅读自己的交易）、"Admin insert transactions"（允许插入）。
-  - 创建索引：user_id、	ype、created_at。
+  - 创建索引：user_id、type、created_at。
 
 - 关键函数
   - public.admin_recharge_credits(target_user_id UUID, amount DECIMAL, description TEXT)：为目标用户增加 profiles.credits 并插入 credit_transactions（type='admin_recharge'）。
@@ -259,7 +259,7 @@ SELECT * FROM public.profiles WHERE id = '你的用户ID';
   - public.is_admin()：基于 profiles.email 判断管理员身份（简单匹配）。
 
 - 权限
-  - 授予 non, uthenticated schema 使用权限；授予 uthenticated 对 profiles、credit_transactions 的操作权限，以及对函数的执行权限。
+  - 授予 anon, authenticated schema 使用权限；授予 authenticated 对 profiles、credit_transactions 的操作权限，以及对函数的执行权限。
 
 - 风险与注意点
   - 回填会插入大量 profiles 行（取决于用户量），建议在低峰期执行并使用分批策略。

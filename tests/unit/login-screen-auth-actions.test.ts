@@ -34,8 +34,8 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
   assert.match(source, /Admin sign-in/);
   assert.match(source, /注册请求已提交，后端认证接口就绪后可继续完成验证。/);
   assert.match(source, /当前请求需要先完成人机验证，验证通过后再提交。/);
-  assert.doesNotMatch(source, /å¨‰ã„¥å”½/);
-  assert.doesNotMatch(source, /ç’‡å³°åŽ›/);
+  assert.doesNotMatch(source, /\u00e5\u00a8\u2030\u00e3\u201e\u00a5\u00e5\u201d\u00bd/);
+  assert.doesNotMatch(source, /\u00e7\u2019\u2021\u00e5\u00b3\u00b0\u00e5\u017d\u203a/);
   assert.doesNotMatch(source, /if \(!user\)/);
   assert.doesNotMatch(source, /if \(checkingAdmin\)/);
   assert.doesNotMatch(source, /if \(!isAdmin\)/);
