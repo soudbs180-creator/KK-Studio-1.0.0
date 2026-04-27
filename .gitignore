@@ -54,8 +54,11 @@ scripts/alipay-mcp.env
 .npm-cache/
 .codex-backups/
 .codex-temp*/
+.codex-tmp-*
+.codex-ssh-*
 .codex-tmp*/
 .codex-temp-*
+.tmp/
 .tmp-playwright/
 .tmp-*.html
 .tmp-*.js

@@ -76,6 +76,7 @@ Risk classes observed:
   - Portable payment release packages `sidecar_compat_bridge.js`, the payment sidecar TypeScript runtime closure, app-level `package.json` with ESM mode, and `pg` in `app/node_modules`.
   - Capability route runtime selection now ignores disabled capability assignments, including stale per-mode key memory and stale assistant `@route` model selections.
   - Additional mojibake/control-character residues were removed from source, tests, release smoke scripts, and credits documentation.
+- Added root ignore rules for `.codex-tmp-*`, `.codex-ssh-*`, and `.tmp/` so local key/tunnel artifacts and planning previews are not accidentally staged.
 
 ## Validation Results
 
@@ -174,7 +175,7 @@ Final gate:
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
-- Untracked local files remain: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They must remain out of commits; deleting them requires explicit user confirmation.
+- Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
