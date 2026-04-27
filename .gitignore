@@ -80,7 +80,14 @@ modal-fix-test-*.png
 settings-panel-current.png
 
 # Local release artifacts
-release/
+release/*
+!release/publish/
+release/publish/*
+!release/publish/stable/
+release/publish/stable/*
+!release/publish/stable/manifest.json
+!scripts/release/
+!scripts/release/**
 workspace/
 
 # Payment sidecar local files

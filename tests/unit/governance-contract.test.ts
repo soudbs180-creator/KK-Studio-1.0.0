@@ -79,19 +79,19 @@ test("portable release bundle stays aligned with the current workspace build whe
   );
   assert.equal(
     readSource("release/KK-Studio-Portable/app/portable-app-server.cjs"),
-    readSource("scripts/portable-app-server.cjs"),
+    readSource("scripts/release/portable-app-server.cjs"),
   );
   assert.equal(
     readSource("release/KK-Studio-Portable/support/portable-launch.ps1"),
-    readSource("scripts/portable-launch.ps1"),
+    readSource("scripts/release/portable-launch.ps1"),
   );
   assert.equal(
     readSource("release/KK-Studio-Portable/support/portable-stop.ps1"),
-    readSource("scripts/portable-stop.ps1"),
+    readSource("scripts/release/portable-stop.ps1"),
   );
   assert.equal(
     readSource("release/KK-Studio-Portable/support/portable-self-update.ps1"),
-    readSource("scripts/portable-self-update.ps1"),
+    readSource("scripts/release/portable-self-update.ps1"),
   );
 });
 
