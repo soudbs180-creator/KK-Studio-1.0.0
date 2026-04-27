@@ -8,7 +8,7 @@ import {
   resolveServerRuntimeConfig,
   summarizeServerRuntimeConfig,
 } from "../../apps/api/src/lib/server-runtime-config.ts";
-import { getSharedPostgresPool, resetSharedPostgresPoolForTests } from "../../apps/api/src/lib/postgres.ts";
+import { getSharedPostgresPool, resolvePostgresConfig, resetSharedPostgresPoolForTests } from "../../apps/api/src/lib/postgres.ts";
 
 const trackedEnvKeys = [
   "DATABASE_URL",
@@ -16,6 +16,8 @@ const trackedEnvKeys = [
   "PGDATABASE",
   "PGUSER",
   "PGPASSWORD",
+  "PGSSL",
+  "PGSSLMODE",
   "VITE_SUPABASE_URL",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -113,6 +115,17 @@ test("server runtime config ignores legacy Supabase env when PostgreSQL is confi
   assert.equal("supabaseUrl" in config, false);
   assert.deepEqual(summary.blockers, []);
   assert.doesNotThrow(() => assertServerRuntimeConfigConsistency(config));
+});
+
+test("PostgreSQL DATABASE_URL uses SSL automatically for public VPS hosts", () => {
+  resetEnv({
+    DATABASE_URL: "postgres://kkstudio_app:password@db.example.com:5432/kkstudio",
+    USER_API_ENCRYPTION_SECRET: "encryption-secret",
+  });
+
+  const config = resolvePostgresConfig();
+
+  assert.deepEqual(config?.ssl, { rejectUnauthorized: false });
 });
 
 test("server runtime config requires an auth-data encryption secret for canonical persistence", () => {

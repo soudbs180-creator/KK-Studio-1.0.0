@@ -7,7 +7,7 @@ Last updated: 2026-04-28
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Turnstile runtime configuration repair.
+- Current milestone: VPS PostgreSQL login probe repair.
 - Milestones 1, 2, 3, 4, 5, and 6 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main` by 17 commits after the 2026-04-28 Turnstile repair commit.
@@ -85,6 +85,16 @@ Risk classes observed:
 - Added a failing regression contract showing that `TURNSTILE_SITE_KEY` must come from explicit runtime configuration.
 - Removed the built-in Turnstile site key fallback so missing `VITE_TURNSTILE_SITE_KEY` is surfaced as configuration error instead of rendering a broken Cloudflare widget.
 - Updated `plans.md` and `validation.md` with the Turnstile repair milestone and validation commands.
+
+## Completed In 2026-04-28 VPS PostgreSQL Login Probe Repair
+
+- Investigated the login path from `LoginScreen` through KK API password auth, browser session bootstrap, and VPS PostgreSQL persistence.
+- Confirmed auth/runtime regression tests pass locally.
+- Found the first live VPS database probe failure was caused by PostgreSQL rejecting non-SSL connections.
+- Added a regression test proving public `DATABASE_URL` PostgreSQL hosts must use SSL automatically.
+- Updated `apps/api/src/lib/postgres.ts` so `DATABASE_URL` connections to public hosts use SSL by default while local/private database hosts can remain non-SSL.
+- Confirmed the live probe now reaches PostgreSQL with SSL but is still rejected by server-side `pg_hba.conf` access control for the current client source.
+- Attempted read-only SSH inspection of the VPS, but the existing local temporary SSH key files are unreadable by the current Windows ACLs.
 
 ## Validation Results
 
@@ -186,29 +196,60 @@ Final gate:
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `npm.cmd run check:encoding`
 
+2026-04-28 VPS PostgreSQL login probe validation:
+
+- Red/green verified: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/server-runtime-config.test.ts`
+- Passed: auth/runtime regression tests (`38/38` tests):
+  - `tests/unit/workspace-auth-gate.test.ts`
+  - `tests/unit/login-screen-auth-actions.test.ts`
+  - `tests/unit/kk-api-client-session-cookie.test.ts`
+  - `tests/unit/kk-api-session-bootstrap.test.ts`
+  - `tests/unit/auth-access-token.test.ts`
+  - `tests/unit/billing-http-routes.test.ts`
+  - `tests/unit/cost-estimation-admin-review-panel.test.ts`
+  - `tests/unit/server-runtime-config.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Live VPS probe: SSL is now enabled by app config, but PostgreSQL still rejects the client via `pg_hba.conf`; remote access-control repair remains blocked on usable VPS SSH access.
+
+2026-04-28 responsive result flow follow-up validation:
+
+- Passed: targeted responsive/mobile/billing contract tests (`19/19` tests):
+  - `tests/unit/responsive-surface.test.ts`
+  - `tests/unit/mobile-home-three-zone-contract.test.ts`
+  - `tests/unit/mobile-result-feed-detail-contract.test.ts`
+  - `tests/unit/mobile-workspace-surface-contract.test.ts`
+  - `tests/unit/app-shell-surface-hook.test.ts`
+  - `tests/unit/mobile-result-feed-app-contract.test.ts`
+  - `tests/unit/billing-remaining-balance-contract.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run build`
+
 ## In Progress
 
-- No recovery milestone remains in progress.
-- Turnstile repair validation is complete and ready for a scoped commit.
+- VPS PostgreSQL login probe repair is code-complete locally.
+- Remote PostgreSQL access-control repair remains blocked because the existing temporary SSH key files cannot be read under the current Windows ACLs.
+- Existing unrelated settings/API, admin/API, mobile, and CSS dirty files remain outside this auth/PostgreSQL scope.
 
 ## Known Risks And Blockers To Verify
 
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
-- Unrelated dirty files are present and must not be staged in the Turnstile commit unless explicitly requested. Currently observed examples:
+- Unrelated dirty files are present and must not be staged in the VPS PostgreSQL login probe commit unless explicitly requested. Currently observed examples:
   - `apps/admin/src/pages/RechargeSubmissionsPage.tsx`
-  - `apps/api/src/lib/postgres.ts`
   - `src/components/mobile/MobileResultDetailScreen.tsx`
   - `src/components/mobile/MobileResultFeed.tsx`
   - `src/components/settings/ApiSettingsView.tsx`
   - `src/components/settings/apiWorkbenchSections.tsx`
   - `src/index.css`
-  - `tests/unit/server-runtime-config.test.ts`
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
+- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
 
-1. Stage only the Turnstile repair files and create the scoped commit.
-2. Keep the unrelated dirty files out of the Turnstile commit unless explicitly requested.
+1. Repair VPS PostgreSQL access control on the server, or provide usable SSH access so the `pg_hba.conf` change and PostgreSQL reload can be applied.
+2. Rerun `node scripts/dev/run-api-dev.mjs --check` and `http://127.0.0.1:3001/healthz?probe=1` after the server-side rule is fixed.
+3. Keep unrelated dirty files out of the auth/PostgreSQL commit unless explicitly requested.
