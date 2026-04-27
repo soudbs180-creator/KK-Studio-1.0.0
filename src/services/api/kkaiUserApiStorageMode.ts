@@ -7,7 +7,7 @@ type UserApiStorageHealthShape = Pick<KkApiServerHealth, 'reachable' | 'persiste
 export type KkaiUserApiStorageMode = 'local-file-ready' | 'cloud-ready' | 'not-ready';
 
 function isReadyBackend(backend: KkApiRepositoryBackend): boolean {
-  return backend === 'local-file' || backend === 'supabase';
+  return backend === 'local-file' || backend === 'postgres';
 }
 
 export function resolveKkaiUserApiStorageMode(

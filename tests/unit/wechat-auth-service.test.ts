@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 
 import { WechatAuthService } from "../../apps/api/src/modules/auth/application/wechat-auth-service.ts";
 import { AuthService } from "../../apps/api/src/modules/auth/application/auth-service.ts";
+import { InMemoryAuthIdentityStore } from "../../apps/api/src/modules/auth/infrastructure/in-memory-auth-identity-store.ts";
 
 const originalConsoleWarn = console.warn;
 const originalConsoleError = console.error;
@@ -29,6 +30,13 @@ function createService(overrides: Partial<ConstructorParameters<typeof WechatAut
     stateSigningSecret: "wechat-state-signing-secret",
     allowedRedirectOrigins: ["https://app.example.com"],
     ...overrides,
+  });
+}
+
+function createAuthService() {
+  return new AuthService({
+    verifyTurnstileToken: async () => ({ success: true }),
+    identityStore: new InMemoryAuthIdentityStore(),
   });
 }
 
@@ -86,9 +94,7 @@ describe("wechat auth service", () => {
   test("redirects invalid callback state to the trusted callback URL", async () => {
     await withMutedWechatLogs(async () => {
       const service = createService();
-      const authService = new AuthService({
-        verifyTurnstileToken: async () => ({ success: true }),
-      });
+      const authService = createAuthService();
 
       const result = await service.handleCallback(authService, {
         code: "wechat-code",
@@ -106,9 +112,7 @@ describe("wechat auth service", () => {
     const targetUserId = "11111111-1111-1111-1111-111111111111";
     const syncCalls: Array<Record<string, unknown>> = [];
     const identityCalls: Array<Record<string, unknown>> = [];
-    const authService = new AuthService({
-      verifyTurnstileToken: async () => ({ success: true }),
-    });
+    const authService = createAuthService();
 
     const service = createService({
       fetchImpl: createWechatFetchStub(),
@@ -152,9 +156,7 @@ describe("wechat auth service", () => {
 
   test("rejects binding a WeChat account that already belongs to another user", async () => {
     await withMutedWechatLogs(async () => {
-      const authService = new AuthService({
-        verifyTurnstileToken: async () => ({ success: true }),
-      });
+      const authService = createAuthService();
       const service = createService({
         fetchImpl: createWechatFetchStub(),
         repository: {
@@ -199,9 +201,7 @@ describe("wechat auth service", () => {
   });
 
   test("wechat login callback redirects with KK API session tokens in the hash", async () => {
-    const authService = new AuthService({
-      verifyTurnstileToken: async () => ({ success: true }),
-    });
+    const authService = createAuthService();
     const service = createService({
       fetchImpl: createWechatFetchStub(),
       repository: {

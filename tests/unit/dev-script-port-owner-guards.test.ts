@@ -15,9 +15,13 @@ test('dev scripts iterate candidate port owners instead of passing PID arrays in
   const devLaunchSource = readSource('scripts/dev/dev-launch.ps1');
 
   for (const source of [devStatusSource, devStopSource, devLaunchSource]) {
-    assert.match(source, /\$ownerPids = @\(Get-NetTCPConnection -State Listen -LocalPort \$Port/);
+    assert.match(source, /function Get-ListeningConnectionRecords/);
+    assert.match(source, /Get-NetTCPConnection -State Listen -ErrorAction Stop/);
+    assert.match(source, /cmd \/c netstat -ano -p tcp/);
+    assert.match(source, /\$ownerPids = @\(Get-ListeningConnectionRecords \| Where-Object \{ \$_.LocalPort -eq \$Port \}/);
     assert.match(source, /foreach \(\$ownerPid in \$ownerPids\)/);
     assert.match(source, /\[int\]::TryParse\(\[string\]\$ownerPid, \[ref\]\$resolvedOwnerPid\)/);
+    assert.match(source, /if \(\$Port -in \$listeningPorts\) \{\s*return \$true\s*}/s);
   }
 
   assert.match(devStatusSource, /return \$null\s*}\s*function Test-UrlReady/s);
@@ -36,10 +40,15 @@ test('dev launch tracks the stable API watch supervisor and stop scripts clean s
   assert.match(devStopSource, /function Get-KnownDevProcessIds/);
   assert.match(devLaunchSource, /\$knownProcessIds = @\(Get-KnownDevProcessIds -Port \$Port \| Where-Object/);
   assert.match(devStopSource, /foreach \(\$knownProcessId in @\(Get-KnownDevProcessIds -Port \$service\.Port\)\)/);
+  assert.match(devLaunchSource, /Stop-Process -Id \$ProcessId -Force -ErrorAction Stop/);
+  assert.match(devStopSource, /Stop-Process -Id \$processId -Force -ErrorAction Stop/);
   assert.match(
     devLaunchSource,
     /\$apiPid = Sync-PidFileToPortOwner -PidFile \$apiPidFile -Port 3001 -FallbackProcessId \$apiPid/,
   );
   assert.match(devLaunchSource, /if \(\$resolvedOwnerPids\.Count -eq 1\) \{/);
   assert.match(devLaunchSource, /return \$resolvedOwnerPids\[0\]/);
+  assert.match(devLaunchSource, /return Start-DetachedPowerShellScript/);
+  assert.match(devLaunchSource, /function Start-DetachedNodeProcess/);
+  assert.match(devLaunchSource, /\$vitePid = Start-DetachedNodeProcess/);
 });

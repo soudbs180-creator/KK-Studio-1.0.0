@@ -38,11 +38,6 @@ const aPlusControlModeLabels: Record<EcommerceAPlusControlMode, string> = {
   '600x450': '600x450',
 };
 
-const SECTION_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 92%, transparent) 0%, color-mix(in srgb, var(--bg-secondary) 88%, transparent) 100%)',
-  borderColor: 'var(--border-default)',
-};
-
 const TITLE_STYLE: React.CSSProperties = {
   color: 'var(--text-secondary)',
 };
@@ -333,8 +328,14 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   onActiveEcommerceSheetChange,
 }) => {
   const displaySizes = useMemo(() => getDisplaySizes(availableSizes), [availableSizes]);
-  const ratioLayout = useMemo(() => resolveRatioLayout(availableRatios), [availableRatios]);
   const isEcommercePanel = !!ecommerceSheetSettings && !!onUpdateEcommerceSheetSetting;
+  const ecommerceDisplaySizes = useMemo(() => {
+    if (!isEcommercePanel || displaySizes.includes(ImageSize.SIZE_4K)) {
+      return displaySizes;
+    }
+    return getDisplaySizes([...displaySizes, ImageSize.SIZE_4K]);
+  }, [displaySizes, isEcommercePanel]);
+  const ratioLayout = useMemo(() => resolveRatioLayout(availableRatios), [availableRatios]);
   const resolvedEcommerceSheet: EcommerceGroupSheet = activeEcommerceSheet ?? '主图';
   const isAPlusControlSheet = isEcommercePanel && resolvedEcommerceSheet === 'A+';
   const activeEcommerceSheetSettings = isEcommercePanel
@@ -360,7 +361,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
       }}
     >
       {networkOptions.length > 0 ? (
-        <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+        <section className="mb-4 last:mb-0">
           <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
             搜索增强
           </div>
@@ -382,7 +383,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
       ) : null}
 
       {shouldShowThinkingMode ? (
-        <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+        <section className="mb-4 last:mb-0">
           <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
             思考模式
           </div>
@@ -415,7 +416,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
 
       {isEcommercePanel ? (
         <>
-          <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+          <section className="mb-4 last:mb-0">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="text-sm font-medium" style={TITLE_STYLE}>
                 选择模块
@@ -440,21 +441,23 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
             </div>
           </section>
 
-          {displaySizes.length > 1 ? (
-            <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+          {ecommerceDisplaySizes.length > 1 ? (
+            <section className="mb-4 last:mb-0">
               <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
                 {resolvedEcommerceSheet} 画质
               </div>
               <ImageSizeControlSegment
-                selectedSize={activeEcommerceSheetSettings.imageSize}
-                displaySizes={displaySizes}
-                onChange={(size) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, { imageSize: size })}
+                selectedSize={isAPlusControlSheet ? ImageSize.SIZE_4K : activeEcommerceSheetSettings.imageSize}
+                displaySizes={ecommerceDisplaySizes}
+                onChange={(size) => onUpdateEcommerceSheetSetting(resolvedEcommerceSheet, {
+                  imageSize: isAPlusControlSheet ? ImageSize.SIZE_4K : size,
+                })}
               />
             </section>
           ) : null}
 
           {!isAPlusControlSheet && ratioLayout.uniqueRatios.length > 0 ? (
-            <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+            <section className="mb-4 last:mb-0">
               <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
                 主图比例
               </div>
@@ -467,7 +470,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
           ) : null}
 
           {isAPlusControlSheet ? (
-            <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+            <section className="mb-4 last:mb-0">
               <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
                 A+ 尺寸档位
               </div>
@@ -484,16 +487,13 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
                   </button>
                 ))}
               </div>
-              <div className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
-                A+ 生成比例由尺寸档位和提示词控制。自动模式会优先读取需求表中的 1464x600、970x600、600x450；识别不到时默认按 970x600 处理。
-              </div>
             </section>
           ) : null}
         </>
       ) : (
         <>
           {displaySizes.length > 1 ? (
-            <section className="mb-3 rounded-2xl border p-3" style={SECTION_STYLE}>
+            <section className="mb-4 last:mb-0">
               <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
                 画质
               </div>
@@ -505,7 +505,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
             </section>
           ) : null}
 
-          <section className="rounded-2xl border p-3" style={SECTION_STYLE}>
+          <section className="mb-4 last:mb-0">
             <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
               比例
             </div>

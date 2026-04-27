@@ -72,7 +72,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const reviewViewportStyle: React.CSSProperties = {
-  maxHeight: 'min(70vh, 720px)',
+  maxHeight: 'min(calc(100vh - 220px), 720px)',
 };
 
 function useFilePreviewUrls(files: File[]): string[] {
@@ -227,6 +227,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
   const activeReviewItem = allReviewItems.find((item) => item.id === activeReviewItemKey) || allReviewItems[0] || null;
   const activeTaskState = activeReviewItem?.taskState || null;
   const configuredTaskCount = Object.values(taskStates).filter(Boolean).length;
+  const dedupedAnalysisWarnings = React.useMemo(() => Array.from(new Set(analysis.reviewWarnings)), [analysis.reviewWarnings]);
   const activePromptPreview = activeReviewItem
     ? (activeTaskState?.promptOverride || activeTaskState?.resolvedPromptPreview || activeReviewItem.promptDraft || '暂无提示词')
     : '暂无提示词';
@@ -385,83 +386,87 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
     </div>
   );
 
-  const renderActiveDetail = (reviewItem: ReviewItemDescriptor, compact = false) => (
-    <div
-      data-testid="ecommerce-review-active-detail"
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border p-3"
-      style={cardStyle}
-    >
-      <div className={compact ? 'space-y-3' : 'min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1'}>
-        <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-            {reviewItem.section === '主图' ? '主图条目详情' : 'A+ 条目详情'}
+  const renderActiveDetail = (reviewItem: ReviewItemDescriptor, compact = false) => {
+    const dedupedItemWarnings = Array.from(new Set(reviewItem.warnings));
+
+    return (
+      <div
+        data-testid="ecommerce-review-active-detail"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border p-3"
+        style={cardStyle}
+      >
+        <div className={compact ? 'space-y-3' : 'min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1'}>
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+              {reviewItem.section === '主图' ? '主图条目详情' : 'A+ 条目详情'}
+            </div>
+            <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+              {reviewItem.title}
+            </div>
+            <div className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+              {reviewItem.subtitle}
+            </div>
+            {reviewItem.section === 'A+' ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {reviewItem.sizeTier ? (
+                  <span className="rounded-full border px-2 py-1 text-[10px]" style={cardStyle}>
+                    识别档位 {reviewItem.sizeTier}
+                  </span>
+                ) : null}
+                {reviewItem.effectiveSizeTier ? (
+                  <span className="rounded-full border px-2 py-1 text-[10px]" style={cardStyle}>
+                    实际采用档位 {reviewItem.effectiveSizeTier}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-          <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-            {reviewItem.title}
+
+          <div className="rounded-xl border p-3" style={cardStyle}>
+            <div className="text-[11px] font-medium text-[var(--text-secondary)]">提示词预览</div>
+            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--text-primary)]">
+              {activePromptPreview}
+            </div>
           </div>
-          <div className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-            {reviewItem.subtitle}
-          </div>
-          {reviewItem.section === 'A+' ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {reviewItem.sizeTier ? (
-                <span className="rounded-full border px-2 py-1 text-[10px]" style={cardStyle}>
-                  识别档位 {reviewItem.sizeTier}
-                </span>
-              ) : null}
-              {reviewItem.effectiveSizeTier ? (
-                <span className="rounded-full border px-2 py-1 text-[10px]" style={cardStyle}>
-                  实际采用档位 {reviewItem.effectiveSizeTier}
-                </span>
-              ) : null}
+
+          {dedupedItemWarnings.length > 0 ? (
+            <div className="rounded-xl border px-3 py-2 text-xs" style={warningStyle}>
+              {dedupedItemWarnings.map((warning) => (
+                <div key={warning}>{warning}</div>
+              ))}
             </div>
           ) : null}
+
+          {renderReferenceGallery('参考图预览', reviewItem.autoReferenceAssets, reviewItem.id)}
+          {renderReferenceGallery('手动补传图', reviewItem.manualReferenceBindings, reviewItem.id, true)}
+          {renderUploadGallery(
+            '全局产品图',
+            uploadPreviewModel.productItems,
+            productPreviewUrls,
+            reviewItem.autoReferenceAssets.length + reviewItem.manualReferenceBindings.length,
+            '产品图',
+          )}
+          {renderUploadGallery(
+            '全局补充参考图',
+            uploadPreviewModel.extraReferenceItems,
+            extraPreviewUrls,
+            reviewItem.autoReferenceAssets.length + reviewItem.manualReferenceBindings.length + uploadPreviewModel.productItems.length,
+            '补充参考图',
+          )}
+
+          {activeTaskState && onTaskStateChange ? (
+            <EcommerceTaskEditorPanel
+              taskState={activeTaskState}
+              onTaskStateChange={(taskId, updater) => onTaskStateChange(activeTaskState.taskId === taskId ? taskId : activeTaskState.taskId, updater)}
+              compact={compact}
+              collapsible
+              defaultExpanded={compact}
+            />
+          ) : null}
         </div>
-
-        <div className="rounded-xl border p-3" style={cardStyle}>
-          <div className="text-[11px] font-medium text-[var(--text-secondary)]">提示词预览</div>
-          <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--text-primary)]">
-            {activePromptPreview}
-          </div>
-        </div>
-
-        {reviewItem.warnings.length > 0 ? (
-          <div className="rounded-xl border px-3 py-2 text-xs" style={warningStyle}>
-            {reviewItem.warnings.map((warning) => (
-              <div key={warning}>{warning}</div>
-            ))}
-          </div>
-        ) : null}
-
-        {renderReferenceGallery('参考图预览', reviewItem.autoReferenceAssets, reviewItem.id)}
-        {renderReferenceGallery('手动补传图', reviewItem.manualReferenceBindings, reviewItem.id, true)}
-        {renderUploadGallery(
-          '全局产品图',
-          uploadPreviewModel.productItems,
-          productPreviewUrls,
-          reviewItem.autoReferenceAssets.length + reviewItem.manualReferenceBindings.length,
-          '产品图',
-        )}
-        {renderUploadGallery(
-          '全局补充参考图',
-          uploadPreviewModel.extraReferenceItems,
-          extraPreviewUrls,
-          reviewItem.autoReferenceAssets.length + reviewItem.manualReferenceBindings.length + uploadPreviewModel.productItems.length,
-          '补充参考图',
-        )}
-
-        {activeTaskState && onTaskStateChange ? (
-          <EcommerceTaskEditorPanel
-            taskState={activeTaskState}
-            onTaskStateChange={(taskId, updater) => onTaskStateChange(activeTaskState.taskId === taskId ? taskId : activeTaskState.taskId, updater)}
-            compact={compact}
-            collapsible
-            defaultExpanded={compact}
-          />
-        ) : null}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderReviewSection = (label: string, items: ReviewItemDescriptor[], accent: string) => (
     <section>
@@ -589,14 +594,14 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
         </button>
       </div>
 
-      {analysis.reviewWarnings.length > 0 ? (
+      {dedupedAnalysisWarnings.length > 0 ? (
         <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={warningStyle}>
           <div className="mb-1 flex items-center gap-2 font-medium text-[var(--text-primary)]">
             <AlertTriangle size={14} />
             需要人工确认
           </div>
           <div className="space-y-1">
-            {analysis.reviewWarnings.slice(0, 4).map((warning) => (
+            {dedupedAnalysisWarnings.slice(0, 4).map((warning) => (
               <div key={warning}>{warning}</div>
             ))}
           </div>

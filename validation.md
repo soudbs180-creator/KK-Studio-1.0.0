@@ -1,0 +1,159 @@
+# KK Studio Validation Matrix
+
+Last updated: 2026-04-27
+
+Use `npm.cmd` on Windows.
+
+## Baseline Commands
+
+- Documentation and agent-rule changes: `npm.cmd run governance:agent-docs`
+- Encoding gate: `npm.cmd run check:encoding`
+- Type checking: `npm.cmd run typecheck`
+- Build: `npm.cmd run build`
+- Unit tests: `npm.cmd run test:unit`
+- Full local change gate when feasible: `npm.cmd run verify:changes`
+
+## Milestone 1: Recovery Ledger
+
+Commands:
+
+```powershell
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
+
+Expected result: both pass. If governance ignores root ledger files, that is acceptable as long as the command exits successfully.
+
+## Milestone 2: Auth, Runtime, Recharge
+
+Targeted tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/login-screen-auth-actions.test.ts" `
+  "tests/unit/kk-api-client-session-cookie.test.ts" `
+  "tests/unit/kk-api-session-bootstrap.test.ts" `
+  "tests/unit/auth-access-token.test.ts" `
+  "tests/unit/billing-http-routes.test.ts" `
+  "tests/unit/cost-estimation-admin-review-panel.test.ts"
+```
+
+API package tests to run when server modules change:
+
+```powershell
+node --test "apps/api/src/modules/auth/application/*.test.ts" "apps/api/src/modules/auth/presentation/*.test.ts"
+node --test "apps/api/src/modules/billing/*.test.ts" "apps/api/src/modules/billing/**/*.test.ts"
+```
+
+Milestone gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+## Milestone 3: Settings And API Capabilities
+
+Targeted tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/settings-workbench-ui-refit.test.ts" `
+  "tests/unit/api-settings-capability-routing-contract.test.ts" `
+  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
+  "tests/unit/api-settings-capability-layout-regression.test.ts" `
+  "tests/unit/ocr-service-settings-contract.test.ts" `
+  "tests/unit/prompt-optimizer-capability-route-contract.test.ts"
+```
+
+Milestone gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+## Milestone 4: Ecommerce Framework And Scheduler
+
+Targeted tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-framework-contract.test.ts" `
+  "tests/unit/ecommerce-framework-runtime.test.ts" `
+  "tests/unit/ecommerce-framework-runtime-order.test.ts" `
+  "tests/unit/ecommerce-confirm-build-flow.test.ts" `
+  "tests/unit/ecommerce-composer-scroll-regression.test.ts" `
+  "tests/unit/ecommerce-xlsx-parser.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts"
+```
+
+Milestone gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+## Milestone 5: PPT Deck Container
+
+Targeted tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ppt-deck-single-container-contract.test.ts"
+```
+
+Add or expand tests around `src/utils/pptDeckModules.ts`, PPT preview helpers, and export package helpers before changing production code.
+
+Milestone gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+## Milestone 6: Responsive Result Flow
+
+Targeted tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/responsive-surface.test.ts" `
+  "tests/unit/mobile-result-feed-detail-contract.test.ts" `
+  "tests/unit/mobile-result-feed-app-contract.test.ts" `
+  "tests/unit/mobile-workspace-surface-contract.test.ts" `
+  "tests/unit/mobile-feed-selectors.test.ts"
+```
+
+Milestone gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+```
+
+## Smoke Scripts
+
+Run when the touched surface requires browser-level confidence:
+
+```powershell
+npm.cmd run verify:prompt-group-drag
+npm.cmd run verify:mobile-settings-smoke
+npm.cmd run verify:desktop-settings-smoke
+npm.cmd run verify:startup-runtime-banner-centering
+```
+
+## Final Gate
+
+Before declaring the recovery complete:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+```

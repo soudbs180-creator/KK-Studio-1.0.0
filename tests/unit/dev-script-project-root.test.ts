@@ -17,6 +17,7 @@ test("dev powershell scripts resolve the repository root from scripts/dev", () =
   const runViteDevSource = readSource("scripts/dev/run-vite-dev.ps1");
   const runApiDevSource = readSource("scripts/dev/run-api-dev.mjs");
   const runApiLocalSource = readSource("scripts/dev/run-api-local.mjs");
+  const runApiRunnerSource = readSource("scripts/dev/run-api-runner.ps1");
   const diagnoseApiEnvSource = readSource("scripts/dev/diagnose-api-env.mjs");
   const statusBatSource = readSource("scripts/查看 KK Studio 状态.bat");
   const stopBatSource = readSource("scripts/停止 KK Studio.bat");
@@ -31,10 +32,15 @@ test("dev powershell scripts resolve the repository root from scripts/dev", () =
   assert.match(devRestartSource, /Join-Path \$projectRoot 'scripts\/dev\/dev-launch\.ps1'/);
   assert.match(devLaunchSource, /Join-Path \$projectRoot 'scripts\\dev\\run-api-dev\.mjs'/);
   assert.match(devLaunchSource, /Join-Path \$projectRoot 'scripts\\dev\\run-api-local\.mjs'/);
+  assert.match(devLaunchSource, /Join-Path \$projectRoot 'scripts\\dev\\run-api-runner\.ps1'/);
   assert.match(devLaunchSource, /Join-Path \$projectRoot 'scripts\\dev\\run-vite-dev\.ps1'/);
   assert.match(runViteDevSource, /\$projectRoot = Split-Path -Parent \(Split-Path -Parent \$PSScriptRoot\)/);
   assert.match(runApiDevSource, /from "\.\.\/lib\/local-api-bootstrap\.mjs"/);
   assert.match(runApiLocalSource, /from "\.\.\/lib\/local-api-bootstrap\.mjs"/);
+  assert.match(runApiRunnerSource, /\$projectRoot = Split-Path -Parent \(Split-Path -Parent \$PSScriptRoot\)/);
+  assert.match(runApiRunnerSource, /^\s*param\(/);
+  assert.match(runApiRunnerSource, /param\([\s\S]*?\)\s*\r?\n\r?\n\$ErrorActionPreference = 'Stop'/);
+  assert.match(runApiRunnerSource, /\[string\]\$ApiScript/);
   assert.match(diagnoseApiEnvSource, /from "\.\.\/lib\/env-contract\.mjs"/);
   assert.match(diagnoseApiEnvSource, /path\.resolve\(path\.dirname\(fileURLToPath\(import\.meta\.url\)\), "\.\.", "\.\."\)/);
   assert.match(statusBatSource, /scripts\/dev\/dev-status\.ps1/);
@@ -75,20 +81,26 @@ test("dev launch normalizes duplicate PATH environment keys before spawning chil
   assert.match(devLaunchSource, /Remove-Item Env:PATH -ErrorAction SilentlyContinue/);
   assert.match(devLaunchSource, /\$env:PATH = \$originalPathUpper/);
   assert.match(devLaunchSource, /\$env:Path = \$originalPathMixed/);
-  assert.match(devLaunchSource, /\$env:CI = 'true'/);
-  assert.match(devLaunchSource, /\$env:CI = \$originalCi/);
 });
 
-test("dev launch keeps Vite alive through a detached PowerShell runner while still using the native config loader", () => {
+test("dev launch starts Vite through the detached Node runner", () => {
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
   const runViteDevSource = readSource("scripts/dev/run-vite-dev.ps1");
+  const runApiRunnerSource = readSource("scripts/dev/run-api-runner.ps1");
 
   assert.match(devLaunchSource, /function Start-DetachedPowerShellScript/);
-  assert.match(devLaunchSource, /\$vitePid = Start-DetachedPowerShellScript/);
-  assert.match(devLaunchSource, /-ScriptPath \$viteRunnerScript/);
+  assert.match(devLaunchSource, /function Start-DetachedNodeProcess/);
+  assert.match(devLaunchSource, /\$vitePid = Start-DetachedNodeProcess/);
+  assert.match(devLaunchSource, /-NodeArguments @\(\$viteCli, '--configLoader', 'native'\)/);
+  assert.doesNotMatch(devLaunchSource, /\$vitePid = Start-DetachedPowerShellScript/);
+  assert.match(devLaunchSource, /function Start-ApiProcess/);
+  assert.match(devLaunchSource, /\$apiPid = Start-ApiProcess -ApiScript \$apiScript -UseWatch \$true/);
   assert.doesNotMatch(devLaunchSource, /Wait-Process -Id \$vitePid/);
   assert.match(runViteDevSource, /node_modules\\vite\\bin\\vite\.js/);
   assert.match(runViteDevSource, /& \$nodeExe \$viteCli --configLoader native/);
+  assert.match(runApiRunnerSource, /if \(\$UseWatch\)/);
+  assert.match(runApiRunnerSource, /& \$nodeExe --watch \$ApiScript/);
+  assert.match(runApiRunnerSource, /& \$nodeExe \$ApiScript/);
 });
 
 test("dev launch does not fail startup when opening the browser is unavailable", () => {
@@ -105,8 +117,11 @@ test("dev launch falls back to plain node when watch mode cannot start on this m
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
 
   assert.match(devLaunchSource, /function Start-ApiProcess/);
-  assert.match(devLaunchSource, /@\('--watch', \$ApiScript\)/);
-  assert.match(devLaunchSource, /@\(\$ApiScript\)/);
+  assert.match(devLaunchSource, /if \(\$UseWatch\) \{/);
+  assert.match(devLaunchSource, /\$runnerArguments = @\('-ApiScript', \$ApiScript\)/);
+  assert.match(devLaunchSource, /\$runnerArguments \+= '-UseWatch'/);
+  assert.match(devLaunchSource, /return Start-DetachedPowerShellScript/);
+  assert.doesNotMatch(devLaunchSource, /return Start-DetachedNodeProcess/);
   assert.match(devLaunchSource, /function Test-ApiWatchSpawnError/);
   assert.match(devLaunchSource, /spawn EPERM/);
   assert.match(devLaunchSource, /watch mode is unavailable/);

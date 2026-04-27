@@ -11,14 +11,19 @@ function readSource(relativePath: string): string {
 
 test('frontend generation flow uses the shared billing coordinator and persists attempt ids on prompt nodes', () => {
   const appSource = readSource('src/App.tsx');
+  const retryHelperSource = readSource('src/app/prepareRetriedExecutionNode.ts');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
   const billingContextSource = readSource('src/context/BillingContext.tsx');
   const typesSource = readSource('src/types.ts');
+  const billingAttemptCallCount =
+    (appSource.split('buildGenerationBillingAttempt(').length - 1)
+    + (retryHelperSource.split('buildGenerationBillingAttempt(').length - 1);
 
   assert.match(appSource, /from '\.\/services\/billing\/generationBillingCoordinator';/);
-  assert.ok((appSource.split('buildGenerationBillingAttempt(').length - 1) >= 3);
+  assert.ok(billingAttemptCallCount >= 2);
   assert.match(appSource, /billingAttemptId: billingAttempt\.attemptId,/);
-  assert.match(appSource, /billingAttempt,\s*\}\);/);
+  assert.match(retryHelperSource, /from '\.\.\/services\/billing\/generationBillingCoordinator';/);
+  assert.match(retryHelperSource, /billingAttemptId: billingAttempt\.attemptId,/);
   assert.match(appSource, /attemptId: params\.billingAttempt\?\.attemptId,/);
   assert.match(appSource, /businessRefId: params\.billingAttempt\?\.businessRefId,/);
   assert.match(appSource, /idempotencyKey: params\.billingAttempt\?\.idempotencyKey,/);

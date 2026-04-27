@@ -91,7 +91,7 @@ test("default auth service persists local password registrations across service 
       verifyTurnstileToken: async () => ({ success: true }),
     });
 
-    const resolvedProfile = tokenResolutionService.resolveAccessToken(loginData.accessToken);
+    const resolvedProfile = await tokenResolutionService.resolveAccessToken(loginData.accessToken);
     assert.equal(resolvedProfile?.email, "user@example.com");
   } finally {
     rmSync(tempDirectory, { recursive: true, force: true });
@@ -147,7 +147,7 @@ test("auth service updates password through the local identity store", async () 
       readFileSync(path.join(outboxPath, readdirSync(outboxPath)[0]), "utf8"),
     ).code as string;
 
-    const updated = authService.updatePassword({
+    const updated = await authService.updatePassword({
       authorization: `Bearer ${session.accessToken}`,
     }, {
       verificationCode,
@@ -225,7 +225,7 @@ test("auth service updates password with a verification code", async () => {
       readFileSync(path.join(outboxPath, readdirSync(outboxPath)[0]), "utf8"),
     ).code as string;
 
-    const updated = authService.updatePassword({
+    const updated = await authService.updatePassword({
       authorization: `Bearer ${session.accessToken}`,
     }, {
       verificationCode,
@@ -304,7 +304,7 @@ test("auth service clears issued password change codes after a current-password 
       readFileSync(path.join(outboxPath, readdirSync(outboxPath)[0]), "utf8"),
     ).code as string;
 
-    const updated = authService.updatePassword({
+    const updated = await authService.updatePassword({
       authorization: `Bearer ${session.accessToken}`,
     }, {
       currentPassword: "password-123",
@@ -312,7 +312,7 @@ test("auth service clears issued password change codes after a current-password 
     });
     assert.equal(updated?.updated, true);
 
-    const rejectedReuse = authService.updatePassword({
+    const rejectedReuse = await authService.updatePassword({
       authorization: `Bearer ${session.accessToken}`,
     }, {
       verificationCode,
@@ -367,7 +367,7 @@ test("auth service rate-limits repeated password verification code attempts", as
     ).code as string;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const rejected = authService.updatePassword({
+      const rejected = await authService.updatePassword({
         authorization: `Bearer ${session.accessToken}`,
       }, {
         verificationCode: "000000",
@@ -376,7 +376,7 @@ test("auth service rate-limits repeated password verification code attempts", as
       assert.equal(rejected, undefined);
     }
 
-    const blocked = authService.updatePassword({
+    const blocked = await authService.updatePassword({
       authorization: `Bearer ${session.accessToken}`,
     }, {
       verificationCode,

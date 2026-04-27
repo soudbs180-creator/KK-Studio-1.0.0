@@ -9,57 +9,56 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
 
-test("hosted preflight checks verify auth prerequisites and keep local API fallback out of Vercel", () => {
+test("hosted preflight checks verify VPS API and PostgreSQL prerequisites without Supabase release dependencies", () => {
   const source = readSource("scripts/diagnose-hosted-release.mjs");
 
   assert.match(source, /from "\.\/lib\/env-contract\.mjs";/);
-  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_KK_API_BASE_URL",\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*\];/);
+  assert.match(source, /const hostedFrontendRequired = \[\s*"VITE_KK_API_BASE_URL",\s*\];/);
+  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*"VITE_SUPABASE_URL",\s*"VITE_SUPABASE_ANON_KEY",\s*\];/);
   assert.match(source, /const frontendSnapshots = snapshots\.frontendSnapshots;/);
   assert.match(source, /const localApiSnapshots = snapshots\.apiSnapshots;/);
   assert.match(source, /label: "vercel whoami"/);
   assert.match(source, /label: "npx vercel whoami"/);
-  assert.match(source, /label: "supabase projects list"/);
-  assert.match(source, /label: "npx supabase projects list"/);
+  assert.doesNotMatch(source, /label: "supabase projects list"/);
+  assert.doesNotMatch(source, /label: "npx supabase projects list"/);
+  assert.match(source, /"DATABASE_URL"/);
   assert.match(source, /"GOOGLE_OAUTH_CLIENT_ID"/);
   assert.match(source, /"GOOGLE_OAUTH_CLIENT_SECRET"/);
   assert.match(source, /"GOOGLE_OAUTH_REDIRECT_URI"/);
   assert.match(source, /"GOOGLE_STATE_SIGNING_SECRET"/);
   assert.match(source, /"GOOGLE_ALLOWED_REDIRECT_ORIGINS"/);
-  assert.match(source, /Hosted API \/ function secret/);
-  assert.match(source, /runtime env or Supabase Secrets/);
-  assert.match(source, /printSection\("Supabase Project Alignment"\);/);
-  assert.match(source, /SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL/);
+  assert.match(source, /Hosted API Required Env/);
+  assert.doesNotMatch(source, /runtime env or Supabase Secrets/);
+  assert.doesNotMatch(source, /printSection\("Supabase Project Alignment"\);/);
+  assert.doesNotMatch(source, /SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL/);
   assert.match(source, /Vercel authentication is unavailable\./);
-  assert.match(source, /Supabase authentication is unavailable\./);
-  assert.match(source, /It does not read remote Vercel or Supabase dashboard state\./);
+  assert.doesNotMatch(source, /Supabase authentication is unavailable\./);
+  assert.match(source, /It does not read remote VPS or Vercel dashboard state\./);
 });
 
-test("hosted release workflow pushes migrations before deploying edge functions and frontend", () => {
+test("hosted release workflow deploys the VPS API before deploying the frontend", () => {
   const source = readSource("scripts/release-hosted.mjs");
   const movedSource = readSource("scripts/release/release-hosted.mjs");
 
-  assert.match(source, /const skipMigrations = args\.has\("--skip-migrations"\);/);
-  assert.match(source, /const productionProjectRef =/);
-  assert.match(source, /const previewProjectRef = process\.env\.SUPABASE_PROJECT_REF_PREVIEW;/);
-  assert.match(source, /if \(previewProjectRef && productionProjectRef && previewProjectRef === productionProjectRef\) \{/);
-  assert.match(source, /const supabaseProjectRef = preview\s+\?\s+previewProjectRef\s+:\s+productionProjectRef;/);
-  assert.match(source, /runStep\("Link Supabase project", `npx supabase link --project-ref \$\{supabaseProjectRef\}`\);/);
-  assert.match(source, /runStep\("Push Supabase migrations", "npx supabase db push"\);/);
-  assert.match(source, /runStep\("Deploy user-route-proxy", "npm run supabase:functions:deploy:user-route-proxy"\);/);
-  assert.match(source, /runStep\("Deploy secure-model-proxy", "npm run supabase:functions:deploy:secure-model-proxy"\);/);
-  assert.match(source, /runStep\("Deploy admin-credit-models", "npm run supabase:functions:deploy:admin-credit-models"\);/);
-  assert.match(source, /runStep\("Deploy wechat-auth", "npm run supabase:functions:deploy:wechat-auth"\);/);
+  assert.match(source, /const skipVps = args\.has\("--skip-vps"\);/);
+  assert.match(source, /const vpsDeployCommand = process\.env\.KK_VPS_DEPLOY_COMMAND/);
+  assert.doesNotMatch(source, /skipSupabase/);
+  assert.doesNotMatch(source, /npx supabase/);
+  assert.doesNotMatch(source, /supabase:functions:deploy/);
+  assert.match(source, /runStep\("Deploy VPS API", vpsDeployCommand\);/);
   assert.match(source, /npx vercel deploy --prod -y/);
   assert.match(movedSource, /import "\.\.\/release-hosted\.mjs";/);
 });
 
-test("cloud auto deploy waits for Supabase functions before Vercel and includes user-route-proxy", () => {
+test("cloud auto deploy waits for the VPS API before Vercel", () => {
   const source = readSource(".github/workflows/cloud-auto-deploy.yml");
 
-  assert.match(source, /deploy-vercel:\s+[\s\S]*needs:\s+[\s\S]*- verify\s+[\s\S]*- deploy-supabase-functions/);
-  assert.match(source, /needs\.deploy-supabase-functions\.result == 'success'/);
-  assert.match(source, /Deploy user-route-proxy Edge Function/);
-  assert.match(source, /supabase functions deploy user-route-proxy/);
+  assert.match(source, /deploy-vercel:\s+[\s\S]*needs:\s+[\s\S]*- verify\s+[\s\S]*- deploy-vps-api/);
+  assert.match(source, /needs\.deploy-vps-api\.result == 'success'/);
+  assert.match(source, /deploy-vps-api:/);
+  assert.match(source, /KK_VPS_DEPLOY_COMMAND/);
+  assert.doesNotMatch(source, /deploy-supabase-functions/);
+  assert.doesNotMatch(source, /supabase functions deploy/);
 });
 
 test("hosted release runbook keeps routing and billing smoke tests explicit", () => {
@@ -69,12 +68,12 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /`apps\/api\/\.env\.local` is the authoritative local API source/);
   assert.match(source, /npm run api:diagnose/);
   assert.match(source, /npm run release:hosted:check/);
-  assert.match(source, /1\. Supabase database migrations/);
-  assert.match(source, /2\. Supabase Edge Functions/);
+  assert.match(source, /1\. VPS PostgreSQL migrations/);
+  assert.match(source, /2\. VPS API and payment sidecar/);
   assert.match(source, /3\. Vercel frontend/);
   assert.match(source, /4\. Smoke tests/);
   assert.match(source, /Confirm the request succeeds and the user credit balance does not decrease\./);
-  assert.match(source, /Hosted `secure-model-proxy` is still on an older version without `userRoute`/);
+  assert.match(source, /Hosted API on the VPS is still on an older version without `userRoute`/);
   assert.match(source, /Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable\./);
   assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
   assert.match(source, /`PAYMENT_SIDECAR_SETTLEMENT_TOKEN`/);

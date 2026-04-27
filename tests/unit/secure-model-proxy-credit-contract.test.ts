@@ -17,7 +17,7 @@ test('secure system proxy transports expose verifiable billing metadata and the 
   const llmServiceSource = readSource('src/services/llm/LLMService.ts');
   const geminiServiceSource = readSource('src/services/llm/geminiService.ts');
   const contractsGenerationSource = readFileSync(path.join(ROOT_DIR, 'packages', 'contracts', 'src', 'dto', 'generation.ts'), 'utf-8');
-  const edgeProxySource = readSource('supabase/functions/secure-model-proxy/index.ts');
+  const localSystemProxySource = readSource('apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts');
 
   assert.match(
     contractsIndexSource,
@@ -59,57 +59,61 @@ test('secure system proxy transports expose verifiable billing metadata and the 
   assert.doesNotMatch(secureProxyClientSource, /supabaseAnonKey/);
   assert.doesNotMatch(secureProxyClientSource, /if \(localSessionState !== 'valid' \|\| !shouldUseLocalUserRouteApi\(\)\) \{/);
   assert.match(
-    edgeProxySource,
-    /const debitIdempotencyKey = String\(body\.attemptId \|\| body\.requestId \|\| crypto\.randomUUID\(\)\)\.trim\(\);/,
+    localSystemProxySource,
+    /const idempotencyKey = attemptId \|\| requestId \|\| `\$\{baseModelId\}:\$\{Date\.now\(\)\}`;/,
   );
   assert.match(
-    edgeProxySource,
-    /serviceClient\.rpc\('api_record_credit_debit_v1', \{/,
+    localSystemProxySource,
+    /const debit = await this\.creditAccountService\.debitCredits\(/,
   );
   assert.match(
-    edgeProxySource,
-    /p_ledger_id: crypto\.randomUUID\(\),/,
+    localSystemProxySource,
+    /businessRefType: "system_model_proxy",/,
   );
   assert.match(
-    edgeProxySource,
-    /p_business_ref_type: 'generation_task',/,
+    localSystemProxySource,
+    /businessRefId,/,
   );
   assert.match(
-    edgeProxySource,
-    /p_business_ref_id: debitBusinessRefId,/,
+    localSystemProxySource,
+    /creditAmount: selected\.requiredCredits,/,
   );
   assert.match(
-    edgeProxySource,
-    /p_idempotency_key: debitIdempotencyKey,/,
+    localSystemProxySource,
+    /modelCode: baseModelId,/,
   );
   assert.match(
-    edgeProxySource,
-    /const balanceAfter = Number\(consumePayload\?\.ledger\?\.balance_after \?\? currentBalance - requiredCredits\);/,
+    localSystemProxySource,
+    /idempotencyKey,/,
   );
   assert.match(
-    edgeProxySource,
-    /const billingResult = \{\s*deducted: true,\s*ledgerId: transactionId,\s*balanceAfter: Number\.isFinite\(balanceAfter\) \? balanceAfter : undefined,[\s\S]*\};/,
+    localSystemProxySource,
+    /enrichTransportWithDebit\(\s*response,\s*debitData\.ledgerId,\s*debitData\.balanceAfter,\s*\)/,
   );
   assert.match(
-    edgeProxySource,
-    /const refundTaskCredits = async \(\s*reason: string,\s*\): Promise<\{ success: boolean; message\?: string; balanceAfter\?: number \}> => \{/,
+    localSystemProxySource,
+    /const refund = await this\.refundCredits\(userId, debitData\.ledgerId, "system_route_request_failed"\);/,
   );
   assert.match(
-    edgeProxySource,
-    /balanceAfter: typeof refundResult\?\.new_balance === 'number' \? refundResult\.new_balance : undefined,/,
+    localSystemProxySource,
+    /refundApplied: refund\.applied,/,
   );
   assert.match(
-    edgeProxySource,
-    /const refundedBillingResult = \(refundResult: \{ success: boolean; message\?: string; balanceAfter\?: number \}\) => \(\{/,
+    localSystemProxySource,
+    /refundBalanceAfter: refund\.balanceAfter,/,
   );
-  assert.match(edgeProxySource, /return json\(\{\s*success: true,\s*content,\s*usage,\s*endpointType,\s*\.\.\.billingResult,\s*\}\);/);
   assert.match(
-    edgeProxySource,
-    /const taskResultNotReady = \(message = 'Task result is not ready yet'\) => \(\s*body\.mode === 'download_task'\s*\?\s*json\(\{ success: false, error: message \}, 409\)\s*:\s*json\(\{ success: true, status: 'pending', \.\.\.billingResult \}\)\s*\);/,
+    localSystemProxySource,
+    /const shouldRefundOnFailure = \(/,
   );
-  assert.match(edgeProxySource, /return json\(\{ success: true, status: 'deleted', \.\.\.billingResult \}\);/);
-  assert.match(edgeProxySource, /return json\(\{ success: true, status: 'failed', \.\.\.refundedBillingResult\(refundResult\) \}\);/);
-  assert.match(edgeProxySource, /return json\(\{ success: true, status: 'success', url: directUrl, \.\.\.billingResult \}\);/);
+  assert.match(
+    localSystemProxySource,
+    /"system_route_task_cancelled" : "system_route_task_failed"/,
+  );
+  assert.match(
+    localSystemProxySource,
+    /appendRefundMetadata\(billedResponse, refund\)/,
+  );
   assert.match(llmAdapterSource, /deducted\?: boolean;/);
   assert.match(llmAdapterSource, /ledgerId\?: string;/);
   assert.match(llmAdapterSource, /balanceAfter\?: number;/);

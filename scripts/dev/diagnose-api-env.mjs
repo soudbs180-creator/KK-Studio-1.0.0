@@ -3,10 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   collectEnvSnapshots,
-  compareSupabaseProjectRefs,
-  describeSupabaseServerKey,
   findSnapshotEntries,
-  findIgnoredLegacySecrets,
   getEffectiveValue,
   summarizeValue,
 } from "../lib/env-contract.mjs";
@@ -47,21 +44,41 @@ async function fetchHealth() {
 async function run() {
   const snapshots = collectEnvSnapshots(rootPath);
   const frontendKeys = [
-    "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY",
     "VITE_KK_API_BASE_URL",
+    "VITE_PAYMENT_GATEWAY_URL",
+    "VITE_AUTH_REDIRECT_ORIGIN",
+    "VITE_TURNSTILE_ENABLED",
+    "VITE_TURNSTILE_SITE_KEY",
   ];
   const apiServerKeys = [
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-    "SUPABASE_ANON_KEY",
+    "DATABASE_URL",
+    "PGHOST",
+    "PGPORT",
+    "PGDATABASE",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGSSL",
+    "PGSSLMODE",
     "USER_API_ENCRYPTION_SECRET",
+    "PROFILE_USER_APIS_ENCRYPTION_SECRET",
+    "KK_API_SESSION_SIGNING_SECRET",
     "KK_API_MAX_JSON_BODY_BYTES",
     "KK_API_PROFILE_MAX_JSON_BODY_BYTES",
     "KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES",
   ];
+  const ignoredLegacyDataProviderKeys = [
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY",
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SECRET_KEY",
+    "SUPABASE_ANON_KEY",
+  ];
   const misplacedRootServerEnv = findSnapshotEntries(snapshots.frontendSnapshots, apiServerKeys);
+  const ignoredLegacyDataProviderEnv = findSnapshotEntries(
+    snapshots.activeSnapshots,
+    ignoredLegacyDataProviderKeys,
+  );
 
   console.log("[diagnose-api-env] Frontend env search order:");
   snapshots.searchedFiles.frontend.forEach((filePath) => {
@@ -98,29 +115,6 @@ async function run() {
   console.log("[diagnose-api-env] Local API JSON body limits:");
   console.log(`- default routes: ${effectiveGlobalBodyLimit} bytes`);
   console.log(`- profile persistence routes: ${effectiveProfileBodyLimit} bytes`);
-  const serverKey =
-    getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SERVICE_ROLE_KEY")?.value
-    || getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_SECRET_KEY")?.value;
-  const serverKeyDescription = describeSupabaseServerKey(serverKey);
-  console.log("[diagnose-api-env] Service-role key validation:");
-  console.log(`- status: ${serverKeyDescription.status}`);
-  if (serverKeyDescription.reason) {
-    console.log(`- detail: ${serverKeyDescription.reason}`);
-  }
-
-  const ignoredLegacySecrets = findIgnoredLegacySecrets(snapshots.ignoredSnapshots, [
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-  ]);
-  console.log("[diagnose-api-env] Ignored legacy service-role entries:");
-  if (ignoredLegacySecrets.length === 0) {
-    console.log("- none");
-  } else {
-    ignoredLegacySecrets.forEach((entry) => {
-      console.log(`- ${entry.key}: ${summarizeValue(entry.value)} from ${entry.source}`);
-    });
-  }
-
   console.log("[diagnose-api-env] Ignored root server env entries:");
   if (misplacedRootServerEnv.length === 0) {
     console.log("- none");
@@ -130,13 +124,14 @@ async function run() {
     });
   }
 
-  const publicUrl = getEffectiveValue(snapshots.frontendSnapshots, "VITE_SUPABASE_URL")?.value;
-  const serverUrl = getEffectiveValue(snapshots.apiSnapshots, "SUPABASE_URL")?.value || publicUrl;
-  const projectAlignment = compareSupabaseProjectRefs(publicUrl, serverUrl);
-  console.log("[diagnose-api-env] Supabase project alignment:");
-  console.log(`- public project ref: ${projectAlignment.publicProjectRef || "<missing>"}`);
-  console.log(`- server project ref: ${projectAlignment.serverProjectRef || "<missing>"}`);
-  console.log(`- project refs match: ${projectAlignment.matches === undefined ? "<unknown>" : String(projectAlignment.matches)}`);
+  console.log("[diagnose-api-env] Ignored legacy data-provider env entries:");
+  if (ignoredLegacyDataProviderEnv.length === 0) {
+    console.log("- none");
+  } else {
+    ignoredLegacyDataProviderEnv.forEach((entry) => {
+      console.log(`- ${entry.key}: ${summarizeValue(entry.value)} from ${entry.source}`);
+    });
+  }
 
   const health = await fetchHealth();
   console.log("[diagnose-api-env] /healthz:");
@@ -150,10 +145,9 @@ async function run() {
   const persistence = health.data?.persistence || {};
   const runtime = health.data?.runtime || {};
   console.log(`- status: ${health.data?.status || "unknown"}`);
-  console.log(`- config.supabaseProjectRef: ${config.supabaseProjectRef || "<missing>"}`);
-  console.log(`- config.publicSupabaseProjectRef: ${config.publicSupabaseProjectRef || "<missing>"}`);
-  console.log(`- config.projectRefMatches: ${config.projectRefMatches === undefined ? "<unknown>" : String(config.projectRefMatches)}`);
-  console.log(`- config.hasServiceRoleKey: ${Boolean(config.hasServiceRoleKey)}`);
+  console.log(`- config.hasPostgresConfig: ${Boolean(config.hasPostgresConfig)}`);
+  console.log(`- config.hasValidPostgresConfig: ${Boolean(config.hasValidPostgresConfig)}`);
+  console.log(`- config.databaseConfigStatus: ${config.databaseConfigStatus || "<unknown>"}`);
   console.log(`- config.hasUserApiEncryptionSecret: ${Boolean(config.hasUserApiEncryptionSecret)}`);
   console.log(`- config.canonicalPersistenceReady: ${Boolean(config.canonicalPersistenceReady)}`);
   console.log(`- repositories.authData: ${repos.authData || "unknown"}`);

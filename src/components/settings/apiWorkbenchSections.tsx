@@ -9,6 +9,11 @@ import {
   SettingsBadge,
   SettingsSection,
 } from './SettingsScaffold';
+import {
+  SettingInput,
+  SettingSelect,
+  SettingToggle,
+} from './ui/index';
 import type { ApiSettingsWorkbenchStage, ApiSettingsWorkbenchTone } from './apiWorkbenchState';
 
 type LocalePick = (zhText: string, enText: string) => string;
@@ -42,6 +47,7 @@ type PlatformAssistantEntryCardProps = {
   platformHelper: string;
   entryActionLabel: string;
   entryActionHelper: string;
+  entryActionDisabled?: boolean;
   onOpen: () => void;
 };
 
@@ -57,6 +63,7 @@ export const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProp
   platformHelper,
   entryActionLabel,
   entryActionHelper,
+  entryActionDisabled = false,
   onOpen,
 }) => (
   <div className="rounded-[24px] border p-4 md:p-5" style={SETTINGS_ELEVATED_STYLE}>
@@ -75,7 +82,7 @@ export const PlatformAssistantEntryCard: React.FC<PlatformAssistantEntryCardProp
       </div>
 
       <div className="flex shrink-0 items-center justify-end">
-        <SettingsActionButton icon={Wand2} tone="secondary" onClick={onOpen}>
+        <SettingsActionButton icon={Wand2} tone="secondary" disabled={entryActionDisabled} onClick={onOpen}>
           {entryActionLabel}
         </SettingsActionButton>
       </div>
@@ -122,8 +129,8 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
     title={pick('工作台摘要', 'Workspace snapshot')}
     eyebrow={pick('运行概览', 'Operations overview')}
     description={pick(
-      '在进入任意卡片前，先在这里查看当前服务健康、持久化状态和预算压力。',
-      'Review current service health, persistence, and budget pressure before jumping into individual cards.',
+      '先看链路、状态和预算。',
+      'Start with routes, status, and budget.',
     )}
     action={<SettingsBadge tone={workbenchTone}>{workbenchStatusLabel}</SettingsBadge>}
   >
@@ -205,8 +212,8 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
       eyebrow={pick('链路面板', 'Routing panel')}
       surface="plain"
       description={pick(
-        '先决定你当前要看的是本地 API 还是第三方供应商，再进入对应卡片和编辑器。',
-        'Choose whether you want to inspect local APIs or third-party providers, then move into the matching cards and editor.',
+        '只看当前视图里的链路和延迟。',
+        'Only inspect routes and latency in this view.',
       )}
       action={(
         <SettingsBadge tone={activeTab === 'official' ? 'indigo' : 'emerald'}>
@@ -221,8 +228,8 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
           </div>
           <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
             {pick(
-              '上方主切换决定当前焦点，这里直接展示当前视图下最需要看的延迟摘要。',
-              'The main switch above sets the active focus, and the latency summary below stays scoped to that view.',
+              '当前标签决定下面显示哪组链路。',
+              'This tab scopes the route summary below.',
             )}
           </div>
         </div>
@@ -240,8 +247,8 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
             </div>
             <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
               {pick(
-                '暂无最近一次的延迟检测结果。你可以点击任意卡片上的“刷新”来重新检测连通状态、模型列表和延迟。',
-                'No recent latency checks are available yet. Use Refresh on any card to re-check connectivity, models, and latency.',
+                '还没有最新延迟，去卡片里刷新即可。',
+                'No recent latency yet. Refresh a card to probe again.',
               )}
             </div>
           </div>
@@ -344,7 +351,7 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
           label={pick('编辑策略', 'Edit policy')}
           value={stageInteractionLabel}
           helper={stage === 'editable'
-            ? pick('允许从列表进入创建、编辑、刷新与启停操作。', 'Create, edit, refresh, and toggle actions are available from the list.')
+            ? pick('可从列表创建、编辑、刷新和启停。', 'Create, edit, refresh, and toggle from the list.')
             : pick('当前会先强调状态说明与下一步，再决定是否允许编辑。', 'The UI emphasizes state honesty and the next step before editing.')}
         />
         <InfoCell
@@ -359,7 +366,7 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
         <InfoCell
           label={pick('下一步', 'Next move')}
           value={stageNextActionLabel}
-          helper={pick('保持一个最重要动作，其它操作继续留在对应卡片或工具位。', 'Keep one primary move here while secondary actions stay inside cards and utilities.')}
+          helper={pick('这里只保留一个主动作。', 'Keep one primary move here.')}
         />
       </div>
     </div>
@@ -392,8 +399,8 @@ export const ApiWorkbenchDiagnosticsSection: React.FC<ApiWorkbenchDiagnosticsSec
     title={pick('诊断视图', 'Diagnostics view')}
     eyebrow={pick('状态拆解', 'Status breakdown')}
     description={pick(
-      '把连通性、持久化和账户状态拆开看，避免把诊断信息堆进每一张卡片。',
-      'Break connectivity, persistence, and account state apart instead of stuffing diagnostics into every card.',
+      '把连通性、存储和账号状态拆开看。',
+      'Review connectivity, storage, and account state separately.',
     )}
     action={(
       <SettingsActionButton
@@ -445,39 +452,249 @@ export const ApiWorkbenchPlatformSection: React.FC<ApiWorkbenchPlatformSectionPr
   <SettingsSection
     testId="settings-workbench-platform"
     title={pick('平台入口', 'Platform entry')}
-    eyebrow={pick('独立入口', 'Separate entry')}
+    eyebrow={pick('平台能力', 'Platform capability')}
     surface="plain"
     description={pick(
-      '平台侧能力单独放在这里，不和你的本地 API 配置混排。',
-      'Keep platform-managed capabilities separate from your local API configuration.',
+      '平台入口单独保留。',
+      'Keep the platform entry separate.',
     )}
-    action={<SettingsBadge tone="neutral">{pick('与本地 API 分开', 'Separate from local APIs')}</SettingsBadge>}
+    action={<SettingsBadge tone="neutral">{pick('待接入', 'Coming soon')}</SettingsBadge>}
   >
     <PlatformAssistantEntryCard
       title={pick('平台辅助 AI', 'Platform Assistant AI')}
       description={pick(
-        '这里仅保留平台入口，不把它塞进本地 API 编辑器里。',
-        'This keeps the platform entry visible without mixing it into the local API editor.',
+        '保持平台能力入口可见，但不混进本地 API 编辑区。',
+        'Keep this visible without mixing it into the local API editor.',
       )}
       entryContextLabel={pick('平台能力入口', 'Platform-managed entry')}
       localApiLabel={pick('本地 API', 'Local APIs')}
       localApiValue={pick('下方继续配置', 'Continue below')}
       localApiHelper={pick(
-        '你的 Base URL、API Key、模型同步、预算规则和路由状态仍然在下方维护。',
-        'Your base URL, API key, model sync, budget rules, and routing state stay managed below.',
+        'Base URL、Key、模型同步和预算规则都在下方处理。',
+        'Base URL, key, model sync, and budget rules stay below.',
       )}
       platformLabel={pick('平台入口', 'Platform entry')}
-      platformValue={pick('单独的平台入口', 'Separate platform entry')}
+      platformValue={pick('稍后开放', 'Available later')}
       platformHelper={pick(
-        '平台侧的辅助 AI 会从这里进入，不和本地 API Key、模型路由或预算规则混在一起。',
-        'Platform assistant capabilities enter here without mixing with local API keys, routing, or budget rules.',
+        '等平台流程接入后再从这里进入，不影响本地 API 管理。',
+        'This stays separate until the platform flow is wired in.',
       )}
-      entryActionLabel={pick('查看平台入口', 'View platform entry')}
+      entryActionLabel={pick('即将接入', 'Coming soon')}
       entryActionHelper={pick(
-        '当前先保留入口说明，完整流程还没有接入。',
-        'The full platform assistant flow is not wired yet.',
+        '当前不提供可点击流程。',
+        'No clickable flow is available yet.',
       )}
+      entryActionDisabled
       onOpen={onOpenPlatformAssistant}
     />
+  </SettingsSection>
+);
+
+type ApiWorkbenchRoutePoolItem = {
+  id: string;
+  name: string;
+  routeKind: string;
+  protocolLabel: string;
+  statusLabel: string;
+  modelSummary: string;
+  billingSummary: string;
+  baseUrlLabel: string;
+};
+
+type ApiWorkbenchRoutePoolSectionProps = {
+  pick: LocalePick;
+  items: ApiWorkbenchRoutePoolItem[];
+};
+
+export const ApiWorkbenchRoutePoolSection: React.FC<ApiWorkbenchRoutePoolSectionProps> = ({
+  pick,
+  items,
+}) => (
+  <SettingsSection
+    testId="settings-workbench-route-pool"
+    title={pick('统一链路池', 'Unified route pool')}
+    eyebrow={pick('链路事实层', 'Route facts')}
+    description={pick(
+      '先把官方直连和中转站放进同一个链路池，再按能力分配。',
+      'Collect official direct routes and proxy routes here before assigning capabilities.',
+    )}
+    action={<SettingsBadge tone="indigo">{pick('Unified route pool', 'Unified route pool')}</SettingsBadge>}
+  >
+    <div className="grid gap-3 lg:grid-cols-2">
+      {items.map((item) => (
+        <div key={item.id} className="rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[14px] font-semibold text-[var(--text-primary)]">{item.name}</div>
+            <SettingsBadge tone="neutral">{item.routeKind}</SettingsBadge>
+            <SettingsBadge tone="neutral">{item.protocolLabel}</SettingsBadge>
+          </div>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            <InfoCell label={pick('状态', 'Status')} value={item.statusLabel} helper={item.modelSummary} />
+            <InfoCell label={pick('计费', 'Billing')} value={item.billingSummary} helper={item.baseUrlLabel} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </SettingsSection>
+);
+
+type ApiWorkbenchCapabilityDraft = {
+  role: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  primaryRouteId: string;
+  primaryModelId: string;
+  fallbackRouteId: string;
+  routeOptions: Array<{ value: string; label: string }>;
+  modelOptions: Array<{ value: string; label: string }>;
+  onEnabledChange: (enabled: boolean) => void;
+  onPrimaryRouteChange: (value: string) => void;
+  onPrimaryModelChange: (value: string) => void;
+  onFallbackRouteChange: (value: string) => void;
+};
+
+type ApiWorkbenchCapabilitySectionProps = {
+  pick: LocalePick;
+  items: ApiWorkbenchCapabilityDraft[];
+};
+
+export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySectionProps> = ({
+  pick,
+  items,
+}) => (
+  <SettingsSection
+    testId="settings-workbench-capability"
+    title={pick('能力分配', 'Capability roles')}
+    eyebrow={pick('角色路由', 'Role routing')}
+    description={pick(
+      '把图片、PPT、电商、AI 助手、全局提示词优化和 OCR 各自绑定到链路与模型。',
+      'Assign image, PPT, ecommerce, assistant, Global prompt optimizer, and OCR roles to routes and models.',
+    )}
+    action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
+  >
+    <div className="settings-capability-grid">
+      {items.map((item) => (
+        <div key={item.role} className="settings-capability-card" style={SETTINGS_ELEVATED_STYLE}>
+          <div className="settings-capability-card__header">
+            <div className="settings-capability-card__main">
+              <div className="settings-capability-card__title-row">
+                <div className="settings-capability-card__title">{item.title}</div>
+                <SettingsBadge tone={item.enabled ? 'emerald' : 'neutral'}>
+                  {item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
+                </SettingsBadge>
+              </div>
+              <div className="settings-capability-card__description">{item.description}</div>
+            </div>
+            <div className="settings-capability-card__toggle-wrap">
+              <div className="settings-capability-card__toggle" style={SETTINGS_OVERLAY_STYLE}>
+              <SettingToggle
+                label={pick('启用', 'Enabled')}
+                checked={item.enabled}
+                onChange={item.onEnabledChange}
+                helper={item.role === 'prompt_optimizer'
+                  ? pick('默认关闭时走本地 skills 提示词体系，开启后才走 AI 优化能力。', 'Disabled keeps local skills-based prompt shaping. Enable it to use AI prompt optimization.')
+                  : undefined}
+              />
+              </div>
+            </div>
+          </div>
+          <div className="settings-capability-card__controls">
+            <SettingSelect
+              label={pick('主链路', 'Primary route')}
+              value={item.primaryRouteId}
+              options={item.routeOptions}
+              onChange={item.onPrimaryRouteChange}
+              disabled={!item.enabled}
+            />
+            <SettingSelect
+              label={item.role === 'prompt_optimizer'
+                ? pick('优化模型', 'Optimizer model')
+                : pick('模型', 'Model')}
+              value={item.primaryModelId}
+              options={item.modelOptions}
+              onChange={item.onPrimaryModelChange}
+              disabled={!item.enabled}
+              helper={item.role === 'prompt_optimizer'
+                ? pick('Global prompt optimizer 会保留需求语义和专业术语。', 'Global prompt optimizer keeps requirement language and professional terminology intact.')
+                : undefined}
+            />
+            <SettingSelect
+              label={pick('备用链路', 'Fallback route')}
+              value={item.fallbackRouteId}
+              options={item.routeOptions}
+              onChange={item.onFallbackRouteChange}
+              disabled={!item.enabled}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  </SettingsSection>
+);
+
+type ApiWorkbenchOcrSectionProps = {
+  pick: LocalePick;
+  enabled: boolean;
+  defaultLanguage: string;
+  apiKey: string;
+  keySourceLabel: string;
+  healthLabel: string;
+  onEnabledChange: (enabled: boolean) => void;
+  onDefaultLanguageChange: (value: string) => void;
+  onApiKeyChange: (value: string) => void;
+};
+
+export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
+  pick,
+  enabled,
+  defaultLanguage,
+  apiKey,
+  keySourceLabel,
+  healthLabel,
+  onEnabledChange,
+  onDefaultLanguageChange,
+  onApiKeyChange,
+}) => (
+  <SettingsSection
+    testId="settings-workbench-ocr"
+    title={pick('OCR 服务', 'OCR service')}
+    eyebrow={pick('文档解析', 'Document parsing')}
+    description={pick(
+      'OCR 单独配置，不混进普通 LLM 链路。优先使用服务端环境变量，缺失时再走本地 BYOK。',
+      'OCR stays isolated from generic LLM routes. Server env keys come first, then local BYOK.',
+    )}
+    action={<SettingsBadge tone="neutral">{pick('OCR service', 'OCR service')}</SettingsBadge>}
+  >
+    <div className="grid gap-3 lg:grid-cols-[1.2fr,1fr]">
+      <div className="space-y-3 rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+        <SettingToggle
+          label={pick('启用 OCR 服务', 'Enable OCR service')}
+          checked={enabled}
+          onChange={onEnabledChange}
+          helper={pick('用于文档解析、电商需求文件、未来 PPT 导入文本提取。', 'Used for document parsing, ecommerce requirement files, and future PPT text extraction.')}
+        />
+        <SettingInput
+          label={pick('默认语言', 'Default language')}
+          value={defaultLanguage}
+          onChange={onDefaultLanguageChange}
+          placeholder="chi_sim"
+          disabled={!enabled}
+        />
+        <SettingInput
+          label={pick('Nutrient API Key（可选）', 'Nutrient API Key (optional)')}
+          value={apiKey}
+          onChange={onApiKeyChange}
+          placeholder={pick('优先读取 NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY', 'Prefer NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY')}
+          type="password"
+          disabled={!enabled}
+          helper={pick('如果服务端环境变量已配置，这里可以留空。', 'Leave this empty when the server env already provides the key.')}
+        />
+      </div>
+      <div className="grid gap-3">
+        <InfoCell label={pick('密钥来源', 'Key source')} value={keySourceLabel} helper={pick('先看服务端环境变量，再看本地 OCR 配置。', 'Server env is preferred before local OCR config.')} />
+        <InfoCell label={pick('健康状态', 'Health state')} value={healthLabel} helper={pick('当前 OCR 请求仍然走 /api/nutrient-document。', 'OCR requests still use /api/nutrient-document.')} />
+      </div>
+    </div>
   </SettingsSection>
 );

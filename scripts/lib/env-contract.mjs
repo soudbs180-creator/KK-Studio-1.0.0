@@ -17,9 +17,7 @@ export const PRIMARY_ENV_RELATIVE_PATHS = [
   ...API_ENV_RELATIVE_PATHS,
 ];
 
-export const FUNCTION_ENV_RELATIVE_PATHS = [
-  path.join("supabase", ".env.functions.local"),
-];
+export const FUNCTION_ENV_RELATIVE_PATHS = [];
 
 export const IGNORED_LEGACY_ENV_RELATIVE_PATHS = [
   path.join("server", ".env"),
@@ -34,23 +32,26 @@ const PLACEHOLDER_PATTERNS = [
   /^placeholder$/i,
 ];
 
-function decodeBase64UrlSegment(segment) {
-  const normalized = String(segment || "").replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4 === 0
-    ? ""
-    : "=".repeat(4 - (normalized.length % 4));
-
-  return Buffer.from(`${normalized}${padding}`, "base64").toString("utf8");
-}
-
 const SERVER_ONLY_ENV_KEYS = new Set([
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "SUPABASE_ANON_KEY",
+  "DATABASE_URL",
+  "PGHOST",
+  "PGPORT",
+  "PGDATABASE",
+  "PGUSER",
+  "PGPASSWORD",
+  "PGSSL",
+  "PGSSLMODE",
+  "KK_API_SESSION_SIGNING_SECRET",
+  "PAYMENT_SIDECAR_INTERNAL_TOKEN",
+  "PAYMENT_SIDECAR_SETTLEMENT_TOKEN",
   "USER_API_ENCRYPTION_SECRET",
   "PROFILE_USER_APIS_ENCRYPTION_SECRET",
 ]);
+
+const LEGACY_DATA_PROVIDER_ENV_PREFIXES = [
+  "SUPABASE_",
+  "VITE_SUPABASE_",
+];
 
 const SERVER_ONLY_ENV_PREFIXES = [
   "WECHAT_",
@@ -87,82 +88,6 @@ export function isPlaceholder(value) {
   }
 
   return PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(normalized));
-}
-
-export function describeSupabaseServerKey(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return {
-      status: "missing",
-      value: normalized,
-      kind: "missing",
-      looksLikeDatabasePassword: false,
-      reason: "missing",
-    };
-  }
-
-  if (isPlaceholder(normalized)) {
-    return {
-      status: "placeholder",
-      value: normalized,
-      kind: "placeholder",
-      looksLikeDatabasePassword: false,
-      reason: "placeholder",
-    };
-  }
-
-  if (normalized.startsWith("sb_secret_")) {
-    return {
-      status: "valid",
-      value: normalized,
-      kind: "secret",
-      looksLikeDatabasePassword: false,
-    };
-  }
-
-  const segments = normalized.split(".");
-  if (segments.length === 3) {
-    try {
-      const payload = JSON.parse(decodeBase64UrlSegment(segments[1]));
-      if (payload?.role === "service_role") {
-        return {
-          status: "valid",
-          value: normalized,
-          kind: "legacy-service-role-jwt",
-          looksLikeDatabasePassword: false,
-        };
-      }
-
-      return {
-        status: "invalid",
-        value: normalized,
-        kind: "jwt",
-        looksLikeDatabasePassword: false,
-        reason: typeof payload?.role === "string"
-          ? `JWT role is ${payload.role}`
-          : "JWT is missing the service_role claim",
-      };
-    } catch {
-      return {
-        status: "invalid",
-        value: normalized,
-        kind: "jwt",
-        looksLikeDatabasePassword: false,
-        reason: "JWT payload could not be decoded",
-      };
-    }
-  }
-
-  const looksLikeDatabasePassword = /^[a-f0-9]{32,}$/i.test(normalized);
-  return {
-    status: "invalid",
-    value: normalized,
-    kind: looksLikeDatabasePassword ? "database-password-like" : "unknown",
-    looksLikeDatabasePassword,
-    reason: looksLikeDatabasePassword
-      ? "looks like a database password, not a Supabase API key"
-      : "unsupported key format",
-  };
 }
 
 export function parseEnvFile(filePath) {
@@ -218,6 +143,18 @@ export function isServerOnlyEnvKey(key) {
   return SERVER_ONLY_ENV_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
+export function isLegacyDataProviderEnvKey(key) {
+  return LEGACY_DATA_PROVIDER_ENV_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function shouldHydrateFrontendEnvKey(key) {
+  return !isServerOnlyEnvKey(key) && !isLegacyDataProviderEnvKey(key);
+}
+
+function shouldHydrateApiEnvKey(key) {
+  return !isLegacyDataProviderEnvKey(key);
+}
+
 export function collectEnvSnapshots(rootPath, options = {}) {
   const includeFunctionEnv = options.includeFunctionEnv === true;
   const frontendSnapshots = FRONTEND_ENV_RELATIVE_PATHS
@@ -261,7 +198,7 @@ export function applyPrimaryEnvToProcess(rootPath, options = {}) {
 
   for (const snapshot of snapshots.frontendSnapshots) {
     for (const [key, value] of Object.entries(snapshot.values)) {
-      if (isServerOnlyEnvKey(key)) {
+      if (!shouldHydrateFrontendEnvKey(key)) {
         continue;
       }
 
@@ -275,6 +212,10 @@ export function applyPrimaryEnvToProcess(rootPath, options = {}) {
 
   for (const snapshot of snapshots.apiSnapshots) {
     for (const [key, value] of Object.entries(snapshot.values)) {
+      if (!shouldHydrateApiEnvKey(key)) {
+        continue;
+      }
+
       if (preserveExisting && protectedKeys.has(key)) {
         continue;
       }
@@ -309,35 +250,6 @@ export function getEffectiveValue(snapshots, key, options = {}) {
   return null;
 }
 
-export function extractSupabaseProjectRef(url) {
-  const normalized = String(url || "").trim();
-  if (!normalized) {
-    return undefined;
-  }
-
-  try {
-    const hostname = new URL(normalized).hostname;
-    const match = hostname.match(/^([^.]+)\.supabase\./i);
-    return match ? match[1] : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function compareSupabaseProjectRefs(publicUrl, serverUrl) {
-  const publicProjectRef = extractSupabaseProjectRef(publicUrl);
-  const serverProjectRef = extractSupabaseProjectRef(serverUrl);
-  const matches = publicProjectRef && serverProjectRef
-    ? publicProjectRef === serverProjectRef
-    : undefined;
-
-  return {
-    publicProjectRef,
-    serverProjectRef,
-    matches,
-  };
-}
-
 export function findSnapshotEntries(snapshots, keys) {
   return snapshots.flatMap((snapshot) => keys
     .filter((key) => Object.prototype.hasOwnProperty.call(snapshot.values, key))
@@ -346,8 +258,4 @@ export function findSnapshotEntries(snapshots, keys) {
       source: snapshot.relativePath,
       value: snapshot.values[key],
     })));
-}
-
-export function findIgnoredLegacySecrets(ignoredSnapshots, keys) {
-  return findSnapshotEntries(ignoredSnapshots, keys);
 }

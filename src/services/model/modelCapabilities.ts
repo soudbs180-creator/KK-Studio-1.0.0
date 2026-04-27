@@ -560,7 +560,7 @@ export function getModelCapabilities(
             supportsGrounding: false
         };
     } else if (lowerModelId.includes('flux')) {
-        let sizes = [ImageSize.SIZE_1K];
+        let sizes: ImageSize[] = [ImageSize.SIZE_1K];
         if (lowerModelId.includes('max')) sizes = [ImageSize.SIZE_1K, ImageSize.SIZE_2K, ImageSize.SIZE_4K];
         else if (lowerModelId.includes('pro')) sizes = [ImageSize.SIZE_1K, ImageSize.SIZE_2K];
 

@@ -18,7 +18,7 @@ test('normalizeAdminBrowserSession rejects empty tokens and strips unrelated sec
       adminSessionToken: 'admin-token',
       accessTokenExpiresAt: '2099-01-01T00:00:00.000Z',
       adminSessionExpiresAt: '2099-01-01T01:00:00.000Z',
-      serviceRoleKey: 'should-not-survive',
+      databasePassword: 'should-not-survive',
     }),
     {
       accessToken: 'user-token',

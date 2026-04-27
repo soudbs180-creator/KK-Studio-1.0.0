@@ -1,9 +1,12 @@
 import type {
+  EcommerceFrameworkRuntimeState,
   GeneratedImage,
   MobileEcommerceContinuation,
   MobileResultEntry,
+  MobileResultLayout,
   PromptNode,
 } from '../../types.ts';
+import { resolveEcommerceFrameworkSummary } from '../../services/ecommerce/frameworkRuntime.ts';
 
 const DEFAULT_RESULT_ACTIONS: MobileResultEntry['actions'] = {
   preview: true,
@@ -12,6 +15,8 @@ const DEFAULT_RESULT_ACTIONS: MobileResultEntry['actions'] = {
   download: true,
   delete: true,
 };
+
+type EcommerceFrameworkSummary = ReturnType<typeof resolveEcommerceFrameworkSummary>;
 
 const normalizeOptionalId = (value: string | null | undefined): string | null => {
   const normalized = value?.trim();
@@ -119,9 +124,9 @@ const parseAspectRatioValue = (value: string | undefined): number | null => {
   return width / height;
 };
 
-const resolveMobileTileLayout = (
+const resolveMobileResultLayout = (
   imageNode: GeneratedImage,
-): Pick<MobileResultEntry, 'mobileTileSpan' | 'mobileTileEmphasis' | 'mobileAspectCategory'> => {
+): MobileResultLayout => {
   const exactWidth = imageNode.exactDimensions?.width;
   const exactHeight = imageNode.exactDimensions?.height;
   const exactRatio = exactWidth && exactHeight && exactWidth > 0 && exactHeight > 0
@@ -131,32 +136,32 @@ const resolveMobileTileLayout = (
 
   if (ratio >= 1.7) {
     return {
-      mobileTileSpan: 6,
-      mobileTileEmphasis: 'hero',
-      mobileAspectCategory: 'wide',
+      aspectRatio: ratio,
+      aspectCategory: 'wide',
+      emphasis: 'wide',
     };
   }
 
   if (ratio >= 1.12) {
     return {
-      mobileTileSpan: 3,
-      mobileTileEmphasis: 'standard',
-      mobileAspectCategory: 'landscape',
+      aspectRatio: ratio,
+      aspectCategory: 'landscape',
+      emphasis: 'standard',
     };
   }
 
   if (ratio <= 0.85) {
     return {
-      mobileTileSpan: 3,
-      mobileTileEmphasis: 'standard',
-      mobileAspectCategory: 'portrait',
+      aspectRatio: ratio,
+      aspectCategory: 'portrait',
+      emphasis: 'standard',
     };
   }
 
   return {
-    mobileTileSpan: 2,
-    mobileTileEmphasis: 'compact',
-    mobileAspectCategory: 'square',
+    aspectRatio: ratio,
+    aspectCategory: 'square',
+    emphasis: 'compact',
   };
 };
 
@@ -253,14 +258,17 @@ function resolveEcommerceStage(
 function resolveEcommerceContinuation(
   imageNode: GeneratedImage,
   promptNode: PromptNode | undefined,
+  frameworkSummaryById: Map<string, EcommerceFrameworkSummary>,
 ): MobileEcommerceContinuation | undefined {
   const ecommerce = promptNode?.ecommerce;
   const inheritedTaskState = imageNode.partialRedraw?.inheritedTaskState;
   const taskState = ecommerce?.editableTask || inheritedTaskState;
   const sourceSheet = ecommerce?.sourceSheet || taskState?.sourceSheet;
   const kind = ecommerce?.kind || taskState?.sourceKind;
+  const frameworkId = ecommerce?.frameworkId;
+  const frameworkSummary = frameworkId ? frameworkSummaryById.get(frameworkId) : undefined;
 
-  if (!sourceSheet || !kind || kind === 'a-plus-group') {
+  if (!sourceSheet || !kind || kind === 'a-plus-group' || kind === 'framework') {
     return undefined;
   }
 
@@ -290,6 +298,23 @@ function resolveEcommerceContinuation(
     canConfirmDesktop: ecommerce?.kind === 'a-plus-module' && ecommerce.desktopStage === 'generated',
     canGenerateMobile: ecommerce?.kind === 'a-plus-module' && ecommerce.desktopStage === 'confirmed',
     canToggleSelection: Boolean(ecommerce && ecommerce.kind !== 'a-plus-group'),
+    ...(frameworkId ? { frameworkId } : {}),
+    ...(frameworkSummary
+      ? {
+          frameworkLabel: frameworkSummary.frameworkLabel,
+          frameworkStatus: {
+            activeSheet: frameworkSummary.activeSheet,
+            paused: frameworkSummary.paused,
+            queued: frameworkSummary.queued,
+            dispatching: frameworkSummary.dispatching,
+            running: frameworkSummary.running,
+            completed: frameworkSummary.completed,
+            failed: frameworkSummary.failed,
+            pausedItems: frameworkSummary.pausedItems,
+            total: frameworkSummary.total,
+          },
+        }
+      : {}),
   };
 }
 
@@ -310,8 +335,17 @@ const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEn
 export function selectMobileFeedResults(
   promptNodes: PromptNode[],
   imageNodes: GeneratedImage[],
+  frameworkRuntime: Record<string, EcommerceFrameworkRuntimeState> = {},
 ): MobileResultEntry[] {
   const promptNodeById = new Map(promptNodes.map((promptNode) => [promptNode.id, promptNode] as const));
+  const frameworkSummaryById = new Map(
+    promptNodes
+      .filter((promptNode) => promptNode.ecommerce?.kind === 'framework')
+      .map((frameworkNode) => [
+        frameworkNode.id,
+        resolveEcommerceFrameworkSummary(promptNodes, frameworkNode.id, frameworkRuntime[frameworkNode.id]),
+      ] as const),
+  );
 
   return imageNodes
     .map((imageNode) => {
@@ -319,7 +353,7 @@ export function selectMobileFeedResults(
       const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
       const promptSummary = resolvePromptSummary(promptNode, imageNode);
       const displaySrc = resolveDisplaySource(imageNode);
-      const mobileTileLayout = resolveMobileTileLayout(imageNode);
+      const mobileLayout = resolveMobileResultLayout(imageNode);
       const detailEntry = {
         imageId: imageNode.id,
         promptId: parentPromptId,
@@ -342,8 +376,8 @@ export function selectMobileFeedResults(
         imageSize: imageNode.imageSize || '1K',
         actions: { ...DEFAULT_RESULT_ACTIONS },
         primaryImageSource: displaySrc,
-        ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode),
-        ...mobileTileLayout,
+        ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode, frameworkSummaryById),
+        mobileLayout,
         detailEntryId: imageNode.id,
         detailEntry,
       } satisfies MobileResultEntry;

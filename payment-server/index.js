@@ -67,14 +67,6 @@ function sanitizePaymentUrl(raw) {
   return url.replace(/[)\],.;]+$/g, '');
 }
 
-function getSupabaseServiceRoleKey() {
-  return String(
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-      || process.env.SUPABASE_SECRET_KEY
-      || '',
-  ).trim();
-}
-
 function getWebhookSettlementToken() {
   return String(
     process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
@@ -100,10 +92,7 @@ function allowHostedLegacyPaymentRoutes() {
   return String(process.env.ALLOW_HOSTED_LEGACY_PAYMENT_ROUTES || '').trim().toLowerCase() === 'true';
 }
 
-const supabaseUrl = String(process.env.SUPABASE_URL || 'https://ovdjhdofjysanamgkfng.supabase.co').trim();
-const mainApiBaseUrl = String(process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001').trim();
 const settlementInternalToken = getWebhookSettlementToken();
-const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
 
 function buildLegacyOrigin(req) {
   const protocol = String(req.headers['x-forwarded-proto'] || req.protocol || 'http')
@@ -172,6 +161,14 @@ function sendRouteResult(res, result) {
   res.type(contentType).send(result.body);
 }
 
+function captureRawJsonBody(req, _res, buf) {
+  if (!buf || !buf.length) {
+    return;
+  }
+
+  req.rawBody = buf.toString('utf8');
+}
+
 const app = express();
 app.disable('x-powered-by');
 
@@ -188,7 +185,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ verify: captureRawJsonBody }));
 app.use(express.urlencoded({ extended: true }));
 
 const alipaySdk = new AlipaySdk({
@@ -208,18 +205,6 @@ const alipaySdk = new AlipaySdk({
 
 if (!settlementInternalToken) {
   console.warn('[payment-server] Settlement token is missing, so webhook settlement write-back will fail.');
-}
-
-if (!mainApiBaseUrl) {
-  console.warn('[payment-server] KK_API_BASE_URL is missing, so webhook settlement write-back will fail.');
-}
-
-if (!supabaseUrl) {
-  console.warn('[payment-server] SUPABASE_URL is missing, so exchange-rate lookup will fall back to defaults.');
-}
-
-if (!supabaseServiceRoleKey) {
-  console.warn('[payment-server] SUPABASE_SERVICE_ROLE_KEY is missing, so the legacy shell will fall back to non-persistent sidecar payment storage.');
 }
 
 app.use('/api/pay/notify', webhookRouter);

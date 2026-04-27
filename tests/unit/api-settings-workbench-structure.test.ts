@@ -15,10 +15,11 @@ test('ApiSettingsView list mode exposes a dedicated workspace snapshot section',
   assert.match(source, /Workspace snapshot/);
 });
 
-test('ApiSettingsView keeps the list-mode hero framed as an API Workspace instead of the old generic console label', () => {
+test('ApiSettingsView keeps the default list-mode hero framed as API setup while advanced workbench sections remain available', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
 
-  assert.match(source, /API Workspace/);
+  assert.match(source, /API setup/);
+  assert.match(source, /showAdvancedWorkbench \? \(/);
   assert.doesNotMatch(source, /API workspace/);
 });
 
@@ -76,7 +77,7 @@ test('ApiSettingsView surfaces local APIs as the primary BYOK path and avoids du
   assert.match(sectionsSource, /pick\('本地 API 视图', 'Local API view'\)/);
   assert.match(sectionsSource, /value: 'official', label: pick\('本地 API', 'Local APIs'\)/);
 
-  const createOfficialButtonUsages = viewSource.match(/onClick=\{beginCreateOfficial\}/g) ?? [];
+  const createOfficialButtonUsages = viewSource.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
   const createProviderButtonUsages = viewSource.match(/onClick=\{beginCreateProvider\}/g) ?? [];
 
   assert.equal(createOfficialButtonUsages.length, 1, 'Expected only the empty state to keep a direct local API create button');

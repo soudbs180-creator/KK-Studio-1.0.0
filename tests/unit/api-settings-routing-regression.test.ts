@@ -20,7 +20,7 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
   assert.doesNotMatch(source, /headerPrimaryActionDisabled/);
   assert.match(source, /<SettingsActionButton\s+icon=\{RefreshCw\}\s+loading=\{busy === 'cloud-refresh'\}/);
 
-  const createOfficialButtonUsages = source.match(/onClick=\{beginCreateOfficial\}/g) ?? [];
+  const createOfficialButtonUsages = source.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
   const createProviderButtonUsages = source.match(/onClick=\{beginCreateProvider\}/g) ?? [];
 
   assert.equal(createOfficialButtonUsages.length, 1);

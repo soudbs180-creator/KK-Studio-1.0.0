@@ -346,13 +346,16 @@ export class WechatAuthService {
       lastLoginAt: input.lastLoginAt,
     });
 
-    const session = input.authService.issueLoginSession(userIdentity.email);
+    const session = await input.authService.issueLoginSession(userIdentity.email);
     const redirectTo = new URL(input.state.redirectTo);
-    redirectTo.hash = new URLSearchParams({
+    const redirectHash = new URLSearchParams({
       access_token: session.accessToken,
-      refresh_token: session.refreshToken,
       provider: "wechat",
-    }).toString();
+    });
+    if (typeof session.refreshToken === "string") {
+      redirectHash.set("refresh_token", session.refreshToken);
+    }
+    redirectTo.hash = redirectHash.toString();
 
     return {
       redirectTo: redirectTo.toString(),

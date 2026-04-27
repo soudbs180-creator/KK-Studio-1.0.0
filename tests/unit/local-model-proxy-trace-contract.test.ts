@@ -17,8 +17,10 @@ test('local model proxy services preserve request tracing metadata across hosted
   assert.match(localSystemSource, /attemptId\?: string;/);
   assert.match(localSystemSource, /const requestId = String\(input\.requestId \|\| ""\)\.trim\(\) \|\| undefined;/);
   assert.match(localSystemSource, /const attemptId = String\(input\.attemptId \|\| ""\)\.trim\(\) \|\| undefined;/);
-  assert.match(localSystemSource, /if \(requestId\) \{\s*payload\.requestId = requestId;\s*\}/);
-  assert.match(localSystemSource, /if \(attemptId\) \{\s*payload\.attemptId = attemptId;\s*\}/);
+  assert.match(localSystemSource, /const directRequest: LocalUserRouteProxyRequest = \{[\s\S]*requestId,[\s\S]*attemptId,[\s\S]*\};/);
+  assert.match(localSystemSource, /this\.encodeTaskToken\(\{[\s\S]*requestId,[\s\S]*attemptId,[\s\S]*\}\)/);
+  assert.match(localSystemSource, /requestId: taskPayload\.requestId \|\| input\.requestId,/);
+  assert.match(localSystemSource, /attemptId: taskPayload\.attemptId \|\| input\.attemptId,/);
 
   assert.match(localUserRouteSource, /requestId\?: string;/);
   assert.match(localUserRouteSource, /attemptId\?: string;/);
@@ -26,12 +28,14 @@ test('local model proxy services preserve request tracing metadata across hosted
   assert.match(localUserRouteSource, /let decodedTask: LocalTaskPayload \| undefined;/);
   assert.match(localUserRouteSource, /const requestId = String\(input\.requestId \|\| decodedTask\?\.requestId \|\| ""\)\.trim\(\) \|\| undefined;/);
   assert.match(localUserRouteSource, /const attemptId = String\(input\.attemptId \|\| decodedTask\?\.attemptId \|\| ""\)\.trim\(\) \|\| undefined;/);
-  assert.match(localUserRouteSource, /if \(requestId\) \{\s*payload\.requestId = requestId;\s*\}/);
-  assert.match(localUserRouteSource, /if \(attemptId\) \{\s*payload\.attemptId = attemptId;\s*\}/);
+  assert.match(localUserRouteSource, /taskId: upstreamTaskId \|\| input\.taskId,[\s\S]*requestId,[\s\S]*attemptId,/);
+  assert.match(localUserRouteSource, /this\.encodeLocalTaskToken\(\{[\s\S]*requestId: videoResponse\.requestId \|\| requestId,[\s\S]*attemptId: videoResponse\.attemptId \|\| attemptId,[\s\S]*\}\)/);
   assert.match(localUserRouteSource, /requestId: videoResponse\.requestId \|\| requestId,/);
   assert.match(localUserRouteSource, /attemptId: videoResponse\.attemptId \|\| attemptId,/);
   assert.match(localUserRouteSource, /requestId: input\.requestId,/);
   assert.match(localUserRouteSource, /attemptId: input\.attemptId,/);
   assert.match(localUserRouteSource, /requestId: taskResponse\.requestId \|\| requestId,/);
   assert.match(localUserRouteSource, /attemptId: taskResponse\.attemptId \|\| attemptId,/);
+  assert.match(localUserRouteSource, /requestId: downloadResponse\.requestId \|\| requestId,/);
+  assert.match(localUserRouteSource, /attemptId: downloadResponse\.attemptId \|\| attemptId,/);
 });

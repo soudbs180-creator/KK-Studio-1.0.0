@@ -5,6 +5,7 @@ import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
+import { resolveCapabilityRouteAssignment } from '../../services/api/capabilityRouteAssignments';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { agentService, AgentConfig } from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
@@ -403,6 +404,8 @@ Return STRICT JSON only:
     };
 };
 
+const resolveAssistantCapabilityRoute = () => resolveCapabilityRouteAssignment('assistant');
+
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
@@ -410,11 +413,41 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
     const canBrowseSystemCreditModels = billingUiEnabled;
+    const resolveAssistantPreferredModel = useCallback((models: ChatModel[]) => {
+        const assignment = resolveAssistantCapabilityRoute();
+        const preferredModelId = String(assignment?.primaryModelId || '').trim();
+        if (!preferredModelId) {
+            return models[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
+        }
+
+        const exact = models.find((model) => model.id === preferredModelId);
+        if (exact) {
+            return exact;
+        }
+
+        const suffix = preferredModelId.split('@')[1];
+        if (suffix) {
+            const matched = models.find((model) => model.id.endsWith(`@${suffix}`));
+            if (matched) {
+                return matched;
+            }
+        }
+
+        return models[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false };
+    }, []);
+    const resolveAssistantPreferredKeyId = useCallback(() => {
+        const assignment = resolveAssistantCapabilityRoute();
+        const preferredRouteId = String(assignment?.primaryRouteId || '').trim();
+        if (!preferredRouteId || !assignment?.enabled) {
+            return undefined;
+        }
+        return keyManager.getKey(preferredRouteId) ? preferredRouteId : undefined;
+    }, []);
 
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
     const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
-    const [selectedModel, setSelectedModel] = useState<ChatModel>(() => availableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false });
+    const [selectedModel, setSelectedModel] = useState<ChatModel>(() => resolveAssistantPreferredModel(availableModels));
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
@@ -512,9 +545,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             setAvailableModels(models);
 
             if (models.length > 0) {
+                const assistantPreferredModel = resolveAssistantPreferredModel(models);
                 const exists = models.find(m => m.id === selectedModel.id);
                 if (!exists) {
-                    setSelectedModel(models[0]);
+                    setSelectedModel(assistantPreferredModel);
                 } else {
                     if (exists.name !== selectedModel.name || exists.description !== selectedModel.description) {
                         setSelectedModel(exists);
@@ -526,7 +560,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         updateModels();
         const unsubscribe = keyManager.subscribe(updateModels);
         return unsubscribe;
-    }, [canBrowseSystemCreditModels, selectedModel.id]);
+    }, [canBrowseSystemCreditModels, resolveAssistantPreferredModel, selectedModel.id]);
 
     const getRequiredCredits = useCallback((model?: ChatModel | null) => {
         if (!model?.isSystemInternal) return 0;
@@ -1176,7 +1210,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                 .filter(Boolean) as Array<{ id: string; data: string; mimeType: string }>;
 
             const lowerModelId = (imageModel.id || '').toLowerCase();
-            let targetSize = ImageSize.SIZE_1K;
+            let targetSize: ImageSize = ImageSize.SIZE_1K;
             if (lowerModelId.includes('4k') || lowerModelId.includes('gemini-3-pro-image-preview') || lowerModelId.includes('nano-banana-pro')) {
                 targetSize = ImageSize.SIZE_4K;
             } else if (lowerModelId.includes('2k')) {
@@ -1342,6 +1376,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                 messages: history,
                 inlineData: inlineData.length > 0 ? inlineData : undefined,
                 stream: false,
+                preferredKeyId: resolveAssistantPreferredKeyId(),
                 signal: controller.signal
             });
 
@@ -1491,6 +1526,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                 messages: history,
                 inlineData: inlineData.length > 0 ? inlineData : undefined,
                 stream: false,
+                preferredKeyId: resolveAssistantPreferredKeyId(),
                 signal: controller.signal
             });
 
@@ -1509,7 +1545,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             abortControllerRef.current = null;
             setIsThinking(false);
         }
-    }, [agentMode, currentAgent, ensureModelAccess, isThinking, messages, registerActivity, selectedModel]);
+    }, [agentMode, currentAgent, ensureModelAccess, isThinking, messages, registerActivity, resolveAssistantPreferredKeyId, selectedModel]);
 
     const handleNewSession = useCallback(() => {
         const id = `session_${Date.now()}`;

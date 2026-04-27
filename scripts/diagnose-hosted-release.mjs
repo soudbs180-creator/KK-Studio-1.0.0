@@ -1,26 +1,20 @@
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
-import { fileURLToPath } from "url";
 
 import {
   collectEnvSnapshots,
-  compareSupabaseProjectRefs,
   findSnapshotEntries,
-  findIgnoredLegacySecrets,
   getEffectiveValue,
   isPlaceholder,
   resolveRepoRoot,
-  summarizeValue,
 } from "./lib/env-contract.mjs";
 
-const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolveRepoRoot(import.meta.url);
 const rootPath = repoRoot;
 
 const hostedFrontendRequired = [
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
+  "VITE_KK_API_BASE_URL",
 ];
 
 const hostedFrontendRecommended = [
@@ -34,14 +28,14 @@ const hostedFrontendOptional = [
 ];
 
 const hostedFrontendForbidden = [
-  "VITE_KK_API_BASE_URL",
   "VITE_ENABLE_LEGACY_WEB_API_FALLBACK",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
 ];
 
-const functionSecretsRequired = [
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
+const hostedApiRequired = [
+  "DATABASE_URL",
+  "USER_API_ENCRYPTION_SECRET",
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
@@ -52,13 +46,16 @@ const functionSecretsRequired = [
   "WECHAT_OPEN_REDIRECT_URI",
   "WECHAT_STATE_SIGNING_SECRET",
   "WECHAT_ALLOWED_REDIRECT_ORIGINS",
+  "PAYMENT_SIDECAR_INTERNAL_TOKEN",
+  "PAYMENT_SIDECAR_SETTLEMENT_TOKEN",
 ];
 
-const functionSecretsRecommended = [
+const hostedApiRecommended = [
   "WECHAT_DEFAULT_REDIRECT_URL",
-  "USER_API_ENCRYPTION_SECRET",
   "KK_INTERNAL_ROUTE_PROXY_SECRET",
   "SYSTEM_PROXY_TASK_SECRET",
+  "USER_ROUTE_PROXY_TASK_SECRET",
+  "KK_PRIMARY_ADMIN_USER_ID",
 ];
 
 function formatStatus(sourceRecord) {
@@ -194,11 +191,19 @@ function printKeyStatuses(title, snapshots, keys) {
   });
 }
 
+function pushMissingEnvChecks(remoteChecks, label, snapshots, keys) {
+  keys.forEach((key) => {
+    const value = getEffectiveValue(snapshots, key);
+    if (!value || isPlaceholder(value.value)) {
+      remoteChecks.push(`${label} ${key} is missing or still a placeholder in the local snapshot. Confirm it in the runtime environment before deploying.`);
+    }
+  });
+}
+
 function run() {
-  const snapshots = collectEnvSnapshots(rootPath, { includeFunctionEnv: true });
+  const snapshots = collectEnvSnapshots(rootPath, { includeFunctionEnv: false });
   const frontendSnapshots = snapshots.frontendSnapshots;
   const localApiSnapshots = snapshots.apiSnapshots;
-  const hostedFunctionSnapshots = [...snapshots.apiSnapshots, ...snapshots.functionSnapshots];
   const vercelProject = readVercelProject();
   const vercelCli = inspectCommandAvailability("vercel", ["--version"], {
     label: "npx vercel",
@@ -217,23 +222,6 @@ function run() {
       args: ["vercel", "whoami"],
     },
   );
-  const supabaseCli = inspectCommandAvailability("supabase", ["--version"], {
-    label: "npx supabase",
-    command: "npx",
-    args: ["supabase", "--version"],
-  });
-  const supabaseAuth = inspectAuthenticatedAccess(
-    {
-      label: "supabase projects list",
-      command: "supabase",
-      args: ["projects", "list"],
-    },
-    {
-      label: "npx supabase projects list",
-      command: "npx",
-      args: ["supabase", "projects", "list"],
-    },
-  );
   const packageRunner = inspectPackageRunner();
 
   printSection("Local Snapshot");
@@ -246,10 +234,6 @@ function run() {
   localApiSnapshots.forEach((snapshot) => {
     console.log(`  * ${snapshot.relativePath}`);
   });
-  console.log(`- function env files: ${snapshots.functionSnapshots.length}`);
-  snapshots.functionSnapshots.forEach((snapshot) => {
-    console.log(`  * ${snapshot.relativePath}`);
-  });
   console.log(`- ignored legacy env files: ${snapshots.ignoredSnapshots.length}`);
   snapshots.ignoredSnapshots.forEach((snapshot) => {
     console.log(`  * ${snapshot.relativePath}`);
@@ -257,12 +241,10 @@ function run() {
 
   printSection("Tooling");
   console.log(`- vercel CLI: ${vercelCli.available ? vercelCli.detail : `missing (${vercelCli.detail})`}`);
-  console.log(`- supabase CLI: ${supabaseCli.available ? supabaseCli.detail : `missing (${supabaseCli.detail})`}`);
   console.log(`- package runner: ${packageRunner.available ? packageRunner.detail : `missing (${packageRunner.detail})`}`);
 
   printSection("Remote Access");
   console.log(`- vercel auth: ${vercelAuth.authenticated ? vercelAuth.detail : `missing (${vercelAuth.detail})`}`);
-  console.log(`- supabase auth: ${supabaseAuth.authenticated ? supabaseAuth.detail : `missing (${supabaseAuth.detail})`}`);
 
   printSection("Vercel Project");
   if (!vercelProject) {
@@ -278,16 +260,8 @@ function run() {
   printKeyStatuses("Hosted Frontend Required Env", frontendSnapshots, hostedFrontendRequired);
   printKeyStatuses("Hosted Frontend Recommended Env", frontendSnapshots, hostedFrontendRecommended);
   printKeyStatuses("Hosted Frontend Optional Env", frontendSnapshots, hostedFrontendOptional);
-  printKeyStatuses("Hosted API And Function Required Secrets", hostedFunctionSnapshots, functionSecretsRequired);
-  printKeyStatuses("Hosted API And Function Recommended Secrets", hostedFunctionSnapshots, functionSecretsRecommended);
-
-  const publicSupabaseUrl = getEffectiveValue(frontendSnapshots, "VITE_SUPABASE_URL")?.value;
-  const serverSupabaseUrl = getEffectiveValue(localApiSnapshots, "SUPABASE_URL")?.value || publicSupabaseUrl;
-  const projectAlignment = compareSupabaseProjectRefs(publicSupabaseUrl, serverSupabaseUrl);
-  printSection("Supabase Project Alignment");
-  console.log(`- public project ref: ${projectAlignment.publicProjectRef || "<missing>"}`);
-  console.log(`- server project ref: ${projectAlignment.serverProjectRef || "<missing>"}`);
-  console.log(`- project refs match: ${projectAlignment.matches === undefined ? "<unknown>" : String(projectAlignment.matches)}`);
+  printKeyStatuses("Hosted API Required Env", localApiSnapshots, hostedApiRequired);
+  printKeyStatuses("Hosted API Recommended Env", localApiSnapshots, hostedApiRecommended);
 
   printSection("Hosted Frontend Forbidden Env");
   hostedFrontendForbidden.forEach((key) => {
@@ -308,52 +282,30 @@ function run() {
   if (!vercelCli.available && !packageRunner.available) {
     blockers.push("Vercel CLI is unavailable on this machine and npm is not available as a package runner.");
   }
-  if (!supabaseCli.available && !packageRunner.available) {
-    blockers.push("Supabase CLI is unavailable on this machine and npm is not available as a package runner.");
-  }
   if (!vercelAuth.authenticated) {
     blockers.push("Vercel authentication is unavailable. Run `vercel login` or export `VERCEL_TOKEN` before releasing.");
   }
-  if (!supabaseAuth.authenticated) {
-    blockers.push("Supabase authentication is unavailable. Run `supabase login` or export `SUPABASE_ACCESS_TOKEN` before releasing.");
-  }
-  if (projectAlignment.matches === false) {
-    blockers.push("SUPABASE_URL does not point at the same Supabase project as VITE_SUPABASE_URL. Align the frontend and server env values before releasing.");
-  }
-  hostedFrontendRequired.forEach((key) => {
-    const value = getEffectiveValue(frontendSnapshots, key);
-    if (!value || isPlaceholder(value.value)) {
-      remoteChecks.push(`Hosted frontend env ${key} is missing or still a placeholder in the local snapshot. Confirm it in Vercel before deploying.`);
-    }
-  });
-  functionSecretsRequired.forEach((key) => {
-    const value = getEffectiveValue(hostedFunctionSnapshots, key);
-    if (!value || isPlaceholder(value.value)) {
-      remoteChecks.push(`Hosted API / function secret ${key} is missing or still a placeholder in the local snapshot. Confirm it in the runtime env or Supabase Secrets before deploying.`);
-    }
-  });
+
+  pushMissingEnvChecks(remoteChecks, "Hosted frontend env", frontendSnapshots, hostedFrontendRequired);
+  pushMissingEnvChecks(remoteChecks, "Hosted API env", localApiSnapshots, hostedApiRequired);
+
   hostedFrontendForbidden.forEach((key) => {
     const value = getEffectiveValue(frontendSnapshots, key);
     if (value && String(value.value || "").trim()) {
-      warnings.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Keep it local-only and do not copy it into Vercel.`);
+      warnings.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Keep hosted builds on the VPS API path and do not copy this into Vercel.`);
     }
   });
   const misplacedRootServerEnv = findSnapshotEntries(frontendSnapshots, [
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-    "SUPABASE_ANON_KEY",
+    "DATABASE_URL",
     "USER_API_ENCRYPTION_SECRET",
+    "PROFILE_USER_APIS_ENCRYPTION_SECRET",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "WECHAT_OPEN_APP_SECRET",
+    "PAYMENT_SIDECAR_INTERNAL_TOKEN",
+    "PAYMENT_SIDECAR_SETTLEMENT_TOKEN",
   ]);
   misplacedRootServerEnv.forEach((entry) => {
-    warnings.push(`Root env file ${entry.source} contains server-only key ${entry.key}. Local API startup ignores root server values, so move it into apps/api/.env.local or Supabase secrets.`);
-  });
-  const ignoredLegacySecrets = findIgnoredLegacySecrets(snapshots.ignoredSnapshots, [
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-  ]);
-  ignoredLegacySecrets.forEach((entry) => {
-    warnings.push(`Legacy env file ${entry.source} still contains ${entry.key}. Hosted checks ignore server/.env, so move active server secrets into apps/api/.env.local or Supabase secrets.`);
+    warnings.push(`Root env file ${entry.source} contains server-only key ${entry.key}. Move active server secrets into apps/api/.env.local or the VPS runtime env.`);
   });
 
   printSection("Immediate Blockers");
@@ -385,17 +337,17 @@ function run() {
 
   if (blockers.length > 0) {
     console.error(
-      `[release:hosted:check] Preflight blocked by ${blockers.length} issue(s). Please fix them before releasing.`
+      `[release:hosted:check] Preflight blocked by ${blockers.length} issue(s). Please fix them before releasing.`,
     );
     process.exitCode = 1;
     process.exit(1);
   }
 
   printSection("Notes");
-  console.log("- This script only checks local files and current process env. It does not read remote Vercel or Supabase dashboard state.");
-  console.log("- Production Edge Function secrets can be managed in Supabase Dashboard or with `npx supabase secrets set --env-file <file>`.");
-  console.log("- If the global CLIs are missing but npm is available, the repo scripts can still run through `npx`.");
-  console.log("- Use this check before deploying the frontend or Edge Functions to avoid copying local-only fallback config into hosted environments.");
+  console.log("- This script only checks local files and current process env. It does not read remote VPS or Vercel dashboard state.");
+  console.log("- VPS API, payment sidecar, and PostgreSQL secrets must be configured in the VPS runtime environment.");
+  console.log("- If the global Vercel CLI is missing but npm is available, the repo scripts can still run through `npx`.");
+  console.log("- Use this check before deploying the frontend or VPS API to avoid copying local-only or legacy managed-database config into hosted environments.");
 }
 
 run();

@@ -44,6 +44,125 @@ describe("billing local static recharge exports", () => {
 });
 
 describe("billing local static recharge flow", () => {
+  test("creates manual recharge orders with fee split, paid marker priority, idempotent review, and expiry guard", async () => {
+    let now = new Date("2026-04-27T08:00:00.000Z");
+    const submissionRepository = new (billing as any).InMemoryRechargeSubmissionRepository();
+    const creditRepository = new billing.InMemoryCreditAccountRepository(10);
+    const creditAccountService = new billing.CreditAccountService(creditRepository);
+    const service = new (billing as any).StaticRechargeService({
+      submissionRepository,
+      exchangeRateRepository: new billing.InMemoryCreditExchangeRateRepository({
+        CNY: {
+          creditsPerUnit: 7,
+          minAmount: 5,
+          maxAmount: 100,
+          isActive: true,
+        },
+      }),
+      creditAccountService,
+      manualRechargeFeeGenerator: () => 0.2,
+      nowProvider: () => now,
+    });
+
+    const first = await service.createRechargeSubmission("user-manual-1", {
+      amount: 20,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+      manualProvider: "alipay",
+    }, "req-manual-create-1");
+    const second = await service.createRechargeSubmission("user-manual-2", {
+      amount: 20,
+      currencyCode: "CNY",
+      paymentChannel: "manual",
+      manualProvider: "wechat",
+    }, "req-manual-create-2");
+
+    assert.equal(first.success, true);
+    assert.equal(second.success, true);
+    if (!first.success || !second.success) {
+      return;
+    }
+
+    assert.equal(first.data.submission.userId, undefined);
+    assert.equal(first.data.submission.status, "paying");
+    assert.equal(first.data.submission.manualProvider, "alipay");
+    assert.equal(first.data.submission.baseAmount, 20);
+    assert.equal(first.data.submission.serviceFee, 0.2);
+    assert.equal(first.data.submission.payableAmount, 20.2);
+    assert.equal(first.data.submission.baseCredits, 140);
+    assert.equal(first.data.submission.bonusCredits, 1);
+    assert.equal(first.data.submission.creditAmount, 141);
+    assert.equal(first.data.submission.paymentMarkedAt, null);
+    assert.equal(first.data.submission.expiresAt, "2026-04-27T08:05:00.000Z");
+
+    const marked = await service.markRechargeSubmissionPaid(
+      "user-manual-2",
+      second.data.submission.submissionId,
+      "req-manual-paid-1",
+    );
+    assert.equal(marked.success, true);
+    if (!marked.success) {
+      return;
+    }
+    assert.equal(marked.data.submission.status, "paying");
+    assert.equal(marked.data.submission.paymentMarkedAt, "2026-04-27T08:00:00.000Z");
+
+    const adminList = await service.listAdminRechargeSubmissions("req-manual-list-1");
+    assert.equal(adminList.success, true);
+    if (!adminList.success) {
+      return;
+    }
+    assert.equal(adminList.data.items[0].submissionId, second.data.submission.submissionId);
+    assert.equal(adminList.data.items[0].paymentMarkedAt, "2026-04-27T08:00:00.000Z");
+    assert.equal(adminList.data.items[1].submissionId, first.data.submission.submissionId);
+
+    const reviewed = await service.reviewRechargeSubmission(
+      second.data.submission.submissionId,
+      "credit",
+      "admin-manual-1",
+      "req-manual-credit-1",
+    );
+    const duplicateReview = await service.reviewRechargeSubmission(
+      second.data.submission.submissionId,
+      "credit",
+      "admin-manual-1",
+      "req-manual-credit-2",
+    );
+    assert.equal(reviewed.success, true);
+    assert.equal(duplicateReview.success, true);
+    if (!reviewed.success || !duplicateReview.success) {
+      return;
+    }
+    assert.equal(reviewed.data.creditAmount, 141);
+    assert.equal(reviewed.data.recharge?.balanceAfter, 151);
+    assert.equal(duplicateReview.data.recharge?.balanceAfter, 151);
+    assert.equal(duplicateReview.data.submission.status, "credited");
+
+    const transactions = await creditAccountService.listTransactions(
+      "user-manual-2",
+      { transactionType: "recharge", limit: 10 },
+      "req-manual-transactions-1",
+    );
+    assert.equal(transactions.success, true);
+    if (transactions.success) {
+      assert.equal(transactions.data.items.length, 1);
+      assert.equal(transactions.data.items[0].businessRefType, "manual_recharge");
+      assert.equal(transactions.data.items[0].businessRefId, second.data.submission.submissionId);
+    }
+
+    now = new Date("2026-04-27T08:06:00.000Z");
+    const expiredReview = await service.reviewRechargeSubmission(
+      first.data.submission.submissionId,
+      "credit",
+      "admin-manual-1",
+      "req-manual-expired-1",
+    );
+    assert.equal(expiredReview.success, false);
+    if (!expiredReview.success) {
+      assert.equal(expiredReview.error.code, "RECHARGE_SUBMISSION_EXPIRED");
+    }
+  });
+
   test("accepts a static recharge submission through the billing handler", async () => {
     const submissionRepository = new (billing as any).InMemoryRechargeSubmissionRepository();
     const rateRepository = new billing.InMemoryCreditExchangeRateRepository({

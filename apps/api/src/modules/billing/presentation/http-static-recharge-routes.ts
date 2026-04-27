@@ -31,6 +31,7 @@ const supportedPaymentChannels = new Set<RechargePaymentChannelDto>([
   "manual",
 ]);
 const supportedReviewDecisions = new Set(["credit", "reject"]);
+const supportedManualProviders = new Set(["alipay", "wechat"]);
 
 function isRechargeReferenceTail(value: string): boolean {
   return /^[0-9A-Z]{4}$/.test(value);
@@ -47,6 +48,8 @@ function mapRechargeFailureStatus(errorCode?: string): number {
     case "RECHARGE_AMOUNT_OUT_OF_RANGE":
     case "RECHARGE_SUBMISSION_NOT_CREATED":
     case "RECHARGE_SUBMISSION_NOT_PENDING":
+    case "RECHARGE_SUBMISSION_NOT_PAYING":
+    case "RECHARGE_SUBMISSION_EXPIRED":
       return 409;
     default:
       return 400;
@@ -144,6 +147,19 @@ export function validateCreateRechargeSubmissionRequest(body: unknown): ApiError
     details.push({
       field: "note",
       reason: "note must be a string when provided.",
+    });
+  }
+
+  if (
+    typeof candidate.manualProvider !== "undefined"
+    && (
+      typeof candidate.manualProvider !== "string"
+      || !supportedManualProviders.has(candidate.manualProvider)
+    )
+  ) {
+    details.push({
+      field: "manualProvider",
+      reason: "manualProvider must be either alipay or wechat when provided.",
     });
   }
 
@@ -288,6 +304,26 @@ export async function handleSubmitRechargeProof(
   };
 }
 
+export async function handleMarkRechargeSubmissionPaid(
+  service: StaticRechargeService,
+  submissionId: string,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveAuthenticatedUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  const result = await service.markRechargeSubmissionPaid(userId, submissionId, requestId, clientVersion);
+  return {
+    statusCode: result.success ? 200 : mapRechargeFailureStatus(result.error.code),
+    body: result,
+  };
+}
+
 export async function handleSubmitRecharge(
   service: StaticRechargeService,
   body: SubmitRechargeRequestDto,
@@ -353,6 +389,33 @@ export async function handleGetAdminRechargeSubmission(
   }
 
   const result = await service.getAdminRechargeSubmission(submissionId, requestId, clientVersion);
+  return {
+    statusCode: result.success ? 200 : mapRechargeFailureStatus(result.error.code),
+    body: result,
+  };
+}
+
+export async function handleListAdminRechargeSubmissions(
+  service: StaticRechargeService,
+  headers: Record<string, string>,
+) {
+  const requestId = headers["x-request-id"] || randomUUID();
+  const clientVersion = headers["x-client-version"];
+  const userId = resolveAuthenticatedUserId(headers);
+
+  if (!userId) {
+    return buildUnauthorizedResult(requestId, clientVersion);
+  }
+
+  if (!hasElevatedAdminSession(headers)) {
+    return buildAdminElevationRequiredResult(requestId, clientVersion);
+  }
+
+  if (!isAdminRequest(headers)) {
+    return buildAdminForbiddenResult(requestId, clientVersion);
+  }
+
+  const result = await service.listAdminRechargeSubmissions(requestId, clientVersion);
   return {
     statusCode: result.success ? 200 : mapRechargeFailureStatus(result.error.code),
     body: result,

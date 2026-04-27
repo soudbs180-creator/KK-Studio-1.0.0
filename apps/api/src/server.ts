@@ -19,14 +19,13 @@ import {
 } from "./lib/request-authenticator.ts";
 import { shouldAttemptBearerAuthentication } from "./lib/request-auth-scope.ts";
 import {
-  assertServerSupabaseConfigConsistency,
-  probeServerSupabasePersistence,
-  resolveServerSupabaseConfig,
-  summarizeServerSupabaseConfig,
-  type ServerSupabaseConfig,
-  type ServerSupabasePersistenceProbe,
-  type ServerSupabaseProbeCheck,
-} from "./lib/server-supabase-config.ts";
+  probeServerRuntimePersistence,
+  resolveServerRuntimeConfig,
+  summarizeServerRuntimeConfig,
+  type ServerRuntimeConfig,
+  type ServerRuntimePersistenceProbe,
+} from "./lib/server-runtime-config.ts";
+import { hasPostgresConfig } from "./lib/postgres.ts";
 import {
   resolveServerAdminConfig,
   summarizeServerAdminConfig,
@@ -41,7 +40,6 @@ import {
   handleGetAdminAccess,
   handleSetUserRole,
   handleVerifyAdminPassword,
-  SupabaseAdminConsoleRepository,
 } from "./modules/admin-console/index.ts";
 import {
   AssetLibraryService,
@@ -58,26 +56,29 @@ import {
   AuthDataService,
   type AuthDataRepository,
   AuthService,
+  BrowserSessionService,
   FileBackedAuthDataRepository,
   GoogleAuthService,
   InMemoryAuthDataRepository,
+  InMemoryBrowserSessionRepository,
   PostgresAuthDataRepository,
   PostgresWechatAuthRepository,
+  createUserSessionRepositoryFromEnv,
   createAuthDataRepositoryFromEnv,
   createWechatAuthRepositoryFromEnv,
-  SupabaseUserScopedAuthDataMirror,
-  SupabaseAuthDataRepository,
-  SupabaseWechatAuthRepository,
   type TurnstileVerifier,
   WechatAuthService,
   handleCreateTempUser,
   handleCheckUserRouteConnectivity,
   handleGetKeyManagerCloudState,
   handleGetProfile,
+  handleGetSession,
   handleSendPasswordChangeCode,
   handleGoogleCallback,
   handleGetUserApiEntries,
+  handleLogoutSession,
   handleReplaceUserApisPayload,
+  handleRefreshSession,
   handleStartGoogleBind,
   handleStartGoogleLogin,
   handleStartWechatBind,
@@ -109,21 +110,23 @@ import {
   InMemoryRechargeSubmissionRepository,
   PostgresCreditAccountRepository,
   PostgresCreditExchangeRateRepository,
+  PostgresRechargeSubmissionRepository,
   createCreditAccountRepositoryFromEnv,
   createCreditExchangeRateRepositoryFromEnv,
+  createRechargeSubmissionRepositoryFromEnv,
   RechargePaymentChannelConfigService,
   StaticRechargeService,
   handleAdminRechargeCredits,
   handleCreateRechargeSubmission,
   handleGetAdminRechargeSubmission,
+  handleListAdminRechargeSubmissions,
   handleListCreditExchangeRates,
   handleListRechargePaymentChannels,
+  handleMarkRechargeSubmissionPaid,
   handleReviewRechargeSubmission,
   handleSubmitRecharge,
   handleSubmitRechargeProof,
   handleUpsertCreditExchangeRate,
-  SupabaseCreditAccountRepository,
-  SupabaseCreditExchangeRateRepository,
   handleDebitCredits,
   handleGetAdminCreditAccount,
   handleGetCreditBalance,
@@ -143,7 +146,6 @@ import {
   InMemoryModelCatalogRepository,
   ModelCatalogService,
   PostgresCreditProviderRepository,
-  SupabaseCreditProviderRepository,
   handleDeleteAdminCreditProvider,
   handleGetAdminCreditProviderPricingCache,
   handleGetSharedProviderPricingCache,
@@ -167,7 +169,6 @@ import {
   InMemoryWorkspaceLayoutRepository,
   PostgresWorkspaceLayoutRepository,
   createWorkspaceLayoutRepositoryFromEnv,
-  SupabaseWorkspaceLayoutRepository,
   WorkspaceCanvasService,
   handleCleanupCloudImages,
   handleGetWorkspaceLayout,
@@ -230,11 +231,17 @@ function resolveJsonBodyMaxBytes(pathname?: string): number {
   return defaultMaxBytes;
 }
 
-function writeJson(res: ServerResponse, statusCode: number, payload: unknown) {
+function writeJson(
+  res: ServerResponse,
+  statusCode: number,
+  payload: unknown,
+  extraHeaders: Record<string, string | string[]> = {},
+) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(body),
+    ...extraHeaders,
   });
   res.end(body);
 }
@@ -266,6 +273,42 @@ function normalizeHeaders(req: IncomingMessage): Record<string, string> {
 
 function getRequestIp(req: IncomingMessage): string {
   return req.socket.remoteAddress || "unknown";
+}
+
+function getRequestUserAgent(req: IncomingMessage): string {
+  const header = req.headers["user-agent"];
+  return Array.isArray(header) ? String(header[0] || "unknown") : String(header || "unknown");
+}
+
+function parseCookies(cookieHeader: string | string[] | undefined): Record<string, string> {
+  const rawCookie = Array.isArray(cookieHeader) ? cookieHeader.join("; ") : String(cookieHeader || "");
+  if (!rawCookie.trim()) {
+    return {};
+  }
+
+  return rawCookie
+    .split(";")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .reduce<Record<string, string>>((cookies, segment) => {
+      const separatorIndex = segment.indexOf("=");
+      if (separatorIndex <= 0) {
+        return cookies;
+      }
+
+      const key = segment.slice(0, separatorIndex).trim();
+      const value = segment.slice(separatorIndex + 1).trim();
+      if (!key) {
+        return cookies;
+      }
+
+      try {
+        cookies[key] = decodeURIComponent(value);
+      } catch {
+        cookies[key] = value;
+      }
+      return cookies;
+    }, {});
 }
 
 async function readJsonBody(
@@ -347,7 +390,7 @@ interface CriticalPersistenceState {
 }
 
 interface RuntimePersistenceState {
-  configSummary: ReturnType<typeof summarizeServerSupabaseConfig>;
+  configSummary: ReturnType<typeof summarizeServerRuntimeConfig>;
   criticalPersistence: Record<CriticalPersistenceCapability, CriticalPersistenceState>;
   runtimeBlockers: string[];
 }
@@ -356,6 +399,18 @@ interface CriticalPersistenceOptions {
   configReady?: boolean;
   readyBackends?: Partial<Record<string, RepositoryBackend[]>>;
   structuralBlockers?: string[];
+}
+
+function resolveProbeCheckBlockers(
+  probe: ServerRuntimePersistenceProbe | undefined,
+  capability: CriticalPersistenceCapability,
+): string[] {
+  const check = probe?.checks[capability];
+  if (!check || check.ready) {
+    return [];
+  }
+
+  return [check.blocker || "POSTGRES_PERSISTENCE_PROBE_FAILED"];
 }
 
 function dedupeStrings(values: string[]): string[] {
@@ -374,36 +429,33 @@ function isKkaiLocalOnlyRuntime(): boolean {
   return !isHostedRuntime() && isTruthyValue(process.env.KKAI_LOCAL_ONLY);
 }
 
+function resolveBrowserSessionCookieSecure(): boolean {
+  if (isHostedRuntime()) {
+    return true;
+  }
+
+  return isTruthyValue(process.env.KK_SESSION_COOKIE_SECURE);
+}
+
 function buildCriticalPersistenceState(
   label: string,
   repositories: Record<string, RepositoryBackend>,
-  configSummary: ReturnType<typeof summarizeServerSupabaseConfig>,
+  configSummary: ReturnType<typeof summarizeServerRuntimeConfig>,
   repositoryBlockers: Record<string, string>,
-  probeChecks: Array<ServerSupabaseProbeCheck | undefined> = [],
   extraBlockers: string[] = [],
   options: CriticalPersistenceOptions = {},
 ): CriticalPersistenceState {
   const readyBackends = options.readyBackends || {};
   const isRepositoryReady = ([key, repository]: [string, RepositoryBackend]) => {
-    const acceptedBackends = readyBackends[key] || ["supabase"];
+    const acceptedBackends = readyBackends[key] || ["postgres"];
     return acceptedBackends.includes(repository);
   };
-  const probeBlockers = probeChecks
-    .filter((check): check is ServerSupabaseProbeCheck => {
-      if (check == null) {
-        return false;
-      }
-
-      return check.ready === false;
-    })
-    .flatMap((check) => String(check.blocker || "").split(",").map((value) => value.trim()).filter(Boolean));
   const blockers = [
     ...(options.structuralBlockers ?? (Array.isArray(configSummary.structuralBlockers) ? configSummary.structuralBlockers : [])),
     ...Object.entries(repositories)
       .filter((entry) => !isRepositoryReady(entry))
       .map(([key]) => repositoryBlockers[key])
       .filter(Boolean),
-    ...probeBlockers,
     ...extraBlockers,
   ];
 
@@ -412,7 +464,6 @@ function buildCriticalPersistenceState(
     ready:
       (options.configReady ?? Boolean(configSummary.canonicalConfigReady ?? configSummary.canonicalPersistenceReady))
       && Object.entries(repositories).every((entry) => isRepositoryReady(entry))
-      && probeBlockers.length === 0
       && extraBlockers.length === 0,
     repositories,
     blockers: dedupeStrings(blockers),
@@ -429,7 +480,7 @@ function buildServerConfigErrorResponse(
     success: false,
     error: {
       code: "SERVER_PERSISTENCE_REQUIRED",
-      message: `${state.label} require the API server to use the canonical Supabase backend.`,
+      message: `${state.label} require the API server to use the VPS PostgreSQL persistence backend.`,
       details: [
         {
           capability,
@@ -475,10 +526,12 @@ function resolveCriticalPersistenceCapability(
     || pathname === "/api/v1/billing/submit-recharge"
     || pathname === "/api/v1/billing/recharge-submissions"
     || /^\/api\/v1\/billing\/recharge-submissions\/[^/]+\/proof$/.test(pathname)
+    || /^\/api\/v1\/billing\/recharge-submissions\/[^/]+\/mark-paid$/.test(pathname)
     || pathname === "/api/v1/billing/credits/debit"
     || pathname === "/api/v1/billing/credits/refunds"
     || pathname === "/api/v1/admin/billing/exchange-rates"
     || pathname === "/api/v1/admin/billing/recharges"
+    || pathname === "/api/v1/admin/billing/recharge-submissions"
     || /^\/api\/v1\/admin\/billing\/recharge-submissions\/[^/]+(?:\/review)?$/.test(pathname)
     || pathname === "/internal/v1/payment-settlements"
   ) {
@@ -504,15 +557,15 @@ export interface ApiServerOptions {
   creditAccountRepository?: CreditAccountRepository;
   localOnlyUser?: AuthenticatedRequestContext;
   requestAuthenticator?: RequestAuthenticator;
-  resolveAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined;
+  resolveAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined | Promise<AuthenticatedRequestContext | undefined>;
   verifyTurnstileToken?: TurnstileVerifier;
   allowDegradedPersistence?: boolean;
-  probeServerSupabasePersistence?: (
-    config: ServerSupabaseConfig,
-  ) => Promise<ServerSupabasePersistenceProbe>;
+  probeServerRuntimePersistence?: (
+    config: ServerRuntimeConfig,
+  ) => Promise<ServerRuntimePersistenceProbe>;
 }
 
-type RepositoryBackend = "memory" | "postgres" | "supabase" | "local-file" | "custom";
+type RepositoryBackend = "memory" | "postgres" | "local-file" | "custom";
 const tempUserRateLimitRule = { max: 10, windowMs: 60 * 60 * 1000 } as const;
 
 function normalizeAuthenticatedRequestContext(
@@ -535,7 +588,6 @@ function normalizeAuthenticatedRequestContext(
 function resolveRepositoryBackend(
   repository: unknown,
   inMemoryCtor: abstract new (...args: any[]) => unknown,
-  supabaseCtor: abstract new (...args: any[]) => unknown,
   postgresCtor?: abstract new (...args: any[]) => unknown,
   localFileCtor?: abstract new (...args: any[]) => unknown,
 ): RepositoryBackend {
@@ -547,10 +599,6 @@ function resolveRepositoryBackend(
     return "postgres";
   }
 
-  if (repository instanceof supabaseCtor) {
-    return "supabase";
-  }
-
   if (localFileCtor && repository instanceof localFileCtor) {
     return "local-file";
   }
@@ -558,10 +606,10 @@ function resolveRepositoryBackend(
   return "custom";
 }
 
-function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig): AdminConsoleRepository {
+function createAdminConsoleRepository(serverRuntimeConfig: ServerRuntimeConfig): AdminConsoleRepository {
   if (isKkaiLocalOnlyRuntime()) {
     logStartupMode("warn", "Using in-memory admin console repository for KKAI local-only runtime", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return new InMemoryAdminConsoleRepository();
   }
@@ -569,32 +617,40 @@ function createAdminConsoleRepository(serverSupabaseConfig: ServerSupabaseConfig
   const postgresRepository = createAdminConsoleRepositoryFromEnv();
   if (postgresRepository instanceof PostgresAdminConsoleRepository) {
     logStartupMode("info", "Using PostgreSQL admin console repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
       hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
     });
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase admin console repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseAdminConsoleRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    });
-  }
-
   logStartupMode("warn", "Falling back to in-memory admin console repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new InMemoryAdminConsoleRepository();
 }
 
-function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfig): CreditAccountRepository {
+function createBrowserSessionService(): BrowserSessionService {
+  const repository = createUserSessionRepositoryFromEnv()
+    || new InMemoryBrowserSessionRepository();
+  const sessionSigningSecret = String(process.env.KK_API_SESSION_SIGNING_SECRET || "").trim()
+    || "kkai-local-dev-browser-session-secret";
+  const normalizedSameSite = String(process.env.KK_SESSION_COOKIE_SAME_SITE || "").trim().toLowerCase();
+
+  return new BrowserSessionService({
+    repository,
+    sessionSigningSecret,
+    cookieName: String(process.env.KK_SESSION_COOKIE_NAME || "").trim() || undefined,
+    secure: resolveBrowserSessionCookieSecure(),
+    sameSite: normalizedSameSite === "strict" || normalizedSameSite === "none"
+      ? normalizedSameSite
+      : "lax",
+  });
+}
+
+function createCreditAccountRepository(serverRuntimeConfig: ServerRuntimeConfig): CreditAccountRepository {
   if (isKkaiLocalOnlyRuntime()) {
     logStartupMode("warn", "Using file-backed credit account repository for KKAI local-only runtime", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return new FileBackedCreditAccountRepository();
   }
@@ -602,34 +658,24 @@ function createCreditAccountRepository(serverSupabaseConfig: ServerSupabaseConfi
   const postgresRepository = createCreditAccountRepositoryFromEnv();
   if (postgresRepository instanceof PostgresCreditAccountRepository) {
     logStartupMode("info", "Using PostgreSQL credit account repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
       hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
     });
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase credit account repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseCreditAccountRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    });
-  }
-
   logStartupMode("warn", "Falling back to in-memory credit account repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new InMemoryCreditAccountRepository();
 }
 
 function createCreditExchangeRateRepository(
-  serverSupabaseConfig: ServerSupabaseConfig,
+  serverRuntimeConfig: ServerRuntimeConfig,
 ): CreditExchangeRateRepository {
   if (isKkaiLocalOnlyRuntime()) {
     logStartupMode("warn", "Using file-backed credit exchange-rate repository for KKAI local-only runtime", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return new FileBackedCreditExchangeRateRepository();
   }
@@ -637,32 +683,22 @@ function createCreditExchangeRateRepository(
   const postgresRepository = createCreditExchangeRateRepositoryFromEnv();
   if (postgresRepository instanceof PostgresCreditExchangeRateRepository) {
     logStartupMode("info", "Using PostgreSQL credit exchange-rate repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
       hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
     });
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase credit exchange-rate repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseCreditExchangeRateRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    });
-  }
-
   logStartupMode("warn", "Falling back to in-memory credit exchange-rate repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new InMemoryCreditExchangeRateRepository();
 }
 
-function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+function createCreditProviderRepository(serverRuntimeConfig: ServerRuntimeConfig) {
   if (isKkaiLocalOnlyRuntime()) {
     logStartupMode("warn", "Using in-memory credit provider repository for KKAI local-only runtime", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return new InMemoryCreditProviderRepository();
   }
@@ -675,27 +711,32 @@ function createCreditProviderRepository(serverSupabaseConfig: ServerSupabaseConf
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase credit provider repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseCreditProviderRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    });
-  }
-
   logStartupMode("warn", "Falling back to in-memory credit provider repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new InMemoryCreditProviderRepository();
 }
 
-function createRechargeSubmissionRepository() {
+function createRechargeSubmissionRepository(serverRuntimeConfig: ServerRuntimeConfig) {
   if (isKkaiLocalOnlyRuntime()) {
+    logStartupMode("warn", "Using file-backed recharge submission repository for KKAI local-only runtime", {
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
+    });
     return new FileBackedRechargeSubmissionRepository();
   }
 
+  const postgresRepository = createRechargeSubmissionRepositoryFromEnv();
+  if (postgresRepository instanceof PostgresRechargeSubmissionRepository) {
+    logStartupMode("info", "Using PostgreSQL recharge submission repository", {
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
+    });
+    return postgresRepository;
+  }
+
+  logStartupMode("warn", "Falling back to in-memory recharge submission repository", {
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
+  });
   return new InMemoryRechargeSubmissionRepository();
 }
 
@@ -707,41 +748,30 @@ function createRechargePaymentChannelConfigRepository() {
   return new InMemoryRechargePaymentChannelConfigRepository();
 }
 
-function createAuthDataRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+function createAuthDataRepository(serverRuntimeConfig: ServerRuntimeConfig) {
   const postgresRepository = createAuthDataRepositoryFromEnv({
-    storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
+    storageEncryptionKey: serverRuntimeConfig.userApiEncryptionSecret,
   });
   if (postgresRepository instanceof PostgresAuthDataRepository) {
     logStartupMode("info", "Using PostgreSQL auth data repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
       hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.PGHOST),
     });
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase auth data repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseAuthDataRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-      storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
-    });
-  }
-
   logStartupMode("warn", "Falling back to file-backed local auth data repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new FileBackedAuthDataRepository({
-    storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
+    storageEncryptionKey: serverRuntimeConfig.userApiEncryptionSecret,
   });
 }
 
-function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseConfig) {
+function createWorkspaceLayoutRepository(serverRuntimeConfig: ServerRuntimeConfig) {
   if (isKkaiLocalOnlyRuntime()) {
     logStartupMode("warn", "Using in-memory workspace layout repository for KKAI local-only runtime", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return new InMemoryWorkspaceLayoutRepository();
   }
@@ -754,23 +784,13 @@ function createWorkspaceLayoutRepository(serverSupabaseConfig: ServerSupabaseCon
     return postgresRepository;
   }
 
-  if (serverSupabaseConfig.supabaseUrl && serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("info", "Using Supabase workspace layout repository", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
-    });
-    return new SupabaseWorkspaceLayoutRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    });
-  }
-
   logStartupMode("warn", "Falling back to in-memory workspace layout repository", {
-    ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+    ...summarizeServerRuntimeConfig(serverRuntimeConfig),
   });
   return new InMemoryWorkspaceLayoutRepository();
 }
 
-function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): WechatAuthService | undefined {
+function createWechatAuthService(serverRuntimeConfig: ServerRuntimeConfig): WechatAuthService | undefined {
   const providerAppId = env.get("WECHAT_OPEN_APP_ID");
   const providerSecret = env.get("WECHAT_OPEN_APP_SECRET");
   const callbackUrl = env.get("WECHAT_OPEN_REDIRECT_URI");
@@ -781,24 +801,9 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
     .filter(Boolean);
 
   const postgresRepository = createWechatAuthRepositoryFromEnv();
-  if (postgresRepository instanceof PostgresWechatAuthRepository) {
-    const resolvedProviderAppId = providerAppId!;
-    const resolvedProviderSecret = providerSecret!;
-    const resolvedCallbackUrl = callbackUrl!;
-    const resolvedStateSigningSecret = stateSigningSecret!;
-    return new WechatAuthService({
-      repository: postgresRepository,
-      providerAppId: resolvedProviderAppId,
-      providerSecret: resolvedProviderSecret,
-      callbackUrl: resolvedCallbackUrl,
-      stateSigningSecret: resolvedStateSigningSecret,
-      allowedRedirectOrigins,
-    });
-  }
-
-  if (!serverSupabaseConfig.supabaseUrl || !serverSupabaseConfig.serviceRoleKey) {
-    logStartupMode("warn", "WeChat auth service is disabled because Supabase admin config is unavailable.", {
-      ...summarizeServerSupabaseConfig(serverSupabaseConfig),
+  if (!(postgresRepository instanceof PostgresWechatAuthRepository)) {
+    logStartupMode("warn", "WeChat auth service is disabled because the PostgreSQL WeChat repository is unavailable.", {
+      ...summarizeServerRuntimeConfig(serverRuntimeConfig),
     });
     return undefined;
   }
@@ -814,10 +819,7 @@ function createWechatAuthService(serverSupabaseConfig: ServerSupabaseConfig): We
   }
 
   return new WechatAuthService({
-    repository: new SupabaseWechatAuthRepository({
-      supabaseUrl: serverSupabaseConfig.supabaseUrl,
-      serviceRoleKey: serverSupabaseConfig.serviceRoleKey,
-    }),
+    repository: postgresRepository,
     providerAppId,
     providerSecret,
     callbackUrl,
@@ -857,16 +859,16 @@ function createGoogleAuthService(): GoogleAuthService | undefined {
 }
 
 function buildRuntimePersistenceState(
-  serverSupabaseConfig: ServerSupabaseConfig,
+  serverRuntimeConfig: ServerRuntimeConfig,
   repositoryModes: RepositoryModeMap,
-  persistenceProbe?: ServerSupabasePersistenceProbe,
   options: {
     localOnly?: boolean;
+    persistenceProbe?: ServerRuntimePersistenceProbe;
   } = {},
 ): RuntimePersistenceState {
   const localOnly = options.localOnly === true;
-  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig, {
-    persistenceProbe,
+  const configSummary = summarizeServerRuntimeConfig(serverRuntimeConfig, {
+    persistenceProbe: options.persistenceProbe,
   });
   const criticalPersistence = {
     authData: buildCriticalPersistenceState(
@@ -874,14 +876,16 @@ function buildRuntimePersistenceState(
       { authData: repositoryModes.authData },
       configSummary,
       { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
-      [persistenceProbe?.checks.authData],
-      configSummary.hasUserApiEncryptionSecret ? [] : ["USER_API_ENCRYPTION_SECRET_MISSING"],
+      [
+        ...(configSummary.hasUserApiEncryptionSecret ? [] : ["USER_API_ENCRYPTION_SECRET_MISSING"]),
+        ...resolveProbeCheckBlockers(options.persistenceProbe, "authData"),
+      ],
       {
         configReady: configSummary.hasUserApiEncryptionSecret,
         readyBackends: {
           authData: localOnly
-            ? ["supabase", "postgres", "local-file", "memory"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "local-file", "memory"]
+            : ["postgres"],
         },
         structuralBlockers: [],
       },
@@ -891,14 +895,13 @@ function buildRuntimePersistenceState(
       { authData: repositoryModes.authData },
       configSummary,
       { authData: "AUTH_DATA_REPOSITORY_DEGRADED" },
-      localOnly ? [] : [persistenceProbe?.checks.guestSessions],
-      [],
+      resolveProbeCheckBlockers(options.persistenceProbe, "guestSessions"),
       {
         configReady: true,
         readyBackends: {
           authData: localOnly
-            ? ["supabase", "postgres", "local-file", "memory"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "local-file", "memory"]
+            : ["postgres"],
         },
         structuralBlockers: [],
       },
@@ -908,14 +911,13 @@ function buildRuntimePersistenceState(
       { workspaceLayout: repositoryModes.workspaceLayout },
       configSummary,
       { workspaceLayout: "WORKSPACE_LAYOUT_REPOSITORY_DEGRADED" },
-      localOnly ? [] : [persistenceProbe?.checks.workspaceLayout],
-      [],
+      resolveProbeCheckBlockers(options.persistenceProbe, "workspaceLayout"),
       {
         configReady: true,
         readyBackends: {
           workspaceLayout: localOnly
-            ? ["supabase", "postgres", "memory"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "memory"]
+            : ["postgres"],
         },
         structuralBlockers: [],
       },
@@ -931,17 +933,16 @@ function buildRuntimePersistenceState(
         creditAccounts: "CREDIT_ACCOUNT_REPOSITORY_DEGRADED",
         creditExchangeRates: "CREDIT_EXCHANGE_RATE_REPOSITORY_DEGRADED",
       },
-      localOnly ? [] : [persistenceProbe?.checks.billing],
-      [],
+      resolveProbeCheckBlockers(options.persistenceProbe, "billing"),
       {
         configReady: true,
         readyBackends: {
           creditAccounts: localOnly
-            ? ["supabase", "postgres", "local-file"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "local-file"]
+            : ["postgres"],
           creditExchangeRates: localOnly
-            ? ["supabase", "postgres", "local-file"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "local-file"]
+            : ["postgres"],
         },
         structuralBlockers: [],
       },
@@ -951,14 +952,13 @@ function buildRuntimePersistenceState(
       { creditProviders: repositoryModes.creditProviders },
       configSummary,
       { creditProviders: "CREDIT_PROVIDER_REPOSITORY_DEGRADED" },
-      localOnly ? [] : [persistenceProbe?.checks.creditProviders],
-      [],
+      resolveProbeCheckBlockers(options.persistenceProbe, "creditProviders"),
       {
         configReady: true,
         readyBackends: {
           creditProviders: localOnly
-            ? ["supabase", "postgres", "memory"]
-            : ["supabase", "postgres"],
+            ? ["postgres", "memory"]
+            : ["postgres"],
         },
         structuralBlockers: [],
       },
@@ -1022,14 +1022,21 @@ function isHostedRuntime(): boolean {
   );
 }
 
-function assertHostedApiRuntimeReady(serverSupabaseConfig: ServerSupabaseConfig) {
-  if (!isHostedRuntime()) {
+function assertHostedApiRuntimeReady(
+  serverRuntimeConfig: ServerRuntimeConfig,
+  options: {
+    allowDegradedPersistence: boolean;
+  },
+) {
+  if (!isHostedRuntime() || options.allowDegradedPersistence) {
     return;
   }
 
-  const configSummary = summarizeServerSupabaseConfig(serverSupabaseConfig);
-  if (!configSummary.canonicalPersistenceReady || !configSummary.hasUserApiEncryptionSecret) {
-    throw new Error("Hosted API runtime requires canonical Supabase persistence.");
+  const hasSessionSigningSecret = Boolean(String(process.env.KK_API_SESSION_SIGNING_SECRET || "").trim());
+  if (!hasPostgresConfig() || !serverRuntimeConfig.userApiEncryptionSecret || !hasSessionSigningSecret) {
+    throw new Error(
+      "Hosted API runtime requires PostgreSQL persistence plus USER_API_ENCRYPTION_SECRET and KK_API_SESSION_SIGNING_SECRET.",
+    );
   }
 }
 
@@ -1037,73 +1044,68 @@ function buildApiServer(
   port = Number(process.env.PORT || 3001),
   options: ApiServerOptions = {},
 ) {
-  const serverSupabaseConfig = resolveServerSupabaseConfig();
+  const serverRuntimeConfig = resolveServerRuntimeConfig();
   const serverAdminConfig = resolveServerAdminConfig();
   const serverAdminSummary = summarizeServerAdminConfig(serverAdminConfig);
-  assertHostedApiRuntimeReady(serverSupabaseConfig);
   const kkaiLocalOnly = isKkaiLocalOnlyRuntime();
   const allowDegradedPersistence = options.allowDegradedPersistence ?? (port === 0);
+  assertHostedApiRuntimeReady(serverRuntimeConfig, { allowDegradedPersistence });
   const localOnlyUser = normalizeAuthenticatedRequestContext(options.localOnlyUser);
-  if (!allowDegradedPersistence && !kkaiLocalOnly) {
-    assertServerSupabaseConfigConsistency(serverSupabaseConfig);
-  }
-  const authDataRepository = options.authDataRepository || createAuthDataRepository(serverSupabaseConfig);
+  const authDataRepository = options.authDataRepository || createAuthDataRepository(serverRuntimeConfig);
   const adminConsoleRepository =
-    options.adminConsoleRepository || createAdminConsoleRepository(serverSupabaseConfig);
+    options.adminConsoleRepository || createAdminConsoleRepository(serverRuntimeConfig);
   if (!serverAdminSummary.primaryAdminUserIdConfigured) {
     logStartupMode("warn", "Owner admin identity is not configured. Set KK_PRIMARY_ADMIN_USER_ID to lock the default administrator.", {
       blockers: serverAdminSummary.blockers,
     });
   }
   const creditAccountRepository =
-    options.creditAccountRepository || createCreditAccountRepository(serverSupabaseConfig);
-  const creditExchangeRateRepository = createCreditExchangeRateRepository(serverSupabaseConfig);
-  const creditProviderRepository = createCreditProviderRepository(serverSupabaseConfig);
-  const workspaceLayoutRepository = createWorkspaceLayoutRepository(serverSupabaseConfig);
+    options.creditAccountRepository || createCreditAccountRepository(serverRuntimeConfig);
+  const creditExchangeRateRepository = createCreditExchangeRateRepository(serverRuntimeConfig);
+  const creditProviderRepository = createCreditProviderRepository(serverRuntimeConfig);
+  const workspaceLayoutRepository = createWorkspaceLayoutRepository(serverRuntimeConfig);
+  const browserSessionService = createBrowserSessionService();
   const authService = new AuthService({
     verifyTurnstileToken: options.verifyTurnstileToken || defaultTurnstileVerifier,
+    browserSessionService,
   });
-  const authDataCloudMirror =
-    !kkaiLocalOnly
-    && !serverSupabaseConfig.serviceRoleKey
-    && serverSupabaseConfig.supabaseUrl
-    && serverSupabaseConfig.authKey
-    && serverSupabaseConfig.userApiEncryptionSecret
-      ? new SupabaseUserScopedAuthDataMirror({
-          supabaseUrl: serverSupabaseConfig.supabaseUrl,
-          authKey: serverSupabaseConfig.authKey,
-          storageEncryptionKey: serverSupabaseConfig.userApiEncryptionSecret,
-        })
-      : undefined;
+  const authDataCloudMirror = undefined;
   const authDataService = new AuthDataService(authDataRepository, {
     cloudMirror: authDataCloudMirror,
     localOnly: kkaiLocalOnly,
   });
   const userRouteDiagnosticsService = new UserRouteDiagnosticsService(authDataService);
-  const localSystemProxyService = new LocalSystemProxyService(serverSupabaseConfig);
-  const localUserRouteProxyService = new LocalUserRouteProxyService(authDataService, serverSupabaseConfig);
+  const localUserRouteProxyService = new LocalUserRouteProxyService(authDataService, serverRuntimeConfig);
   const adminConsoleService = new AdminConsoleService(adminConsoleRepository, {
     primaryAdminUserId: serverAdminConfig.primaryAdminUserId,
   });
-    const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
-    const creditAccountService = new CreditAccountService(creditAccountRepository);
-    const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
-    const rechargePaymentChannelConfigService = new RechargePaymentChannelConfigService(
-      createRechargePaymentChannelConfigRepository(),
-    );
-    const staticRechargeService = new StaticRechargeService({
-      submissionRepository: createRechargeSubmissionRepository(),
-      exchangeRateRepository: creditExchangeRateRepository,
-      creditAccountService,
-    });
+  const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
+  const creditAccountService = new CreditAccountService(creditAccountRepository);
+  const localSystemProxyService = new LocalSystemProxyService({
+    creditProviderRepository,
+    creditAccountService,
+    directRouteInvoker: localUserRouteProxyService,
+    taskSigningSecret: serverRuntimeConfig.userApiEncryptionSecret,
+  });
+  const creditExchangeRateService = new CreditExchangeRateService(creditExchangeRateRepository);
+  const rechargePaymentChannelConfigService = new RechargePaymentChannelConfigService(
+    createRechargePaymentChannelConfigRepository(),
+  );
+  const staticRechargeService = new StaticRechargeService({
+    submissionRepository: createRechargeSubmissionRepository(serverRuntimeConfig),
+    exchangeRateRepository: creditExchangeRateRepository,
+    creditAccountService,
+  });
   const requestAuthenticator = options.requestAuthenticator || createRequestAuthenticator({
-    resolveLegacyAccessToken: (accessToken) => {
-      const resolvedOverride = options.resolveAccessToken?.(accessToken);
+    resolveLegacyAccessToken: async (accessToken) => {
+      const resolvedOverride = options.resolveAccessToken
+        ? await options.resolveAccessToken(accessToken)
+        : undefined;
       if (resolvedOverride) {
         return resolvedOverride;
       }
 
-      const profile = authService.resolveAccessToken(accessToken);
+      const profile = await authService.resolveAccessToken(accessToken);
       if (!profile) {
         return undefined;
       }
@@ -1114,12 +1116,6 @@ function buildApiServer(
         role: profile.role,
       };
     },
-    ...(kkaiLocalOnly
-      ? {}
-      : {
-          supabaseUrl: serverSupabaseConfig.supabaseUrl,
-          supabaseAuthKey: serverSupabaseConfig.authKey,
-        }),
   });
   const tempUserRateLimiter = new InMemoryRateLimiter();
   const generationService = new GenerationService(createGenerationTaskRepositoryFromEnv());
@@ -1132,74 +1128,45 @@ function buildApiServer(
     workspaceLayoutRepository,
   );
   const googleAuthService = createGoogleAuthService();
-  const wechatAuthService = createWechatAuthService(serverSupabaseConfig);
+  const wechatAuthService = createWechatAuthService(serverRuntimeConfig);
   const repositoryModes = {
     adminConsole: resolveRepositoryBackend(
       adminConsoleRepository,
       InMemoryAdminConsoleRepository,
-      SupabaseAdminConsoleRepository,
       PostgresAdminConsoleRepository,
     ),
     authData: resolveRepositoryBackend(
       authDataRepository,
       InMemoryAuthDataRepository,
-      SupabaseAuthDataRepository,
       PostgresAuthDataRepository,
       FileBackedAuthDataRepository,
     ),
     creditAccounts: resolveRepositoryBackend(
       creditAccountRepository,
       InMemoryCreditAccountRepository,
-      SupabaseCreditAccountRepository,
       PostgresCreditAccountRepository,
       FileBackedCreditAccountRepository,
     ),
     creditExchangeRates: resolveRepositoryBackend(
       creditExchangeRateRepository,
       InMemoryCreditExchangeRateRepository,
-      SupabaseCreditExchangeRateRepository,
       PostgresCreditExchangeRateRepository,
       FileBackedCreditExchangeRateRepository,
     ),
     creditProviders: resolveRepositoryBackend(
       creditProviderRepository,
       InMemoryCreditProviderRepository,
-      SupabaseCreditProviderRepository,
       PostgresCreditProviderRepository,
     ),
     workspaceLayout: resolveRepositoryBackend(
       workspaceLayoutRepository,
       InMemoryWorkspaceLayoutRepository,
-      SupabaseWorkspaceLayoutRepository,
       PostgresWorkspaceLayoutRepository,
     ),
   } as const;
-  const resolvePersistenceProbe = options.probeServerSupabasePersistence || probeServerSupabasePersistence;
-  let cachedPersistenceProbe: ServerSupabasePersistenceProbe | undefined;
-  let cachedPersistenceProbeAt = 0;
-  let pendingPersistenceProbe: Promise<ServerSupabasePersistenceProbe> | undefined;
-  const persistenceProbeTtlMs = 30_000;
-
-  async function getPersistenceProbe(): Promise<ServerSupabasePersistenceProbe> {
-    const now = Date.now();
-    if (cachedPersistenceProbe && (now - cachedPersistenceProbeAt) < persistenceProbeTtlMs) {
-      return cachedPersistenceProbe;
-    }
-
-    if (!pendingPersistenceProbe) {
-      pendingPersistenceProbe = resolvePersistenceProbe(serverSupabaseConfig)
-        .then((probe) => {
-          cachedPersistenceProbe = probe;
-          cachedPersistenceProbeAt = Date.now();
-          return probe;
-        })
-        .finally(() => {
-          pendingPersistenceProbe = undefined;
-        });
-    }
-
-    return pendingPersistenceProbe;
-  }
+  const browserSessionHealth = {
+    ready: true,
+  } as const;
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -1209,6 +1176,7 @@ function buildApiServer(
       const clientVersion = getClientVersion(req);
       const url = new URL(req.url || "/", "http://localhost");
       const pathname = url.pathname;
+      const requestCookies = parseCookies(req.headers.cookie);
       const userRouteConnectivityMatch = pathname.match(/^\/api\/v1\/profile\/user-routes\/([^/]+)\/connectivity$/);
       const userRoutePricingMatch = pathname.match(/^\/api\/v1\/profile\/user-routes\/([^/]+)\/pricing-sync$/);
 
@@ -1216,13 +1184,16 @@ function buildApiServer(
         const requiredCapability = !allowDegradedPersistence
           ? resolveCriticalPersistenceCapability(pathname, { localOnly: kkaiLocalOnly })
           : undefined;
-        const forceHealthProbe = pathname === "/healthz" && isTruthyValue(url.searchParams.get("probe"));
-        const shouldProbePersistence = forceHealthProbe || Boolean(requiredCapability);
-        const persistenceProbe = shouldProbePersistence
-          ? await getPersistenceProbe()
-          : cachedPersistenceProbe;
-        const runtimePersistenceState = buildRuntimePersistenceState(serverSupabaseConfig, repositoryModes, persistenceProbe, {
+        const probeRequested = isTruthyValue(url.searchParams.get("probe"));
+        const shouldRunPersistenceProbe = !allowDegradedPersistence && (
+          probeRequested || Boolean(requiredCapability && options.probeServerRuntimePersistence)
+        );
+        const persistenceProbe = shouldRunPersistenceProbe
+          ? await (options.probeServerRuntimePersistence || probeServerRuntimePersistence)(serverRuntimeConfig)
+          : undefined;
+        const runtimePersistenceState = buildRuntimePersistenceState(serverRuntimeConfig, repositoryModes, {
           localOnly: kkaiLocalOnly,
+          persistenceProbe,
         });
         const {
           configSummary,
@@ -1233,17 +1204,28 @@ function buildApiServer(
           const overallStatus = Object.values(criticalPersistence).every((state) => state.ready)
             ? "ok"
             : "degraded";
+          const selfHostedCoreReady = browserSessionHealth.ready
+            && (kkaiLocalOnly || (
+              repositoryModes.adminConsole === "postgres"
+              && repositoryModes.authData === "postgres"
+              && repositoryModes.workspaceLayout === "postgres"
+              && criticalPersistence.authData.ready
+            ))
+            && criticalPersistence.guestSessions.ready
+            && criticalPersistence.workspaceLayout.ready;
           writeJson(res, 200, {
             success: true,
             data: {
               service: "kk-studio-api",
               status: overallStatus,
+              selfHostedCoreReady,
               config: configSummary,
               repositories: repositoryModes,
               persistence: {
                 userApiKeys: criticalPersistence.authData.ready,
                 keyManager: criticalPersistence.authData.ready,
                 authData: criticalPersistence.authData.ready,
+                authSessions: browserSessionHealth.ready,
                 tempUsers: criticalPersistence.guestSessions.ready,
                 credits: criticalPersistence.billing.ready,
                 creditProviders: criticalPersistence.creditProviders.ready,
@@ -1355,8 +1337,44 @@ function buildApiServer(
 
         if (req.method === "POST" && pathname === "/api/v1/auth/login") {
           const body = await readJsonBody(req);
-          const result = await handleVersionedLogin(authService, body, requestHeaders, getRequestIp(req));
-          writeJson(res, result.statusCode, result.body);
+          const result = await handleVersionedLogin(
+            authService,
+            body,
+            requestHeaders,
+            getRequestIp(req),
+            getRequestUserAgent(req),
+          );
+          writeJson(res, result.statusCode, result.body, result.headers);
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/auth/session") {
+          const result = await handleGetSession(
+            authService,
+            requestHeaders,
+            requestCookies,
+            getRequestIp(req),
+            getRequestUserAgent(req),
+          );
+          writeJson(res, result.statusCode, result.body, result.headers);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/auth/refresh") {
+          const result = await handleRefreshSession(
+            authService,
+            requestHeaders,
+            requestCookies,
+            getRequestIp(req),
+            getRequestUserAgent(req),
+          );
+          writeJson(res, result.statusCode, result.body, result.headers);
+          return;
+        }
+
+        if (req.method === "POST" && pathname === "/api/v1/auth/logout") {
+          const result = await handleLogoutSession(authService, requestHeaders, requestCookies);
+          writeJson(res, result.statusCode, result.body, result.headers);
           return;
         }
 
@@ -1513,10 +1531,12 @@ function buildApiServer(
         }
 
         if (req.method === "POST" && userRoutePricingMatch) {
+          const body = await readJsonBody(req);
           const result = await handleSyncUserRoutePricing(
             userRouteDiagnosticsService,
             decodeURIComponent(userRoutePricingMatch[1] || ""),
             requestHeaders,
+            body,
           );
           writeJson(res, result.statusCode, result.body);
           return;
@@ -1627,6 +1647,17 @@ function buildApiServer(
             staticRechargeService,
             decodeURIComponent(rechargeProofMatch[1]),
             body,
+            requestHeaders,
+          );
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        const rechargeMarkPaidMatch = pathname.match(/^\/api\/v1\/billing\/recharge-submissions\/([^/]+)\/mark-paid$/);
+        if (req.method === "POST" && rechargeMarkPaidMatch) {
+          const result = await handleMarkRechargeSubmissionPaid(
+            staticRechargeService,
+            decodeURIComponent(rechargeMarkPaidMatch[1]),
             requestHeaders,
           );
           writeJson(res, result.statusCode, result.body);
@@ -1822,6 +1853,15 @@ function buildApiServer(
         if (req.method === "POST" && pathname === "/api/v1/admin/billing/recharges") {
           const body = await readJsonBody(req);
           const result = await handleAdminRechargeCredits(creditAccountService, body, requestHeaders);
+          writeJson(res, result.statusCode, result.body);
+          return;
+        }
+
+        if (req.method === "GET" && pathname === "/api/v1/admin/billing/recharge-submissions") {
+          const result = await handleListAdminRechargeSubmissions(
+            staticRechargeService,
+            requestHeaders,
+          );
           writeJson(res, result.statusCode, result.body);
           return;
         }

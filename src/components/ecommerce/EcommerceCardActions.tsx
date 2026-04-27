@@ -2,10 +2,23 @@ import React from 'react';
 
 import type { EcommerceEditableTaskState, PromptNode } from '../../types';
 
+type EcommerceFrameworkStatus = {
+  activeSheet: string;
+  paused: boolean;
+  queued: number;
+  dispatching: number;
+  running: number;
+  completed: number;
+  failed: number;
+  pausedItems: number;
+  total: number;
+};
+
 interface EcommerceCardActionsProps {
   node: PromptNode;
   taskState?: EcommerceEditableTaskState;
   activeTaskState?: EcommerceEditableTaskState | null;
+  frameworkStatus?: EcommerceFrameworkStatus | null;
   onActivateTask?: (node: PromptNode) => void;
   onTaskStateChange?: (
     taskId: string,
@@ -17,6 +30,10 @@ interface EcommerceCardActionsProps {
   onSetGroupSelection?: (node: PromptNode, selected: boolean) => void;
   onGenerateNode: (node: PromptNode) => void;
   onGenerateGroup: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
+  onGenerateFramework?: (node: PromptNode) => void;
+  onPauseFramework?: (node: PromptNode) => void;
+  onResumeFramework?: (node: PromptNode) => void;
+  onCancelNodeQueue?: (node: PromptNode) => void;
   onConfirmDesktop: (node: PromptNode) => void;
   onGenerateMobile: (node: PromptNode) => void;
 }
@@ -27,12 +44,17 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   node,
   taskState,
   activeTaskState = null,
+  frameworkStatus = null,
   onActivateTask,
   onTaskStateChange,
   onToggleSelected,
   onSetGroupSelection,
   onGenerateNode,
   onGenerateGroup,
+  onGenerateFramework,
+  onPauseFramework,
+  onResumeFramework,
+  onCancelNodeQueue,
   onConfirmDesktop,
   onGenerateMobile,
 }) => {
@@ -40,6 +62,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   if (!ecommerce) return null;
 
   const selected = ecommerce.selectedForGeneration !== false;
+  const isFramework = ecommerce.kind === 'framework';
   const isModule = ecommerce.kind === 'a-plus-module';
   const isGroup = ecommerce.kind === 'a-plus-group';
   const effectiveSizePolicy = ecommerce.effectiveSizePolicy || ecommerce.sizePolicy;
@@ -47,11 +70,6 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   const isDesktopThenMobile = effectiveSizePolicy === 'desktop-then-mobile';
   const desktopReadyToConfirm = ecommerce.desktopStage === 'generated';
   const mobileReady = ecommerce.desktopStage === 'confirmed';
-  const mobileActionLabel = effectiveSizeTier === '1464x600'
-    ? '转 600×450 手机端'
-    : effectiveSizeTier === '600x450'
-      ? '生成 600×450 手机端'
-      : '生成手机端';
   const resolvedTaskState = taskState ?? ecommerce.editableTask;
   const taskIsActive = Boolean(
     resolvedTaskState
@@ -61,6 +79,65 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         || activeTaskState.sourceRowKey === ecommerce.sourceRowKey
       ),
   );
+  const mobileActionLabel = effectiveSizeTier === '1464x600'
+    ? 'Generate mobile'
+    : effectiveSizeTier === '600x450'
+      ? 'Regenerate mobile'
+      : 'Generate mobile';
+
+  if (isFramework) {
+    return (
+      <div className="mt-2 flex flex-col gap-2">
+        {frameworkStatus ? (
+          <div className="flex flex-wrap gap-1 text-[10px] text-[var(--text-secondary)]">
+            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+              {frameworkStatus.paused ? 'Paused' : 'Running'}
+            </span>
+            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+              Queue {frameworkStatus.queued}
+            </span>
+            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+              Active {frameworkStatus.dispatching + frameworkStatus.running}
+            </span>
+            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+              Done {frameworkStatus.completed}
+            </span>
+            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+              Failed {frameworkStatus.failed}
+            </span>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={actionClass}
+            style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onGenerateFramework?.(node);
+            }}
+          >
+            Start queue
+          </button>
+          <button
+            type="button"
+            className={actionClass}
+            style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (frameworkStatus?.paused) {
+                onResumeFramework?.(node);
+              } else {
+                onPauseFramework?.(node);
+              }
+            }}
+          >
+            {frameworkStatus?.paused ? 'Resume' : 'Pause'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -78,7 +155,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onToggleSelected(node, !selected);
           }}
         >
-          {selected ? '取消确认' : '确认生成'}
+          {selected ? 'Skip' : 'Include'}
         </button>
       ) : null}
 
@@ -97,7 +174,21 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onTaskStateChange(resolvedTaskState.taskId, (previous) => ({ ...previous }));
           }}
         >
-          {taskIsActive ? '编辑中' : '编辑任务'}
+          {taskIsActive ? 'Editing' : 'Edit task'}
+        </button>
+      ) : null}
+
+      {!isGroup && onCancelNodeQueue ? (
+        <button
+          type="button"
+          className={actionClass}
+          style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCancelNodeQueue(node);
+          }}
+        >
+          Cancel queued
         </button>
       ) : null}
 
@@ -111,7 +202,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onGenerateNode(node);
           }}
         >
-          生成主图
+          Generate
         </button>
       ) : null}
 
@@ -128,7 +219,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onSetGroupSelection(node, true);
                 }}
               >
-                全选此组
+                Select all
               </button>
               <button
                 type="button"
@@ -139,11 +230,11 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onSetGroupSelection(node, false);
                 }}
               >
-                全不选
+                Clear all
               </button>
             </>
           ) : null}
-          {ecommerce.sourceSheet === '主图' ? (
+          {ecommerce.sourceRowKey === 'main-group' ? (
             <button
               type="button"
               className={actionClass}
@@ -153,32 +244,32 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                 onGenerateGroup(node, 'desktop');
               }}
             >
-              批量生成主图
+              Queue main cards
             </button>
           ) : (
             <>
-            <button
-              type="button"
-              className={actionClass}
-              style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
-              onClick={(event) => {
-                event.stopPropagation();
-                onGenerateGroup(node, 'desktop');
-              }}
-            >
-              批量生成桌面端
-            </button>
-            <button
-              type="button"
-              className={actionClass}
-              style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
-              onClick={(event) => {
-                event.stopPropagation();
-                onGenerateGroup(node, 'mobile');
-              }}
-            >
-              批量生成手机端
-            </button>
+              <button
+                type="button"
+                className={actionClass}
+                style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onGenerateGroup(node, 'desktop');
+                }}
+              >
+                Queue desktop
+              </button>
+              <button
+                type="button"
+                className={actionClass}
+                style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onGenerateGroup(node, 'mobile');
+                }}
+              >
+                Queue mobile
+              </button>
             </>
           )}
         </>
@@ -195,7 +286,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               onGenerateNode(node);
             }}
           >
-            {isDesktopThenMobile ? '生成桌面端' : '生成模块图'}
+            {isDesktopThenMobile ? 'Generate desktop' : 'Generate'}
           </button>
           {isDesktopThenMobile ? (
             <>
@@ -209,7 +300,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onConfirmDesktop(node);
                 }}
               >
-                确认桌面版
+                Confirm desktop
               </button>
               <button
                 type="button"

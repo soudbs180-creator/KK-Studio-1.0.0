@@ -2,40 +2,36 @@
 setlocal
 
 echo ========================================
-echo KK Studio Database Setup (Supabase CLI)
+echo KK Studio Database Setup (VPS PostgreSQL)
 echo ========================================
 echo.
 
-if "%SUPABASE_PROJECT_REF%"=="" (
-  set "SUPABASE_PROJECT_REF=YOUR_PROJECT_REF"
-)
-
-echo [1/4] Checking Supabase login...
-npx supabase projects list >nul 2>&1
-if %errorlevel% neq 0 (
-  echo Supabase CLI is not logged in.
-  echo Run: npx supabase login
+if "%DATABASE_URL%"=="" (
+  echo DATABASE_URL is required.
+  echo Example: set DATABASE_URL=postgres://kk:password@127.0.0.1:5432/kkstudio
   exit /b 1
 )
 
-echo [2/4] Linking project...
-npx supabase link --project-ref %SUPABASE_PROJECT_REF%
-if %errorlevel% neq 0 (
-  echo Failed to link project. Check SUPABASE_PROJECT_REF.
+set "BOOTSTRAP_SQL=scripts\postgres\bootstrap-kk-vps.sql"
+if not exist "%BOOTSTRAP_SQL%" (
+  echo Missing bootstrap SQL: %BOOTSTRAP_SQL%
   exit /b 1
 )
 
-echo [3/4] Pushing migrations...
-npx supabase db push
+echo [1/2] Checking psql...
+where psql >nul 2>&1
 if %errorlevel% neq 0 (
-  echo Failed to push migrations.
+  echo psql was not found in PATH. Install PostgreSQL client tools on this machine or run the SQL on the VPS.
   exit /b 1
 )
 
-echo [4/4] Checking status...
-npx supabase status
+echo [2/2] Applying VPS PostgreSQL bootstrap...
+psql "%DATABASE_URL%" -v ON_ERROR_STOP=1 -f "%BOOTSTRAP_SQL%"
+if %errorlevel% neq 0 (
+  echo Failed to apply bootstrap SQL.
+  exit /b 1
+)
 
 echo.
 echo Done.
-echo Dashboard: https://app.supabase.com/project/%SUPABASE_PROJECT_REF%/editor
 endlocal

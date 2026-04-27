@@ -7,7 +7,7 @@ import {
 } from "../../packages/shared/src/index.ts";
 import { AuthDataService } from "../../apps/api/src/modules/auth/application/auth-data-service.ts";
 import { InMemoryAuthDataRepository } from "../../apps/api/src/modules/auth/infrastructure/in-memory-auth-data-repository.ts";
-import type { UserScopedAuthDataMirror } from "../../apps/api/src/modules/auth/infrastructure/supabase-user-scoped-auth-data-mirror.ts";
+import type { UserScopedAuthDataMirror } from "../../apps/api/src/modules/auth/infrastructure/user-scoped-auth-data-mirror.ts";
 import {
   handleCreateTempUser,
   handleGetKeyManagerCloudState,

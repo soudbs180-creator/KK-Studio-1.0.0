@@ -715,8 +715,8 @@ async function buildInvocationError(
   let message = error?.message || 'System proxy invocation failed';
   if (status === 401) {
     // A proxy-side 401 does not always mean the local KK session is gone.
-    // It can also happen when the Edge Function deployment/config drifts from the
-    // frontend auth project. Keep the local session intact here so users see a
+    // It can also happen when the VPS API session or provider route config drifts
+    // from the current browser session. Keep the local session intact here so users see a
     // recoverable auth error instead of being force-signed-out mid-generation.
     return buildSessionReauthError(feature, responseBody, 'system');
   } else if (status === 403) {

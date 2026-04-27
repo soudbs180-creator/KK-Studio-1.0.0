@@ -107,16 +107,27 @@ test('prompt bar keeps the textarea transparent while reserving the frosted foot
 });
 
 test('prompt bar keeps a real frosted shell while desktop options stay inside the composer surface', () => {
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+  const videoOptionsSource = readSource('src/components/video/VideoOptionsPanel.tsx');
   const cssSource = readSource('src/index.css');
 
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*backdrop-filter: blur\(22px\) saturate\(160%\);/);
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*-webkit-backdrop-filter: blur\(22px\) saturate\(160%\);/);
+  assert.match(promptBarSource, /config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT \|\| config\.mode === GenerationMode\.ECOMMERCE/);
+  assert.match(promptBarSource, /<ImageOptionsPanel[\s\S]*<VideoOptionsPanel/);
   assert.match(modePanelSource, /const DESKTOP_PANEL_EXIT_MS = 180;/);
   assert.match(modePanelSource, /const \[isDesktopPanelVisible, setIsDesktopPanelVisible\] = useState\(showOptionsPanel\);/);
   assert.match(modePanelSource, /const \[isDesktopPanelClosing, setIsDesktopPanelClosing\] = useState\(false\);/);
   assert.match(modePanelSource, /bottom:\s*'calc\(100% - 4px\)'/);
   assert.match(modePanelSource, /animate-fadeOut/);
+  assert.match(modePanelSource, /<div ref=\{optionsPanelRef\}>\s*\{optionsPanelContent\}\s*<\/div>/);
+  assert.doesNotMatch(modePanelSource, /className="rounded-\[26px\] border p-2 shadow-2xl"/);
+  assert.doesNotMatch(imageOptionsSource, /const SECTION_STYLE/);
+  assert.doesNotMatch(imageOptionsSource, /rounded-2xl border p-3/);
+  assert.match(videoOptionsSource, /className="mb-4 last:mb-0"/);
+  assert.doesNotMatch(videoOptionsSource, /rounded-2xl border p-3/);
   assert.doesNotMatch(modePanelSource, /createPortal/);
 });
 

@@ -110,6 +110,10 @@ export interface UserRoutePricingSyncDto {
   groupRatio: Record<string, number>;
 }
 
+export interface UserRoutePricingSyncRequestDto {
+  endpointUrl?: string;
+}
+
 export interface KeyManagerCloudStateDto {
   version: number;
   slots: KeyManagerCloudRecordDto[];
@@ -134,20 +138,16 @@ export interface TempUserSessionDto {
 
 export interface LoginResponseDto {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   expiresIn: number;
+  sessionExpiresAt?: string;
   profile: ProfileDto;
 }
 
-export interface AuthSessionDto {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  profile: ProfileDto;
-}
+export type AuthSessionDto = LoginResponseDto;
 
 export interface RefreshSessionRequestDto {
-  refreshToken: string;
+  refreshToken?: string;
 }
 
 export interface LogoutResponseDto {

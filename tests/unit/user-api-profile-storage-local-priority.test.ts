@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { supabase } from '../../src/lib/supabase.ts';
 import { setStoredKkApiAccessToken } from '../../src/services/api/authAccessToken.ts';
 import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import {
+  clearPersistedRuntimeAuthState,
+  persistRuntimeAuthState,
+} from '../../src/services/auth/runtimeAuthState.ts';
 import {
   loadUserApiEntries,
   saveUserApiEntries,
 } from '../../src/services/api/userApiProfileStorage.ts';
 
-const originalGetSession = supabase.auth.getSession;
-const originalGetUser = supabase.auth.getUser;
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
@@ -20,6 +21,31 @@ const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
 const locationLike = globalThis as { location?: { origin?: string } };
 const originalLocation = locationLike.location;
+
+function createRuntimeUser() {
+  return {
+    id: 'user-1',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'user-1@example.com',
+    phone: '',
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+    confirmed_at: '1970-01-01T00:00:00.000Z',
+    last_sign_in_at: '1970-01-01T00:00:00.000Z',
+    app_metadata: {
+      provider: 'password',
+      providers: ['password'],
+    },
+    user_metadata: {
+      provider: 'password',
+      auth_provider: 'password',
+      providers: ['password'],
+      full_name: 'User One',
+      display_name: 'User One',
+    },
+  };
+}
 
 function createEntry(id: string, overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -55,29 +81,15 @@ function setLocalRuntime() {
 }
 
 function mockAuthenticatedUser() {
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: null,
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
-
-  supabase.auth.getUser = async () =>
-    ({
-      data: {
-        user: {
-          id: 'user-1',
-          email: 'user-1@example.com',
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetUser>>;
+  persistRuntimeAuthState({
+    user: createRuntimeUser(),
+    isTempUser: false,
+    tempUserExpiry: null,
+  });
 }
 
 afterEach(() => {
-  supabase.auth.getSession = originalGetSession;
-  supabase.auth.getUser = originalGetUser;
+  clearPersistedRuntimeAuthState();
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
   legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;

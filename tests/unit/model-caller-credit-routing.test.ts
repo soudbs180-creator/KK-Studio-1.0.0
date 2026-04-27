@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('credit model calls stay on the Supabase secure proxy path and never fall back to local billing writes', () => {
+test('credit model calls stay on the VPS system proxy path and never fall back to browser billing writes', () => {
   const source = readSource('src/services/model/modelCaller.ts');
 
   assert.doesNotMatch(source, /legacyWebApiClient/);

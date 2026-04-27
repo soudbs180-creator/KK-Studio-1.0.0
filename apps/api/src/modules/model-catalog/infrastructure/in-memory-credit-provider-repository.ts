@@ -39,6 +39,23 @@ interface StoredCreditProviderRecord {
   models: StoredCreditProviderModelRecord[];
 }
 
+export interface ActiveCreditModelRuntimeRoute {
+  providerId: string;
+  providerName: string;
+  baseUrl: string;
+  apiKeys: string[];
+  modelId: string;
+  displayName: string;
+  endpointType: string;
+  creditCost: number;
+  priority: number;
+  weight: number;
+  callCount: number;
+  advancedEnabled: boolean;
+  mixWithSameModel: boolean;
+  qualityPricing?: Record<string, { enabled: boolean; creditCost: number }>;
+}
+
 interface StoredProviderPricingCacheRecord {
   providerId: string;
   pricing: ProviderPricingCacheItemDto[];
@@ -55,6 +72,7 @@ export interface SavedCreditProviderRecord {
 export interface CreditProviderRepository {
   listAdminProviders(): Promise<AdminCreditProviderDto[]>;
   listActiveCreditModels(): Promise<ActiveCreditModelProviderDto[]>;
+  listActiveRuntimeRoutes(modelId?: string): Promise<ActiveCreditModelRuntimeRoute[]>;
   saveAdminProvider(
     providerId: string,
     input: SaveAdminCreditProviderRequestDto,
@@ -229,6 +247,31 @@ export class InMemoryCreditProviderRepository implements CreditProviderRepositor
           .map((model) => toActiveModelDto(model)),
       }))
       .filter((provider) => provider.models.length > 0);
+  }
+
+  async listActiveRuntimeRoutes(modelId?: string): Promise<ActiveCreditModelRuntimeRoute[]> {
+    const normalizedModelId = String(modelId || "").trim();
+    return Array.from(this.providers.values()).flatMap((provider) =>
+      provider.models
+        .filter((model) => model.isActive)
+        .filter((model) => !normalizedModelId || model.modelId === normalizedModelId)
+        .map((model) => ({
+          providerId: provider.providerId,
+          providerName: provider.providerName,
+          baseUrl: provider.baseUrl,
+          apiKeys: [...provider.apiKeys],
+          modelId: model.modelId,
+          displayName: model.displayName,
+          endpointType: model.endpointType,
+          creditCost: model.creditCost,
+          priority: model.priority,
+          weight: model.weight,
+          callCount: model.callCount,
+          advancedEnabled: model.advancedEnabled,
+          mixWithSameModel: model.mixWithSameModel,
+          qualityPricing: cloneQualityPricing(model.qualityPricing),
+        }))
+    );
   }
 
   async saveAdminProvider(

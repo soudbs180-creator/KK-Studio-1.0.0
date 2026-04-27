@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import authPasswordLoginHandler from '../../api/auth-password-login.ts';
 import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from '../../src/services/api/authAccessToken.ts';
 import { kkWebApiClient } from '../../src/services/api/kkApiClient.ts';
 import {
@@ -57,12 +56,17 @@ describe('password sign-in fallback', () => {
       success: true,
       data: {
         accessToken: 'access-token-1',
-        refreshToken: 'refresh-token-1',
+        expiresIn: 3600,
+        sessionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         profile: {
           id: 'user-1',
           email: 'user@example.com',
           nickname: 'User One',
           avatarUrl: '',
+          role: 'user',
+          status: 'active',
+          createdAt: new Date(0).toISOString(),
+          updatedAt: new Date(0).toISOString(),
         },
       },
       meta: {
@@ -103,112 +107,5 @@ describe('password sign-in fallback', () => {
 
     assert.equal(result.usedProxy, false);
     assert.match(result.error?.message || '', /Invalid login credentials/);
-  });
-});
-
-describe('auth password login edge handler', () => {
-  const originalFetch = globalThis.fetch;
-  const originalSupabaseUrl = process.env.SUPABASE_URL;
-  const originalSupabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-  beforeEach(() => {
-    globalThis.fetch = originalFetch;
-    if (typeof originalSupabaseUrl === 'string') {
-      process.env.SUPABASE_URL = originalSupabaseUrl;
-    } else {
-      delete process.env.SUPABASE_URL;
-    }
-    if (typeof originalSupabaseAnonKey === 'string') {
-      process.env.SUPABASE_ANON_KEY = originalSupabaseAnonKey;
-    } else {
-      delete process.env.SUPABASE_ANON_KEY;
-    }
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-    if (typeof originalSupabaseUrl === 'string') {
-      process.env.SUPABASE_URL = originalSupabaseUrl;
-    } else {
-      delete process.env.SUPABASE_URL;
-    }
-    if (typeof originalSupabaseAnonKey === 'string') {
-      process.env.SUPABASE_ANON_KEY = originalSupabaseAnonKey;
-    } else {
-      delete process.env.SUPABASE_ANON_KEY;
-    }
-  });
-
-  test('forwards the password sign-in payload to Supabase auth', async () => {
-    process.env.SUPABASE_URL = 'https://project-ref.supabase.co';
-    process.env.SUPABASE_ANON_KEY = 'anon-key-123';
-
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      assert.equal(String(input), 'https://project-ref.supabase.co/auth/v1/token?grant_type=password');
-      assert.equal(init?.method, 'POST');
-
-      const headers = new Headers(init?.headers);
-      assert.equal(headers.get('apikey'), 'anon-key-123');
-      assert.equal(headers.get('authorization'), 'Bearer anon-key-123');
-
-      const payload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
-      assert.deepEqual(payload, {
-        email: 'user@example.com',
-        password: 'secret-123',
-        gotrue_meta_security: {
-          captcha_token: 'turnstile-token',
-        },
-      });
-
-      return new Response(JSON.stringify({
-        access_token: 'access-token-1',
-        refresh_token: 'refresh-token-1',
-      }), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-        },
-      });
-    };
-
-    const response = await authPasswordLoginHandler(new Request('https://kkai.plus/api/auth-password-login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: 'user@example.com',
-        password: 'secret-123',
-        captchaToken: 'turnstile-token',
-      }),
-    }));
-
-    assert.equal(response.status, 200);
-    const payload = await response.json() as Record<string, string>;
-    assert.equal(payload.access_token, 'access-token-1');
-    assert.equal(payload.refresh_token, 'refresh-token-1');
-  });
-
-  test('rejects browser requests from third-party origins', async () => {
-    process.env.SUPABASE_URL = 'https://project-ref.supabase.co';
-    process.env.SUPABASE_ANON_KEY = 'anon-key-123';
-
-    globalThis.fetch = async () => {
-      assert.fail('upstream fetch should not run for disallowed origins');
-    };
-
-    const response = await authPasswordLoginHandler(new Request('https://kkai.plus/api/auth-password-login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: 'https://evil.example.com',
-      },
-      body: JSON.stringify({
-        email: 'user@example.com',
-        password: 'secret-123',
-      }),
-    }));
-
-    assert.equal(response.status, 403);
   });
 });

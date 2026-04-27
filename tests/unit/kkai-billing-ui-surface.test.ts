@@ -12,6 +12,9 @@ function readSource(relativePath: string): string {
 
 test('KKAI keeps billing surfaces feature-gated and restores the desktop assistant trigger', () => {
   const appSource = readSource('src/App.tsx');
+  const desktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
+  const mobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const globalModalsSource = readSource('src/app/AppGlobalModals.tsx');
   const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
@@ -20,13 +23,20 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   const localizedSettingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(appSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
-  assert.match(appSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('billing'\) : undefined\}/);
-  assert.match(appSource, /onRechargeClick=\{billingUiEnabled \? \(\) => setShowRechargeModal\(true\) : undefined\}/);
-  assert.match(appSource, /\{!isMobile && billingUiEnabled && \(/);
-  assert.match(appSource, /\{billingUiEnabled && showRechargeModal && \(/);
-  assert.match(appSource, /id="chat-trigger-button"/);
-  assert.doesNotMatch(appSource, /\{false\s*\?\s*\(\s*<div[\s\S]*id="chat-trigger-button"/);
-  assert.doesNotMatch(appSource, /\{false\s*&&\s*<div[\s\S]*id="chat-trigger-button"/);
+  assert.match(appSource, /<AppDesktopChrome[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
+  assert.match(appSource, /<AppMobileWorkspace[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
+  assert.match(appSource, /rechargeModal:\s*\{\s*enabled:\s*billingUiEnabled,\s*isOpen:\s*showRechargeModal,/);
+
+  assert.match(desktopChromeSource, /\{billingUiEnabled && \(/);
+  assert.match(desktopChromeSource, /onOpenProfile\('billing'\)/);
+  assert.match(desktopChromeSource, /onClick=\{onRecharge\}/);
+  assert.match(desktopChromeSource, /id="chat-trigger-button"/);
+  assert.doesNotMatch(desktopChromeSource, /\{false\s*\?\s*\(\s*<div[\s\S]*id="chat-trigger-button"/);
+  assert.doesNotMatch(desktopChromeSource, /\{false\s*&&\s*<div[\s\S]*id="chat-trigger-button"/);
+
+  assert.match(mobileWorkspaceSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('billing'\) : undefined\}/);
+  assert.match(mobileWorkspaceSource, /onRechargeClick=\{billingUiEnabled \? onShowRecharge : undefined\}/);
+  assert.match(globalModalsSource, /rechargeModal\.enabled && rechargeModal\.isOpen/);
 
   assert.match(chatSidebarSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(chatSidebarSource, /const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;/);
@@ -50,4 +60,27 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(settingsPanelSource, /export type \{ SettingsViewId \} from '\.\/settingsRegistry';/);
   assert.doesNotMatch(settingsPanelSource, /lazy\(\(\) => import\('\.\/views\/DashboardView\.localized\.tsx'\)\)/);
   assert.doesNotMatch(localizedSettingsPanelSource, /CostEstimation embedded/);
+});
+
+test('manual recharge UI exposes reserved dynamic channels and admin paid-order handling surface', () => {
+  const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
+  const floatingPanelSource = readSource('src/components/admin/AdminRechargeFloatingPanel.tsx');
+  const authenticatedShellSource = readSource('src/app/AuthenticatedAppShell.tsx');
+
+  assert.match(rechargeModalSource, /支付宝动态码/);
+  assert.match(rechargeModalSource, /微信动态码/);
+  assert.match(rechargeModalSource, /国际支付/);
+  assert.match(rechargeModalSource, /人工充值/);
+  assert.match(rechargeModalSource, /当前渠道未配置，请使用人工充值或联系客服/);
+  assert.match(rechargeModalSource, /我已支付/);
+  assert.match(rechargeModalSource, /人工充值较慢，请等待 1-5 分钟/);
+  assert.match(rechargeModalSource, /支付成功但积分未到账，请联系客服处理/);
+  assert.match(rechargeModalSource, /markRechargeSubmissionPaid/);
+
+  assert.match(floatingPanelSource, /useAdminRole/);
+  assert.match(floatingPanelSource, /paymentMarkedAt/);
+  assert.match(floatingPanelSource, /直接处理/);
+  assert.match(floatingPanelSource, /进入处理/);
+  assert.match(floatingPanelSource, /slice\(0,\s*10\)/);
+  assert.match(authenticatedShellSource, /AdminRechargeFloatingPanel/);
 });

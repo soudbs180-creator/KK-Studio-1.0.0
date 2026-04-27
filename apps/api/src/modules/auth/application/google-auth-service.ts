@@ -118,13 +118,16 @@ export class GoogleAuthService {
       };
     }
 
-    const session = authService.issueLoginSession(email);
+    const session = await authService.issueLoginSession(email);
     const redirectTo = new URL(state.redirectTo);
-    redirectTo.hash = new URLSearchParams({
+    const redirectHash = new URLSearchParams({
       access_token: session.accessToken,
-      refresh_token: session.refreshToken,
       provider: "google",
-    }).toString();
+    });
+    if (typeof session.refreshToken === "string") {
+      redirectHash.set("refresh_token", session.refreshToken);
+    }
+    redirectTo.hash = redirectHash.toString();
 
     return {
       redirectTo: redirectTo.toString(),

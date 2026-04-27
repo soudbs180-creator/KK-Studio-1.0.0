@@ -6,6 +6,7 @@ import AdminProvidersPage from '../pages/AdminProvidersPage';
 import AdminDashboardPage from '../pages/AdminDashboardPage';
 import ExchangeRatesPage from '../pages/ExchangeRatesPage';
 import AdminLoginPage from '../pages/AdminLoginPage';
+import RechargeSubmissionsPage from '../pages/RechargeSubmissionsPage';
 import UserCreditsPage from '../pages/UserCreditsPage';
 import { RequireAdminRoute } from './RequireAdminRoute';
 
@@ -19,6 +20,7 @@ export default function AdminRouter() {
             <Route path="/" element={<AdminDashboardPage />} />
             <Route path="/exchange-rates" element={<ExchangeRatesPage />} />
             <Route path="/providers" element={<AdminProvidersPage />} />
+            <Route path="/recharge-submissions" element={<RechargeSubmissionsPage />} />
             <Route path="/users/credits" element={<UserCreditsPage />} />
           </Route>
         </Route>

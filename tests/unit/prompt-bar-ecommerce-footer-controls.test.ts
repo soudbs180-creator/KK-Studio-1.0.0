@@ -24,26 +24,41 @@ test('prompt bar ecommerce footer keeps ecommerce state inside the shared mode p
   assert.match(promptBarSource, /onActiveEcommerceSheetChange=\{config\.mode === GenerationMode\.ECOMMERCE \? onActivateEcommerceGroupSheet : undefined\}/);
 
   assert.match(imageOptionsPanelSource, /const isEcommercePanel = !!ecommerceSheetSettings && !!onUpdateEcommerceSheetSetting;/);
-  assert.match(imageOptionsPanelSource, /const resolvedEcommerceSheet: EcommerceGroupSheet = activeEcommerceSheet \?\? '主图';/);
+  assert.match(imageOptionsPanelSource, /const resolvedEcommerceSheet: EcommerceGroupSheet = activeEcommerceSheet \?\? /);
   assert.match(typesSource, /export type EcommerceAPlusControlMode = 'auto' \| '1464x600' \| '970x600' \| '600x450';/);
   assert.match(imageOptionsPanelSource, /const isAPlusControlSheet = isEcommercePanel && resolvedEcommerceSheet === 'A\+';/);
-  assert.match(imageOptionsPanelSource, /A\+ 尺寸档位/);
-  assert.match(imageOptionsPanelSource, /自动/);
+  assert.match(imageOptionsPanelSource, /const aPlusControlModeLabels: Record<EcommerceAPlusControlMode, string> = \{/);
+  assert.match(imageOptionsPanelSource, /auto:/);
   assert.match(imageOptionsPanelSource, /1464x600/);
   assert.match(imageOptionsPanelSource, /970x600/);
   assert.match(imageOptionsPanelSource, /600x450/);
-  assert.match(imageOptionsPanelSource, /主图比例/);
-  assert.match(imageOptionsPanelSource, /A\+ 不再手动选择比例|A\+ 生成比例由尺寸档位和提示词控制/);
+  assert.match(imageOptionsPanelSource, /onUpdateEcommerceSheetSetting\('A\+', \{ aPlusControlMode: mode \}\)/);
+  assert.match(imageOptionsPanelSource, /const ecommerceDisplaySizes = useMemo/);
+  assert.match(imageOptionsPanelSource, /ImageSize\.SIZE_4K/);
+  assert.doesNotMatch(imageOptionsPanelSource, /A\+ 生成比例/);
+  assert.doesNotMatch(imageOptionsPanelSource, /fallback to 970x600/i);
+  assert.match(promptBarSource, /return ecommerceAspectContext\.allowedAspectRatios;/);
+  assert.match(promptBarSource, /config\.mode === GenerationMode\.ECOMMERCE && !baseSizes\.includes\(ImageSize\.SIZE_4K\)/);
+  assert.match(promptBarSource, /availableRatios\.includes\(prev\.aspectRatio\)/);
+  assert.match(promptBarSource, /availableSizes\.includes\(prev\.imageSize\)/);
+  assert.match(imageOptionsPanelSource, /resolvedEcommerceSheet === sheet \? ACTIVE_BUTTON_STYLE : INACTIVE_BUTTON_STYLE/);
 });
 
 test('app forwards ecommerce sheet settings and the ecommerce confirm label into prompt bar surfaces', () => {
   const appSource = readSource('src/App.tsx');
+  const appPromptComposerSource = readSource('src/app/AppPromptComposer.tsx');
+  const promptBarHookSource = readSource('src/app/useAppPromptBarProps.ts');
 
   assert.match(
-    appSource,
-    /const PromptBarCompat = PromptBar as React\.ComponentType<React\.ComponentProps<typeof PromptBar> & \{\s*ecommerceSheetSettings\?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;\s*onUpdateEcommerceSheetSetting\?: \(sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch\) => void;\s*sendLabel\?: string;\s*\}>;/s,
+    appPromptComposerSource,
+    /export type AppPromptBarProps = React\.ComponentProps<typeof PromptBar> & \{\s*ecommerceSheetSettings\?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;\s*onUpdateEcommerceSheetSetting\?: \(sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch\) => void;\s*sendLabel\?: string;\s*\};/s,
   );
-  assert.match(appSource, /ecommerceSheetSettings=\{ecommerceState\.sheetSettings\}/);
-  assert.match(appSource, /onUpdateEcommerceSheetSetting=\{handleUpdateEcommerceSheetSetting\}/);
-  assert.match(appSource, /sendLabel=\{config\.mode === GenerationMode\.ECOMMERCE \? '确认' : '发送'\}/);
+  assert.match(appPromptComposerSource, /const PromptBarCompat = PromptBar as React\.ComponentType<AppPromptBarProps>;/);
+  assert.match(appSource, /const \{\s*mobilePromptBarProps,\s*desktopPromptBarProps,\s*\} = useAppPromptBarProps\(\{/s);
+  assert.match(appSource, /aspectRatio: AspectRatio\.AUTO,\s*imageSize: preferredImageSize,/s);
+  assert.match(appSource, /'A\+': \{\s*aspectRatio: AspectRatio\.LANDSCAPE_16_9,\s*imageSize: ImageSize\.SIZE_4K,/s);
+  assert.match(appSource, /sheet === 'A\+'\s*\?\s*\{ \.\.\.mergedSetting, imageSize: ImageSize\.SIZE_4K \}/);
+  assert.match(promptBarHookSource, /ecommerceSheetSettings: ecommerceState\.sheetSettings,/);
+  assert.match(promptBarHookSource, /onUpdateEcommerceSheetSetting,/);
+  assert.match(promptBarHookSource, /sendLabel: config\.mode === GenerationMode\.ECOMMERCE \?/);
 });

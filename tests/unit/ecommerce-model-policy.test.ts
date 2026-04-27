@@ -28,7 +28,7 @@ describe('ecommerce model policy', () => {
     assert.equal(isEcommerceAllowedModel('imagen-4.0-generate-001'), false);
   });
 
-  test('uses a constrained aspect policy for main-image requirements', () => {
+  test('uses auto as the default constrained aspect policy for main-image requirements', () => {
     const policy = resolveEcommerceAspectPolicy({
       kind: 'main-image',
       modelId: 'gemini-3.1-flash-image-preview',
@@ -36,14 +36,14 @@ describe('ecommerce model policy', () => {
 
     assert.equal(policy.sizePolicy, 'main-default');
     assert.equal(policy.sizeTier, undefined);
-    assert.equal(policy.defaultAspectRatio, '1:1');
-    assert.deepEqual(policy.allowedAspectRatios, ['1:1', '3:4']);
+    assert.equal(policy.defaultAspectRatio, 'auto');
+    assert.deepEqual(policy.allowedAspectRatios, ['auto', '1:1', '3:4']);
     assert.equal(policy.mobileAspectRatio, undefined);
   });
 
   test('classifies declared A+ business size tiers before ratio inference', () => {
     assert.equal(classifyEcommerceAPlusSizeTier('1464*600'), '1464x600');
-    assert.equal(classifyEcommerceAPlusSizeTier('1460×600'), '1464x600');
+    assert.equal(classifyEcommerceAPlusSizeTier('1460\u00d7600'), '1464x600');
     assert.equal(classifyEcommerceAPlusSizeTier('970 x 600'), '970x600');
     assert.equal(classifyEcommerceAPlusSizeTier('600*450'), '600x450');
     assert.equal(classifyEcommerceAPlusSizeTier('1200*628'), 'unknown');
@@ -161,9 +161,9 @@ describe('ecommerce model policy', () => {
     assert.deepEqual(
       resolveEcommercePromptBarAspectContext({}),
       {
-        activeSheet: 'ä¸»å›¾',
-        allowedAspectRatios: ['1:1', '3:4'],
-        defaultAspectRatio: '1:1',
+        activeSheet: '\u4e3b\u56fe',
+        allowedAspectRatios: ['auto', '1:1', '3:4'],
+        defaultAspectRatio: 'auto',
       },
     );
   });
@@ -184,6 +184,25 @@ describe('ecommerce model policy', () => {
         activeSheet: 'A+',
         allowedAspectRatios: ['16:9'],
         defaultAspectRatio: '16:9',
+      },
+    );
+  });
+
+  test('keeps all main-image ecommerce ratios visible when the sheet default is auto', () => {
+    assert.deepEqual(
+      resolveEcommercePromptBarAspectContext({
+        activeSheet: '\u4e3b\u56fe',
+        sheetSettings: {
+          '\u4e3b\u56fe': {
+            aspectRatio: 'auto',
+            aPlusControlMode: 'auto',
+          },
+        },
+      }),
+      {
+        activeSheet: '\u4e3b\u56fe',
+        allowedAspectRatios: ['auto', '1:1', '3:4'],
+        defaultAspectRatio: 'auto',
       },
     );
   });

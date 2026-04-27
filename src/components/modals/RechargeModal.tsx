@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CreditCard, Loader2, Receipt, ShieldCheck, Wallet, X, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, Loader2, QrCode, X } from 'lucide-react';
 
 import alipayIcon from '../../assets/payment/alipay.png';
 import cardIcon from '../../assets/payment/card.png';
 import wechatIcon from '../../assets/payment/wechat.png';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
-import { useLocale } from '../../context/LocaleContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
   DEFAULT_CREDIT_EXCHANGE_RATES,
@@ -18,17 +17,18 @@ import {
   buildRechargeSubmissionRequestId,
   createRechargeBill,
   getRechargeSubmissionErrorMessage,
-  getRechargeSubmissionStatusLabel,
   listRechargePaymentChannels,
+  markRechargeSubmissionPaid,
   normalizeRechargeBillSnapshot,
-  sanitizeTransferReferenceLast4,
   submitRechargeProof,
   type RechargeBillSnapshot,
   type RechargePaymentChannelConfig,
-  type RechargeSubmissionChannel,
 } from '../../services/billing/rechargeSubmissionService';
 import { notify } from '../../services/system/notificationService';
 import { localizeUserFacingText } from '../../utils/localeText';
+
+type ReservedChannel = 'dynamic-alipay' | 'dynamic-wechat' | 'international' | 'manual';
+type ManualProvider = 'alipay' | 'wechat';
 
 const INITIAL_RATE_MAP: Record<SupportedRechargeCurrency, CreditExchangeRate> = {
   CNY: { ...DEFAULT_CREDIT_EXCHANGE_RATES.CNY },
@@ -38,323 +38,106 @@ const INITIAL_RATE_MAP: Record<SupportedRechargeCurrency, CreditExchangeRate> = 
 const FALLBACK_CHANNELS: RechargePaymentChannelConfig[] = [
   {
     channel: 'alipay',
-    label: '支付宝',
-    instructionText: '使用支付宝静态收款码完成转账后，再提交账单编号和流水尾号。',
+    label: '支付宝静态码',
+    instructionText: '人工充值较慢，请等待 1-5 分钟。',
     isActive: true,
-    qrDisplay: {
-      title: '支付宝静态码',
-      helperText: '若管理员暂未上传图片，请联系管理员获取收款二维码。',
-    },
+    qrImageDataUrl: null,
+    qrImagePath: null,
   },
   {
     channel: 'wechat',
-    label: '微信',
-    instructionText: '使用微信静态收款码完成转账后，再提交账单编号和流水尾号。',
+    label: '微信静态码',
+    instructionText: '人工充值较慢，请等待 1-5 分钟。',
     isActive: true,
-    qrDisplay: {
-      title: '微信静态码',
-      helperText: '移动端可直接扫码，桌面端请联系管理员获取二维码。',
-    },
-  },
-  {
-    channel: 'paypal',
-    label: 'PayPal',
-    instructionText: '完成国际付款后，再提交账单编号和流水尾号。',
-    isActive: false,
-    qrDisplay: {
-      title: 'PayPal',
-      helperText: '默认未启用国际付款，请联系管理员确认渠道。',
-    },
-  },
-  {
-    channel: 'bank',
-    label: '银行卡',
-    instructionText: '线下或网银转账后，再提交账单编号和流水尾号。',
-    isActive: false,
-    qrDisplay: {
-      title: '银行卡转账',
-      helperText: '默认未启用银行卡静态配置，请联系管理员确认收款账户。',
-    },
-  },
-  {
-    channel: 'manual',
-    label: '人工处理',
-    instructionText: '联系管理员确认付款方式后，再按账单编号提交付款凭证。',
-    isActive: true,
-    qrDisplay: {
-      title: '人工处理',
-      helperText: '当静态码未配置时，请联系管理员获取当前收款方式。',
-    },
+    qrImageDataUrl: null,
+    qrImagePath: null,
   },
 ];
 
-const CHANNEL_ARTWORK: Partial<Record<RechargeSubmissionChannel, string>> = {
-  alipay: alipayIcon,
-  wechat: wechatIcon,
-  paypal: cardIcon,
-  bank: cardIcon,
-  manual: cardIcon,
+const RESERVED_CHANNELS: Array<{ id: ReservedChannel; title: string; caption: string }> = [
+  { id: 'dynamic-alipay', title: '支付宝动态码', caption: '商户动态码预留' },
+  { id: 'dynamic-wechat', title: '微信动态码', caption: '商户动态码预留' },
+  { id: 'international', title: '国际支付', caption: '海外付款预留' },
+  { id: 'manual', title: '人工充值', caption: '当前可用渠道' },
+];
+
+const MANUAL_PROVIDERS: Array<{ id: ManualProvider; title: string; icon: string }> = [
+  { id: 'alipay', title: '支付宝', icon: alipayIcon },
+  { id: 'wechat', title: '微信', icon: wechatIcon },
+];
+
+const formatMoney = (value: number, currency: SupportedRechargeCurrency) => {
+  const symbol = currency === 'CNY' ? '¥' : '$';
+  return `${symbol}${Number(value || 0).toFixed(2)}`;
 };
 
-const formatCurrencySymbol = (currency: SupportedRechargeCurrency) => (currency === 'CNY' ? '¥' : '$');
-const formatRateValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+const formatCountdown = (seconds: number) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const rest = safeSeconds % 60;
+  return `${minutes}:${String(rest).padStart(2, '0')}`;
+};
+
+function getSecondsLeft(expiresAt?: string | null): number {
+  if (!expiresAt) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
+}
 
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal, refreshBilling } = useBilling();
   const { user } = useAuth();
-  const { pick } = useLocale();
   const { isDarkMode } = useTheme();
-
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
   const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(INITIAL_RATE_MAP);
   const [paymentChannels, setPaymentChannels] = useState<RechargePaymentChannelConfig[]>(FALLBACK_CHANNELS);
-  const [loadingRates, setLoadingRates] = useState(false);
-  const [loadingChannels, setLoadingChannels] = useState(false);
-  const [creatingBill, setCreatingBill] = useState(false);
-  const [submittingProof, setSubmittingProof] = useState(false);
   const [currency, setCurrency] = useState<SupportedRechargeCurrency>('CNY');
-  const [amount, setAmount] = useState<number>(20);
-  const [paymentChannel, setPaymentChannel] = useState<RechargeSubmissionChannel>('alipay');
-  const [transferReferenceLast4, setTransferReferenceLast4] = useState('');
-  const [note, setNote] = useState('');
-  const [submissionMessage, setSubmissionMessage] = useState('');
+  const [amount, setAmount] = useState(20);
+  const [selectedChannel, setSelectedChannel] = useState<ReservedChannel>('manual');
+  const [manualProvider, setManualProvider] = useState<ManualProvider>('alipay');
   const [billSnapshot, setBillSnapshot] = useState<RechargeBillSnapshot | null>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const availableCurrencies = useMemo(
-    () =>
-      (['CNY', 'USD'] as SupportedRechargeCurrency[]).filter(
-        (code) => (exchangeRates[code] || INITIAL_RATE_MAP[code]).isActive,
-      ),
-    [exchangeRates],
-  );
+  const [transferReferenceLast4, setTransferReferenceLast4] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
+  const [message, setMessage] = useState('');
 
   const currentRate = exchangeRates[currency] || INITIAL_RATE_MAP[currency];
   const minAmount = currentRate.minAmount ?? (currency === 'CNY' ? 5 : 1);
   const maxAmount = currentRate.maxAmount ?? (currency === 'CNY' ? 500 : 100);
-  const estimatedCredits = Math.max(0, Math.round(Math.max(0, amount) * currentRate.creditsPerUnit));
-  const hasAvailableCurrency = availableCurrencies.length > 0;
-
-  const channelOptions = useMemo(() => {
-    const activeChannels = paymentChannels.filter((channel) => channel.isActive !== false);
-
-    if (currency === 'USD') {
-      return activeChannels.filter(
-        (channel) => channel.channel === 'paypal' || channel.channel === 'bank' || channel.channel === 'manual',
-      );
-    }
-
-    return activeChannels.filter((channel) => channel.channel !== 'paypal');
-  }, [currency, paymentChannels]);
-
-  const selectedChannelConfig = useMemo(
-    () => channelOptions.find((channel) => channel.channel === paymentChannel) || channelOptions[0] || FALLBACK_CHANNELS[0],
-    [channelOptions, paymentChannel],
-  );
-
-  const displayChannel = billSnapshot?.paymentChannel ?? selectedChannelConfig?.channel ?? 'manual';
-  const displayChannelConfig = useMemo(
-    () =>
-      paymentChannels.find((channel) => channel.channel === displayChannel)
-      || FALLBACK_CHANNELS.find((channel) => channel.channel === displayChannel)
-      || selectedChannelConfig
+  const baseCreditsPreview = Math.max(0, Math.round(amount * currentRate.creditsPerUnit));
+  const isExpired = Boolean(billSnapshot?.expiresAt && secondsLeft <= 0 && billSnapshot.status !== 'credited');
+  const activeProvider = billSnapshot?.manualProvider || manualProvider;
+  const activeChannelConfig = useMemo(
+    () => paymentChannels.find((channel) => channel.channel === activeProvider)
+      || FALLBACK_CHANNELS.find((channel) => channel.channel === activeProvider)
       || FALLBACK_CHANNELS[0],
-    [displayChannel, paymentChannels, selectedChannelConfig],
+    [activeProvider, paymentChannels],
   );
 
-  const selectedThemeChannel = displayChannelConfig?.channel === 'wechat'
-    ? 'wechat'
-    : displayChannelConfig?.channel === 'paypal' || currency === 'USD'
-      ? 'paypal'
-      : 'alipay';
-
-  const theme = useMemo(() => {
-    if (selectedThemeChannel === 'paypal') {
-      return {
-        text: isDarkMode ? '#fbbf24' : '#b45309',
-        border: isDarkMode ? 'rgba(245, 158, 11, 0.32)' : 'rgba(245, 158, 11, 0.24)',
-        light: isDarkMode
-          ? 'linear-gradient(180deg, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.08) 100%)'
-          : 'linear-gradient(180deg, rgba(245, 158, 11, 0.14) 0%, rgba(245, 158, 11, 0.06) 100%)',
-        gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-        shadow: isDarkMode
-          ? '0 20px 44px rgba(245, 158, 11, 0.26)'
-          : '0 18px 36px rgba(245, 158, 11, 0.2)',
-        accent: '#f59e0b',
-        via: 'rgba(245, 158, 11, 0.36)',
-      };
-    }
-
-    if (selectedThemeChannel === 'wechat') {
-      return {
-        text: isDarkMode ? '#6ee7b7' : '#047857',
-        border: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.24)',
-        light: isDarkMode
-          ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%)'
-          : 'linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.05) 100%)',
-        gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-        shadow: isDarkMode
-          ? '0 20px 44px rgba(16, 185, 129, 0.24)'
-          : '0 18px 36px rgba(16, 185, 129, 0.18)',
-        accent: '#10b981',
-        via: 'rgba(16, 185, 129, 0.34)',
-      };
-    }
-
-    return {
-      text: isDarkMode ? '#93c5fd' : '#2563eb',
-      border: isDarkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.24)',
-      light: isDarkMode
-        ? 'linear-gradient(180deg, rgba(59, 130, 246, 0.18) 0%, rgba(59, 130, 246, 0.08) 100%)'
-        : 'linear-gradient(180deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.05) 100%)',
-      gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-      shadow: isDarkMode
-        ? '0 20px 44px rgba(59, 130, 246, 0.24)'
-        : '0 18px 36px rgba(59, 130, 246, 0.18)',
-      accent: '#3b82f6',
-      via: 'rgba(59, 130, 246, 0.34)',
-    };
-  }, [isDarkMode, selectedThemeChannel]);
-
-  const palette = useMemo(
-    () => ({
-      modalBg: isDarkMode
-        ? 'linear-gradient(180deg, rgba(8, 12, 19, 0.98) 0%, rgba(5, 8, 14, 1) 100%)'
-        : '#ffffff',
-      modalBorder: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(15, 23, 42, 0.12)',
-      modalShadow: isDarkMode ? '0 40px 96px rgba(0, 0, 0, 0.56)' : '0 36px 88px rgba(15, 23, 42, 0.18)',
-      cardBg: isDarkMode ? 'rgba(15, 23, 42, 0.76)' : '#ffffff',
-      cardBorder: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.1)',
-      cardShadow: isDarkMode
-        ? '0 18px 40px rgba(0, 0, 0, 0.24)'
-        : '0 16px 36px rgba(15, 23, 42, 0.08)',
-      cardShadowStrong: isDarkMode
-        ? '0 24px 54px rgba(0, 0, 0, 0.34)'
-        : '0 24px 52px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.05)',
-      sectionBg: isDarkMode
-        ? 'linear-gradient(180deg, rgba(17, 24, 39, 0.84) 0%, rgba(10, 14, 22, 0.94) 100%)'
-        : '#ffffff',
-      segmentBg: isDarkMode
-        ? 'rgba(15, 23, 42, 0.92)'
-        : 'linear-gradient(180deg, #f3f4f6 0%, #eef2f7 100%)',
-      segmentBorder: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.1)',
-      inputBg: isDarkMode ? '#10151e' : '#ffffff',
-      inputBorder: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(15, 23, 42, 0.12)',
-      inputShadow: isDarkMode
-        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-        : '0 1px 0 rgba(255, 255, 255, 0.96), 0 10px 22px rgba(15, 23, 42, 0.06)',
-      textPrimary: isDarkMode ? '#ffffff' : '#0f172a',
-      textSecondary: isDarkMode ? 'rgba(226, 232, 240, 0.82)' : 'rgba(55, 65, 81, 0.92)',
-      textMuted: isDarkMode ? 'rgba(148, 163, 184, 0.78)' : 'rgba(107, 114, 128, 0.92)',
-      strongBorder: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.14)',
-      sliderTrack: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#e5e7eb',
-      closeHoverBg: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(15, 23, 42, 0.04)',
-      disabledButtonBg: isDarkMode ? '#1f2937' : '#d1d5db',
-      disabledButtonText: isDarkMode ? 'rgba(226, 232, 240, 0.5)' : 'rgba(17, 24, 39, 0.55)',
-    }),
-    [isDarkMode],
-  );
-
-  const getSegmentButtonStyle = (selected: boolean) => ({
-    background: selected ? theme.gradient : 'transparent',
-    color: selected ? '#ffffff' : palette.textMuted,
-    borderColor: selected ? theme.border : palette.cardBorder,
-    boxShadow: selected ? theme.shadow : 'none',
-  });
-
-  const getSelectableCardStyle = (selected: boolean) => ({
-    background: selected ? theme.light : palette.cardBg,
-    borderColor: selected ? theme.border : palette.cardBorder,
-    color: selected ? theme.text : palette.textSecondary,
-    boxShadow: selected ? theme.shadow : 'none',
-  });
-
-  const getChannelArtwork = (channel?: RechargeSubmissionChannel) => CHANNEL_ARTWORK[channel || 'alipay'] || alipayIcon;
-
-  const getChannelSupportText = (channel?: RechargeSubmissionChannel) => {
-    switch (channel) {
-      case 'alipay':
-        return pick('适合支付宝静态码转账', 'Best for Alipay static transfers');
-      case 'wechat':
-        return pick('适合移动端扫码转账', 'Best for mobile scan transfers');
-      case 'paypal':
-        return pick('适合国际支付与海外卡', 'Best for international payments');
-      case 'bank':
-        return pick('适合线下或网银转账', 'Best for bank transfers');
-      case 'manual':
-        return pick('适合人工确认当前收款方式', 'Confirm the current payment method with admin');
-      default:
-        return pick('适合当前渠道的静态收款流程', 'Best for the current static payment flow');
-    }
-  };
-
-  const clampAmount = (value: number) => Math.max(minAmount, Math.min(maxAmount, value));
-
-  const submissionId = billSnapshot?.submissionId || '--';
-  const billNumber = billSnapshot?.billNumber || '--';
-  const statusLabel = billSnapshot?.statusLabel || getRechargeSubmissionStatusLabel('draft');
-  const qrDisplay = billSnapshot?.qrDisplay || selectedChannelConfig?.qrDisplay;
-  const displayedCredits = billSnapshot?.estimatedCredits ?? estimatedCredits;
-  const displayedAmount = billSnapshot?.amount ?? amount;
-  const heroStatusLabel = billSnapshot ? statusLabel : pick('待创建账单', 'Create a bill first');
-  const amountProgress = Math.max(0, Math.min(100, ((amount - minAmount) / Math.max(1, maxAmount - minAmount)) * 100));
-  const isBusy = creatingBill || submittingProof;
-  const canCreateBill = !isBusy && hasAvailableCurrency && !!selectedChannelConfig;
-  const canSubmitProof = !isBusy && !!billSnapshot;
-  const inputStyle = {
-    borderColor: palette.inputBorder,
-    background: palette.inputBg,
-    color: palette.textPrimary,
-    boxShadow: palette.inputShadow,
+  const panelStyle = {
+    background: isDarkMode ? 'rgba(10, 14, 22, 0.98)' : '#ffffff',
+    borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)',
+    color: isDarkMode ? '#f8fafc' : '#0f172a',
   };
 
   useEffect(() => {
-    let alive = true;
-
     if (!showRechargeModal) {
-      return () => {
-        alive = false;
-      };
+      return undefined;
     }
 
-    setLoadingRates(true);
-    void getCreditExchangeRateMap()
-      .then((nextRates) => {
-        if (alive) {
-          setExchangeRates(nextRates);
-        }
-      })
-      .finally(() => {
-        if (alive) {
-          setLoadingRates(false);
-        }
-      });
-
-    setLoadingChannels(true);
-    void listRechargePaymentChannels({
-      requestId: `recharge-payment-channels-${Date.now()}`,
-    })
-      .then((response) => {
-        if (!alive || !response.success || !Array.isArray(response.data.items) || response.data.items.length === 0) {
-          return;
-        }
-
+    let alive = true;
+    void getCreditExchangeRateMap().then((rates) => {
+      if (alive) {
+        setExchangeRates(rates);
+      }
+    });
+    void listRechargePaymentChannels({ requestId: `recharge-payment-channels-${Date.now()}` }).then((response) => {
+      if (alive && response.success && response.data.items.length > 0) {
         setPaymentChannels(response.data.items as RechargePaymentChannelConfig[]);
-      })
-      .finally(() => {
-        if (alive) {
-          setLoadingChannels(false);
-        }
-      });
+      }
+    });
 
     return () => {
       alive = false;
@@ -362,137 +145,113 @@ const RechargeModal: React.FC = () => {
   }, [showRechargeModal]);
 
   useEffect(() => {
-    if (!availableCurrencies.includes(currency) && availableCurrencies.length > 0) {
-      setCurrency(availableCurrencies[0]);
-    }
-  }, [availableCurrencies, currency]);
-
-  useEffect(() => {
-    setAmount((currentAmount) => clampAmount(currentAmount));
-  }, [maxAmount, minAmount]);
-
-  useEffect(() => {
-    if (!channelOptions.some((channel) => channel.channel === paymentChannel)) {
-      setPaymentChannel(channelOptions[0]?.channel || 'manual');
-    }
-  }, [channelOptions, paymentChannel]);
-
-  useEffect(() => {
-    if (showRechargeModal) {
-      return;
+    if (!billSnapshot?.expiresAt) {
+      setSecondsLeft(0);
+      return undefined;
     }
 
-    setCurrency('CNY');
-    setAmount(20);
-    setPaymentChannel('alipay');
-    setTransferReferenceLast4('');
-    setNote('');
-    setSubmissionMessage('');
-    setBillSnapshot(null);
-    setCreatingBill(false);
-    setSubmittingProof(false);
+    const update = () => setSecondsLeft(getSecondsLeft(billSnapshot.expiresAt));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [billSnapshot?.expiresAt]);
+
+  useEffect(() => {
+    if (!showRechargeModal) {
+      setCurrency('CNY');
+      setAmount(20);
+      setSelectedChannel('manual');
+      setManualProvider('alipay');
+      setBillSnapshot(null);
+      setTransferReferenceLast4('');
+      setMessage('');
+      setCreating(false);
+      setMarkingPaid(false);
+    }
   }, [showRechargeModal]);
 
-  const closeModal = () => {
-    setShowRechargeModal(false);
+  if (!showRechargeModal) {
+    return null;
+  }
+
+  const showNotConfigured = () => {
+    const text = '当前渠道未配置，请使用人工充值或联系客服';
+    setMessage(text);
+    notify.warning('渠道未配置', text);
   };
 
-  const handleCreateBill = async () => {
+  const handleReservedChannelClick = (channel: ReservedChannel) => {
+    setSelectedChannel(channel);
+    if (channel !== 'manual') {
+      showNotConfigured();
+    }
+  };
+
+  const clampAmount = (value: number) => {
+    if (!Number.isFinite(value)) {
+      return minAmount;
+    }
+    return Math.max(minAmount, Math.min(maxAmount, Number(value.toFixed(2))));
+  };
+
+  const handleCreateOrder = async () => {
     if (!user?.id) {
-      notify.error(
-        pick('请先登录', 'Sign in required'),
-        pick('登录后才能创建充值账单。', 'Sign in before creating a recharge bill.'),
-      );
+      notify.error('请先登录', '登录后才能创建充值订单。');
       return;
     }
 
-    if (!hasAvailableCurrency || !currentRate.isActive || !selectedChannelConfig) {
-      notify.error(
-        pick('当前不可充值', 'Recharge unavailable'),
-        pick('当前没有可用的充值币种或支付渠道，请稍后再试。', 'No active recharge currency or payment channel is available right now.'),
-      );
-      return;
-    }
-
-    setCreatingBill(true);
-    setSubmissionMessage('');
-
+    setCreating(true);
+    setMessage('');
     try {
       const response = await createRechargeBill(
         {
           amount,
           currencyCode: currency,
-          paymentChannel: selectedChannelConfig.channel,
-          note,
+          paymentChannel: 'manual',
+          manualProvider,
         },
-        {
-          requestId: buildRechargeSubmissionRequestId(user.id, 'bill'),
-        },
+        { requestId: buildRechargeSubmissionRequestId(user.id, 'bill') },
       );
 
       if (!response.success) {
-        throw new Error(getRechargeSubmissionErrorMessage(response, '创建充值账单失败，请稍后重试。'));
+        throw new Error(getRechargeSubmissionErrorMessage(response, '创建人工充值订单失败，请稍后重试。'));
       }
 
-      const nextBillSnapshot = normalizeRechargeBillSnapshot(response.data, {
+      const snapshot = normalizeRechargeBillSnapshot(response.data, {
         amount,
         currencyCode: currency,
-        paymentChannel: selectedChannelConfig.channel,
-        estimatedCredits,
-        note,
-        status: 'created',
-        qrDisplay: selectedChannelConfig.qrDisplay,
+        paymentChannel: 'manual',
+        manualProvider,
+        baseCredits: baseCreditsPreview,
+        estimatedCredits: baseCreditsPreview,
+        status: 'paying',
       });
-
-      setBillSnapshot(nextBillSnapshot);
-      setSubmissionMessage(
-        pick(
-          '账单已创建，请完成转账后提交流水尾号。',
-          'Bill created. Complete the transfer, then submit the payment proof.',
-        ),
-      );
-      notify.success(
-        pick('账单已创建', 'Bill created'),
-        pick('请按当前渠道完成转账，然后提交付款凭证。', 'Complete the transfer using the selected channel, then submit payment proof.'),
-      );
+      setBillSnapshot(snapshot);
+      setSecondsLeft(getSecondsLeft(snapshot.expiresAt));
+      setMessage('订单已创建，请按实付金额扫码付款。');
+      notify.success('订单已创建', '人工充值较慢，请等待 1-5 分钟。');
     } catch (error) {
-      const message = localizeUserFacingText(error instanceof Error ? error.message : '') || '创建充值账单失败，请稍后重试。';
-      setSubmissionMessage(message);
-      notify.error(pick('创建失败', 'Create failed'), message);
+      const text = localizeUserFacingText(error instanceof Error ? error.message : '')
+        || '创建人工充值订单失败，请稍后重试。';
+      setMessage(text);
+      notify.error('创建失败', text);
     } finally {
-      setCreatingBill(false);
+      setCreating(false);
     }
   };
 
-  const handleSubmitProof = async () => {
-    if (!user?.id) {
-      notify.error(
-        pick('请先登录', 'Sign in required'),
-        pick('登录后才能提交付款凭证。', 'Sign in before submitting payment proof.'),
-      );
+  const handleMarkPaid = async () => {
+    if (!billSnapshot?.submissionId || isExpired) {
       return;
     }
 
-    if (!selectedChannelConfig || !billSnapshot?.submissionId || !billSnapshot?.billNumber) {
-      notify.error(
-        pick('请先创建账单', 'Create a bill first'),
-        pick('请先创建账单，再提交付款流水尾号。', 'Create a bill before submitting the transfer reference tail.'),
-      );
-      return;
-    }
-
-    if (!/^[A-Z0-9]{4}$/.test(sanitizeTransferReferenceLast4(transferReferenceLast4))) {
-      notify.error(
-        pick('流水尾号无效', 'Invalid transfer tail'),
-        pick('请输入 4 位字母或数字的流水尾号。', 'Enter a valid 4-character transfer reference tail.'),
-      );
-      return;
-    }
-
-    setSubmittingProof(true);
-    setSubmissionMessage('');
-
+    setMarkingPaid(true);
     try {
+      const normalizedReference = transferReferenceLast4.trim().toUpperCase();
+      if (!/^[0-9A-Z]{4}$/.test(normalizedReference)) {
+        throw new Error('请填写转账流水后四位。');
+      }
+
       const response = await submitRechargeProof(
         {
           submissionId: billSnapshot.submissionId,
@@ -500,516 +259,284 @@ const RechargeModal: React.FC = () => {
           amount: billSnapshot.amount,
           currencyCode: billSnapshot.currencyCode,
           paymentChannel: billSnapshot.paymentChannel,
-          transferReferenceLast4,
-          note,
+          transferReferenceLast4: normalizedReference,
+          note: billSnapshot.note,
         },
-        {
-          requestId: buildRechargeSubmissionRequestId(user.id, 'proof'),
-        },
+        { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
-
       if (!response.success) {
-        throw new Error(getRechargeSubmissionErrorMessage(response, '提交付款凭证失败，请稍后重试。'));
+        if (response.error?.code === 'HTTP_404') {
+          const paidResponse = await markRechargeSubmissionPaid(
+            billSnapshot.submissionId,
+            { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
+          );
+          if (paidResponse.success) {
+            const fallbackBill = normalizeRechargeBillSnapshot({ submission: paidResponse.data.submission }, {
+              ...billSnapshot,
+              transferReferenceLast4: normalizedReference,
+            });
+            setBillSnapshot(fallbackBill);
+            setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
+            notify.success('已通知管理员', '管理员处理后积分会自动到账。');
+            await refreshBilling({ includeTransactions: true });
+            return;
+          }
+        }
+        throw new Error(getRechargeSubmissionErrorMessage(response, '标记已支付失败，请联系客服处理。'));
       }
 
-      const nextBillSnapshot = normalizeRechargeBillSnapshot(response.data, {
-        submissionId: billSnapshot.submissionId,
-        billNumber: billSnapshot.billNumber,
-        amount: billSnapshot.amount,
-        currencyCode: billSnapshot.currencyCode,
-        paymentChannel: billSnapshot.paymentChannel,
-        estimatedCredits: billSnapshot.estimatedCredits,
-        note,
-        transferReferenceLast4,
-        status: 'pending',
-        qrDisplay: billSnapshot.qrDisplay || selectedChannelConfig.qrDisplay,
+      const nextBill = normalizeRechargeBillSnapshot(response.data, {
+        ...billSnapshot,
+        transferReferenceLast4: normalizedReference,
       });
-
-      setBillSnapshot(nextBillSnapshot);
-      setSubmissionMessage(
-        pick(
-          `付款凭证已提交，当前状态：${nextBillSnapshot.statusLabel}。`,
-          `Payment proof submitted. Current status: ${nextBillSnapshot.statusLabel}.`,
-        ),
-      );
+      setBillSnapshot(nextBill);
+      setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
+      notify.success('已通知管理员', '管理员处理后积分会自动到账。');
       await refreshBilling({ includeTransactions: true });
-      notify.success(
-        pick('提交成功', 'Submitted'),
-        pick('付款凭证已提交，等待管理员审核。', 'Your payment proof has been submitted for review.'),
-      );
     } catch (error) {
-      const message = localizeUserFacingText(error instanceof Error ? error.message : '') || '提交付款凭证失败，请稍后重试。';
-      setSubmissionMessage(message);
-      notify.error(pick('提交失败', 'Submit failed'), message);
+      const text = localizeUserFacingText(error instanceof Error ? error.message : '')
+        || '标记已支付失败，请联系客服处理。';
+      setMessage(text);
+      notify.error('提交失败', text);
     } finally {
-      setSubmittingProof(false);
+      setMarkingPaid(false);
     }
   };
 
-  if (!showRechargeModal) {
-    return null;
-  }
+  const baseAmount = billSnapshot?.baseAmount ?? billSnapshot?.amount ?? amount;
+  const serviceFee = billSnapshot?.serviceFee ?? 0;
+  const payableAmount = billSnapshot?.payableAmount ?? billSnapshot?.amount ?? amount;
+  const baseCredits = billSnapshot?.baseCredits ?? baseCreditsPreview;
+  const bonusCredits = billSnapshot?.bonusCredits ?? 0;
+  const creditAmount = billSnapshot?.creditAmount ?? billSnapshot?.estimatedCredits ?? baseCreditsPreview;
+  const providerTitle = activeProvider === 'wechat' ? '微信' : '支付宝';
+  const providerIcon = activeProvider === 'wechat' ? wechatIcon : alipayIcon;
 
   return (
-    <div
-      className={`fixed inset-0 z-[10020] flex justify-center bg-black/60 backdrop-blur-sm ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center p-4'}`}
-      onClick={closeModal}
-    >
-      <div
-        className={`w-full overflow-hidden border animate-in fade-in zoom-in-95 duration-300 ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 max-w-[760px] flex-col rounded-t-[26px] rounded-b-none' : 'max-w-[480px] rounded-[30px]'}`}
-        style={{
-          background: palette.modalBg,
-          borderColor: palette.modalBorder,
-          boxShadow: palette.modalShadow,
-          color: palette.textPrimary,
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className={`relative flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-4 pb-3 pt-4' : 'px-5 pb-4 pt-5'}`} style={{ borderColor: palette.cardBorder }}>
-          <div
-            className="absolute left-0 top-0 h-1 w-full"
-            style={{
-              background: `linear-gradient(90deg, transparent 0%, ${theme.via} 50%, transparent 100%)`,
-            }}
-          />
-          <div className="flex items-center gap-3">
-            <div
-              className="rounded-2xl p-2"
-              style={{
-                background: theme.light,
-                color: theme.text,
-                border: `1px solid ${theme.border}`,
-                boxShadow: theme.shadow,
-              }}
-            >
-              <Zap size={18} />
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold leading-tight">{pick('积分充值', 'Balance recharge')}</h3>
-              <p className="mt-1 max-w-[34ch] text-xs leading-4" style={{ color: palette.textMuted }}>
-                {pick('先创建账单，再按静态码转账并提交付款凭证。', 'Create a bill first, then transfer with the static channel and submit payment proof.')}
-              </p>
-            </div>
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border shadow-2xl" style={panelStyle}>
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-semibold">充值积分</h2>
+            <p className="mt-1 text-sm text-slate-400">人工充值较慢，请等待 1-5 分钟</p>
           </div>
-
           <button
             type="button"
-            onClick={closeModal}
-            className="rounded-full p-2 transition"
-            style={{ color: palette.textMuted, background: palette.closeHoverBg }}
+            onClick={() => setShowRechargeModal(false)}
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+            aria-label="关闭充值弹窗"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-4 py-3 pb-4' : 'max-h-[82vh] overflow-y-auto px-5 py-4 pb-5'} ${isMobile ? 'space-y-4' : 'space-y-5'}`}>
-          <div className={isMobile ? 'space-y-4' : 'space-y-5'}>
-            <section
-              className="rounded-[26px] px-5 py-5 sm:px-6 sm:py-6"
-              style={{
-                background: palette.sectionBg,
-                border: `1px solid ${palette.cardBorder}`,
-                boxShadow: palette.cardShadowStrong,
-              }}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>
-                    {pick('预计到账', 'Estimated credits')}
-                  </div>
-                  <div className="mt-2 text-5xl font-black tracking-tight" style={{ color: theme.text }}>
-                    {displayedCredits}
-                  </div>
-                  <div className="mt-1 text-xs leading-4" style={{ color: palette.textMuted }}>
-                    {pick('支付金额', 'Payment amount')} {formatCurrencySymbol(currency)}
-                    {displayedAmount}
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-right">
-                  <div
-                    className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold"
+        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {RESERVED_CHANNELS.map((channel) => {
+                const selected = selectedChannel === channel.id;
+                return (
+                  <button
+                    key={channel.id}
+                    type="button"
+                    onClick={() => handleReservedChannelClick(channel.id)}
+                    className="rounded-xl border p-4 text-left transition"
                     style={{
-                      background: theme.light,
-                      borderColor: theme.border,
-                      color: theme.text,
-                      boxShadow: theme.shadow,
+                      borderColor: selected ? '#3b82f6' : 'rgba(148,163,184,0.22)',
+                      background: selected ? 'rgba(59,130,246,0.14)' : 'rgba(148,163,184,0.08)',
                     }}
                   >
-                    {loadingRates ? (
-                      <>
-                        <Loader2 size={12} className="animate-spin" />
-                        {pick('同步中', 'Syncing')}
-                      </>
-                    ) : (
-                      <span>
-                        {formatCurrencySymbol(currency)}1 = {formatRateValue(currentRate.creditsPerUnit)} {pick('积分', 'credits')}
-                      </span>
-                    )}
-                  </div>
-                  {billSnapshot ? (
-                    <div className="text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: palette.textMuted }}>
-                      {heroStatusLabel}
-                    </div>
-                  ) : null}
-                </div>
+                    <div className="text-sm font-semibold">{channel.title}</div>
+                    <div className="mt-1 text-xs text-slate-400">{channel.caption}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <QrCode size={16} />
+                人工充值
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {MANUAL_PROVIDERS.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    onClick={() => {
+                      setManualProvider(provider.id);
+                      setSelectedChannel('manual');
+                    }}
+                    disabled={Boolean(billSnapshot)}
+                    className="flex items-center gap-3 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      borderColor: manualProvider === provider.id ? '#22c55e' : 'rgba(148,163,184,0.22)',
+                      background: manualProvider === provider.id ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.06)',
+                    }}
+                  >
+                    <img src={provider.icon} alt={provider.title} className="h-9 w-9 rounded-lg object-contain" />
+                    <div>
+                      <div className="text-sm font-semibold">{provider.title}</div>
+                      <div className="text-xs text-slate-400">静态码人工确认</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>
-                  <span>{pick('充值金额', 'Amount')}</span>
-                  <span>
-                    {pick('最小', 'Min')} {formatCurrencySymbol(currency)}
-                    {minAmount} / {pick('最大', 'Max')} {formatCurrencySymbol(currency)}
-                    {maxAmount}
-                  </span>
-                </div>
-
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="mb-3 text-sm font-semibold">充值金额</div>
+              <div className="flex gap-2">
+                {(['CNY', 'USD'] as SupportedRechargeCurrency[]).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setCurrency(item)}
+                    disabled={Boolean(billSnapshot)}
+                    className="rounded-lg border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      borderColor: currency === item ? '#3b82f6' : 'rgba(148,163,184,0.22)',
+                      background: currency === item ? 'rgba(59,130,246,0.16)' : 'transparent',
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
                 <input
                   type="range"
-                  min={String(minAmount)}
-                  max={String(maxAmount)}
-                  step={currency === 'CNY' ? '5' : '1'}
+                  min={minAmount}
+                  max={maxAmount}
+                  step={currency === 'CNY' ? 5 : 1}
                   value={amount}
-                  onChange={(event) => setAmount(Number(event.target.value))}
-                  disabled={isBusy}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    accentColor: theme.accent,
-                    backgroundColor: palette.sliderTrack,
-                    backgroundImage: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${amountProgress}%, ${palette.sliderTrack} ${amountProgress}%, ${palette.sliderTrack} 100%)`,
-                  }}
+                  disabled={Boolean(billSnapshot)}
+                  onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
+                  className="w-full"
                 />
-
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
-                  <div className="text-xs leading-5" style={{ color: palette.textMuted }}>
-                    {pick('汇率、最小金额和最大金额会在打开充值页时自动同步。', 'Rates and amount limits are synced when the recharge sheet opens.')}
-                  </div>
-                  <input
-                    type="number"
-                    min={minAmount}
-                    max={maxAmount}
-                    step={currency === 'CNY' ? 5 : 1}
-                    value={amount}
-                    onChange={(event) => {
-                      const nextValue = Number(event.target.value);
-                      if (Number.isFinite(nextValue)) {
-                        setAmount(clampAmount(nextValue));
-                      }
-                    }}
-                    disabled={isBusy}
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('充值币种', 'Recharge currency')}</div>
-              <div
-                className="flex rounded-xl border p-1"
-                style={{
-                  background: palette.segmentBg,
-                  borderColor: palette.segmentBorder,
-                  boxShadow: palette.cardShadow,
-                }}
-              >
-                {availableCurrencies.length > 0 ? (
-                  availableCurrencies.map((item) => {
-                    const selected = item === currency;
-
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setCurrency(item)}
-                        disabled={isBusy}
-                        className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
-                        style={getSegmentButtonStyle(selected)}
-                      >
-                        {item === 'CNY' ? '人民币 (CNY)' : '美元 (USD)'}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div
-                    className="col-span-2 rounded-2xl border border-dashed px-4 py-3 text-sm"
-                    style={{
-                      borderColor: palette.cardBorder,
-                      background: palette.sectionBg,
-                      color: palette.textMuted,
-                    }}
-                  >
-                    {pick('当前没有启用中的充值币种，请联系管理员检查配置。', 'No active recharge currency is available right now.')}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>
-                <span>{pick('支付方式', 'Payment channel')}</span>
-                {loadingChannels ? (
-                  <span className="inline-flex items-center gap-1" style={{ color: palette.textMuted }}>
-                    <Loader2 size={12} className="animate-spin" />
-                    {pick('同步中', 'Syncing')}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {channelOptions.map((channel) => {
-                  const selected = channel.channel === paymentChannel;
-                  const artwork = CHANNEL_ARTWORK[channel.channel] || cardIcon;
-
-                  return (
-                    <button
-                      key={channel.channel}
-                      type="button"
-                      onClick={() => setPaymentChannel(channel.channel)}
-                      disabled={isBusy}
-                      className="flex items-start gap-4 rounded-2xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                      style={getSelectableCardStyle(selected)}
-                    >
-                      <img src={artwork} className="h-10 w-10 rounded-lg object-contain" alt={channel.label} />
-                      <div className="min-w-0 space-y-1">
-                        <div className="text-sm font-semibold">{channel.label}</div>
-                        <div className="text-xs leading-5 text-current/70">{getChannelSupportText(channel.channel)}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('流水尾号 4 位', 'Last 4 transfer chars')}</span>
                 <input
-                  type="text"
-                  maxLength={4}
-                  value={transferReferenceLast4}
-                  onChange={(event) => setTransferReferenceLast4(sanitizeTransferReferenceLast4(event.target.value))}
-                  placeholder={pick('例如 8X9Z', 'Example 8X9Z')}
-                  className="w-full rounded-xl border px-3 py-3 text-sm uppercase outline-none"
-                  style={inputStyle}
+                  type="number"
+                  min={minAmount}
+                  max={maxAmount}
+                  value={amount}
+                  disabled={Boolean(billSnapshot)}
+                  onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
+                  className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
-              </label>
+              </div>
+              <div className="mt-2 text-xs text-slate-400">
+                当前预计基础积分：{baseCreditsPreview}，创建订单后会显示随机服务费和赠送积分。
+              </div>
+            </div>
 
-              <label className="space-y-2">
-                <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('备注', 'Note')}</span>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder={pick('可选：付款时间或补充说明', 'Optional: payment time or extra context')}
-                  className="w-full rounded-xl border px-3 py-3 text-sm outline-none"
-                  style={inputStyle}
-                />
-              </label>
-            </section>
-
-            {billSnapshot ? (
-              <section
-                className="rounded-xl border border-dashed px-4 py-3 text-xs"
-                style={{
-                  background: palette.sectionBg,
-                  borderColor: palette.strongBorder,
-                  color: palette.textMuted,
-                }}
-              >
-                <div className="flex items-start gap-2">
-                  <ShieldCheck size={14} style={{ color: theme.text }} />
-                  <div className="space-y-1">
-                    <div className="font-medium" style={{ color: palette.textPrimary }}>{pick('流程说明', 'Flow')}</div>
-                    <p>{pick('先按当前静态码转账，再填写流水尾号并提交凭证。', 'Complete the transfer with the current static code, then submit the transfer tail and proof.')}</p>
-                    {submissionMessage ? <p style={{ color: theme.text }}>{submissionMessage}</p> : null}
-                  </div>
-                </div>
-              </section>
+            {message ? (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <span>{message}</span>
+              </div>
             ) : null}
 
-            <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={billSnapshot ? handleSubmitProof : handleCreateBill}
-                disabled={billSnapshot ? !canSubmitProof : !canCreateBill}
-                className="flex h-14 w-full min-w-0 items-center justify-center gap-3 overflow-hidden whitespace-nowrap rounded-2xl text-lg font-semibold transition-all disabled:cursor-not-allowed"
-                style={{
-                  background: billSnapshot
-                    ? (!canSubmitProof ? palette.disabledButtonBg : theme.gradient)
-                    : (!canCreateBill ? palette.disabledButtonBg : theme.gradient),
-                  color: billSnapshot
-                    ? (!canSubmitProof ? palette.disabledButtonText : '#ffffff')
-                    : (!canCreateBill ? palette.disabledButtonText : '#ffffff'),
-                  boxShadow: billSnapshot
-                    ? (!canSubmitProof ? 'none' : theme.shadow)
-                    : (!canCreateBill ? 'none' : theme.shadow),
-                }}
-              >
-                {billSnapshot ? (
-                  submittingProof ? <Loader2 size={18} className="shrink-0 animate-spin" /> : <CreditCard size={18} className="shrink-0" />
-                ) : (
-                  creatingBill ? <Loader2 size={18} className="shrink-0 animate-spin" /> : <Receipt size={18} className="shrink-0" />
-                )}
-                {billSnapshot ? pick('提交付款凭证', 'Submit payment proof') : pick('创建账单', 'Create bill')}
-              </button>
-
-              {billSnapshot ? (
-                <button
-                  type="button"
-                  onClick={handleCreateBill}
-                  disabled={!canCreateBill}
-                  className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border px-4 text-[11px] font-medium uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: canCreateBill ? 'transparent' : palette.cardBg,
-                    borderColor: canCreateBill ? palette.strongBorder : palette.cardBorder,
-                    color: canCreateBill ? palette.textMuted : palette.disabledButtonText,
-                    boxShadow: 'none',
-                  }}
-                >
-                  {creatingBill ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
-                  {pick('重新创建账单', 'Create bill again')}
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <section className="space-y-4">
             {billSnapshot ? (
-              <div
-                className="rounded-[26px] p-4"
-                style={{
-                  background: palette.sectionBg,
-                  border: `1px solid ${palette.cardBorder}`,
-                  boxShadow: palette.cardShadow,
-                }}
-              >
-                <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                  <div className="flex justify-center">
-                    {qrDisplay?.imageUrl ? (
-                      <div className="rounded-2xl bg-white p-3" style={{ boxShadow: palette.cardShadow }}>
-                        <img
-                          src={qrDisplay.imageUrl}
-                          alt={qrDisplay.title || 'Recharge QR'}
-                          className="h-40 w-40 rounded-xl object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className="flex h-40 w-40 flex-col items-center justify-center gap-3 rounded-2xl border text-center text-xs"
-                        style={{
-                          borderColor: palette.cardBorder,
-                          background: theme.light,
-                          color: theme.text,
-                        }}
-                      >
-                        <img
-                          src={getChannelArtwork(displayChannelConfig?.channel)}
-                          className="h-12 w-12 rounded-xl object-contain"
-                          alt={displayChannelConfig?.label || 'channel'}
-                        />
-                        {qrDisplay?.title || pick('等待管理员配置静态码', 'Waiting for the admin to configure the static code')}
-                      </div>
-                    )}
-                  </div>
+              <label className="block rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm">
+                <span className="mb-2 block text-xs text-slate-400">转账流水后四位</span>
+                <input
+                  value={transferReferenceLast4}
+                  onChange={(event) => setTransferReferenceLast4(
+                    event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(-4),
+                  )}
+                  placeholder="例如 8X9Z"
+                  className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+                />
+              </label>
+            ) : null}
 
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <img
-                        src={getChannelArtwork(displayChannelConfig?.channel)}
-                        className="h-11 w-11 rounded-xl object-contain"
-                        alt={displayChannelConfig?.label || 'channel'}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('当前账单', 'Current bill')}</div>
-                            <div className="mt-1 text-base font-semibold" style={{ color: palette.textPrimary }}>{displayChannelConfig?.label || pick('静态收款', 'Static payment')}</div>
-                          </div>
-                          <div
-                            className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]"
-                            style={{
-                              background: theme.light,
-                              borderColor: theme.border,
-                              color: theme.text,
-                            }}
-                          >
-                            {statusLabel}
-                          </div>
-                        </div>
-                        <div className="mt-2 text-xs leading-5" style={{ color: palette.textMuted }}>
-                          {getChannelSupportText(displayChannelConfig?.channel)}
-                        </div>
-                      </div>
-                    </div>
+            <button
+              type="button"
+              onClick={billSnapshot ? handleMarkPaid : handleCreateOrder}
+              disabled={creating || markingPaid || isExpired || (Boolean(billSnapshot) && transferReferenceLast4.trim().length !== 4)}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-600"
+            >
+              {creating || markingPaid ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+              {billSnapshot ? '我已支付' : '创建人工充值订单'}
+            </button>
+          </section>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('提交单号', 'Submission ID')}</div>
-                        <div className="break-all font-medium" style={{ color: palette.textPrimary }}>{submissionId}</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('账单编号', 'Bill number')}</div>
-                        <div className="break-all font-medium" style={{ color: palette.textPrimary }}>{billNumber}</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('预计到账', 'Estimated credits')}</div>
-                        <div className="font-medium" style={{ color: palette.textPrimary }}>{displayedCredits}</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('流水尾号', 'Transfer tail')}</div>
-                        <div className="font-medium" style={{ color: palette.textPrimary }}>{transferReferenceLast4 || '--'}</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 pt-2 text-xs" style={{ color: palette.textMuted }}>
-                      <div className="font-medium" style={{ color: palette.textPrimary }}>{qrDisplay?.title || displayChannelConfig?.label}</div>
-                      {qrDisplay?.subtitle ? <div>{qrDisplay.subtitle}</div> : null}
-                      {qrDisplay?.helperText ? <div>{qrDisplay.helperText}</div> : null}
-                      {qrDisplay?.codeValue ? (
-                        <div
-                          className="break-all rounded-xl border px-3 py-2 text-[11px]"
-                          style={{
-                            borderColor: theme.border,
-                            background: theme.light,
-                            color: theme.text,
-                          }}
-                        >
-                          {qrDisplay.codeValue}
-                        </div>
-                      ) : null}
+          <aside className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            {billSnapshot ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <img src={providerIcon} alt={providerTitle} className="h-10 w-10 rounded-xl object-contain" />
+                    <div>
+                      <div className="text-sm font-semibold">{providerTitle}静态码</div>
+                      <div className="text-xs text-slate-400">订单号 {billSnapshot.submissionId}</div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-xs">
+                    <Clock3 size={13} />
+                    {isExpired ? '已超时' : formatCountdown(secondsLeft)}
+                  </div>
+                </div>
+
+                <div className="flex justify-center rounded-2xl bg-white p-4">
+                  {activeChannelConfig.qrImageDataUrl ? (
+                    <img
+                      src={activeChannelConfig.qrImageDataUrl}
+                      alt={`${providerTitle}静态码`}
+                      className="h-48 w-48 rounded-xl object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-center text-slate-600">
+                      <img src={providerIcon} alt={providerTitle} className="mb-3 h-12 w-12 object-contain" />
+                      <span className="text-sm font-semibold">等待管理员配置静态码</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-white/10 bg-black/10 p-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">充值金额</span>
+                    <span>{formatMoney(baseAmount, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">服务费</span>
+                    <span>{formatMoney(serviceFee, currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>实付金额</span>
+                    <span>{formatMoney(payableAmount, currency)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-white/10 bg-black/10 p-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">充值积分</span>
+                    <span>{baseCredits}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">赠送积分</span>
+                    <span>+{bonusCredits}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>到账积分</span>
+                    <span>{creditAmount}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs leading-5 text-slate-400">
+                  <p>人工充值较慢，请等待 1-5 分钟。</p>
+                  <p>支付成功但积分未到账，请联系客服处理。</p>
+                  {isExpired ? <p className="font-semibold text-red-300">支付失败，请联系客服处理。</p> : null}
                 </div>
               </div>
             ) : (
-              <div
-                className="rounded-xl border border-dashed px-4 py-3 text-xs"
-                style={{
-                  background: palette.cardBg,
-                  borderColor: palette.cardBorder,
-                  boxShadow: 'none',
-                }}
-              >
-                <div className="flex items-start gap-2.5">
-                  <img
-                    src={getChannelArtwork(displayChannelConfig?.channel)}
-                    className="h-9 w-9 rounded-lg object-contain opacity-70"
-                    alt={displayChannelConfig?.label || 'channel'}
-                  />
-                  <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.textMuted }}>{pick('账单参考区', 'Bill reference')}</div>
-                    <div className="text-sm font-medium" style={{ color: palette.textSecondary }}>{pick('创建账单后，这里会展示收款码和账单摘要。', 'Create a bill to reveal the payment code and bill summary here.')}</div>
-                    <div className="text-[11px] leading-4" style={{ color: palette.textMuted }}>
-                      {getChannelSupportText(displayChannelConfig?.channel)}
-                    </div>
-                  </div>
-                </div>
+              <div className="flex min-h-[420px] flex-col items-center justify-center text-center text-sm text-slate-400">
+                <img src={cardIcon} alt="人工充值" className="mb-4 h-14 w-14 opacity-80" />
+                <div className="text-base font-semibold text-slate-200">等待创建人工充值订单</div>
+                <p className="mt-2 max-w-xs">动态码支付宝、动态码微信和国际支付当前暂未配置，请使用人工充值。</p>
               </div>
             )}
-          </section>
+          </aside>
         </div>
       </div>
     </div>

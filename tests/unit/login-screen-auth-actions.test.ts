@@ -12,7 +12,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('LoginScreen stays parseable and exposes google plus compact auxiliary auth actions', () => {
+test('LoginScreen stays parseable and keeps the server-backed sign-in actions compact', () => {
   const source = readSource(LOGIN_SCREEN_PATH);
   const sourceFile = ts.createSourceFile(
     LOGIN_SCREEN_PATH,
@@ -23,15 +23,22 @@ test('LoginScreen stays parseable and exposes google plus compact auxiliary auth
   );
 
   assert.deepEqual(sourceFile.parseDiagnostics, []);
-  assert.match(source, /import \{ useAdminRole \} from '\.\.\/\.\.\/hooks\/useAdminRole';/);
+  assert.match(source, /const \{ loginAsTempUser \} = useAuth\(\);/);
   assert.match(source, /import \{ startGoogleSignIn \} from '\.\.\/\.\.\/services\/auth\/googleAuth\.ts';/);
   assert.match(source, /const handleGoogleLogin = async \(\) => \{/);
+  assert.match(source, /const handleTempUserEntry = async \(\) => \{/);
+  assert.match(source, /await loginAsTempUser\(\);/);
   assert.match(source, /Continue with Google/);
   assert.match(source, /className="auth-aux-actions"/);
-  assert.match(source, /Temporary account/);
+  assert.match(source, /Temporary local access/);
   assert.match(source, /Admin sign-in/);
-  assert.match(source, /Sign in with an administrator account first\./);
-  assert.match(source, /Current account is not an administrator\./);
+  assert.match(source, /注册请求已提交，后端认证接口就绪后可继续完成验证。/);
+  assert.match(source, /当前请求需要先完成人机验证，验证通过后再提交。/);
+  assert.doesNotMatch(source, /å¨‰ã„¥å”½/);
+  assert.doesNotMatch(source, /ç’‡å³°åŽ›/);
+  assert.doesNotMatch(source, /if \(!user\)/);
+  assert.doesNotMatch(source, /if \(checkingAdmin\)/);
+  assert.doesNotMatch(source, /if \(!isAdmin\)/);
 });
 
 test('LoginScreen styles keep temporary and admin entry points compact and grouped', () => {

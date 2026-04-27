@@ -29,20 +29,21 @@ export const AppStartupScreen: React.FC<{
   return (
     <div className="fixed inset-0 flex items-center justify-center px-6" style={{ backgroundColor: 'var(--bg-base)' }}>
       <div
-        className="w-full max-w-xl rounded-[28px] border p-8 text-center backdrop-blur-xl"
+        className="settings-reference-card settings-reference-card--elevated w-full max-w-xl p-8 text-center backdrop-blur-xl"
         style={{
           borderColor: 'var(--settings-border-subtle, var(--border-light))',
           background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.04) 0%, transparent 100%), var(--settings-section-bg, var(--bg-surface))',
-          boxShadow: '0 24px 60px rgb(2 6 23 / 0.18)',
+            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-section-bg, var(--bg-surface))',
+          boxShadow: '0 28px 64px rgb(2 6 23 / 0.18)',
         }}
       >
         <div
-          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border"
+          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border"
           style={{
             borderColor: 'var(--settings-border-subtle, var(--border-light))',
             background: 'var(--settings-surface-overlay, var(--bg-elevated))',
             color: 'var(--text-secondary)',
+            borderRadius: 'var(--radius-surface-md, 18px)',
           }}
         >
           <Loader2 className="animate-spin" size={20} />
@@ -51,11 +52,12 @@ export const AppStartupScreen: React.FC<{
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getStageLabel(stage)}</p>
         {localizedWarning ? (
           <div
-            className="mt-5 flex items-start gap-3 rounded-[20px] border px-4 py-3 text-left text-sm"
+            className="mt-5 flex items-start gap-3 border px-4 py-3 text-left text-sm"
             style={{
               borderColor: 'var(--settings-state-warning-border, rgba(245, 158, 11, 0.24))',
               background: 'var(--settings-state-warning-bg, rgba(245, 158, 11, 0.12))',
               color: 'var(--settings-state-warning-text, #fde68a)',
+              borderRadius: 'var(--radius-surface-sm, 16px)',
             }}
           >
             <AlertCircle className="mt-0.5 shrink-0" size={16} />

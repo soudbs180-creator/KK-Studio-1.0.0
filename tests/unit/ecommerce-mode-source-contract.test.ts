@@ -15,7 +15,7 @@ test('ecommerce mode is wired into the shared mode entry surfaces', () => {
   const registrySource = readSource('src/components/layout/prompt-bar/composerModeRegistry.ts');
   const mobileTabBarSource = readSource('src/components/mobile/MobileTabBar.tsx');
 
-  assert.match(typesSource, /ECOMMERCE = 'ecommerce'/);
+  assert.match(typesSource, /ECOMMERCE\s*[:=]\s*'ecommerce'/);
   assert.match(registrySource, /mode:\s*GenerationMode\.ECOMMERCE/);
   assert.match(registrySource, /PackageOpen/);
   assert.match(

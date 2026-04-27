@@ -30,6 +30,10 @@ export const sortPptImageNodes = (images: GeneratedImage[]) => {
   });
 };
 
+export const getPromptPptImageNodes = (images: GeneratedImage[], promptNodeId: string) => {
+  return sortPptImageNodes(images.filter((image) => image.parentPromptId === promptNodeId));
+};
+
 const createBackgroundLayer = (image: GeneratedImage, pageIndex: number): PptEditableImageLayer => ({
   id: `page-${pageIndex + 1}-background`,
   name: 'Background',

@@ -3,9 +3,9 @@ import { setStoredKkApiAccessToken } from "../api/authAccessToken.ts";
 import { emitAuthSessionChange } from "./authSessionEvents.ts";
 import { updateRuntimeAuthStateFromProfile } from "./runtimeAuthState.ts";
 
-export const HOSTED_PASSWORD_PROXY_DISABLED_CODE = "HOSTED_PASSWORD_PROXY_DISABLED";
-export const HOSTED_PASSWORD_PROXY_DISABLED_MESSAGE =
-  "The browser no longer falls back to Supabase password sign-in. Use the KK API auth route, or wait until the local runtime auth backend is ready.";
+export const HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE = "HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED";
+export const HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_MESSAGE =
+  "The hosted password login route is unavailable. Use the KK API auth route, or wait until the local runtime auth backend is ready.";
 
 export type PasswordSignInParams = {
   email: string;

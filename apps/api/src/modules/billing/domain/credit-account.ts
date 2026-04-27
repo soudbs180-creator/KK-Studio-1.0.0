@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   CreditTransactionType,
   domainEventNames,
+  type AdminRechargeCreditsResponseDto,
   type ApplyPaymentSettlementRequestDto,
   type ApplyPaymentSettlementResponseDto,
   type CreditBalanceDto,
@@ -123,6 +124,50 @@ export function applyPaymentSettlementCredits(
       transactionType: CreditTransactionType.Recharge,
       createdAt: now,
     },
+  };
+}
+
+export function applyManualRechargeCredits(
+  account: CreditBalanceDto,
+  input: {
+    submissionId: string;
+    creditAmount: number;
+  },
+  now: string,
+): CreditRechargeResult {
+  const nextBalance = account.balance + input.creditAmount;
+
+  return {
+    account: {
+      ...account,
+      balance: nextBalance,
+      updatedAt: now,
+    },
+    ledger: {
+      ledgerId: randomUUID(),
+      userId: account.userId,
+      businessRefType: "manual_recharge",
+      businessRefId: input.submissionId,
+      creditAmount: input.creditAmount,
+      idempotencyKey: input.submissionId,
+      balanceAfter: nextBalance,
+      transactionType: CreditTransactionType.Recharge,
+      createdAt: now,
+    },
+  };
+}
+
+export function buildManualRechargeApplied(
+  identity: string,
+  creditAmount: number,
+  recharge: CreditRechargeResult | CreditLedgerEntry,
+): AdminRechargeCreditsResponseDto {
+  const balanceAfter = "ledger" in recharge ? recharge.ledger.balanceAfter : recharge.balanceAfter;
+  return {
+    identity,
+    subjectId: identity,
+    balanceAfter,
+    creditedAmount: creditAmount,
   };
 }
 

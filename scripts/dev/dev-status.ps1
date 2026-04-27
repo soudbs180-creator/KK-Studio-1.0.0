@@ -50,10 +50,58 @@ function Get-ProcessCommandLine {
     }
 }
 
+function Get-ListeningConnectionRecords {
+    $netTcpRecords = @()
+
+    try {
+        $netTcpRecords = @(Get-NetTCPConnection -State Listen -ErrorAction Stop |
+            Select-Object LocalPort, OwningProcess -Unique)
+    } catch {
+        $netTcpRecords = @()
+    }
+
+    if ($netTcpRecords.Count -gt 0) {
+        return $netTcpRecords
+    }
+
+    $netstatRecords = @()
+    try {
+        $netstatLines = @(cmd /c netstat -ano -p tcp | Select-String 'LISTENING')
+        foreach ($lineMatch in $netstatLines) {
+            $normalizedLine = ([string]$lineMatch.Line -replace '\s+', ' ').Trim()
+            if ([string]::IsNullOrWhiteSpace($normalizedLine)) {
+                continue
+            }
+
+            $parts = $normalizedLine.Split(' ')
+            if ($parts.Length -lt 5) {
+                continue
+            }
+
+            $localPort = 0
+            $owningProcess = 0
+            $localPortText = [string](($parts[1] -split ':')[-1])
+            $localPortText = $localPortText.Trim()
+            $owningProcessText = [string]$parts[4]
+
+            if ([int]::TryParse($localPortText, [ref]$localPort) -and [int]::TryParse($owningProcessText, [ref]$owningProcess)) {
+                $netstatRecords += [pscustomobject]@{
+                    LocalPort = $localPort
+                    OwningProcess = $owningProcess
+                }
+            }
+        }
+    } catch {
+        $netstatRecords = @()
+    }
+
+    return @($netstatRecords | Sort-Object LocalPort, OwningProcess -Unique)
+}
+
 function Get-ListeningPortsForProcess {
     param([int]$ProcessId)
 
-    return @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    return @(Get-ListeningConnectionRecords |
         Where-Object { $_.OwningProcess -eq $ProcessId } |
         Select-Object -ExpandProperty LocalPort -Unique)
 }
@@ -75,6 +123,10 @@ function Is-KnownDevProcess {
 
     $commandLine = [string](Get-ProcessCommandLine -ProcessId $ProcessId)
     $listeningPorts = @(Get-ListeningPortsForProcess -ProcessId $ProcessId)
+
+    if ($Port -in $listeningPorts) {
+        return $true
+    }
 
     if ($process.ProcessName -eq 'node' -and 3000 -in $listeningPorts -and 3001 -in $listeningPorts) {
         return $true
@@ -100,7 +152,7 @@ function Is-KnownDevProcess {
 function Get-PortOwnerProcessId {
     param([int]$Port)
 
-    $ownerPids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+    $ownerPids = @(Get-ListeningConnectionRecords | Where-Object { $_.LocalPort -eq $Port } |
         Select-Object -ExpandProperty OwningProcess -Unique)
 
     $resolvedOwnerPids = @()

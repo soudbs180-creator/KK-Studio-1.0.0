@@ -5,9 +5,9 @@ import { test } from 'node:test';
 test('package.json exposes admin scripts for the separate Vite target', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
-  assert.equal(pkg.scripts['admin:dev'], 'vite --config apps/admin/vite.config.ts');
-  assert.equal(pkg.scripts['admin:build'], 'vite build --config apps/admin/vite.config.ts');
-  assert.equal(pkg.scripts['admin:preview'], 'vite preview --config apps/admin/vite.config.ts');
+  assert.equal(pkg.scripts['admin:dev'], 'vite --configLoader native --config apps/admin/vite.config.ts');
+  assert.equal(pkg.scripts['admin:build'], 'vite build --configLoader native --config apps/admin/vite.config.ts');
+  assert.equal(pkg.scripts['admin:preview'], 'vite preview --configLoader native --config apps/admin/vite.config.ts');
 });
 
 test('admin html shell is local-only and ad-free', () => {

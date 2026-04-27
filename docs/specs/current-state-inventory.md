@@ -13,8 +13,8 @@
 | [api](/Users/Administrator/Downloads/KK-Studio-1.0.0/api) | 边缘/Serverless 路由 | 与 `server` 存在双入口问题 |
 | [billing](/Users/Administrator/Downloads/KK-Studio-1.0.0/billing) | 计费路由与引擎 | 域模型雏形明确，适合迁入模块化 API |
 | [payment-server](/Users/Administrator/Downloads/KK-Studio-1.0.0/payment-server) | 支付边车服务 | 建议保留独立部署，不并回前端 |
-| [supabase](/Users/Administrator/Downloads/KK-Studio-1.0.0/supabase) | Supabase 迁移与函数 | 是当前数据层主要来源 |
-| [migrations](/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations) | 历史 SQL | 与 `supabase/migrations` 双轨并存 |
+| [scripts/postgres](/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/postgres) | VPS PostgreSQL bootstrap 与导入脚本 | 是当前数据层主要来源 |
+| [migrations](/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations) | 历史 SQL | 与 legacy migrations 双轨并存 |
 | [tests/integration](/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/integration) | 集成测试 | 已具备账务与性能测试起点 |
 
 ## 2. 当前前端结构摘要
@@ -51,8 +51,8 @@
 
 ### 3.3 数据层
 
-- [supabase/migrations](/Users/Administrator/Downloads/KK-Studio-1.0.0/supabase/migrations)：现行迁移主干
-- [supabase/functions/secure-model-proxy/index.ts](/Users/Administrator/Downloads/KK-Studio-1.0.0/supabase/functions/secure-model-proxy/index.ts)：安全代理函数
+- [scripts/postgres/bootstrap-kk-vps.sql](/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/postgres/bootstrap-kk-vps.sql)：现行 VPS bootstrap 主干
+- [apps/api/src/modules/model-proxy](/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/api/src/modules/model-proxy)：安全代理服务
 - [migrations](/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations)：历史账务 schema
 
 ### 3.4 当前主要数据表
@@ -85,11 +85,11 @@
 | `src/services/api` | `apps/api/modules/model-catalog` + `packages/contracts` | 把供应商/模型配置迁出 UI 业务编排 |
 | `src/services/billing` | `apps/api/modules/billing` + `packages/domain` | 保留计算逻辑，新增服务端入口与 typed DTO |
 | `src/services/llm` | `apps/api/modules/generation` | 前端仅保留 client 与展示状态 |
-| `src/services/storage` | `apps/api/modules/storage-sync` + `infra/supabase` | 明确客户端缓存和服务端持久化职责 |
+| `src/services/storage` | `apps/api/modules/storage-sync` + `scripts/postgres` | 明确客户端缓存和服务端持久化职责 |
 | `server/*` | `apps/api/src/modules/*` | 逐个路由映射到模块控制器 |
 | `billing/*` | `apps/api/modules/billing/*` | 拆成 `presentation/application/domain/infrastructure` |
 | `payment-server/*` | `apps/payment-sidecar/*` | 保留独立部署并定义内部事件回写 |
-| `supabase/*` | `infra/supabase/*` | 迁移规范先收口，文件逐步归并 |
+| legacy database artifacts | `scripts/postgres/*` | 迁移规范先收口，文件逐步归并 |
 
 ## 5. 迁移优先级
 

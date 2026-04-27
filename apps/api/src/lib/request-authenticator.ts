@@ -6,7 +6,6 @@ import {
   AUTHENTICATED_USER_ROLE_HEADER,
 } from "../../../../packages/shared/src/index.ts";
 import { verifyKkSessionToken } from "../modules/auth/infrastructure/kk-session-token.ts";
-import { resolveServerSupabaseConfig } from "./server-supabase-config.ts";
 
 export interface AuthenticatedRequestContext {
   userId: string;
@@ -14,14 +13,14 @@ export interface AuthenticatedRequestContext {
   role?: string;
 }
 
+type MaybePromise<T> = T | Promise<T>;
+
 export interface RequestAuthenticator {
   authenticate(headers: Record<string, string>): Promise<AuthenticatedRequestContext | undefined>;
 }
 
 export interface RequestAuthenticatorOptions {
-  resolveLegacyAccessToken?: (accessToken: string) => AuthenticatedRequestContext | undefined;
-  supabaseUrl?: string;
-  supabaseAuthKey?: string;
+  resolveLegacyAccessToken?: (accessToken: string) => MaybePromise<AuthenticatedRequestContext | undefined>;
 }
 
 function readBearerToken(headers: Record<string, string>): string | undefined {
@@ -66,8 +65,6 @@ class HybridRequestAuthenticator implements RequestAuthenticator {
 
   constructor(options: RequestAuthenticatorOptions) {
     this.resolveLegacyAccessToken = options.resolveLegacyAccessToken;
-    void options.supabaseUrl;
-    void options.supabaseAuthKey;
   }
 
   async authenticate(
@@ -78,7 +75,9 @@ class HybridRequestAuthenticator implements RequestAuthenticator {
       return undefined;
     }
 
-    const legacyProfile = this.resolveLegacyAccessToken?.(bearerToken);
+    const legacyProfile = this.resolveLegacyAccessToken
+      ? await this.resolveLegacyAccessToken(bearerToken)
+      : undefined;
     if (legacyProfile) {
       return legacyProfile;
     }
@@ -106,8 +105,4 @@ export function createRequestAuthenticator(
   options: RequestAuthenticatorOptions,
 ): RequestAuthenticator {
   return new HybridRequestAuthenticator(options);
-}
-
-export function resolveSupabaseAuthKey(): string | undefined {
-  return resolveServerSupabaseConfig().authKey;
 }

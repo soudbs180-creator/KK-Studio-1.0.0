@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 
-import { supabase } from '../../src/lib/supabase.ts';
 import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import {
+  clearPersistedRuntimeAuthState,
+  persistRuntimeAuthState,
+} from '../../src/services/auth/runtimeAuthState.ts';
 import {
   combineUserApisEnvelopeSources,
   getUserApisPayloadDensity,
@@ -21,9 +24,6 @@ import {
 
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
-const originalGetSession = supabase.auth.getSession;
-const originalGetUser = supabase.auth.getUser;
-const originalSupabaseFrom = supabase.from.bind(supabase);
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
@@ -32,6 +32,31 @@ const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const locationLike = globalThis as { location?: { origin?: string } };
 const originalLocation = locationLike.location;
+
+function createRuntimeUser() {
+  return {
+    id: 'user-1',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'user-1@example.com',
+    phone: '',
+    created_at: '1970-01-01T00:00:00.000Z',
+    updated_at: '1970-01-01T00:00:00.000Z',
+    confirmed_at: '1970-01-01T00:00:00.000Z',
+    last_sign_in_at: '1970-01-01T00:00:00.000Z',
+    app_metadata: {
+      provider: 'password',
+      providers: ['password'],
+    },
+    user_metadata: {
+      provider: 'password',
+      auth_provider: 'password',
+      providers: ['password'],
+      full_name: 'User One',
+      display_name: 'User One',
+    },
+  };
+}
 
 type MutableEnvelope = {
   version: number;
@@ -161,42 +186,15 @@ function sanitizeEnvelopeForApi(payload: MutableEnvelope): MutableEnvelope {
 }
 
 function mockAuthenticatedUser() {
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: null,
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
-
-  supabase.auth.getUser = async () =>
-    ({
-      data: {
-        user: {
-          id: 'user-1',
-          email: 'user-1@example.com',
-        },
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetUser>>;
+  persistRuntimeAuthState({
+    user: createRuntimeUser(),
+    isTempUser: false,
+    tempUserExpiry: null,
+  });
 }
 
 function mockMissingAuthenticatedUser() {
-  supabase.auth.getSession = async () =>
-    ({
-      data: {
-        session: null,
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetSession>>;
-
-  supabase.auth.getUser = async () =>
-    ({
-      data: {
-        user: null,
-      },
-      error: null,
-    }) as Awaited<ReturnType<typeof originalGetUser>>;
+  clearPersistedRuntimeAuthState();
 }
 
 function mockApiState(initialPayload: unknown) {
@@ -272,16 +270,9 @@ function mockApiState(initialPayload: unknown) {
   };
 }
 
-function forbidSupabaseProfileFallback() {
-  (supabase as unknown as { from: typeof supabase.from }).from = (() => {
-    throw new Error('Supabase profile fallback should stay unused.');
-  }) as typeof supabase.from;
-}
 
 afterEach(() => {
-  supabase.auth.getSession = originalGetSession;
-  supabase.auth.getUser = originalGetUser;
-  (supabase as unknown as { from: typeof supabase.from }).from = originalSupabaseFrom;
+  clearPersistedRuntimeAuthState();
   legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
   legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
   legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
@@ -690,7 +681,6 @@ describe('user api cloud storage helpers', () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
     mockAuthenticatedUser();
-    forbidSupabaseProfileFallback();
 
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: false,
@@ -1060,7 +1050,6 @@ describe('user api cloud storage helpers', () => {
     delete process.env.VITE_KK_API_BASE_URL;
     locationLike.location = { origin: 'https://kk-studio.vercel.app' };
     mockAuthenticatedUser();
-    forbidSupabaseProfileFallback();
 
     legacyWebApiClient.getKeyManagerCloudState = async () => ({
       success: true,

@@ -1,12 +1,16 @@
 import React from 'react';
 
-import type { MobileResultEntry } from '../../types';
+import { Sparkles } from 'lucide-react';
+
+import type { MobileResultEntry, ResultViewMode } from '../../types';
 
 interface MobileResultTileProps {
   entry: MobileResultEntry;
   isActive: boolean;
   isSource: boolean;
+  viewMode: ResultViewMode;
   onEntryOpen: (entryId: string) => void;
+  onUseAsSource: (imageId: string) => void;
 }
 
 const formatTimestamp = (timestamp: number): string => {
@@ -27,20 +31,8 @@ const normalizePromptSummary = (value: string): string => {
   return normalized || '未命名结果';
 };
 
-const getSpanClassName = (entry: MobileResultEntry): string => {
-  if (entry.mobileTileSpan === 6) {
-    return 'col-span-6';
-  }
-
-  if (entry.mobileTileSpan === 3) {
-    return 'col-span-3';
-  }
-
-  return 'col-span-2';
-};
-
 const getFallbackAspectClassName = (entry: MobileResultEntry): string => {
-  switch (entry.mobileAspectCategory) {
+  switch (entry.mobileLayout.aspectCategory) {
     case 'wide':
       return 'aspect-[16/8]';
     case 'landscape':
@@ -56,18 +48,22 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   entry,
   isActive,
   isSource,
+  viewMode,
   onEntryOpen,
+  onUseAsSource,
 }) => {
   const promptSummary = normalizePromptSummary(entry.promptSummary);
-  const spanClassName = getSpanClassName(entry);
   const emphasisShadow =
-    entry.mobileTileEmphasis === 'hero'
+    entry.mobileLayout.emphasis === 'wide'
       ? 'shadow-[0_24px_56px_rgba(15,23,42,0.28)]'
       : 'shadow-[0_16px_36px_rgba(15,23,42,0.2)]';
+  const imageAspectRatio = Number.isFinite(entry.mobileLayout.aspectRatio) && entry.mobileLayout.aspectRatio > 0
+    ? entry.mobileLayout.aspectRatio
+    : 1;
 
   return (
     <article
-      className={`${spanClassName} ${emphasisShadow} overflow-hidden rounded-[24px] border bg-[var(--bg-secondary)]/92 transition-transform duration-200 ${
+      className={`relative ${emphasisShadow} mb-3 break-inside-avoid overflow-hidden rounded-[20px] border bg-[var(--bg-secondary)]/92 transition-transform duration-200 ${
         isActive ? 'border-blue-400/55 ring-1 ring-blue-400/35' : 'border-[var(--border-light)]'
       } ${isSource ? 'border-amber-400/60 ring-1 ring-amber-400/30' : ''}`}
     >
@@ -82,7 +78,8 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
           <img
             src={entry.displaySrc}
             alt={promptSummary}
-            className="block h-auto w-full bg-[var(--bg-tertiary)] object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
+            className="block w-full bg-[var(--bg-tertiary)] object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
+            style={{ aspectRatio: imageAspectRatio }}
           />
         ) : (
           <div
@@ -93,7 +90,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         )}
 
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <span className="rounded-full bg-black/55 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">
+          <span className="max-w-[65%] truncate rounded-full bg-black/55 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">
             {formatTimestamp(entry.timestamp)}
           </span>
           {isSource ? (
@@ -108,12 +105,38 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             <span className="line-clamp-2 text-[11px] font-medium leading-4 text-white/90">
               {promptSummary}
             </span>
-            <span className="shrink-0 rounded-full border border-white/10 bg-black/35 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur">
+            <span className="max-w-[42%] shrink-0 truncate rounded-full border border-white/10 bg-black/35 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur">
               {entry.displayLabel || entry.aspectRatio}
             </span>
           </div>
         </div>
       </button>
+      {viewMode === 'detail' ? (
+        <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
+          <div className="min-w-0 text-[11px] text-[var(--text-secondary)]">
+            <span className="truncate">{entry.modelLabel}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onUseAsSource(entry.imageId)}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2.5 text-[11px] font-medium text-[var(--text-primary)]"
+            title="继续创作"
+          >
+            <Sparkles size={13} />
+            <span className="whitespace-nowrap">继续</span>
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onUseAsSource(entry.imageId)}
+          className="absolute right-2 top-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white shadow-lg backdrop-blur-md"
+          title="继续创作"
+          aria-label="继续创作"
+        >
+          <Sparkles size={14} />
+        </button>
+      )}
     </article>
   );
 };

@@ -19,26 +19,15 @@ import {
 import { cleanupCompletedTasksOlderThan } from '../../../services/persistence/taskPersistence';
 import { cleanupLogsOlderThan } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
+import {
+  SettingsActionButton,
+  SettingsBadge,
+  SettingsHero,
+  SettingsMetricCard,
+  SettingsSection,
+  SettingsViewShell,
+} from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
-
-const StorageMetricCard: React.FC<{ label: string; value: string; helper: string; badge?: React.ReactNode }> = ({
-  label,
-  value,
-  helper,
-  badge,
-}) => (
-  <section className="settings-reference-card settings-reference-card--elevated">
-    <div className="settings-reference-card__header">
-      <div>
-        <div className="settings-reference-card__eyebrow">{label}</div>
-        <div className="settings-reference-card__title">{value}</div>
-        <div className="settings-reference-card__meta">{helper}</div>
-      </div>
-      {badge}
-    </div>
-  </section>
-);
 
 const StorageModeTile: React.FC<{
   title: string;
@@ -86,7 +75,7 @@ export const StorageSettingsView: React.FC = () => {
   const [projectAction, setProjectAction] = useState<'merge' | 'cleanup' | null>(null);
   const [mergeSourceId, setMergeSourceId] = useState('');
   const [lastActionMessage, setLastActionMessage] = useState(() =>
-    pick('还没有执行过存储操作。', 'No storage action has been executed yet.')
+    pick('还没有存储动作。', 'No storage action yet.')
   );
 
   const supportsLocal = isFileSystemAccessSupported();
@@ -182,13 +171,7 @@ export const StorageSettingsView: React.FC = () => {
         );
         setLastActionMessage(pick('未能启用本地文件夹存储。', 'Failed to activate local-folder persistence.'));
         return;
-      }
-
-      notify.success(
-        pick('切换成功', 'Switched'),
-        pick('现在已经改为本地文件夹存储。', 'Local-folder persistence is now active.')
-      );
-      await refresh();
+      }      await refresh();
     } catch (error) {
       console.error('[StorageSettingsView] Failed to switch local mode:', error);
       notify.error(
@@ -214,13 +197,7 @@ export const StorageSettingsView: React.FC = () => {
         );
         setLastActionMessage(pick('未能启用浏览器缓存模式。', 'Failed to activate browser persistence.'));
         return;
-      }
-
-      notify.success(
-        pick('切换成功', 'Switched'),
-        pick('现在已经改为浏览器缓存。', 'Browser-cache persistence is now active.')
-      );
-      await refresh();
+      }      await refresh();
     } catch (error) {
       console.error('[StorageSettingsView] Failed to switch browser mode:', error);
       notify.error(
@@ -234,6 +211,16 @@ export const StorageSettingsView: React.FC = () => {
   };
 
   const handleCleanup = async () => {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            '确认清理原图缓存吗？结果图和项目数据会保留。',
+            'Clean cached originals now? Result images and project data will stay.',
+          ),
+        );
+    if (!confirmed) return;
+
     setCleanupType('compress');
     setLastActionMessage(pick('正在清理原始图片缓存...', 'Cleaning original image cache...'));
     try {
@@ -258,6 +245,16 @@ export const StorageSettingsView: React.FC = () => {
   };
 
   const handleRetentionCleanup = async (days: number) => {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            `确认应用 ${days} 天保留策略吗？这会清理缓存图、原图、任务记录和系统日志。`,
+            `Apply the ${days}-day retention policy? This clears cached images, originals, task records, and system logs.`,
+          ),
+        );
+    if (!confirmed) return;
+
     setCleanupType(days);
     setLastActionMessage(
       pick(
@@ -320,6 +317,16 @@ export const StorageSettingsView: React.FC = () => {
       return;
     }
 
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            `确认把“${sourceCanvas.name}”合并到“${activeCanvas.name}”吗？合并后原项目会被删除。`,
+            `Merge "${sourceCanvas.name}" into "${activeCanvas.name}"? The source project will be removed.`,
+          ),
+        );
+    if (!confirmed) return;
+
     setProjectAction('merge');
     setLastActionMessage(
       pick(
@@ -356,6 +363,16 @@ export const StorageSettingsView: React.FC = () => {
       return;
     }
 
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            `确认清理“${activeCanvas.name}”中的无效卡片吗？`,
+            `Clean invalid cards in "${activeCanvas.name}" now?`,
+          ),
+        );
+    if (!confirmed) return;
+
     setProjectAction('cleanup');
     setLastActionMessage(
       pick(
@@ -389,76 +406,88 @@ export const StorageSettingsView: React.FC = () => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">{pick('高级设置', 'Advanced Settings')}</div>
-            <h2>{pick('存储管理', 'Storage')}</h2>
-            <p>
-              {pick(
-                '把存储目标、缓存压力和项目维护整合到同一页，避免在不同面板之间来回切换。',
-                'Storage targets, cache pressure, and project maintenance now live in the same console.'
-              )}
-            </p>
-          </div>
-          <div className="settings-reference-actions">
+        <SettingsHero
+          eyebrow={pick('高级设置', 'Advanced settings')}
+          title={pick('存储维护', 'Storage')}
+          description={pick(
+            '切换模式、查看容量、执行清理。',
+            'Switch modes, check capacity, and run cleanup.'
+          )}
+          icon={HardDrive}
+          badge={(
             <SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>
               {getModeLabel(mode)}
             </SettingsBadge>
+          )}
+          actions={(
             <SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refresh()}>
               {pick('刷新', 'Refresh')}
             </SettingsActionButton>
-          </div>
-        </div>
-
-        <div className="settings-reference-grid-3">
-          <StorageMetricCard
-            label={pick('主存储目标', 'Primary Target')}
-            value={getModeLabel(mode)}
-            helper={
-              mode === 'local'
-                ? pick('资源会落到授权的本地文件夹中。', 'Assets are being persisted into a granted local folder.')
-                : mode === 'browser'
-                  ? pick('资源当前保留在浏览器缓存层中。', 'Assets remain inside the browser storage layer.')
-                  : pick('请选择一个持久化目标，让缓存行为稳定下来。', 'Pick a persistent target to stabilise cache operations.')
-            }
-            badge={<SettingsBadge tone={mode ? 'emerald' : 'amber'}>{mode ? pick('已配置', 'Configured') : pick('待配置', 'Pending')}</SettingsBadge>}
-          />
-          <StorageMetricCard
-            label={pick('缓存占用', 'Cache Footprint')}
-            value={formatMb(usageMB)}
-            helper={pick(`缓存层当前追踪 ${imageCount} 张图片。`, `${imageCount} images currently tracked in the cache layer.`)}
-            badge={<SettingsBadge tone={usageMB >= 512 ? 'amber' : 'indigo'}>{usageMB >= 512 ? pick('注意占用', 'Watch usage') : pick('健康', 'Healthy')}</SettingsBadge>}
-          />
-          <StorageMetricCard
-            label={pick('工作区项目', 'Workspace Projects')}
-            value={activeCanvas?.name || pick('没有活动项目', 'No active project')}
-            helper={pick(`当前工作区可管理 ${state.canvases.length} 个画布项目。`, `${state.canvases.length} canvases can be managed from this workspace.`)}
-            badge={<SettingsBadge tone="neutral">{pick(`共 ${state.canvases.length} 个`, `${state.canvases.length} total`)}</SettingsBadge>}
-          />
-        </div>
+          )}
+          metrics={(
+            <>
+              <SettingsMetricCard
+                label={pick('主存储目标', 'Primary target')}
+                value={getModeLabel(mode)}
+                helper={
+                  mode === 'local'
+                    ? pick('资源会落到授权的本地文件夹中。', 'Assets are being persisted into a granted local folder.')
+                    : mode === 'browser'
+                      ? pick('资源当前保留在浏览器缓存层中。', 'Assets remain inside the browser storage layer.')
+                      : pick('请选择一个存储目标。', 'Choose a storage target.')
+                }
+                tone={mode ? 'emerald' : 'amber'}
+              />
+              <SettingsMetricCard
+                label={pick('缓存占用', 'Cache footprint')}
+                value={formatMb(usageMB)}
+                helper={pick(`缓存层当前追踪 ${imageCount} 张图片。`, `${imageCount} images currently tracked in the cache layer.`)}
+                tone={usageMB >= 512 ? 'amber' : 'indigo'}
+              />
+              <SettingsMetricCard
+                label={pick('活动项目', 'Active project')}
+                value={activeCanvas?.name || pick('没有活动项目', 'No active project')}
+                helper={pick(`当前工作区可管理 ${state.canvases.length} 个画布项目。`, `${state.canvases.length} canvases can be managed from this workspace.`)}
+                tone="neutral"
+              />
+              <SettingsMetricCard
+                label={pick('图片记录', 'Image records')}
+                value={`${imageCount}`}
+                helper={pick('当前存储层中发现的图片 ID 总数。', 'Total image IDs currently discovered in the storage layer.')}
+                tone="neutral"
+              />
+            </>
+          )}
+        />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
+          <SettingsSection
+            title={pick('持久化模式', 'Persistence modes')}
+            eyebrow={pick('存储策略', 'Storage strategy')}
+            description={pick(
+              '选择当前工作区的存储目标。',
+              'Choose the storage target for this workspace.'
+            )}
+          >
+            <div className="hidden">
               <div>
-                <div className="settings-reference-card__eyebrow">{pick('存储策略', 'Storage Strategy')}</div>
-                <div className="settings-reference-card__title">{pick('持久化模式', 'Persistence Modes')}</div>
+                <div className="settings-reference-card__eyebrow">{pick('模式总览', 'Mode overview')}</div>
                 <div className="settings-reference-card__meta">
-                  {pick('每个按钮只负责一种真实动作，避免保存、刷新和切换语义混在一起。', 'Each action tile handles exactly one storage task so the result is easier to predict.')}
+                  {pick('为快速体验保留浏览器缓存，为长期归档保留本地文件夹。', 'Keep browser cache for quick sessions and local folders for longer-lived workspaces.')}
                 </div>
-              </div>
+                </div>
               <HardDrive size={18} className="text-[var(--text-primary)]" />
             </div>
 
             <div className="mt-5 settings-reference-grid-2">
               <StorageModeTile
                 title={pick('本地文件夹', 'Local Folder')}
-                description={pick('适合长期归档、跨浏览器复用和较大的工作区。', 'Best for durable archiving, cross-browser reuse, and long-running workspaces.')}
+                description={pick('适合长期归档和较大工作区。', 'Best for durable storage and larger workspaces.')}
                 helper={
                   supportsLocal
                     ? isConnectedToLocal
-                      ? pick('本地文件夹已经授权完成。', 'Browser permission is already granted for the local folder.')
-                      : pick('浏览器支持本地文件夹，但还没有授权。', 'Browser supports local-folder permission but a folder still needs to be granted.')
+                      ? pick('本地文件夹已授权。', 'Local folder permission is ready.')
+                      : pick('浏览器支持本地文件夹，但还没授权。', 'Local folder is supported but not granted yet.')
                     : pick('当前浏览器不支持本地文件夹接口。', 'This browser does not expose the local folder API.')
                 }
                 active={mode === 'local'}
@@ -467,6 +496,7 @@ export const StorageSettingsView: React.FC = () => {
                     icon={FolderOpen}
                     tone="primary"
                     loading={switchingMode === 'local'}
+                    disabled={!supportsLocal || mode === 'local'}
                     onClick={() => void switchToLocal()}
                   >
                     {pick('使用本地文件夹', 'Use Local Folder')}
@@ -475,12 +505,13 @@ export const StorageSettingsView: React.FC = () => {
               />
               <StorageModeTile
                 title={pick('浏览器缓存', 'Browser Cache')}
-                description={pick('适合临时实验和轻量本地会话。', 'Fastest option for quick experiments and lightweight local sessions.')}
-                helper={pick('不需要额外授权，但数据会保留在浏览器环境中。', 'No folder permission is required, but the data remains inside the browser environment.')}
+                description={pick('适合临时会话和快速试验。', 'Best for quick sessions and experiments.')}
+                helper={pick('不需要额外授权，数据保留在浏览器里。', 'No extra permission is required. Data stays in the browser.')}
                 active={mode === 'browser'}
                 action={
                   <SettingsActionButton
                     loading={switchingMode === 'browser'}
+                    disabled={mode === 'browser'}
                     onClick={() => void switchToBrowser()}
                   >
                     {pick('使用浏览器缓存', 'Use Browser Cache')}
@@ -489,26 +520,31 @@ export const StorageSettingsView: React.FC = () => {
               />
             </div>
 
-            <div className="mt-5 rounded-[22px] border border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] p-4">
-              <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--text-tertiary)]">
-                {pick('最近动作', 'Last Action')}
+              <div className="mt-5 rounded-[22px] border border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] p-4">
+                <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--text-tertiary)]">
+                  {pick('最近动作', 'Last Action')}
               </div>
-              <div className="mt-2 text-[14px] leading-6 text-[var(--text-secondary)]">{lastActionMessage}</div>
-            </div>
-          </section>
+                <div className="mt-2 text-[14px] leading-6 text-[var(--text-secondary)]">{lastActionMessage}</div>
+              </div>
+          </SettingsSection>
 
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
+          <SettingsSection
+            title={pick('占用分布', 'Usage distribution')}
+            eyebrow={pick('容量快照', 'Capacity snapshot')}
+            description={pick(
+              '用 1 GB 参考线查看容量。',
+              'Read usage against a 1 GB guide.'
+            )}
+          >
+            <div className="hidden">
               <div>
-                <div className="settings-reference-card__eyebrow">{pick('容量快照', 'Capacity Snapshot')}</div>
-                <div className="settings-reference-card__title">{pick('占用分布', 'Usage Distribution')}</div>
+                <div className="settings-reference-card__eyebrow">{pick('占用总量', 'Current footprint')}</div>
+                <div className="settings-reference-card__title">{formatMb(usageMB)}</div>
+                <div className="settings-reference-card__meta">
+                  {pick('缓存层正在持续跟踪图片、原图和工作区材料。', 'The cache layer is tracking images, originals, and workspace materials.')}
+                </div>
               </div>
               <Layers3 size={18} className="text-[var(--text-primary)]" />
-            </div>
-
-            <div className="settings-reference-kpi__value">{formatMb(usageMB)}</div>
-            <div className="settings-reference-kpi__helper">
-              {pick('按 1 GB 运行阈值可视化，用于快速判断容量压力。', 'Visualised against a 1 GB operating threshold for quick pressure checks.')}
             </div>
 
             <div className="mt-4">
@@ -553,22 +589,25 @@ export const StorageSettingsView: React.FC = () => {
                 <div className="settings-reference-mini-metric__helper">
                   {pick('当前工作区内可维护的画布总数。', 'Total canvases currently available for maintenance.')}
                 </div>
+                </div>
               </div>
-            </div>
-          </section>
+          </SettingsSection>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,1fr)]">
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
+          <SettingsSection
+            title={pick('清理控制', 'Cleanup controls')}
+            eyebrow={pick('缓存维护', 'Cache maintenance')}
+            description={pick(
+              '手动清理或应用保留策略。',
+              'Run manual cleanup or apply a retention policy.'
+            )}
+          >
+            <div className="hidden">
               <div>
-                <div className="settings-reference-card__eyebrow">{pick('缓存维护', 'Cache Maintenance')}</div>
-                <div className="settings-reference-card__title">{pick('清理控制', 'Cleanup Controls')}</div>
+                <div className="settings-reference-card__eyebrow">{pick('手动与策略', 'Manual and policy-based')}</div>
                 <div className="settings-reference-card__meta">
-                  {pick(
-                    '手机端只保留手动清原图和 7 天 / 30 天策略，避免误触过短档位。',
-                    'Mobile keeps manual original cleanup plus 7-day and 30-day policies only.'
-                  )}
+                  {pick('原图清理和按时保留策略分开处理，避免误删结果图与项目数据。', 'Original cleanup and timed retention policies stay separate to reduce accidental data loss.')}
                 </div>
               </div>
               <Trash2 size={18} className="text-[var(--text-primary)]" />
@@ -617,15 +656,21 @@ export const StorageSettingsView: React.FC = () => {
                 ))}
               </div>
             </div>
-          </section>
+          </SettingsSection>
 
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
+          <SettingsSection
+            title={pick('工作区修复动作', 'Workspace repair actions')}
+            eyebrow={pick('项目维护', 'Project maintenance')}
+            description={pick(
+              '合并旧项目，或清理无效卡片。',
+              'Merge old projects or remove invalid cards.'
+            )}
+          >
+            <div className="hidden">
               <div>
-                <div className="settings-reference-card__eyebrow">{pick('项目维护', 'Project Maintenance')}</div>
-                <div className="settings-reference-card__title">{pick('工作区修复动作', 'Workspace Repair Actions')}</div>
+                <div className="settings-reference-card__eyebrow">{pick('项目合并与整理', 'Merge and cleanup')}</div>
                 <div className="settings-reference-card__meta">
-                  {pick('可以把旧项目合并到当前项目，或清理无效卡片，不需要离开存储页。', 'Merge retired canvases into the active project or clean invalid cards without leaving the storage page.')}
+                  {pick('所有动作都围绕当前活动项目展开，减少跨页维护成本。', 'All repair actions stay centered on the current active project to reduce maintenance overhead.')}
                 </div>
               </div>
               <Activity size={18} className="text-[var(--text-primary)]" />
@@ -650,6 +695,7 @@ export const StorageSettingsView: React.FC = () => {
                   <SettingsActionButton
                     loading={projectAction === 'merge'}
                     tone="primary"
+                    disabled={!activeCanvas || mergeCandidates.length === 0 || !mergeSourceId}
                     onClick={() => void handleMergeProject()}
                   >
                     {pick('合并到当前项目', 'Merge into Active Project')}
@@ -680,7 +726,7 @@ export const StorageSettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
-          </section>
+          </SettingsSection>
         </div>
       </div>
     </SettingsViewShell>

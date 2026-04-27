@@ -1,26 +1,21 @@
-﻿import React, { Suspense, lazy, useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
-import PromptBar from './components/layout/PromptBar';
 import ImageNode from './components/image/ImageCard';
-import { GlobalLightbox } from './components/image/GlobalLightbox';
-import PptStackPreviewModal from './components/image/PptStackPreviewModal';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch } from './types';
-import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, User, LayoutDashboard, LogOut, Settings, Zap, Sparkles } from 'lucide-react';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState, type EcommerceFrameworkQueueItem } from './types';
+import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
 import { modelCaller } from './services/model/modelCaller';
-import { getModelPricing, isCreditBasedModel, getModelCredits } from './services/model/modelPricing';
+import { getModelPricing, getModelCredits } from './services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { getModelCapabilities } from './services/model/modelCapabilities';
-import { isSystemModelRoute } from './services/model/modelRoute';
-import { resolveModelExecutionLane } from './services/model/modelExecutionLane';
 import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
 import { resolveEcommercePromptNodeMetadata } from './services/ecommerce/ecommercePromptNodeMetadata.ts';
@@ -37,13 +32,26 @@ import {
   type EcommerceGroupSlotState,
 } from './services/ecommerce/groupSlotState.ts';
 import { mergeEcommerceTaskState } from './services/ecommerce/taskMerger.ts';
+import {
+  cancelEcommerceFrameworkNodeQueue,
+  createDefaultEcommerceFrameworkSchedulerConfig,
+  createEcommerceFrameworkRuntimeState,
+  enqueueEcommerceFrameworkItems,
+  markEcommerceFrameworkQueueItemStatus,
+  migrateLegacyEcommerceFrameworkCanvas,
+  pauseEcommerceFrameworkRuntime,
+  resolveEcommerceFrameworkDispatchPlan,
+  resolveEcommerceFrameworkSummary,
+  resolveFrameworkLane,
+  resumeEcommerceFrameworkRuntime,
+} from './services/ecommerce/frameworkRuntime.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { appendUploadFilesWithinLimit } from './components/ecommerce/ecommerceImportPreview.ts';
 import { getCardDimensions } from './utils/styleUtils';
 import { buildDockedPromptChildRegroupLayout, buildGeneratedImageBatchPositions, resolveRegroupTargetSlotIndices } from './utils/generatedImageLayout';
-import { getViewportPreferredPosition, findSafePosition } from './utils/canvasUtils'; // 🎯 Smart Positioning
-import { getViewportOffsets, getPromptBarFrontPosition } from './utils/canvasCenter';
+import { getViewportPreferredPosition } from './utils/canvasUtils';
+import { getViewportOffsets } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
@@ -61,6 +69,52 @@ import {
   type LiveSceneSnapshot,
   type PromptGroupLayoutMode,
 } from './canvas/liveScene';
+import AppPromptComposer from './app/AppPromptComposer';
+import AppGlobalModals, { type AppGlobalModalsProps } from './app/AppGlobalModals';
+import {
+  type AgentRenderItem,
+  type CanvasRenderItem,
+  type ImageRenderItem,
+  type PreviewRenderItem,
+  type PromptGroupLayoutPresentationState,
+  type PromptGroupRegroupLayout,
+  type PromptGroupRenderItem,
+  type PromptGroupTier,
+  type PromptGroupView,
+  type SaveRenderItem,
+  type ScheduledImageLoadState,
+  type WorkflowUtilityCanvasNode,
+} from './app/appCanvasTypes';
+import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connectorGeometry';
+import AppDesktopChrome from './app/AppDesktopChrome';
+import AppCanvasOverlays from './app/AppCanvasOverlays';
+import AppMobileWorkspace from './app/AppMobileWorkspace';
+import { buildPptSlidesPreviewHtml } from './app/buildPptSlidesPreviewHtml';
+import { buildPptxSlideRelationshipsXml, buildPptxSlideXml } from './app/buildPptxSlideDocuments';
+import { buildCancelledPromptNodePatch } from './app/buildCancelledPromptNodePatch';
+import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
+import { buildGeneratingPromptNode } from './app/buildGeneratingPromptNode';
+import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
+import { buildRetryExecutionNode } from './app/buildRetryExecutionNode';
+import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
+import { persistGeneratingPromptNode } from './app/persistGeneratingPromptNode';
+import { resolveGenerationBillingState } from './app/resolveGenerationBillingState';
+import { resolveGenerationPreviewState } from './app/resolveGenerationPreviewState';
+import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
+import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
+import { writePptxPackageSkeleton } from './app/writePptxPackageSkeleton';
+import { useAppPromptBarProps } from './app/useAppPromptBarProps';
+import { useCanvasDragConnection } from './app/useCanvasDragConnection';
+import { useCanvasSelectionBox } from './app/useCanvasSelectionBox';
+import { useCanvasNodeSelection } from './app/useCanvasNodeSelection';
+import { useDraftNodeSync } from './app/useDraftNodeSync';
+import { useGenerationPlacement } from './app/useGenerationPlacement';
+import { useGenerationReferenceImages } from './app/useGenerationReferenceImages';
+import { usePromptGroupDragHandlers } from './app/usePromptGroupDragHandlers';
+import { useSelectionMenuOverlay } from './app/useSelectionMenuOverlay';
+import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
+import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
+import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TRIGGER_COOLDOWN_MS = 500;
 const GENERATE_SIGNATURE_DEDUP_MS = 4000;
@@ -79,7 +133,9 @@ type EcommerceRuntimeState = {
   groupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
   activeTaskNodeId: string | null;
   activeTaskState: EcommerceEditableTaskState | null;
+  activeFrameworkId: string | null;
   activeGroupSheet: EcommerceGroupSheet | null;
+  frameworkRuntime: Record<string, EcommerceFrameworkRuntimeState>;
   isAnalyzing: boolean;
   isConfirmingAnalysis: boolean;
 };
@@ -98,31 +154,156 @@ type EcommerceUploadReferenceBundle = {
   productImageRef?: EcommerceImageRef;
 };
 
+type SharedPromptNodeActionProps = Pick<
+  React.ComponentProps<typeof PromptNodeComponent>,
+  | 'onCancel'
+  | 'onRetry'
+  | 'onEditPptDeck'
+  | 'onExportPpt'
+  | 'onExportPptx'
+  | 'onRetryPptPage'
+  | 'onExportPptPage'
+  | 'onToggleEcommerceSelected'
+  | 'onSetEcommerceGroupSelection'
+  | 'onGenerateEcommerceNode'
+  | 'onGenerateEcommerceGroup'
+  | 'onGenerateEcommerceFramework'
+  | 'onPauseEcommerceFramework'
+  | 'onResumeEcommerceFramework'
+  | 'onCancelEcommerceNodeQueue'
+  | 'onConfirmEcommerceDesktop'
+  | 'onRetryEcommerceModule'
+  | 'onExportEcommerceGroup'
+  | 'ecommerceFrameworkStatus'
+  | 'activeEcommerceTaskState'
+  | 'onActivateEcommerceTask'
+  | 'onEcommerceTaskStateChange'
+  | 'ecommerceSlotState'
+  | 'onPreviewEcommerceSlotHistory'
+  | 'ioTrace'
+  | 'onOpenStorageSettings'
+  | 'onDelete'
+  | 'onDisconnect'
+  | 'onUpdateNode'
+>;
+
+type SharedImageNodeProps = Pick<
+  React.ComponentProps<typeof ImageNode>,
+  | 'image'
+  | 'onPositionChange'
+  | 'onDimensionsUpdate'
+  | 'onUpdate'
+  | 'onDelete'
+  | 'onConnectEnd'
+  | 'onClick'
+  | 'isActive'
+  | 'zoomScale'
+  | 'isMobile'
+  | 'onPreview'
+  | 'onPreviewPptStack'
+  | 'onDownloadPptComposite'
+  | 'isCanvasTransforming'
+  | 'isNew'
+  | 'canvasTransform'
+>;
+
+type ConnectorDisconnectButtonProps = {
+  x: number;
+  y: number;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+};
+
+type ConnectorRenderSnapshot = {
+  promptIds: string[];
+  imageIds: string[];
+  workflowUtilityIds: string[];
+  positionByNodeId: Record<string, { x: number; y: number }>;
+};
+
+const EMPTY_CONNECTOR_RENDER_SNAPSHOT: ConnectorRenderSnapshot = {
+  promptIds: [],
+  imageIds: [],
+  workflowUtilityIds: [],
+  positionByNodeId: {},
+};
+
 const MAX_ECOMMERCE_PRODUCT_FILES = 4;
 const MAX_ECOMMERCE_EXTRA_REFERENCE_FILES = 4;
 const MAX_ECOMMERCE_ITEM_REFERENCE_FILES = 6;
+
+const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x, y, onClick }) => (
+  <foreignObject
+    x={x - 12}
+    y={y - 12}
+    width={24}
+    height={24}
+    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+    style={{ pointerEvents: 'auto' }}
+  >
+    <div
+      className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
+      style={{ backgroundColor: 'var(--bg-secondary)' }}
+      onClick={onClick}
+      title="鏂紑杩炴帴"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </div>
+  </foreignObject>
+);
+
+const createEmptyEcommerceGroupSlots = (): Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> => ({
+  '主图': [],
+  'A+': [],
+});
+
+const createEcommerceAnalysisResetPatch = (
+  options: {
+    isAnalyzing?: boolean;
+    requirementFile?: File | null;
+  } = {},
+): Partial<EcommerceRuntimeState> => {
+  const patch: Partial<EcommerceRuntimeState> = {
+    itemReferenceFiles: {},
+    analysis: null,
+    analysisConfirmed: false,
+    selectedItems: {},
+    taskStates: {},
+    groupSlots: createEmptyEcommerceGroupSlots(),
+    activeTaskNodeId: null,
+    activeTaskState: null,
+    activeGroupSheet: null,
+    isConfirmingAnalysis: false,
+  };
+
+  if ('requirementFile' in options) {
+    patch.requirementFile = options.requirementFile ?? null;
+  }
+
+  if ('isAnalyzing' in options) {
+    patch.isAnalyzing = options.isAnalyzing ?? false;
+  }
+
+  return patch;
+};
 
 const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceGroupSheet, EcommerceSheetSetting> => {
   const preferredImageSize = resolvePreferredEcommerceImageSize(normalizeEcommerceModelId(modelId) || modelId) as ImageSize;
 
   return {
     '主图': {
-      aspectRatio: AspectRatio.SQUARE,
+      aspectRatio: AspectRatio.AUTO,
       imageSize: preferredImageSize,
     },
     'A+': {
       aspectRatio: AspectRatio.LANDSCAPE_16_9,
-      imageSize: preferredImageSize,
+      imageSize: ImageSize.SIZE_4K,
       aPlusControlMode: 'auto',
     },
   };
 };
-
-const PromptBarCompat = PromptBar as React.ComponentType<React.ComponentProps<typeof PromptBar> & {
-  ecommerceSheetSettings?: Record<EcommerceGroupSheet, EcommerceSheetSetting>;
-  onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch) => void;
-  sendLabel?: string;
-}>;
 
 const boundsIntersect = (
   left: { x: number; y: number; width: number; height: number },
@@ -134,232 +315,10 @@ const boundsIntersect = (
   || right.y + right.height <= left.y
 );
 
-function buildSoftConnectorPath(startX: number, startY: number, endX: number, endY: number) {
-  const { control1X, control1Y, control2X, control2Y } = getSoftConnectorControlPoints(startX, startY, endX, endY);
-
-  return `M${startX},${startY} C${control1X},${control1Y} ${control2X},${control2Y} ${endX},${endY}`;
-}
-
-function buildDockedVerticalConnectorPath(startX: number, startY: number, endX: number, endY: number) {
-  const deltaY = endY - startY;
-  const directionY = deltaY === 0 ? 1 : Math.sign(deltaY);
-  const distanceY = Math.abs(deltaY);
-  const startPullY = Math.max(28, Math.min(distanceY * 0.5, 140)) * directionY;
-  const endPullY = Math.max(24, Math.min(distanceY * 0.34, 112)) * directionY;
-
-  return `M${startX},${startY} C${startX},${startY + startPullY} ${endX},${endY - endPullY} ${endX},${endY}`;
-}
-
-function getSoftConnectorControlPoints(startX: number, startY: number, endX: number, endY: number) {
-  const deltaX = endX - startX;
-  const distanceX = Math.abs(deltaX);
-  const distanceY = Math.abs(endY - startY);
-  const directionX = deltaX === 0 ? 0 : Math.sign(deltaX);
-  const horizontalPull = Math.min(distanceX * 0.22, 64) * directionX;
-  const startPullY = Math.min(Math.max(distanceY * 0.42, 24), Math.max(distanceY * 0.72, 24));
-  const endPullY = Math.min(Math.max(distanceY * 0.24, 18), Math.max(distanceY * 0.44, 18));
-
-  return {
-    control1X: startX + horizontalPull,
-    control1Y: startY + startPullY,
-    control2X: endX - horizontalPull,
-    control2Y: endY - endPullY,
-  };
-}
-
-type CubicBezierSegment = {
-  startX: number;
-  startY: number;
-  control1X: number;
-  control1Y: number;
-  control2X: number;
-  control2Y: number;
-  endX: number;
-  endY: number;
-};
-
-function getSoftConnectorBezierSegment(startX: number, startY: number, endX: number, endY: number): CubicBezierSegment {
-  return {
-    startX,
-    startY,
-    ...getSoftConnectorControlPoints(startX, startY, endX, endY),
-    endX,
-    endY,
-  };
-}
-
-function buildCubicBezierPath(segment: CubicBezierSegment) {
-  return `M${segment.startX},${segment.startY} C${segment.control1X},${segment.control1Y} ${segment.control2X},${segment.control2Y} ${segment.endX},${segment.endY}`;
-}
-
-function interpolatePoint(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  t: number
-) {
-  return {
-    x: from.x + ((to.x - from.x) * t),
-    y: from.y + ((to.y - from.y) * t),
-  };
-}
-
-function splitCubicBezierSegment(segment: CubicBezierSegment, t: number) {
-  const p0 = { x: segment.startX, y: segment.startY };
-  const p1 = { x: segment.control1X, y: segment.control1Y };
-  const p2 = { x: segment.control2X, y: segment.control2Y };
-  const p3 = { x: segment.endX, y: segment.endY };
-
-  const p01 = interpolatePoint(p0, p1, t);
-  const p12 = interpolatePoint(p1, p2, t);
-  const p23 = interpolatePoint(p2, p3, t);
-  const p012 = interpolatePoint(p01, p12, t);
-  const p123 = interpolatePoint(p12, p23, t);
-  const p0123 = interpolatePoint(p012, p123, t);
-
-  return {
-    left: {
-      startX: p0.x,
-      startY: p0.y,
-      control1X: p01.x,
-      control1Y: p01.y,
-      control2X: p012.x,
-      control2Y: p012.y,
-      endX: p0123.x,
-      endY: p0123.y,
-    } satisfies CubicBezierSegment,
-    right: {
-      startX: p0123.x,
-      startY: p0123.y,
-      control1X: p123.x,
-      control1Y: p123.y,
-      control2X: p23.x,
-      control2Y: p23.y,
-      endX: p3.x,
-      endY: p3.y,
-    } satisfies CubicBezierSegment,
-  };
-}
-
-function getCubicBezierPoint(start: number, control1: number, control2: number, end: number, t: number) {
-  const mt = 1 - t;
-  const mt2 = mt * mt;
-  const t2 = t * t;
-
-  return (mt * mt2 * start) + (3 * mt2 * t * control1) + (3 * mt * t2 * control2) + (t * t2 * end);
-}
-
-function getSoftConnectorPointAt(startX: number, startY: number, endX: number, endY: number, t: number) {
-  const { control1X, control1Y, control2X, control2Y } = getSoftConnectorControlPoints(startX, startY, endX, endY);
-
-  return {
-    x: getCubicBezierPoint(startX, control1X, control2X, endX, t),
-    y: getCubicBezierPoint(startY, control1Y, control2Y, endY, t),
-  };
-}
-
-function estimateCubicBezierLength(segment: CubicBezierSegment, samples: number = 18) {
-  let totalLength = 0;
-  let previousPoint = { x: segment.startX, y: segment.startY };
-
-  for (let index = 1; index <= samples; index += 1) {
-    const t = index / samples;
-    const point = {
-      x: getCubicBezierPoint(segment.startX, segment.control1X, segment.control2X, segment.endX, t),
-      y: getCubicBezierPoint(segment.startY, segment.control1Y, segment.control2Y, segment.endY, t),
-    };
-    totalLength += Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y);
-    previousPoint = point;
-  }
-
-  return totalLength;
-}
-
-type Point = { x: number; y: number };
-type SelectionBoxState = { start: Point; current: Point; active: boolean } | null;
-type DragConnectionState = {
-  active: boolean;
-  startId: string;
-  startPos: Point;
-  currentPos: Point;
-} | null;
-
-type PromptGroupRenderItem = {
-  id: string;
-  kind: 'prompt-group';
-  groupView: PromptGroupView;
-  node: PromptNode;
-  childNodes: GeneratedImage[];
-  detailLevel: CanvasCardDetailLevel;
-};
-
-type ImageRenderItem = {
-  id: string;
-  kind: 'image';
-  node: GeneratedImage;
-  groupLayerZIndex: number;
-  stackZIndexOverride?: number;
-  detailLevel: CanvasCardDetailLevel;
-  loadPriority: number;
-  loadBand: 0 | 1 | 2 | 3;
-};
-
-type PreviewRenderItem = {
-  id: string;
-  kind: 'preview';
-  node: PreviewWorkflowNode;
-};
-
-type SaveRenderItem = {
-  id: string;
-  kind: 'save';
-  node: SaveWorkflowNode;
-};
-
-type AgentRenderItem = {
-  id: string;
-  kind: 'agent';
-  node: AgentWorkflowNode;
-};
-
-type WorkflowUtilityCanvasNode = PreviewWorkflowNode | SaveWorkflowNode | AgentWorkflowNode;
-
-type PromptGroupTier = 'base' | 'generating' | 'focused';
-
-type PromptGroupView = {
-  id: string;
-  rootPrompt: PromptNode;
-  childImages: GeneratedImage[];
-  intraGroupEdges: Array<{ fromId: string; toId: string }>;
-  bounds: { x: number; y: number; width: number; height: number };
-  baseOrder: number;
-  tier: PromptGroupTier;
-  isOverlapping: boolean;
-};
-
-type PromptGroupLayoutPresentationState = {
-  layoutMode: 'expanded' | 'regrouping' | 'docked';
-  regroupProgress: number;
-  startedAt: number;
-  settleUntil: number | null;
-  targetSlotIndicesByChildId: Record<string, number>;
-};
-
 const PROMPT_GROUP_REGROUP_FAST_MS = 110;
 const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
 const PROMPT_GROUP_REGROUP_TOTAL_MS = PROMPT_GROUP_REGROUP_FAST_MS + PROMPT_GROUP_REGROUP_SLOW_MS;
 const PROMPT_GROUP_REGROUP_SETTLE_MS = 180;
-
-type CanvasRenderItem =
-  | PromptGroupRenderItem
-  | ImageRenderItem
-  | PreviewRenderItem
-  | SaveRenderItem
-  | AgentRenderItem;
-type ScheduledImageLoadState = {
-  loadBand: 0 | 1 | 2 | 3;
-  loadPriority: number;
-  prefetchQuality: ImageQuality;
-};
 
 const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   base: 1,
@@ -385,6 +344,7 @@ import {
   buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
 } from './services/billing/generationBillingCoordinator';
+import { resolveCapabilityRouteAssignment } from './services/api/capabilityRouteAssignments';
 
 
 import { saveAs } from 'file-saver';
@@ -394,17 +354,17 @@ import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from '.
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
-import { optimizePromptForImage } from './services/llm/promptOptimizerService';
 import { normalizePptSlidesForCount, buildAutoPptSlides } from './utils/pptUtils';
 import {
   PPT_EDITABLE_CANVAS,
   buildPptEditablePages,
+  getPromptPptImageNodes,
   getPptTextLayer,
   patchPptTextLayer,
-  sortPptImageNodes,
   sortPptLayers,
   syncPptSlidesFromEditablePages,
 } from './utils/pptEditable';
+import { buildPptDeckModuleState } from './utils/pptDeckModules';
 import { useImageGeneration } from './hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from './hooks/useWorkspaceSurface';
 import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfacePanels';
@@ -415,18 +375,14 @@ import ProjectManager from './components/settings/ProjectManager';
 import { Search } from 'lucide-react'; // Import Search icon
 import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
-import { MobileWorkspaceSurface } from './components/mobile';
-import { selectMobileFeedResults } from './components/mobile/mobileFeedSelectors';
 import { resolveAvatarUrl } from './utils/presetAvatars';
 import { cleanupImagesOlderThan, cleanupOriginalsOlderThan, getStrictOriginalImage } from './services/storage/imageStorage';
 import { cleanupCompletedTasksOlderThan } from './services/persistence/taskPersistence';
+import { traceLocalPerformance } from './services/system/localPerformanceTrace';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
 import SettingsPageRoot from './app/SettingsPageRoot';
-import {
-  GlobalModals,
-  WorkspaceShell,
-} from './components/workspace';
+import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,
   renderWorkflowNode,
@@ -446,19 +402,6 @@ import {
   getCanvasPerformanceProfile,
   type CanvasCardDetailLevel,
 } from './canvas/performanceProfile';
-
-const UserProfileModal = lazy(() => import('./components/modals/UserProfileModal'));
-const SettingsPanel = lazy(() => import('./components/settings/SettingsPanel')); // single production entry
-const SearchPalette = lazy(() => import('./components/layout/SearchPalette'));
-const TagInputModal = lazy(() => import('./components/modals/TagInputModal'));
-const TutorialOverlay = lazy(() => import('./components/common/TutorialOverlay'));
-const StorageSelectionModal = lazy(() => import('./components/modals/StorageSelectionModal'));
-const MigrateModal = lazy(async () => {
-  const module = await import('./components/modals/MigrateModal');
-  return { default: module.MigrateModal };
-});
-const PptDeckEditorModal = lazy(() => import('./components/image/PptDeckEditorModal'));
-const RechargeModal = lazy(() => import('./components/modals/RechargeModal'));
 
 interface AppContentProps {
 }
@@ -487,7 +430,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   const liveSceneFrameRef = useRef<number | null>(null);
   const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
   const promptGroupRegroupFrameRef = useRef<number | null>(null);
-
 
 
 
@@ -531,6 +473,30 @@ const AppContent: React.FC<AppContentProps> = () => {
     switchCanvas  // 🎯 切换项目
   } = useCanvas();
 
+  const imageNodesById = React.useMemo(
+    () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
+    [activeCanvas]
+  );
+
+  const promptNodesById = React.useMemo(
+    () => new Map((activeCanvas?.promptNodes || []).map(node => [node.id, node])),
+    [activeCanvas]
+  );
+
+  const draftPromptNode = React.useMemo(
+    () => (draftNodeId ? promptNodesById.get(draftNodeId) ?? null : null),
+    [draftNodeId, promptNodesById]
+  );
+
+  const workflowUtilityNodesById = React.useMemo(
+    () => new Map(
+      (activeCanvas?.workflow?.nodes || [])
+        .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
+        .map((node) => [node.id, node])
+    ),
+    [activeCanvas]
+  );
+
   const {
     balance,
     loading: billingLoading,
@@ -559,6 +525,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   useLayoutEffect(() => {
     activeCanvasRef.current = activeCanvas;
   }, [activeCanvas]);
+  const ecommerceFrameworkRuntimeRef = useRef<Record<string, EcommerceFrameworkRuntimeState>>({});
 
   const selectedNodeIdsRef = useRef<string[]>(selectedNodeIds);
   useEffect(() => {
@@ -729,6 +696,18 @@ const AppContent: React.FC<AppContentProps> = () => {
     return failureState;
   }, [refundCreditsByTransaction, refreshBilling]);
 
+  const applyOptimisticServerCreditDebit = useCallback((requiredCredits: number, useServerSideCreditSettlement: boolean) => {
+    if (useServerSideCreditSettlement && requiredCredits > 0) {
+      adjustBalanceOptimistically(-requiredCredits);
+    }
+  }, [adjustBalanceOptimistically]);
+
+  const showNoPptPagesWarning = useCallback(() => {
+    import('./services/system/notificationService').then(({ notify }) => {
+      notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
+    });
+  }, []);
+
   // Track reserved regions for rapid-fire generation to prevent overlaps (before React update reflects)
   const reservedRegionsRef = useRef<{ bounds: { x: number; y: number; width: number; height: number }; timestamp: number; }[]>([]);
 
@@ -820,7 +799,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [profileInitialView, setProfileInitialView] = useState<UserProfileView>('main');
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
+  const [responsiveSurface, setResponsiveSurface] = useState(() => (
+    typeof window !== 'undefined' ? resolveResponsiveSurface(window.innerWidth) : 'desktop'
+  ));
+  const isMobile = isCompactResponsiveSurface(responsiveSurface);
   const [mobileScreen, setMobileScreen] = useState<MobileSurfaceScreen>('home');
   const [mobileActiveResultId, setMobileActiveResultId] = useState<string | null>(null);
 
@@ -833,7 +815,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
 
     const syncMobileViewport = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setResponsiveSurface(resolveResponsiveSurface(window.innerWidth));
     };
 
     syncMobileViewport();
@@ -978,25 +960,28 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [inheritedTags, setInheritedTags] = useState<string[]>([]);
   const [isSubCard, setIsSubCard] = useState(false);
+  const allCanvasTags = React.useMemo(() => {
+    const allPromptTags = activeCanvas?.promptNodes.flatMap((node) => node.tags || []) || [];
+    const allImageTags = activeCanvas?.imageNodes.flatMap((node) => node.tags || []) || [];
+
+    return [...new Set([...allPromptTags, ...allImageTags])];
+  }, [activeCanvas]);
 
   const handleTag = useCallback(() => {
     if (selectedNodeIds.length === 0) return;
     setTaggingNodeIds(selectedNodeIds);
 
     const firstId = selectedNodeIds[0];
-    const promptNode = activeCanvas?.promptNodes.find(n => n.id === firstId);
-    const imageNode = activeCanvas?.imageNodes.find(n => n.id === firstId);
+    const promptNode = promptNodesById.get(firstId);
+    const imageNode = imageNodesById.get(firstId);
 
     // 🎯 Collect all existing tags from canvas for suggestions
-    const allPromptTags = activeCanvas?.promptNodes.flatMap(n => n.tags || []) || [];
-    const allImageTags = activeCanvas?.imageNodes.flatMap(n => n.tags || []) || [];
-    const uniqueAllTags = [...new Set([...allPromptTags, ...allImageTags])];
-    setAllTags(uniqueAllTags);
+    setAllTags(allCanvasTags);
 
     // Determine if editing Sub Card and find inherited tags
     if (imageNode) {
       // 🎯 Sub Card - find parent's tags
-      const parentPrompt = activeCanvas?.promptNodes.find(n => n.id === imageNode.parentPromptId);
+      const parentPrompt = imageNode.parentPromptId ? promptNodesById.get(imageNode.parentPromptId) : null;
       setInheritedTags(parentPrompt?.tags || []);
       setIsSubCard(true);
       setTagLimits({ maxTags: 3, maxChars: 6 });
@@ -1011,11 +996,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     setInitialTags(tags);
     setIsTagModalOpen(true);
     setSelectionMenuPosition(null);
-  }, [selectedNodeIds, activeCanvas]);
+  }, [allCanvasTags, imageNodesById, promptNodesById, selectedNodeIds]);
 
   const handleSaveTags = useCallback(async (tags: string[]) => {
     const firstId = taggingNodeIds[0];
-    const promptNode = activeCanvas?.promptNodes.find(n => n.id === firstId);
+    const promptNode = promptNodesById.get(firstId);
 
     // 🎯 Deduplication Logic: If Main Card adds a tag, remove from its Sub Cards
     if (promptNode) {
@@ -1025,7 +1010,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       // For each child sub-card, remove any tag that now exists on the main card
       childImageIds.forEach(imgId => {
-        const img = activeCanvas?.imageNodes.find(n => n.id === imgId);
+        const img = imageNodesById.get(imgId);
         if (img && img.tags && img.tags.length > 0) {
           const filteredTags = img.tags.filter(t => !newMainTags.includes(t));
           if (filteredTags.length !== img.tags.length) {
@@ -1046,7 +1031,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       if (handle) {
         for (const nodeId of taggingNodeIds) {
-          const img = activeCanvas?.imageNodes.find(n => n.id === nodeId);
+          const img = imageNodesById.get(nodeId);
           // Only process ImageNodes that have a filename (from local storage)
           // @ts-ignore - filename injected by CanvasContext
           if (img && img.fileName) {
@@ -1075,8 +1060,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     } catch (e) {
       console.warn('[App] Failed to update tag shortcuts:', e);
     }
-  }, [taggingNodeIds, setNodeTags, activeCanvas]);
+  }, [imageNodesById, promptNodesById, setNodeTags, taggingNodeIds]);
 
+
+  const startupAuthenticatedUserId = user && !isTempUser ? user.id : null;
 
   // Sync user with KeyManager and handle Modal Logic (Storage -> API)
   useEffect(() => {
@@ -1093,7 +1080,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         if (!active) return;
 
         // 1. Sync User ID
-        const authenticatedUserId = user && !isTempUser ? user.id : null;
+        const authenticatedUserId = startupAuthenticatedUserId;
 
         if (authenticatedUserId) {
           import('./services/billing/costService').then(async ({ setUserId }) => {
@@ -1189,7 +1176,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         window.clearTimeout(backgroundReadyTimer);
       }
     };
-  }, [advanceTo, authLoading, isTempUser, user]);
+  }, [advanceTo, authLoading, startupAuthenticatedUserId]);
 
   // Generation config state
   // Generation config state with Persistence
@@ -1252,14 +1239,164 @@ const AppContent: React.FC<AppContentProps> = () => {
     selectedItems: {},
     taskStates: {},
     sheetSettings: createDefaultEcommerceSheetSettings(config.model),
-    groupSlots: { '主图': [], 'A+': [] },
+    groupSlots: createEmptyEcommerceGroupSlots(),
     activeTaskNodeId: null,
     activeTaskState: null,
+    activeFrameworkId: null,
     activeGroupSheet: null,
+    frameworkRuntime: {},
     isAnalyzing: false,
     isConfirmingAnalysis: false,
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
+
+  useEffect(() => {
+    ecommerceFrameworkRuntimeRef.current = ecommerceState.frameworkRuntime;
+  }, [ecommerceState.frameworkRuntime]);
+
+  useEffect(() => {
+    const frameworkNodes = (activeCanvas?.promptNodes || []).filter((node) => (
+      node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework'
+    ));
+
+    setEcommerceState((previousState) => {
+      const nextFrameworkRuntime: Record<string, EcommerceFrameworkRuntimeState> = {};
+      let didChange = false;
+
+      frameworkNodes.forEach((frameworkNode) => {
+        const existingRuntime = previousState.frameworkRuntime[frameworkNode.id];
+        if (existingRuntime) {
+          nextFrameworkRuntime[frameworkNode.id] = existingRuntime;
+          return;
+        }
+
+        nextFrameworkRuntime[frameworkNode.id] = createEcommerceFrameworkRuntimeState({
+          frameworkId: frameworkNode.id,
+          activeSheet: frameworkNode.ecommerce?.frameworkMeta?.activeSheet || frameworkNode.ecommerce?.sourceSheet || '主图',
+          config: frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig,
+        });
+        didChange = true;
+      });
+
+      if (!didChange) {
+        const previousIds = Object.keys(previousState.frameworkRuntime);
+        if (previousIds.length !== Object.keys(nextFrameworkRuntime).length) {
+          didChange = true;
+        } else if (previousIds.some((frameworkId) => !nextFrameworkRuntime[frameworkId])) {
+          didChange = true;
+        }
+      }
+
+      const nextActiveFrameworkId = previousState.activeFrameworkId && nextFrameworkRuntime[previousState.activeFrameworkId]
+        ? previousState.activeFrameworkId
+        : (frameworkNodes[0]?.id || null);
+      const nextActiveGroupSheet = previousState.activeTaskState?.sourceSheet
+        || (nextActiveFrameworkId
+          ? (previousState.activeGroupSheet || nextFrameworkRuntime[nextActiveFrameworkId]?.activeSheet || null)
+          : null);
+
+      if (
+        !didChange
+        && nextActiveFrameworkId === previousState.activeFrameworkId
+        && nextActiveGroupSheet === previousState.activeGroupSheet
+      ) {
+        return previousState;
+      }
+
+      return {
+        ...previousState,
+        frameworkRuntime: nextFrameworkRuntime,
+        activeFrameworkId: nextActiveFrameworkId,
+        activeGroupSheet: nextActiveGroupSheet,
+      };
+    });
+  }, [activeCanvas]);
+
+  const resolveEcommerceFrameworkId = useCallback((node?: PromptNode | null): string | null => {
+    if (!node?.ecommerce) {
+      return null;
+    }
+
+    if (node.ecommerce.kind === 'framework') {
+      return node.id;
+    }
+
+    return node.ecommerce.frameworkId || null;
+  }, []);
+
+  const resolveEcommerceFrameworkNode = useCallback((frameworkId?: string | null): PromptNode | null => {
+    if (!frameworkId) {
+      return null;
+    }
+
+    return activeCanvasRef.current?.promptNodes.find((node) => (
+      node.id === frameworkId && node.ecommerce?.kind === 'framework'
+    )) || null;
+  }, []);
+
+  const updateEcommerceFrameworkMeta = useCallback((
+    frameworkId: string,
+    patch: Partial<NonNullable<NonNullable<PromptNode['ecommerce']>['frameworkMeta']>>,
+  ) => {
+    const frameworkNode = activeCanvasRef.current?.promptNodes.find((node) => (
+      node.id === frameworkId && node.ecommerce?.kind === 'framework'
+    ));
+    if (!frameworkNode?.ecommerce) {
+      return;
+    }
+
+    updatePromptNode({
+      ...frameworkNode,
+      ecommerce: {
+        ...frameworkNode.ecommerce,
+        frameworkMeta: {
+          activeSheet: frameworkNode.ecommerce.frameworkMeta?.activeSheet || frameworkNode.ecommerce.sourceSheet || '主图',
+          groupIds: frameworkNode.ecommerce.frameworkMeta?.groupIds,
+          taskNodeIds: frameworkNode.ecommerce.frameworkMeta?.taskNodeIds,
+          schedulerConfig: frameworkNode.ecommerce.frameworkMeta?.schedulerConfig,
+          ...patch,
+        },
+      },
+    });
+  }, [updatePromptNode]);
+
+  const updateEcommerceFrameworkRuntime = useCallback((
+    frameworkId: string,
+    updater: (current: EcommerceFrameworkRuntimeState) => EcommerceFrameworkRuntimeState,
+  ): EcommerceFrameworkRuntimeState => {
+    const frameworkNode = resolveEcommerceFrameworkNode(frameworkId);
+    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId]
+      || createEcommerceFrameworkRuntimeState({
+        frameworkId,
+        activeSheet: frameworkNode?.ecommerce?.frameworkMeta?.activeSheet || frameworkNode?.ecommerce?.sourceSheet || '主图',
+        config: frameworkNode?.ecommerce?.frameworkMeta?.schedulerConfig,
+      });
+    const nextRuntime = updater(currentRuntime);
+
+    ecommerceFrameworkRuntimeRef.current = {
+      ...ecommerceFrameworkRuntimeRef.current,
+      [frameworkId]: nextRuntime,
+    };
+
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      frameworkRuntime: {
+        ...previousState.frameworkRuntime,
+        [frameworkId]: nextRuntime,
+      },
+    }));
+
+    return nextRuntime;
+  }, [resolveEcommerceFrameworkNode]);
+
+  const syncEcommerceFrameworkView = useCallback((frameworkId: string, activeSheet: EcommerceGroupSheet) => {
+    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => ({
+      ...currentRuntime,
+      activeSheet,
+      lastUpdatedAt: Date.now(),
+    }));
+    updateEcommerceFrameworkMeta(frameworkId, { activeSheet });
+  }, [updateEcommerceFrameworkMeta, updateEcommerceFrameworkRuntime]);
 
   const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
     config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
@@ -1413,7 +1550,20 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const getPreferredKeyForMode = useCallback((mode?: GenerationMode) => {
     const m = mode || GenerationMode.IMAGE;
-    return modePreferredKeyMap[m];
+    const capabilityRole = m === GenerationMode.PPT
+      ? 'ppt_generation'
+      : m === GenerationMode.ECOMMERCE
+        ? 'ecommerce_generation'
+        : m === GenerationMode.IMAGE
+          ? 'image_generation'
+          : null;
+    const capabilityRouteId = capabilityRole
+      ? resolveCapabilityRouteAssignment(capabilityRole)?.primaryRouteId
+      : undefined;
+    const capabilityKeyId = capabilityRouteId && keyManager.getKey(capabilityRouteId)
+      ? capabilityRouteId
+      : undefined;
+    return capabilityKeyId || modePreferredKeyMap[m];
   }, [modePreferredKeyMap]);
 
   const rememberPreferredKeyForMode = useCallback((mode: GenerationMode | undefined, keySlotId?: string) => {
@@ -1646,53 +1796,16 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Derived Pending Position: Always Center (or linked to source)
   const pendingPosition = React.useMemo(() => {
     if (activeSourceImage && activeCanvas) {
-      const sourceImage = activeCanvas.imageNodes.find(img => img.id === activeSourceImage);
+      const sourceImage = imageNodesById.get(activeSourceImage);
       if (sourceImage) {
-        // Follow-up mode: place the new parent card below the original parent group
-        const parentPromptId = sourceImage.parentPromptId;
-        const parentPromptRaw = activeCanvas.promptNodes.find(p => p.id === parentPromptId);
-        const parentPrompt = parentPromptRaw
-          ? { ...parentPromptRaw, position: { ...parentPromptRaw.position, x: sourceImage.position.x } }
-          : undefined;
-
-        if (parentPrompt) {
-          // Find all child cards below the parent prompt and compute the maximum Y
-          const siblingImages = activeCanvas.imageNodes.filter(img => img.parentPromptId === parentPromptId);
-          let maxY = parentPrompt.position.y; // Parent prompt Y position (bottom anchor)
-
-          // Compute the maximum bottom Y across all child cards
-          siblingImages.forEach(img => {
-            const { totalHeight } = getCardDimensions(img.aspectRatio, true);
-            const imgBottom = img.position.y + totalHeight;
-            maxY = Math.max(maxY, imgBottom);
-          });
-
-          const GAP = 60; // Gap between the new parent card and the child-card group
-          return {
-            x: parentPrompt.position.x,  // Align with the parent prompt on the X axis
-            y: maxY + GAP  // Place the card below the lowest child card
-          };
-        }
-
-        // If there is no parent prompt (orphan child card), place it below the source image
-        let sourceHeight = 320;
-        if (sourceImage.dimensions) {
-          const [w, h] = sourceImage.dimensions.split('x').map(Number);
-          if (w && h) {
-            const ratio = w / h;
-            const cardWidth = ratio > 1 ? 320 : (ratio < 1 ? 200 : 280);
-            sourceHeight = (cardWidth / ratio) + 40;
-          }
-        } else {
-          const { totalHeight } = getCardDimensions(sourceImage.aspectRatio, true);
-          sourceHeight = totalHeight;
-        }
-
-        const GAP = 40;
-        return {
-          x: sourceImage.position.x,
-          y: sourceImage.position.y + sourceHeight + GAP
-        };
+        const parentPrompt = sourceImage.parentPromptId
+          ? (promptNodesById.get(sourceImage.parentPromptId) ?? null)
+          : null;
+        return resolveFollowUpDraftPosition({
+          sourceImage,
+          parentPrompt,
+          imageNodes: activeCanvas.imageNodes,
+        });
       }
     }
     // Smart Center Placement - Manual Mode (Always Center)
@@ -1701,7 +1814,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     const vpRect = canvasRef.current?.getCanvasRect() || null;
     return getViewportPreferredPosition(currentTf, vpRect, 180);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSourceImage, activeCanvas, canvasTransform]);
+  }, [activeCanvas, activeSourceImage, canvasTransform, imageNodesById, promptNodesById]);
 
   // [Draft Feature] Persistent Input Card State - Moved to Top
 
@@ -1713,243 +1826,40 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleClearSource = useCallback(() => {
     setActiveSourceImage(null);
     // If the draft belongs to follow-up mode and is empty, remove it
-    if (draftNodeId) {
-      const draftNode = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
-      if (draftNode && draftNode.sourceImageId && !draftNode.prompt.trim()) {
-        // Only remove drafts that still belong to follow-up mode and have no content
-        deletePromptNode(draftNodeId);
-        setDraftNodeId(null);
-      }
+    if (draftNodeId && draftPromptNode?.sourceImageId && !draftPromptNode.prompt.trim()) {
+      // Only remove drafts that still belong to follow-up mode and have no content
+      deletePromptNode(draftNodeId);
+      setDraftNodeId(null);
     }
-  }, [draftNodeId, activeCanvas, deletePromptNode]);
+  }, [deletePromptNode, draftNodeId, draftPromptNode]);
 
   // Right-Click Selection State
-  const [selectionBox, setSelectionBox] = useState<SelectionBoxState>(null);
   const [selectionMenuPosition, setSelectionMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const selectionBoxRef = useRef<SelectionBoxState>(null);
-  const selectionBoxFrameRef = useRef<number | null>(null);
-  const pendingSelectionPointRef = useRef<Point | null>(null);
-
-  useEffect(() => {
-    selectionBoxRef.current = selectionBox;
-  }, [selectionBox]);
-
-  const flushPendingSelectionBox = useCallback(() => {
-    if (selectionBoxFrameRef.current !== null) {
-      cancelAnimationFrame(selectionBoxFrameRef.current);
-      selectionBoxFrameRef.current = null;
-    }
-
-    const pendingPoint = pendingSelectionPointRef.current;
-    const currentSelection = selectionBoxRef.current;
-    if (!pendingPoint || !currentSelection) return currentSelection;
-
-    const nextSelection = { ...currentSelection, current: pendingPoint };
-    selectionBoxRef.current = nextSelection;
-    pendingSelectionPointRef.current = null;
-    setSelectionBox(nextSelection);
-    return nextSelection;
-  }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only allow box selection if clicking on background
-    const target = e.target as HTMLElement;
-    const isNode = target.closest('.prompt-node') || target.closest('.image-node') || target.closest('.group-container') || target.closest('button') || target.closest('input');
-
-    if (e.button !== 2) {
-      setSelectionMenuPosition(null);
-    }
-
-    // Middle click (button 1) handled by InfiniteCanvas
-    if (e.button === 2 && !isNode) { // Right click on BACKGROUND only
-      e.preventDefault(); // allow context menu? No, user wants box select.
-      // E.preventDefault avoids native menu.
-      e.stopPropagation();
-      setSelectionMenuPosition(null);
-      const nextSelectionBox = {
-        start: { x: e.clientX, y: e.clientY },
-        current: { x: e.clientX, y: e.clientY },
-        active: true
-      };
-      selectionBoxRef.current = nextSelectionBox;
-      pendingSelectionPointRef.current = null;
-      setSelectionBox(nextSelectionBox);
-    }
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!selectionBoxRef.current?.active) return;
-
-    pendingSelectionPointRef.current = { x: e.clientX, y: e.clientY };
-    if (selectionBoxFrameRef.current !== null) return;
-
-    selectionBoxFrameRef.current = window.requestAnimationFrame(() => {
-      selectionBoxFrameRef.current = null;
-      const pendingPoint = pendingSelectionPointRef.current;
-      const currentSelection = selectionBoxRef.current;
-      if (!pendingPoint || !currentSelection) return;
-
-      const nextSelection = { ...currentSelection, current: pendingPoint };
-      selectionBoxRef.current = nextSelection;
-      setSelectionBox(nextSelection);
-    });
-  }, []);
-
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const currentSelectionBox = flushPendingSelectionBox() ?? selectionBoxRef.current;
-    if (currentSelectionBox?.active) {
-      const startX = Math.min(currentSelectionBox.start.x, currentSelectionBox.current.x);
-      const startY = Math.min(currentSelectionBox.start.y, currentSelectionBox.current.y);
-      const endX = Math.max(currentSelectionBox.start.x, currentSelectionBox.current.x);
-      const endY = Math.max(currentSelectionBox.start.y, currentSelectionBox.current.y);
-      const width = endX - startX;
-      const height = endY - startY;
-      let nextSelectionIds: string[] = [];
-
-      if (width > 5 || height > 5) {
-        // Convert screen rect to canvas rect
-        const s = canvasTransform.scale;
-        const ox = canvasTransform.x;
-        const oy = canvasTransform.y;
-
-        const canvasRect = {
-          x: (startX - ox) / s,
-          y: (startY - oy) / s,
-          w: width / s,
-          h: height / s
-        };
-
-        const ids: string[] = [];
-        // Check prompts
-        activeCanvas?.promptNodes.forEach(node => {
-          const { width: nw } = getCardDimensions(node.aspectRatio);
-          const nh = 140; // Approx height
-          // Card origin (x,y) is Bottom Center.
-          // Rect is [x - w/2, y - h, w, h]
-          const nx = node.position.x - nw / 2;
-          const ny = node.position.y - nh;
-
-          if (nx < canvasRect.x + canvasRect.w && nx + nw > canvasRect.x &&
-            ny < canvasRect.y + canvasRect.h && ny + nh > canvasRect.y) {
-            ids.push(node.id);
-          }
-        });
-
-        // Check images
-        activeCanvas?.imageNodes.forEach(node => {
-          const { width: nw, totalHeight: nh } = getCardDimensions(node.aspectRatio, true);
-          const nx = node.position.x - nw / 2;
-          const ny = node.position.y - nh;
-
-          if (nx < canvasRect.x + canvasRect.w && nx + nw > canvasRect.x &&
-            ny < canvasRect.y + canvasRect.h && ny + nh > canvasRect.y) {
-            ids.push(node.id);
-          }
-        });
-
-        nextSelectionIds = ids;
-        if (ids.length > 0) {
-          // Shift=add, Ctrl=remove, no modifier=replace
-          const mode = e.ctrlKey ? 'remove' : (e.shiftKey ? 'add' : 'replace');
-          selectNodes(ids, mode);
-        } else {
-          if (!e.shiftKey && !e.ctrlKey) clearSelection();
-        }
-      } else {
-        // Clicked without drag
-        // If Right Click (button 2), DO NOT clear selection (it's likely for Context Menu)
-        // Only clear if Left Click and not Shift
-        if (e.button !== 2 && !e.shiftKey) {
-          clearSelection();
-        }
-      }
-      // 🎯 Show selection menu centered on selection bounds (not at mouse)
-      if (e.button === 2) {
-        const allSelectedIds = nextSelectionIds.length > 0 ? nextSelectionIds : selectedNodeIds;
-        if (allSelectedIds.length > 0) {
-          // Calculate center position immediately - getSelectionScreenCenter depends on activeCanvas
-          // which may not include newly selected IDs, so we compute manually here
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          let hasNodes = false;
-
-          activeCanvas?.promptNodes
-            .filter(n => allSelectedIds.includes(n.id))
-            .forEach(n => {
-              const w = 380;
-              const h = n.height || 200;
-              minX = Math.min(minX, n.position.x - w / 2);
-              maxX = Math.max(maxX, n.position.x + w / 2);
-              minY = Math.min(minY, n.position.y - h);
-              maxY = Math.max(maxY, n.position.y);
-              hasNodes = true;
-            });
-
-          activeCanvas?.imageNodes
-            .filter(n => allSelectedIds.includes(n.id))
-            .forEach(n => {
-              const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
-              minX = Math.min(minX, n.position.x - width / 2);
-              maxX = Math.max(maxX, n.position.x + width / 2);
-              minY = Math.min(minY, n.position.y - totalHeight);
-              maxY = Math.max(maxY, n.position.y);
-              hasNodes = true;
-            });
-
-          if (hasNodes) {
-            const centerX = (minX + maxX) / 2;
-            const topY = minY;
-            const screenX = centerX * canvasTransform.scale + canvasTransform.x;
-            const screenY = topY * canvasTransform.scale + canvasTransform.y;
-            setSelectionMenuPosition({ x: screenX, y: screenY });
-          } else {
-            setSelectionMenuPosition(null);
-          }
-        } else {
-          setSelectionMenuPosition(null);
-        }
-      } else {
-        // Left click clears position unless clicking on a node (handled separately)
-        setSelectionMenuPosition(null);
-      }
-      selectionBoxRef.current = null;
-      pendingSelectionPointRef.current = null;
-      setSelectionBox(null);
-    }
-  }, [flushPendingSelectionBox, canvasTransform, activeCanvas, selectNodes, clearSelection, selectedNodeIds, getCardDimensions]);
+  const {
+    selectionBox,
+    handleSelectionMouseDown,
+    handleSelectionMouseMove,
+    handleSelectionMouseUp,
+  } = useCanvasSelectionBox({
+    activeCanvas,
+    canvasTransform,
+    selectedNodeIds,
+    getCardDimensions,
+    selectNodes,
+    clearSelection,
+    closeSelectionMenu: () => setSelectionMenuPosition(null),
+    setSelectionMenuPosition,
+  });
 
 
 
   // Connection Dragging State
-  const [dragConnection, setDragConnection] = useState<DragConnectionState>(null);
-  const dragConnectionRef = useRef<DragConnectionState>(null);
-  const dragConnectionFrameRef = useRef<number | null>(null);
-  const pendingDragConnectionPointRef = useRef<Point | null>(null);
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
-
-  useEffect(() => {
-    dragConnectionRef.current = dragConnection;
-  }, [dragConnection]);
-
-  const flushPendingDragConnection = useCallback(() => {
-    if (dragConnectionFrameRef.current !== null) {
-      cancelAnimationFrame(dragConnectionFrameRef.current);
-      dragConnectionFrameRef.current = null;
-    }
-
-    const pendingPoint = pendingDragConnectionPointRef.current;
-    const currentDragConnection = dragConnectionRef.current;
-    if (!pendingPoint || !currentDragConnection) return currentDragConnection;
-
-    const nextDragConnection = { ...currentDragConnection, currentPos: pendingPoint };
-    dragConnectionRef.current = nextDragConnection;
-    pendingDragConnectionPointRef.current = null;
-    setDragConnection(nextDragConnection);
-    return nextDragConnection;
-  }, []);
   const lastGenerateAtRef = useRef(0);
   const lastGenerateSignatureRef = useRef<{ value: string; at: number } | null>(null);
 
@@ -1979,6 +1889,39 @@ const AppContent: React.FC<AppContentProps> = () => {
     setShowUserMenu,
   });
 
+  useDraftNodeSync({
+    draftNodeId,
+    draftPromptNode,
+    activeSourceImage,
+    config,
+    canvasRef,
+    canvasTransform,
+    isSidebarOpen,
+    isChatOpen,
+    isMobile,
+    resolveNodeRouteState,
+    updatePromptNode,
+    deletePromptNode,
+    setDraftNodeId,
+  });
+
+  const resolveGenerationPlacement = useGenerationPlacement({
+    activeCanvasRef,
+    canvasRef,
+    canvasTransform,
+    isSidebarOpen,
+    isChatOpen,
+    isMobile,
+    chatSidebarWidth,
+    reservedRegionsRef,
+    updatePromptNode,
+  });
+
+  const prepareGenerationReferenceImages = useGenerationReferenceImages({
+    activeSourceImage,
+    imageNodesById,
+  });
+
   const openSettingsSurfaceTracked = useCallback((
     view: SettingsSurfaceView = 'dashboard',
     supplier: Supplier | null = null,
@@ -1989,6 +1932,17 @@ const AppContent: React.FC<AppContentProps> = () => {
   const openCurrentMobileSettingsSurface = useCallback(() => {
     openSettingsSurfaceTracked('dashboard');
   }, [openSettingsSurfaceTracked]);
+
+  const {
+    dragConnection,
+    handleConnectStart,
+    handleConnectEnd,
+    handleDragConnectionMouseMove,
+    handleDragConnectionMouseUp,
+  } = useCanvasDragConnection({
+    canvasTransform,
+    linkNodes,
+  });
 
   const {
     isGenerating,
@@ -2229,35 +2183,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (!file) return;
     setEcommerceState((previousState) => ({
       ...previousState,
-      requirementFile: file,
-      itemReferenceFiles: {},
-      analysis: null,
-      analysisConfirmed: false,
-      selectedItems: {},
-      taskStates: {},
-      groupSlots: { '主图': [], 'A+': [] },
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeGroupSheet: null,
-      isConfirmingAnalysis: false,
+      ...createEcommerceAnalysisResetPatch({ requirementFile: file }),
     }));
   }, []);
 
   const handleClearEcommerceRequirementFile = useCallback(() => {
     setEcommerceState((previousState) => ({
       ...previousState,
-      requirementFile: null,
-      itemReferenceFiles: {},
-      analysis: null,
-      analysisConfirmed: false,
-      selectedItems: {},
-      taskStates: {},
-      groupSlots: { '主图': [], 'A+': [] },
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeGroupSheet: null,
-      isAnalyzing: false,
-      isConfirmingAnalysis: false,
+      ...createEcommerceAnalysisResetPatch({ requirementFile: null, isAnalyzing: false }),
     }));
   }, []);
 
@@ -2359,17 +2292,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleResetEcommerceAnalysis = useCallback(() => {
     setEcommerceState((previousState) => ({
       ...previousState,
-      itemReferenceFiles: {},
-      analysis: null,
-      analysisConfirmed: false,
-      selectedItems: {},
-      taskStates: {},
-      groupSlots: { '主图': [], 'A+': [] },
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeGroupSheet: null,
-      isAnalyzing: false,
-      isConfirmingAnalysis: false,
+      ...createEcommerceAnalysisResetPatch({ isAnalyzing: false }),
     }));
   }, []);
 
@@ -2388,10 +2311,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     patch: EcommerceSheetSettingPatch,
   ) => {
     const previousSetting = ecommerceState.sheetSettings[sheet] || createDefaultEcommerceSheetSettings(config.model)[sheet];
-    const nextSetting: EcommerceSheetSetting = {
+    const mergedSetting: EcommerceSheetSetting = {
       ...previousSetting,
       ...patch,
     };
+    const nextSetting: EcommerceSheetSetting = sheet === 'A+'
+      ? { ...mergedSetting, imageSize: ImageSize.SIZE_4K }
+      : mergedSetting;
 
     if (
       previousSetting.aspectRatio === nextSetting.aspectRatio
@@ -2556,7 +2482,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         analysisConfirmed: false,
         selectedItems,
         taskStates: buildInitialEcommerceTaskStates(analysis),
-        groupSlots: { '主图': [], 'A+': [] },
+        groupSlots: createEmptyEcommerceGroupSlots(),
         activeTaskNodeId: null,
         activeTaskState: null,
         activeGroupSheet: null,
@@ -2770,10 +2696,69 @@ const AppContent: React.FC<AppContentProps> = () => {
     updatePromptNode,
   ]);
 
+  const buildEcommerceFrameworkNode = useCallback((
+    analysis: EcommerceAnalysisResult,
+    position: { x: number; y: number },
+  ): PromptNode => {
+    const productName = analysis.projectMeta.productName;
+    const label = `${productName || '电商'} Framework`;
+    const schedulerConfig = createDefaultEcommerceFrameworkSchedulerConfig();
+    const summary = [
+      analysis.projectMeta.projectName || label,
+      analysis.projectMeta.productName ? `产品：${analysis.projectMeta.productName}` : '',
+      '主图',
+      ...analysis.mainImageItems.map((item, index) => {
+        const selected = ecommerceState.selectedItems[item.itemId] !== false ? '保留' : '跳过';
+        return `${index + 1}. [${selected}] ${item.theme || item.type}${item.designRequirements ? ` - ${item.designRequirements}` : ''}`;
+      }),
+      'A+',
+      ...analysis.aPlusGroup.modules.map((item, index) => {
+        const selected = ecommerceState.selectedItems[item.moduleId] !== false ? '保留' : '跳过';
+        return `${index + 1}. [${selected}] ${item.moduleName}${item.designRequirements ? ` - ${item.designRequirements}` : ''}`;
+      }),
+    ].filter(Boolean).join('\n');
+
+    return {
+      id: createEphemeralId('ecom-framework'),
+      prompt: summary,
+      originalPrompt: summary,
+      position,
+      aspectRatio: AspectRatio.LANDSCAPE_16_9,
+      imageSize: ImageSize.SIZE_1K,
+      model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
+      childImageIds: [],
+      timestamp: Date.now(),
+      mode: GenerationMode.ECOMMERCE,
+      parallelCount: 1,
+      thinkingMode: 'high',
+      referenceImages: [],
+      ecommerce: {
+        kind: 'framework',
+        sourceSheet: '主图',
+        sourceRowKey: 'framework-root',
+        selectedForGeneration: false,
+        stage: 'ready',
+        theme: label,
+        displayLabel: label,
+        desktopStage: 'not_applicable',
+        mobileStage: 'not_applicable',
+        allowedAspectRatios: [AspectRatio.LANDSCAPE_16_9],
+        currentAspectRatio: AspectRatio.LANDSCAPE_16_9,
+        frameworkMeta: {
+          activeSheet: '主图',
+          groupIds: {},
+          taskNodeIds: [],
+          schedulerConfig,
+        },
+      },
+    };
+  }, [config.model, createEphemeralId, ecommerceState.selectedItems]);
+
   const buildEcommerceGroupNode = useCallback((
     productName: string,
     sourceSheet: '主图' | 'A+',
     position: { x: number; y: number },
+  frameworkId?: string,
   ): PromptNode => {
     const sheetSetting = ecommerceState.sheetSettings[sourceSheet] || createDefaultEcommerceSheetSettings(config.model)[sourceSheet];
 
@@ -2788,12 +2773,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       childImageIds: [],
       timestamp: Date.now(),
       mode: GenerationMode.ECOMMERCE,
+      hiddenInCanvas: Boolean(frameworkId),
       parallelCount: 1,
       thinkingMode: 'high',
       ecommerce: {
         kind: 'a-plus-group',
         sourceSheet,
         sourceRowKey: sourceSheet === '主图' ? 'main-group' : 'aplus-group',
+        frameworkId,
+        parentNodeId: frameworkId,
         selectedForGeneration: false,
         stage: 'analysis_ready',
         theme: `${productName || '电商'} ${sourceSheet}组卡`,
@@ -2811,6 +2799,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     kind: 'main-image';
     position: { x: number; y: number };
     groupId?: string;
+    frameworkId?: string;
     selected: boolean;
     analysis: EcommerceAnalysisResult;
     uploadReferences?: EcommerceUploadReferenceBundle;
@@ -2819,6 +2808,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     kind: 'a-plus-module';
     position: { x: number; y: number };
     groupId?: string;
+    frameworkId?: string;
     selected: boolean;
     analysis: EcommerceAnalysisResult;
     uploadReferences?: EcommerceUploadReferenceBundle;
@@ -2932,6 +2922,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       referenceImages,
       timestamp: Date.now(),
       mode: GenerationMode.ECOMMERCE,
+      hiddenInCanvas: Boolean(params.frameworkId),
       parallelCount: 1,
       thinkingMode: 'high',
       ecommerce: {
@@ -2939,6 +2930,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         sourceSheet: sourceMetadata.sourceSheet,
         sourceRowKey: sourceMetadata.sourceRowKey,
         groupId: params.groupId,
+        frameworkId: params.frameworkId,
+        parentNodeId: params.groupId || params.frameworkId,
         selectedForGeneration: params.selected,
         productImageRef,
         referenceBindings: params.item.referenceMentions,
@@ -2977,13 +2970,19 @@ const AppContent: React.FC<AppContentProps> = () => {
     }));
 
     try {
+      const analysis = ecommerceState.analysis;
+      if (!analysis) {
+        return;
+      }
+
       const currentUploadReferences = await buildCurrentEcommerceUploadReferences();
       const basePosition = findNextGroupPosition();
       const createdNodeIds: string[] = [];
+      const taskNodeIds: string[] = [];
       const layoutPlan = buildEcommerceCanvasGroupLayout({
         basePosition,
-        mainSlotKeys: ecommerceState.analysis.mainImageItems.map((item) => item.itemId),
-        aPlusSlotKeys: ecommerceState.analysis.aPlusGroup.modules.map((item) => item.moduleId),
+        mainSlotKeys: analysis.mainImageItems.map((item) => item.itemId),
+        aPlusSlotKeys: analysis.aPlusGroup.modules.map((item) => item.moduleId),
       });
       const mainSlotPositionByKey = new Map(
         layoutPlan.mainGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
@@ -3006,7 +3005,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             slotId: slot.slotId,
             sourceKey: slot.sourceKey,
             deliveryKinds: (ecommerceState.taskStates[slot.sourceKey]?.effectiveSizePolicy
-              || ecommerceState.analysis?.aPlusGroup.modules.find((item) => item.moduleId === slot.sourceKey)?.sizePolicy) === 'desktop-then-mobile'
+              || analysis.aPlusGroup.modules.find((item) => item.moduleId === slot.sourceKey)?.sizePolicy) === 'desktop-then-mobile'
               ? ['desktop', 'mobile']
               : ['default'],
           })),
@@ -3014,34 +3013,33 @@ const AppContent: React.FC<AppContentProps> = () => {
         }),
       };
 
-      const mainImageGroupShellSpec = {
-        sourceSheet: '主图' as const,
-        position: layoutPlan.mainGroup.position,
-      };
-      const aPlusGroupShellSpec = {
-        sourceSheet: 'A+' as const,
-        position: layoutPlan.aPlusGroup.position,
-      };
+      const frameworkNode = buildEcommerceFrameworkNode(analysis, {
+        x: basePosition.x + 260,
+        y: basePosition.y - 260,
+      });
+      await addPromptNode(frameworkNode);
+      createdNodeIds.push(frameworkNode.id);
 
       const mainGroupNode = buildEcommerceGroupNode(
-        ecommerceState.analysis.projectMeta.productName,
-        mainImageGroupShellSpec.sourceSheet,
-        mainImageGroupShellSpec.position,
+        analysis.projectMeta.productName,
+        '主图',
+        layoutPlan.mainGroup.position,
+        frameworkNode.id,
       );
       await addPromptNode(mainGroupNode);
       createdNodeIds.push(mainGroupNode.id);
 
       const aPlusGroupNode = buildEcommerceGroupNode(
-        ecommerceState.analysis.projectMeta.productName,
-        aPlusGroupShellSpec.sourceSheet,
-        aPlusGroupShellSpec.position,
+        analysis.projectMeta.productName,
+        'A+',
+        layoutPlan.aPlusGroup.position,
+        frameworkNode.id,
       );
       await addPromptNode(aPlusGroupNode);
       createdNodeIds.push(aPlusGroupNode.id);
 
-      const mainItems = ecommerceState.analysis.mainImageItems;
-      for (let index = 0; index < mainItems.length; index += 1) {
-        const item = mainItems[index];
+      for (let index = 0; index < analysis.mainImageItems.length; index += 1) {
+        const item = analysis.mainImageItems[index];
         const node = await buildEcommercePromptNode({
           item,
           kind: 'main-image',
@@ -3050,31 +3048,60 @@ const AppContent: React.FC<AppContentProps> = () => {
             y: layoutPlan.mainGroup.position.y + 180 + index * 220,
           },
           groupId: mainGroupNode.id,
+          frameworkId: frameworkNode.id,
           selected: ecommerceState.selectedItems[item.itemId] !== false,
-          analysis: ecommerceState.analysis,
+          analysis,
           uploadReferences: currentUploadReferences,
         });
         await addPromptNode(node);
         createdNodeIds.push(node.id);
+        taskNodeIds.push(node.id);
       }
 
-      for (let index = 0; index < ecommerceState.analysis.aPlusGroup.modules.length; index += 1) {
-        const item = ecommerceState.analysis.aPlusGroup.modules[index];
+      for (let index = 0; index < analysis.aPlusGroup.modules.length; index += 1) {
+        const item = analysis.aPlusGroup.modules[index];
         const node = await buildEcommercePromptNode({
           item,
           kind: 'a-plus-module',
           groupId: aPlusGroupNode.id,
+          frameworkId: frameworkNode.id,
           position: aPlusSlotPositionByKey.get(item.moduleId) || {
             x: layoutPlan.aPlusGroup.position.x,
             y: layoutPlan.aPlusGroup.position.y + 180 + index * 220,
           },
           selected: ecommerceState.selectedItems[item.moduleId] !== false,
-          analysis: ecommerceState.analysis,
+          analysis,
           uploadReferences: currentUploadReferences,
         });
         await addPromptNode(node);
         createdNodeIds.push(node.id);
+        taskNodeIds.push(node.id);
       }
+
+      const frameworkSchedulerConfig = frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig;
+      if (frameworkNode.ecommerce) {
+        await updatePromptNode({
+          ...frameworkNode,
+          ecommerce: {
+            ...frameworkNode.ecommerce,
+            frameworkMeta: {
+              activeSheet: '主图',
+              groupIds: {
+                '主图': mainGroupNode.id,
+                'A+': aPlusGroupNode.id,
+              },
+              taskNodeIds,
+              schedulerConfig: frameworkSchedulerConfig,
+            },
+          },
+        });
+      }
+
+      const initialFrameworkRuntime = createEcommerceFrameworkRuntimeState({
+        frameworkId: frameworkNode.id,
+        activeSheet: '主图',
+        config: frameworkSchedulerConfig,
+      });
 
       bringNodesToFront(createdNodeIds);
       setEcommerceState((previousState) => ({
@@ -3083,7 +3110,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         groupSlots: initialGroupSlots,
         activeTaskNodeId: null,
         activeTaskState: null,
+        activeFrameworkId: frameworkNode.id,
         activeGroupSheet: '主图',
+        frameworkRuntime: {
+          ...previousState.frameworkRuntime,
+          [frameworkNode.id]: initialFrameworkRuntime,
+        },
       }));
       setConfig((previousConfig) => ({
         ...previousConfig,
@@ -3091,11 +3123,11 @@ const AppContent: React.FC<AppContentProps> = () => {
         referenceImages: [],
       }));
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('建卡完成', `已创建 ${createdNodeIds.length} 张电商相关卡片。`);
+        notify.success('Build complete', 'Created ' + createdNodeIds.length + ' ecommerce cards.');
       });
     } catch (error: any) {
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('建卡失败', error?.message || '请稍后重试。');
+        notify.error('Build failed', error?.message || 'Please try again later.');
       });
     } finally {
       setEcommerceState((previousState) => ({
@@ -3103,7 +3135,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         isConfirmingAnalysis: false,
       }));
     }
-  }, [addPromptNode, bringNodesToFront, buildCurrentEcommerceUploadReferences, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.isConfirmingAnalysis, ecommerceState.selectedItems, ecommerceState.taskStates, findNextGroupPosition]);
+  }, [addPromptNode, bringNodesToFront, buildCurrentEcommerceUploadReferences, buildEcommerceFrameworkNode, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.isConfirmingAnalysis, ecommerceState.selectedItems, ecommerceState.taskStates, findNextGroupPosition, updatePromptNode]);
 
   const handleActivateEcommerceGroupSheet = useCallback((sheet: '主图' | 'A+') => {
     setEcommerceState((previousState) => ({
@@ -3112,51 +3144,16 @@ const AppContent: React.FC<AppContentProps> = () => {
       activeTaskState: null,
       activeGroupSheet: sheet,
     }));
-  }, []);
+
+    if (ecommerceState.activeFrameworkId) {
+      syncEcommerceFrameworkView(ecommerceState.activeFrameworkId, sheet);
+    }
+  }, [ecommerceState.activeFrameworkId, syncEcommerceFrameworkView]);
 
   useEffect(() => {
     return () => {
-      if (selectionBoxFrameRef.current !== null) {
-        cancelAnimationFrame(selectionBoxFrameRef.current);
-      }
-      if (dragConnectionFrameRef.current !== null) {
-        cancelAnimationFrame(dragConnectionFrameRef.current);
-      }
     };
   }, []);
-
-  const handleRootMouseMove = useCallback((e: React.MouseEvent) => {
-    handleMouseMove(e);
-
-    if (!dragConnectionRef.current?.active) return;
-
-    const nextPoint = {
-      x: (e.clientX - canvasTransform.x) / canvasTransform.scale,
-      y: (e.clientY - canvasTransform.y) / canvasTransform.scale,
-    };
-    pendingDragConnectionPointRef.current = nextPoint;
-
-    const currentDragConnection = dragConnectionRef.current;
-    if (!currentDragConnection) return;
-
-    const nextDragConnection = { ...currentDragConnection, currentPos: nextPoint };
-    dragConnectionRef.current = nextDragConnection;
-    setDragConnection(nextDragConnection);
-  }, [handleMouseMove, canvasTransform]);
-
-  const handleRootMouseUp = useCallback((e: React.MouseEvent) => {
-    handleMouseUp(e);
-
-    if (dragConnectionRef.current?.active) {
-      if (dragConnectionFrameRef.current !== null) {
-        cancelAnimationFrame(dragConnectionFrameRef.current);
-        dragConnectionFrameRef.current = null;
-      }
-      pendingDragConnectionPointRef.current = null;
-      dragConnectionRef.current = null;
-      setDragConnection(null);
-    }
-  }, [handleMouseUp]);
 
   useEffect(() => {
     return () => {
@@ -3192,131 +3189,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       setCanvasInteractionPhase((prev) => (prev === 'node-drag' ? 'idle' : prev));
     });
   }, []);
-
-  // [Draft Sync Effect] Keep the draft node in sync with PromptBar config
-  // AND [Smart Re-centering] Auto-calculate position for new/stale drafts
-  useEffect(() => {
-    if (draftNodeId && activeCanvas) {
-      if (config.prompt.trim()) {
-        const node = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
-        if (node) {
-          const nextSourceImageId = activeSourceImage || undefined;
-          const draftModelMeta = keyManager.getGlobalModelList().find((model) => model.id === config.model);
-          const draftSystemDisplay = draftModelMeta?.isSystemInternal
-            ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
-            : null;
-          const draftRouteState = resolveNodeRouteState({
-            model: config.model,
-            keySlotId: node.keySlotId,
-            provider: node.provider,
-            providerLabel: node.providerLabel,
-          });
-          const nextDraftModelLabel = draftSystemDisplay?.displayName || resolveModelDisplayName(
-            config.model,
-            draftModelMeta?.name || getModelMetadata(config.model)?.name || config.model,
-          );
-          const nextDraftColorStart = draftSystemDisplay?.colorStart || draftModelMeta?.colorStart;
-          const nextDraftColorEnd = draftSystemDisplay?.colorEnd || draftModelMeta?.colorEnd;
-          const nextDraftColorSecondary = draftSystemDisplay?.colorSecondary || draftModelMeta?.colorSecondary;
-          const nextDraftTextColor = draftSystemDisplay?.textColor || draftModelMeta?.textColor;
-          const referenceImagesChanged = node.referenceImages !== config.referenceImages;
-          // Detect changes to avoid loop
-          const hasChanged = node.prompt !== config.prompt ||
-            node.model !== config.model ||
-            node.modelLabel !== nextDraftModelLabel ||
-            node.provider !== draftRouteState.provider ||
-            node.providerLabel !== draftRouteState.providerLabel ||
-            node.keySlotId !== draftRouteState.keySlotId ||
-            node.modelColorStart !== nextDraftColorStart ||
-            node.modelColorEnd !== nextDraftColorEnd ||
-            node.modelColorSecondary !== nextDraftColorSecondary ||
-            node.modelTextColor !== nextDraftTextColor ||
-            node.aspectRatio !== config.aspectRatio ||
-            node.imageSize !== config.imageSize ||
-            (node.thinkingMode || 'minimal') !== (config.thinkingMode || 'minimal') ||
-            !!node.enableGrounding !== !!config.enableGrounding ||
-            !!node.enableImageSearch !== !!config.enableImageSearch ||
-            node.mode !== config.mode ||
-            referenceImagesChanged ||
-            node.sourceImageId !== nextSourceImageId;
-
-          const shouldAutoCenter = !node.userMoved && !node.sourceImageId;
-
-          if (hasChanged || shouldAutoCenter) {
-            // 🎯 [Smart Re-centering]
-            // If the user hasn't moved the draft, and it's a normal draft (not follow-up),
-            // auto-sync its position to current viewport center
-            const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
-            const viewportRect = canvasRef.current?.getCanvasRect() || null;
-            const leftOffset = isSidebarOpen && !isMobile ? 260 : (isMobile ? 0 : 60);
-            const rightOffset = isChatOpen && !isMobile ? 420 : 0;
-            const liveCenter = getViewportPreferredPosition(currentTransform, viewportRect, 180, { left: leftOffset, right: rightOffset });
-
-            // Only update position if it actually needs to move (avoid spam)
-            const isPositionDifferent = Math.abs(node.position.x - liveCenter.x) > 1 || Math.abs(node.position.y - liveCenter.y) > 1;
-
-            if (hasChanged || (shouldAutoCenter && isPositionDifferent)) {
-              const nextDraftNode: PromptNode = {
-                ...node,
-                prompt: config.prompt,
-                aspectRatio: config.aspectRatio,
-                imageSize: config.imageSize,
-                model: config.model,
-                modelLabel: nextDraftModelLabel,
-                modelColorStart: nextDraftColorStart,
-                modelColorEnd: nextDraftColorEnd,
-                modelColorSecondary: nextDraftColorSecondary,
-                modelTextColor: nextDraftTextColor,
-                keySlotId: draftRouteState.keySlotId,
-                provider: draftRouteState.provider,
-                providerLabel: draftRouteState.providerLabel,
-                thinkingMode: config.thinkingMode || 'minimal',
-                enableGrounding: !!config.enableGrounding,
-                enableImageSearch: !!config.enableImageSearch,
-                referenceImages: referenceImagesChanged ? config.referenceImages : undefined,
-                sourceImageId: nextSourceImageId,
-                mode: config.mode,
-                position: shouldAutoCenter ? liveCenter : node.position
-              };
-
-              updatePromptNode(nextDraftNode);
-            }
-          }
-        } else {
-          setDraftNodeId(null);
-        }
-      }
-    } else {
-      // Config is empty
-      if (draftNodeId) {
-        const node = activeCanvas?.promptNodes.find(n => n.id === draftNodeId);
-        if (node && !node.sourceImageId && !node.isGenerating) {
-          deletePromptNode(draftNodeId);
-          setDraftNodeId(null);
-        }
-      }
-    }
-  }, [
-    activeCanvas,
-    activeSourceImage,
-    canvasTransform,
-    config.aspectRatio,
-    config.enableGrounding,
-    config.enableImageSearch,
-    config.imageSize,
-    config.mode,
-    config.model,
-    config.prompt,
-    config.referenceImages,
-    config.thinkingMode,
-    deletePromptNode,
-    draftNodeId,
-    isChatOpen,
-    isMobile,
-    isSidebarOpen,
-    resolveNodeRouteState,
-    updatePromptNode,
-  ]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -3359,64 +3231,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       arrangeAllNodes();
     }, 100);
   }, [selectNodes, arrangeAllNodes]);
-
-  // 🎯 Helper: Compute selection bounds center in screen coordinates
-  const getSelectionScreenCenter = useCallback((nodeIds: string[]) => {
-    if (!activeCanvas || nodeIds.length === 0) return null;
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let hasNodes = false;
-
-    // Check prompts
-    activeCanvas.promptNodes
-      .filter(n => nodeIds.includes(n.id))
-      .forEach(n => {
-        const w = 380;
-        const h = n.height || 200;
-        minX = Math.min(minX, n.position.x - w / 2);
-        maxX = Math.max(maxX, n.position.x + w / 2);
-        minY = Math.min(minY, n.position.y - h);
-        maxY = Math.max(maxY, n.position.y);
-        hasNodes = true;
-      });
-
-    // Check images
-    activeCanvas.imageNodes
-      .filter(n => nodeIds.includes(n.id))
-      .forEach(n => {
-        const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
-        minX = Math.min(minX, n.position.x - width / 2);
-        maxX = Math.max(maxX, n.position.x + width / 2);
-        minY = Math.min(minY, n.position.y - totalHeight);
-        maxY = Math.max(maxY, n.position.y);
-        hasNodes = true;
-      });
-
-    (activeCanvas.workflow?.nodes || [])
-      .filter((node): node is WorkflowUtilityCanvasNode => (
-        nodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
-      ))
-      .forEach((node) => {
-        const width = node.width || 284;
-        const height = node.height || 176;
-        minX = Math.min(minX, node.position.x - width / 2);
-        maxX = Math.max(maxX, node.position.x + width / 2);
-        minY = Math.min(minY, node.position.y - height);
-        maxY = Math.max(maxY, node.position.y);
-        hasNodes = true;
-      });
-
-    if (!hasNodes) return null;
-
-    // Convert canvas coords to screen coords
-    const centerX = (minX + maxX) / 2;
-    const topY = minY; // Use top of bounds for menu position (above selection)
-
-    const screenX = centerX * canvasTransform.scale + canvasTransform.x;
-    const screenY = topY * canvasTransform.scale + canvasTransform.y;
-
-    return { x: screenX, y: screenY };
-  }, [activeCanvas, canvasTransform, getCardDimensions]);
 
   // Reset view: prefer the selected group, otherwise fall back to the latest node
   const handleResetView = useCallback(() => {
@@ -3641,14 +3455,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           }
           updatePromptNode({
             ...node,
-            isGenerating: false,
-            error: "Cancelled by user",
-            errorDetails: {
-              code: 'CANCELLED',
-              responseBody: 'Generation cancelled by user',
-              model: node.model,
-              timestamp: Date.now()
-            }
+            ...buildCancelledPromptNodePatch(node.model)
           });
         }
       }
@@ -3673,14 +3480,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           updatePromptNode({
             ...node,
-            isGenerating: false,
-            error: "Cancelled by user",
-            errorDetails: {
-              code: 'CANCELLED',
-              responseBody: 'Generation cancelled by user',
-              model: node.model,
-              timestamp: Date.now()
-            }
+            ...buildCancelledPromptNodePatch(node.model)
           });
         }));
       }
@@ -3839,9 +3639,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (!promptNode) return null;
 
     const orderedIds = (promptNode.childImageIds || []).filter(Boolean) as string[];
-    const fallbackOrder = sortPptImageNodes(
-      canvas.imageNodes.filter((img) => img.parentPromptId === promptNode.id),
-    ).map((img) => img.id);
+    const fallbackOrder = getPromptPptImageNodes(canvas.imageNodes, promptNode.id).map((img) => img.id);
     const finalOrder = orderedIds.length > 0 ? orderedIds : fallbackOrder;
 
     const images = finalOrder
@@ -3869,9 +3667,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (!promptNode || promptNode.mode !== GenerationMode.PPT) return null;
 
     const orderedIds = (promptNode.childImageIds || []).filter(Boolean) as string[];
-    const fallbackImages = sortPptImageNodes(
-      canvas.imageNodes.filter((img) => img.parentPromptId === promptNode.id),
-    );
+    const fallbackImages = getPromptPptImageNodes(canvas.imageNodes, promptNode.id);
 
     const images = orderedIds.length > 0
       ? orderedIds
@@ -3968,6 +3764,16 @@ const AppContent: React.FC<AppContentProps> = () => {
       imageById: new Map(images.map((image) => [image.id, image] as const)),
     };
   }, [getOrderedPptNodeBundle]);
+
+  const requirePptEditableExportBundle = useCallback((node: PromptNode) => {
+    const exportBundle = getPptEditableExportBundle(node);
+    if (!exportBundle) {
+      showNoPptPagesWarning();
+      return null;
+    }
+
+    return exportBundle;
+  }, [getPptEditableExportBundle, showNoPptPagesWarning]);
 
   const sanitizePptFileSegment = useCallback((value: string, fallback: string) => {
     const normalized = String(value || '')
@@ -4589,7 +4395,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     return { inputStorageIds, outputStorageIds };
   }, [activeCanvas]);
 
-
   // Extracted Execution Logic
 
   const handleGenerate = useCallback(async (promptOverride?: string) => {
@@ -4636,32 +4441,32 @@ const AppContent: React.FC<AppContentProps> = () => {
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
     // it must never enter the system-credit deduction flow.
-    const provider = config.model.includes('@') ? config.model.split('@')[1] : undefined;
     const customLocal = (() => {
       try {
         return JSON.parse(localStorage.getItem('kk_model_customizations') || '{}')[config.model] || {};
       } catch { return {}; }
     })();
 
-    const hasCustomUserKey = keyManager.hasCustomKeyForModel(config.model);
     const preferredKeyIdForBilling = hasExplicitModelRoute(config.model)
       ? undefined
       : getPreferredKeyForMode(config.mode);
     const selectedKeyForBilling = keyManager.getNextKey(config.model, preferredKeyIdForBilling);
-    const isCreditModel = isCreditBasedModel(
-      config.model,
-      provider,
-      customLocal.alias,
-      hasCustomUserKey,
-      selectedKeyForBilling?.id || preferredKeyIdForBilling,
-    );
+    const generationBillingState = resolveGenerationBillingState({
+      modelId: config.model,
+      imageSize: config.imageSize,
+      mode: config.mode,
+      parallelCount: config.parallelCount,
+      customAlias: customLocal.alias,
+      preferredKeyId: selectedKeyForBilling?.id || preferredKeyIdForBilling,
+      resolveCreditCostForModel,
+    });
 
     console.log('[handleGenerate] 计费检查', {
       model: config.model,
-      provider,
+      provider: generationBillingState.resolvedProvider,
       selectedKeyId: selectedKeyForBilling?.id,
-      hasCustomUserKey,
-      isCreditModel,
+      hasCustomUserKey: generationBillingState.hasCustomUserKey,
+      isCreditModel: generationBillingState.isCreditModel,
       mode: config.mode
     });
 
@@ -4675,10 +4480,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       ? existingPromptDraftId
       : `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 
-    let requiredCredits = 0;
-    let perImageCreditCost = 0;
+    let requiredCredits = generationBillingState.requiredCredits;
+    let perImageCreditCost = generationBillingState.perImageCreditCost;
     let paymentTransactionId: string | undefined = undefined;
-    const resolvedCreditRoute = isCreditModel
+    const resolvedCreditRoute = generationBillingState.isCreditModel
       ? adminModelService.getCreditRouteSnapshot(config.model, config.imageSize)
       : null;
     const resolvedCreditSpecId = resolvedCreditRoute?.specId;
@@ -4686,12 +4491,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       nodeId: promptNodeId,
       phase: 'initial',
     });
-    const executionLane = resolveModelExecutionLane({
-      modelId: config.model,
-      isCreditModel,
-    });
-    const useServerSideCreditSettlement = executionLane === 'cloud-credit-model';
-    if (isCreditModel) {
+    const executionLane = generationBillingState.executionLane;
+    const useServerSideCreditSettlement = generationBillingState.useServerSideCreditSettlement;
+    if (generationBillingState.isCreditModel) {
       if (authLoading) {
         import('./services/system/notificationService').then(({ notify }) => {
           notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
@@ -4704,13 +4506,6 @@ const AppContent: React.FC<AppContentProps> = () => {
           notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
         });
         return;
-      }
-
-      perImageCreditCost = resolveCreditCostForModel(config.model, config.imageSize);
-      if (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) {
-        requiredCredits = (config.parallelCount || 1) * perImageCreditCost;
-      } else {
-        requiredCredits = perImageCreditCost || 1;
       }
 
       if (requiredCredits > 0 && billingLoading) {
@@ -4732,8 +4527,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         const chargeAttempt = await ensureCreditAttemptCharged({
           modelId: config.model,
           modelLabel: config.model,
-          providerId: provider || selectedKeyForBilling?.id || 'managed',
-          provider,
+          providerId: generationBillingState.resolvedProvider || selectedKeyForBilling?.id || 'managed',
+          provider: generationBillingState.resolvedProvider,
           requiredCredits,
           useServerSideCreditSettlement,
           billingAttempt,
@@ -4751,396 +4546,103 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       // 4. Calculate Position
       // Normal mode uses the current viewport center; follow-up mode keeps the existing linked placement flow.
-      const currentTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
-      const viewportRect = canvasRef.current?.getCanvasRect() || null;
-      const viewportOffsets = getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth);
-      const liveCenter = getPromptBarFrontPosition(currentTransform, viewportRect, viewportOffsets, 200, 48);
-      const realViewCenter = liveCenter;
-      let viewCenter = { ...liveCenter };
-      let currentPos = { ...viewCenter };
-
-      // [Draft Logic] Use existing draft only for follow-up mode.
-      // Normal mode must always lock to the current viewport center.
-      const canvasNow = activeCanvasRef.current;
-      let isReusingDraft = false;
-
-      if (!isFollowUp) {
-        currentPos = { ...liveCenter };
-        isReusingDraft = false;
-        console.log('[handleGenerate] Normal mode - locked to current viewport center:', currentPos);
-      } else if (hasReusablePromptDraft) {
-        // We have a draft. Use it.
-        const draft = canvasNow?.promptNodes.find(n => n.id === promptNodeId);
-        if (draft) {
-          isReusingDraft = true;
-          currentPos = draft.position;
-
-          // 🎯 [Smart Re-centering Fix]
-          // If the draft is an auto-center draft (not moved by user), FORCE it to stay at the REAL center
-          // during the final generation calculation, even if the canvas was panned just now.
-          const shouldAutoCenter = !draft.userMoved && !draft.sourceImageId && !draft.isGenerating;
-
-          if (shouldAutoCenter) {
-            console.log('[handleGenerate] Auto-centering draft to latest viewCenter for precise placement');
-            currentPos = { ...viewCenter };
-          } else {
-            // 🎯 [Auto-Center Fallback] If draft is off-screen, snap it to current view center
-            // This fixes the issue where users pan away from a draft and then generate, causing the result to be "lost"
-            // Use the live transform, including any in-progress drag offset.
-            const currentTransformForVisibility = canvasRef.current?.getCurrentTransform() || canvasTransform;
-            const vLeft = -currentTransformForVisibility.x / currentTransformForVisibility.scale;
-            const vTop = -currentTransformForVisibility.y / currentTransformForVisibility.scale;
-            const vWidth = window.innerWidth / currentTransformForVisibility.scale;
-            const vHeight = window.innerHeight / currentTransformForVisibility.scale;
-
-            // Margin of error (e.g. 100px)
-            const margin = 100;
-            const isVisible =
-              currentPos.x >= vLeft - margin &&
-              currentPos.x <= vLeft + vWidth + margin &&
-              currentPos.y >= vTop - margin &&
-              currentPos.y <= vTop + vHeight + margin;
-
-            if (!isVisible) {
-              console.warn('[handleGenerate] Draft is off-screen, moving to center:', {
-                currentPos,
-                viewCenter,
-                viewport: { vLeft, vRight: vLeft + vWidth, vTop, vBottom: vTop + vHeight }
-              });
-              currentPos = { ...viewCenter };
-            } else {
-              console.log('[handleGenerate] Reusing draft at position (Visible):', currentPos);
-            }
-          }
-
-          // 🎯 [Collision Check] Ensure draft doesn't overlap others
-          const freshCanvas = activeCanvasRef.current; // Use Ref for fresh state
-          const now = Date.now();
-
-          // [Rapid-Fire] Prune old reserved regions (>3s)
-          reservedRegionsRef.current = reservedRegionsRef.current.filter(r => now - r.timestamp < 3000);
-
-          const otherNodes = [
-            ...(freshCanvas?.promptNodes || [])
-              .filter(n => n.id !== draft.id)
-              .map(n => ({ x: n.position.x, y: n.position.y, width: n.width || 380, height: n.height || 200 })),
-            ...(freshCanvas?.imageNodes || []).map(n => {
-              const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
-              return { x: n.position.x, y: n.position.y, width, height: totalHeight };
-            }),
-            ...(reservedRegionsRef.current || []).map(r => ({ x: r.bounds.x, y: r.bounds.y, width: r.bounds.width, height: r.bounds.height }))
-          ];
-
-          // 🎯 [Fix] If reusing a draft (user placed), Respect its position! 
-          // Only use safe-find for completely new/automatic generations.
-          let safePos = currentPos;
-          if (!isReusingDraft) {
-            safePos = findSafePosition(currentPos, otherNodes);
-          } else {
-            // Ensure we are snapping to integer coordinates for sharpness
-            safePos = { x: Math.round(currentPos.x), y: Math.round(currentPos.y) };
-          }
-
-          // 🎯 Always reserve the FINAL position (whether shifted or not)
-          reservedRegionsRef.current.push({
-            timestamp: now,
-            bounds: { x: safePos.x, y: safePos.y, width: 380, height: 200 }
-          });
-
-          if (safePos.x !== currentPos.x || safePos.y !== currentPos.y) {
-            console.log('[handleGenerate] Draft collision detected, shifting to:', safePos);
-            // Persist the shifted position to canvas state so it cannot jump back or collide with the next card
-            updatePromptNode({ ...draft, position: safePos });
-            currentPos = safePos;
-          }
-        } else {
-          // Draft ID stale?
-          promptNodeId = `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
-          console.log('[handleGenerate] Creating new node at view center (Stale ID):', currentPos);
-        }
-      } else {
-        // Follow-up mode but no draft id: create a new node at computed center/path
-        console.log('[handleGenerate] Follow-up mode without draft, using computed center:', currentPos);
-      }
+      const placement = resolveGenerationPlacement({
+        isFollowUp,
+        promptNodeId,
+        hasReusablePromptDraft,
+      });
+      promptNodeId = placement.promptNodeId;
+      let currentPos = placement.currentPos;
 
       // setDraftNodeId(null); // Moved to end to prevent flicker
 
-      // Legacy calculation reference, but we used currentPos above.
-      const promptHeight = getPromptHeight(promptText);
+      // 立即创建卡片，参考图异步加载。
+      const finalReferenceImages = prepareGenerationReferenceImages(config.referenceImages);
 
-      // 🚀 [Performance Fix] 立即创建卡片，参考图异步加载
-      // 先使用现有的参考图数据（可能有 storageId 但没有 data），在 executeGeneration 中再加载
-      let finalReferenceImages = config.referenceImages.map(img => ({ ...img }));
-
-      // 如果有源图片（追询模式），添加到参考图中
-      if (activeSourceImage) {
-        const sourceImage = activeCanvasRef.current?.imageNodes.find(img => img.id === activeSourceImage);
-        const alreadyAdded = finalReferenceImages.some(ref => ref.id === sourceImage?.id);
-        if (sourceImage && !alreadyAdded) {
-          finalReferenceImages.push({
-            id: sourceImage.id,
-            data: '', // 在 executeGeneration 中异步加载
-            storageId: sourceImage.storageId || sourceImage.id,
-            mimeType: 'image/png'
-          });
-        }
-      }
-
-      // 🚀 异步保存参考图到 IDB（不阻塞）
-      finalReferenceImages.forEach(ref => {
-        if (ref.data) {
-          import('./services/storage/imageStorage').then(({ saveImage }) => {
-            const fullUrl = toReferenceImageDataUrl(ref.data, (ref as any).mimeType || 'image/png');
-            const lookupIds = getReferenceImageLookupIds(ref);
-            Promise.allSettled(lookupIds.map((lookupId) => saveImage(lookupId, fullUrl)))
-              .catch(e => console.warn('Ref save failed', e));
-          });
-        }
-      });
-
-      // 🎯 Final hard-guard: in normal mode, always lock to CURRENT viewport center at click-time
-      // This prevents any stale draft/canvas closure from pulling position back to initial canvas.
-      if (!isFollowUp) {
-        const latestTransform = canvasRef.current?.getCurrentTransform() || canvasTransform;
-        const latestViewportRect = canvasRef.current?.getCanvasRect() || null;
-        const latestOffsets = getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth);
-        currentPos = getPromptBarFrontPosition(latestTransform, latestViewportRect, latestOffsets, 200, 48);
-        console.log('[handleGenerate] Final position hard-guard (normal mode):', currentPos);
-      }
-
-      const isNewAnim = true; // 🎯 Always set for standard generation
+      const isNewAnim = true; // Always set for standard generation
 
       const rawPrompt = trimmedPrompt;
-      let optimizedPromptEn: string | undefined;
-      let optimizedPromptZh: string | undefined;
-      let promptOptimizerResult: any | undefined; // Store the full prompt-optimizer result
-
-      if ((config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT) && config.enablePromptOptimization && rawPrompt) {
-        try {
-          const optimized = await optimizePromptForImage(rawPrompt, {
-            preferredModelId: config.model,
-            aspectRatio: config.aspectRatio,
-            imageSize: config.imageSize,
-            mode: config.mode,
-            supportsThinking: !!getModelCapabilities(config.model)?.supportsThinking,
-            thinkingMode: config.thinkingMode || 'minimal',
-            referenceImages: finalReferenceImages
-              .filter(ref => ref.data)
-              .map(ref => {
-                const mime = (ref as any).mimeType || 'image/png';
-                let base64Data = ref.data!;
-                if (base64Data.startsWith('data:')) {
-                  const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
-                  if (match) {
-                    base64Data = match[2];
-                  }
-                }
-                return { mimeType: mime, data: base64Data };
-              })
-          });
-          optimizedPromptEn = optimized.optimizedEn;
-          optimizedPromptZh = optimized.optimizedZh;
-          promptOptimizerResult = optimized.fullResult; // Capture the full prompt-optimizer result
-        } catch (e: any) {
-          console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', e);
-          import('./services/system/notificationService').then(({ notify }) => {
-            notify.error('提示词优化失败', '无法调用对话模型，已自动降级为原始提示词：' + (e.message || ''));
-          });
-        }
-      }
-
-      const baseModelIdForPreview = config.model.split('@')[0];
-      const modelSuffixForPreview = config.model.split('@')[1];
-      const previewModelMeta = keyManager.getGlobalModelList().find((model) => model.id === config.model);
-      const previewSystemDisplay = previewModelMeta?.isSystemInternal
-        ? adminModelService.getModelDisplayInfo(config.model, config.imageSize)
-        : null;
-      const previewModelLabel = previewSystemDisplay?.displayName || resolveModelDisplayName(
-        config.model,
-        previewModelMeta?.name || getModelMetadata(config.model)?.name || baseModelIdForPreview,
-      );
-      const selectedKey = useServerSideCreditSettlement
-        ? null
-        : selectedKeyForBilling;
-      const previewProvider = useServerSideCreditSettlement
-        ? 'SystemProxy'
-        : (selectedKey?.provider || previewModelMeta?.provider || (modelSuffixForPreview ? 'Custom' : 'Google'));
-      const previewProviderLabel = useServerSideCreditSettlement
-        ? (previewSystemDisplay?.providerName || previewSystemDisplay?.provider || previewModelMeta?.providerLabel || 'System Proxy')
-        : (selectedKey?.name || previewModelMeta?.providerLabel || modelSuffixForPreview || 'Google');
-      const pptCount = config.mode === GenerationMode.PPT
-        ? Math.min(20, Math.max(1, config.parallelCount || 1))
-        : Math.min(4, Math.max(1, config.parallelCount || 1));
-      const normalizedSlides = (config.pptSlides || []).map(s => String(s || '').trim()).filter(Boolean);
-      const effectivePptSlides = config.mode === GenerationMode.PPT
-        ? normalizePptSlidesForCount(normalizedSlides, rawPrompt, pptCount)
-        : [];
-
-      const generatingNode: PromptNode = {
-        id: promptNodeId!,
-        prompt: rawPrompt,
-        originalPrompt: rawPrompt,
+      const {
         optimizedPromptEn,
         optimizedPromptZh,
-        promptOptimizerResult, // Store the full prompt-optimizer result
+        promptOptimizerResult,
+      } = await optimizeGenerationPrompt({
+        enabled: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT)
+          && config.enablePromptOptimization
+          && !!rawPrompt,
+        rawPrompt,
+        referenceImages: finalReferenceImages,
+        options: {
+          preferredModelId: config.model,
+          aspectRatio: config.aspectRatio,
+          imageSize: config.imageSize,
+          mode: config.mode,
+          supportsThinking: !!getModelCapabilities(config.model)?.supportsThinking,
+          thinkingMode: config.thinkingMode || 'minimal',
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : String(error || '');
+          console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', error);
+          import('./services/system/notificationService').then(({ notify }) => {
+            notify.error('Prompt optimization failed', 'Fell back to the original prompt: ' + message);
+          });
+        },
+      });
+
+      const generationPreviewState = resolveGenerationPreviewState({
+        config,
+        rawPrompt,
+        selectedKeyForBilling,
+        useServerSideCreditSettlement,
+      });
+
+      const generatingNode = buildGeneratingPromptNode({
+        promptNodeId,
+        prompt: rawPrompt,
+        optimizedPromptEn,
+        optimizedPromptZh,
+        promptOptimizerResult,
         promptOptimizationEnabled: !!(config.enablePromptOptimization && (optimizedPromptEn || promptOptimizerResult)),
         position: currentPos,
-        aspectRatio: config.aspectRatio,
-        imageSize: config.imageSize,
-        model: config.model,
-        modelLabel: previewModelLabel,
-        modelColorStart: previewModelMeta?.colorStart,
-        modelColorEnd: previewModelMeta?.colorEnd,
-        modelColorSecondary: previewModelMeta?.colorSecondary,
-        modelTextColor: previewModelMeta?.textColor,
-        thinkingMode: config.thinkingMode || 'minimal',
-        enableGrounding: !!config.enableGrounding,
-        enableImageSearch: !!config.enableImageSearch,
-        provider: previewProvider,
-        providerLabel: previewProviderLabel,
-        keySlotId: useServerSideCreditSettlement ? 'system_proxy_slot' : selectedKey?.id,
-        childImageIds: [],
-        lastGenerationSuccessCount: undefined,
-        lastGenerationFailCount: undefined,
-        lastGenerationTotalCount: undefined,
+        config,
+        previewModelLabel: generationPreviewState.previewModelLabel,
+        previewModelMeta: generationPreviewState.previewColorMeta,
+        previewProvider: generationPreviewState.previewProvider,
+        previewProviderLabel: generationPreviewState.previewProviderLabel,
+        keySlotId: generationPreviewState.keySlotId,
         referenceImages: finalReferenceImages,
-        timestamp: Date.now(),
-        isGenerating: true,
-        error: undefined,
-        errorDetails: undefined,
-        refundStatus: undefined,
         creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
         executionLane,
         billingAttemptId: billingAttempt.attemptId,
         creditRouteSpecId: resolvedCreditSpecId,
         creditRouteUnitId: resolvedCreditRoute?.routeUnitId,
         paymentTransactionId,
-        isNew: isNewAnim, // Mark the node as newly created so the launch animation can run.
-        parallelCount: pptCount,
+        isNew: isNewAnim,
+        parallelCount: generationPreviewState.parallelCount,
         sourceImageId: activeSourceImage || undefined,
-        mode: config.mode,
-        isDraft: false, // Ensure it is NOT a draft anymore
-        videoResolution: config.videoResolution,
-        videoDuration: config.videoDuration,
-        videoAudio: config.videoAudio,
-        pptSlides: effectivePptSlides,
-        pptStyleLocked: config.pptStyleLocked !== false,
+        pptSlides: generationPreviewState.pptSlides,
         cost: requiredCredits,
-        billingMode: isCreditModel ? 'credits' : 'currency',
-        creditCost: isCreditModel ? perImageCreditCost : undefined,
+        billingMode: generationBillingState.isCreditModel ? 'credits' : 'currency',
+        creditCost: generationBillingState.isCreditModel ? perImageCreditCost : undefined,
         isPaymentProcessed: requiredCredits > 0 && !useServerSideCreditSettlement,
-        generationMetadata: {
-          pendingTaskIds: [],
-        },
-      };
-
-      // 🎯 [Fix Duplicate Placeholders]
-      // Always check if the ID we are about to add/update actually exists on canvas
-      // If not, revert to add. If yes, update.
-      const canvasForWrite = activeCanvasRef.current;
-      const STACK_SHIFT_Y = 10;
-      const STACK_MATCH_X = 36;
-      const STACK_MATCH_Y = 120;
-
-      const overlappingPromptGroups = (canvasForWrite?.promptNodes || [])
-        .filter(node =>
-          node.id !== generatingNode.id &&
-          Math.abs(node.position.x - generatingNode.position.x) <= STACK_MATCH_X &&
-          Math.abs(node.position.y - generatingNode.position.y) <= STACK_MATCH_Y
-        )
-        .sort((a, b) => b.position.y - a.position.y);
-
-      const promptUpdates: { id: string, updates: Partial<PromptNode> }[] = [];
-      const imageUpdates: { id: string, updates: Partial<GeneratedImage> }[] = [];
-
-      overlappingPromptGroups.forEach((node) => {
-        promptUpdates.push({
-          id: node.id,
-          updates: {
-            position: {
-              ...node.position,
-              y: node.position.y - STACK_SHIFT_Y,
-            }
-          }
-        });
-
-        (canvasForWrite?.imageNodes || [])
-          .filter(img => img.parentPromptId === node.id)
-          .forEach((img) => {
-            imageUpdates.push({
-              id: img.id,
-              updates: {
-                position: {
-                  ...img.position,
-                  y: img.position.y - STACK_SHIFT_Y,
-                }
-              }
-            });
-          });
       });
 
-      if (promptUpdates.length > 0) {
-        promptUpdates.forEach(({ id, updates }) => {
-          const freshNode = activeCanvasRef.current?.promptNodes.find(n => n.id === id);
-          if (freshNode) {
-            updatePromptNode({ ...freshNode, ...updates });
-          }
-        });
-      }
-
-      if (imageUpdates.length > 0) {
-        imageUpdates.forEach(({ id, updates }) => {
-          if (updates.position) {
-            updateImageNodePosition(id, updates.position, { ignoreSelection: true });
-          } else {
-            updateImageNode(id, updates);
-          }
-        });
-      }
-
-      const existingNode = canvasForWrite?.promptNodes.find(n => n.id === generatingNode.id);
-
-      if (existingNode) {
-        console.log('[handleGenerate] Updating existing node:', generatingNode.id);
-        await updatePromptNode(generatingNode);
-      } else {
-        // Safety: Check if ANY draft exists that we might have missed (stale closure)
-        const strayDraft = canvasForWrite?.promptNodes.find(n => n.isDraft);
-        if (strayDraft) {
-          console.log('[handleGenerate] Found stray draft during generation, converting it:', strayDraft.id);
-          // Replace the stray draft's ID with our generating ID? 
-          // Or just update the stray draft with our config?
-          // Better to update the stray draft to avoid orphans.
-          // IMPORTANT: keep the freshly calculated generation position (current viewport center in normal mode)
-          // Do NOT reuse stray draft position, otherwise node may jump back to old/initial canvas location.
-          const fusedNode = { ...generatingNode, id: strayDraft.id, position: generatingNode.position };
-          await updatePromptNode(fusedNode);
-          // Update our local ID reference for executeGeneration
-          generatingNode.id = strayDraft.id;
-        } else {
-          console.log('[handleGenerate] Creating NEW node:', generatingNode.id);
-          await addPromptNode(generatingNode);
-          console.log('[handleGenerate] addPromptNode completed for:', generatingNode.id, 'isDraft:', generatingNode.isDraft);
-        }
-      }
-
-      // 🎯 [Cleanup] Remove any OTHER drafts if they exist (duplicate prevention)
-      // This is a safety measure - uncommented to fix orphan card issue
-      const leftovers = canvasForWrite?.promptNodes.filter(n => n.isDraft && n.id !== generatingNode.id);
-      if (leftovers && leftovers.length > 0) {
-        console.log('[handleGenerate] Cleaning up orphan drafts:', leftovers.map(n => n.id));
-        leftovers.forEach(n => deletePromptNode(n.id));
-      }
+      const persistedGeneratingNode = await persistGeneratingPromptNode({
+        generatingNode,
+        getCanvas: () => activeCanvasRef.current,
+        updatePromptNode,
+        addPromptNode,
+        updateImageNodePosition,
+        deletePromptNode,
+      });
 
       setDraftNodeId(null); // Detach status NOW that the node is updated in canvas
       setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
       setActiveSourceImage(null);
 
       // Execute immediately after save completed
-      if (useServerSideCreditSettlement && requiredCredits > 0) {
-        adjustBalanceOptimistically(-requiredCredits);
-      }
-      await executeGeneration(generatingNode);
+      applyOptimisticServerCreditDebit(requiredCredits, useServerSideCreditSettlement);
+      await executeGeneration(persistedGeneratingNode);
     } catch (e: any) {
       console.error('[handleGenerate] failed:', e);
       import('./services/system/notificationService').then(({ notify }) => {
@@ -5150,7 +4652,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by lastGenerateAtRef instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, updateImageNode, activeCanvas, activeSourceImage, canvasTransform, findNextGroupPosition, executeGeneration, getPromptHeight, isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, adjustBalanceOptimistically, resolveCreditCostForModel, hasExplicitModelRoute]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -5180,22 +4682,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       reader.readAsDataURL(file);
     });
   }, [config.referenceImages]);
-
-  const handleConnectStart = useCallback((id: string, startPos: { x: number; y: number }) => {
-    setDragConnection({
-      active: true,
-      startId: id,
-      startPos,
-      currentPos: startPos
-    });
-  }, []);
-
-  const handleConnectEnd = useCallback((targetId: string) => {
-    if (dragConnection?.active) {
-      linkNodes(dragConnection.startId, targetId);
-    }
-    setDragConnection(null);
-  }, [dragConnection, linkNodes]);
 
   // 鑷姩鏁寸悊锛氬鎵樼粰 CanvasContext
   const handleAutoArrange = useCallback(() => {
@@ -5293,17 +4779,10 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
-    const normalizedRetryModel = normalizeModelId(node.model);
-    const normalizedRetryNode: PromptNode = {
-      ...node,
-      model: normalizedRetryModel,
-      modelLabel: resolveModelDisplayName(normalizedRetryModel, node.modelLabel || node.model),
-    };
-    const resolvedRoute = resolveNodeRouteState(normalizedRetryNode);
-    let executionNode: PromptNode = {
-      ...normalizedRetryNode,
-      ...resolvedRoute,
-    };
+    let executionNode = buildRetryExecutionNode({
+      node,
+      resolveNodeRouteState,
+    });
 
     const recovered = await recoverFailedSyncBridgeGeneration(executionNode);
     if (recovered.recoveredCount > 0 || recovered.pendingCount > 0) {
@@ -5319,55 +4798,21 @@ const AppContent: React.FC<AppContentProps> = () => {
     const currentNodeId = node.id;
     const requestedCount = node.parallelCount || config.parallelCount || 1;
     const count = node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
-    const retryProvider = executionNode.model.includes('@')
-      ? executionNode.model.split('@')[1]
-      : executionNode.provider;
-    const hasRetryCustomUserKey = keyManager.hasCustomKeyForModel(executionNode.model);
-    const retryIsCreditModel = isCreditBasedModel(
-      executionNode.model,
-      retryProvider,
-      undefined,
-      hasRetryCustomUserKey,
-      executionNode.keySlotId,
-    );
-    const retryUseServerSideCreditSettlement = retryIsCreditModel && isSystemModelRoute(executionNode.model);
-    const retryPerImageCreditCost = retryIsCreditModel
-      ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
-      : 0;
-    const retryRequiredCredits = retryIsCreditModel
-      ? ((executionNode.mode === GenerationMode.IMAGE || executionNode.mode === GenerationMode.PPT || executionNode.mode === GenerationMode.ECOMMERCE)
-        ? count * retryPerImageCreditCost
-        : (retryPerImageCreditCost || 1))
-      : 0;
-    const retryBillingAttempt = buildGenerationBillingAttempt({
+    const preparedRetry = await prepareRetriedExecutionNode({
+      executionNode,
       nodeId: currentNodeId,
+      parallelCount: count,
       phase: 'retry',
-    });
-    const retryChargeAttempt = await ensureCreditAttemptCharged({
-      modelId: executionNode.model,
-      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
-      providerId: retryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
-      provider: executionNode.provider,
-      requiredCredits: retryRequiredCredits,
-      useServerSideCreditSettlement: retryUseServerSideCreditSettlement,
-      billingAttempt: retryBillingAttempt,
+      resolveCreditCostForModel,
+      ensureCreditAttemptCharged,
     });
 
-    if (!retryChargeAttempt.success) {
+    if (!preparedRetry) {
       return;
     }
 
-    executionNode = {
-      ...executionNode,
-      refundStatus: undefined,
-      billingMode: retryIsCreditModel ? 'credits' : 'currency',
-      creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
-      creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
-      billingAttemptId: retryBillingAttempt.attemptId,
-      cost: retryRequiredCredits,
-      isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
-      paymentTransactionId: retryChargeAttempt.transactionId,
-    };
+    const { billingAttempt: retryBillingAttempt, billingState: retryBillingState } = preparedRetry;
+    executionNode = preparedRetry.executionNode;
 
     // 1. Reset state to generating
     updatePromptNode({
@@ -5376,20 +4821,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       isGenerating: true,
       error: undefined,
       errorDetails: undefined,
-      refundStatus: undefined,
-      billingMode: retryIsCreditModel ? 'credits' : 'currency',
-      creditCost: retryIsCreditModel ? retryPerImageCreditCost : undefined,
-      creditSettlement: retryUseServerSideCreditSettlement ? 'server' : 'client',
-      billingAttemptId: retryBillingAttempt.attemptId,
-      cost: retryRequiredCredits,
-      isPaymentProcessed: Boolean(retryChargeAttempt.transactionId),
-      paymentTransactionId: retryChargeAttempt.transactionId,
       isDraft: false, // 🎯 [Fix] Ensure visibility
       timestamp: Date.now() // Reset timer
     });
-    if (retryUseServerSideCreditSettlement && retryRequiredCredits > 0) {
-      adjustBalanceOptimistically(-retryRequiredCredits);
-    }
+    applyOptimisticServerCreditDebit(
+      retryBillingState.requiredCredits,
+      retryBillingState.useServerSideCreditSettlement,
+    );
 
     const startTime = Date.now();
 
@@ -5816,11 +5254,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           isGenerating: false,
           isDraft: false, // 🎯 [Fix] Ensure persistence
           childImageIds: alignedImageNodes.map(n => n.id),
-          error: undefined,
-          errorDetails: undefined,
-          refundStatus: undefined,
-          isPaymentProcessed: false,
-          paymentTransactionId: undefined,
+          ...buildCompletedPromptNodePatch(),
           keySlotId: alignedImageNodes[0]?.keySlotId || executionNode.keySlotId,
           provider: alignedImageNodes[0]?.provider || executionNode.provider,
           providerLabel: alignedImageNodes[0]?.providerLabel || executionNode.providerLabel,
@@ -5870,27 +5304,14 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('重试失败', error.message);
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, resolveCreditCostForModel, adjustBalanceOptimistically, resolveFailedCreditAttempt]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, resolveFailedCreditAttempt]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
-    const childImages = activeCanvas.imageNodes
-      .filter(img => img.parentPromptId === node.id)
-      .sort((a, b) => {
-        const getNum = (x: string | undefined) => {
-          if (!x) return Number.POSITIVE_INFINITY;
-          const m = x.match(/图\s*(\d+)/);
-          return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
-        };
-        const diff = getNum(a.alias) - getNum(b.alias);
-        if (Number.isFinite(diff) && diff !== 0) return diff;
-        return (a.timestamp || 0) - (b.timestamp || 0);
-      });
+    const childImages = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
 
     if (childImages.length === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
-      });
+      showNoPptPagesWarning();
       return;
     }
 
@@ -5964,36 +5385,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       referenceStorageIds: (node.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean)
     }, null, 2));
 
-    const slidesHtml = `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PPT 导出预览</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0b1020; color: #e5e7eb; margin: 0; padding: 20px; }
-    h1 { font-size: 18px; margin: 0 0 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
-    .card { background: #121a2f; border: 1px solid #23304f; border-radius: 10px; overflow: hidden; }
-    .meta { padding: 10px 12px; font-size: 12px; line-height: 1.4; }
-    .title { color: #7dd3fc; font-weight: 600; margin-bottom: 6px; }
-    img { width: 100%; display: block; background: #0f172a; }
-  </style>
-</head>
-<body>
-  <h1>${(node.prompt || 'PPT 导出').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
-  <div class="grid">
-    ${pagesMeta.map(p => `
-      <div class="card">
-        <img src="../${p.file}" alt="${String(p.title).replace(/"/g, '&quot;')}" />
-        <div class="meta">
-          <div class="title">第 ${p.page} 页 · ${String(p.title).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-          <div>${String(p.prompt || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-        </div>
-      </div>`).join('')}
-  </div>
-</body>
-</html>`;
+    const slidesHtml = buildPptSlidesPreviewHtml({
+      title: node.prompt || 'PPT 导出',
+      items: pagesMeta.map((pageMeta) => ({
+        page: pageMeta.page,
+        title: String(pageMeta.title || ''),
+        imageSrc: `../${String(pageMeta.file || '')}`,
+        description: String(pageMeta.prompt || ''),
+      })),
+    });
     zip.file('outline/slides-preview.html', slidesHtml);
 
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -6007,35 +5407,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     import('./services/system/notificationService').then(({ notify }) => {
       notify.success('导出完成', `已导出 ${childImages.length} 页与 pages/outline/meta 目录`);
     });
-  }, [activeCanvas, parsePptOutlineLine]);
+  }, [activeCanvas, parsePptOutlineLine, showNoPptPagesWarning]);
 
   const handleRetryPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
     if (!activeCanvas) return;
     if (node.mode !== GenerationMode.PPT) return;
-    const normalizedRetryModel = normalizeModelId(node.model);
-    const normalizedRetryNode: PromptNode = {
-      ...node,
-      model: normalizedRetryModel,
-      modelLabel: resolveModelDisplayName(normalizedRetryModel, node.modelLabel || node.model),
-    };
-    const resolvedRoute = resolveNodeRouteState(normalizedRetryNode);
-    let executionNode: PromptNode = {
-      ...normalizedRetryNode,
-      ...resolvedRoute,
-    };
+    let executionNode = buildRetryExecutionNode({
+      node,
+      resolveNodeRouteState,
+    });
 
-    const ordered = activeCanvas.imageNodes
-      .filter(img => img.parentPromptId === node.id)
-      .sort((a, b) => {
-        const num = (val?: string) => {
-          if (!val) return Number.POSITIVE_INFINITY;
-          const m = val.match(/图\s*(\d+)/);
-          return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
-        };
-        const d = num(a.alias) - num(b.alias);
-        if (Number.isFinite(d) && d !== 0) return d;
-        return (a.timestamp || 0) - (b.timestamp || 0);
-      });
+    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
 
     const target = ordered[pageIndex];
     if (!target) {
@@ -6045,56 +5427,22 @@ const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
-    const pageRetryProvider = executionNode.model.includes('@')
-      ? executionNode.model.split('@')[1]
-      : executionNode.provider;
-    const hasPageRetryCustomUserKey = keyManager.hasCustomKeyForModel(executionNode.model);
-    const pageRetryIsCreditModel = isCreditBasedModel(
-      executionNode.model,
-      pageRetryProvider,
-      undefined,
-      hasPageRetryCustomUserKey,
-      executionNode.keySlotId,
-    );
-    const pageRetryUseServerSideCreditSettlement = pageRetryIsCreditModel && isSystemModelRoute(executionNode.model);
-    const pageRetryPerImageCreditCost = pageRetryIsCreditModel
-      ? resolveCreditCostForModel(executionNode.model, executionNode.imageSize)
-      : 0;
-    const pageRetryRequiredCredits = pageRetryIsCreditModel
-      ? (pageRetryPerImageCreditCost || 1)
-      : 0;
-    const pageRetryBillingAttempt = buildGenerationBillingAttempt({
+    const preparedPageRetry = await prepareRetriedExecutionNode({
+      executionNode,
       nodeId: node.id,
+      parallelCount: 1,
       phase: 'ppt-single',
       pageIndex,
-    });
-    const pageRetryChargeAttempt = await ensureCreditAttemptCharged({
-      modelId: executionNode.model,
-      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
-      providerId: pageRetryUseServerSideCreditSettlement ? 'system_proxy_slot' : executionNode.keySlotId,
-      provider: executionNode.provider,
-      requiredCredits: pageRetryRequiredCredits,
-      useServerSideCreditSettlement: pageRetryUseServerSideCreditSettlement,
-      billingAttempt: pageRetryBillingAttempt,
+      resolveCreditCostForModel,
+      ensureCreditAttemptCharged,
     });
 
-    if (!pageRetryChargeAttempt.success) {
+    if (!preparedPageRetry) {
       return;
     }
 
-    executionNode = {
-      ...executionNode,
-      refundStatus: undefined,
-      billingMode: pageRetryIsCreditModel ? 'credits' : 'currency',
-      creditCost: pageRetryIsCreditModel ? pageRetryPerImageCreditCost : undefined,
-      creditSettlement: pageRetryUseServerSideCreditSettlement ? 'server' : 'client',
-      billingAttemptId: pageRetryBillingAttempt.attemptId,
-      cost: pageRetryRequiredCredits,
-      isPaymentProcessed: Boolean(pageRetryChargeAttempt.transactionId),
-      paymentTransactionId: pageRetryChargeAttempt.transactionId,
-      error: undefined,
-      errorDetails: undefined,
-    };
+    const { billingAttempt: pageRetryBillingAttempt, billingState: pageRetryBillingState } = preparedPageRetry;
+    executionNode = preparedPageRetry.executionNode;
 
     updatePromptNode(executionNode);
 
@@ -6131,9 +5479,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
     });
 
-    if (pageRetryUseServerSideCreditSettlement && pageRetryRequiredCredits > 0) {
-      adjustBalanceOptimistically(-pageRetryRequiredCredits);
-    }
+    applyOptimisticServerCreditDebit(
+      pageRetryBillingState.requiredCredits,
+      pageRetryBillingState.useServerSideCreditSettlement,
+    );
 
     const startTime = Date.now();
     try {
@@ -6173,7 +5522,8 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       }
 
-      updateImageNode(target.id, {
+      const refreshedPageImage: GeneratedImage = {
+        ...target,
         ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, result.providerName || target.providerLabel, result.provider || target.provider),
         url: result.url,
         originalUrl: result.url.startsWith('data:') ? result.url : undefined,
@@ -6204,16 +5554,23 @@ const AppContent: React.FC<AppContentProps> = () => {
         storageId,
         isGenerating: false,
         error: undefined
-      });
+      };
+      updateImageNode(target.id, refreshedPageImage);
 
       rememberPreferredKeyForMode(executionNode.mode, result.keySlotId || executionNode.keySlotId);
+      const refreshedDeckImages = ordered.map((imageNode, index) => (
+        index === pageIndex ? refreshedPageImage : imageNode
+      ));
       updatePromptNode({
         ...executionNode,
-        refundStatus: undefined,
-        isPaymentProcessed: false,
-        paymentTransactionId: undefined,
-        error: undefined,
-        errorDetails: undefined
+        ...buildCompletedPromptNodePatch(),
+        childImageIds: node.childImageIds,
+        pptDeck: buildPptDeckModuleState({
+          ...executionNode,
+          ...buildCompletedPromptNodePatch(),
+          childImageIds: node.childImageIds,
+          pptDeck: node.pptDeck,
+        }, refreshedDeckImages),
       });
 
       import('./services/system/notificationService').then(({ notify }) => {
@@ -6233,7 +5590,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         notify.error('单页重绘失败', error?.message || '请稍后重试');
       });
     }
-  }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay, ensureCreditAttemptCharged, resolveCreditCostForModel, adjustBalanceOptimistically, updatePromptNode, resolveFailedCreditAttempt]);
+  }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, updatePromptNode, resolveFailedCreditAttempt]);
 
   const updateEcommerceNodeState = useCallback((nodeId: string, patch: Partial<NonNullable<PromptNode['ecommerce']>>, nodePatch: Partial<PromptNode> = {}) => {
     const latestNode = activeCanvasRef.current?.promptNodes.find((node) => node.id === nodeId);
@@ -6311,54 +5668,38 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? 'desktop'
         : 'default';
     let nextPrompt = [renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
-    let optimizedPromptEn: string | undefined;
-    let optimizedPromptZh: string | undefined;
-    let promptOptimizerResult: any | undefined;
-
-    if (config.enablePromptOptimization && nextPrompt) {
-      try {
-        const optimized = await optimizePromptForImage(nextPrompt, {
-          preferredModelId: latestNode.model,
-          aspectRatio: String(nextAspectRatio),
-          imageSize: String(nextImageSize),
-          mode: GenerationMode.ECOMMERCE,
-          supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
-          thinkingMode: resolveEffectiveEcommerceThinkingMode(),
-          referenceImages: (latestNode.referenceImages || [])
-            .filter((referenceImage) => referenceImage.data)
-            .map((referenceImage) => {
-              const mimeType = referenceImage.mimeType || 'image/png';
-              let data = referenceImage.data;
-              if (data.startsWith('data:')) {
-                const match = data.match(/^data:([^;]+);base64,(.+)$/);
-                if (match?.[2]) {
-                  data = match[2];
-                }
-              }
-              return {
-                mimeType,
-                data,
-              };
-            }),
-          ecommerceContext: renderTask && seriesTemplate ? {
-            taskState: renderTask.taskState,
-            seriesTemplate,
-            assetRoles: renderTask.taskState.assetRoles,
-            outputTarget: {
-              label: renderTask.displayLabel,
-              aspectRatio: String(nextAspectRatio),
-              imageSize: String(nextImageSize),
-            },
-          } : undefined,
-        });
-        optimizedPromptEn = optimized.optimizedEn;
-        optimizedPromptZh = optimized.optimizedZh;
-        promptOptimizerResult = optimized.fullResult;
-        nextPrompt = optimized.optimizedEn || nextPrompt;
-      } catch (error) {
+    const {
+      optimizedPrompt: optimizedNextPrompt,
+      optimizedPromptEn,
+      optimizedPromptZh,
+      promptOptimizerResult,
+    } = await optimizeGenerationPrompt({
+      enabled: config.enablePromptOptimization && !!nextPrompt,
+      rawPrompt: nextPrompt,
+      referenceImages: latestNode.referenceImages || [],
+      options: {
+        preferredModelId: latestNode.model,
+        aspectRatio: String(nextAspectRatio),
+        imageSize: String(nextImageSize),
+        mode: GenerationMode.ECOMMERCE,
+        supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
+        thinkingMode: resolveEffectiveEcommerceThinkingMode(),
+        ecommerceContext: renderTask && seriesTemplate ? {
+          taskState: renderTask.taskState,
+          seriesTemplate,
+          assetRoles: renderTask.taskState.assetRoles,
+          outputTarget: {
+            label: renderTask.displayLabel,
+            aspectRatio: String(nextAspectRatio),
+            imageSize: String(nextImageSize),
+          },
+        } : undefined,
+      },
+      onError: (error) => {
         console.warn('[runEcommerceNodeGeneration] Prompt optimization failed, fallback to render task prompt.', error);
-      }
-    }
+      },
+    });
+    nextPrompt = optimizedNextPrompt;
 
     const executionNode: PromptNode = {
       ...latestNode,
@@ -6511,80 +5852,269 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [runEcommerceNodeGeneration]);
 
+  const resolveEcommerceFrameworkQueuePhases = useCallback((
+    node: PromptNode,
+    phasePreference?: 'desktop' | 'mobile',
+  ): EcommerceFrameworkQueueItem['phase'][] => {
+    const ecommerce = node.ecommerce;
+    if (!ecommerce || ecommerce.selectedForGeneration === false) {
+      return [];
+    }
+
+    if (ecommerce.kind === 'main-image') {
+      if (phasePreference === 'mobile') {
+        return [];
+      }
+
+      return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
+        ? ['sheet']
+        : [];
+    }
+
+    if (ecommerce.kind !== 'a-plus-module') {
+      return [];
+    }
+
+    const effectiveSizePolicy = ecommerce.effectiveSizePolicy || ecommerce.sizePolicy;
+    const requiresMobileFollowUp = effectiveSizePolicy === 'desktop-then-mobile';
+
+    if (phasePreference === 'mobile') {
+      return ecommerce.desktopStage === 'confirmed'
+        && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed' || ecommerce.mobileStage === 'locked')
+        ? ['mobile']
+        : [];
+    }
+
+    if (phasePreference === 'desktop') {
+      if (requiresMobileFollowUp) {
+        return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
+          ? ['desktop']
+          : [];
+      }
+
+      return ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed'
+        ? ['sheet']
+        : [];
+    }
+
+    if (requiresMobileFollowUp) {
+      if (ecommerce.desktopStage === 'confirmed' && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed')) {
+        return ['mobile'];
+      }
+
+      return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
+        ? ['desktop']
+        : [];
+    }
+
+    return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
+      ? ['sheet']
+      : [];
+  }, []);
+
+  const enqueueEcommerceFrameworkNodes = useCallback((
+    frameworkId: string,
+    nodes: PromptNode[],
+    phasePreference?: 'desktop' | 'mobile',
+  ): number => {
+    const queueItems: Array<Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet'>> = [];
+
+    nodes.forEach((node) => {
+      const ecommerce = node.ecommerce;
+      if (!ecommerce) {
+        return;
+      }
+
+      const phases = resolveEcommerceFrameworkQueuePhases(node, phasePreference);
+      if (phases.length === 0) {
+        return;
+      }
+
+      const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
+      const provider = resolvedKey?.provider || node.provider;
+      const baseUrl = resolvedKey?.baseUrl || resolvedKey?.providerConfig?.baseUrl;
+      const providerKeyType = resolveProviderKeyType(provider, baseUrl);
+      const lane = resolveFrameworkLane({
+        keySlotId: resolvedKey?.id || node.keySlotId || providerKeyType,
+        provider,
+        baseUrl,
+      });
+
+      phases.forEach((phase) => {
+        queueItems.push({
+          queueId: frameworkId + ':' + node.id + ':' + phase + ':' + Date.now() + ':' + queueItems.length,
+          nodeId: node.id,
+          phase,
+          laneKey: lane.laneKey,
+          laneType: lane.laneType,
+          sourceSheet: ecommerce.sourceSheet,
+        });
+      });
+    });
+
+    if (queueItems.length === 0) {
+      return 0;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => enqueueEcommerceFrameworkItems(currentRuntime, queueItems));
+    return queueItems.length;
+  }, [resolveEcommerceFrameworkQueuePhases, updateEcommerceFrameworkRuntime]);
+
+  const pumpEcommerceFrameworkQueue = useCallback((frameworkId: string) => {
+    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId];
+    if (!currentRuntime || currentRuntime.paused) {
+      return;
+    }
+
+    const starters = resolveEcommerceFrameworkDispatchPlan(currentRuntime);
+    if (starters.length === 0) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => {
+      let nextRuntime = runtime;
+      starters.forEach((item) => {
+        nextRuntime = markEcommerceFrameworkQueueItemStatus(nextRuntime, item.queueId, 'dispatching');
+      });
+      return nextRuntime;
+    });
+
+    starters.forEach((item) => {
+      void (async () => {
+        updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'running', {
+          startedAt: Date.now(),
+          error: undefined,
+        }));
+
+        try {
+          const latestNode = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === item.nodeId);
+          if (!latestNode?.ecommerce) {
+            throw new Error('Missing ecommerce node');
+          }
+
+          if (item.phase === 'mobile') {
+            await handleRetryEcommerceModule(latestNode);
+          } else {
+            await handleGenerateEcommerceNode(latestNode);
+          }
+
+          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'completed', {
+            finishedAt: Date.now(),
+            error: undefined,
+          }));
+        } catch (error: any) {
+          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'failed', {
+            finishedAt: Date.now(),
+            error: error?.message || 'Queue item failed',
+          }));
+        } finally {
+          setTimeout(() => {
+            pumpEcommerceFrameworkQueue(frameworkId);
+          }, 0);
+        }
+      })();
+    });
+  }, [handleGenerateEcommerceNode, handleRetryEcommerceModule, updateEcommerceFrameworkRuntime]);
+
+  const handleGenerateEcommerceFramework = useCallback(async (node: PromptNode) => {
+    if (!node.ecommerce || node.ecommerce.kind !== 'framework') return;
+
+    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
+      item.mode === GenerationMode.ECOMMERCE
+      && !!item.ecommerce
+      && item.ecommerce.kind !== 'framework'
+      && item.ecommerce.kind !== 'a-plus-group'
+      && item.ecommerce.frameworkId === node.id
+      && item.ecommerce.selectedForGeneration !== false
+    ));
+
+    const queuedCount = enqueueEcommerceFrameworkNodes(node.id, targetNodes);
+    if (queuedCount === 0) {
+      import('./services/system/notificationService').then(({ notify }) => {
+        notify.warning('No eligible cards', 'There are no ecommerce cards ready to enqueue.');
+      });
+      return;
+    }
+
+    const nextSheet = node.ecommerce.frameworkMeta?.activeSheet || ecommerceState.activeGroupSheet || '主图';
+    syncEcommerceFrameworkView(node.id, nextSheet);
+    pumpEcommerceFrameworkQueue(node.id);
+  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
+
+  const handlePauseEcommerceFramework = useCallback((node: PromptNode) => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => pauseEcommerceFrameworkRuntime(runtime));
+  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
+
+  const handleResumeEcommerceFramework = useCallback((node: PromptNode) => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => resumeEcommerceFrameworkRuntime(runtime));
+    pumpEcommerceFrameworkQueue(frameworkId);
+  }, [pumpEcommerceFrameworkQueue, resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
+
+  const handleCancelEcommerceFrameworkNodeQueue = useCallback((node: PromptNode) => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => cancelEcommerceFrameworkNodeQueue(runtime, node.id));
+  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
+
   const handleGenerateEcommerceGroup = useCallback(async (node: PromptNode, phase: 'desktop' | 'mobile') => {
     if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-group') return;
-    const moduleNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      !!item.ecommerce
+
+    const frameworkId = node.ecommerce.frameworkId;
+    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
+      item.mode === GenerationMode.ECOMMERCE
+      && !!item.ecommerce
+      && item.ecommerce.kind !== 'framework'
       && item.ecommerce.kind !== 'a-plus-group'
       && item.ecommerce.groupId === node.id
       && item.ecommerce.selectedForGeneration !== false
     ));
 
-    if (node.ecommerce.sourceSheet === '主图') {
-      const targetModules = moduleNodes.filter((item) => (
-        item.ecommerce?.kind === 'main-image'
-        && (item.ecommerce.stage === 'analysis_ready' || item.ecommerce.stage === 'ready' || item.ecommerce.stage === 'failed')
-      ));
-
-      if (targetModules.length === 0) {
-        import('./services/system/notificationService').then(({ notify }) => {
-          notify.warning('无可生成卡片', '当前没有可生成的主图卡片。');
-        });
-        return;
+    if (!frameworkId) {
+      for (const targetNode of targetNodes) {
+        if (phase === 'mobile') {
+          await handleRetryEcommerceModule(targetNode);
+        } else {
+          await handleGenerateEcommerceNode(targetNode);
+        }
       }
-
-      await Promise.allSettled(targetModules.map((item) => handleGenerateEcommerceNode(item)));
       return;
     }
-    const targetModules = moduleNodes.filter((item) => {
-      const itemEcommerce = item.ecommerce;
-      if (!itemEcommerce) {
-        return false;
-      }
 
-      if (phase === 'desktop') {
-        return (itemEcommerce.effectiveSizePolicy || itemEcommerce.sizePolicy) === 'desktop-then-mobile'
-          ? itemEcommerce.desktopStage === 'pending' || itemEcommerce.desktopStage === 'failed'
-          : itemEcommerce.stage !== 'generated';
-      }
-
-      return itemEcommerce.desktopStage === 'confirmed'
-        && (itemEcommerce.mobileStage === 'pending' || itemEcommerce.mobileStage === 'failed' || itemEcommerce.mobileStage === 'locked');
-    });
-
-    if (targetModules.length === 0) {
+    const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, targetNodes, phase);
+    if (queuedCount === 0) {
       import('./services/system/notificationService').then(({ notify }) => {
         notify.warning(
-          '无可生成卡片',
+          'No eligible cards',
           phase === 'mobile'
-            ? '当前没有可生成手机端的已确认模块。'
-            : '当前没有可生成的桌面端模块。',
+            ? 'There are no confirmed mobile follow-up cards ready to enqueue.'
+            : 'There are no ecommerce cards ready to enqueue for this group.',
         );
       });
       return;
     }
 
-    await Promise.allSettled(targetModules.map((item) => (
-      phase === 'desktop' ? handleGenerateEcommerceNode(item) : handleRetryEcommerceModule(item)
-    )));
-  }, [handleGenerateEcommerceNode, handleRetryEcommerceModule]);
+    syncEcommerceFrameworkView(frameworkId, node.ecommerce.sourceSheet);
+    pumpEcommerceFrameworkQueue(frameworkId);
+  }, [enqueueEcommerceFrameworkNodes, handleGenerateEcommerceNode, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
 
   const handleExportPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
     if (!activeCanvas) return;
     if (node.mode !== GenerationMode.PPT) return;
 
-    const ordered = activeCanvas.imageNodes
-      .filter(img => img.parentPromptId === node.id)
-      .sort((a, b) => {
-        const num = (val?: string) => {
-          if (!val) return Number.POSITIVE_INFINITY;
-          const m = val.match(/图\s*(\d+)/);
-          return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
-        };
-        const d = num(a.alias) - num(b.alias);
-        if (Number.isFinite(d) && d !== 0) return d;
-        return (a.timestamp || 0) - (b.timestamp || 0);
-      });
+    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
 
     const target = ordered[pageIndex];
     if (!target) return;
@@ -6608,24 +6138,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (!activeCanvas) return;
     if (node.mode !== GenerationMode.PPT) return;
 
-    const ordered = activeCanvas.imageNodes
-      .filter(img => img.parentPromptId === node.id)
-      .sort((a, b) => {
-        const num = (val?: string) => {
-          if (!val) return Number.POSITIVE_INFINITY;
-          const m = val.match(/图\s*(\d+)/);
-          return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
-        };
-        const d = num(a.alias) - num(b.alias);
-        if (Number.isFinite(d) && d !== 0) return d;
-        return (a.timestamp || 0) - (b.timestamp || 0);
-      })
-      .slice(0, 20);
+    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id).slice(0, 20);
 
     if (ordered.length === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
-      });
+      showNoPptPagesWarning();
       return;
     }
 
@@ -6637,87 +6153,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       .replace(/'/g, '&apos;');
 
     const zip = new JSZip();
-
-    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Default Extension="png" ContentType="image/png"/>
-  <Default Extension="jpg" ContentType="image/jpeg"/>
-  <Default Extension="jpeg" ContentType="image/jpeg"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
-  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
-  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-  ${ordered.map((_, i) => `  <Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join('\n')}
-</Types>`);
-
-    zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>`);
-
-    zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${escapeXml(node.prompt || 'KK Studio PPT 导出')}</dc:title>
-  <dc:creator>KK Studio</dc:creator>
-  <cp:lastModifiedBy>KK Studio</cp:lastModifiedBy>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
-</cp:coreProperties>`);
-
-    zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>KK Studio</Application>
-  <Slides>${ordered.length}</Slides>
-</Properties>`);
-
-    zip.file('ppt/presentation.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>
-  <p:sldIdLst>
-    ${ordered.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 2}"/>`).join('')}
-  </p:sldIdLst>
-  <p:sldSz cx="12192000" cy="6858000" type="screen16x9"/>
-  <p:notesSz cx="6858000" cy="9144000"/>
-</p:presentation>`);
-
-    zip.file('ppt/_rels/presentation.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
-  ${ordered.map((_, i) => `<Relationship Id="rId${i + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`).join('\n')}
-</Relationships>`);
-
-    zip.file('ppt/slideMasters/slideMaster1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld name="Master"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>
-  <p:clrMap accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" bg1="lt1" bg2="lt2" folHlink="folHlink" hlink="hlink" tx1="dk1" tx2="dk2"/>
-  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
-</p:sldMaster>`);
-
-    zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
-</Relationships>`);
-
-    zip.file('ppt/slideLayouts/slideLayout1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1">
-  <p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sldLayout>`);
-
-    zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
-</Relationships>`);
-
-    zip.file('ppt/theme/theme1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Default"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Default"><a:majorFont><a:latin typeface="Calibri"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme><a:fmtScheme name="Default"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`);
+    writePptxPackageSkeleton({
+      zip,
+      slideCount: ordered.length,
+      title: node.prompt || 'KK Studio PPT 导出',
+    });
 
     for (let i = 0; i < ordered.length; i++) {
       const img = ordered[i];
@@ -6733,20 +6173,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       const mediaPath = `ppt/media/image${i + 1}.${ext}`;
       zip.file(mediaPath, blob);
 
-      zip.file(`ppt/slides/slide${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>
-    <p:spTree>
-      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-      <p:grpSpPr>
-        <a:xfrm>
-          <a:off x="0" y="0"/>
-          <a:ext cx="0" cy="0"/>
-          <a:chOff x="0" y="0"/>
-          <a:chExt cx="0" cy="0"/>
-        </a:xfrm>
-      </p:grpSpPr>
-      <p:pic>
+      zip.file(`ppt/slides/slide${i + 1}.xml`, buildPptxSlideXml({
+        bodyXml: `      <p:pic>
         <p:nvPicPr>
           <p:cNvPr id="2" name="${escapeXml(img.alias || `Slide ${i + 1}`)}"/>
           <p:cNvPicPr/>
@@ -6809,16 +6237,13 @@ const AppContent: React.FC<AppContentProps> = () => {
           </a:p>
         </p:txBody>
       </p:sp>` : ''}
-    </p:spTree>
-  </p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sld>`);
+`,
+      }));
 
-      zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i + 1}.${ext}"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
-</Relationships>`);
+      zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, buildPptxSlideRelationshipsXml([
+        `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i + 1}.${ext}"/>`,
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>',
+      ]));
     }
 
     const pptxBlob = await zip.generateAsync({ type: 'blob' });
@@ -6826,16 +6251,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     import('./services/system/notificationService').then(({ notify }) => {
       notify.success('PPTX 导出完成', `已导出 ${ordered.length} 页的 .pptx 文件`);
     });
-  }, [activeCanvas, parsePptOutlineLine]);
+  }, [activeCanvas, parsePptOutlineLine, showNoPptPagesWarning]);
 
   const handleExportPptPackageEditable = useCallback(async (node: PromptNode) => {
-    const exportBundle = getPptEditableExportBundle(node);
-    if (!exportBundle) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
-      });
-      return;
-    }
+    const exportBundle = requirePptEditableExportBundle(node);
+    if (!exportBundle) return;
 
     const zip = new JSZip();
     const { promptNode, images, pages, imageById } = exportBundle;
@@ -7007,36 +6427,15 @@ const AppContent: React.FC<AppContentProps> = () => {
       ),
     ].join('\n'));
 
-    const slidesHtml = `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PPT 导出预览</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0b1020; color: #e5e7eb; margin: 0; padding: 20px; }
-    h1 { font-size: 18px; margin: 0 0 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
-    .card { background: #121a2f; border: 1px solid #23304f; border-radius: 10px; overflow: hidden; }
-    .meta { padding: 10px 12px; font-size: 12px; line-height: 1.4; }
-    .title { color: #7dd3fc; font-weight: 600; margin-bottom: 6px; }
-    img { width: 100%; display: block; background: #0f172a; }
-  </style>
-</head>
-<body>
-  <h1>${(promptNode.prompt || 'PPT 导出预览').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h1>
-  <div class="grid">
-    ${pageSummaries.map((page) => `
-      <div class="card">
-        <img src="../${String(page.previewFile)}" alt="${String(page.title).replace(/"/g, '&quot;')}" />
-        <div class="meta">
-          <div class="title">第 ${String(page.page)} 页 · ${String(page.title).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-          <div>${String(page.outline || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-        </div>
-      </div>`).join('')}
-  </div>
-</body>
-</html>`;
+    const slidesHtml = buildPptSlidesPreviewHtml({
+      title: promptNode.prompt || 'PPT 导出预览',
+      items: pageSummaries.map((page) => ({
+        page: String(page.page || ''),
+        title: String(page.title || ''),
+        imageSrc: `../${String(page.previewFile || '')}`,
+        description: String(page.outline || ''),
+      })),
+    });
     zip.file('outline/slides-preview.html', slidesHtml);
 
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -7045,16 +6444,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     import('./services/system/notificationService').then(({ notify }) => {
       notify.success('导出完成', `已导出 ${pages.length} 页，以及 editable 图层包、预览页和素材目录`);
     });
-  }, [getPptEditableExportBundle, renderPptEditablePagePreviewBlob, resolvePptExportImageAsset, sanitizePptFileSegment]);
+  }, [requirePptEditableExportBundle, renderPptEditablePagePreviewBlob, resolvePptExportImageAsset, sanitizePptFileSegment]);
 
   const handleExportPptxEditable = useCallback(async (node: PromptNode) => {
-    const exportBundle = getPptEditableExportBundle(node);
-    if (!exportBundle) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
-      });
-      return;
-    }
+    const exportBundle = requirePptEditableExportBundle(node);
+    if (!exportBundle) return;
 
     const { promptNode, pages, imageById } = exportBundle;
     const slideWidth = 12192000;
@@ -7112,88 +6506,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       zip.file(`ppt/media/${fileName}`, asset.blob);
       mediaByImageId.set(imageId, { fileName, ext: asset.ext });
     }
-
-    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Default Extension="png" ContentType="image/png"/>
-  <Default Extension="jpg" ContentType="image/jpeg"/>
-  <Default Extension="jpeg" ContentType="image/jpeg"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
-  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
-  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-  ${pages.map((_, index) => `  <Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join('\n')}
-</Types>`);
-
-    zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>`);
-
-    const nowIso = new Date().toISOString();
-    zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${escapeXml(promptNode.prompt || 'KK Studio PPT')}</dc:title>
-  <dc:creator>KK Studio</dc:creator>
-  <cp:lastModifiedBy>KK Studio</cp:lastModifiedBy>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:modified>
-</cp:coreProperties>`);
-
-    zip.file('docProps/app.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>KK Studio</Application>
-  <Slides>${pages.length}</Slides>
-</Properties>`);
-
-    zip.file('ppt/presentation.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>
-  <p:sldIdLst>
-    ${pages.map((_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`).join('')}
-  </p:sldIdLst>
-  <p:sldSz cx="${slideWidth}" cy="${slideHeight}" type="screen16x9"/>
-  <p:notesSz cx="6858000" cy="9144000"/>
-</p:presentation>`);
-
-    zip.file('ppt/_rels/presentation.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
-  ${pages.map((_, index) => `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`).join('\n')}
-</Relationships>`);
-
-    zip.file('ppt/slideMasters/slideMaster1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld name="Master"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>
-  <p:clrMap accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" bg1="lt1" bg2="lt2" folHlink="folHlink" hlink="hlink" tx1="dk1" tx2="dk2"/>
-  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
-</p:sldMaster>`);
-
-    zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
-</Relationships>`);
-
-    zip.file('ppt/slideLayouts/slideLayout1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1">
-  <p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sldLayout>`);
-
-    zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
-</Relationships>`);
-
-    zip.file('ppt/theme/theme1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Default"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Default"><a:majorFont><a:latin typeface="Calibri"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme><a:fmtScheme name="Default"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`);
+    writePptxPackageSkeleton({
+      zip,
+      slideCount: pages.length,
+      title: promptNode.prompt || 'KK Studio PPT',
+      slideWidth,
+      slideHeight,
+    });
 
     for (let slideIndex = 0; slideIndex < pages.length; slideIndex += 1) {
       const page = pages[slideIndex];
@@ -7281,29 +6600,11 @@ ${paragraphs}
         `<Relationship Id="rId${nextRelationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>`,
       );
 
-      zip.file(`ppt/slides/slide${slideIndex + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>
-    <p:spTree>
-      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-      <p:grpSpPr>
-        <a:xfrm>
-          <a:off x="0" y="0"/>
-          <a:ext cx="0" cy="0"/>
-          <a:chOff x="0" y="0"/>
-          <a:chExt cx="0" cy="0"/>
-        </a:xfrm>
-      </p:grpSpPr>
-${slideLayerXml.join('\n')}
-    </p:spTree>
-  </p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sld>`);
+      zip.file(`ppt/slides/slide${slideIndex + 1}.xml`, buildPptxSlideXml({
+        bodyXml: slideLayerXml.join('\n'),
+      }));
 
-      zip.file(`ppt/slides/_rels/slide${slideIndex + 1}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  ${slideRelationships.join('\n  ')}
-</Relationships>`);
+      zip.file(`ppt/slides/_rels/slide${slideIndex + 1}.xml.rels`, buildPptxSlideRelationshipsXml(slideRelationships));
     }
 
     const pptxBlob = await zip.generateAsync({ type: 'blob' });
@@ -7312,23 +6613,7 @@ ${slideLayerXml.join('\n')}
     import('./services/system/notificationService').then(({ notify }) => {
       notify.success('PPTX 导出完成', `已导出 ${pages.length} 页的可编辑图层 PPTX`);
     });
-  }, [getPptEditableExportBundle, resolvePptExportImageAsset]);
-
-  const promptNodeById = React.useMemo(() => {
-    const map = new Map<string, PromptNode>();
-    activeCanvas?.promptNodes.forEach((node) => {
-      map.set(node.id, node);
-    });
-    return map;
-  }, [activeCanvas?.promptNodes]);
-
-  const imageNodeById = React.useMemo(() => {
-    const map = new Map<string, GeneratedImage>();
-    activeCanvas?.imageNodes.forEach((node) => {
-      map.set(node.id, node);
-    });
-    return map;
-  }, [activeCanvas?.imageNodes]);
+  }, [requirePptEditableExportBundle, resolvePptExportImageAsset]);
 
   // Auto-Recover Interrupted Tasks
   useEffect(() => {
@@ -7349,67 +6634,148 @@ ${slideLayerXml.join('\n')}
   }, [activeCanvas, handleRetryNode]);
 
   // Optimization: Stable handlers for Node Clicks
-  const handlePromptClick = useCallback(async (clickedNode: PromptNode, isOptimizedView?: boolean) => {
-    setActiveSourceImage(null);
+  const handlePromptClick = useCallback((clickedNode: PromptNode, isOptimizedView?: boolean) => {
+    traceLocalPerformance('canvas-interaction.prompt-click', () => {
+      setActiveSourceImage(null);
 
-    let referenceImages = clickedNode.referenceImages || [];
+      const ecommerceTaskState = clickedNode.ecommerce?.editableTask
+        || clickedNode.partialRedraw?.inheritedTaskState
+        || null;
+      const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE
+        ? ''
+        : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
+          ? clickedNode.optimizedPromptEn.trim()
+          : clickedNode.prompt);
 
-    // Pre-hydrate if needed to prevent flicker
-    // We do this BEFORE setting config so the UI never sees the "loading" state
-    if (referenceImages.some(img => !img.data && getReferenceImageLookupIds(img).length > 0)) {
-      try {
-        const { getImage } = await import('./services/storage/imageStorage');
-        const hydrated = await Promise.all(referenceImages.map(async (img) => {
-          if (!img.data) {
-            for (const lookupId of getReferenceImageLookupIds(img)) {
-              const data = await getImage(lookupId);
-              if (data) {
-                return { ...img, storageId: img.storageId || lookupId, data };
-              }
-            }
-          }
-          return img;
-        }));
-        referenceImages = hydrated;
-      } catch (e) {
-        console.error('Failed to pre-hydrate reference images', e);
+      setConfig((prev) => ({
+        ...prev,
+        prompt: textToCopy,
+        aspectRatio: clickedNode.aspectRatio,
+        imageSize: clickedNode.imageSize,
+        model: normalizeModelId(clickedNode.model),
+        // Let the composer switch immediately, then hydrate any missing image data in the background.
+        referenceImages: clickedNode.referenceImages || [],
+        mode: clickedNode.mode || GenerationMode.IMAGE, // 🎯 Sync Mode (Image/Video)
+      }));
+
+      const nextFrameworkId = clickedNode.mode === GenerationMode.ECOMMERCE
+        ? resolveEcommerceFrameworkId(clickedNode)
+        : null;
+      const nextActiveSheet = clickedNode.mode === GenerationMode.ECOMMERCE
+        ? (clickedNode.ecommerce?.kind === 'framework'
+          ? (clickedNode.ecommerce.frameworkMeta?.activeSheet || clickedNode.ecommerce.sourceSheet || null)
+          : (clickedNode.ecommerce?.sourceSheet || null))
+        : null;
+
+      setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
+      setEcommerceState((previousState) => ({
+        ...previousState,
+        activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
+          ? clickedNode.id
+          : null,
+        activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
+          ? ecommerceTaskState
+          : null,
+        activeFrameworkId: nextFrameworkId,
+        activeGroupSheet: nextActiveSheet,
+      }));
+
+      if (nextFrameworkId && nextActiveSheet) {
+        syncEcommerceFrameworkView(nextFrameworkId, nextActiveSheet);
       }
+
+      // [Draft Logic] Resume Draft if clicked on a draft node
+      if (clickedNode.isDraft) {
+        setDraftNodeId(clickedNode.id);
+      } else {
+        // Detach draft if clicking a finalized node (acting as "Edit Template" or "Remix")
+        setDraftNodeId(null);
+      }
+    }, {
+      mode: clickedNode.mode || GenerationMode.IMAGE,
+      nodeId: clickedNode.id,
+      referenceImageCount: clickedNode.referenceImages?.length || 0,
+    });
+  }, [resolveEcommerceFrameworkId, setConfig, syncEcommerceFrameworkView]);
+
+  const resolvePromptNodeFrameworkStatus = useCallback((node: PromptNode) => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return null;
     }
 
-    const ecommerceTaskState = clickedNode.ecommerce?.editableTask
-      || clickedNode.partialRedraw?.inheritedTaskState
-      || null;
-    const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE
-      ? ''
-      : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
-        ? clickedNode.optimizedPromptEn.trim()
-        : clickedNode.prompt);
+    return resolveEcommerceFrameworkSummary(
+      activeCanvasRef.current?.promptNodes || [],
+      frameworkId,
+      ecommerceFrameworkRuntimeRef.current[frameworkId],
+    );
+  }, [resolveEcommerceFrameworkId]);
 
-    setConfig(prev => ({
-      ...prev,
-      prompt: textToCopy,
-      aspectRatio: clickedNode.aspectRatio,
-      imageSize: clickedNode.imageSize,
-      model: normalizeModelId(clickedNode.model),
-      referenceImages: referenceImages,
-      mode: clickedNode.mode || GenerationMode.IMAGE // 🎯 Sync Mode (Image/Video)
-    }));
-    setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE ? clickedNode.id : null,
-      activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE ? ecommerceTaskState : null,
-      activeGroupSheet: clickedNode.mode === GenerationMode.ECOMMERCE ? (clickedNode.ecommerce?.sourceSheet || null) : null,
-    }));
-
-    // [Draft Logic] Resume Draft if clicked on a draft node
-    if (clickedNode.isDraft) {
-      setDraftNodeId(clickedNode.id);
-    } else {
-      // Detach draft if clicking a finalized node (acting as "Edit Template" or "Remix")
-      setDraftNodeId(null);
-    }
-  }, [setConfig]);
+  const getSharedPromptNodeActionProps = useCallback((node: PromptNode): SharedPromptNodeActionProps => ({
+    onCancel: handleCancelGeneration,
+    onRetry: handleRetryNode,
+    onEditPptDeck: handleOpenPptDeckEditor,
+    onExportPpt: handleExportPptPackageEditable,
+    onExportPptx: handleExportPptxEditable,
+    onRetryPptPage: handleRetryPptSinglePage,
+    onExportPptPage: handleExportPptSinglePage,
+    onToggleEcommerceSelected: handleToggleEcommerceSelected,
+    onSetEcommerceGroupSelection: handleSetEcommerceGroupSelection,
+    onGenerateEcommerceNode: handleGenerateEcommerceNode,
+    onGenerateEcommerceGroup: handleGenerateEcommerceGroup,
+    onGenerateEcommerceFramework: handleGenerateEcommerceFramework,
+    onPauseEcommerceFramework: handlePauseEcommerceFramework,
+    onResumeEcommerceFramework: handleResumeEcommerceFramework,
+    onCancelEcommerceNodeQueue: handleCancelEcommerceFrameworkNodeQueue,
+    onConfirmEcommerceDesktop: handleConfirmEcommerceDesktop,
+    onRetryEcommerceModule: handleRetryEcommerceModule,
+    onExportEcommerceGroup: handleExportEcommerceGroup,
+    ecommerceFrameworkStatus: resolvePromptNodeFrameworkStatus(node),
+    activeEcommerceTaskState: ecommerceState.activeTaskState,
+    onActivateEcommerceTask: (promptNode: PromptNode) => {
+      void handlePromptClick(promptNode, false);
+    },
+    onEcommerceTaskStateChange: handleChangeEcommerceTaskState,
+    ecommerceSlotState: resolveEcommerceSlotState(node),
+    onPreviewEcommerceSlotHistory: handlePreviewEcommerceSlotHistoryForNode,
+    ioTrace: getNodeIoTrace(node.id),
+    onOpenStorageSettings: () => {
+      openSettingsSurfaceTracked('storage-settings');
+    },
+    onDelete: deletePromptNode,
+    onDisconnect: handleDisconnectPrompt,
+    onUpdateNode: updatePromptNode,
+  }), [
+    deletePromptNode,
+    ecommerceState.activeTaskState,
+    getNodeIoTrace,
+    handleCancelGeneration,
+    handleChangeEcommerceTaskState,
+    handleConfirmEcommerceDesktop,
+    handleCancelEcommerceFrameworkNodeQueue,
+    handleDisconnectPrompt,
+    handleExportEcommerceGroup,
+    handleExportPptPackageEditable,
+    handleExportPptSinglePage,
+    handleExportPptxEditable,
+    handleGenerateEcommerceGroup,
+    handleGenerateEcommerceFramework,
+    handleGenerateEcommerceNode,
+    handleOpenPptDeckEditor,
+    handlePauseEcommerceFramework,
+    handlePreviewEcommerceSlotHistoryForNode,
+    handlePromptClick,
+    handleResumeEcommerceFramework,
+    handleRetryEcommerceModule,
+    handleRetryNode,
+    handleRetryPptSinglePage,
+    handleSetEcommerceGroupSelection,
+    handleToggleEcommerceSelected,
+    openSettingsSurfaceTracked,
+    resolvePromptNodeFrameworkStatus,
+    resolveEcommerceSlotState,
+    updatePromptNode,
+  ]);
 
   const handleActivateEcommerceTaskBySourceKey = useCallback((sourceKey: string) => {
     const targetNode = activeCanvas?.promptNodes.find((node) => (
@@ -7437,7 +6803,7 @@ ${slideLayerXml.join('\n')}
 
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换（向后兼容），无修饰键=替换
-    const sourceImage = activeCanvas?.imageNodes.find(img => img.id === imageId);
+    const sourceImage = imageNodesById.get(imageId);
     // Keep the parent prompt group focused so the subcard frame stays visible after click.
     setFocusedGroupId(sourceImage?.parentPromptId || null);
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
@@ -7449,6 +6815,7 @@ ${slideLayerXml.join('\n')}
       ...previousState,
       activeTaskNodeId: null,
       activeTaskState: null,
+      activeFrameworkId: null,
       activeGroupSheet: null,
     }));
     // Clear prompt and existing references to start fresh continue-conversation
@@ -7462,29 +6829,14 @@ ${slideLayerXml.join('\n')}
 
     // Compute the follow-up draft position below the parent group
     if (sourceImage) {
-      const parentPromptId = sourceImage.parentPromptId;
-      const parentPrompt = activeCanvas?.promptNodes.find(p => p.id === parentPromptId);
-
-      // For images, position.y is already the bottom anchor
-      const sourceBottom = sourceImage.position.y;
-
-      let draftPos = { x: sourceImage.position.x, y: sourceBottom + 100 }; // Fallback: 100px below the source image
-
-      if (parentPrompt) {
-        // Find all sibling child cards and compute the maximum bottom Y
-        const siblingImages = activeCanvas?.imageNodes.filter(img => img.parentPromptId === parentPromptId) || [];
-        let maxY = parentPrompt.position.y; // Parent prompt bottom anchor
-
-        siblingImages.forEach(img => {
-          // Images already use a bottom anchor, so no extra height is needed
-          maxY = Math.max(maxY, img.position.y);
-        });
-
-        draftPos = {
-          x: sourceImage.position.x,
-          y: maxY + 80  // 80px below the lowest card
-        };
-      }
+      const parentPrompt = sourceImage.parentPromptId
+        ? (promptNodesById.get(sourceImage.parentPromptId) ?? null)
+        : null;
+      const draftPos = resolveFollowUpDraftPosition({
+        sourceImage,
+        parentPrompt,
+        imageNodes: activeCanvas?.imageNodes || [],
+      });
 
       const newId = Date.now().toString();
       addPromptNode({
@@ -7505,7 +6857,7 @@ ${slideLayerXml.join('\n')}
       });
       setDraftNodeId(newId);
     }
-  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, getCardDimensions]);
+  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
@@ -7697,8 +7049,21 @@ ${slideLayerXml.join('\n')}
       return;
     }
 
+    const frameworkId = promptNode.ecommerce?.frameworkId;
+    if (frameworkId) {
+      const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, [promptNode], 'mobile');
+      if (queuedCount > 0) {
+        syncEcommerceFrameworkView(
+          frameworkId,
+          (promptNode.ecommerce?.sourceSheet || ecommerceState.activeGroupSheet || 'A+') as EcommerceGroupSheet,
+        );
+        pumpEcommerceFrameworkQueue(frameworkId);
+        return;
+      }
+    }
+
     void handleRetryEcommerceModule(promptNode);
-  }, [handleRetryEcommerceModule, resolveMobileResultPromptNode]);
+  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, resolveMobileResultPromptNode, syncEcommerceFrameworkView]);
 
   // Dynamic Group Bounds Calculation
   const getComputedGroupBounds = useCallback((group: CanvasGroup) => {
@@ -7728,13 +7093,13 @@ ${slideLayerXml.join('\n')}
 
     group.nodeIds.forEach(id => {
       // 1. Check Prompts
-      const prompt = promptNodeById.get(id);
+      const prompt = promptNodesById.get(id);
       if (prompt) {
         addRect(prompt.position.x, prompt.position.y, 380, prompt.height || 200);
         return;
       }
       // 2. Check Images
-      const img = imageNodeById.get(id);
+      const img = imageNodesById.get(id);
       if (img) {
         const { width, totalHeight } = getCardDimensions(img.aspectRatio, true);
         addRect(img.position.x, img.position.y, width, totalHeight);
@@ -7749,7 +7114,7 @@ ${slideLayerXml.join('\n')}
       width: (maxX - minX) + PADDING * 2,
       height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA
     };
-  }, [activeCanvas, imageNodeById, promptNodeById]);
+  }, [activeCanvas, imageNodesById, promptNodesById]);
 
   const promptGroupLayerById = React.useMemo(() => {
     const groupLayerMap = new Map<string, number>();
@@ -7771,11 +7136,26 @@ ${slideLayerXml.join('\n')}
     return groupLayerMap;
   }, [activeCanvas]);
 
+  const isPptDeckChildImageNode = useCallback((imageNode: GeneratedImage) => {
+    if (!imageNode.parentPromptId) {
+      return false;
+    }
+
+    const canvas = activeCanvasRef.current;
+    if (!canvas) {
+      return false;
+    }
+
+    const parentPrompt = canvas.promptNodes.find((promptNode) => promptNode.id === imageNode.parentPromptId);
+    return Boolean(parentPrompt && parentPrompt.mode === GenerationMode.PPT);
+  }, []);
+
   const resolveCurrentPromptChildImages = useCallback((
     promptNode: PromptNode | undefined | null,
     imageNodes: GeneratedImage[],
   ) => {
     if (!promptNode) return [] as GeneratedImage[];
+    if (promptNode.mode === GenerationMode.PPT) return [] as GeneratedImage[];
 
     const promptId = promptNode.id;
     const sourceImageId = promptNode.sourceImageId;
@@ -7836,10 +7216,7 @@ ${slideLayerXml.join('\n')}
     layoutState: PromptGroupLayoutPresentationState | undefined,
   ) => {
     if (!layoutState || childImages.length === 0) {
-      return new Map<string, {
-        renderPosition: { x: number; y: number };
-        settledPosition: { x: number; y: number };
-      }>();
+      return new Map<string, PromptGroupRegroupLayout>();
     }
 
     const fastPhaseRatio = PROMPT_GROUP_REGROUP_FAST_MS / PROMPT_GROUP_REGROUP_TOTAL_MS;
@@ -7869,10 +7246,7 @@ ${slideLayerXml.join('\n')}
       targetSlotIndices: childImages.map((imageNode) => layoutState.targetSlotIndicesByChildId[imageNode.id]),
     });
 
-    return new Map<string, {
-      renderPosition: { x: number; y: number };
-      settledPosition: { x: number; y: number };
-    }>(
+    return new Map<string, PromptGroupRegroupLayout>(
       childImages.map((imageNode, index) => {
         const liveStartPosition = liveStartPositions[index] ?? imageNode.position;
         const layout = layouts[index];
@@ -7886,7 +7260,7 @@ ${slideLayerXml.join('\n')}
         return [imageNode.id, { renderPosition, settledPosition }] as const;
       })
     );
-  }, [isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions]);
+  }, [isMobile, parseImageDimensions]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -8032,7 +7406,7 @@ ${slideLayerXml.join('\n')}
           return;
         }
 
-        const imageNode = imageNodeById.get(nodeId);
+        const imageNode = imageNodesById.get(nodeId);
         if (imageNode) {
           const imageStack = imageNode.parentPromptId
             ? (
@@ -8063,7 +7437,7 @@ ${slideLayerXml.join('\n')}
     return stackMap;
   }, [
     activeCanvas,
-    imageNodeById,
+    imageNodesById,
     promptGroupLayerById,
     promptGroupStackZIndexById,
     standaloneImageStackZIndexById,
@@ -8187,6 +7561,18 @@ ${slideLayerXml.join('\n')}
           return false;
         }
 
+        if (n.hiddenInCanvas) {
+          return false;
+        }
+
+        if (
+          n.mode === GenerationMode.ECOMMERCE
+          && n.ecommerce?.frameworkId
+          && n.ecommerce.kind !== 'framework'
+        ) {
+          return false;
+        }
+
         // Estimate Bounds (Center X, Bottom Y)
         const w = 800;
         const h = 800;
@@ -8205,6 +7591,10 @@ ${slideLayerXml.join('\n')}
     // 3. Filter Image Nodes
     const visibleImageNodes = activeCanvas.imageNodes
       .filter(n => {
+        if (isPptDeckChildImageNode(n)) {
+          return false;
+        }
+
         const w = 800;
         const h = 1200;
         const position = resolveViewportNodePosition(n);
@@ -8245,7 +7635,68 @@ ${slideLayerXml.join('\n')}
     };
 
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, isNodeDragActive, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+
+  const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
+    image,
+    onPositionChange: updateImageNodePosition,
+    onDimensionsUpdate: updateImageNodeDisplayMeta,
+    onUpdate: updateImageNode,
+    onDelete: deleteImageNode,
+    onConnectEnd: handleConnectEnd,
+    onClick: handleImageClick,
+    isActive: image.id === activeSourceImage,
+    zoomScale: canvasTransform.scale,
+    isMobile,
+    onPreview: handleOpenPreview,
+    onPreviewPptStack: handleOpenPptStackPreview,
+    onDownloadPptComposite: handleDownloadPptComposite,
+    isCanvasTransforming,
+    isNew: (nowTimestamp || Date.now()) - (image.timestamp || 0) < 10000,
+    canvasTransform,
+  }), [
+    activeSourceImage,
+    canvasTransform,
+    deleteImageNode,
+    handleConnectEnd,
+    handleDownloadPptComposite,
+    handleImageClick,
+    handleOpenPptStackPreview,
+    handleOpenPreview,
+    isCanvasTransforming,
+    isMobile,
+    nowTimestamp,
+    updateImageNode,
+    updateImageNodeDisplayMeta,
+    updateImageNodePosition,
+  ]);
+
+  const handleLegacyImageRelativeDrag = useCallback((delta: { x: number; y: number }, sourceNodeId?: string) => {
+    if (!sourceNodeId) {
+      return;
+    }
+
+    const expandedSelectedIds = Array.from(new Set(
+      selectedNodeIds.flatMap((selectedId) => {
+        const selectedPrompt = activeCanvas?.promptNodes.find((promptNode) => promptNode.id === selectedId);
+        if (!selectedPrompt) {
+          return [selectedId];
+        }
+
+        return [
+          selectedId,
+          ...(selectedPrompt.childImageIds || []).filter((id): id is string => !!id),
+        ];
+      })
+    ));
+
+    if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedIds.length > 0) {
+      moveSelectedNodes(delta, expandedSelectedIds);
+      return;
+    }
+
+    moveSelectedNodes(delta, sourceNodeId);
+  }, [activeCanvas, moveSelectedNodes, selectedNodeIds]);
 
   const actualChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -8274,36 +7725,43 @@ ${slideLayerXml.join('\n')}
   const stablePromptGroupViewsRef = useRef<PromptGroupView[]>([]);
 
   const promptGroupRegroupLayoutsById = React.useMemo(() => {
-    const regroupLayoutMap = new Map<string, Map<string, {
-      renderPosition: { x: number; y: number };
-      settledPosition: { x: number; y: number };
-    }>>();
-    if (!activeCanvas) return regroupLayoutMap;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
-      if (childImages.length === 0) {
-        return;
-      }
-      const layoutState = promptGroupLayoutStateByIdRef.current[promptNode.id];
-      if (!layoutState) {
-        return;
+    const promptGroupLayoutEntries = Object.entries(promptGroupLayoutStateByIdRef.current);
+    return traceLocalPerformance('canvas-interaction.prompt-group-regroup-layouts', () => {
+      const regroupLayoutMap = new Map<string, Map<string, PromptGroupRegroupLayout>>();
+      if (promptGroupLayoutEntries.length === 0) {
+        return regroupLayoutMap;
       }
 
-      const promptPosition = liveNodePositionByIdRef.current[promptNode.id] ?? promptNode.position;
-      regroupLayoutMap.set(
-        promptNode.id,
-        buildPromptGroupRegroupLayouts(
-          promptNode,
-          childImages,
-          promptPosition,
-          layoutState,
-        ),
-      );
+      promptGroupLayoutEntries.forEach(([promptNodeId, layoutState]) => {
+        const promptNode = promptNodesById.get(promptNodeId);
+        if (!promptNode) {
+          return;
+        }
+
+        const childImages = actualChildImagesByPromptId.get(promptNodeId) || [];
+        if (childImages.length === 0) {
+          return;
+        }
+
+        const promptPosition = liveNodePositionByIdRef.current[promptNodeId] ?? promptNode.position;
+        regroupLayoutMap.set(
+          promptNodeId,
+          buildPromptGroupRegroupLayouts(
+            promptNode,
+            childImages,
+            promptPosition,
+            layoutState,
+          ),
+        );
+      });
+
+      return regroupLayoutMap;
+    }, {
+      activeLayoutStateCount: promptGroupLayoutEntries.length,
+      liveNodePositionVersion,
+      promptGroupLayoutVersion,
     });
-
-    return regroupLayoutMap;
-  }, [activeCanvas, actualChildImagesByPromptId, buildPromptGroupRegroupLayouts, liveNodePositionVersion, promptGroupLayoutVersion]);
+  }, [actualChildImagesByPromptId, buildPromptGroupRegroupLayouts, liveNodePositionVersion, promptGroupLayoutVersion, promptNodesById]);
 
   const promptGroupBoundsById = React.useMemo(() => {
     if (isNodeDragActive && stablePromptGroupBoundsByIdRef.current.size > 0) {
@@ -8415,13 +7873,26 @@ ${slideLayerXml.join('\n')}
 
   useEffect(() => {
     if (!activeCanvas) {
-      setFocusedGroupId(null);
-      liveNodePositionByIdRef.current = {};
-      liveDerivedNodeIdsByOwnerRef.current = {};
-      promptGroupLayoutStateByIdRef.current = {};
-      setLiveNodePositionVersion((prev) => prev + 1);
-      setPromptGroupLayoutVersion((prev) => prev + 1);
-      setLockedGroupBoundsById({});
+      setFocusedGroupId((current) => (current === null ? current : null));
+
+      const hadLivePositions = Object.keys(liveNodePositionByIdRef.current).length > 0
+        || Object.keys(liveDerivedNodeIdsByOwnerRef.current).length > 0;
+      const hadPromptGroupLayouts = Object.keys(promptGroupLayoutStateByIdRef.current).length > 0;
+
+      if (hadLivePositions) {
+        liveNodePositionByIdRef.current = {};
+        liveDerivedNodeIdsByOwnerRef.current = {};
+        setLiveNodePositionVersion((prev) => prev + 1);
+      }
+
+      if (hadPromptGroupLayouts) {
+        promptGroupLayoutStateByIdRef.current = {};
+        setPromptGroupLayoutVersion((prev) => prev + 1);
+      }
+
+      setLockedGroupBoundsById((current) => (
+        Object.keys(current).length === 0 ? current : {}
+      ));
       return;
     }
 
@@ -8462,25 +7933,33 @@ ${slideLayerXml.join('\n')}
     });
   }, [isNodeDragActive]);
 
+  const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
+    if (promptNodesById.has(nodeId)) {
+      return nodeId;
+    }
+
+    return imageNodesById.get(nodeId)?.parentPromptId || null;
+  }, [imageNodesById, promptNodesById]);
+
   const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
     const livePosition = liveNodePositionByIdRef.current[nodeId];
     if (livePosition) {
       return livePosition;
     }
 
-    const promptNode = activeCanvas?.promptNodes.find((node) => node.id === nodeId);
+    const promptNode = promptNodesById.get(nodeId);
     if (promptNode) {
       return promptNode.position;
     }
 
-    const imageNode = activeCanvas?.imageNodes.find((node) => node.id === nodeId);
+    const imageNode = imageNodesById.get(nodeId);
     if (imageNode) {
       return imageNode.position;
     }
 
-    const workflowNode = activeCanvas?.workflow?.nodes?.find((node) => node.id === nodeId);
+    const workflowNode = workflowUtilityNodesById.get(nodeId);
     return workflowNode?.position ?? null;
-  }, [activeCanvas]);
+  }, [imageNodesById, promptNodesById, workflowUtilityNodesById]);
 
   const applyLiveNodeDeltaToDraggedSet = useCallback((
     ownerId: string,
@@ -8544,10 +8023,7 @@ ${slideLayerXml.join('\n')}
   }, [resolveCanvasNodePositionForLiveDrag, syncLiveNodePositionState]);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
-    const promptNode = activeCanvas?.promptNodes.find((candidate) => candidate.id === nodeId) ?? null;
-    const groupId = promptNode
-      ? nodeId
-      : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId)?.parentPromptId ?? null);
+    const groupId = resolvePromptGroupIdForNodeId(nodeId);
 
     let nextLivePositions = liveNodePositionByIdRef.current;
     let hasLivePositionChanged = false;
@@ -8619,9 +8095,7 @@ ${slideLayerXml.join('\n')}
       const hasOtherLiveNodeInGroup = Object.keys(liveNodePositionByIdRef.current).some((liveNodeId) => {
         if (liveNodeId === nodeId) return false;
 
-        const liveGroupId = activeCanvas?.promptNodes.some((promptNode) => promptNode.id === liveNodeId)
-          ? liveNodeId
-          : (activeCanvas?.imageNodes.find((imageNode) => imageNode.id === liveNodeId)?.parentPromptId ?? null);
+        const liveGroupId = resolvePromptGroupIdForNodeId(liveNodeId);
 
         return liveGroupId === groupId;
       });
@@ -8634,7 +8108,7 @@ ${slideLayerXml.join('\n')}
       delete next[groupId];
       return next;
     });
-  }, [activeCanvas, moveSelectedNodesImmediate, promptGroupBoundsById, syncLiveNodePositionState]);
+  }, [moveSelectedNodesImmediate, promptGroupBoundsById, resolvePromptGroupIdForNodeId, syncLiveNodePositionState]);
 
   const syncPromptGroupLayoutState = useCallback((
     updater: Record<string, PromptGroupLayoutPresentationState>
@@ -8824,15 +8298,6 @@ ${slideLayerXml.join('\n')}
     return nodeIdsByGroupId;
   }, [activeCanvas, actualChildImageIdsByPromptId]);
 
-  const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
-    if (!activeCanvas) return null;
-    if (activeCanvas.promptNodes.some((promptNode) => promptNode.id === nodeId)) {
-      return nodeId;
-    }
-    const imageNode = activeCanvas.imageNodes.find((node) => node.id === nodeId);
-    return imageNode?.parentPromptId || null;
-  }, [activeCanvas]);
-
   const handleFocusPromptGroup = useCallback((groupId: string | null, options?: {
     nodeIds?: string[];
     keepSelection?: boolean;
@@ -8896,6 +8361,12 @@ ${slideLayerXml.join('\n')}
 
     const nextPromptGroupViews = activeCanvas.promptNodes
       .filter((promptNode) => !(promptNode.isDraft && !promptNode.isGenerating))
+      .filter((promptNode) => !promptNode.hiddenInCanvas)
+      .filter((promptNode) => !(
+        promptNode.mode === GenerationMode.ECOMMERCE
+        && promptNode.ecommerce?.frameworkId
+        && promptNode.ecommerce.kind !== 'framework'
+      ))
       .map((promptNode) => {
         const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
         const bounds = promptGroupBoundsById.get(promptNode.id);
@@ -9010,16 +8481,6 @@ ${slideLayerXml.join('\n')}
     });
   }, [activeCanvas, actualChildImagesByPromptId, isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
-  const imageNodesById = React.useMemo(
-    () => new Map((activeCanvas?.imageNodes || []).map(node => [node.id, node])),
-    [activeCanvas]
-  );
-
-  const promptNodesById = React.useMemo(
-    () => new Map((activeCanvas?.promptNodes || []).map(node => [node.id, node])),
-    [activeCanvas]
-  );
-
   const liveSceneInteractionPhase: CanvasInteractionPhase = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => state.layoutMode === 'docked')
     ? 'regroup-settle'
     : isNodeDragActive
@@ -9130,19 +8591,136 @@ ${slideLayerXml.join('\n')}
     [promptGroupViews, visibleImageNodes]
   );
 
-  const workflowUtilityNodesById = React.useMemo(
-    () => new Map(
-      (activeCanvas?.workflow?.nodes || [])
-        .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
-        .map((node) => [node.id, node])
-    ),
-    [activeCanvas]
-  );
-
   const visibleWorkflowUtilityNodesById = React.useMemo(
     () => new Map(visibleWorkflowUtilityNodes.map((node) => [node.id, node])),
     [visibleWorkflowUtilityNodes]
   );
+
+  const buildConnectorRenderSnapshot = useCallback((): ConnectorRenderSnapshot => {
+    return traceLocalPerformance('canvas-interaction.connector-render-snapshot', () => {
+      const positionByNodeId: ConnectorRenderSnapshot['positionByNodeId'] = {};
+
+      visiblePromptNodes.forEach((promptNode) => {
+        positionByNodeId[promptNode.id] = resolveLiveSceneNodePosition(
+          liveSceneState,
+          promptNode.id,
+          promptNodesById.get(promptNode.id)?.position ?? promptNode.position,
+        );
+      });
+
+      visibleImageNodes.forEach((imageNode) => {
+        positionByNodeId[imageNode.id] = resolveLiveSceneNodePosition(
+          liveSceneState,
+          imageNode.id,
+          imageNodesById.get(imageNode.id)?.position ?? imageNode.position,
+        );
+      });
+
+      visibleWorkflowUtilityNodes.forEach((workflowNode) => {
+        positionByNodeId[workflowNode.id] = resolveLiveSceneNodePosition(
+          liveSceneState,
+          workflowNode.id,
+          workflowUtilityNodesById.get(workflowNode.id)?.position ?? workflowNode.position,
+        );
+      });
+
+      return {
+        promptIds: visiblePromptNodes.map((promptNode) => promptNode.id),
+        imageIds: visibleImageNodes.map((imageNode) => imageNode.id),
+        workflowUtilityIds: visibleWorkflowUtilityNodes.map((workflowNode) => workflowNode.id),
+        positionByNodeId,
+      };
+    }, {
+      promptCount: visiblePromptNodes.length,
+      imageCount: visibleImageNodes.length,
+      workflowUtilityCount: visibleWorkflowUtilityNodes.length,
+    });
+  }, [
+    imageNodesById,
+    liveSceneState,
+    promptNodesById,
+    visibleImageNodes,
+    visiblePromptNodes,
+    visibleWorkflowUtilityNodes,
+    workflowUtilityNodesById,
+  ]);
+
+  const connectorVisibilitySignature = React.useMemo(
+    () => [
+      visiblePromptNodes.map((promptNode) => promptNode.id).join(','),
+      visibleImageNodes.map((imageNode) => imageNode.id).join(','),
+      visibleWorkflowUtilityNodes.map((workflowNode) => workflowNode.id).join(','),
+    ].join('|'),
+    [visibleImageNodes, visiblePromptNodes, visibleWorkflowUtilityNodes]
+  );
+
+  const connectorRenderSnapshotRef = useRef<ConnectorRenderSnapshot>(EMPTY_CONNECTOR_RENDER_SNAPSHOT);
+  const connectorRenderSnapshotBuilderRef = useRef(buildConnectorRenderSnapshot);
+  const connectorRenderSnapshotTimerRef = useRef<number | null>(null);
+  const connectorRenderSnapshotLastCapturedAtRef = useRef(0);
+  const connectorVisibilitySignatureRef = useRef('');
+  const [connectorRenderSnapshotVersion, setConnectorRenderSnapshotVersion] = useState(0);
+
+  useEffect(() => {
+    connectorRenderSnapshotBuilderRef.current = buildConnectorRenderSnapshot;
+  }, [buildConnectorRenderSnapshot]);
+
+  const shouldThrottleConnectorSnapshot = canvasPerformanceProfile.edgeMode !== 'full'
+    || canvasPerformanceProfile.renderMode !== 'standard';
+  const connectorSnapshotThrottleMs = shouldThrottleConnectorSnapshot
+    ? canvasPerformanceProfile.edgeThrottleMs
+    : 0;
+
+  const commitConnectorRenderSnapshot = useCallback((capturedAt?: number) => {
+    connectorRenderSnapshotRef.current = connectorRenderSnapshotBuilderRef.current();
+    connectorRenderSnapshotLastCapturedAtRef.current = capturedAt ?? performance.now();
+    setConnectorRenderSnapshotVersion((version) => version + 1);
+  }, []);
+
+  const scheduleConnectorRenderSnapshot = useCallback((forceImmediate = false) => {
+    if (forceImmediate || connectorSnapshotThrottleMs <= 0) {
+      if (connectorRenderSnapshotTimerRef.current !== null) {
+        window.clearTimeout(connectorRenderSnapshotTimerRef.current);
+        connectorRenderSnapshotTimerRef.current = null;
+      }
+      commitConnectorRenderSnapshot(forceImmediate ? performance.now() : undefined);
+      return;
+    }
+
+    const now = performance.now();
+    const elapsed = now - connectorRenderSnapshotLastCapturedAtRef.current;
+    if (elapsed >= connectorSnapshotThrottleMs) {
+      if (connectorRenderSnapshotTimerRef.current !== null) {
+        window.clearTimeout(connectorRenderSnapshotTimerRef.current);
+        connectorRenderSnapshotTimerRef.current = null;
+      }
+      commitConnectorRenderSnapshot(now);
+      return;
+    }
+
+    if (connectorRenderSnapshotTimerRef.current !== null) {
+      return;
+    }
+
+    const remaining = Math.max(0, connectorSnapshotThrottleMs - elapsed);
+    connectorRenderSnapshotTimerRef.current = window.setTimeout(() => {
+      connectorRenderSnapshotTimerRef.current = null;
+      commitConnectorRenderSnapshot();
+    }, remaining);
+  }, [commitConnectorRenderSnapshot, connectorSnapshotThrottleMs]);
+
+  useEffect(() => {
+    const visibilityChanged = connectorVisibilitySignatureRef.current !== connectorVisibilitySignature;
+    connectorVisibilitySignatureRef.current = connectorVisibilitySignature;
+    scheduleConnectorRenderSnapshot(visibilityChanged);
+  }, [connectorVisibilitySignature, liveSceneState, scheduleConnectorRenderSnapshot]);
+
+  useEffect(() => () => {
+    if (connectorRenderSnapshotTimerRef.current !== null) {
+      window.clearTimeout(connectorRenderSnapshotTimerRef.current);
+      connectorRenderSnapshotTimerRef.current = null;
+    }
+  }, []);
 
   const imageLoadSchedulingById = React.useMemo(() => {
     const scheduling = new Map<string, ScheduledImageLoadState>();
@@ -9287,8 +8865,34 @@ ${slideLayerXml.join('\n')}
     selectionBox?.active,
   ]);
 
-  const connectorRenderPromptNodes = visiblePromptNodes;
-  const connectorRenderVisibleImageNodes = visibleImageNodes;
+  const connectorRenderSnapshot = React.useMemo(
+    () => connectorRenderSnapshotRef.current,
+    [connectorRenderSnapshotVersion]
+  );
+
+  const connectorRenderPromptNodes = React.useMemo(
+    () => connectorRenderSnapshot.promptIds
+      .map((nodeId) => promptNodesById.get(nodeId))
+      .filter((node): node is PromptNode => Boolean(node)),
+    [connectorRenderSnapshot, promptNodesById]
+  );
+
+  const connectorRenderVisibleImageNodes = React.useMemo(
+    () => connectorRenderSnapshot.imageIds
+      .map((nodeId) => imageNodesById.get(nodeId))
+      .filter((node): node is GeneratedImage => Boolean(node)),
+    [connectorRenderSnapshot, imageNodesById]
+  );
+
+  const connectorRenderWorkflowUtilityNodesById = React.useMemo(
+    () => new Map(
+      connectorRenderSnapshot.workflowUtilityIds
+        .map((nodeId) => workflowUtilityNodesById.get(nodeId))
+        .filter((node): node is WorkflowUtilityCanvasNode => Boolean(node))
+        .map((node) => [node.id, node] as const)
+    ),
+    [connectorRenderSnapshot, workflowUtilityNodesById]
+  );
 
   const connectorVisibleImageNodeIds = React.useMemo(
     () => new Set(connectorRenderVisibleImageNodes.map((node) => node.id)),
@@ -9312,6 +8916,14 @@ ${slideLayerXml.join('\n')}
       imageNodesById.get(imageNode.id)?.position ?? imageNode.position,
     );
   }, [imageNodesById]);
+
+  const resolveConnectorRenderPosition = useCallback((
+    nodeId: string | undefined | null,
+    fallbackPosition: { x: number; y: number } | undefined | null
+  ) => {
+    if (!nodeId) return fallbackPosition ?? null;
+    return connectorRenderSnapshot.positionByNodeId[nodeId] ?? fallbackPosition ?? null;
+  }, [connectorRenderSnapshot]);
 
   const connectorChildImagesByPromptId = React.useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -9342,15 +8954,69 @@ ${slideLayerXml.join('\n')}
     [activeCanvas, actualChildImageIdsByPromptId, selectedNodeIds]
   );
 
-  const handleCanvasNodeSelect = useCallback((nodeId: string) => {
-    const nextGroupId = resolvePromptGroupIdForNodeId(nodeId);
-    setFocusedGroupId(nextGroupId);
-    selectNodes([nodeId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-    if ((window.event as any)?.button === 2) {
-      const pos = getSelectionScreenCenter([nodeId]);
-      if (pos) setSelectionMenuPosition(pos);
+  const {
+    getSelectionScreenCenter,
+    selectNodeFromCurrentEvent,
+    handleCanvasNodeSelect,
+  } = useCanvasNodeSelection({
+    activeCanvas,
+    canvasTransform,
+    getCardDimensions,
+    resolvePromptGroupIdForNodeId,
+    selectNodes,
+    setFocusedGroupId,
+    setSelectionMenuPosition,
+  });
+
+  const {
+    handlePromptGroupDragDelta,
+    handlePromptGroupDragCommit,
+    handlePromptGroupChildDragDelta,
+    handlePromptGroupChildDragCommit,
+  } = usePromptGroupDragHandlers({
+    selectedNodeIds,
+    expandedSelectedNodeIds,
+    shouldAutoRegroupPromptGroup,
+    beginPromptGroupRegroup,
+    clearPromptGroupRegroup,
+    applyLiveNodeDeltaToDraggedSet,
+    moveSelectedNodesImmediate,
+    commitPromptGroupDrag,
+  });
+
+  const handlePromptGroupNodeSelect = useCallback((groupId: string, nodeId: string) => {
+    setFocusedGroupId(groupId);
+    handleCanvasNodeSelect(nodeId);
+  }, [handleCanvasNodeSelect]);
+
+  const handlePromptGroupNodeHeightChange = useCallback((fallbackNode: PromptNode, id: string, height: number) => {
+    const targetNode = promptNodesById.get(id) ?? fallbackNode;
+    if (targetNode.height !== height) {
+      void updatePromptNode({ ...targetNode, height });
     }
-  }, [getSelectionScreenCenter, resolvePromptGroupIdForNodeId, selectNodes]);
+  }, [promptNodesById, updatePromptNode]);
+
+  const handlePromptGroupTagRemove = useCallback((id: string, tag: string) => {
+    const promptNode = promptNodesById.get(id);
+    if (!promptNode?.tags) {
+      return;
+    }
+
+    void updatePromptNode({
+      ...promptNode,
+      tags: promptNode.tags.filter((currentTag) => currentTag !== tag),
+    });
+  }, [promptNodesById, updatePromptNode]);
+
+  const handleRootMouseMove = useCallback((e: React.MouseEvent) => {
+    handleSelectionMouseMove(e);
+    handleDragConnectionMouseMove(e);
+  }, [handleSelectionMouseMove, handleDragConnectionMouseMove]);
+
+  const handleRootMouseUp = useCallback((e: React.MouseEvent) => {
+    handleSelectionMouseUp(e);
+    handleDragConnectionMouseUp();
+  }, [handleSelectionMouseUp, handleDragConnectionMouseUp]);
 
   const notifyWorkflowCard = useCallback((
     level: 'success' | 'warning' | 'info' | 'error',
@@ -9362,36 +9028,22 @@ ${slideLayerXml.join('\n')}
     });
   }, []);
 
-  const getPromptChildrenForWorkflow = useCallback((promptNode: PromptNode | undefined | null) => {
-    if (!promptNode || !activeCanvas) return [] as GeneratedImage[];
-    return resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
-  }, [activeCanvas, resolveCurrentPromptChildImages]);
-
-  const resolveWorkflowSourceIdsFromSelection = useCallback(() => {
-    const explicitIds = selectedNodeIds.filter((nodeId) => (
-      Boolean(activeCanvas?.promptNodes.some((promptNode) => promptNode.id === nodeId))
-      || Boolean(activeCanvas?.imageNodes.some((imageNode) => imageNode.id === nodeId))
-    ));
-
-    if (explicitIds.length > 0) {
-      return Array.from(new Set(explicitIds));
-    }
-
-    return activeSourceImage ? [activeSourceImage] : [];
-  }, [activeCanvas, activeSourceImage, selectedNodeIds]);
-
-  const resolveCanvasNodePosition = useCallback((nodeId?: string | null) => {
-    if (!nodeId || !activeCanvas) return null;
-
-    const promptNode = activeCanvas.promptNodes.find((node) => node.id === nodeId);
-    if (promptNode) return promptNode.position;
-
-    const imageNode = activeCanvas.imageNodes.find((node) => node.id === nodeId);
-    if (imageNode) return imageNode.position;
-
-    const workflowNode = workflowUtilityNodesById.get(nodeId);
-    return workflowNode?.position || null;
-  }, [activeCanvas, workflowUtilityNodesById]);
+  const {
+    getPromptChildrenForWorkflow,
+    resolveWorkflowSourceIdsFromSelection,
+    resolveCanvasNodePosition,
+    resolvePrimaryWorkflowSourcePrompt,
+    resolvePrimaryWorkflowSourceImage,
+    resolveWorkflowLinkedImages,
+  } = useWorkflowSourceResolvers({
+    activeCanvas,
+    selectedNodeIds,
+    activeSourceImage,
+    promptNodesById,
+    imageNodesById,
+    workflowUtilityNodesById,
+    resolveCurrentPromptChildImages,
+  });
 
   const getWorkflowInsertPosition = useCallback((options?: {
     anchorNodeId?: string | null;
@@ -9428,57 +9080,6 @@ ${slideLayerXml.join('\n')}
     isSidebarOpen,
     resolveCanvasNodePosition,
   ]);
-
-  const resolvePrimaryWorkflowSourcePrompt = useCallback((sourceNodeIds?: string[]) => {
-    if (!activeCanvas) return null;
-
-    const directPrompt = (sourceNodeIds || [])
-      .map((nodeId) => activeCanvas.promptNodes.find((node) => node.id === nodeId))
-      .find((node): node is PromptNode => Boolean(node));
-    if (directPrompt) return directPrompt;
-
-    const parentPrompt = (sourceNodeIds || [])
-      .map((nodeId) => activeCanvas.imageNodes.find((node) => node.id === nodeId))
-      .map((imageNode) => (
-        imageNode?.parentPromptId
-          ? activeCanvas.promptNodes.find((promptNode) => promptNode.id === imageNode.parentPromptId)
-          : null
-      ))
-      .find((node): node is PromptNode => Boolean(node));
-    if (parentPrompt) return parentPrompt;
-
-    const fallbackId = resolveWorkflowSourceIdsFromSelection()[0];
-    if (!fallbackId) return null;
-
-    return activeCanvas.promptNodes.find((node) => node.id === fallbackId)
-      || activeCanvas.promptNodes.find((node) => node.id === (activeCanvas.imageNodes.find((imageNode) => imageNode.id === fallbackId)?.parentPromptId || ''))
-      || null;
-  }, [activeCanvas, resolveWorkflowSourceIdsFromSelection]);
-
-  const resolvePrimaryWorkflowSourceImage = useCallback((sourceNodeIds?: string[]) => {
-    if (!activeCanvas) return null;
-
-    const directImage = (sourceNodeIds || [])
-      .map((nodeId) => activeCanvas.imageNodes.find((node) => node.id === nodeId))
-      .find((node): node is GeneratedImage => Boolean(node));
-    if (directImage) return directImage;
-
-    const promptResultImage = (sourceNodeIds || [])
-      .map((nodeId) => activeCanvas.promptNodes.find((node) => node.id === nodeId))
-      .find((node): node is PromptNode => Boolean(node));
-    if (promptResultImage) {
-      const children = getPromptChildrenForWorkflow(promptResultImage);
-      if (children.length > 0) return children[0];
-    }
-
-    if (activeSourceImage) {
-      return activeCanvas.imageNodes.find((node) => node.id === activeSourceImage) || null;
-    }
-
-    const fallbackId = resolveWorkflowSourceIdsFromSelection()[0];
-    if (!fallbackId) return null;
-    return activeCanvas.imageNodes.find((node) => node.id === fallbackId) || null;
-  }, [activeCanvas, activeSourceImage, getPromptChildrenForWorkflow, resolveWorkflowSourceIdsFromSelection]);
 
   const exportWorkflowImagesAsZip = useCallback(async (images: GeneratedImage[], nameHint: string) => {
     const validImages = images.filter((imageNode) => Boolean(imageNode.originalUrl || imageNode.url));
@@ -9595,12 +9196,7 @@ ${slideLayerXml.join('\n')}
 
   const handleWorkflowSaveAction = useCallback(async (node: SaveWorkflowNode) => {
     const sourcePrompt = resolvePrimaryWorkflowSourcePrompt(node.data.sourceNodeIds);
-    const linkedImages = Array.from(new Set([
-      ...((node.data.sourceNodeIds || [])
-        .map((nodeId) => activeCanvas?.imageNodes.find((imageNode) => imageNode.id === nodeId))
-        .filter((imageNode): imageNode is GeneratedImage => Boolean(imageNode))),
-      ...(sourcePrompt ? getPromptChildrenForWorkflow(sourcePrompt) : []),
-    ]));
+    const linkedImages = resolveWorkflowLinkedImages(node.data.sourceNodeIds);
 
     if ((node.data.format || 'zip').toLowerCase() === 'pptx') {
       if (sourcePrompt && sourcePrompt.mode === GenerationMode.PPT) {
@@ -9623,9 +9219,9 @@ ${slideLayerXml.join('\n')}
   }, [
     activeCanvas,
     exportWorkflowImagesAsZip,
-    getPromptChildrenForWorkflow,
     handleExportPptxEditable,
     notifyWorkflowCard,
+    resolveWorkflowLinkedImages,
     resolvePrimaryWorkflowSourcePrompt,
   ]);
 
@@ -9862,34 +9458,19 @@ ${slideLayerXml.join('\n')}
 
     return (
       <ImageNode
-        image={node}
+        {...getSharedImageNodeProps(node)}
         detailLevel={imageDetailLevel}
         loadPriority={item.loadPriority}
         loadBand={item.loadBand}
         groupLayerZIndex={item.groupLayerZIndex}
         stackZIndexOverride={item.stackZIndexOverride}
         position={renderedImagePosition}
-        onPositionChange={updateImageNodePosition}
         onLivePositionChange={handleLiveNodePositionChange}
         onHeightChange={handleImageCardHeightChange}
         highlighted={highlightedId === node.id}
-        onDimensionsUpdate={updateImageNodeDisplayMeta}
-        onUpdate={updateImageNode}
-        onDelete={deleteImageNode}
-        onConnectEnd={handleConnectEnd}
-        onClick={handleImageClick}
         onBringToFront={() => bringNodesToFront([node.id])}
-        isActive={node.id === activeSourceImage}
         isSelected={selectedNodeIds.includes(node.id)}
         onSelect={() => handleCanvasNodeSelect(node.id)}
-        zoomScale={canvasTransform.scale}
-        isMobile={isMobile}
-        onPreview={handleOpenPreview}
-        onPreviewPptStack={handleOpenPptStackPreview}
-        onDownloadPptComposite={handleDownloadPptComposite}
-        isCanvasTransforming={isCanvasTransforming}
-        isNew={(nowTimestamp || Date.now()) - (node.timestamp || 0) < 10000}
-        canvasTransform={canvasTransform}
         onDragStateChange={handleCanvasNodeDragStateChange}
         onDragDelta={(delta, sourceNodeId) => {
           if (!sourceNodeId) return;
@@ -9911,31 +9492,18 @@ ${slideLayerXml.join('\n')}
       />
     );
   }, [
-    activeSourceImage,
     bringNodesToFront,
-    canvasTransform,
-    deleteImageNode,
     expandedSelectedNodeIds,
     handleCanvasNodeSelect,
-    handleConnectEnd,
-    handleDownloadPptComposite,
-    handleImageClick,
     handleImageCardHeightChange,
     handleCanvasNodeDragStateChange,
     handleLiveNodePositionChange,
-    handleOpenPptStackPreview,
-    handleOpenPreview,
+    getSharedImageNodeProps,
     highlightedId,
-    isCanvasTransforming,
-    isMobile,
     applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodesImmediate,
     resolveLiveImagePosition,
-    nowTimestamp,
     selectedNodeIds,
-    updateImageNode,
-    updateImageNodeDisplayMeta,
-    updateImageNodePosition,
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
@@ -9944,119 +9512,37 @@ ${slideLayerXml.join('\n')}
     const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
     const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
-    const isGroupFocused = focusedGroupId === node.id && groupView.isOverlapping;
-    const isGeneratingGroup = generatingGroupIds.includes(node.id);
-    const promptDetailLevel = item.detailLevel === 'thumbnail-shell' ? 'compact' : item.detailLevel;
-    const groupConnectorZoom = Math.max(canvasTransform.scale || 1, 0.5);
-    const groupConnectorStroke = Math.max(0.95, Math.min(2.4, 1.1 / groupConnectorZoom));
-    const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
-    const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
-    const groupConnectorDash = `${groupConnectorDashLength} ${groupConnectorGapLength}`;
-    const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping || Boolean(promptGroupLayoutState);
-    const connectorLayerZIndex = Math.max(0, groupStackZIndex - 1);
-    const promptCardZIndex = groupStackZIndex + 20;
-    const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
-    const regroupLayoutsById = promptGroupRegroupLayoutsById.get(node.id) ?? new Map();
-    const renderedPromptNode = (
-      promptConnectorPosition.x === node.position.x && promptConnectorPosition.y === node.position.y
-    )
-      ? node
-      : { ...node, position: promptConnectorPosition };
-    const promptCardHeight = node.height || getPromptHeight(node.prompt);
-    const promptCardWidth = isMobile
-      ? Math.min(320, Math.max(248, ((typeof window !== 'undefined' ? window.innerWidth : 320) - 24)))
-      : 320;
-    // Tuck both connector ends slightly underneath the cards so the card surfaces
-    // visually cover the dashed line instead of letting it float over the edges.
-    const promptConnectorDockInset = 0;
-    const childConnectorDockInset = 0;
-    const connectorOccluderInset = Math.max(4, Math.min(12, 8 / groupConnectorZoom));
-    const connectorOccluderRadius = Math.max(18, Math.min(26, 22 / groupConnectorZoom));
-    const connectorMaskId = `prompt-group-mask-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-    const connectorCanvasPadding = 128;
-    const childVisualLayouts = groupView.childImages.map((childNode) => {
-      const livePosition = resolveLiveImagePosition(childNode) ?? childNode.position;
-      const regroupLayout = regroupLayoutsById.get(childNode.id);
-      const { width: renderedWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
-      let imageHeight = theoreticalHeight;
-
-      if (childNode.dimensions && typeof childNode.dimensions === 'string') {
-        const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-        if (match?.[1] && match?.[2]) {
-          const width = parseInt(match[1], 10);
-          const height = parseInt(match[2], 10);
-          if (width > 0 && height > 0) {
-            const aspect = width / height;
-            imageHeight = (renderedWidth / aspect) + 40;
-          }
-        }
-      }
-
-      const resolvedImageHeight = imageCardHeightById[childNode.id] ?? imageHeight;
-
-      return {
-        childNode,
-        renderedWidth,
-        resolvedImageHeight,
-        livePosition,
-        visualPosition: regroupLayout?.renderPosition ?? livePosition,
-        settledPosition: regroupLayout?.settledPosition ?? livePosition,
-      };
+    const sourceImageNode = node.sourceImageId ? imageNodesById.get(node.sourceImageId) : null;
+    const {
+      isGroupFocused,
+      promptDetailLevel,
+      shadowBoost,
+      connectorLayerZIndex,
+      promptCardZIndex,
+      groupConnectorStroke,
+      groupConnectorDash,
+      connectorSvgLeft,
+      connectorSvgTop,
+      connectorSvgWidth,
+      connectorSvgHeight,
+      connectorOpacity,
+      renderedPromptNode,
+      childVisualLayouts,
+      groupConnectorLayouts,
+    } = buildPromptGroupRenderLayout({
+      item,
+      groupStackZIndex,
+      focusedGroupId,
+      generatingGroupIds,
+      canvasScale: canvasTransform.scale,
+      isMobile,
+      promptGroupLayoutState,
+      regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
+      imageCardHeightById,
+      resolveLivePromptPosition,
+      resolveLiveImagePosition,
+      getPromptHeight,
     });
-    const groupConnectorNodes = childVisualLayouts.map((layout) => ({
-      key: `${node.id}-${layout.childNode.id}`,
-      childNode: layout.childNode,
-      childConnectorPosition: layout.visualPosition,
-      renderedWidth: layout.renderedWidth,
-      resolvedImageHeight: layout.resolvedImageHeight,
-    }));
-    const promptCardLeft = promptConnectorPosition.x - (promptCardWidth / 2);
-    const promptCardRight = promptConnectorPosition.x + (promptCardWidth / 2);
-    const promptCardTop = promptConnectorPosition.y - promptCardHeight;
-    const promptCardBottom = promptConnectorPosition.y;
-    const connectorBounds = {
-      minX: groupView.bounds.x,
-      maxX: groupView.bounds.x + groupView.bounds.width,
-      minY: groupView.bounds.y,
-      maxY: groupView.bounds.y + groupView.bounds.height,
-    };
-    const connectorSvgLeft = connectorBounds.minX - connectorCanvasPadding;
-    const connectorSvgTop = connectorBounds.minY - connectorCanvasPadding;
-    const connectorSvgWidth = Math.max(1, (connectorBounds.maxX - connectorBounds.minX) + (connectorCanvasPadding * 2));
-    const connectorSvgHeight = Math.max(1, (connectorBounds.maxY - connectorBounds.minY) + (connectorCanvasPadding * 2));
-    const groupConnectorLayouts = groupConnectorNodes.map((childLayout) => {
-      const startX = promptConnectorPosition.x - connectorSvgLeft;
-      const startY = (promptConnectorPosition.y - promptConnectorDockInset) - connectorSvgTop;
-      const endX = childLayout.childConnectorPosition.x - connectorSvgLeft;
-      const endY = (childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight + childConnectorDockInset) - connectorSvgTop;
-
-      return {
-        key: childLayout.key,
-        path: buildDockedVerticalConnectorPath(startX, startY, endX, endY),
-        occluder: {
-          key: `${childLayout.key}-occluder`,
-          x: (childLayout.childConnectorPosition.x - (childLayout.renderedWidth / 2)) - connectorSvgLeft - connectorOccluderInset,
-          y: (childLayout.childConnectorPosition.y - childLayout.resolvedImageHeight) - connectorSvgTop - connectorOccluderInset,
-          width: childLayout.renderedWidth + (connectorOccluderInset * 2),
-          height: childLayout.resolvedImageHeight + (connectorOccluderInset * 2),
-          radius: connectorOccluderRadius,
-        },
-      };
-    });
-    const groupConnectorOccluders = [
-      {
-        key: `${node.id}-prompt-occluder`,
-        x: promptCardLeft - connectorSvgLeft - connectorOccluderInset,
-        y: promptCardTop - connectorSvgTop - connectorOccluderInset,
-        width: promptCardWidth + (connectorOccluderInset * 2),
-        height: promptCardHeight + (connectorOccluderInset * 2),
-        radius: connectorOccluderRadius,
-      },
-      ...groupConnectorLayouts.map((layout) => layout.occluder),
-    ];
-    // The card layers already sit above the connector layer via z-index, so the
-    // extra SVG mask only makes the line appear to "break" early on long drags.
-    const shouldMaskGroupConnectors = false;
 
     return (
       <>
@@ -10076,34 +9562,7 @@ ${slideLayerXml.join('\n')}
               zIndex: connectorLayerZIndex,
             }}
           >
-            {shouldMaskGroupConnectors && (
-              <defs>
-                <mask
-                  id={connectorMaskId}
-                  maskUnits="userSpaceOnUse"
-                  maskContentUnits="userSpaceOnUse"
-                  x={0}
-                  y={0}
-                  width={connectorSvgWidth}
-                  height={connectorSvgHeight}
-                >
-                  <rect x={0} y={0} width={connectorSvgWidth} height={connectorSvgHeight} fill="white" />
-                  {groupConnectorOccluders.map((occluder) => (
-                    <rect
-                      key={occluder.key}
-                      x={occluder.x}
-                      y={occluder.y}
-                      width={occluder.width}
-                      height={occluder.height}
-                      rx={occluder.radius}
-                      ry={occluder.radius}
-                      fill="black"
-                    />
-                  ))}
-                </mask>
-              </defs>
-            )}
-            <g mask={shouldMaskGroupConnectors ? `url(#${connectorMaskId})` : undefined}>
+            <g>
               {groupConnectorLayouts.map((segment) => (
                 <path
                   key={segment.key}
@@ -10115,7 +9574,7 @@ ${slideLayerXml.join('\n')}
                   vectorEffect="non-scaling-stroke"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  opacity={isGroupFocused ? 0.68 : 0.4}
+                  opacity={connectorOpacity}
                 />
               ))}
             </g>
@@ -10133,154 +9592,73 @@ ${slideLayerXml.join('\n')}
           isSelected={selectedNodeIds.includes(node.id)}
           highlighted={highlightedId === node.id || isGroupFocused}
           onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-          onSelect={() => {
-            setFocusedGroupId(node.id);
-            handleCanvasNodeSelect(node.id);
-          }}
+          onSelect={() => handlePromptGroupNodeSelect(node.id, node.id)}
           onClickPrompt={handlePromptClick}
           onConnectStart={handleConnectStart}
           zoomScale={canvasTransform.scale}
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
-          sourcePosition={node.sourceImageId
-            ? (resolveLiveImagePosition(activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId) || null)
-              ?? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position)
-            : undefined
-          }
-          onCancel={handleCancelGeneration}
-          onRetry={handleRetryNode}
-          onEditPptDeck={handleOpenPptDeckEditor}
-          onExportPpt={handleExportPptPackageEditable}
-          onExportPptx={handleExportPptxEditable}
-          onRetryPptPage={handleRetryPptSinglePage}
-          onExportPptPage={handleExportPptSinglePage}
-          onToggleEcommerceSelected={handleToggleEcommerceSelected}
-          onSetEcommerceGroupSelection={handleSetEcommerceGroupSelection}
-          onGenerateEcommerceNode={handleGenerateEcommerceNode}
-          onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
-          onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
-          onRetryEcommerceModule={handleRetryEcommerceModule}
-          onExportEcommerceGroup={handleExportEcommerceGroup}
-          activeEcommerceTaskState={ecommerceState.activeTaskState}
-          onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
-          onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
-          ecommerceSlotState={resolveEcommerceSlotState(renderedPromptNode)}
-          onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistoryForNode}
-          ioTrace={getNodeIoTrace(node.id)}
-          onOpenStorageSettings={() => {
-            openSettingsSurfaceTracked('storage-settings');
-          }}
-          onDelete={deletePromptNode}
-          onDisconnect={handleDisconnectPrompt}
-          onUpdateNode={updatePromptNode}
+          sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
+          {...getSharedPromptNodeActionProps(renderedPromptNode)}
           onLivePositionChange={handleLiveNodePositionChange}
           onHeightChange={(id, height) => {
-            const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
-            const targetNode = latestNode || node;
-            if (targetNode.height !== height) {
-              updatePromptNode({ ...targetNode, height });
-            }
+            handlePromptGroupNodeHeightChange(node, id, height);
           }}
           onPin={handlePinDraft}
-          onRemoveTag={(id, tag) => {
-            const promptNode = activeCanvas?.promptNodes.find(n => n.id === id);
-            if (promptNode && promptNode.tags) {
-              const newTags = promptNode.tags.filter(t => t !== tag);
-              updatePromptNode({ ...promptNode, tags: newTags });
-            }
-          }}
+          onRemoveTag={handlePromptGroupTagRemove}
           onDragDelta={(delta, sourceNodeId) => {
-            if (!sourceNodeId) return;
-
-            const shouldRegroup = shouldAutoRegroupPromptGroup(node, groupView.childImages, sourceNodeId);
-            if (shouldRegroup) {
-              beginPromptGroupRegroup(node.id, groupView.childImages);
-            } else {
-              clearPromptGroupRegroup(node.id);
-            }
-
-            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
-              applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
-            } else if (shouldRegroup) {
-              applyLiveNodeDeltaToDraggedSet(sourceNodeId, [sourceNodeId], delta);
-            } else {
-              applyLiveNodeDeltaToDraggedSet(sourceNodeId, groupNodeIds, delta);
-            }
+            handlePromptGroupDragDelta({
+              node,
+              childImages: groupView.childImages,
+              groupNodeIds,
+              delta,
+              sourceNodeId,
+            });
           }}
           onDragCommit={(delta, sourceNodeId, finalPosition) => {
-            if (!sourceNodeId || !finalPosition) return;
-
-            if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
-              clearPromptGroupRegroup(node.id);
-              moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
-              return;
-            }
-
-            commitPromptGroupDrag(
+            handlePromptGroupDragCommit({
               node,
-              groupView.childImages,
+              childImages: groupView.childImages,
+              delta,
+              sourceNodeId,
               finalPosition,
-              shouldAutoRegroupPromptGroup(node, groupView.childImages, sourceNodeId),
-            );
+            });
           }}
           canvasTransform={canvasTransform}
           onDragStateChange={handleCanvasNodeDragStateChange}
         />
 
-        {groupConnectorNodes.map((childLayout, childIndex) => (
+        {childVisualLayouts.map((childLayout, childIndex) => (
           <React.Fragment key={childLayout.childNode.id}>
             <ImageNode
-              image={childLayout.childNode}
+              {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
               loadPriority={1200}
               loadBand={0}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
               stackZIndexOverride={promptCardZIndex + 10 + childIndex}
               shadowBoost={shadowBoost}
-              position={childLayout.childConnectorPosition}
-              onPositionChange={updateImageNodePosition}
+              position={childLayout.visualPosition}
               onLivePositionChange={handleLiveNodePositionChange}
               onHeightChange={handleImageCardHeightChange}
               highlighted={highlightedId === childLayout.childNode.id || isGroupFocused}
-              onDimensionsUpdate={updateImageNodeDisplayMeta}
-              onUpdate={updateImageNode}
-              onDelete={deleteImageNode}
-              onConnectEnd={handleConnectEnd}
-              onClick={handleImageClick}
               onBringToFront={() => handleFocusPromptGroup(node.id, { keepSelection: true })}
-              isActive={childLayout.childNode.id === activeSourceImage}
               isSelected={selectedNodeIds.includes(childLayout.childNode.id)}
-              onSelect={() => {
-                setFocusedGroupId(node.id);
-                handleCanvasNodeSelect(childLayout.childNode.id);
-              }}
-              zoomScale={canvasTransform.scale}
-              isMobile={isMobile}
-              onPreview={handleOpenPreview}
-              onPreviewPptStack={handleOpenPptStackPreview}
-              onDownloadPptComposite={handleDownloadPptComposite}
-              isCanvasTransforming={isCanvasTransforming}
-              isNew={(nowTimestamp || Date.now()) - (childLayout.childNode.timestamp || 0) < 10000}
-              canvasTransform={canvasTransform}
+              onSelect={() => handlePromptGroupNodeSelect(node.id, childLayout.childNode.id)}
               onDragStateChange={handleCanvasNodeDragStateChange}
               onDragDelta={(delta, sourceNodeId) => {
-                if (!sourceNodeId) return;
-                clearPromptGroupRegroup(node.id);
-
-                if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
-                  applyLiveNodeDeltaToDraggedSet(sourceNodeId, expandedSelectedNodeIds, delta);
-                }
+                handlePromptGroupChildDragDelta({
+                  groupId: node.id,
+                  delta,
+                  sourceNodeId,
+                });
               }}
               onDragCommit={(delta, sourceNodeId) => {
-                if (!sourceNodeId) return;
-                clearPromptGroupRegroup(node.id);
-
-                if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
-                  moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
-                  return;
-                }
-
-                moveSelectedNodesImmediate(delta, [sourceNodeId]);
+                handlePromptGroupChildDragCommit({
+                  groupId: node.id,
+                  delta,
+                  sourceNodeId,
+                });
               }}
             />
           </React.Fragment>
@@ -10288,42 +9666,33 @@ ${slideLayerXml.join('\n')}
       </>
     );
   }, [
-    activeCanvas,
+    handlePromptGroupChildDragCommit,
+    handlePromptGroupChildDragDelta,
+    handlePromptGroupDragCommit,
+    handlePromptGroupDragDelta,
+    handlePromptGroupNodeHeightChange,
+    handlePromptGroupNodeSelect,
+    handlePromptGroupTagRemove,
     canvasTransform,
-    deletePromptNode,
     deleteImageNode,
-    expandedSelectedNodeIds,
-    getNodeIoTrace,
-    handleCancelGeneration,
-    handleCanvasNodeSelect,
     handleConnectStart,
     handleConnectEnd,
-    handleDisconnectPrompt,
     handleDownloadPptComposite,
-    handleExportPptPackageEditable,
-    handleExportPptSinglePage,
-    handleExportPptxEditable,
-    handleOpenPptDeckEditor,
     handleOpenPptStackPreview,
     handleOpenPreview,
     handleCanvasNodeDragStateChange,
     handleLiveNodePositionChange,
     handleFocusPromptGroup,
+    getSharedImageNodeProps,
+    getSharedPromptNodeActionProps,
     handleImageClick,
     handlePinDraft,
-    handlePromptClick,
-    handleRetryNode,
-    handleRetryPptSinglePage,
     focusedGroupId,
     generatingGroupIds,
     imageCardHeightById,
+    imageNodesById,
     highlightedId,
     isMobile,
-    applyLiveNodeDeltaToDraggedSet,
-    beginPromptGroupRegroup,
-    clearPromptGroupRegroup,
-    commitPromptGroupDrag,
-    moveSelectedNodesImmediate,
     nowTimestamp,
     promptGroupNodeIdsById,
     promptGroupLayoutVersion,
@@ -10334,7 +9703,6 @@ ${slideLayerXml.join('\n')}
     resolveLivePromptPosition,
     getPromptHeight,
     selectedNodeIds,
-    shouldAutoRegroupPromptGroup,
     updatePromptNode,
     updateImageNode,
     updateImageNodeDisplayMeta,
@@ -10661,88 +10029,47 @@ ${slideLayerXml.join('\n')}
 
   
 
-  const mobileResultEntries = React.useMemo<MobileResultEntry[]>(
-    () => selectMobileFeedResults(activeCanvas?.promptNodes || [], activeCanvas?.imageNodes || []),
-    [activeCanvas?.imageNodes, activeCanvas?.promptNodes],
-  );
-
-  // [Blocking Load] Wait for Canvas Hydration to prevent "Triple Load" flash
-  // Keep this after all hooks so the hook order stays stable across renders.
-  if (!isReady) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
-        <Loader2 className="animate-spin text-indigo-500" size={32} />
-      </div>
-    );
-  }
-
   const workspaceChrome = null;
 
-  const mobileComposerNode = isMobile ? (
-    <div className="h-full px-3 pb-3 pt-2">
-      <div className="flex h-full flex-col rounded-[30px] border border-[var(--border-light)] bg-[var(--bg-overlay)]/96 p-2 shadow-[0_18px_48px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
-        <PromptBarCompat
-          config={config}
-          setConfig={setConfig}
-          isGenerating={isGenerating}
-          onUiBusyChange={setPromptBarUiBusy}
-          onGenerate={handleGenerate}
-          onCancel={handleCancelGeneration}
-          onFilesDrop={handleFilesDrop}
-          activeSourceImage={activeSourceImage ?
-            (activeCanvas?.imageNodes.find((node) => node.id === activeSourceImage) ? {
-              id: activeSourceImage,
-              url: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.url,
-              prompt: activeCanvas.imageNodes.find((node) => node.id === activeSourceImage)!.prompt,
-            } : null) : null
-          }
-          onClearSource={handleClearSource}
-          isMobile={isMobile}
-          mobileShellMode="embedded"
-          sendLabel={config.mode === GenerationMode.ECOMMERCE ? '确认' : '发送'}
-          onOpenSettings={(view) => {
-            openSettingsSurfaceTracked(view === 'api-management' ? 'api-management' : 'dashboard');
-          }}
-          onFocus={() => setIsPromptFocused(true)}
-          onBlur={() => setIsPromptFocused(false)}
-          ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
-          ecommerceProductFileCount={ecommerceState.productFiles.length}
-          ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
-          ecommerceProductFiles={ecommerceState.productFiles}
-          ecommerceExtraReferenceFiles={ecommerceState.extraReferenceFiles}
-          ecommerceItemReferenceFiles={ecommerceState.itemReferenceFiles}
-          ecommerceAnalysis={ecommerceState.analysis}
-          ecommerceSelection={ecommerceState.selectedItems}
-          ecommerceTaskStates={ecommerceState.taskStates}
-          ecommerceGroupSlots={ecommerceState.groupSlots}
-          ecommerceActiveTaskState={ecommerceState.activeTaskState}
-          ecommerceSheetSettings={ecommerceState.sheetSettings}
-          ecommerceAnalysisConfirmed={ecommerceState.analysisConfirmed}
-          ecommerceConfirmingAnalysis={ecommerceState.isConfirmingAnalysis}
-          ecommerceActiveGroupSheet={ecommerceState.activeGroupSheet}
-          ecommerceAnalyzing={ecommerceState.isAnalyzing}
-          onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
-          onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
-          onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
-          onClearEcommerceRequirementFile={handleClearEcommerceRequirementFile}
-          onRemoveEcommerceProductFile={handleRemoveEcommerceProductFile}
-          onRemoveEcommerceExtraReferenceFile={handleRemoveEcommerceExtraReferenceFile}
-          onPickEcommerceItemReferenceFiles={handlePickEcommerceItemReferenceFiles}
-          onRemoveEcommerceItemReferenceFile={handleRemoveEcommerceItemReferenceFile}
-          onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
-          onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
-          onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
-          onActivateEcommerceGroupSheet={handleActivateEcommerceGroupSheet}
-          onActivateEcommerceTaskBySourceKey={handleActivateEcommerceTaskBySourceKey}
-          onUpdateEcommerceSheetSetting={handleUpdateEcommerceSheetSetting}
-          onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
-          onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistory}
-          ecommerceRatioOverride={ecommerceRatioOverride}
-          onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
-        />
-      </div>
-    </div>
-  ) : null;
+  const {
+    mobilePromptBarProps,
+    desktopPromptBarProps,
+  } = useAppPromptBarProps({
+    config,
+    setConfig,
+    isGenerating,
+    onUiBusyChange: setPromptBarUiBusy,
+    onGenerate: handleGenerate,
+    onCancel: handleCancelGeneration,
+    onFilesDrop: handleFilesDrop,
+    activeCanvas,
+    activeSourceImageId: activeSourceImage,
+    onClearSource: handleClearSource,
+    isMobile,
+    ecommerceState,
+    onPickEcommerceRequirementFile: handlePickEcommerceRequirementFile,
+    onPickEcommerceProductFiles: handlePickEcommerceProductFiles,
+    onPickEcommerceExtraReferenceFiles: handlePickEcommerceExtraReferenceFiles,
+    onClearEcommerceRequirementFile: handleClearEcommerceRequirementFile,
+    onRemoveEcommerceProductFile: handleRemoveEcommerceProductFile,
+    onRemoveEcommerceExtraReferenceFile: handleRemoveEcommerceExtraReferenceFile,
+    onPickEcommerceItemReferenceFiles: handlePickEcommerceItemReferenceFiles,
+    onRemoveEcommerceItemReferenceFile: handleRemoveEcommerceItemReferenceFile,
+    onResetEcommerceAnalysis: handleResetEcommerceAnalysis,
+    onConfirmEcommerceAnalysis: handleConfirmEcommerceAnalysis,
+    onToggleEcommerceSelection: handleToggleEcommerceAnalysisSelection,
+    onActivateEcommerceGroupSheet: handleActivateEcommerceGroupSheet,
+    onActivateEcommerceTaskBySourceKey: handleActivateEcommerceTaskBySourceKey,
+    onUpdateEcommerceSheetSetting: handleUpdateEcommerceSheetSetting,
+    onChangeEcommerceTaskState: handleChangeEcommerceTaskState,
+    onPreviewEcommerceSlotHistory: handlePreviewEcommerceSlotHistory,
+    ecommerceRatioOverride,
+    onAnalyzeEcommerceFile: handleAnalyzeEcommerceRequirement,
+    openSettingsSurface: openSettingsSurfaceTracked,
+    handleShowMobileNav,
+    handleHideMobileNav,
+    setIsPromptFocused,
+  });
 
   const workspacePanels = (
     <WorkspaceSurfacePanels
@@ -10763,11 +10090,181 @@ ${slideLayerXml.join('\n')}
     />
   );
 
+  const selectionMenuOverlay = useSelectionMenuOverlay({
+    activeCanvas,
+    selectedNodeIds,
+    selectionMenuPosition,
+    closeSelectionMenu: () => setSelectionMenuPosition(null),
+    actualChildImageIdsByPromptId,
+    deletePromptNode,
+    deleteImageNode,
+    deleteWorkflowNode,
+    removeGroup,
+    addGroup,
+    clearSelection,
+    arrangeAllNodes,
+    getCardDimensions,
+    onTag: handleTag,
+    onOpenMigrate: () => setShowMigrateModal(true),
+  });
 
-  return (
+  const handleCloseSettingsPanel = useCallback(() => {
+    setShowSettingsPanel(false);
+    setSettingsInitialSupplier(null);
+  }, []);
+
+  const handleStorageSelectionComplete = useCallback(() => {
+    setShowStorageModal(false);
+    setIsStorageChecked(true);
+    if (!keyManager.hasValidKeys()) {
+      openSettingsSurfaceTracked('api-management');
+    }
+  }, [openSettingsSurfaceTracked]);
+
+  const handleTutorialComplete = useCallback(() => {
+    setShowTutorial(false);
+    localStorage.setItem('kk_tutorial_seen', 'true');
+  }, []);
+
+  const handleMigrateSelection = useCallback((targetCanvasId: string) => {
+    if (targetCanvasId === '__new__') {
+      const newCanvasId = createCanvas();
+      if (newCanvasId) {
+        const originalCanvasId = state.activeCanvasId;
+        switchCanvas(originalCanvasId);
+        setTimeout(() => {
+          migrateNodes(selectedNodeIds, newCanvasId);
+          switchCanvas(newCanvasId);
+
+          import('./services/system/notificationService').then(({ notify }) => {
+            notify.success('迁移成功', `已创建新项目并迁移 ${selectedNodeIds.length} 个项目`);
+          });
+        }, 50);
+      }
+    } else {
+      migrateNodes(selectedNodeIds, targetCanvasId);
+    }
+
+    setShowMigrateModal(false);
+    clearSelection();
+  }, [clearSelection, createCanvas, migrateNodes, selectedNodeIds, state.activeCanvasId, switchCanvas]);
+
+  // [Blocking Load] Wait for Canvas Hydration to prevent "Triple Load" flash
+  // Keep this after all hooks so the hook order stays stable across renders.
+  if (!isReady) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+      </div>
+    );
+  }
+
+  const projectManagerNode = !isMobile ? (
+    <ProjectManager
+      onSearch={() => {
+        focusWorkspace();
+        setIsSearchOpen(true);
+      }}
+      isSidebarOpen={isSidebarOpen}
+      onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+      isMobile={isMobile}
+      onFitToAll={handleFitToAll}
+      onResetView={handleResetView}
+      onToggleGrid={handleToggleGrid}
+      showGrid={showGrid}
+      onAutoArrange={handleAutoArrange}
+      onToggleChat={toggleChatPanel}
+      isChatOpen={isChatOpen}
+      workflowTemplates={WORKFLOW_TEMPLATES}
+      onApplyWorkflowTemplate={(templateId) => {
+        void handleApplyWorkflowTemplate(templateId);
+      }}
+      onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
+    />
+  ) : null;
+
+  const globalModalsProps: AppGlobalModalsProps = {
+    projectManager: projectManagerNode,
+    tagModal: {
+      isOpen: isTagModalOpen,
+      onClose: () => setIsTagModalOpen(false),
+      initialTags,
+      onSave: handleSaveTags,
+      maxTags: tagLimits.maxTags,
+      maxChars: tagLimits.maxChars,
+      allTags,
+      inheritedTags,
+      isSubCard,
+    },
+    profileModal: {
+      isOpen: showProfileModal,
+      onClose: () => setShowProfileModal(false),
+      user,
+      onSignOut: signOut,
+      initialView: profileInitialView,
+      isMobile,
+    },
+    settingsPanel: {
+      isOpen: showSettingsPanel,
+      sessionKey: settingsPanelSessionKey,
+      initialView: settingsInitialView,
+      initialSupplier: settingsInitialSupplier,
+      onClose: handleCloseSettingsPanel,
+    },
+    storageModal: {
+      isOpen: showStorageModal,
+      onComplete: handleStorageSelectionComplete,
+    },
+    lightbox: {
+      images: previewImages,
+      initialIndex: previewInitialIndex,
+      onClose: () => setPreviewImages(null),
+      onEditPptDeck: handleOpenPptDeckEditorFromImage,
+      onEditText: handleEditPptTextFromLightbox,
+      onDownloadPptComposite: handleDownloadPptComposite,
+      onPartialRedraw: handlePartialRedrawRequest,
+    },
+    pptStackPreview: {
+      state: pptStackPreview,
+      onClose: () => setPptStackPreview(null),
+    },
+    pptDeckEditor: {
+      state: pptDeckEditor,
+      resolveBundle: getOrderedPptNodeBundle,
+      onClose: () => setPptDeckEditor(null),
+      onSave: handleSavePptEditablePages,
+    },
+    searchPalette: {
+      isOpen: isSearchOpen,
+      onClose: () => setIsSearchOpen(false),
+      promptNodes: activeCanvas?.promptNodes || [],
+      groups: activeCanvas?.groups || [],
+      onNavigate: handleNavigateToNode,
+      onMultiSelectConfirm: handleMultiSelectConfirm,
+    },
+    tutorial: {
+      isVisible: showTutorial,
+      onComplete: handleTutorialComplete,
+    },
+    migrateModal: {
+      isOpen: showMigrateModal,
+      onClose: () => setShowMigrateModal(false),
+      canvases: state.canvases,
+      currentCanvasId: state.activeCanvasId,
+      selectedCount: selectedNodeIds.length,
+      onMigrate: handleMigrateSelection,
+    },
+    rechargeModal: {
+      enabled: billingUiEnabled,
+      isOpen: showRechargeModal,
+    },
+  };
+
+
+    return (
     <WorkspaceShell
       isMobile={isMobile}
-      onMouseDown={handleMouseDown}
+      onMouseDown={handleSelectionMouseDown}
       onContextMenu={handleContextMenu}
       onMouseMove={handleRootMouseMove}
       onMouseUp={handleRootMouseUp}
@@ -10778,399 +10275,63 @@ ${slideLayerXml.join('\n')}
         showConnections={true}
         mode={backgroundMode}
       />
+      <AppDesktopChrome
+        isMobile={isMobile}
+        billingUiEnabled={billingUiEnabled}
+        remainingBalanceDisplay={remainingBalanceDisplay}
+        onRecharge={() => setShowRechargeModal(true)}
+        rightOffset={desktopChromeRight}
+        user={user}
+        avatarUrl={derivedMobileUserAvatarUrl}
+        apiStatus={derivedApiStatus}
+        showUserMenu={showUserMenu}
+        setShowUserMenu={setShowUserMenu}
+        onOpenProfile={openProfileSurface}
+        onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
+        onSignOut={() => { void signOut(); }}
+        isChatOpen={isChatOpen}
+        onToggleChat={toggleChatPanel}
+      />
 
-      {/* Top Left Credits Display */}
-      {!isMobile && billingUiEnabled && (
-        <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
-          <div
-            className="flex items-center gap-3 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-md transition-all hover:border-[var(--border-medium)] group"
-            style={{
-              background: 'var(--floating-shell-bg)',
-              borderColor: 'var(--floating-shell-border)',
-              boxShadow: 'var(--floating-shell-shadow)',
-              backdropFilter: 'blur(18px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={18} fill="currentColor" className="text-blue-500" />
-              <div className="flex items-center select-none gap-1">
-                <span className="text-[18px] font-mono font-bold leading-none min-w-[20px] drop-shadow-sm" style={{ color: 'var(--text-primary)' }}>
-                  {remainingBalanceDisplay}
-                </span>
-                <span className="text-[14px] font-bold leading-none text-blue-400">积分</span>
-              </div>
-            </div>
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--floating-shell-border)' }} />
-            <button
-              onClick={() => setShowRechargeModal(true)}
-              className="inline-flex items-center justify-center px-3 py-1 bg-indigo-500 hover:bg-indigo-400 text-white text-[11px] font-bold leading-none rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-500/20"
-            >
-              充值
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Chat Sidebar (Left) */}
-
-
-      {/* Top Right User Menu - Desktop Only */}
-      {/* Top Right User Menu - Desktop Only */}
-      {!isMobile && (
-        <div id="header-user-menu" className="absolute top-4 z-[100] hidden md:flex items-center gap-3 transition-all duration-300" style={{ right: isChatOpen ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))` : '48px' }}>
-          {/* User Avatar & Dropdown Trigger */}
-          <div className="relative group">
-            <button
-              data-testid="desktop-user-menu-trigger"
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="relative w-10 h-10 rounded-full overflow-hidden border-2 transition-all shadow-2xl flex items-center justify-center cursor-pointer active:scale-95"
-              style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-secondary)' }}
-            >
-              {derivedMobileUserAvatarUrl ? (
-                <img src={derivedMobileUserAvatarUrl} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 flex items-center justify-center font-bold text-white text-sm">
-                  {user?.email?.[0].toUpperCase() || 'K'}
-                </div>
-              )}
-            </button>
-
-            {/* API Status Dot */}
-            <div className={`absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 z-10 shadow-lg ${derivedApiStatus === 'success' ? 'bg-green-500' :
-              derivedApiStatus === 'error' ? 'bg-red-500' : 'bg-zinc-500'
-              }`} style={{ borderColor: 'var(--bg-canvas)' }} />
-
-            {showUserMenu ? (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowUserMenu(false)}
-                />
-                <div
-                  className="absolute right-0 top-12 z-50 w-64 origin-top-right animate-in rounded-xl border p-2 shadow-2xl duration-100 fade-in zoom-in-95"
-                  style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
-                >
-                  <div
-                    className="group mb-2 cursor-pointer rounded-lg border-b px-3 py-3 transition-colors"
-                    style={{ borderColor: 'var(--border-light)' }}
-                    onMouseEnter={(event) => { event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; }}
-                    onMouseLeave={(event) => { event.currentTarget.style.backgroundColor = 'transparent'; }}
-                    onClick={() => {
-                      setProfileInitialView('main');
-                      setShowProfileModal(true);
-                      setShowUserMenu(false);
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-500 font-bold text-white">
-                        {derivedMobileUserAvatarUrl ? (
-                          <img src={derivedMobileUserAvatarUrl} className="h-full w-full object-cover" />
-                        ) : user?.email?.[0].toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {user?.user_metadata?.full_name || '用户'}
-                        </div>
-                        <div className="truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {user?.email}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => {
-                        setProfileInitialView('main');
-                        setShowProfileModal(true);
-                        setShowUserMenu(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
-                      style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
-                        event.currentTarget.style.color = 'var(--text-primary)';
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.backgroundColor = 'transparent';
-                        event.currentTarget.style.color = 'var(--text-secondary)';
-                      }}
-                    >
-                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-blue)' }}>
-                        <User size={14} />
-                      </div>
-                      个人中心
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProfileInitialView('billing');
-                        setShowProfileModal(true);
-                        setShowUserMenu(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
-                      style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
-                        event.currentTarget.style.color = 'var(--text-primary)';
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.backgroundColor = 'transparent';
-                        event.currentTarget.style.color = 'var(--text-secondary)';
-                      }}
-                    >
-                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-yellow)' }}>
-                        <Zap size={14} />
-                      </div>
-                      账号管理
-                    </button>
-
-                    <button
-                      data-testid="desktop-user-menu-settings"
-                      onClick={() => {
-                        openSettingsSurfaceTracked('dashboard');
-                        setShowUserMenu(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
-                      style={{ color: 'var(--text-secondary)' }}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
-                        event.currentTarget.style.color = 'var(--text-primary)';
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.backgroundColor = 'transparent';
-                        event.currentTarget.style.color = 'var(--text-secondary)';
-                      }}
-                    >
-                      <div className="rounded-lg p-1.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--accent-purple)' }}>
-                        <LayoutDashboard size={14} />
-                      </div>
-                      设置
-                    </button>
-
-                    <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
-
-                    <button
-                      onClick={() => {
-                        signOut();
-                        setShowUserMenu(false);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10"
-                    >
-                      <div className="rounded-lg bg-red-500/10 p-1.5">
-                        <LogOut size={14} />
-                      </div>
-                      退出登录
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {/* Selection Box Overlay */}
-      {selectionBox && selectionBox.active && (
-        <div
-          className="fixed z-[9999] border border-indigo-500 bg-indigo-500/10 pointer-events-none rounded-lg"
-          style={{
-            left: Math.min(selectionBox.start.x, selectionBox.current.x),
-            top: Math.min(selectionBox.start.y, selectionBox.current.y),
-            width: Math.abs(selectionBox.current.x - selectionBox.start.x),
-            height: Math.abs(selectionBox.current.y - selectionBox.start.y),
-          }}
-        />
-      )}
-      {/* Selection Menu Overlay */}
-      {selectionMenuPosition && selectedNodeIds.length > 0 && (() => {
-        // Compute detailed selection stats: prompt groups, images, and videos
-        const selectedPrompts = activeCanvas?.promptNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
-        const selectedImages = activeCanvas?.imageNodes.filter(n => selectedNodeIds.includes(n.id)) || [];
-
-        const groupCount = selectedPrompts.length; // Prompt cards count as groups
-        const videoCount = selectedImages.filter(img =>
-          img.mode === GenerationMode.VIDEO ||
-          img.url?.includes('.mp4') ||
-          img.url?.startsWith('data:video')
-        ).length;
-        const imageCount = selectedImages.length - videoCount; // 图片 = 鍓崱鎬绘暟 - 视频鏁?
-
-        return (
-          <SelectionMenu
-            position={selectionMenuPosition}
-            selectedCount={selectedNodeIds.length}
-            groupCount={groupCount}
-            imageCount={imageCount}
-            videoCount={videoCount}
-            onDelete={() => {
-              if (activeCanvas) {
-                const prompts = activeCanvas.promptNodes.filter(n => selectedNodeIds.includes(n.id));
-                const images = activeCanvas.imageNodes.filter(n => selectedNodeIds.includes(n.id));
-                const workflowNodes = (activeCanvas.workflow?.nodes || []).filter(
-                  (node): node is WorkflowUtilityCanvasNode => (
-                    selectedNodeIds.includes(node.id) && isWorkflowUtilityNodeKind(node.kind)
-                  )
-                );
-                prompts.forEach(n => deletePromptNode(n.id));
-                images.forEach(n => deleteImageNode(n.id));
-                workflowNodes.forEach(n => deleteWorkflowNode(n.id));
-                clearSelection();
-              }
-              setSelectionMenuPosition(null);
-            }}
-            onGroup={() => {
-              if (!activeCanvas) return;
-              // Calculate bounds
-              const prompts = activeCanvas.promptNodes.filter(n => selectedNodeIds.includes(n.id));
-
-              // [FIX] Include child images of selected prompts for adaptive bounding
-              const childImageIds = prompts.flatMap((promptNode) => actualChildImageIdsByPromptId.get(promptNode.id) || []);
-              const images = activeCanvas.imageNodes.filter(n => selectedNodeIds.includes(n.id) || childImageIds.includes(n.id));
-
-              // 🎯 Merge Logic: Find existing groups that contain any of the selected nodes
-              const selectedNodeSet = new Set([...prompts.map(n => n.id), ...images.map(n => n.id)]);
-              const existingGroupsInSelection = activeCanvas.groups.filter(g =>
-                g.nodeIds.some(nid => selectedNodeSet.has(nid))
-              );
-
-              // Collect all node IDs from existing groups to ensure they're merged
-              const allMergedNodeIds = new Set<string>();
-              existingGroupsInSelection.forEach(g => g.nodeIds.forEach(nid => allMergedNodeIds.add(nid)));
-              selectedNodeSet.forEach(nid => allMergedNodeIds.add(nid));
-
-              // 🎯 Label Merge Logic
-              let mergedLabel: string | undefined;
-              const existingLabels = existingGroupsInSelection
-                .map(g => g.label?.trim())
-                .filter((l): l is string => !!l && l !== 'Group');
-
-              // Remove duplicates
-              const uniqueLabels = [...new Set(existingLabels)];
-
-              if (uniqueLabels.length === 0) {
-                mergedLabel = undefined; // Use default 'Group'
-              } else if (uniqueLabels.length === 1) {
-                mergedLabel = uniqueLabels[0];
-              } else {
-                // Combine names: "Name1 + Name2"
-                mergedLabel = uniqueLabels.join(' + ');
-              }
-
-              // 🎯 Remove old groups that are being merged
-              existingGroupsInSelection.forEach(g => removeGroup(g.id));
-
-              // Calculate combined bounds (using all merged nodes)
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-              // Find all prompts and images by ID
-              const allPrompts = activeCanvas.promptNodes.filter(n => allMergedNodeIds.has(n.id));
-              const allImages = activeCanvas.imageNodes.filter(n => allMergedNodeIds.has(n.id));
-
-              allPrompts.forEach(n => {
-                const w = 380; // Assuming prompt width
-                const h = n.height || 200;
-                minX = Math.min(minX, n.position.x - w / 2);
-                maxX = Math.max(maxX, n.position.x + w / 2);
-                minY = Math.min(minY, n.position.y - h); // Anchor bottom
-                maxY = Math.max(maxY, n.position.y);
-              });
-
-              allImages.forEach(n => {
-                const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
-                minX = Math.min(minX, n.position.x - width / 2);
-                maxX = Math.max(maxX, n.position.x + width / 2);
-                minY = Math.min(minY, n.position.y - totalHeight);
-                maxY = Math.max(maxY, n.position.y);
-              });
-
-              if (minX === Infinity) {
-                setSelectionMenuPosition(null);
-                return;
-              }
-
-              const padding = 40; // 🎯 Uniform 40px all sides
-              const topExtra = 40;
-              const bottomExtra = 40;
-              const group: CanvasGroup = {
-                id: Date.now().toString(),
-                nodeIds: [...allMergedNodeIds],
-                bounds: {
-                  x: minX - padding,
-                  y: minY - (padding + topExtra),
-                  width: (maxX - minX) + padding * 2,
-                  height: (maxY - minY) + padding + topExtra + bottomExtra
-                },
-                label: mergedLabel,
-                type: 'custom'
-              };
-              addGroup(group);
-              clearSelection();
-              setSelectionMenuPosition(null);
-            }}
-            onTag={handleTag}
-            onMigrate={() => {
-              setSelectionMenuPosition(null);
-              setShowMigrateModal(true);
-            }}
-            onArrange={(mode) => {
-              arrangeAllNodes(mode);
-              setSelectionMenuPosition(null);
-            }}
-          />
-        );
-      })()}
-
-
-
-      {isMobile && (
-        <MobileWorkspaceSurface
-          activeScreen={mobileScreen}
-          onScreenChange={setMobileScreen}
-          onOpenSettings={openCurrentMobileSettingsSurface}
-          title="KK Studio"
-          userName={derivedMobileUserName}
-          userAvatarUrl={derivedMobileUserAvatarUrl}
-          balance={billingUiEnabled ? balance : 0}
-          balanceLoading={billingUiEnabled ? billingLoading : false}
-          projectName={activeCanvas?.name || '项目'}
-          projectCount={state.canvases.length}
-          onOpenProjects={() => setMobileScreen('more-sheet')}
-          onOpenSearch={() => {
-            focusWorkspace();
-            setIsSearchOpen(true);
-            setMobileScreen('home');
-          }}
-          onOpenHistory={() => {
-            setWorkspaceSurface('library');
-            setMobileScreen('home');
-          }}
-          onOpenChat={() => {
-            focusWorkspace();
-            setIsChatOpen(true);
-            setMobileScreen('home');
-          }}
-          onOpenProfile={() => openProfileSurface('main')}
-          onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
-          onRechargeClick={billingUiEnabled ? () => setShowRechargeModal(true) : undefined}
-          resultEntries={mobileResultEntries}
-          activeEntryId={mobileActiveResultId}
-          activeSourceImage={activeSourceImage}
-          onEntryOpen={handleMobileResultOpen}
-          onPreviewImage={handleOpenPreview}
-          onUseResultAsSource={handleMobileUseImageAsSource}
-          onPartialRedraw={handleMobileResultPartialRedraw}
-          onDownloadEntry={handleMobileResultDownload}
-          onDeleteImage={deleteImageNode}
-          onEditEcommerceTask={handleMobileEditEcommerceTask}
-          onConfirmEcommerceDesktop={handleMobileConfirmEcommerceDesktop}
-          onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
-          onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
-          composer={mobileComposerNode}
-          overlays={workspacePanels}
-        />
-      )}
+      <AppCanvasOverlays
+        selectionBox={selectionBox}
+        selectionMenu={selectionMenuOverlay}
+      />
+      <AppMobileWorkspace
+        isMobile={isMobile}
+        surface={responsiveSurface}
+        mobileScreen={mobileScreen}
+        setMobileScreen={setMobileScreen}
+        onOpenSettings={openCurrentMobileSettingsSurface}
+        userName={derivedMobileUserName}
+        userAvatarUrl={derivedMobileUserAvatarUrl}
+        billingUiEnabled={billingUiEnabled}
+        balance={balance}
+        billingLoading={billingLoading}
+        activeCanvas={activeCanvas}
+        frameworkRuntime={ecommerceState.frameworkRuntime}
+        projectCount={state.canvases.length}
+        focusWorkspace={focusWorkspace}
+        setIsSearchOpen={setIsSearchOpen}
+        setWorkspaceSurface={setWorkspaceSurface}
+        setIsChatOpen={setIsChatOpen}
+        openProfileSurface={openProfileSurface}
+        onShowRecharge={() => setShowRechargeModal(true)}
+        activeEntryId={mobileActiveResultId}
+        activeSourceImage={activeSourceImage}
+        onEntryOpen={handleMobileResultOpen}
+        onPreviewImage={handleOpenPreview}
+        onUseResultAsSource={handleMobileUseImageAsSource}
+        onPartialRedraw={handleMobileResultPartialRedraw}
+        onDownloadEntry={handleMobileResultDownload}
+        onDeleteImage={deleteImageNode}
+        onEditEcommerceTask={handleMobileEditEcommerceTask}
+        onConfirmEcommerceDesktop={handleMobileConfirmEcommerceDesktop}
+        onGenerateEcommerceMobile={handleMobileGenerateEcommerceMobile}
+        onToggleEcommerceSelected={handleMobileToggleEcommerceSelected}
+        promptBarProps={mobilePromptBarProps}
+        overlays={workspacePanels}
+      />
 
       {/* Main Infinite Canvas - 仅在非手机端显示 */}
       {!isMobile && (
@@ -11181,7 +10342,14 @@ ${slideLayerXml.join('\n')}
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
         cardPositions={[
-          ...(activeCanvas?.promptNodes.map(n => n.position) || []),
+          ...(activeCanvas?.promptNodes
+            .filter((n) => !n.hiddenInCanvas)
+            .filter((n) => !(
+              n.mode === GenerationMode.ECOMMERCE
+              && n.ecommerce?.frameworkId
+              && n.ecommerce.kind !== 'framework'
+            ))
+            .map(n => n.position) || []),
           ...(activeCanvas?.imageNodes.map(n => n.position) || [])
         ]}
         onCanvasClick={() => {
@@ -11343,8 +10511,9 @@ ${slideLayerXml.join('\n')}
             if (!pn.sourceImageId) return null;
             const sourceNode = imageNodesById.get(pn.sourceImageId);
             if (!sourceNode) return null;
-            const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
-            const promptPosition = resolveLivePromptPosition(pn) ?? pn.position;
+            const sourcePosition = resolveConnectorRenderPosition(sourceNode.id, sourceNode.position);
+            const promptPosition = resolveConnectorRenderPosition(pn.id, pn.position);
+            if (!sourcePosition || !promptPosition) return null;
 
             // Source: Image Bottom Center (+5000 offset)
             const startX = sourcePosition.x + 5000;
@@ -11398,29 +10567,14 @@ ${slideLayerXml.join('\n')}
 
                 {/* Disconnect Button - Visible on Hover */}
                 {showConnectorButtons && (
-                  <foreignObject
-                    x={btnX - 12}
-                    y={btnY - 12}
-                    width={24}
-                    height={24}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    style={{ pointerEvents: 'auto' }}
-                  >
-                  <div
-                    className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
-                    style={{ backgroundColor: 'var(--bg-secondary)' }}
+                  <ConnectorDisconnectButton
+                    x={btnX}
+                    y={btnY}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDisconnectPrompt(pn.id);
                     }}
-                    title="断开连接"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </div>
-                  </foreignObject>
+                  />
                 )}
               </g>
             );
@@ -11432,7 +10586,8 @@ ${slideLayerXml.join('\n')}
             if (hasDraftFollowup) return null;
             const sourceNode = imageNodesById.get(activeSourceImage);
             if (!sourceNode) return null;
-            const sourcePosition = resolveLiveImagePosition(sourceNode) ?? sourceNode.position;
+            const sourcePosition = resolveConnectorRenderPosition(sourceNode.id, sourceNode.position);
+            if (!sourcePosition) return null;
 
             // Position + 5000 Offset
             const startX = sourcePosition.x + 5000;
@@ -11472,30 +10627,15 @@ ${slideLayerXml.join('\n')}
                 <circle cx={endX} cy={endY} r={connectorDotEnd} fill={baseColor} opacity="0.5" />
 
                 {showConnectorButtons && (
-                  <foreignObject
-                    x={btnX - 12}
-                    y={btnY - 12}
-                    width={24}
-                    height={24}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    style={{ pointerEvents: 'auto' }}
-                  >
-                  <div
-                    className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
-                    style={{ backgroundColor: 'var(--bg-secondary)' }}
+                  <ConnectorDisconnectButton
+                    x={btnX}
+                    y={btnY}
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveSourceImage(null);
                       setConfig(prev => ({ ...prev, referenceImages: [] }));
                     }}
-                    title="断开连接"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </div>
-                  </foreignObject>
+                  />
                 )}
               </g>
             );
@@ -11503,21 +10643,31 @@ ${slideLayerXml.join('\n')}
 
           {/* C. Workflow Utility Connections */}
           {(activeCanvas?.workflow?.edges || []).map((edge) => {
-            const targetNode = visibleWorkflowUtilityNodesById.get(edge.to);
+            const targetNode = connectorRenderWorkflowUtilityNodesById.get(edge.to);
             if (!targetNode) return null;
 
             const sourcePrompt = promptNodesById.get(edge.from);
             const sourceImage = imageNodesById.get(edge.from);
-            const sourceUtility = workflowUtilityNodesById.get(edge.from);
+            const sourceUtility = connectorRenderWorkflowUtilityNodesById.get(edge.from)
+              ?? workflowUtilityNodesById.get(edge.from);
             if (!sourcePrompt && !sourceImage && !sourceUtility) return null;
-            const sourcePromptPosition = resolveLivePromptPosition(sourcePrompt);
-            const sourceImagePosition = resolveLiveImagePosition(sourceImage);
+            const sourcePromptPosition = sourcePrompt
+              ? resolveConnectorRenderPosition(sourcePrompt.id, sourcePrompt.position)
+              : null;
+            const sourceImagePosition = sourceImage
+              ? resolveConnectorRenderPosition(sourceImage.id, sourceImage.position)
+              : null;
+            const sourceUtilityPosition = sourceUtility
+              ? resolveConnectorRenderPosition(sourceUtility.id, sourceUtility.position)
+              : null;
+            const targetPosition = resolveConnectorRenderPosition(targetNode.id, targetNode.position);
+            if (!targetPosition) return null;
 
-            const startX = (sourcePromptPosition?.x || sourceImagePosition?.x || sourceUtility?.position.x || 0) + 5000;
-            const startY = (sourcePromptPosition?.y || sourceImagePosition?.y || sourceUtility?.position.y || 0) + 5000;
+            const startX = (sourcePromptPosition?.x || sourceImagePosition?.x || sourceUtilityPosition?.x || 0) + 5000;
+            const startY = (sourcePromptPosition?.y || sourceImagePosition?.y || sourceUtilityPosition?.y || 0) + 5000;
             const targetHeight = targetNode.height || 176;
-            const endX = targetNode.position.x + 5000;
-            const endY = (targetNode.position.y - targetHeight) + 5000;
+            const endX = targetPosition.x + 5000;
+            const endY = (targetPosition.y - targetHeight) + 5000;
             const d = buildSoftConnectorPath(startX, startY, endX, endY);
             const strokeColor = targetNode.kind === 'preview'
               ? '#38bdf8'
@@ -11598,14 +10748,7 @@ ${slideLayerXml.join('\n')}
               isSelected={selectedNodeIds.includes(node.id)}
               highlighted={highlightedId === node.id}
               onBringToFront={() => bringNodesToFront([node.id])}
-              onSelect={() => {
-                selectNodes([node.id], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-                // Right click opens the selection menu centered on the current node bounds.
-                if ((window.event as any)?.button === 2) {
-                  const pos = getSelectionScreenCenter([node.id]);
-                  if (pos) setSelectionMenuPosition(pos);
-                }
-              }}
+              onSelect={() => selectNodeFromCurrentEvent(node.id)}
               onClickPrompt={handlePromptClick}
               onConnectStart={handleConnectStart}
               zoomScale={canvasTransform.scale}
@@ -11615,32 +10758,7 @@ ${slideLayerXml.join('\n')}
                 ? activeCanvas?.imageNodes.find(n => n.id === node.sourceImageId)?.position
                 : undefined
               }
-              onCancel={handleCancelGeneration}
-              onRetry={handleRetryNode}
-              onEditPptDeck={handleOpenPptDeckEditor}
-              onExportPpt={handleExportPptPackageEditable}
-              onExportPptx={handleExportPptxEditable}
-              onRetryPptPage={handleRetryPptSinglePage}
-              onExportPptPage={handleExportPptSinglePage}
-              onToggleEcommerceSelected={handleToggleEcommerceSelected}
-              onSetEcommerceGroupSelection={handleSetEcommerceGroupSelection}
-              onGenerateEcommerceNode={handleGenerateEcommerceNode}
-              onGenerateEcommerceGroup={handleGenerateEcommerceGroup}
-              onConfirmEcommerceDesktop={handleConfirmEcommerceDesktop}
-              onRetryEcommerceModule={handleRetryEcommerceModule}
-              onExportEcommerceGroup={handleExportEcommerceGroup}
-              activeEcommerceTaskState={ecommerceState.activeTaskState}
-              onActivateEcommerceTask={(promptNode) => { void handlePromptClick(promptNode, false); }}
-              onEcommerceTaskStateChange={handleChangeEcommerceTaskState}
-              ecommerceSlotState={resolveEcommerceSlotState(node)}
-              onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistoryForNode}
-              ioTrace={getNodeIoTrace(node.id)}
-              onOpenStorageSettings={() => {
-                openSettingsSurfaceTracked('storage-settings');
-              }}
-              onDelete={deletePromptNode}
-              onDisconnect={handleDisconnectPrompt}
-              onUpdateNode={updatePromptNode}
+              {...getSharedPromptNodeActionProps(node)}
               onHeightChange={(id, height) => {
                 const latestNode = activeCanvas?.promptNodes.find(n => n.id === id);
                 const targetNode = latestNode || node;
@@ -11688,60 +10806,16 @@ ${slideLayerXml.join('\n')}
             {(visibleChildImagesByPromptId.get(node.id) || []).map(childNode => (
               <ImageNode
                 key={childNode.id}
-                image={childNode}
+                {...getSharedImageNodeProps(childNode)}
                 detailLevel="full"
                 groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childNode.zIndex ?? 0}
                 stackZIndexOverride={promptGroupStackZIndexById.get(node.id)}
                 position={childNode.position}
-                onPositionChange={updateImageNodePosition}
                 highlighted={highlightedId === childNode.id}
-                onDimensionsUpdate={updateImageNodeDisplayMeta}
-                onUpdate={updateImageNode}
-                onDelete={deleteImageNode}
-                onConnectEnd={handleConnectEnd}
-                onClick={handleImageClick}
                 onBringToFront={() => bringNodesToFront([childNode.id])}
-                isActive={childNode.id === activeSourceImage}
                 isSelected={selectedNodeIds.includes(childNode.id)}
-                onSelect={() => {
-                  selectNodes([childNode.id], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-                  if ((window.event as any)?.button === 2) {
-                    const pos = getSelectionScreenCenter([childNode.id]);
-                    if (pos) setSelectionMenuPosition(pos);
-                  }
-                }}
-                zoomScale={canvasTransform.scale}
-                isMobile={isMobile}
-                onPreview={handleOpenPreview}
-                onPreviewPptStack={handleOpenPptStackPreview}
-                onDownloadPptComposite={handleDownloadPptComposite}
-                isCanvasTransforming={isCanvasTransforming}
-                isNew={(nowTimestamp || Date.now()) - (childNode.timestamp || 0) < 10000}
-                canvasTransform={canvasTransform}
-                onDragDelta={(delta, sourceNodeId) => {
-                  if (!sourceNodeId) return;
-
-                  const isSubCard = childNode.parentPromptId && activeCanvas?.promptNodes.some(p => p.id === childNode.parentPromptId);
-                  const expandedSelectedIds = Array.from(new Set(
-                    selectedNodeIds.flatMap((selectedId) => {
-                      const selectedPrompt = activeCanvas?.promptNodes.find(p => p.id === selectedId);
-                      if (!selectedPrompt) return [selectedId];
-
-                      return [
-                        selectedId,
-                        ...(selectedPrompt.childImageIds || []).filter((id): id is string => !!id),
-                      ];
-                    })
-                  ));
-
-                  if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedIds.length > 0) {
-                    moveSelectedNodes(delta, expandedSelectedIds);
-                  } else if (isSubCard) {
-                    moveSelectedNodes(delta, sourceNodeId);
-                  } else {
-                    moveSelectedNodes(delta, sourceNodeId);
-                  }
-                }}
+                onSelect={() => selectNodeFromCurrentEvent(childNode.id)}
+                onDragDelta={handleLegacyImageRelativeDrag}
               />
             ))}
           </React.Fragment>
@@ -11749,7 +10823,7 @@ ${slideLayerXml.join('\n')}
         {false && standaloneVisibleImageNodes.map(node => (
           <ImageNode
             key={node.id}
-            image={node}
+            {...getSharedImageNodeProps(node)}
             detailLevel={canvasPerformanceProfile.cardDetailLevel}
             groupLayerZIndex={node.parentPromptId
               ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
@@ -11758,58 +10832,7 @@ ${slideLayerXml.join('\n')}
               ? promptGroupStackZIndexById.get(node.parentPromptId)
               : standaloneImageStackZIndexById.get(node.id)}
             position={node.position}
-            onPositionChange={updateImageNodePosition}
-            highlighted={highlightedId === node.id}
-            onDimensionsUpdate={updateImageNodeDisplayMeta}
-            onUpdate={updateImageNode} // 🎯
-            onDelete={deleteImageNode}
-            onConnectEnd={handleConnectEnd}
-            onClick={handleImageClick}
-            onBringToFront={() => bringNodesToFront([node.id])}
-            isActive={node.id === activeSourceImage}
-            isSelected={selectedNodeIds.includes(node.id)}
-            onSelect={() => {
-              selectNodes([node.id], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
-              // 🎯 Right Click triggers Selection Menu centered on node bounds
-              if ((window.event as any)?.button === 2) {
-                const pos = getSelectionScreenCenter([node.id]);
-                if (pos) setSelectionMenuPosition(pos);
-              }
-            }}
-            zoomScale={canvasTransform.scale}
-            isMobile={isMobile}
-            onPreview={handleOpenPreview}
-            onPreviewPptStack={handleOpenPptStackPreview}
-            onDownloadPptComposite={handleDownloadPptComposite}
-            isCanvasTransforming={isCanvasTransforming}
-            // 🎯 [Optimization] Identify if the node was created in the last 10 seconds
-            isNew={(nowTimestamp || Date.now()) - (node.timestamp || 0) < 10000}
-            canvasTransform={canvasTransform} // 🎯 Pass Transform for Animation Calculation
-            onDragDelta={(delta, sourceNodeId) => {
-              if (!sourceNodeId) return;
-
-              const isSubCard = node.parentPromptId && activeCanvas?.promptNodes.some(p => p.id === node.parentPromptId);
-              const expandedSelectedIds = Array.from(new Set(
-                selectedNodeIds.flatMap((selectedId) => {
-                  const selectedPrompt = activeCanvas?.promptNodes.find(p => p.id === selectedId);
-                  if (!selectedPrompt) return [selectedId];
-
-                  return [
-                    selectedId,
-                    ...(selectedPrompt.childImageIds || []).filter((id): id is string => !!id),
-                  ];
-                })
-              ));
-
-              if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedIds.length > 0) {
-                moveSelectedNodes(delta, expandedSelectedIds);
-              } else if (isSubCard) {
-                moveSelectedNodes(delta, sourceNodeId);
-              } else {
-                moveSelectedNodes(delta, sourceNodeId);
-              }
-              // 🎯 [Fix] Force re-render for real-time connection line updates
-            }} // 🎯 Enable Safe Relative Drag
+            onDragDelta={handleLegacyImageRelativeDrag}
           />
         ))}
 
@@ -11822,174 +10845,15 @@ ${slideLayerXml.join('\n')}
 
 
       {!isMobile && (
-        <div className="contents">
-          <PromptBarCompat
-            config={config}
-            setConfig={setConfig}
-            isGenerating={isGenerating}
-            onUiBusyChange={setPromptBarUiBusy}
-            onGenerate={handleGenerate}
-            onCancel={handleCancelGeneration}
-            onFilesDrop={handleFilesDrop}
-            activeSourceImage={activeSourceImage ?
-              (activeCanvas?.imageNodes.find(n => n.id === activeSourceImage) ? {
-                id: activeSourceImage,
-                url: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.url,
-                prompt: activeCanvas.imageNodes.find(n => n.id === activeSourceImage)!.prompt
-              } : null) : null
-            }
-            onClearSource={handleClearSource}
-            isMobile={isMobile}
-            sendLabel={config.mode === GenerationMode.ECOMMERCE ? '确认' : '发送'}
-            onOpenSettings={(view) => {
-              openSettingsSurfaceTracked(view || 'api-management');
-              handleHideMobileNav();
-            }}
-            onInteract={handleShowMobileNav}
-            onFocus={() => {
-              console.log('[PromptBar] onFocus - 设置isPromptFocused=true');
-              setIsPromptFocused(true);
-            }}
-            onBlur={() => {
-              console.log('[PromptBar] onBlur - 设置isPromptFocused=false');
-              setIsPromptFocused(false);
-              setTimeout(() => handleShowMobileNav(), 0);
-            }}
-            ecommerceRequirementFileName={ecommerceState.requirementFile?.name}
-            ecommerceProductFileCount={ecommerceState.productFiles.length}
-            ecommerceExtraReferenceCount={ecommerceState.extraReferenceFiles.length}
-             ecommerceProductFiles={ecommerceState.productFiles}
-             ecommerceExtraReferenceFiles={ecommerceState.extraReferenceFiles}
-             ecommerceItemReferenceFiles={ecommerceState.itemReferenceFiles}
-             ecommerceAnalysis={ecommerceState.analysis}
-            ecommerceSelection={ecommerceState.selectedItems}
-            ecommerceTaskStates={ecommerceState.taskStates}
-             ecommerceGroupSlots={ecommerceState.groupSlots}
-             ecommerceActiveTaskState={ecommerceState.activeTaskState}
-             ecommerceSheetSettings={ecommerceState.sheetSettings}
-             ecommerceAnalysisConfirmed={ecommerceState.analysisConfirmed}
-             ecommerceConfirmingAnalysis={ecommerceState.isConfirmingAnalysis}
-             ecommerceActiveGroupSheet={ecommerceState.activeGroupSheet}
-             ecommerceAnalyzing={ecommerceState.isAnalyzing}
-            onPickEcommerceRequirementFile={handlePickEcommerceRequirementFile}
-            onPickEcommerceProductFiles={handlePickEcommerceProductFiles}
-            onPickEcommerceExtraReferenceFiles={handlePickEcommerceExtraReferenceFiles}
-            onClearEcommerceRequirementFile={handleClearEcommerceRequirementFile}
-             onRemoveEcommerceProductFile={handleRemoveEcommerceProductFile}
-             onRemoveEcommerceExtraReferenceFile={handleRemoveEcommerceExtraReferenceFile}
-             onPickEcommerceItemReferenceFiles={handlePickEcommerceItemReferenceFiles}
-             onRemoveEcommerceItemReferenceFile={handleRemoveEcommerceItemReferenceFile}
-             onResetEcommerceAnalysis={handleResetEcommerceAnalysis}
-            onConfirmEcommerceAnalysis={handleConfirmEcommerceAnalysis}
-            onToggleEcommerceSelection={handleToggleEcommerceAnalysisSelection}
-            onActivateEcommerceGroupSheet={handleActivateEcommerceGroupSheet}
-            onActivateEcommerceTaskBySourceKey={handleActivateEcommerceTaskBySourceKey}
-            onUpdateEcommerceSheetSetting={handleUpdateEcommerceSheetSetting}
-            onChangeEcommerceTaskState={handleChangeEcommerceTaskState}
-            onPreviewEcommerceSlotHistory={handlePreviewEcommerceSlotHistory}
-            ecommerceRatioOverride={ecommerceRatioOverride}
-            onAnalyzeEcommerceFile={handleAnalyzeEcommerceRequirement}
-          />
-        </div>
+        <AppPromptComposer
+          variant="desktop"
+          promptBarProps={desktopPromptBarProps}
+        />
       )}
 
       {!isMobile && workspacePanels}
 
-      <GlobalModals>
-      {/* Legacy KeyManagerModal removed - integrated into UserProfileModal */}
-
-      {/* User Profile Modal (Unified) */}
-      {/* Modals */}
-      {isTagModalOpen && (
-        <Suspense fallback={null}>
-          <TagInputModal
-            isOpen={isTagModalOpen}
-            onClose={() => setIsTagModalOpen(false)}
-            initialTags={initialTags}
-            onSave={handleSaveTags}
-            maxTags={tagLimits.maxTags}
-            maxChars={tagLimits.maxChars}
-            allTags={allTags}
-            inheritedTags={inheritedTags}
-            isSubCard={isSubCard}
-          />
-        </Suspense>
-      )}
-      {showProfileModal && (
-        <Suspense fallback={null}>
-          <UserProfileModal
-            isOpen={showProfileModal}
-            onClose={() => setShowProfileModal(false)}
-            user={user}
-            onSignOut={signOut}
-            initialView={profileInitialView}
-            isMobile={isMobile}
-          />
-        </Suspense>
-      )}
-
-      {/* Settings Panel (Dashboard, API Channels, Cost, Logs) */}
-      {showSettingsPanel && (
-        <Suspense fallback={null}>
-          <SettingsPanel
-            key={`${settingsPanelSessionKey}-${settingsInitialView}-${settingsInitialSupplier?.id || 'none'}`}
-            isOpen={showSettingsPanel}
-            onClose={() => {
-              setShowSettingsPanel(false);
-              setSettingsInitialSupplier(null);
-            }}
-            initialView={settingsInitialView}
-            initialSupplier={settingsInitialSupplier}
-          />
-        </Suspense>
-      )}
-
-      {/* Storage Selection Modal (Post-Login) */}
-      {showStorageModal && (
-        <Suspense fallback={null}>
-          <StorageSelectionModal
-            isOpen={showStorageModal}
-            onComplete={() => {
-              setShowStorageModal(false);
-              setIsStorageChecked(true);
-              if (!keyManager.hasValidKeys()) {
-                openSettingsSurfaceTracked('api-management');
-              }
-            }}
-          />
-        </Suspense>
-      )}
-
-
-
-
-
-
-
-      {/* Project Manager (Replaces Canvas Manager) */}
-      {!isMobile && (
-        <ProjectManager
-          onSearch={() => {
-            focusWorkspace();
-            setIsSearchOpen(true);
-          }}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
-          isMobile={isMobile}
-          onFitToAll={handleFitToAll}
-          onResetView={handleResetView}
-          onToggleGrid={handleToggleGrid}
-          showGrid={showGrid}
-          onAutoArrange={handleAutoArrange}
-          onToggleChat={toggleChatPanel}
-          isChatOpen={isChatOpen}
-          workflowTemplates={WORKFLOW_TEMPLATES}
-          onApplyWorkflowTemplate={(templateId) => {
-            void handleApplyWorkflowTemplate(templateId);
-          }}
-          onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
-        />
-      )}
+      <AppGlobalModals {...globalModalsProps} />
 
 
 
@@ -12038,169 +10902,6 @@ ${slideLayerXml.join('\n')}
       })()} */}
 
 
-
-      {/* Global lightbox and search panel (search sits near the bottom, the lightbox stays on top) */}
-      {previewImages && (
-        <Suspense fallback={null}>
-          <GlobalLightbox
-            images={previewImages}
-            initialIndex={previewInitialIndex}
-            onClose={() => setPreviewImages(null)}
-            onEditPptDeck={handleOpenPptDeckEditorFromImage}
-            onEditText={handleEditPptTextFromLightbox}
-            onDownloadPptComposite={handleDownloadPptComposite}
-            onPartialRedraw={handlePartialRedrawRequest}
-          />
-        </Suspense>
-      )}
-
-      {pptStackPreview && (
-        <PptStackPreviewModal
-          images={pptStackPreview.images}
-          initialIndex={pptStackPreview.initialIndex}
-          onClose={() => setPptStackPreview(null)}
-        />
-      )}
-
-      {pptDeckEditor && (() => {
-        const bundle = getOrderedPptNodeBundle(pptDeckEditor.nodeId);
-        if (!bundle) return null;
-
-        return (
-          <Suspense fallback={null}>
-            <PptDeckEditorModal
-              promptNode={bundle.promptNode}
-              images={bundle.images}
-              initialIndex={pptDeckEditor.initialIndex}
-              onClose={() => setPptDeckEditor(null)}
-              onSave={(pages) => handleSavePptEditablePages(bundle.promptNode.id, pages)}
-            />
-          </Suspense>
-        );
-      })()}
-
-      {isSearchOpen && (
-        <Suspense fallback={null}>
-          <SearchPalette
-            isOpen={isSearchOpen}
-            onClose={() => setIsSearchOpen(false)}
-            promptNodes={activeCanvas?.promptNodes || []}
-            groups={activeCanvas?.groups || []}
-            onNavigate={handleNavigateToNode}
-            onMultiSelectConfirm={handleMultiSelectConfirm}
-          />
-        </Suspense>
-      )}
-
-      {/* Navigation and Overlays Removed for Mobile Bottom Dock Consistency */}
-      {showTutorial && (
-        <Suspense fallback={null}>
-          <TutorialOverlay
-            onComplete={() => {
-              setShowTutorial(false);
-              localStorage.setItem('kk_tutorial_seen', 'true');
-            }}
-          />
-        </Suspense>
-      )}
-
-
-      {/* AI chat button - fixed in the bottom-right corner */}
-      {/* AI chat button - fixed in the bottom-right corner */}
-      {!isMobile ? (
-        <div
-          className="absolute bottom-6 z-50 hidden transition-all duration-300 md:block"
-          style={{ right: isChatOpen ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))` : '48px' }}
-        >
-          <button
-            id="chat-trigger-button"
-            className="ai-chat-btn relative flex aspect-square h-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-transparent p-2 text-xs transition-all duration-300 hover:scale-110 hover:shadow-[0_0_35px] hover:shadow-blue-400/80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            onClick={() => setIsChatOpen((prev) => !prev)}
-          >
-            <div className="uiverse visible absolute left-0 top-0 z-[-1] h-full w-full">
-              <div className="circle circle-12"></div>
-              <div className="circle circle-11"></div>
-              <div className="circle circle-10"></div>
-              <div className="circle circle-9"></div>
-              <div className="circle circle-8"></div>
-              <div className="circle circle-7"></div>
-              <div className="circle circle-6"></div>
-              <div className="circle circle-5"></div>
-              <div className="circle circle-4"></div>
-              <div className="circle circle-3"></div>
-              <div className="circle circle-2"></div>
-              <div className="circle circle-1"></div>
-            </div>
-            <div className="absolute inset-0 z-[1] rounded-full bg-blue-500/15"></div>
-            <svg
-              className="ai-chat-icon relative z-10"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="rgba(255, 255, 255, 0.95)"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5))' }}
-            >
-              <path d="M11.6061 4.23218C11.6838 3.79153 12.3162 3.79153 12.3939 4.23218L12.5268 4.98521C13.1111 8.29642 15.7036 10.8889 19.0148 11.4732L19.7678 11.6061C20.2085 11.6838 20.2085 12.3162 19.7678 12.3939L19.0148 12.5268C15.7036 13.1111 13.1111 15.7036 12.5268 19.0148L12.3939 19.7678C12.3162 20.2085 11.6838 20.2085 11.6061 19.7678L11.4732 19.0148C10.8889 15.7036 8.29642 13.1111 4.98521 12.5268L4.23218 12.3939C3.79153 12.3162 3.79153 11.6838 4.23218 11.6061L4.98521 11.4732C8.29642 10.8889 10.8889 8.29642 11.4732 4.98521L11.6061 4.23218Z" fill="rgba(255, 255, 255, 0.95)"></path>
-            </svg>
-            <style>{`
-              .ai-chat-icon {
-                transition: transform 0.7s ease-out;
-              }
-              .ai-chat-btn:hover .ai-chat-icon {
-                transform: rotate(90deg);
-              }
-              .ai-chat-btn:hover .uiverse .circle {
-                animation-duration: calc(var(--duration) / 3) !important;
-              }
-            `}</style>
-          </button>
-        </div>
-      ) : null}
-
-      {/* 🎯 迁移弹窗 */}
-      {showMigrateModal && (
-        <Suspense fallback={null}>
-          <MigrateModal
-            isOpen={showMigrateModal}
-            onClose={() => setShowMigrateModal(false)}
-            canvases={state.canvases}
-            currentCanvasId={state.activeCanvasId}
-            selectedCount={selectedNodeIds.length}
-            onMigrate={(targetCanvasId) => {
-              if (targetCanvasId === '__new__') {
-                const newCanvasId = createCanvas();
-                if (newCanvasId) {
-                  const originalCanvasId = state.activeCanvasId;
-                  switchCanvas(originalCanvasId);
-                  setTimeout(() => {
-                    migrateNodes(selectedNodeIds, newCanvasId);
-                    switchCanvas(newCanvasId);
-
-                    import('./services/system/notificationService').then(({ notify }) => {
-                      notify.success('迁移成功', `已创建新项目并迁移 ${selectedNodeIds.length} 个项目`);
-                    });
-                  }, 50);
-                }
-              } else {
-                migrateNodes(selectedNodeIds, targetCanvasId);
-              }
-
-              setShowMigrateModal(false);
-              clearSelection();
-            }}
-          />
-        </Suspense>
-      )}
-
-      {/* Global recharge modal */}
-      {billingUiEnabled && showRechargeModal && (
-        <Suspense fallback={null}>
-          <RechargeModal />
-        </Suspense>
-      )}
-      </GlobalModals>
     </WorkspaceShell>
   );
 };
@@ -12225,6 +10926,7 @@ const App: React.FC = () => {
             <AuthenticatedAppShell
               showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
               onExitCostEstimation={() => setShowCostEstimation(false)}
+              showStartupBanner={rootMode === 'workspace'}
               AppContentComponent={rootMode === 'settings' ? SettingsPageRoot : AppContent}
             />
           </CanvasProvider>
@@ -12236,7 +10938,3 @@ const App: React.FC = () => {
 
 export default App;
 // Force Rebuild
-
-
-
-

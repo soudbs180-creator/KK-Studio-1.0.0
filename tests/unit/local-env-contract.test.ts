@@ -10,9 +10,15 @@ const helperModuleUrl = pathToFileURL(path.join(ROOT_DIR, "scripts", "lib", "env
 const envHelper = await import(helperModuleUrl);
 
 const trackedEnvKeys = [
+  "VITE_KK_API_BASE_URL",
   "VITE_SUPABASE_URL",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "DATABASE_URL",
+  "PGHOST",
+  "PGDATABASE",
+  "PGUSER",
+  "USER_API_ENCRYPTION_SECRET",
 ];
 
 const originalEnv = new Map(trackedEnvKeys.map((key) => [key, process.env[key]]));
@@ -32,7 +38,7 @@ after(() => {
   restoreTrackedEnv();
 });
 
-test("local env contract ignores legacy server env files for active API config", () => {
+test("local env contract hydrates VPS API config and ignores legacy Supabase env files", () => {
   restoreTrackedEnv();
   trackedEnvKeys.forEach((key) => {
     delete process.env[key];
@@ -45,17 +51,25 @@ test("local env contract ignores legacy server env files for active API config",
 
   fs.writeFileSync(
     path.join(tempRoot, ".env"),
-    "VITE_SUPABASE_URL=https://frontend-ref.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=root-secret\n",
+    [
+      "VITE_KK_API_BASE_URL=http://127.0.0.1:3001",
+      "VITE_SUPABASE_URL=https://frontend-ref.supabase.co",
+      "SUPABASE_SERVICE_ROLE_KEY=root-secret",
+    ].join("\n"),
     "utf8",
   );
   fs.writeFileSync(
     path.join(tempRoot, "apps", "api", ".env.local"),
-    "SUPABASE_URL=https://frontend-ref.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=api-secret\n",
+    [
+      "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
+      "USER_API_ENCRYPTION_SECRET=api-encryption-secret",
+      "SUPABASE_URL=https://ignored-api-ref.supabase.co",
+    ].join("\n"),
     "utf8",
   );
   fs.writeFileSync(
     path.join(tempRoot, "server", ".env"),
-    "SUPABASE_SERVICE_ROLE_KEY=server-only-secret\n",
+    "DATABASE_URL=postgres://legacy:secret@127.0.0.1:5432/legacy\n",
     "utf8",
   );
   fs.writeFileSync(
@@ -70,7 +84,6 @@ test("local env contract ignores legacy server env files for active API config",
     [
       ".env",
       path.join("apps", "api", ".env.local"),
-      path.join("supabase", ".env.functions.local"),
     ],
   );
   assert.deepEqual(
@@ -79,20 +92,15 @@ test("local env contract ignores legacy server env files for active API config",
   );
 
   envHelper.applyPrimaryEnvToProcess(tempRoot, { preserveExisting: false });
-  assert.equal(process.env.VITE_SUPABASE_URL, "https://frontend-ref.supabase.co");
-  assert.equal(process.env.SUPABASE_URL, "https://frontend-ref.supabase.co");
-  assert.equal(process.env.SUPABASE_SERVICE_ROLE_KEY, "api-secret");
-
-  const alignment = envHelper.compareSupabaseProjectRefs(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_URL,
-  );
-  assert.equal(alignment.publicProjectRef, "frontend-ref");
-  assert.equal(alignment.serverProjectRef, "frontend-ref");
-  assert.equal(alignment.matches, true);
+  assert.equal(process.env.VITE_KK_API_BASE_URL, "http://127.0.0.1:3001");
+  assert.equal(process.env.DATABASE_URL, "postgres://kk:secret@127.0.0.1:5432/kkstudio");
+  assert.equal(process.env.USER_API_ENCRYPTION_SECRET, "api-encryption-secret");
+  assert.equal(process.env.VITE_SUPABASE_URL, undefined);
+  assert.equal(process.env.SUPABASE_URL, undefined);
+  assert.equal(process.env.SUPABASE_SERVICE_ROLE_KEY, undefined);
 });
 
-test("root frontend env files do not hydrate server-only API secrets", () => {
+test("root frontend env files do not hydrate server-only API secrets or legacy Supabase env", () => {
   restoreTrackedEnv();
   trackedEnvKeys.forEach((key) => {
     delete process.env[key];
@@ -104,35 +112,42 @@ test("root frontend env files do not hydrate server-only API secrets", () => {
   fs.writeFileSync(
     path.join(tempRoot, ".env"),
     [
+      "VITE_KK_API_BASE_URL=http://127.0.0.1:3001",
+      "DATABASE_URL=postgres://root:secret@127.0.0.1:5432/wrong",
+      "USER_API_ENCRYPTION_SECRET=root-secret",
       "VITE_SUPABASE_URL=https://frontend-ref.supabase.co",
       "SUPABASE_URL=https://wrong-root-ref.supabase.co",
-      "SUPABASE_SERVICE_ROLE_KEY=root-secret",
     ].join("\n"),
     "utf8",
   );
   fs.writeFileSync(
     path.join(tempRoot, "apps", "api", ".env.local"),
-    "SUPABASE_URL=https://frontend-ref.supabase.co\n",
+    [
+      "DATABASE_URL=postgres://kk:secret@127.0.0.1:5432/kkstudio",
+      "USER_API_ENCRYPTION_SECRET=api-secret",
+    ].join("\n"),
     "utf8",
   );
 
   const snapshots = envHelper.collectEnvSnapshots(tempRoot);
   const misplacedRootValues = envHelper.findSnapshotEntries(snapshots.frontendSnapshots, [
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY",
+    "DATABASE_URL",
+    "USER_API_ENCRYPTION_SECRET",
   ]);
   assert.deepEqual(
     misplacedRootValues.map((entry) => `${entry.key}:${entry.source}`),
     [
-      "SUPABASE_URL:.env",
-      "SUPABASE_SERVICE_ROLE_KEY:.env",
+      "DATABASE_URL:.env",
+      "USER_API_ENCRYPTION_SECRET:.env",
     ],
   );
 
   envHelper.applyPrimaryEnvToProcess(tempRoot, { preserveExisting: false });
-  assert.equal(process.env.VITE_SUPABASE_URL, "https://frontend-ref.supabase.co");
-  assert.equal(process.env.SUPABASE_URL, "https://frontend-ref.supabase.co");
-  assert.equal(process.env.SUPABASE_SERVICE_ROLE_KEY, undefined);
+  assert.equal(process.env.VITE_KK_API_BASE_URL, "http://127.0.0.1:3001");
+  assert.equal(process.env.DATABASE_URL, "postgres://kk:secret@127.0.0.1:5432/kkstudio");
+  assert.equal(process.env.USER_API_ENCRYPTION_SECRET, "api-secret");
+  assert.equal(process.env.VITE_SUPABASE_URL, undefined);
+  assert.equal(process.env.SUPABASE_URL, undefined);
 });
 
 test("runtime env helper keeps Vite public vars on explicit import.meta.env keys", () => {
@@ -141,8 +156,9 @@ test("runtime env helper keeps Vite public vars on explicit import.meta.env keys
     "utf8",
   );
 
-  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_URL/);
-  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_KK_API_BASE_URL/);
+  assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_URL/);
+  assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
   assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_TURNSTILE_SITE_KEY/);
   assert.doesNotMatch(runtimeEnvSource, /const meta = import\.meta/);
   assert.doesNotMatch(runtimeEnvSource, /meta\.env;\s*$/m);

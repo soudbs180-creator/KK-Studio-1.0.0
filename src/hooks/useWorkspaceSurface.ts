@@ -3,6 +3,7 @@
 import type { Supplier } from '../services/billing/supplierService';
 import type { AppSurface, MobilePrimaryTab, WorkspacePanel } from '../types';
 import type { UserProfileView } from '../components/modals/UserProfileModal';
+import { isCompactResponsiveSurface, resolveResponsiveSurface } from '../utils/responsiveSurface';
 
 export type SettingsSurfaceView =
   | 'dashboard'
@@ -33,7 +34,8 @@ export function useWorkspaceSurface({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatSidebarWidth, setChatSidebarWidth] = useState(420);
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [responsiveSurface, setResponsiveSurface] = useState(() => resolveResponsiveSurface(window.innerWidth));
+  const isMobile = isCompactResponsiveSurface(responsiveSurface);
   const [workspaceSurface, setWorkspaceSurface] = useState<Extract<AppSurface, 'workspace' | 'library'>>('workspace');
 
   const activeAppSurface: AppSurface = showSettingsPanel
@@ -60,9 +62,9 @@ export function useWorkspaceSurface({
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (!mobile && !isSidebarOpen) {
+      const nextSurface = resolveResponsiveSurface(window.innerWidth);
+      setResponsiveSurface(nextSurface);
+      if (!isCompactResponsiveSurface(nextSurface) && !isSidebarOpen) {
         setIsSidebarOpen(true);
       }
     };

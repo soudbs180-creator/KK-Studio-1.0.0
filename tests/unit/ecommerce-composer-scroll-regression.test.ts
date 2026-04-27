@@ -13,16 +13,28 @@ test('ecommerce review and workbench panels stay viewport-bound with inner scrol
   const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
   const desktopWorkbenchSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
-  assert.match(reviewPanelSource, /const reviewViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(70vh, 720px\)',\s*\};/);
+  assert.match(reviewPanelSource, /const reviewViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(calc\(100vh - 220px\), 720px\)',\s*\};/);
   assert.match(reviewPanelSource, /className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"/);
   assert.match(reviewPanelSource, /className="grid min-h-0 min-w-0 flex-1 gap-3 md:grid-cols-\[minmax\(0,0\.9fr\)_minmax\(0,1\.1fr\)\]"/);
   assert.match(reviewPanelSource, /className="flex min-h-0 min-w-0 flex-col overflow-hidden"/);
   assert.match(reviewPanelSource, /className="min-h-0 min-w-0 flex-1 overflow-y-auto custom-scrollbar pr-1"/);
   assert.match(reviewPanelSource, /className=\{compact \? 'space-y-3' : 'min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1'\}/);
 
-  assert.match(desktopWorkbenchSource, /const workbenchViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(70vh, 720px\)',\s*\};/);
+  assert.match(desktopWorkbenchSource, /const workbenchViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(calc\(100vh - 220px\), 720px\)',\s*\};/);
+  assert.match(desktopWorkbenchSource, /className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1"/);
   assert.match(desktopWorkbenchSource, /className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"/);
-  assert.match(desktopWorkbenchSource, /className="min-h-0 overflow-y-auto custom-scrollbar pr-1"/);
+  assert.match(desktopWorkbenchSource, /style=\{\{ \.\.\.sectionCardStyle, \.\.\.workbenchViewportStyle \}\}/);
+  assert.match(desktopWorkbenchSource, /className="mt-3 min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1"/);
+  assert.match(desktopWorkbenchSource, /className="mb-3 max-h-48 space-y-2 overflow-y-auto custom-scrollbar pr-1"/);
+});
+
+test('ecommerce review warnings render from deduped warning collections', () => {
+  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+
+  assert.match(reviewPanelSource, /const dedupedAnalysisWarnings = React\.useMemo\(\(\) => Array\.from\(new Set\(analysis\.reviewWarnings\)\), \[analysis\.reviewWarnings\]\);/);
+  assert.match(reviewPanelSource, /const dedupedItemWarnings = Array\.from\(new Set\(reviewItem\.warnings\)\);/);
+  assert.match(reviewPanelSource, /dedupedAnalysisWarnings\.slice\(0, 4\)\.map\(\(warning\) => \(/);
+  assert.match(reviewPanelSource, /dedupedItemWarnings\.map\(\(warning\) => \(/);
 });
 
 test('ecommerce task editor exposes a denser compact layout for constrained composer panels', () => {

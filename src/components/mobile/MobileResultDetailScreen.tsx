@@ -178,6 +178,8 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   ].filter(Boolean) as Array<{ label: string; value: string }>;
   const previewLabel = entry.hasOriginal ? '原图' : '无原图';
   const ecommerceRequirementText = normalizeText(ecommerceContinuation?.taskPrompt, fullPrompt);
+  const frameworkStatus = ecommerceContinuation?.frameworkStatus;
+  const showSecondaryActions = true;
 
   return (
     <section
@@ -279,6 +281,38 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             <div className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
               {ecommerceContinuation.stageDescription}
             </div>
+
+            {frameworkStatus ? (
+              <div className="mt-3 rounded-[18px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]/45 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                      Framework Queue
+                    </div>
+                    <div className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                      {ecommerceContinuation.frameworkLabel || 'Framework'}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] ${
+                      frameworkStatus.paused
+                        ? 'border-amber-400/30 bg-amber-500/10 text-amber-200'
+                        : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                    }`}
+                  >
+                    {frameworkStatus.paused ? 'Paused' : 'Running'}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-[var(--text-secondary)]">
+                  <span>Queued {frameworkStatus.queued}</span>
+                  <span>Running {frameworkStatus.running}</span>
+                  <span>Done {frameworkStatus.completed}</span>
+                  <span>Dispatch {frameworkStatus.dispatching}</span>
+                  <span>Failed {frameworkStatus.failed}</span>
+                  <span>Total {frameworkStatus.total}</span>
+                </div>
+              </div>
+            ) : null}
 
             {ecommerceContinuation.reviewWarnings.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -414,7 +448,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           />
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-2">
+        <div data-testid="mobile-result-secondary-actions" className="mt-2 grid grid-cols-3 gap-2">
           <ActionButton
             label={previewLabel}
             icon={<Eye size={15} />}

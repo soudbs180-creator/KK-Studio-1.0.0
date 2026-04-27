@@ -1,3 +1,5 @@
+import { shouldUseLegacyWebApiFallback } from "../api/kkApiClient";
+
 export const STORAGE_KEY = "kk_studio_key_manager";
 export const PROVIDERS_STORAGE_KEY = "kk_studio_third_party_providers";
 export const LEGACY_API_KEYS_STORAGE_KEY = "kk-api-keys-local";
@@ -8,6 +10,10 @@ export type ProviderStorageScope = "anonymous" | "user" | "cloud" | "none";
 
 export function isBrowserRuntime(): boolean {
     return typeof window !== "undefined";
+}
+
+export function shouldAllowSessionlessLocalUserApiStorage(): boolean {
+    return isBrowserRuntime() && shouldUseLegacyWebApiFallback();
 }
 
 export function createBrowserDirectProviderChecksDisabledError(): Error {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
@@ -41,7 +41,7 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(syncServiceSource, /kkWebApiClient\.cleanupCloudImages/);
   assert.doesNotMatch(syncServiceSource, /\.storage\s*\.\s*from\(/);
   assert.doesNotMatch(tempUserServiceSource, /import \{ supabase \} from '\.\.\/\.\.\/lib\/supabase';/);
-  assert.match(tempUserServiceSource, /import \{ kkWebApiClient \} from '\.\.\/api\/kkApiClient';/);
+  assert.match(tempUserServiceSource, /import \{ kkWebApiClient, shouldUseLegacyWebApiFallback \} from '\.\.\/api\/kkApiClient';/);
   assert.match(tempUserServiceSource, /kkWebApiClient\.createTempUser/);
   assert.doesNotMatch(tempUserServiceSource, /\.from\('temp_users'\)\s*\.insert\(/);
 });
@@ -65,4 +65,11 @@ test('register form now routes through the KK API instead of browser-side Supaba
   assert.match(registerFormSource, /await kkWebApiClient\.register\(/);
   assert.match(registerFormSource, /turnstileToken: turnstileToken \|\| ""/);
   assert.doesNotMatch(registerFormSource, /supabase\.auth\.signUp\(/);
+});
+
+test('frontend runtime no longer exposes the disabled Supabase browser shim', () => {
+  const servicesIndexSource = readSource('src/services/index.ts');
+
+  assert.equal(existsSync(path.join(ROOT_DIR, 'src/lib/supabase.ts')), false);
+  assert.doesNotMatch(servicesIndexSource, /supabase/);
 });

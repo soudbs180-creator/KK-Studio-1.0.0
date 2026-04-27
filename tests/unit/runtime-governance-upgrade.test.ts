@@ -39,10 +39,12 @@ test("verification chain includes integration tests and payment-server static ch
     exclude?: string[];
   };
 
-  assert.equal(packageJson.scripts["test:integration"], "node --test \"tests/integration/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:integration"], "node --test --test-isolation=none \"tests/integration/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:contract"], "node --test --test-isolation=none \"tests/contract/*.test.ts\"");
+  assert.equal(packageJson.scripts["test:e2e"], "node --test --test-isolation=none \"tests/e2e/*.test.ts\"");
   assert.match(packageJson.scripts.test, /npm run test:integration/);
   assert.match(packageJson.scripts.typecheck, /npm run typecheck:payment-server/);
-  assert.equal(packageJson.scripts["typecheck:payment-server"], "node scripts/check-payment-server.mjs");
+  assert.equal(packageJson.scripts["typecheck:payment-server"], "node scripts/ci/check-payment-server.mjs");
   assert.match(packageJson.scripts["verify:changes"], /npm run test/);
   assert.match(packageJson.scripts["verify:changes"], /verify:prompt-group-drag/);
   assert.match(packageJson.scripts["verify:changes"], /verify:mobile-settings-smoke/);

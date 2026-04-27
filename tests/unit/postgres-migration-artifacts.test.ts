@@ -13,10 +13,11 @@ test("postgres migration scripts exist for Supabase runtime export and VPS impor
   const envTemplate = "scripts/postgres/runtime-migration.env.example";
   const exportScript = "scripts/postgres/export-supabase-runtime.sh";
   const importScript = "scripts/postgres/import-runtime-into-vps.sh";
+  const importLocalAuthScript = "scripts/postgres/import-local-auth-identities.mjs";
   const migrateScript = "scripts/postgres/migrate-supabase-runtime.sh";
   const bootstrapSql = "scripts/postgres/bootstrap-kk-vps.sql";
 
-  [envTemplate, exportScript, importScript, migrateScript, bootstrapSql].forEach((relativePath) => {
+  [envTemplate, exportScript, importScript, importLocalAuthScript, migrateScript, bootstrapSql].forEach((relativePath) => {
     assert.equal(existsSync(path.join(ROOT_DIR, relativePath)), true, `${relativePath} should exist`);
   });
 
@@ -44,6 +45,13 @@ test("postgres migration scripts exist for Supabase runtime export and VPS impor
   assert.match(importSource, /runtime-schema\.sql/);
   assert.match(importSource, /runtime-data\.sql/);
   assert.match(importSource, /TARGET_DATABASE_URL is required/);
+
+  const importLocalAuthSource = readSource(importLocalAuthScript);
+  assert.match(importLocalAuthSource, /auth-identities\.json/);
+  assert.match(importLocalAuthSource, /insert into profiles/i);
+  assert.match(importLocalAuthSource, /insert into password_identities/i);
+  assert.doesNotMatch(importLocalAuthSource, /user_credits/i);
+  assert.doesNotMatch(importLocalAuthSource, /credit_transactions/i);
 
   const migrateSource = readSource(migrateScript);
   assert.match(migrateSource, /export-supabase-runtime\.sh/);

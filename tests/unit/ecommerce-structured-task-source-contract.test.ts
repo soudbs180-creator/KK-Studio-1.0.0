@@ -17,6 +17,7 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   const cardActionsSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
   const promptBarSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
+  const optimizePromptSource = readSource('src/app/optimizeGenerationPrompt.ts');
   const optimizerSource = readSource('src/services/llm/promptOptimizerService.ts');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
 
@@ -44,13 +45,15 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(cardActionsSource, /onTaskStateChange\?:/);
   assert.match(cardActionsSource, /activeTaskState\?: EcommerceEditableTaskState \| null/);
   assert.match(cardActionsSource, /600.*450/);
-  assert.match(cardActionsSource, /转 .*手机端|生成 .*手机端/);
+  assert.match(cardActionsSource, /const mobileActionLabel = effectiveSizeTier === '1464x600'/);
+  assert.match(cardActionsSource, /'Generate mobile'/);
+  assert.match(cardActionsSource, /'Regenerate mobile'/);
 
   assert.match(promptBarSource, /activeTaskState/);
   assert.match(promptBarSource, /taskStates/);
   assert.match(promptBarSource, /onTaskStateChange/);
 
-  assert.match(appSource, /optimizePromptForImage\(nextPrompt,\s*\{/);
+  assert.match(appSource, /optimizeGenerationPrompt\(\{/);
   assert.match(appSource, /mode:\s*GenerationMode\.ECOMMERCE/);
   assert.match(appSource, /ecommerceContext:/);
   assert.match(appSource, /displayLabel:\s*renderTask\.displayLabel/);
@@ -58,6 +61,7 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(appSource, /editableTask:\s*renderTask\.taskState/);
 
   assert.match(imageCardSource, /image\.displayLabel \|\| /);
+  assert.match(optimizePromptSource, /const optimized = await optimizePromptForImage\(rawPrompt,\s*\{/);
   assert.match(optimizerSource, /ecommerceContext\?:/);
   assert.match(optimizerSource, /Structured ecommerce context:/);
   assert.match(generationHookSource, /ecommerceDeliveryKind:/);

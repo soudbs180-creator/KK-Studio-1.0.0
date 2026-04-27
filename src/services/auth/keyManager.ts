@@ -23,6 +23,7 @@ import {
     getProviderStorageKey,
     isBrowserRuntime,
     purgeAnonymousSensitiveLocalCaches,
+    shouldAllowSessionlessLocalUserApiStorage,
     type ProviderStorageScope,
     USER_API_LOGIN_REQUIRED_MESSAGE,
 } from './keyManagerStorage';
@@ -75,6 +76,7 @@ import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
 import { Provider } from '../../types';
+import { getLatestRuntimeAuthState } from './runtimeAuthState';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
 import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
 import { requestCostSync } from '../billing/costSyncBridge';
@@ -1190,6 +1192,7 @@ export class KeyManager {
     private userId: string | null = null;
     private authHasSession = false;
     private authIsTempUser = false;
+    private sessionlessLocalUserApiStorageEnabled = false;
     private isSyncing = false;
     private cloudSyncBackoffUntil = 0;
     private hasHydratedCloudState = false;
@@ -1207,6 +1210,7 @@ export class KeyManager {
     private readonly CACHE_TTL = 5000; // 5 seconds
 
     constructor() {
+        this.bootstrapSessionlessLocalUserApiStorage();
         this.state = this.loadState();
         // Ensure strategy exists for legacy state
         if (!this.state.rotationStrategy) {
@@ -1263,6 +1267,26 @@ export class KeyManager {
         }
     }
 
+    private bootstrapSessionlessLocalUserApiStorage(): void {
+        if (!shouldAllowSessionlessLocalUserApiStorage()) {
+            return;
+        }
+
+        const runtimeState = getLatestRuntimeAuthState();
+        if (!runtimeState.isTempUser) {
+            return;
+        }
+
+        const runtimeUserId = String(runtimeState.user?.id || '').trim();
+        if (!runtimeUserId) {
+            return;
+        }
+
+        this.userId = runtimeUserId;
+        this.authIsTempUser = true;
+        this.sessionlessLocalUserApiStorageEnabled = true;
+    }
+
     private getStorageKey(): string {
         return getKeyManagerStorageKey(this.userId);
     }
@@ -1271,7 +1295,15 @@ export class KeyManager {
         return getProviderStorageKey(targetUserId);
     }
 
+    private canUseSessionlessLocalUserApiStorage(): boolean {
+        return this.sessionlessLocalUserApiStorageEnabled && Boolean(this.userId);
+    }
+
     private purgeAnonymousSensitiveLocalCaches(): void {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            return;
+        }
+
         purgeAnonymousSensitiveLocalCaches();
     }
 
@@ -1446,6 +1478,11 @@ export class KeyManager {
         const key = this.getStorageKey();
 
         try {
+            if (this.canUseSessionlessLocalUserApiStorage()) {
+                localStorage.setItem(key, JSON.stringify(toSave));
+                return;
+            }
+
             // Security update:
             // Logged-in users sync through the local API payload bridge and skip plain-text local persistence.
             // Local storage is only kept as a compatibility fallback for anonymous sessions.
@@ -1477,11 +1514,19 @@ export class KeyManager {
     /**
      * Set user ID and sync with cloud
      */
-    async setUserId(userId: string | null) {
+    async setUserId(
+        userId: string | null,
+        options?: {
+            sessionlessLocalUserApiStorageEnabled?: boolean;
+        },
+    ) {
         this.unsubscribeRealtime();
         this.clearPendingCloudRetry();
 
         this.userId = userId;
+        this.sessionlessLocalUserApiStorageEnabled =
+            options?.sessionlessLocalUserApiStorageEnabled === true
+            && Boolean(userId);
         this.hasHydratedCloudState = false;
         resetCloudSyncState(this.cloudSyncState);
         this.loadProviders(true);
@@ -1495,6 +1540,11 @@ export class KeyManager {
             // Prime local cache first for responsive UI.
             if (this.state.slots.length > 0) {
                 console.log('[KeyManager] Local cache loaded:', this.state.slots.length, 'slots');
+            }
+
+            if (this.canUseSessionlessLocalUserApiStorage()) {
+                console.log('[KeyManager] Local-only temp user storage enabled:', userId);
+                return;
             }
 
             // Then hydrate the local API payload asynchronously.
@@ -1533,10 +1583,18 @@ export class KeyManager {
     private realtimeChannel: ReturnType<typeof setInterval> | null = null;
 
     private canHydrateCloudState(): boolean {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            return false;
+        }
+
         return isStartupStageReady(this.startupStage, 'workspace_ready');
     }
 
     private canPollCloudState(): boolean {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            return false;
+        }
+
         return isStartupStageReady(this.startupStage, 'background_ready');
     }
 
@@ -1741,6 +1799,10 @@ export class KeyManager {
      * Refresh state from the local API payload bridge for the active user.
      */
     private async loadFromCloud() {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            return;
+        }
+
         if (!this.userId) return;
 
         const activeUserId = this.userId;
@@ -1833,6 +1895,11 @@ export class KeyManager {
             throwOnError?: boolean;
         }
     ) {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            console.log('[KeyManager] Skip local API payload sync (sessionless local storage active)');
+            return;
+        }
+
         const activeUserId = this.userId;
         if (!activeUserId) {
             console.log('[KeyManager] Skip local API payload sync (missing userId)');
@@ -1995,6 +2062,10 @@ export class KeyManager {
     }
 
     async refreshFromCloudNow(): Promise<void> {
+        if (this.canUseSessionlessLocalUserApiStorage()) {
+            return;
+        }
+
         if (!this.userId) {
             return;
         }
@@ -4636,7 +4707,11 @@ export class KeyManager {
 
     private persistProvidersLocal(): void {
         try {
-            this.providerStorageScope = persistProvidersLocal(this.userId);
+            this.providerStorageScope = persistProvidersLocal(
+                this.userId,
+                this.providers,
+                this.canUseSessionlessLocalUserApiStorage(),
+            );
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
         }
@@ -4673,7 +4748,12 @@ export class KeyManager {
 
     private loadProviders(force = false): void {
         try {
-            const loaded = loadProvidersFromLocal(this.userId, this.providers, force);
+            const loaded = loadProvidersFromLocal(
+                this.userId,
+                this.providers,
+                force,
+                this.canUseSessionlessLocalUserApiStorage(),
+            );
             if (!loaded) {
                 return;
             }
@@ -4693,7 +4773,7 @@ export class KeyManager {
     private saveProviders(): void {
         this.persistProvidersLocal();
 
-        if (this.userId) {
+        if (this.userId && !this.canUseSessionlessLocalUserApiStorage()) {
             markPendingProviderCloudSync(this.cloudSyncState);
             void this.flushPendingCloudSync();
         }

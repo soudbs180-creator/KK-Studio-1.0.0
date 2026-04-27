@@ -2,6 +2,9 @@ import type {
   ApiResponse,
   CreateRechargeSubmissionRequestDto,
   CreateRechargeSubmissionResponseDto,
+  ListAdminRechargeSubmissionsResponseDto,
+  ManualRechargeProviderDto,
+  MarkRechargeSubmissionPaidResponseDto,
   RechargePaymentChannelConfigDto,
   RechargePaymentChannelConfigListDto,
   RechargePaymentChannelDto,
@@ -32,6 +35,7 @@ export interface RechargeBillDraft {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargeSubmissionChannel;
+  manualProvider?: ManualRechargeProviderDto;
   note?: string;
 }
 
@@ -57,6 +61,7 @@ export interface RechargeBillRequest {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargeSubmissionChannel;
+  manualProvider?: ManualRechargeProviderDto;
   note?: string;
 }
 
@@ -71,11 +76,20 @@ export interface RechargeBillSnapshotSeed {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargeSubmissionChannel;
+  manualProvider?: ManualRechargeProviderDto | null;
+  baseAmount?: number;
+  serviceFee?: number;
+  payableAmount?: number;
+  baseCredits?: number;
+  bonusCredits?: number;
+  creditAmount?: number;
   estimatedCredits?: number;
   transferReferenceLast4?: string;
   note?: string;
   status?: string;
   qrDisplay?: RechargeQrDisplay;
+  expiresAt?: string;
+  paymentMarkedAt?: string | null;
   submittedAt?: string;
 }
 
@@ -85,11 +99,20 @@ export interface RechargeBillSnapshot {
   amount: number;
   currencyCode: SupportedRechargeCurrencyDto;
   paymentChannel: RechargeSubmissionChannel;
+  manualProvider?: ManualRechargeProviderDto | null;
+  baseAmount?: number;
+  serviceFee?: number;
+  payableAmount?: number;
+  baseCredits?: number;
+  bonusCredits?: number;
+  creditAmount?: number;
   estimatedCredits?: number;
   transferReferenceLast4?: string;
   note?: string;
   status: string;
   statusLabel: string;
+  expiresAt?: string;
+  paymentMarkedAt?: string | null;
   qrDisplay?: RechargeQrDisplay;
   submittedAt?: string;
 }
@@ -100,10 +123,19 @@ export interface RechargeBillRecord {
   amount?: number | null;
   currencyCode?: SupportedRechargeCurrencyDto | null;
   paymentChannel?: RechargeSubmissionChannel | null;
+  manualProvider?: ManualRechargeProviderDto | null;
+  baseAmount?: number | null;
+  serviceFee?: number | null;
+  payableAmount?: number | null;
+  baseCredits?: number | null;
+  bonusCredits?: number | null;
+  creditAmount?: number | null;
   estimatedCredits?: number | null;
   transferReferenceLast4?: string | null;
   note?: string | null;
   status?: string | null;
+  expiresAt?: string | null;
+  paymentMarkedAt?: string | null;
   qrDisplay?: RechargeQrDisplay | null;
   submittedAt?: string | null;
 }
@@ -132,6 +164,13 @@ type ExtendedRechargeApiClient = typeof kkWebApiClient & {
   listRechargePaymentChannels?: (
     options?: RechargeClientOptions,
   ) => Promise<ApiResponse<RechargePaymentChannelConfigListDto>>;
+  markRechargeSubmissionPaid?: (
+    submissionId: string,
+    options?: RechargeClientOptions,
+  ) => Promise<ApiResponse<MarkRechargeSubmissionPaidResponseDto>>;
+  listAdminRechargeSubmissions?: (
+    options?: RechargeClientOptions,
+  ) => Promise<ApiResponse<ListAdminRechargeSubmissionsResponseDto>>;
 };
 
 const rechargeApiClient = kkWebApiClient as ExtendedRechargeApiClient;
@@ -195,6 +234,11 @@ function normalizeRechargeChannel(
 ): RechargeSubmissionChannel {
   const normalized = String(value ?? '').trim().toLowerCase() as RechargeSubmissionChannel;
   return RECHARGE_CHANNELS.includes(normalized) ? normalized : fallback;
+}
+
+function normalizeManualProvider(value: unknown): ManualRechargeProviderDto | undefined {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized === 'alipay' || normalized === 'wechat' ? normalized : undefined;
 }
 
 function normalizeRechargeNote(value?: string): string | undefined {
@@ -366,10 +410,12 @@ function normalizeTransferReferenceLast4(value: string): string {
 }
 
 export function buildRechargeBillRequest(input: RechargeBillDraft): RechargeBillRequest {
+  const manualProvider = normalizeManualProvider(input.manualProvider);
   return {
     amount: normalizeSubmissionAmount(input.amount),
     currencyCode: input.currencyCode,
     paymentChannel: input.paymentChannel,
+    manualProvider,
     note: normalizeRechargeNote(input.note),
   };
 }
@@ -431,6 +477,10 @@ export function getRechargeSubmissionStatusLabel(
       return '\u5df2\u5165\u8d26';
     case 'pending':
       return '\u7b49\u5f85\u5ba1\u6838';
+    case 'paying':
+      return '\u652f\u4ed8\u4e2d';
+    case 'expired':
+      return '\u652f\u4ed8\u5931\u8d25';
     case 'completed':
       return '\u5df2\u5b8c\u6210';
     default:
@@ -464,17 +514,25 @@ export function normalizeRechargeBillSnapshot(
   const amount = pickNumericValue(source['amount'], normalizeSubmissionAmount(seed.amount));
   const currencyCode = normalizeRechargeCurrency(source['currencyCode'], seed.currencyCode);
   const paymentChannel = normalizeRechargeChannel(source['paymentChannel'], seed.paymentChannel);
+  const manualProvider = normalizeManualProvider(source['manualProvider']) || normalizeManualProvider(seed.manualProvider) || null;
+  const baseAmount = pickNumericValue(source['baseAmount'], seed.baseAmount ?? amount);
+  const serviceFee = pickNumericValue(source['serviceFee'], seed.serviceFee ?? 0);
+  const payableAmount = pickNumericValue(source['payableAmount'], seed.payableAmount ?? amount);
+  const baseCredits = pickEstimatedCredits(source['baseCredits'], seed.baseCredits);
+  const bonusCredits = pickEstimatedCredits(source['bonusCredits'], seed.bonusCredits);
+  const creditAmount = pickEstimatedCredits(source['creditAmount'], seed.creditAmount ?? seed.estimatedCredits);
   const estimatedCredits = pickEstimatedCredits(source['estimatedCredits'], seed.estimatedCredits);
   const transferReferenceLast4 = pickFirstString(source['transferReferenceLast4'], seed.transferReferenceLast4);
   const note = pickFirstString(source['note'], seed.note);
   const status = pickFirstString(source['status'], seed.status) || 'draft';
+  const expiresAt = pickFirstString(source['expiresAt'], seed.expiresAt);
+  const paymentMarkedAt = pickFirstString(source['paymentMarkedAt'], seed.paymentMarkedAt) ?? null;
   const qrDisplay = normalizeQrDisplay(source['qrDisplay'])
     || normalizeQrDisplay(source['staticQr'])
     || normalizeQrDisplay(seed.qrDisplay)
     || seed.qrDisplay;
   const submittedAt = pickFirstString(source['submittedAt'], seed.submittedAt);
-
-  return {
+  const snapshot: RechargeBillSnapshot = {
     submissionId,
     billNumber,
     amount,
@@ -488,6 +546,36 @@ export function normalizeRechargeBillSnapshot(
     qrDisplay,
     submittedAt,
   };
+
+  if (manualProvider) {
+    snapshot.manualProvider = manualProvider;
+  }
+  if (typeof source['baseAmount'] !== 'undefined' || typeof seed.baseAmount !== 'undefined') {
+    snapshot.baseAmount = baseAmount;
+  }
+  if (typeof source['serviceFee'] !== 'undefined' || typeof seed.serviceFee !== 'undefined') {
+    snapshot.serviceFee = serviceFee;
+  }
+  if (typeof source['payableAmount'] !== 'undefined' || typeof seed.payableAmount !== 'undefined') {
+    snapshot.payableAmount = payableAmount;
+  }
+  if (typeof source['baseCredits'] !== 'undefined' || typeof seed.baseCredits !== 'undefined') {
+    snapshot.baseCredits = baseCredits;
+  }
+  if (typeof source['bonusCredits'] !== 'undefined' || typeof seed.bonusCredits !== 'undefined') {
+    snapshot.bonusCredits = bonusCredits;
+  }
+  if (typeof source['creditAmount'] !== 'undefined' || typeof seed.creditAmount !== 'undefined') {
+    snapshot.creditAmount = creditAmount;
+  }
+  if (expiresAt) {
+    snapshot.expiresAt = expiresAt;
+  }
+  if (paymentMarkedAt) {
+    snapshot.paymentMarkedAt = paymentMarkedAt;
+  }
+
+  return snapshot;
 }
 
 export function getRechargeSubmissionErrorMessage(
@@ -537,9 +625,19 @@ export async function createRechargeBill(
           amount: response.data.submission.amount,
           currencyCode: response.data.submission.currencyCode,
           paymentChannel: response.data.submission.paymentChannel as RechargeSubmissionChannel,
+          manualProvider: response.data.submission.manualProvider ?? null,
+          baseAmount: response.data.submission.baseAmount ?? response.data.submission.amount,
+          serviceFee: response.data.submission.serviceFee ?? 0,
+          payableAmount: response.data.submission.payableAmount ?? response.data.submission.amount,
+          baseCredits: response.data.submission.baseCredits ?? response.data.submission.creditAmount,
+          bonusCredits: response.data.submission.bonusCredits ?? 0,
+          creditAmount: response.data.submission.creditAmount,
+          estimatedCredits: response.data.submission.creditAmount,
           transferReferenceLast4: response.data.submission.transferReferenceLast4 ?? null,
           note: response.data.submission.note,
           status: response.data.submission.status,
+          expiresAt: response.data.submission.expiresAt ?? null,
+          paymentMarkedAt: response.data.submission.paymentMarkedAt ?? null,
           submittedAt: response.data.submission.submittedAt ?? undefined,
         },
       },
@@ -550,6 +648,47 @@ export async function createRechargeBill(
     success: true,
     data: {
       bill: buildLocalRechargeBill(request, requestId),
+    },
+    meta: buildRequestMeta(requestId),
+  };
+}
+
+export async function markRechargeSubmissionPaid(
+  submissionId: string,
+  options?: RechargeClientOptions,
+): Promise<ApiResponse<MarkRechargeSubmissionPaidResponseDto>> {
+  if (typeof rechargeApiClient.markRechargeSubmissionPaid === 'function') {
+    return rechargeApiClient.markRechargeSubmissionPaid(
+      submissionId,
+      options?.requestId ? { requestId: options.requestId } : undefined,
+    );
+  }
+
+  const requestId = options?.requestId || `recharge-mark-paid-${Date.now()}`;
+  return {
+    success: false,
+    error: {
+      code: 'HTTP_404',
+      message: 'Recharge paid marker endpoint is not deployed.',
+    },
+    meta: buildRequestMeta(requestId),
+  };
+}
+
+export async function listAdminRechargeSubmissions(
+  options?: RechargeClientOptions,
+): Promise<ApiResponse<ListAdminRechargeSubmissionsResponseDto>> {
+  if (typeof rechargeApiClient.listAdminRechargeSubmissions === 'function') {
+    return rechargeApiClient.listAdminRechargeSubmissions(
+      options?.requestId ? { requestId: options.requestId } : undefined,
+    );
+  }
+
+  const requestId = options?.requestId || `admin-recharge-submissions-${Date.now()}`;
+  return {
+    success: true,
+    data: {
+      items: [],
     },
     meta: buildRequestMeta(requestId),
   };

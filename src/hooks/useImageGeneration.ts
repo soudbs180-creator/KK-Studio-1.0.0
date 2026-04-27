@@ -30,6 +30,7 @@ import {
   buildPptPageAlias 
 } from '../utils/pptUtils';
 import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
+import { buildPptDeckModuleState } from '../utils/pptDeckModules';
 import { clearSyncImageBridgeRequest, getSyncImageBridgeRequest, isSyncImageBridgeSupported } from '../services/llm/syncImageBridge';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { hasNetworkErrorMarkers, hasTimeoutMarkers } from '../services/api/errorClassification';
@@ -1486,6 +1487,15 @@ export const useImageGeneration = (options: {
         lastGenerationTotalCount: actualCount,
         error: undefined,
         errorDetails: undefined,
+        pptDeck: executionNode.mode === GenerationMode.PPT
+          ? buildPptDeckModuleState({
+              ...latestNode,
+              ...executionNode,
+              childImageIds: [],
+              timestamp: generationAttemptStartedAt,
+              isGenerating: true,
+            })
+          : executionNode.pptDeck,
         generationMetadata: buildGenerationMetadata(latestNode, {
           attemptStartedAt: generationAttemptStartedAt,
           pendingTaskIds: [],
@@ -1866,6 +1876,12 @@ export const useImageGeneration = (options: {
         const updatedNode = {
           ...persistedPromptState,
           childImageIds: results.map(r => r.id),
+          pptDeck: persistedPromptState.mode === GenerationMode.PPT
+            ? buildPptDeckModuleState({
+                ...persistedPromptState,
+                childImageIds: results.map(r => r.id),
+              }, results)
+            : persistedPromptState.pptDeck,
         };
         
         if (results.length > 0) {

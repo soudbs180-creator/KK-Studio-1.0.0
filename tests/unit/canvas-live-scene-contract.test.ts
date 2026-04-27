@@ -132,12 +132,18 @@ describe('canvas live scene contract', () => {
 
   test('App tracks prompt-group regrouping states explicitly', () => {
     const appSource = readSource('src/App.tsx')
+    const liveSceneSource = readSource('src/canvas/liveScene.ts')
+    const dragHandlerSource = readSource('src/app/usePromptGroupDragHandlers.ts')
 
-    assert.match(appSource, /layoutMode:\s*'expanded'\s*\|\s*'regrouping'\s*\|\s*'docked'/)
+    assert.match(liveSceneSource, /export type PromptGroupLayoutMode = 'expanded' \| 'regrouping' \| 'docked'/)
+    assert.match(appSource, /type PromptGroupLayoutMode,/)
+    assert.match(appSource, /promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>/)
     assert.match(appSource, /regroupProgress/)
-    assert.match(appSource, /onDragCommit/)
     assert.match(appSource, /promptGroupRegroupLayoutsById/)
     assert.equal(appSource.match(/buildPromptGroupRegroupLayouts\(/g)?.length ?? 0, 1)
+    assert.match(appSource, /usePromptGroupDragHandlers\(/)
+    assert.match(dragHandlerSource, /commitPromptGroupDrag\(/)
+    assert.match(dragHandlerSource, /handlePromptGroupDragCommit/)
   })
 
   test('card components expose drag commit callbacks for final persistence', () => {

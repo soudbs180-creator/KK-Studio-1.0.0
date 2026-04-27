@@ -3,12 +3,8 @@ import { fileURLToPath, pathToFileURL } from "url";
 
 import {
   applyPrimaryEnvToProcess,
-  compareSupabaseProjectRefs,
-  describeSupabaseServerKey,
-  findIgnoredLegacySecrets,
   findSnapshotEntries,
   getEffectiveValue,
-  isPlaceholder,
 } from "./env-contract.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -70,25 +66,27 @@ export async function assertLocalApiConfig(options = {}) {
   const snapshots = applyPrimaryEnvToProcess(repoRoot);
   const publicSnapshots = snapshots.frontendSnapshots;
   const apiSnapshots = snapshots.apiSnapshots;
-  const supabaseUrl = resolveEffectiveValue(apiSnapshots, "SUPABASE_URL");
-  const publicSupabaseUrl = resolveEffectiveValue(publicSnapshots, "VITE_SUPABASE_URL");
-  const rawServiceRoleKey =
-    resolveEffectiveValue(apiSnapshots, "SUPABASE_SERVICE_ROLE_KEY").value
-    || resolveEffectiveValue(apiSnapshots, "SUPABASE_SECRET_KEY").value;
-  const serviceRoleKey = describeSupabaseServerKey(rawServiceRoleKey);
-  const projectRefs = compareSupabaseProjectRefs(publicSupabaseUrl.value, supabaseUrl.value);
+  const databaseUrl = resolveEffectiveValue(apiSnapshots, "DATABASE_URL");
+  const pgHost = resolveEffectiveValue(apiSnapshots, "PGHOST");
+  const pgDatabase = resolveEffectiveValue(apiSnapshots, "PGDATABASE");
+  const pgUser = resolveEffectiveValue(apiSnapshots, "PGUSER");
+  const userApiEncryptionSecret =
+    resolveEffectiveValue(apiSnapshots, "USER_API_ENCRYPTION_SECRET").value
+    || resolveEffectiveValue(apiSnapshots, "PROFILE_USER_APIS_ENCRYPTION_SECRET").value;
   const misplacedRootServerEnv = findSnapshotEntries(publicSnapshots, [
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-    "SUPABASE_ANON_KEY",
+    "DATABASE_URL",
+    "PGHOST",
+    "PGPORT",
+    "PGDATABASE",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGSSL",
     "USER_API_ENCRYPTION_SECRET",
   ]);
-  const ignoredLegacySecrets = findIgnoredLegacySecrets(snapshots.ignoredSnapshots, [
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_SECRET_KEY",
-  ]).filter((entry) => !isPlaceholder(entry.value));
   const problems = [];
+  const hasPostgresConfig = Boolean(
+    databaseUrl.value || (pgHost.value && pgDatabase.value && pgUser.value),
+  );
 
   if (misplacedRootServerEnv.length > 0) {
     problems.push(
@@ -98,51 +96,29 @@ export async function assertLocalApiConfig(options = {}) {
     );
   }
 
-  if (!supabaseUrl.value) {
+  if (!hasPostgresConfig) {
     problems.push(
-      "SUPABASE_URL is missing. Add it to apps/api/.env.local.",
+      "DATABASE_URL is missing, or PGHOST/PGDATABASE/PGUSER are incomplete. "
+      + "Copy apps/api/.env.local.example to apps/api/.env.local and set your VPS PostgreSQL connection.",
     );
   }
 
-  if (!serviceRoleKey.value || isPlaceholder(serviceRoleKey.value)) {
-    const ignoredLegacyHint = ignoredLegacySecrets.length > 0
-      ? ` Ignored legacy entries still exist in ${ignoredLegacySecrets.map((entry) => entry.source).join(", ")}.`
-      : "";
+  if (!userApiEncryptionSecret) {
     problems.push(
-      "SUPABASE_SERVICE_ROLE_KEY is missing or still using a placeholder. "
-      + "Copy apps/api/.env.local.example to apps/api/.env.local and set a real service role key."
-      + ignoredLegacyHint,
-    );
-  }
-
-  if (serviceRoleKey.status === "invalid") {
-    const invalidKeyHint = serviceRoleKey.looksLikeDatabasePassword
-      ? " The current value looks like a database password copied from the connection string, not the service-role/secret API key."
-      : "";
-    problems.push(
-      "SUPABASE_SERVICE_ROLE_KEY is present but not a valid Supabase service-role/secret key. "
-      + "Copy the service_role JWT or sb_secret key from Supabase Project Settings > API into apps/api/.env.local."
-      + invalidKeyHint,
-    );
-  }
-
-  if (projectRefs.matches === false) {
-    problems.push(
-      `SUPABASE_URL (${projectRefs.serverProjectRef}) does not match VITE_SUPABASE_URL `
-      + `(${projectRefs.publicProjectRef}). Point both to the same Supabase project.`,
+      "USER_API_ENCRYPTION_SECRET is missing. Add it to apps/api/.env.local.",
     );
   }
 
   if (problems.length === 0) {
     const configModule = await import(
-      pathToFileURL(path.join(repoRoot, "apps", "api", "src", "lib", "server-supabase-config.ts")).href
+      pathToFileURL(path.join(repoRoot, "apps", "api", "src", "lib", "server-runtime-config.ts")).href
     );
-    const persistenceProbe = await configModule.probeServerSupabasePersistence(
-      configModule.resolveServerSupabaseConfig(),
+    const persistenceProbe = await configModule.probeServerRuntimePersistence(
+      configModule.resolveServerRuntimeConfig(),
     );
-    if (persistenceProbe.serviceRoleKeyValid === false || persistenceProbe.blockers.length > 0) {
+    if (persistenceProbe.postgresConfigValid === false || persistenceProbe.blockers.length > 0) {
       problems.push(
-        "SUPABASE_SERVICE_ROLE_KEY did not pass the canonical Supabase probe. "
+        "PostgreSQL persistence probe failed. "
         + `Probe blockers: ${persistenceProbe.blockers.join(", ") || "<none>"}.`,
       );
     }
@@ -150,7 +126,7 @@ export async function assertLocalApiConfig(options = {}) {
 
   if (problems.length > 0) {
     throw new Error(
-      "[run-api-dev] Local API startup blocked because the canonical Supabase config is incomplete.\n"
+      "[run-api-dev] Local API startup blocked because the VPS PostgreSQL config is incomplete.\n"
       + `${problems.map((problem) => `- ${problem}`).join("\n")}\n`
       + `Searched primary env files: ${formatSearchedFiles(snapshots, repoRoot)}`,
     );
@@ -172,7 +148,7 @@ export async function startLocalApiServer(options = {}) {
 
   // The local-only bootstrap still needs the canonical env search order so
   // local auth and encrypted profile storage keep working without the full
-  // server-side Supabase persistence path.
+  // server-side VPS PostgreSQL startup checks.
   applyPrimaryEnvToProcess(repoRoot);
 
   if (!skipConfigCheck) {

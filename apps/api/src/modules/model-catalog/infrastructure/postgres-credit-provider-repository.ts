@@ -11,6 +11,7 @@ import type {
 } from "../../../../../../packages/contracts/src/index.ts";
 import { getSharedPostgresPool, hasPostgresConfig, type PostgresQueryable } from "../../../lib/postgres.ts";
 import {
+  type ActiveCreditModelRuntimeRoute,
   InMemoryCreditProviderRepository,
   type CreditProviderRepository,
   type SavedCreditProviderRecord,
@@ -234,6 +235,55 @@ export class PostgresCreditProviderRepository implements CreditProviderRepositor
       providerName: String(providerRows[0]?.provider_name || providerId).trim(),
       models: providerRows.map((row) => toActiveModelDto(row)),
     }));
+  }
+
+  async listActiveRuntimeRoutes(modelId?: string): Promise<ActiveCreditModelRuntimeRoute[]> {
+    const normalizedModelId = String(modelId || "").trim();
+    const values: unknown[] = [];
+    let modelFilterSql = "";
+    if (normalizedModelId) {
+      values.push(normalizedModelId);
+      modelFilterSql = ` and model_id = $${values.length}`;
+    }
+
+    const result = await this.queryable.query(
+      `select provider_id, provider_name, base_url, api_keys, model_id, display_name,
+              endpoint_type, credit_cost, priority, weight, call_count,
+              advanced_enabled, mix_with_same_model, quality_pricing
+         from admin_credit_models
+        where is_active = true${modelFilterSql}
+        order by priority desc, weight desc, provider_id asc, model_id asc`,
+      values,
+    );
+    const rows = Array.isArray(result.rows) ? (result.rows as CreditProviderTableRow[]) : [];
+    const routes: ActiveCreditModelRuntimeRoute[] = [];
+
+    rows.forEach((row) => {
+      const providerId = String(row.provider_id || "").trim();
+      const resolvedModelId = String(row.model_id || "").trim();
+      if (!providerId || !resolvedModelId) {
+        return;
+      }
+
+      routes.push({
+        providerId,
+        providerName: String(row.provider_name || providerId).trim(),
+        baseUrl: String(row.base_url || "").trim(),
+        apiKeys: normalizeApiKeys(row.api_keys),
+        modelId: resolvedModelId,
+        displayName: String(row.display_name || resolvedModelId).trim(),
+        endpointType: String(row.endpoint_type || "openai").trim(),
+        creditCost: Math.max(1, Number(row.credit_cost || 1)),
+        priority: Number(row.priority || 0),
+        weight: Number(row.weight || 0),
+        callCount: Number(row.call_count || 0),
+        advancedEnabled: Boolean(row.advanced_enabled),
+        mixWithSameModel: Boolean(row.mix_with_same_model),
+        qualityPricing: cloneQualityPricing(row.quality_pricing),
+      });
+    });
+
+    return routes;
   }
 
   async saveAdminProvider(

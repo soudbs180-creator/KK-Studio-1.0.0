@@ -26,13 +26,13 @@ Architecture notes:
 - Credit settlement is written back through the main API internal contract:
   `POST /internal/v1/payment-settlements`
 - Public third-party provider webhooks should terminate at the verified `payment-server/webhook.js` handlers instead of the sidecar.
-- When `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) are present, the sidecar stores orders and callbacks in Supabase.
-- When those server-side credentials are missing, the sidecar falls back to the in-memory repository for local development and isolated tests.
+- In production, the sidecar persists payment orders, callbacks, and credit pricing through PostgreSQL.
+- When PostgreSQL is not configured, the sidecar falls back to the in-memory repository for local development and isolated tests only.
 
 Local verification:
 
 - Set `RUN_PAYMENT_SIDECAR=true` to boot the sidecar directly from `apps/payment-sidecar/src/server.ts`.
 - Set `KK_API_BASE_URL` to point at the main API when you want callbacks to settle credits.
 - Set `PAYMENT_SIDECAR_INTERNAL_TOKEN` on both services to protect the internal settlement path.
-- Set `SUPABASE_URL` plus `SUPABASE_SERVICE_ROLE_KEY` to enable durable payment storage.
+- Set `DATABASE_URL` (or `PGHOST` + `PGDATABASE` + `PGUSER`) to enable durable payment storage and server-side credit pricing.
 - Set `PAYMENT_SIDECAR_ALLOW_MANUAL_CHECKOUT=true` only for local/manual checkout verification.

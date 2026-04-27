@@ -23,6 +23,9 @@ test('cost estimation uses billing-ledger naming and drops the old dark console 
   const source = readSource('src/pages/CostEstimation.tsx');
 
   assert.match(source, /Billing Ledger/);
+  assert.match(source, /SettingsHero/);
+  assert.match(source, /SettingsSection/);
+  assert.doesNotMatch(source, /settings-reference-page-header/);
   assert.doesNotMatch(source, /Consumption Center/);
   assert.doesNotMatch(source, /dark control-console structure/);
 });

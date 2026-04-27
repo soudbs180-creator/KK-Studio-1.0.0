@@ -177,6 +177,179 @@ async function buildFallbackWorkbook(): Promise<ArrayBuffer> {
   return zip.generateAsync({ type: 'arraybuffer' });
 }
 
+async function buildEnglishAliasedWorkbook(options: {
+  mainSheetName?: string;
+  aPlusSheetName?: string;
+} = {}): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+  const mainSheetName = options.mainSheetName || 'Main Images';
+  const aPlusSheetName = options.aPlusSheetName || 'A Plus Modules';
+
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="${mainSheetName}" sheetId="1" r:id="rId1" />
+    <sheet name="${aPlusSheetName}" sheetId="2" r:id="rId2" />
+  </sheets>
+</workbook>`,
+  );
+
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships>
+  <Relationship Id="rId1" Target="/xl/worksheets/sheet1.xml" />
+  <Relationship Id="rId2" Target="worksheets/sheet2.xml" />
+</Relationships>`,
+  );
+
+  zip.file(
+    'xl/worksheets/sheet1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet>
+  <sheetData>
+    <row r="1"><c r="A1" t="inlineStr"><is><t>Project Name</t></is></c><c r="B1" t="inlineStr"><is><t>Portable Blender Launch</t></is></c></row>
+    <row r="2"><c r="A2" t="inlineStr"><is><t>Product Name</t></is></c><c r="B2" t="inlineStr"><is><t>Portable Blender</t></is></c></row>
+    <row r="4">
+      <c r="A4" t="inlineStr"><is><t>No.</t></is></c>
+      <c r="B4" t="inlineStr"><is><t>Image Type</t></is></c>
+      <c r="C4" t="inlineStr"><is><t>Angle</t></is></c>
+      <c r="D4" t="inlineStr"><is><t>Theme</t></is></c>
+      <c r="E4" t="inlineStr"><is><t>Design Requirements</t></is></c>
+      <c r="F4" t="inlineStr"><is><t>Copy</t></is></c>
+    </row>
+    <row r="5">
+      <c r="A5"><v>1</v></c>
+      <c r="B5" t="inlineStr"><is><t>Hero</t></is></c>
+      <c r="C5" t="inlineStr"><is><t>front view</t></is></c>
+      <c r="D5" t="inlineStr"><is><t>fresh kitchen</t></is></c>
+      <c r="E5" t="inlineStr"><is><t>Show bottle scale and fruit splash</t></is></c>
+      <c r="F5" t="inlineStr"><is><t>Blend anywhere</t></is></c>
+    </row>
+  </sheetData>
+</worksheet>`,
+  );
+
+  zip.file(
+    'xl/worksheets/sheet2.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet>
+  <sheetData>
+    <row r="3">
+      <c r="A3" t="inlineStr"><is><t>Module</t></is></c>
+      <c r="B3" t="inlineStr"><is><t>Type</t></is></c>
+      <c r="C3" t="inlineStr"><is><t>Size</t></is></c>
+      <c r="D3" t="inlineStr"><is><t>Angle</t></is></c>
+      <c r="E3" t="inlineStr"><is><t>Design Brief</t></is></c>
+      <c r="F3" t="inlineStr"><is><t>Selling Points</t></is></c>
+      <c r="G3" t="inlineStr"><is><t>Headline</t></is></c>
+    </row>
+    <row r="4">
+      <c r="A4" t="inlineStr"><is><t>Module 1</t></is></c>
+      <c r="B4" t="inlineStr"><is><t>Feature banner</t></is></c>
+      <c r="C4" t="inlineStr"><is><t>970*600</t></is></c>
+      <c r="D4" t="inlineStr"><is><t>detail</t></is></c>
+      <c r="E4" t="inlineStr"><is><t>Explain USB charging and compact storage</t></is></c>
+      <c r="F4" t="inlineStr"><is><t>portable, easy clean</t></is></c>
+      <c r="G4" t="inlineStr"><is><t>Power in your bag</t></is></c>
+    </row>
+  </sheetData>
+</worksheet>`,
+  );
+
+  return zip.generateAsync({ type: 'arraybuffer' });
+}
+
+async function buildSupplierAPlusWorkbook(): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="A+" sheetId="1" r:id="rId1" />
+  </sheets>
+</workbook>`,
+  );
+
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships>
+  <Relationship Id="rId1" Target="worksheets/sheet1.xml" />
+</Relationships>`,
+  );
+
+  zip.file(
+    'xl/worksheets/sheet1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetData>
+    <row r="1"><c r="B1" t="inlineStr"><is><t>参考链接</t></is></c><c r="D1" t="inlineStr"><is><t>https://example.com/product</t></is></c></row>
+    <row r="3">
+      <c r="B3" t="inlineStr"><is><t>序号</t></is></c>
+      <c r="C3" t="inlineStr"><is><t>A+模块</t></is></c>
+      <c r="D3" t="inlineStr"><is><t>图片尺寸</t></is></c>
+      <c r="E3" t="inlineStr"><is><t>图片内容</t></is></c>
+      <c r="F3" t="inlineStr"><is><t>图片要求</t></is></c>
+      <c r="G3" t="inlineStr"><is><t>文案</t></is></c>
+      <c r="H3" t="inlineStr"><is><t>参考</t></is></c>
+      <c r="I3" t="inlineStr"><is><t>参考图1</t></is></c>
+    </row>
+    <row r="4">
+      <c r="B4"><v>1</v></c>
+      <c r="C4" t="inlineStr"><is><t>高级完整图片</t></is></c>
+      <c r="D4" t="inlineStr"><is><t>1464*600</t></is></c>
+      <c r="E4" t="inlineStr"><is><t>一张长图切图</t></is></c>
+      <c r="F4" t="inlineStr"><is><t>背景换成宠物和婴儿在客厅玩耍，无叶风扇吹出柔和风效。</t></is></c>
+      <c r="G4" t="inlineStr"><is><t>MEPTY&#10;Embrace Safe, All-Day Cooling Comfort</t></is></c>
+      <c r="H4" t="inlineStr"><is><t>风格参考图1</t></is></c>
+    </row>
+    <row r="5"><c r="B5" t="inlineStr"><is><t>600*450</t></is></c></row>
+  </sheetData>
+  <drawing r:id="rId9" />
+</worksheet>`,
+  );
+
+  zip.file(
+    'xl/worksheets/_rels/sheet1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId9" Target="../drawings/drawing1.xml" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" />
+</Relationships>`,
+  );
+
+  zip.file(
+    'xl/drawings/drawing1.xml',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>8</xdr:col><xdr:row>3</xdr:row></xdr:from>
+    <xdr:to><xdr:col>10</xdr:col><xdr:row>8</xdr:row></xdr:to>
+    <xdr:pic>
+      <xdr:nvPicPr><xdr:cNvPr id="1" name="APlus Supplier Reference" /></xdr:nvPicPr>
+      <xdr:blipFill><a:blip r:embed="rId1" /></xdr:blipFill>
+    </xdr:pic>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>`,
+  );
+
+  zip.file(
+    'xl/drawings/_rels/drawing1.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Target="../media/supplier-aplus-reference.png" />
+</Relationships>`,
+  );
+
+  zip.file('xl/media/supplier-aplus-reference.png', TINY_PNG_BASE64, { base64: true });
+
+  return zip.generateAsync({ type: 'arraybuffer' });
+}
+
 async function buildFloatingDrawingWorkbook(options: {
   reverseMainAnchorOrder?: boolean;
   mainDesignRequirements?: string;
@@ -563,6 +736,57 @@ describe('ecommerce xlsx parser', () => {
     assert.deepEqual(parsed.mediaAssets.map((asset) => asset.anchorCellRef), ['H11', 'I11']);
   });
 
+  test('normalizes English sheet aliases and flexible headers from alternate supplier workbooks', async () => {
+    const workbook = await buildEnglishAliasedWorkbook();
+    const parsed = await parseOpenXmlWorkbook(workbook, 'english-aliases.xlsx');
+    const analysis = normalizeEcommerceAnalysis(parsed, 'gemini-3.1-flash-image-preview');
+
+    assert.deepEqual(parsed.sheets.map((sheet) => sheet.name), ['Main Images', 'A Plus Modules']);
+    assert.equal(analysis.projectMeta.projectName, 'Portable Blender Launch');
+    assert.equal(analysis.projectMeta.productName, 'Portable Blender');
+    assert.equal(analysis.mainImageItems.length, 1);
+    assert.equal(analysis.aPlusGroup.modules.length, 1);
+    assert.equal(analysis.mainImageItems[0].type, 'Hero');
+    assert.equal(analysis.mainImageItems[0].copyText, 'Blend anywhere');
+    assert.equal(analysis.aPlusGroup.modules[0].moduleName, 'Module 1');
+    assert.equal(analysis.aPlusGroup.modules[0].declaredSizeText, '970*600');
+  });
+
+  test('detects main and A+ sheets from flexible header schemas when supplier sheet names are generic', async () => {
+    const workbook = await buildEnglishAliasedWorkbook({
+      mainSheetName: 'Sheet 1',
+      aPlusSheetName: 'Supplier Export',
+    });
+    const parsed = await parseOpenXmlWorkbook(workbook, 'generic-sheets.xlsx');
+    const analysis = normalizeEcommerceAnalysis(parsed, 'gemini-3.1-flash-image-preview');
+
+    assert.deepEqual(parsed.sheets.map((sheet) => sheet.name), ['Sheet 1', 'Supplier Export']);
+    assert.equal(analysis.mainImageItems.length, 1);
+    assert.equal(analysis.aPlusGroup.modules.length, 1);
+    assert.equal(analysis.mainImageItems[0].designRequirements, 'Show bottle scale and fruit splash');
+    assert.equal(analysis.aPlusGroup.modules[0].designRequirements, 'Explain USB charging and compact storage');
+  });
+
+  test('normalizes supplier A+ tables with sequence, content, requirement, copy, and reference columns', async () => {
+    const workbook = await buildSupplierAPlusWorkbook();
+    const parsed = await parseOpenXmlWorkbook(workbook, 'supplier-aplus.xlsx');
+    const analysis = normalizeEcommerceAnalysis(parsed, 'gemini-3.1-flash-image-preview');
+
+    assert.equal(parsed.mediaAssets.length, 1);
+    assert.equal(parsed.mediaAssets[0].anchorCellRef, 'I4');
+    assert.equal(analysis.aPlusGroup.modules.length, 1);
+
+    const module = analysis.aPlusGroup.modules[0];
+    assert.equal(module.moduleName, '高级完整图片');
+    assert.equal(module.type, '一张长图切图');
+    assert.equal(module.declaredSizeText, '1464*600');
+    assert.equal(module.angle, '');
+    assert.equal(module.designRequirements, '背景换成宠物和婴儿在客厅玩耍，无叶风扇吹出柔和风效。');
+    assert.equal(module.copyText, 'MEPTY\nEmbrace Safe, All-Day Cooling Comfort');
+    assert.deepEqual(module.referenceAssetIds, ['supplier-aplus-reference.png-A+-I4']);
+    assert(module.referenceMentions[0].mentionTokens.includes('参考图1'));
+  });
+
   test('parses floating drawing images and main rows without sequence numbers', async () => {
     const workbook = await buildFloatingDrawingWorkbook();
     const parsed = await parseOpenXmlWorkbook(workbook, 'floating.xlsx');
@@ -633,5 +857,88 @@ describe('ecommerce xlsx parser', () => {
       analysis.mainImageItems.map((item) => item.referenceAssetIds.length),
       [1, 0],
     );
+  });
+
+  test('dedupes identical review warnings at the analysis and group level', () => {
+    const analysis = normalizeEcommerceAnalysis({
+      sheets: [],
+      mediaAssets: [],
+      sourceFileName: 'warnings.xlsx',
+      sourceFileType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }, 'gemini-3.1-flash-image-preview');
+
+    analysis.mainImageItems = [
+      {
+        itemId: 'main-1',
+        sheet: '主图',
+        rowIndex: 1,
+        sequence: 1,
+        type: '场景图',
+        angle: '',
+        theme: 'A',
+        designRequirements: 'A',
+        copyText: '',
+        sizePolicy: 'main-default',
+        referenceAssetIds: [],
+        referenceMentions: [],
+        productAssetRequired: true,
+        promptDraft: '',
+        resolvedPromptPreview: '',
+        editableTask: undefined,
+        needsReview: true,
+        reviewWarnings: ['存在多张参考图，但文本中未检测到明确的编号引用。'],
+      },
+      {
+        itemId: 'main-2',
+        sheet: '主图',
+        rowIndex: 2,
+        sequence: 2,
+        type: '场景图',
+        angle: '',
+        theme: 'B',
+        designRequirements: 'B',
+        copyText: '',
+        sizePolicy: 'main-default',
+        referenceAssetIds: [],
+        referenceMentions: [],
+        productAssetRequired: true,
+        promptDraft: '',
+        resolvedPromptPreview: '',
+        editableTask: undefined,
+        needsReview: true,
+        reviewWarnings: ['存在多张参考图，但文本中未检测到明确的编号引用。'],
+      },
+    ];
+
+    analysis.aPlusGroup.modules = [
+      {
+        moduleId: 'aplus-1',
+        sheet: 'A+',
+        rowIndex: 3,
+        moduleName: '模块1',
+        type: '长图',
+        declaredSizeText: '1464*600',
+        angle: '',
+        sellingPoints: '',
+        designRequirements: 'C',
+        copyText: '',
+        sizePolicy: 'desktop-then-mobile',
+        referenceAssetIds: [],
+        referenceMentions: [],
+        productAssetRequired: true,
+        promptDraft: '',
+        resolvedPromptPreview: '',
+        editableTask: undefined,
+        needsReview: true,
+        reviewWarnings: ['存在多张参考图，但文本中未检测到明确的编号引用。'],
+      },
+    ];
+
+    const dedupedWarnings = Array.from(new Set([
+      ...analysis.mainImageItems.flatMap((item) => item.reviewWarnings),
+      ...analysis.aPlusGroup.modules.flatMap((module) => module.reviewWarnings),
+    ]));
+
+    assert.deepEqual(dedupedWarnings, ['存在多张参考图，但文本中未检测到明确的编号引用。']);
   });
 });

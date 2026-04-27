@@ -46,6 +46,7 @@ interface SettingsRouteOptions {
   dashboardBasePath?: string;
   initialSupplier?: Supplier | null;
   onDashboardNavigate?: (view: CanonicalSettingsViewId) => void;
+  refreshKey?: number;
 }
 
 const DashboardRouteElement: React.FC<{
@@ -73,22 +74,27 @@ function getRouteElement(
   definition: SettingsWorkbenchRouteDefinition,
   options: SettingsRouteOptions,
 ) {
+  const routeRefreshKey = `${definition.kind}:${definition.path || 'dashboard'}:${options.refreshKey || 0}`;
+
   switch (definition.kind) {
     case 'dashboard':
       return (
         <DashboardRouteElement
+          key={routeRefreshKey}
           basePath={options.dashboardBasePath || '/settings'}
           onNavigateOverride={options.onDashboardNavigate}
         />
       );
     case 'api':
-      return <ApiSettingsView initialSupplier={options.initialSupplier || null} />;
+      return <ApiSettingsView key={routeRefreshKey} initialSupplier={options.initialSupplier || null} />;
     case 'billing':
-      return KKAI_FEATURE_FLAGS.billing ? <CostEstimation embedded /> : <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
+      return KKAI_FEATURE_FLAGS.billing
+        ? <CostEstimation key={routeRefreshKey} embedded />
+        : <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
     case 'storage':
-      return <StorageSettingsView />;
+      return <StorageSettingsView key={routeRefreshKey} />;
     case 'logs':
-      return <SystemLogsView />;
+      return <SystemLogsView key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }

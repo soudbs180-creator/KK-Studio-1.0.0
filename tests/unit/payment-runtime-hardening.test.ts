@@ -41,12 +41,7 @@ const trackedEnvKeys = [
   "VERCEL",
   "VERCEL_ENV",
   "CONTEXT",
-  "VITE_SUPABASE_URL",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "VITE_SUPABASE_ANON_KEY",
-  "SUPABASE_ANON_KEY",
+  "DATABASE_URL",
   "USER_API_ENCRYPTION_SECRET",
   "PROFILE_USER_APIS_ENCRYPTION_SECRET",
   "PAYMENT_SIDECAR_INTERNAL_TOKEN",
@@ -93,12 +88,7 @@ beforeEach(() => {
 describe("hosted runtime hardening", () => {
   test("hosted api server refuses to boot without canonical persistence", async () => {
     process.env.VERCEL = "1";
-    process.env.VITE_SUPABASE_URL = "https://guard-ref.supabase.co";
-    process.env.SUPABASE_URL = "https://guard-ref.supabase.co";
-    process.env.VITE_SUPABASE_ANON_KEY = "publishable-anon";
-    process.env.SUPABASE_ANON_KEY = "anon";
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.SUPABASE_SECRET_KEY;
+    delete process.env.DATABASE_URL;
     delete process.env.USER_API_ENCRYPTION_SECRET;
     delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
 
@@ -110,7 +100,7 @@ describe("hosted runtime hardening", () => {
       }));
       assert.fail("Expected hosted API startup to throw without canonical persistence.");
     } catch (error) {
-      assert.match(String(error), /Hosted API runtime requires canonical Supabase persistence/);
+      assert.match(String(error), /Hosted API runtime requires PostgreSQL persistence plus USER_API_ENCRYPTION_SECRET and KK_API_SESSION_SIGNING_SECRET/);
     } finally {
       if (server?.listening) {
         await new Promise<void>((resolve, reject) => {
@@ -129,9 +119,6 @@ describe("hosted runtime hardening", () => {
 
   test("hosted payment sidecar refuses to boot without durable payment dependencies", async () => {
     process.env.VERCEL = "1";
-    delete process.env.SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.SUPABASE_SECRET_KEY;
     delete process.env.DATABASE_URL;
     delete process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN;
     delete process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN;

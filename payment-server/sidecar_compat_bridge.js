@@ -6,23 +6,42 @@ const AUTHENTICATED_USER_EMAIL_HEADER = 'x-authenticated-user-email';
 const AUTHENTICATED_USER_ROLE_HEADER = 'x-authenticated-user-role';
 
 let paymentModulePromise;
-let paymentServicePromise;
+let inMemoryPaymentRuntimePromise;
 let requestAuthenticatorPromise;
 
-function getSupabaseServiceRoleKey() {
+function getPaymentSettlementToken(options = {}) {
   return String(
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-      || process.env.SUPABASE_SECRET_KEY
+    options.settlementToken
+      || process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_SETTLEMENT_TOKEN
+      || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
       || '',
   ).trim();
 }
 
-function getPaymentWebhookSettlementToken() {
+function getPaymentInternalToken(options = {}, settlementToken = '') {
   return String(
-    process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
+    options.internalToken
       || process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN
+      || settlementToken
       || '',
   ).trim();
+}
+
+function getPaymentApiBaseUrl(options = {}) {
+  return String(options.baseUrl || process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001').trim();
+}
+
+function hasPostgresPaymentStoreConfig() {
+  if (String(process.env.DATABASE_URL || '').trim()) {
+    return true;
+  }
+
+  return Boolean(
+    String(process.env.PGHOST || '').trim()
+      && String(process.env.PGDATABASE || '').trim()
+      && String(process.env.PGUSER || '').trim(),
+  );
 }
 
 function loadPaymentModule() {
@@ -67,28 +86,7 @@ async function getRequestAuthenticator() {
     const moduleUrl = pathToFileURL(
       path.resolve(__dirname, '../apps/api/src/lib/request-authenticator.ts'),
     ).href;
-    requestAuthenticatorPromise = import(moduleUrl).then((mod) => {
-      const supabaseUrl = String(
-        process.env.SUPABASE_URL
-        || process.env.VITE_SUPABASE_URL
-        || ''
-      ).trim();
-      const supabaseAuthKey = String(
-        getSupabaseServiceRoleKey()
-        || process.env.SUPABASE_ANON_KEY
-        || process.env.VITE_SUPABASE_ANON_KEY
-        || ''
-      ).trim();
-
-      if (!supabaseUrl || !supabaseAuthKey) {
-        return undefined;
-      }
-
-      return mod.createRequestAuthenticator({
-        supabaseUrl,
-        supabaseAuthKey,
-      });
-    });
+    requestAuthenticatorPromise = import(moduleUrl).then((mod) => mod.createRequestAuthenticator({}));
   }
 
   return requestAuthenticatorPromise;
@@ -153,41 +151,55 @@ async function buildLegacyCompatibilityHeaders(headers = {}, options = {}) {
   };
 }
 
-async function createCompatibilityPaymentService() {
-  const paymentModule = await loadPaymentModule();
-  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
-  const serviceRoleKey = getSupabaseServiceRoleKey();
-  const repository = supabaseUrl && serviceRoleKey
-    ? new paymentModule.SupabasePaymentOrderRepository({
-      supabaseUrl,
-      serviceRoleKey,
-    })
-    : new paymentModule.InMemoryPaymentOrderRepository();
-  const creditAmountResolver = new paymentModule.SupabasePaymentCreditAmountResolver({
-    supabaseUrl,
-    serviceRoleKey,
-  });
-  const settlementWriter = new paymentModule.HttpMainApiSettlementWriter({
-    baseUrl: String(process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001').trim(),
-    internalToken: getPaymentWebhookSettlementToken(),
-    settlementToken: getPaymentWebhookSettlementToken(),
+async function createCompatibilityPaymentService(options = {}) {
+  const runtime = await getCompatibilityPaymentRuntime();
+  const settlementToken = getPaymentSettlementToken(options);
+  const internalToken = getPaymentInternalToken(options, settlementToken);
+  const settlementWriter = new runtime.paymentModule.HttpMainApiSettlementWriter({
+    baseUrl: getPaymentApiBaseUrl(options),
+    internalToken,
+    settlementToken,
     caller: 'payment-webhook',
   });
 
-  return new paymentModule.PaymentService(repository, settlementWriter, creditAmountResolver);
+  return new runtime.paymentModule.PaymentService(
+    runtime.repository,
+    settlementWriter,
+    runtime.creditAmountResolver,
+  );
 }
 
-async function getCompatibilityPaymentService() {
-  if (!paymentServicePromise) {
-    paymentServicePromise = createCompatibilityPaymentService();
+async function createCompatibilityPaymentRuntime() {
+  const paymentModule = await loadPaymentModule();
+  const repository = typeof paymentModule.createPaymentOrderRepositoryFromEnv === 'function'
+    ? paymentModule.createPaymentOrderRepositoryFromEnv()
+    : new paymentModule.InMemoryPaymentOrderRepository();
+  const creditAmountResolver = typeof paymentModule.createPaymentCreditAmountResolverFromEnv === 'function'
+    ? paymentModule.createPaymentCreditAmountResolverFromEnv()
+    : new paymentModule.StaticPaymentCreditAmountResolver();
+
+  return {
+    paymentModule,
+    repository,
+    creditAmountResolver,
+  };
+}
+
+async function getCompatibilityPaymentRuntime() {
+  if (hasPostgresPaymentStoreConfig()) {
+    return createCompatibilityPaymentRuntime();
   }
 
-  return paymentServicePromise;
+  if (!inMemoryPaymentRuntimePromise) {
+    inMemoryPaymentRuntimePromise = createCompatibilityPaymentRuntime();
+  }
+
+  return inMemoryPaymentRuntimePromise;
 }
 
 async function handleLegacyCreateQrCodeThroughSidecar(query, headers, origin, options = {}) {
   const paymentModule = await loadPaymentModule();
-  const service = await getCompatibilityPaymentService();
+  const service = await createCompatibilityPaymentService();
   const compatibility = await buildLegacyCompatibilityHeaders(headers, {
     queryUserId: query.get('userId') || '',
   });
@@ -206,7 +218,7 @@ async function handleLegacyCreateQrCodeThroughSidecar(query, headers, origin, op
 
 async function handleLegacyRedirectThroughSidecar(query, headers, origin, options = {}) {
   const paymentModule = await loadPaymentModule();
-  const service = await getCompatibilityPaymentService();
+  const service = await createCompatibilityPaymentService();
   const compatibility = await buildLegacyCompatibilityHeaders(headers, {
     queryUserId: query.get('userId') || '',
   });
@@ -225,7 +237,7 @@ async function handleLegacyRedirectThroughSidecar(query, headers, origin, option
 
 async function handleLegacyGetStatusThroughSidecar(query, headers) {
   const paymentModule = await loadPaymentModule();
-  const service = await getCompatibilityPaymentService();
+  const service = await createCompatibilityPaymentService();
   const compatibility = await buildLegacyCompatibilityHeaders(headers, {
     queryUserId: query.get('userId') || '',
   });
@@ -241,7 +253,7 @@ async function handleLegacyGetStatusThroughSidecar(query, headers) {
 }
 
 async function handleLegacyPaymentCallbackThroughSidecar(input, options = {}) {
-  const service = await getCompatibilityPaymentService();
+  const service = await createCompatibilityPaymentService(options);
   const requestId = String(
     options.requestId
       || `payment-webhook-${String(input.providerCode || input.payType || 'alipay').trim()}-${String(input.merchantOrderNo || input.callbackId || input.transactionId || 'unknown').trim()}`,

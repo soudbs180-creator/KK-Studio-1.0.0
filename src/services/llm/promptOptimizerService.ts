@@ -5,6 +5,7 @@ import type {
     EcommerceTaskAssetRoleBinding,
 } from '../../types';
 import { keyManager } from '../auth/keyManager';
+import { resolveCapabilityRouteAssignment } from '../api/capabilityRouteAssignments';
 import {
     buildAutomaticOptimizationInstruction,
     resolveAutomaticOptimizationRoute,
@@ -568,19 +569,45 @@ const buildOptimizerCacheKey = (
     ].join('::');
 };
 
+const resolveModelCandidate = (
+    models: ReturnType<typeof keyManager.getGlobalModelList>,
+    modelId?: string,
+) => {
+    if (!modelId) {
+        return null;
+    }
+
+    const exact = models.find((model) => model.id === modelId);
+    if (exact) {
+        return exact.id;
+    }
+
+    const suffix = modelId.split('@')[1];
+    if (!suffix) {
+        return null;
+    }
+
+    const sameSuffix = models.find((model) => model.id.endsWith(`@${suffix}`));
+    return sameSuffix?.id || null;
+};
+
 const pickOptimizerModel = (preferredModelId?: string): string | null => {
     // Avoid silently consuming admin/system credits for behind-the-scenes prompt optimization.
     const models = keyManager.getGlobalModelList().filter((model) => model.type === 'chat' && !model.isSystemInternal);
     if (models.length === 0) return null;
 
-    if (preferredModelId) {
-        const exact = models.find((model) => model.id === preferredModelId);
-        if (exact) return exact.id;
+    const capabilityAssignment = resolveCapabilityRouteAssignment('prompt_optimizer');
+    if (capabilityAssignment?.enabled) {
+        const routedModelId = resolveModelCandidate(models, capabilityAssignment.primaryModelId);
+        if (routedModelId) {
+            return routedModelId;
+        }
+    }
 
-        const suffix = preferredModelId.split('@')[1];
-        if (suffix) {
-            const sameSuffix = models.find((model) => model.id.endsWith(`@${suffix}`));
-            if (sameSuffix) return sameSuffix.id;
+    if (preferredModelId) {
+        const preferredCandidate = resolveModelCandidate(models, preferredModelId);
+        if (preferredCandidate) {
+            return preferredCandidate;
         }
     }
 
@@ -657,6 +684,8 @@ const buildOptimizationUserMessage = (
         `Automatic route: ${autoroute.strategyTitle}`,
         `Route task type: ${autoroute.taskType}`,
         `Additional optimization instructions: ${truncateText(autoInstruction, 320)}`,
+        'Preserve requirement semantics, domain terminology, product nouns, and professional phrasing from the raw prompt.',
+        'Do not flatten the prompt into generic art language. Keep the optimized prompt aligned with the requested scene, workflow, and specialist vocabulary.',
         missingInputs.length > 0
             ? `Likely underspecified areas: ${missingInputs.join(', ')}`
             : 'Likely underspecified areas: none detected',
@@ -754,6 +783,10 @@ export const optimizePromptForImage = async (
     }
 
     const modelId = pickOptimizerModel(resolvedOptions.preferredModelId);
+    const optimizerRoute = resolveCapabilityRouteAssignment('prompt_optimizer');
+    const preferredKeyId = optimizerRoute?.enabled && optimizerRoute.primaryRouteId && keyManager.getKey(optimizerRoute.primaryRouteId)
+        ? optimizerRoute.primaryRouteId
+        : undefined;
     if (!modelId) {
         const fallback = buildFallbackResult(input, strategy, resolvedOptions);
         return {
@@ -775,6 +808,7 @@ export const optimizePromptForImage = async (
             stream: false,
             maxTokens: 1600,
             temperature: 0.2,
+            preferredKeyId,
         });
 
         const parsed = extractJsonObject(raw);

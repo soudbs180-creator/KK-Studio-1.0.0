@@ -7,14 +7,6 @@ const {
 
 const router = express.Router();
 
-function getSupabaseServiceRoleKey() {
-    return String(
-        process.env.SUPABASE_SERVICE_ROLE_KEY
-        || process.env.SUPABASE_SECRET_KEY
-        || ''
-    ).trim();
-}
-
 function getWebhookSettlementToken() {
     return String(
         process.env.PAYMENT_WEBHOOK_SETTLEMENT_TOKEN
@@ -30,6 +22,18 @@ function formatKey(key, type) {
     if (raw.includes('-----BEGIN')) return raw;
     const chunks = raw.match(/.{1,64}/g) || [];
     return `-----BEGIN ${type}-----\n${chunks.join('\n')}\n-----END ${type}-----`;
+}
+
+function resolveWebhookRawBody(req) {
+    if (typeof req.rawBody === 'string' && req.rawBody.length > 0) {
+        return req.rawBody;
+    }
+
+    if (typeof req.body === 'string') {
+        return req.body;
+    }
+
+    return JSON.stringify(req.body);
 }
 
 // Keep this Alipay configuration aligned with payment-server/index.js.
@@ -57,8 +61,6 @@ async function applyPaymentSettlement(userId, transactionId, amount, currency, p
         baseUrl: process.env.KK_API_BASE_URL || 'http://127.0.0.1:3001',
         internalToken: getWebhookSettlementToken(),
         settlementToken: getWebhookSettlementToken(),
-        supabaseUrl: process.env.SUPABASE_URL,
-        serviceRoleKey: getSupabaseServiceRoleKey(),
         requestId: `payment-webhook-${payType}-${billNo || transactionId}`,
         onWarning(message, error) {
             console.warn('[payment-webhook]', message, error || '');
@@ -196,8 +198,7 @@ router.post('/wechat', async (req, res) => {
         const timestamp = req.headers['wechatpay-timestamp'];
         const nonce = req.headers['wechatpay-nonce'];
 
-        // Express usually gives us parsed JSON, so convert it back to a string before verifySign.
-        const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        const bodyStr = resolveWebhookRawBody(req);
 
         const isValid = wxpay.verifySign({
             body: bodyStr,

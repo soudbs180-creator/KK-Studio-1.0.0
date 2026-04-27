@@ -1,8 +1,8 @@
 # KK Studio 数据规格书
 
-文档状态：Draft Frozen v1  
-目标数据库：Supabase PostgreSQL  
-数据库命名：`snake_case`  
+文档状态：Draft Frozen v1
+目标数据库：VPS PostgreSQL
+数据库命名：`snake_case`
 API 字段命名：`camelCase`
 
 ## 1. 总体原则
@@ -17,7 +17,7 @@ API 字段命名：`camelCase`
 
 ## 1.1 运行时基线（2026-03-23）
 
-当前远端 Supabase 仍运行在“兼容运行时”阶段。以下对象是当前真实运行面，审计与迁移必须先保障它们，再逐步收敛到第 3 章目标模型：
+当前远端 VPS PostgreSQL 运行在“自托管运行时”阶段。以下对象是当前真实运行面，审计与迁移必须先保障它们，再逐步收敛到第 3 章目标模型：
 
 - `profiles`
 - `user_credits`

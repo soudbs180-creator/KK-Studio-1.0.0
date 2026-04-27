@@ -1,6 +1,8 @@
+import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags.ts';
 import { getStoredKkApiAccessToken } from '../services/api/authAccessToken.ts';
 import {
   createDefaultRuntimeAuthState,
+  createFixedLocalRuntimeAuthState,
   getLatestRuntimeAuthState,
 } from '../services/auth/runtimeAuthState.ts';
 import type { RuntimeAuthSession, RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
@@ -13,6 +15,7 @@ export interface KkaiRuntimeAuthSnapshot {
   loginAsTempUser: () => Promise<void>;
   isTempUser: boolean;
   tempUserExpiry: number | null;
+  sessionRecoveryWarning: string | null;
 }
 
 function createRuntimeSession(user: RuntimeAuthUser, accessToken?: string): RuntimeAuthSession | null {
@@ -31,18 +34,28 @@ function createRuntimeSession(user: RuntimeAuthUser, accessToken?: string): Runt
   };
 }
 
+function shouldUseFixedLocalRuntimeUser(): boolean {
+  return !KKAI_FEATURE_FLAGS.admin
+    && !KKAI_FEATURE_FLAGS.workspaceCloudSync
+    && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
+}
+
 export function createKkaiRuntimeAuthSnapshot(): KkaiRuntimeAuthSnapshot {
   const runtimeState = getLatestRuntimeAuthState() || createDefaultRuntimeAuthState();
-  const accessToken = runtimeState.isTempUser ? undefined : getStoredKkApiAccessToken();
+  const effectiveRuntimeState = !runtimeState.user && !runtimeState.isTempUser && shouldUseFixedLocalRuntimeUser()
+    ? createFixedLocalRuntimeAuthState()
+    : runtimeState;
+  const accessToken = effectiveRuntimeState.isTempUser ? undefined : getStoredKkApiAccessToken();
 
   return {
-    session: runtimeState.user ? createRuntimeSession(runtimeState.user, accessToken) : null,
-    user: runtimeState.user,
+    session: effectiveRuntimeState.user ? createRuntimeSession(effectiveRuntimeState.user, accessToken) : null,
+    user: effectiveRuntimeState.user,
     loading: false,
     signOut: async () => {},
     loginAsTempUser: async () => {},
-    isTempUser: runtimeState.isTempUser,
-    tempUserExpiry: runtimeState.tempUserExpiry,
+    isTempUser: effectiveRuntimeState.isTempUser,
+    tempUserExpiry: effectiveRuntimeState.tempUserExpiry,
+    sessionRecoveryWarning: null,
   };
 }
 

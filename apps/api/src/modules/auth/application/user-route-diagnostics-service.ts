@@ -2,6 +2,7 @@ import type {
   SecureProxyUserRouteConfigDto,
   UserApiProtocolFormat,
   UserRouteConnectivityCheckDto,
+  UserRoutePricingSyncRequestDto,
   UserRoutePricingSyncDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import type { AuthDataService } from "./auth-data-service.ts";
@@ -575,6 +576,7 @@ export class UserRouteDiagnosticsService {
     email: string | undefined,
     routeId: string,
     accessToken?: string,
+    input?: UserRoutePricingSyncRequestDto,
   ): Promise<UserRoutePricingSyncDto> {
     const routeConfig = await this.resolveRouteConfig(userId, email, routeId, accessToken);
     const format = inferRouteFormat(routeConfig);
@@ -600,10 +602,15 @@ export class UserRouteDiagnosticsService {
       headerName,
       authorizationValueFormat,
     );
+    const customEndpointUrl = normalizeString(input?.endpointUrl);
     const attemptedUrls: string[] = [];
     let lastMessage = "No pricing data is available right now.";
 
-    for (const endpointUrl of buildPricingEndpointCandidates(routeConfig.baseUrl)) {
+    const candidateUrls = customEndpointUrl
+      ? [customEndpointUrl]
+      : buildPricingEndpointCandidates(routeConfig.baseUrl);
+
+    for (const endpointUrl of candidateUrls) {
       attemptedUrls.push(endpointUrl);
       try {
         const response = await fetch(endpointUrl, {

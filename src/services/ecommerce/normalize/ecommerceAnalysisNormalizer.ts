@@ -15,6 +15,9 @@ import type {
 } from '../types.ts';
 import { resolveReferenceBindings } from '../xlsx/referenceBindingResolver.ts';
 
+const CANONICAL_MAIN_SHEET = '主图' as const;
+const CANONICAL_APLUS_SHEET = 'A+' as const;
+
 function findSheet(sheets: OpenXmlParsedSheet[], name: string): OpenXmlParsedSheet | undefined {
   return sheets.find((sheet) => sheet.name === name);
 }
@@ -30,17 +33,20 @@ type MainSheetColumnKey =
   | 'theme'
   | 'sellingPoints'
   | 'designRequirements'
+  | 'referenceNotes'
   | 'copyZh'
   | 'copyEn'
   | 'copyGeneric';
 
 type APlusSheetColumnKey =
+  | 'sequence'
   | 'moduleName'
   | 'type'
   | 'declaredSizeText'
   | 'angle'
   | 'sellingPoints'
   | 'designRequirements'
+  | 'referenceNotes'
   | 'copyZh'
   | 'copyEn'
   | 'copyGeneric';
@@ -65,6 +71,7 @@ type MainRowCandidate = {
   angle: string;
   theme: string;
   designRequirements: string;
+  referenceNotes: string;
   copyText: string;
 };
 
@@ -77,31 +84,35 @@ type APlusRowCandidate = {
   angle: string;
   sellingPoints: string;
   designRequirements: string;
+  referenceNotes: string;
   copyText: string;
 };
 
 const MAIN_SHEET_HEADER_DEFINITIONS: SheetHeaderDefinition[] = [
   { key: 'copyZh', patterns: ['文案中文', '中文文案'] },
   { key: 'copyEn', patterns: ['文案英文', '英文文案'] },
-  { key: 'sequence', patterns: ['序号', '编号', '序列'] },
-  { key: 'designRequirements', patterns: ['设计要求', '设计需求', '设计说明', '画面要求', '需求描述'] },
-  { key: 'sellingPoints', patterns: ['卖点', '亮点', '核心卖点'] },
-  { key: 'theme', patterns: ['主题', '场景主题', '风格主题'] },
-  { key: 'angle', patterns: ['角度', '产品角度', '镜头'] },
-  { key: 'type', patterns: ['类型', '画面类型', '版式类型'] },
-  { key: 'copyGeneric', patterns: ['文案', '标题文案'] },
+  { key: 'sequence', patterns: ['序号', '编号', '序列', 'no', 'number', 'sequence', 'seq', 'index'] },
+  { key: 'designRequirements', patterns: ['设计要求', '设计需求', '设计说明', '画面要求', '需求描述', 'designrequirements', 'designbrief', 'creativebrief', 'requirements', 'brief', 'prompt', 'description'] },
+  { key: 'sellingPoints', patterns: ['卖点', '亮点', '核心卖点', 'sellingpoints', 'sellingpoint', 'features', 'feature', 'benefits'] },
+  { key: 'theme', patterns: ['主题', '场景主题', '风格主题', 'theme', 'scene', 'concept'] },
+  { key: 'angle', patterns: ['角度', '产品角度', '镜头', 'angle', 'view', 'productangle'] },
+  { key: 'type', patterns: ['类型', '画面类型', '版式类型', 'imagetype', 'type', 'outputtype', 'deliverable'] },
+  { key: 'referenceNotes', patterns: ['参考', '图片参考', '参考图', '参考图片', 'reference', 'referenceimage', 'referenceimages'] },
+  { key: 'copyGeneric', patterns: ['文案', '标题文案', 'copy', 'headline', 'text', 'caption'] },
 ];
 
 const APLUS_SHEET_HEADER_DEFINITIONS: SheetHeaderDefinition[] = [
+  { key: 'sequence', patterns: ['序号', '编号', '序列', 'no', 'number', 'sequence', 'seq', 'index'] },
   { key: 'copyZh', patterns: ['文案中文', '中文文案'] },
   { key: 'copyEn', patterns: ['文案英文', '英文文案'] },
-  { key: 'declaredSizeText', patterns: ['图片尺寸', '模块尺寸', '尺寸', '画布尺寸'] },
-  { key: 'designRequirements', patterns: ['设计要求', '设计需求', '设计说明', '画面要求', '需求描述'] },
-  { key: 'sellingPoints', patterns: ['产品卖点', '卖点', '亮点', '核心卖点'] },
-  { key: 'moduleName', patterns: ['模块名称', '模块名', '模块', '版块'] },
-  { key: 'angle', patterns: ['产品角度', '角度', '镜头'] },
-  { key: 'type', patterns: ['类型', '模块类型', '版式类型'] },
-  { key: 'copyGeneric', patterns: ['文案', '标题文案'] },
+  { key: 'declaredSizeText', patterns: ['图片尺寸', '模块尺寸', '尺寸', '画布尺寸', 'size', 'dimensions', 'dimension', 'pixels', 'px'] },
+  { key: 'designRequirements', patterns: ['图片要求', '设计要求', '设计需求', '设计说明', '画面要求', '需求描述', 'designrequirements', 'designbrief', 'creativebrief', 'requirements', 'brief', 'prompt', 'description'] },
+  { key: 'sellingPoints', patterns: ['产品卖点', '卖点', '亮点', '核心卖点', 'sellingpoints', 'sellingpoint', 'features', 'feature', 'benefits'] },
+  { key: 'moduleName', patterns: ['模块名称', '模块名', '模块', '版块', 'module', 'modulename', 'section', 'sectionname'] },
+  { key: 'angle', patterns: ['产品角度', '角度', '镜头', 'angle', 'view', 'productangle'] },
+  { key: 'type', patterns: ['图片内容', '内容', '类型', '模块类型', '版式类型', 'type', 'moduletype', 'sectiontype', 'bannerkind'] },
+  { key: 'referenceNotes', patterns: ['参考', '图片参考', '参考图', '参考图1', '参考图片', 'reference', 'referenceimage', 'referenceimages'] },
+  { key: 'copyGeneric', patterns: ['文案', '标题文案', 'copy', 'headline', 'text', 'caption'] },
 ];
 
 function normalizeLabelToken(value: string): string {
@@ -170,6 +181,57 @@ function detectSheetSchema(
   return bestScore >= 3 ? bestSchema : null;
 }
 
+function normalizeSheetRoleToken(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[+＋]/g, 'plus')
+    .replace(/[\s\r\n\t_./\\\-()（）【】\[\]<>《》:：，。,;；·•]+/g, '');
+}
+
+function countSchemaColumns(schema: SheetSchema | null): number {
+  return Object.keys(schema?.columns || {}).length;
+}
+
+function scoreSheetNameForRole(sheetName: string, role: 'main' | 'aplus'): number {
+  const token = normalizeSheetRoleToken(sheetName);
+  const aliases = role === 'main'
+    ? ['主图', 'main', 'mainimage', 'mainimages', 'hero', 'listing', 'listingimage', 'productimage']
+    : ['aplus', 'a+', '详情', '详情页', '模块', 'module', 'modules', 'detail', 'details', 'enhancedbrandcontent'];
+
+  return aliases.some((alias) => token.includes(normalizeSheetRoleToken(alias))) ? 8 : 0;
+}
+
+function findSheetByRole(
+  sheets: OpenXmlParsedSheet[],
+  role: 'main' | 'aplus',
+): OpenXmlParsedSheet | undefined {
+  const definitions = role === 'main'
+    ? MAIN_SHEET_HEADER_DEFINITIONS
+    : APLUS_SHEET_HEADER_DEFINITIONS;
+
+  const scoredSheets = sheets
+    .map((sheet) => {
+      const schemaScore = countSchemaColumns(detectSheetSchema(sheet, definitions));
+      return {
+        sheet,
+        score: scoreSheetNameForRole(sheet.name, role) + schemaScore,
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+
+  const best = scoredSheets[0];
+  return best && best.score >= 3 ? best.sheet : undefined;
+}
+
+function findMainSheet(sheets: OpenXmlParsedSheet[]): OpenXmlParsedSheet | undefined {
+  return findSheet(sheets, CANONICAL_MAIN_SHEET) || findSheetByRole(sheets, 'main');
+}
+
+function findAPlusSheet(sheets: OpenXmlParsedSheet[]): OpenXmlParsedSheet | undefined {
+  return findSheet(sheets, CANONICAL_APLUS_SHEET) || findSheetByRole(sheets, 'aplus');
+}
+
 function readSchemaCell(
   row: OpenXmlParsedRow,
   schema: SheetSchema | null,
@@ -198,6 +260,18 @@ function joinUniqueText(parts: string[]): string {
   return Array.from(
     new Set(parts.map((part) => String(part || '').trim()).filter(Boolean)),
   ).join('\n');
+}
+
+function dedupeWarnings(warnings: string[]): string[] {
+  return Array.from(new Set(warnings.map((warning) => String(warning || '').trim()).filter(Boolean)));
+}
+
+function looksLikeNumericSequence(value: string): boolean {
+  return /^\d+(?:\.0+)?$/.test(String(value || '').trim());
+}
+
+function looksLikeDimensionText(value: string): boolean {
+  return /\d+\s*(?:\*|x|×)\s*\d+/i.test(String(value || '').trim());
 }
 
 function findMetaValue(rows: OpenXmlParsedRow[], labels: string[], fallbackColumn: string): string {
@@ -230,11 +304,24 @@ function findMetaValue(rows: OpenXmlParsedRow[], labels: string[], fallbackColum
 }
 
 function buildReferenceAssets(parseResult: OpenXmlWorkbookParseResult): EcommerceAnalysisAsset[] {
+  const mainSheetName = findMainSheet(parseResult.sheets)?.name;
+  const aPlusSheetName = findAPlusSheet(parseResult.sheets)?.name;
+
   return parseResult.mediaAssets.map((asset, index) => ({
     assetId: asset.assetId,
     label: `参考图${index + 1}`,
     source: 'reference',
-    sheetName: asset.sheetName as '主图' | 'A+' | undefined,
+    sheetName: asset.sheetName === CANONICAL_MAIN_SHEET
+      ? CANONICAL_MAIN_SHEET
+      : asset.sheetName === CANONICAL_APLUS_SHEET
+        ? CANONICAL_APLUS_SHEET
+        : asset.sheetName === aPlusSheetName && aPlusSheetName !== mainSheetName
+          ? CANONICAL_APLUS_SHEET
+          : asset.sheetName === mainSheetName
+            ? CANONICAL_MAIN_SHEET
+            : asset.sheetName === aPlusSheetName
+              ? CANONICAL_APLUS_SHEET
+              : asset.sheetName as '主图' | 'A+' | undefined,
     rowIndex: asset.rowIndex,
     anchorRowIndex: asset.anchorRowIndex,
     anchorColRef: asset.anchorColRef,
@@ -260,11 +347,11 @@ function getAssetsForRow(
 }
 
 function extractProjectMeta(parseResult: OpenXmlWorkbookParseResult) {
-  const mainSheet = findSheet(parseResult.sheets, '主图');
+  const mainSheet = findMainSheet(parseResult.sheets);
   const mainRows = mainSheet?.rows || [];
-  const projectName = findMetaValue(mainRows, ['需求名称'], 'D');
-  const productName = findMetaValue(mainRows, ['产品名称'], 'D');
-  const defaultMainImageSizeHint = findMetaValue(mainRows, ['需求尺寸', '图片尺寸'], 'D');
+  const projectName = findMetaValue(mainRows, ['需求名称', 'Project Name', 'Project', 'Requirement Name'], 'D');
+  const productName = findMetaValue(mainRows, ['产品名称', 'Product Name', 'Product'], 'D');
+  const defaultMainImageSizeHint = findMetaValue(mainRows, ['需求尺寸', '图片尺寸', 'Image Size', 'Default Size', 'Size'], 'D');
 
   return {
     projectName,
@@ -331,10 +418,11 @@ function extractMainRowCandidates(sheet: OpenXmlParsedSheet | undefined): MainRo
       const angle = readSchemaCell(row, schema, 'angle', ['C', 'B']);
       const sellingPoints = readSchemaCell(row, schema, 'sellingPoints', ['C']);
       const designRequirements = readSchemaCell(row, schema, 'designRequirements', ['E', 'D']);
+      const referenceNotes = readSchemaCell(row, schema, 'referenceNotes');
       const copyText = joinUniqueText([
-        readSchemaCell(row, schema, 'copyZh', ['G', 'E']),
-        readSchemaCell(row, schema, 'copyEn', ['F']),
-        readSchemaCell(row, schema, 'copyGeneric', ['G', 'F', 'E']),
+        readSchemaCell(row, schema, 'copyZh', schema ? [] : ['G', 'E']),
+        readSchemaCell(row, schema, 'copyEn', schema ? [] : ['F']),
+        readSchemaCell(row, schema, 'copyGeneric', schema ? [] : ['G', 'F', 'E']),
       ]);
       const theme = readSchemaCell(row, schema, 'theme') || sellingPoints || type;
       const sequenceText = readSchemaCell(row, schema, 'sequence', ['A']);
@@ -360,6 +448,7 @@ function extractMainRowCandidates(sheet: OpenXmlParsedSheet | undefined): MainRo
         angle,
         theme,
         designRequirements,
+        referenceNotes,
         copyText,
       };
     })
@@ -376,17 +465,30 @@ function extractAPlusRowCandidates(sheet: OpenXmlParsedSheet | undefined): APlus
   return sheet.rows
     .filter((row) => row.rowIndex > headerRowIndex)
     .map((row) => {
-      const moduleName = readSchemaCell(row, schema, 'moduleName', ['A']);
-      const type = readSchemaCell(row, schema, 'type', ['B']);
-      const declaredSizeText = readSchemaCell(row, schema, 'declaredSizeText', ['C']);
-      const angle = readSchemaCell(row, schema, 'angle', ['D']);
-      const designRequirements = readSchemaCell(row, schema, 'designRequirements', ['E']);
-      const sellingPoints = readSchemaCell(row, schema, 'sellingPoints', ['F']);
-      const copyText = joinUniqueText([
-        readSchemaCell(row, schema, 'copyZh', ['G']),
+      let moduleName = readSchemaCell(row, schema, 'moduleName', schema ? [] : ['A']);
+      let type = readSchemaCell(row, schema, 'type', schema ? [] : ['B']);
+      let declaredSizeText = readSchemaCell(row, schema, 'declaredSizeText', schema ? [] : ['C']);
+      let angle = readSchemaCell(row, schema, 'angle', schema ? [] : ['D']);
+      let designRequirements = readSchemaCell(row, schema, 'designRequirements', schema ? [] : ['E']);
+      let sellingPoints = readSchemaCell(row, schema, 'sellingPoints', schema ? [] : ['F']);
+      let referenceNotes = readSchemaCell(row, schema, 'referenceNotes');
+      let copyText = joinUniqueText([
+        readSchemaCell(row, schema, 'copyZh', schema ? [] : ['G']),
         readSchemaCell(row, schema, 'copyEn'),
-        readSchemaCell(row, schema, 'copyGeneric', ['G']),
+        readSchemaCell(row, schema, 'copyGeneric', schema ? [] : ['G']),
       ]);
+
+      if (looksLikeNumericSequence(moduleName) && readCell(row, 'C') && looksLikeDimensionText(readCell(row, 'D'))) {
+        moduleName = readCell(row, 'C');
+        declaredSizeText = readCell(row, 'D');
+        type = readCell(row, 'E');
+        angle = '';
+        designRequirements = readCell(row, 'F');
+        sellingPoints = '';
+        referenceNotes = readCell(row, 'H');
+        copyText = readCell(row, 'G');
+      }
+
       const hasMeaningfulContent = [moduleName, type, declaredSizeText, designRequirements, copyText]
         .filter(Boolean)
         .length >= 2;
@@ -405,6 +507,7 @@ function extractAPlusRowCandidates(sheet: OpenXmlParsedSheet | undefined): APlus
         angle,
         sellingPoints,
         designRequirements,
+        referenceNotes,
         copyText,
       };
     })
@@ -492,8 +595,8 @@ function buildDraftAnalysisForTemplate(
   projectMeta: ReturnType<typeof extractProjectMeta>,
   modelId: string,
 ): EcommerceAnalysisResult {
-  const mainSheet = findSheet(parseResult.sheets, '主图');
-  const aPlusSheet = findSheet(parseResult.sheets, 'A+');
+  const mainSheet = findMainSheet(parseResult.sheets);
+  const aPlusSheet = findAPlusSheet(parseResult.sheets);
   const mainRowCandidates = extractMainRowCandidates(mainSheet);
   const aPlusRowCandidates = extractAPlusRowCandidates(aPlusSheet);
   const mainAssetAssignments = resolveAssetRowAssignments(
@@ -666,6 +769,7 @@ function normalizeMainImageItems(
         })),
         designRequirements: candidate.designRequirements,
         copyText: candidate.copyText,
+        referenceNotes: candidate.referenceNotes,
       });
       const policy = resolveEcommerceAspectPolicy({ kind: 'main-image', modelId });
       const taskState = buildBaseTaskState({
@@ -745,6 +849,7 @@ function normalizeAPlusModules(
         })),
         designRequirements: candidate.designRequirements,
         copyText: candidate.copyText,
+        referenceNotes: candidate.referenceNotes,
       });
       const policy = resolveEcommerceAspectPolicy({
         kind: 'a-plus-module',
@@ -809,14 +914,14 @@ export function normalizeEcommerceAnalysis(
   const projectMeta = extractProjectMeta(parseResult);
   const draftAnalysis = buildDraftAnalysisForTemplate(parseResult, referenceAssets, projectMeta, modelId);
   const seriesTemplate = extractSeriesTemplateFromAnalysis(draftAnalysis);
-  const mainSheet = findSheet(parseResult.sheets, '主图');
-  const aPlusSheet = findSheet(parseResult.sheets, 'A+');
+  const mainSheet = findMainSheet(parseResult.sheets);
+  const aPlusSheet = findAPlusSheet(parseResult.sheets);
   const mainImageItems = normalizeMainImageItems(mainSheet, referenceAssets, modelId, seriesTemplate);
   const modules = normalizeAPlusModules(aPlusSheet, referenceAssets, modelId, seriesTemplate);
-  const reviewWarnings = [
+  const reviewWarnings = dedupeWarnings([
     ...mainImageItems.flatMap((item) => item.reviewWarnings),
     ...modules.flatMap((module) => module.reviewWarnings),
-  ];
+  ]);
 
   return {
     seriesTemplate,
@@ -837,7 +942,7 @@ export function normalizeEcommerceAnalysis(
       groupId: 'aplus-group',
       title: `${projectMeta.productName || 'A+'} A+ 模块`,
       modules,
-      groupWarnings: modules.flatMap((module) => module.reviewWarnings),
+      groupWarnings: dedupeWarnings(modules.flatMap((module) => module.reviewWarnings)),
     },
     reviewWarnings,
   };

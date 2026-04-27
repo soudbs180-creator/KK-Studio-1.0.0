@@ -9,28 +9,18 @@ import {
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
+import {
+  SettingsActionButton,
+  SettingsBadge,
+  SettingsDangerZone,
+  SettingsHero,
+  SettingsMetricCard,
+  SettingsSection,
+  SettingsViewShell,
+} from '../SettingsScaffold';
 import { EmptyState, SegmentedControlMulti, SettingSelect, StatusBadge } from '../ui/index';
 
 type LevelFilter = 'all' | 'error' | 'warning' | 'info';
-
-const LogMetricCard: React.FC<{ label: string; value: string; helper: string; badge?: React.ReactNode }> = ({
-  label,
-  value,
-  helper,
-  badge,
-}) => (
-  <section className="settings-reference-card settings-reference-card--elevated">
-    <div className="settings-reference-card__header">
-      <div>
-        <div className="settings-reference-card__eyebrow">{label}</div>
-        <div className="settings-reference-card__title">{value}</div>
-        <div className="settings-reference-card__meta">{helper}</div>
-      </div>
-      {badge}
-    </div>
-  </section>
-);
 
 export const SystemLogsView: React.FC = () => {
   const { locale, pick } = useLocale();
@@ -219,6 +209,16 @@ export const SystemLogsView: React.FC = () => {
   };
 
   const handleClearLogs = () => {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            '确认清空今日日志缓存吗？此操作不可撤销。',
+            'Clear today’s log cache? This action cannot be undone.',
+          ),
+        );
+    if (!confirmed) return;
+
     clearLogs();
     setLogs([]);
     notify.success(
@@ -230,58 +230,66 @@ export const SystemLogsView: React.FC = () => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">{pick('高级设置', 'Advanced Settings')}</div>
-            <h2>{pick('系统日志', 'Logs')}</h2>
-            <p>
-              {pick(
-                '这里集中查看实时日志流、过滤条件和高优先级告警，方便快速排查运行风险。',
-                'Inspect the live stream, filters, and alert summary from a single runtime console.'
-              )}
-            </p>
-          </div>
-          <div className="settings-reference-actions">
+        <SettingsHero
+          eyebrow={pick('高级设置', 'Advanced settings')}
+          title={pick('日志', 'Logs')}
+          description={pick(
+            '查看实时日志、过滤和告警。',
+            'Inspect live logs, filters, and alerts.'
+          )}
+          badge={(
             <SettingsBadge tone={isStreamPaused ? 'neutral' : errorLogs.length > 0 ? 'amber' : 'emerald'}>
               {isStreamPaused ? pick('流已暂停', 'Stream Paused') : pick('实时流', 'Live Stream')}
             </SettingsBadge>
-            <SettingsActionButton icon={isStreamPaused ? Play : Pause} onClick={handleToggleStream}>
-              {isStreamPaused ? pick('恢复流', 'Resume Stream') : pick('暂停流', 'Pause Stream')}
-            </SettingsActionButton>
-            <SettingsActionButton icon={Download} tone="primary" onClick={handleDownload}>
-              {pick('导出日志', 'Export Logs')}
-            </SettingsActionButton>
-          </div>
-        </div>
+          )}
+          actions={(
+            <>
+              <SettingsActionButton icon={isStreamPaused ? Play : Pause} onClick={handleToggleStream}>
+                {isStreamPaused ? pick('恢复流', 'Resume Stream') : pick('暂停流', 'Pause Stream')}
+              </SettingsActionButton>
+              <SettingsActionButton icon={Download} tone="primary" onClick={handleDownload}>
+                {pick('导出日志', 'Export Logs')}
+              </SettingsActionButton>
+            </>
+          )}
+          metrics={(
+            <>
+              <SettingsMetricCard
+                label={pick('今日', 'Today')}
+                value={pick(`${logs.length} 条`, `${logs.length} rows`)}
+                helper={pick('当前本地日期内写入的全部日志。', 'All log entries recorded during the current local day.')}
+                tone="indigo"
+              />
+              <SettingsMetricCard
+                label={pick('可见', 'Visible')}
+                value={pick(`${filteredLogs.length} 条`, `${filteredLogs.length} rows`)}
+                helper={hasFilters ? pick('当前筛选条件正在限制结果范围。', 'Current filters are limiting the live stream.') : pick('当前展示了全部可用日志。', 'The stream is showing every available log row.')}
+                tone={hasFilters ? 'amber' : 'neutral'}
+              />
+              <SettingsMetricCard
+                label={pick('错误', 'Errors')}
+                value={`${errorLogs.length}`}
+                helper={errorLogs.length > 0 ? pick('建议优先排查严重和错误级别日志。', 'Critical or error entries should be triaged first.') : pick('当前没有严重或错误日志。', 'No critical or error entries are present right now.')}
+                tone={errorLogs.length > 0 ? 'rose' : 'emerald'}
+              />
+              <SettingsMetricCard
+                label={pick('来源', 'Sources')}
+                value={`${sourceOptions.length}`}
+                helper={latestLog ? pick(`最近更新于 ${formatLogTime(latestLog.timestamp)}`, `Latest update ${formatLogTime(latestLog.timestamp)}`) : pick('还没有收到新的实时更新。', 'No live updates have arrived yet.')}
+                tone="neutral"
+              />
+            </>
+          )}
+        />
 
-        <div className="settings-reference-grid-4">
-          <LogMetricCard
-            label={pick('今日', 'Today')}
-            value={pick(`${logs.length} 条`, `${logs.length} rows`)}
-            helper={pick('当前本地日期内写入的全部日志。', 'All log entries recorded during the current local day.')}
-            badge={<SettingsBadge tone="indigo">{pick('总量', 'Total')}</SettingsBadge>}
-          />
-          <LogMetricCard
-            label={pick('可见', 'Visible')}
-            value={pick(`${filteredLogs.length} 条`, `${filteredLogs.length} rows`)}
-            helper={hasFilters ? pick('当前筛选条件正在限制结果范围。', 'Current filters are limiting the live stream.') : pick('当前展示了全部可用日志。', 'The stream is showing every available log row.')}
-            badge={<SettingsBadge tone={hasFilters ? 'amber' : 'neutral'}>{hasFilters ? pick('已筛选', 'Filtered') : pick('全部', 'All')}</SettingsBadge>}
-          />
-          <LogMetricCard
-            label={pick('错误', 'Errors')}
-            value={`${errorLogs.length}`}
-            helper={errorLogs.length > 0 ? pick('建议优先排查严重和错误级别日志。', 'Critical or error entries should be triaged first.') : pick('当前没有严重或错误日志。', 'No critical or error entries are present right now.')}
-            badge={<StatusBadge status={errorLogs.length > 0 ? 'error' : 'online'} label={errorLogs.length > 0 ? pick('需处理', 'Attention') : pick('健康', 'Healthy')} />}
-          />
-          <LogMetricCard
-            label={pick('来源', 'Sources')}
-            value={`${sourceOptions.length}`}
-            helper={latestLog ? pick(`最近更新于 ${formatLogTime(latestLog.timestamp)}`, `Latest update ${formatLogTime(latestLog.timestamp)}`) : pick('还没有收到新的实时更新。', 'No live updates have arrived yet.')}
-            badge={<SettingsBadge tone="neutral">{pick('信号源', 'Feeds')}</SettingsBadge>}
-          />
-        </div>
-
-        <section className="settings-reference-card settings-reference-card--soft">
+        <SettingsSection
+          title={pick('过滤与流控制', 'Filters and stream control')}
+          eyebrow={pick('查看范围', 'View scope')}
+          description={pick(
+            '统一控制级别、来源和流状态。',
+            'Control severity, source, and stream state in one place.'
+          )}
+        >
           <div className="settings-reference-toolbar">
             <div className="settings-reference-toolbar__filters">
               <div className="min-w-[280px] max-w-full">
@@ -312,18 +320,19 @@ export const SystemLogsView: React.FC = () => {
               <StatusBadge status={isStreamPaused ? 'paused' : 'online'} label={isStreamPaused ? pick('已暂停', 'Paused') : pick('运行中', 'Running')} />
             </div>
           </div>
-        </section>
+        </SettingsSection>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-          <section className="settings-reference-card">
+          <SettingsSection
+            title={pick('日志流列表', 'Streaming log rows')}
+            eyebrow={pick('实时流', 'Live feed')}
+            description={pick(
+              '保留时间、来源、级别和详情。',
+              'Keep timestamp, source, level, and details visible.'
+            )}
+          >
             <div className="settings-reference-card__header">
-              <div>
-                <div className="settings-reference-card__eyebrow">{pick('实时流', 'Live Feed')}</div>
-                <div className="settings-reference-card__title">{pick('日志流列表', 'Streaming Log Rows')}</div>
-                <div className="settings-reference-card__meta">
-                  {pick('每一条都会保留时间、来源、级别和详情，方便直接定位问题。', 'Each row keeps the timestamp, source, level, and detail block visible.')}
-                </div>
-              </div>
+              <div />
               <ScrollText size={18} className="text-[var(--text-primary)]" />
             </div>
 
@@ -353,18 +362,19 @@ export const SystemLogsView: React.FC = () => {
                 ))}
               </div>
             )}
-          </section>
+          </SettingsSection>
 
           <div className="settings-reference-stack">
-            <section className="settings-reference-card">
+            <SettingsSection
+              title={pick('当前信号', 'Current signal')}
+              eyebrow={pick('告警摘要', 'Alert summary')}
+              description={pick(
+                '快速查看告警数量和主要来源。',
+                'Quickly review alert count and priority source.'
+              )}
+            >
               <div className="settings-reference-card__header">
-                <div>
-                  <div className="settings-reference-card__eyebrow">{pick('告警摘要', 'Alert Summary')}</div>
-                  <div className="settings-reference-card__title">{pick('当前信号', 'Current Signal')}</div>
-                  <div className="settings-reference-card__meta">
-                    {pick('快速查看当前的告警压力和最高优先级消息。', 'A compact summary of alert pressure and the highest-priority message in the stream.')}
-                  </div>
-                </div>
+                <div />
                 <ShieldAlert size={18} className="text-[var(--text-primary)]" />
               </div>
 
@@ -397,49 +407,49 @@ export const SystemLogsView: React.FC = () => {
                   <div className="settings-reference-list-item__value">{latestCritical?.source || pick('无', 'None')}</div>
                 </div>
               </div>
-            </section>
+            </SettingsSection>
 
-            <section className="settings-reference-card settings-reference-card--soft">
-              <div className="settings-reference-card__header">
-                <div>
-                  <div className="settings-reference-card__eyebrow">{pick('最新告警', 'Latest Alert')}</div>
-                  <div className="settings-reference-card__title">
-                    {latestCritical ? getLevelLabel(latestCritical.level) : pick('没有严重事件', 'No critical event')}
-                  </div>
-                  <div className="settings-reference-card__meta">
-                    {latestCritical
-                      ? `${formatLogTime(latestCritical.timestamp)} · ${latestCritical.source}`
-                      : pick('当前实时流中没有严重或错误日志。', 'The live stream has no critical or error rows right now.')}
-                  </div>
-                </div>
+            <SettingsSection
+              title={pick('最新告警', 'Latest alert')}
+              eyebrow={pick('最新告警', 'Latest alert')}
+              description={
+                latestCritical
+                  ? `${formatLogTime(latestCritical.timestamp)} · ${latestCritical.source}`
+                  : pick('当前实时流中没有严重或错误日志。', 'The live stream has no critical or error rows right now.')
+              }
+              action={(
                 <StatusBadge
                   status={latestCritical ? getLevelStatus(latestCritical.level) : 'online'}
                   label={latestCritical ? pick('待排查', 'Investigate') : pick('稳定', 'Stable')}
                 />
+              )}
+            >
+              <div className="settings-reference-card__header">
+                <div>
+                  <div className="settings-reference-card__title">
+                    {latestCritical ? getLevelLabel(latestCritical.level) : pick('没有严重事件', 'No critical event')}
+                  </div>
+                </div>
+                <div />
               </div>
               <div className="mt-4 text-[14px] leading-6 text-[var(--text-secondary)]">
                 {latestCritical?.message || pick('普通警告和信息日志可以在左侧日志流中继续查看。', 'Warnings and informational rows can be reviewed from the stream without urgent intervention.')}
               </div>
-            </section>
+            </SettingsSection>
 
             {logs.length > 0 ? (
-              <section className="settings-reference-card settings-reference-danger">
-                <div className="settings-reference-card__header">
-                  <div>
-                    <div className="settings-reference-card__eyebrow">{pick('危险操作', 'Danger Zone')}</div>
-                    <div className="settings-reference-card__title">{pick('清空今日日志缓存', 'Clear Today’s Log Cache')}</div>
-                    <div className="settings-reference-card__meta">
-                      {pick('这会删除今天的全部缓存日志，而不仅仅是当前筛选结果。', 'This removes all cached log rows for the current day, not just the currently visible filtered result.')}
-                    </div>
-                  </div>
-                  <Trash2 size={18} className="text-[var(--state-danger-text)]" />
-                </div>
-                <div className="mt-4">
+              <SettingsDangerZone
+                title={pick('清空今日日志缓存', 'Clear today’s log cache')}
+                description={pick(
+                  '会清空今天的全部缓存日志，不只是当前筛选结果。',
+                  'This clears every cached log row for today, not only the filtered view.'
+                )}
+                action={(
                   <SettingsActionButton icon={Trash2} tone="danger" onClick={handleClearLogs}>
                     {pick('清空日志缓存', 'Clear Log Cache')}
                   </SettingsActionButton>
-                </div>
-              </section>
+                )}
+              />
             ) : null}
           </div>
         </div>

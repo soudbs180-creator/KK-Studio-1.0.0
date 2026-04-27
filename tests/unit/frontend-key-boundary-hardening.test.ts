@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('keyManager blocks browser-side provider diagnostics and anonymous/local secret persistence', () => {
+test('keyManager blocks browser-side provider diagnostics while allowing loopback temp-user local persistence', () => {
   const source = readSource('src/services/auth/keyManager.ts');
   const storageSource = readSource('src/services/auth/keyManagerStorage.ts');
 
@@ -18,8 +18,10 @@ test('keyManager blocks browser-side provider diagnostics and anonymous/local se
   assert.match(storageSource, /const BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE = "Browser-side provider diagnostics are disabled\. Save the key to your account and use the server-side secure proxy path instead\.";/);
   assert.match(storageSource, /type ProviderStorageScope = "anonymous" \| "user" \| "cloud" \| "none";/);
   assert.match(storageSource, /function isBrowserRuntime\(\): boolean \{/);
+  assert.match(storageSource, /function shouldAllowSessionlessLocalUserApiStorage\(\): boolean \{/);
   assert.match(storageSource, /function createBrowserDirectProviderChecksDisabledError\(\): Error \{/);
   assert.match(source, /private purgeAnonymousSensitiveLocalCaches\(\): void \{/);
+  assert.match(source, /private canUseSessionlessLocalUserApiStorage\(\): boolean \{/);
   assert.match(storageSource, /localStorage\.removeItem\(LEGACY_API_KEYS_STORAGE_KEY\);/);
   assert.match(storageSource, /localStorage\.removeItem\(STORAGE_KEY\);/);
   assert.match(storageSource, /localStorage\.removeItem\(PROVIDERS_STORAGE_KEY\);/);
@@ -28,6 +30,8 @@ test('keyManager blocks browser-side provider diagnostics and anonymous/local se
   assert.match(source, /return USER_API_LOGIN_REQUIRED_MESSAGE;/);
   assert.match(source, /private getBrowserDirectProviderChecksDisabledMessage\(\): string \{/);
   assert.match(source, /console\.warn\('\[KeyManager\] Anonymous local key storage is disabled\.'\);/);
+  assert.match(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*localStorage\.setItem\(key, JSON\.stringify\(toSave\)\);\s*return;\s*\}/);
+  assert.match(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*console\.log\('\[KeyManager\] Skip local API payload sync \(sessionless local storage active\)'\);\s*return;\s*\}/);
   assert.match(source, /async testChannel\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*success: false,\s*message: this\.getBrowserDirectProviderChecksDisabledMessage\(\),\s*\};\s*\}/);
   assert.match(source, /async fetchRemoteModels\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*console\.warn\('\[KeyManager\] Browser-side remote model discovery is disabled\.'\);\s*return \[\];\s*\}/);
   assert.match(source, /async validateKey\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*valid: false,\s*error: this\.getBrowserDirectProviderChecksDisabledMessage\(\),\s*\};\s*\}/);
@@ -108,7 +112,9 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /import \{ resolveUserApiViewState \} from '\.\.\/\.\.\/services\/api\/userApiViewState';/);
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
   assert.match(source, /const authenticatedUserId = !isTempUser \? \(user\?\.id \|\| keyManager\.getUserId\(\)\) : null;/);
-  assert.match(source, /const isAuthenticated = Boolean\(authenticatedUserId\);/);
+  assert.match(source, /const hasAuthenticatedUser = Boolean\(authenticatedUserId\);/);
+  assert.match(source, /const canUseSessionlessLocalDraftStorage =/);
+  assert.match(source, /const sessionlessLocalDraftHelper = canUseSessionlessLocalDraftStorage/);
   assert.match(source, /const userApiViewState = resolveUserApiViewState\(\{/);
   assert.match(source, /const isHydratingRuntimeUserApis = userApiViewState\.isHydratingRuntimeUserApis;/);
   assert.match(source, /const userApiActionsDisabled = userApiViewState\.userApiActionsDisabled;/);
@@ -123,9 +129,8 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const browserDirectChecksHelper = pick\(/);
   assert.match(source, /const ensureUserApiActionsAllowed = \(\): boolean => \{/);
   assert.match(source, /const ensureProviderActionsAllowed = \(\): boolean => \{/);
-  assert.match(source, /if \(!isAuthenticated\) \{/);
   assert.match(source, /if \(hasReadonlySnapshot\) \{\s*return true;\s*\}/);
-  assert.match(source, /const beginCreateOfficial = \(\) => \{\s*if \(!ensureUserApiActionsAllowed\(\)\) \{\s*return;\s*\}/);
+  assert.match(source, /const beginCreateOfficial = \(provider: OfficialProvider = 'Google'\) => \{\s*if \(!ensureUserApiActionsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /const beginCreateProvider = \(\) => \{\s*if \(!ensureProviderActionsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /const startEditOfficial = \(slot: KeySlot\) => \{\s*if \(!ensureUserApiActionsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /const startEditProvider = \(provider: ThirdPartyProvider\) => \{\s*if \(!ensureProviderActionsAllowed\(\)\) \{\s*return;\s*\}/);
@@ -140,12 +145,12 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /'Browser direct calls disabled'/);
   assert.match(source, /if \(!ensureBrowserDirectDiagnosticsAllowed\(\)\) \{\s*return;\s*\}/);
   assert.match(source, /resolveApiWorkbenchDiagnosticsAvailability/);
-  assert.match(source, /const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability\(\{\s*isAuthenticated,\s*isApiReachable: apiHealth\?\.reachable,\s*\}\);/);
+  assert.match(source, /const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability\(\{\s*hasWorkbenchAccess,\s*isApiReachable: apiHealth\?\.reachable,\s*\}\);/);
   assert.match(source, /const diagnosticsRefreshDisabled = diagnosticsAvailability\.refreshDisabled;/);
   assert.match(source, /const routeDiagnosticsActionDisabled = diagnosticsAvailability\.routeActionsDisabled;/);
   assert.doesNotMatch(source, /const diagnosticsActionDisabled = !isAuthenticated \|\| apiHealth\?\.reachable === false;/);
   assert.doesNotMatch(source, /const headerPrimaryActionDisabled = activeTab === 'official' \? userApiActionsDisabled : providerActionsDisabled;/);
-  assert.match(source, /data-testid="api-official-empty-create" icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{beginCreateOfficial\}/);
+  assert.match(source, /data-testid="api-official-empty-create" icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => beginCreateOfficial\(\)\}/);
   assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => startEditOfficial\(slot\)\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);
@@ -168,8 +173,9 @@ test('AuthContext keeps KeyManager scoped to the current KK runtime user and cle
   assert.match(source, /import \{ keyManager \} from ["']\.\.\/services\/auth\/keyManager["'];/);
   assert.match(source, /useLayoutEffect/);
   assert.match(source, /const runtimeUserId = runtimeState\.user\?\.id \|\| null;/);
-  assert.match(source, /const keyManagerUserId = runtimeState\.isTempUser \? null : runtimeUserId;/);
-  assert.match(source, /void keyManager\.setUserId\(keyManagerUserId\)\.catch\(\(error\) => \{/);
+  assert.match(source, /const allowSessionlessLocalUserApiStorage =/);
+  assert.match(source, /const keyManagerUserId = allowSessionlessLocalUserApiStorage/);
+  assert.match(source, /void keyManager\.setUserId\(keyManagerUserId, \{\s*sessionlessLocalUserApiStorageEnabled: allowSessionlessLocalUserApiStorage,\s*\}\)\.catch\(\(error\) => \{/);
   assert.match(source, /emitAuthSessionChange\(\{\s*hasSession: Boolean\(sessionAccessToken\) && !runtimeState\.isTempUser,/);
   assert.match(source, /subscribeAuthSessionInvalidationRequest\(\(\) => \{/);
   assert.match(source, /setRuntimeState\(clearPersistedRuntimeAuthState\(\)\);/);
@@ -178,9 +184,11 @@ test('AuthContext keeps KeyManager scoped to the current KK runtime user and cle
 test('KeyManager clears prior in-memory user state before hydrating the next account scope', () => {
   const source = readSource('src/services/auth/keyManager.ts');
 
-  assert.match(source, /async setUserId\(userId: string \| null\) \{/);
+  assert.match(source, /async setUserId\(\s*userId: string \| null,\s*options\?: \{\s*sessionlessLocalUserApiStorageEnabled\?: boolean;\s*\},\s*\) \{/);
   assert.match(source, /this\.loadProviders\(true\);\s*this\.state = this\.loadState\(\);\s*this\.globalModelListCache = null;\s*this\.notifyListeners\(\);/);
   assert.match(source, /if \(this\.state\.slots\.length > 0\) \{\s*console\.log\('\[KeyManager\] Local cache loaded:', this\.state\.slots\.length, 'slots'\);/);
+  assert.match(source, /this\.sessionlessLocalUserApiStorageEnabled =/);
+  assert.match(source, /console\.log\('\[KeyManager\] Local-only temp user storage enabled:', userId\);/);
 });
 
 test('BillingContext clears balance and transaction state immediately when the user scope changes', () => {

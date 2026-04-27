@@ -9,20 +9,15 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('mobile settings shell keeps the focused four-entry home inside the shared router-backed workbench', () => {
+test('mobile settings shell opens the overview directly inside the shared router-backed workbench', () => {
   const appSource = readSource('src/App.tsx');
   const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
   const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
   const registrySource = readSource('src/components/settings/settingsRegistry.ts');
-  const homeSource = readSource('src/components/settings/mobile/MobileSettingsHome.tsx');
 
-  assert.match(homeSource, /data-testid="mobile-settings-home"/);
-  assert.match(homeSource, /Overview \/ API \/ Billing \/ Errors/);
-  assert.match(homeSource, /label: 'Overview'/);
-  assert.match(homeSource, /label: 'Billing'/);
-  assert.match(homeSource, /label: 'Errors'/);
-  assert.doesNotMatch(homeSource, /Storage/);
-  assert.match(settingsSource, /MobileSettingsHome/);
+  assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
+  assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
+  assert.match(settingsSource, /activeView === 'dashboard' \? pick\('关闭设置', 'Close settings'\) : pick\('返回设置总览', 'Back to settings overview'\)/);
   assert.match(settingsSource, /onBackToApiManagement/);
   assert.doesNotMatch(settingsSource, /settings-shell-mobile__focus/);
   assert.doesNotMatch(appSource, /mobileSettingsSection/);
@@ -35,4 +30,15 @@ test('mobile settings shell keeps the focused four-entry home inside the shared 
   assert.doesNotMatch(mobileSurfaceSource, /settings-page/);
   assert.match(registrySource, /id: 'storage-settings'/);
   assert.match(registrySource, /id: 'system-logs'/);
+});
+
+test('mobile settings shell treats settings root as the dashboard detail route', () => {
+  const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+
+  assert.doesNotMatch(settingsSource, /SettingsRouterLocationState/);
+  assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
+  assert.doesNotMatch(settingsSource, /isMobileHomeRoute/);
+  assert.doesNotMatch(settingsSource, /showHome/);
+  assert.doesNotMatch(settingsSource, /setShowHome/);
+  assert.match(settingsSource, /const handleNavigate = \(view: CanonicalSettingsViewId\) => \{\s*navigate\(buildSettingsPath\(view\)\);\s*\};/);
 });

@@ -75,15 +75,11 @@ function loadStatusRouteHarness(options: RouteHarnessOptions = {}) {
     PORT: process.env.PORT,
     PAYMENT_SIDECAR_INTERNAL_TOKEN: process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN,
     KK_API_BASE_URL: process.env.KK_API_BASE_URL,
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 
   process.env.PORT = "0";
   process.env.PAYMENT_SIDECAR_INTERNAL_TOKEN = "test-internal-token";
   process.env.KK_API_BASE_URL = "https://api.kk.local";
-  process.env.SUPABASE_URL = "https://db.kk.local";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
   const routeHandlers = new Map<string, (req: any, res: any) => Promise<unknown>>();
   const alipayExecCalls: Array<{ method: string; params: unknown }> = [];

@@ -53,15 +53,6 @@ export function setTaskPersistenceStorageUserId(userId: string | null): void {
   setCachedResolvedStorageUserId(userId);
 }
 
-function isSupabaseAuthLockError(error: unknown): boolean {
-  const name = error instanceof Error ? error.name : '';
-  const message = error instanceof Error ? error.message : String(error || '');
-
-  return name === 'NavigatorLockAcquireTimeoutError'
-    || /NavigatorLockAcquireTimeoutError/i.test(message)
-    || /lock:sb-/i.test(message);
-}
-
 function buildTaskRecordId(taskId: string): string {
   return `task_${taskId}`;
 }

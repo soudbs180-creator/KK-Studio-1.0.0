@@ -17,6 +17,7 @@ import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 
 const truncateByChars = (text: string, maxChars: number): string => {
@@ -103,6 +104,53 @@ const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
     return null;
 };
 
+const getPptDeckStageLabel = (stage: NonNullable<PromptNode['pptDeck']>['stage']) => {
+    switch (stage) {
+        case 'generating':
+            return '生成中';
+        case 'ready':
+            return '可导出';
+        case 'failed':
+            return '异常';
+        case 'exported':
+            return '已导出';
+        case 'descriptions':
+            return '待生成';
+        default:
+            return '待整理';
+    }
+};
+
+const getPptDeckStageTone = (stage: NonNullable<PromptNode['pptDeck']>['stage']) => {
+    switch (stage) {
+        case 'generating':
+            return 'border-blue-500/30 bg-blue-500/10 text-blue-200';
+        case 'ready':
+            return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+        case 'failed':
+            return 'border-rose-500/30 bg-rose-500/10 text-rose-200';
+        case 'exported':
+            return 'border-indigo-500/30 bg-indigo-500/10 text-indigo-200';
+        default:
+            return 'border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]';
+    }
+};
+
+const getPptPageStatusTone = (status: NonNullable<NonNullable<PromptNode['pptDeck']>['pages']>[number]['generationStatus']) => {
+    switch (status) {
+        case 'ready':
+            return 'border-emerald-500/25 bg-emerald-500/8 text-emerald-200';
+        case 'generating':
+            return 'border-blue-500/25 bg-blue-500/8 text-blue-200';
+        case 'error':
+            return 'border-rose-500/25 bg-rose-500/8 text-rose-200';
+        case 'queued':
+            return 'border-amber-500/25 bg-amber-500/8 text-amber-200';
+        default:
+            return 'border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]';
+    }
+};
+
 type EcommercePromptBadge = { label: string; tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'neutral' };
 
 const getEcommerceAssetPreviewLabel = (
@@ -141,7 +189,7 @@ const getEcommerceSelectionBadges = (
         ),
     );
 
-    if (ecommerce.kind !== 'a-plus-group' && ecommerce.selectedForGeneration === false) {
+    if (ecommerce.kind !== 'a-plus-group' && ecommerce.kind !== 'framework' && ecommerce.selectedForGeneration === false) {
         badges.push({ label: '已跳过', tone: 'neutral' });
     }
 
@@ -149,7 +197,7 @@ const getEcommerceSelectionBadges = (
         badges.push({ label: '待编辑', tone: 'amber' });
     }
 
-    if (ecommerce.stage === 'ready' && ecommerce.selectedForGeneration !== false && ecommerce.kind !== 'a-plus-group') {
+    if (ecommerce.stage === 'ready' && ecommerce.selectedForGeneration !== false && ecommerce.kind !== 'a-plus-group' && ecommerce.kind !== 'framework') {
         badges.push({ label: '已确认生成', tone: 'blue' });
     }
 
@@ -230,9 +278,24 @@ interface PromptNodeProps {
     onSetEcommerceGroupSelection?: (node: PromptNode, selected: boolean) => void;
     onGenerateEcommerceNode?: (node: PromptNode) => void;
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
+    onGenerateEcommerceFramework?: (node: PromptNode) => void;
+    onPauseEcommerceFramework?: (node: PromptNode) => void;
+    onResumeEcommerceFramework?: (node: PromptNode) => void;
+    onCancelEcommerceNodeQueue?: (node: PromptNode) => void;
     onConfirmEcommerceDesktop?: (node: PromptNode) => void;
     onRetryEcommerceModule?: (node: PromptNode) => void;
     onExportEcommerceGroup?: (node: PromptNode) => void;
+    ecommerceFrameworkStatus?: {
+        activeSheet: string;
+        paused: boolean;
+        queued: number;
+        dispatching: number;
+        running: number;
+        completed: number;
+        failed: number;
+        pausedItems: number;
+        total: number;
+    } | null;
     ecommerceSlotState?: EcommerceGroupSlotState | null;
     activeEcommerceTaskState?: EcommerceEditableTaskState | null;
     onActivateEcommerceTask?: (node: PromptNode) => void;
@@ -479,9 +542,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onSetEcommerceGroupSelection,
     onGenerateEcommerceNode,
     onGenerateEcommerceGroup,
+    onGenerateEcommerceFramework,
+    onPauseEcommerceFramework,
+    onResumeEcommerceFramework,
+    onCancelEcommerceNodeQueue,
     onConfirmEcommerceDesktop,
     onRetryEcommerceModule,
     onExportEcommerceGroup,
+    ecommerceFrameworkStatus = null,
     ecommerceSlotState = null,
     activeEcommerceTaskState = null,
     onActivateEcommerceTask,
@@ -896,9 +964,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     }, [isDragging]);
 
     const effectiveChildImageCount = Math.max(0, actualChildImageCount);
+    const pptDeck = node.mode === GenerationMode.PPT ? buildPptDeckModuleState(node) : null;
+    const pptReadyPageCount = pptDeck?.pages.filter((page) => page.generationStatus === 'ready').length || 0;
     const renderedSuccessCount = effectiveChildImageCount > 0
         ? effectiveChildImageCount
-        : Math.max(0, Number(node.lastGenerationSuccessCount || 0));
+        : (pptReadyPageCount > 0 ? pptReadyPageCount : Math.max(0, Number(node.lastGenerationSuccessCount || 0)));
     const renderedFailCount = Math.max(0, Number(node.lastGenerationFailCount || 0));
     const showError = Boolean(node.error);
     const isThumbnailShell = detailLevel === 'thumbnail-shell';
@@ -1226,7 +1296,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <span>{node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}</span>
                             </button>
                         )}
-                        {node.mode === GenerationMode.ECOMMERCE && node.ecommerce && onToggleEcommerceSelected && node.ecommerce.kind !== 'a-plus-group' && (
+                        {node.mode === GenerationMode.ECOMMERCE && node.ecommerce && onToggleEcommerceSelected && node.ecommerce.kind !== 'a-plus-group' && node.ecommerce.kind !== 'framework' && (
                             <button
                                 type="button"
                                 onClick={(e) => {
@@ -1292,6 +1362,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 {node.mode === GenerationMode.ECOMMERCE
                     && node.ecommerce
                     && node.ecommerce.kind !== 'a-plus-group'
+                    && node.ecommerce.kind !== 'framework'
                     && ecommerceSlotState
                     && (ecommerceSlotState.currentImageId || ecommerceSlotState.history.length > 1) ? (
                     <div
@@ -1598,90 +1669,189 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 node={node}
                                 taskState={node.ecommerce.editableTask}
                                 activeTaskState={activeEcommerceTaskState}
+                                frameworkStatus={ecommerceFrameworkStatus}
                                 onActivateTask={onActivateEcommerceTask}
                                 onTaskStateChange={onEcommerceTaskStateChange}
                                 onToggleSelected={onToggleEcommerceSelected}
                                 onSetGroupSelection={onSetEcommerceGroupSelection}
                                 onGenerateNode={onGenerateEcommerceNode}
                                 onGenerateGroup={onGenerateEcommerceGroup}
+                                onGenerateFramework={onGenerateEcommerceFramework}
+                                onPauseFramework={onPauseEcommerceFramework}
+                                onResumeFramework={onResumeEcommerceFramework}
+                                onCancelNodeQueue={onCancelEcommerceNodeQueue}
                                 onConfirmDesktop={onConfirmEcommerceDesktop}
                                 onGenerateMobile={onRetryEcommerceModule}
                             />
                         )}
 
-                        {onEditPptDeck && node.mode === GenerationMode.PPT && (node.childImageIds?.length || 0) > 0 && !node.isGenerating && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditPptDeck(node);
-                                }}
-                                className="px-2 py-1 rounded-md border text-[11px] leading-none bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
-                                title={pickByDocumentLanguage('编辑分层 PPT 内容', 'Edit layered PPT content')}
-                            >
-                                {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
-                            </button>
-                        )}
-
-                        {onExportPpt && node.mode === GenerationMode.PPT && (node.childImageIds?.length || 0) > 0 && !node.isGenerating && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onExportPpt(node);
-                                }}
-                                className="px-2 py-1 rounded-md border text-[11px] leading-none bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500/20"
-                                title="导出该PPT主卡的页面包"
-                            >
-                                导出包
-                            </button>
-                        )}
-
-                        {onExportPptx && node.mode === GenerationMode.PPT && (node.childImageIds?.length || 0) > 0 && !node.isGenerating && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onExportPptx(node);
-                                }}
-                                className="px-2 py-1 rounded-md border text-[11px] leading-none bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20"
-                                title="导出PPTX文档"
-                            >
-                                导出PPTX
-                            </button>
-                        )}
                     </div>
 
                     {/* 错误详情面板已被移除 */}
 
 
-                    {node.mode === GenerationMode.PPT && !node.isGenerating && (node.childImageIds?.length || 0) > 0 && onRetryPptPage && (
-                        <div className="mt-2 p-2 rounded-lg border" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)', ...secondaryTextRenderStyle }}>
-                            <div className="text-[10px] mb-1 text-[var(--text-tertiary)]">单页重生</div>
-                            <div className="flex flex-wrap gap-1">
-                                {Array.from({ length: Math.min(20, node.childImageIds.length) }).map((_, idx) => (
-                                    <div key={`retry-ppt-${idx}`} className="flex items-center gap-0.5">
-                                        <button
-                                            className="px-1.5 py-0.5 rounded border text-[10px] border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onRetryPptPage(node, idx);
-                                            }}
-                                            title={`重生图${idx + 1}`}
-                                        >
-                                            图{idx + 1}
-                                        </button>
-                                        {onExportPptPage && (
-                                            <button
-                                                className="px-1 py-0.5 rounded border text-[10px] border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onExportPptPage(node, idx);
-                                                }}
-                                                title={`导出图${idx + 1}`}
-                                            >
-                                                导
-                                            </button>
-                                        )}
+                    {node.mode === GenerationMode.PPT && pptDeck && pptDeck.pageCount > 0 && (
+                        <div
+                            data-testid="ppt-deck-container"
+                            className="mt-3 rounded-[18px] border p-3"
+                            style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)', ...secondaryTextRenderStyle }}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">PPT 页面模块</div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <div className="min-w-0 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                                            {pptDeck.title}
+                                        </div>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[10px] ${getPptDeckStageTone(pptDeck.stage)}`}>
+                                            {getPptDeckStageLabel(pptDeck.stage)}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">
+                                        {`${pptDeck.pageCount} 页 · ${pptReadyPageCount} 页已生成 · ${pptDeck.styleLocked ? '风格锁定' : '风格可变'}`}
+                                    </div>
+                                </div>
+                                {pptDeck.lastThumbnailUrl ? (
+                                    <img
+                                        src={pptDeck.lastThumbnailUrl}
+                                        alt="PPT deck preview"
+                                        className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-[var(--border-light)] text-[10px] text-[var(--text-tertiary)]">
+                                        Deck
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                {onEditPptDeck && !node.isGenerating && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditPptDeck(node);
+                                        }}
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                                        title={pickByDocumentLanguage('编辑分层 PPT 内容', 'Edit layered PPT content')}
+                                    >
+                                        {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
+                                    </button>
+                                )}
+                                {onExportPpt && pptReadyPageCount > 0 && !node.isGenerating && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onExportPpt(node);
+                                        }}
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500/20"
+                                        title="导出该 PPT 项目的页面包"
+                                    >
+                                        导出页面包
+                                    </button>
+                                )}
+                                {onExportPptx && pptReadyPageCount > 0 && !node.isGenerating && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onExportPptx(node);
+                                        }}
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20"
+                                        title="导出 PPTX 文档"
+                                    >
+                                        导出 PPTX
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                                {pptDeck.pages.slice(0, 6).map((page) => (
+                                    <div
+                                        key={`ppt-page-module-${page.pageIndex}`}
+                                        className="rounded-xl border p-2.5"
+                                        style={{ borderColor: 'var(--border-light)', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                                    >
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9px] text-sky-200">
+                                                        P{page.pageNumber}
+                                                    </span>
+                                                    <div className="min-w-0 truncate text-[11px] font-medium text-[var(--text-primary)]" title={page.title}>
+                                                        {page.title}
+                                                    </div>
+                                                    <span className={`rounded-full border px-1.5 py-0.5 text-[9px] ${getPptPageStatusTone(page.generationStatus)}`}>
+                                                        {page.generationStatus === 'ready'
+                                                            ? '已生成'
+                                                            : page.generationStatus === 'generating'
+                                                                ? '生成中'
+                                                                : page.generationStatus === 'error'
+                                                                    ? '异常'
+                                                                    : page.generationStatus === 'queued'
+                                                                        ? '排队中'
+                                                                        : '待处理'}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1 line-clamp-2 text-[10px] leading-5 text-[var(--text-secondary)]" title={page.pageDescription}>
+                                                    {page.pageDescription}
+                                                </div>
+                                            </div>
+                                            {page.thumbnailUrl ? (
+                                                <img
+                                                    src={page.thumbnailUrl}
+                                                    alt={page.title}
+                                                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                                                />
+                                            ) : (
+                                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--border-light)] text-[9px] text-[var(--text-tertiary)]">
+                                                    暂无
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            {onRetryPptPage && (
+                                                <button
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onRetryPptPage(node, page.pageIndex);
+                                                    }}
+                                                    title={`重生第 ${page.pageNumber} 页`}
+                                                >
+                                                    单页重生
+                                                </button>
+                                            )}
+                                            {onExportPptPage && page.imageId && (
+                                                <button
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onExportPptPage(node, page.pageIndex);
+                                                    }}
+                                                    title={`导出第 ${page.pageNumber} 页`}
+                                                >
+                                                    导出单页
+                                                </button>
+                                            )}
+                                            {onEditPptDeck && (
+                                                <button
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditPptDeck(node);
+                                                    }}
+                                                    title={`编辑第 ${page.pageNumber} 页所在页面包`}
+                                                >
+                                                    编辑页面包
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
+                                {pptDeck.pages.length > 6 && (
+                                    <div className="text-[10px] text-[var(--text-tertiary)]">
+                                        其余 {pptDeck.pages.length - 6} 页继续在页面模块面板中管理。
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -17,14 +17,14 @@ test('resolveKkaiUserApiStorageMode treats local-file auth persistence as ready 
   );
 });
 
-test('resolveKkaiUserApiStorageMode treats supabase auth persistence as cloud-ready but still writable', () => {
+test('resolveKkaiUserApiStorageMode rejects legacy Supabase auth persistence', () => {
   assert.equal(
     resolveKkaiUserApiStorageMode({
       reachable: true,
       repositories: { authData: 'supabase' },
       persistence: { userApiKeys: true, keyManager: true },
-    }),
-    'cloud-ready',
+    } as any),
+    'not-ready',
   );
 });
 
