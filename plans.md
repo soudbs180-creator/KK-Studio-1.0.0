@@ -252,6 +252,27 @@ Validation:
 - `npm.cmd run check:encoding`
 - `npm.cmd run governance:agent-docs`
 
+### 11. Shared Theme Contrast Audit
+
+Goal: ensure the shared app, settings, toolbar, navigation, input, and auth surfaces keep readable text contrast in light, dark, and system-resolved themes.
+
+Scope:
+- Add a broad source-contract contrast test for global theme surfaces, settings panel surfaces, settings navigation glass, and light auth support text.
+- Keep the previous canvas-card parity intact.
+- Adjust only low-contrast shared text tokens and auth support colors.
+
+Acceptance:
+- Global light/dark `primary`, `secondary`, and `tertiary` text tokens meet normal text contrast on common app surfaces, inputs, and toolbars.
+- Settings light/dark text tokens meet normal text contrast on section cards, elevated cards, overlays, inputs, secondary buttons, and navigation glass.
+- Light auth helper text and placeholders remain readable on light auth surfaces.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/theme-contrast-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts"`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run check:encoding`
+- `npm.cmd run governance:agent-docs`
+
 ## Final Gate
 
 After all milestones are complete:

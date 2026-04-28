@@ -425,6 +425,18 @@ npm.cmd run check:encoding
 npm.cmd run governance:agent-docs
 ```
 
+## Shared Theme Contrast
+
+Run these when touching global theme tokens, settings panel theme tokens, toolbar/nav/input surfaces, auth theme colors, or contrast source contracts:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/theme-contrast-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:

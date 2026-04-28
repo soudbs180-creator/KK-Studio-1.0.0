@@ -719,7 +719,7 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-page--light .auth-field-help {
-  color: #6c82a7;
+  color: #5b6f92;
 }
 
 .auth-page--light .auth-field-error {
@@ -743,7 +743,7 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-page--light .auth-input-wrap input::placeholder {
-  color: #7a8fb1;
+  color: #5f759c;
 }
 
 .auth-page--light .auth-eye-btn {

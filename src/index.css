@@ -575,7 +575,7 @@ body.dark-mode {
   /* 文字 - 清晰白色 */
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-tertiary: rgba(255, 255, 255, 0.54);
   --text-muted: rgba(255, 255, 255, 0.35);
   --text-disabled: rgba(255, 255, 255, 0.2);
   --text-color: var(--text-primary);
@@ -11869,7 +11869,7 @@ body:not(.dark-mode) {
   --border-strong: rgba(15, 23, 42, 0.18);
   --text-primary: #111827;
   --text-secondary: rgba(17, 24, 39, 0.76);
-  --text-tertiary: rgba(55, 65, 81, 0.68);
+  --text-tertiary: rgba(55, 65, 81, 0.72);
   --text-muted: rgba(107, 114, 128, 0.58);
   --text-disabled: rgba(148, 163, 184, 0.56);
   --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
@@ -11925,11 +11925,11 @@ body:not(.dark-mode) {
   --settings-state-danger-text: #b91c1c;
   --text-primary: #1d1d1f;
   --text-secondary: rgba(29, 29, 31, 0.72);
-  --text-tertiary: rgba(29, 29, 31, 0.52);
+  --text-tertiary: rgba(29, 29, 31, 0.64);
   --text-muted: rgba(29, 29, 31, 0.32);
   --settings-nav-text-primary: #ffffff;
   --settings-nav-text-secondary: rgba(255, 255, 255, 0.74);
-  --settings-nav-text-tertiary: rgba(255, 255, 255, 0.52);
+  --settings-nav-text-tertiary: rgba(255, 255, 255, 0.66);
   --text-inverse: var(--settings-button-primary-text);
   --error: var(--settings-button-danger-text);
   --settings-input-bg: #ffffff;

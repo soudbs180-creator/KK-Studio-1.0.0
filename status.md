@@ -7,8 +7,8 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Canvas main/sub card surface parity and desktop settings smoke hardening complete; validation passed locally.
-- Milestones 1 through 10 are complete; desktop settings smoke hardening was folded into the final close-out.
+- Current milestone: Shared theme contrast audit complete; validation passed locally.
+- Milestones 1 through 11 are complete; desktop settings smoke hardening was folded into the final close-out.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 
@@ -543,6 +543,18 @@ Final gate:
 - Browser-verified the local flow: the list exposes one add button, the editor shows `谷歌` and `OpenAI`, and `新增本地 API` stays disabled with inline API Key feedback until a key is provided.
 - Passed: targeted API/settings tests, `npm.cmd run typecheck`, `npm.cmd run verify:mobile-settings-smoke`, `npm.cmd run verify:desktop-settings-smoke`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding`.
 
+2026-04-29 shared theme contrast audit:
+
+- Root cause confirmed: the late `body:not(.dark-mode)` light-theme override still used the old `--text-tertiary` alpha, settings panel light tertiary/nav tertiary tokens were below normal text contrast, global dark tertiary was low on `--bg-input`, and light auth helper/placeholder colors were too pale.
+- Added `tests/unit/theme-contrast-contract.test.ts` to cover global app surfaces, toolbar/input surfaces, settings cards/inputs/buttons/navigation, and light auth support text.
+- Adjusted only shared low-contrast text tokens and light auth support colors; existing canvas card surface parity remains unchanged.
+- Passed: focused theme/canvas contrast contracts (`10/10` tests).
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `git diff --check` (only Windows line-ending warnings).
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
@@ -550,6 +562,7 @@ Final gate:
 - Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
 - Local image generation proxy requests can now exceed the legacy 1 MB JSON cap without failing at the HTTP boundary first.
 - Canvas prompt cards now share the same theme surface fill as image cards in dark and light modes.
+- Global app, settings, toolbar, input, navigation, and light auth support text now have source-contract contrast coverage.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.
