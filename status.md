@@ -385,16 +385,46 @@ Final gate:
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run check:encoding`
 
+2026-04-28 official API default-model follow-up validation:
+
+- Root cause confirmed: official Google/OpenAI routes still looked like model discovery was mandatory, and official OpenAI routes had no built-in runtime model fallback when the saved model list was empty.
+- Added regression coverage for:
+  - built-in Google official model defaults in the runtime resolver
+  - built-in OpenAI official model defaults in the runtime resolver
+  - official route cards in settings so they show built-in model readiness instead of requiring a manual fetch first
+  - official OpenAI slot channel configs so an empty saved `baseUrl` still resolves to `https://api.openai.com`
+- Red/green verified: `node --test --test-isolation=none tests/unit/official-route-default-models.test.ts`
+- Passed: focused local API + official route validation (`7/7` tests):
+  - `tests/unit/user-route-diagnostics-routes.test.ts`
+  - `tests/unit/official-route-default-models.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+
+2026-04-28 VPS PostgreSQL tunnel wrapper validation:
+
+- Root cause confirmed: direct public PostgreSQL access is brittle because the current client source IP changes between probes.
+- Red/green verified: `node --test --test-isolation=none tests/unit/run-api-dev-config-guards.test.ts`
+- Added `scripts/dev/run-api-dev-vps-tunnel.mjs` for existing local SSH tunnels; it rewrites `DATABASE_URL` to the local tunnel and delegates to `run-api-dev.mjs`.
+- Passed through a live temporary tunnel: `node scripts/dev/run-api-dev-vps-tunnel.mjs --check`
+- Passed through a live temporary tunnel: `/healthz?probe=1` returned HTTP 200 with `canonicalPersistenceReady: true`.
+- Passed: `node --test --test-isolation=none tests/unit/vps-deploy-artifacts.test.ts`
+- Passed: `node --test --test-isolation=none tests/unit/vps-deploy-contract.test.ts tests/unit/vps-postgres-audit-contract.test.ts tests/unit/server-runtime-config.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `npm.cmd run check:encoding`
+
 ## In Progress
 
 - No local settings/API, Dashboard, or PromptBar close-out gap remains after final validation.
 - Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
+- Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
 - PowerShell command execution became unreliable during final staging, but `git add` succeeded through the Node REPL command path.
 - VPS PostgreSQL client-access helper is committed locally.
-- VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper.
+- VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.
 - Direct public PostgreSQL access remains unstable because the current execution environment's source IP changes between probes. Observed rejected sources include `13.208.210.0`, `3.1.51.45`, and `13.212.119.86`.
-- Verified stable local API access through an SSH tunnel (`127.0.0.1:15432` -> VPS `127.0.0.1:5432`): `run-api-dev --check` passed and `/healthz?probe=1` returned HTTP 200 with `canonicalPersistenceReady: true`.
+- Added `scripts/dev/run-api-dev-vps-tunnel.mjs`, which validates an existing local SSH tunnel, rewrites `DATABASE_URL` to that tunnel, disables PostgreSQL SSL for the localhost hop, and delegates to `run-api-dev.mjs`.
+- Verified stable local API access through an SSH tunnel (`127.0.0.1:15432` -> VPS `127.0.0.1:5432`): `run-api-dev --check` passed, `run-api-dev-vps-tunnel.mjs --check` passed, and `/healthz?probe=1` returned HTTP 200 with `canonicalPersistenceReady: true`.
 
 ## Known Risks And Blockers To Verify
 
@@ -409,6 +439,6 @@ Final gate:
 
 ## Next Steps
 
-1. Keep using an SSH tunnel for local API development against the VPS PostgreSQL database instead of relying on the changing public client IP.
+1. Keep using `node scripts/dev/run-api-dev-vps-tunnel.mjs` with an existing SSH tunnel for local API development against the VPS PostgreSQL database instead of relying on the changing public client IP.
 2. If direct public PostgreSQL access is still required, rerun a live probe, dry-run `scripts/vps/repair-postgres-client-access.sh` with the latest `/32`, then apply only after action-time confirmation.
 3. Push local `main` when publishing these commits is desired.

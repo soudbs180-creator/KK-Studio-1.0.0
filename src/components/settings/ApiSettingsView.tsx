@@ -2789,6 +2789,12 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 const progress = getProgress(mode, mode === 'amount' ? slot.totalCost : slot.usedTokens || 0, slot.budgetLimit, slot.tokenLimit);
                 const usageSummary = getOfficialUsageSummary(slot);
                 const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
+                const effectiveOfficialModels = resolveEffectiveProviderModels({
+                  provider: slot.provider,
+                  baseUrl: slot.baseUrl || (slot.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL),
+                  format: slot.format,
+                  models: slot.supportedModels,
+                });
 
                 const prioritizedMetrics: ConsoleEndpointCardMetric[] = [
                   {
@@ -2803,8 +2809,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   },
                   {
                     label: pick('支持模型', 'Supported models'),
-                    value: `${slot.supportedModels.length}`,
-                    helper: slot.supportedModels.length > 0 ? pick('已自动识别模型列表', 'Auto detected models list') : pick('点击刷新后自动拉取', 'Refresh to fetch models'),
+                    value: `${effectiveOfficialModels.length}`,
+                    helper: effectiveOfficialModels.length > 0 ? pick('官方默认模型已内置', 'Built-in default models are ready') : pick('点击刷新后自动拉取', 'Refresh to fetch models'),
                   },
                   {
                     label: pick('最近延迟', 'Latest latency'),

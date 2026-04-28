@@ -656,6 +656,18 @@ export function getDocumentedStaticModelsForProvider(strategyId: string): string
     ]));
 }
 
+function getDefaultOfficialModelsForRuntime(runtime: ReturnType<typeof resolveProviderRuntime>): string[] {
+    if (runtime.strategyId === 'google') {
+        return DEFAULT_GOOGLE_MODELS;
+    }
+
+    if (runtime.strategyId === 'openai') {
+        return DEFAULT_OPENAI_MODELS;
+    }
+
+    return [];
+}
+
 export function resolveEffectiveProviderModels(input: {
     provider?: string;
     baseUrl?: string;
@@ -675,6 +687,11 @@ export function resolveEffectiveProviderModels(input: {
 
     if (normalizedModels.length > 0) {
         return normalizedModels;
+    }
+
+    const builtInOfficialModels = getDefaultOfficialModelsForRuntime(runtime);
+    if (builtInOfficialModels.length > 0) {
+        return normalizeModelList(builtInOfficialModels, runtime.uiProvider || input.provider, input.baseUrl);
     }
 
     const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
@@ -1011,6 +1028,7 @@ export const DEFAULT_GOOGLE_MODELS = [
     'veo-3.1-generate-preview',
     'veo-3.1-fast-generate-preview'
 ];
+const DEFAULT_OPENAI_MODELS = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
 
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
@@ -1399,15 +1417,18 @@ export class KeyManager {
                     );
                     const headerName = shouldOverrideHeader ? runtime.headerName : s.headerName;
                     const rawModels = Array.isArray(s.supportedModels) ? s.supportedModels : [];
-                    // If a Google key has no stored models yet, seed it with the official defaults.
-                    let supportedModels = provider === 'Google' && rawModels.length === 0
-                        ? [...DEFAULT_GOOGLE_MODELS]
+                    const builtInOfficialModels = getDefaultOfficialModelsForRuntime(runtime);
+                    let supportedModels = builtInOfficialModels.length > 0 && rawModels.length === 0
+                        ? [...builtInOfficialModels]
                         : rawModels;
 
                     // Official Google keys should only keep canonical official model IDs.
                     if (provider === 'Google') {
                         supportedModels = supportedModels.filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
-                        const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !supportedModels.includes(m));
+                    }
+
+                    if (builtInOfficialModels.length > 0) {
+                        const missingDefaults = builtInOfficialModels.filter(m => !supportedModels.includes(m));
                         if (missingDefaults.length > 0) {
                             console.log(`[KeyManager] Auto-adding missing official models to key ${s.name}:`, missingDefaults);
                             supportedModels = [...supportedModels, ...missingDefaults];
@@ -1761,9 +1782,19 @@ export class KeyManager {
             if ((s.provider as string) === 'Gemini' && !s.baseUrl) newProvider = 'Google' as Provider;
             if (s.provider === 'Google' && s.baseUrl && !s.baseUrl.includes('googleapis.com')) newProvider = 'Custom' as Provider;
 
+            const runtime = resolveProviderRuntime({
+                provider: newProvider,
+                baseUrl: s.baseUrl,
+                format: s.format,
+                authMethod: s.authMethod,
+                headerName: s.headerName,
+                compatibilityMode: s.compatibilityMode,
+            });
+            const builtInOfficialModels = getDefaultOfficialModelsForRuntime(runtime);
+
             if (isGoogle) {
                 const currentModels = (s.supportedModels || []).filter((m: string) => isGoogleOfficialModelId(parseModelString(m).id));
-                const missingDefaults = DEFAULT_GOOGLE_MODELS.filter(m => !currentModels.includes(m));
+                const missingDefaults = builtInOfficialModels.filter(m => !currentModels.includes(m));
 
                 if (missingDefaults.length > 0 || newProvider !== s.provider) {
                     console.log(`[KeyManager] API payload refresh: Auto-adding models/fixing provider for key ${s.name}`);
@@ -1771,6 +1802,18 @@ export class KeyManager {
                         ...s,
                         provider: 'Google',
                         supportedModels: [...currentModels, ...missingDefaults]
+                    };
+                }
+            }
+
+            if (builtInOfficialModels.length > 0) {
+                const currentModels = normalizeModelList(s.supportedModels || [], String(newProvider || s.provider || ''));
+                const missingDefaults = builtInOfficialModels.filter((model) => !currentModels.includes(model));
+                if (missingDefaults.length > 0 || newProvider !== s.provider) {
+                    return {
+                        ...s,
+                        provider: newProvider,
+                        supportedModels: [...currentModels, ...missingDefaults],
                     };
                 }
             }
@@ -3950,9 +3993,11 @@ export class KeyManager {
     }
 
     private buildSlotChannelConfig(slot: KeySlot): ChannelConfig {
+        const slotBaseUrl = slot.baseUrl
+            || (slot.provider === 'OpenAI' ? 'https://api.openai.com' : GOOGLE_API_BASE);
         const runtime = resolveProviderRuntime({
             provider: slot.provider,
-            baseUrl: slot.baseUrl || GOOGLE_API_BASE,
+            baseUrl: slotBaseUrl,
             format: slot.format,
             authMethod: slot.authMethod,
             headerName: slot.headerName,
@@ -3964,11 +4009,17 @@ export class KeyManager {
             runtime,
             documentedModels: getDocumentedStaticModelsForProvider(runtime.strategyId),
         });
+        const effectiveSlotModels = resolveEffectiveProviderModels({
+            provider: slot.provider,
+            baseUrl: slot.baseUrl,
+            format: slot.format,
+            models: slot.supportedModels,
+        });
 
         return {
             id: slot.id,
             name: slot.name || slot.provider || 'Unnamed Channel',
-            baseUrl: slot.baseUrl || GOOGLE_API_BASE,
+            baseUrl: slotBaseUrl,
             apiKey: '',
             provider: slot.provider,
             providerFamily: runtime.providerFamily,
@@ -3978,10 +4029,10 @@ export class KeyManager {
                 headerName: slot.headerName || runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(slot.supportedModels || [], pricingSupport, managementSupport),
+            capabilities: this.buildChannelCapabilities(effectiveSlotModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
-            supportedModels: normalizeModelList(slot.supportedModels || [], slot.provider, slot.baseUrl),
+            supportedModels: effectiveSlotModels,
             surfaces,
             group: slot.group,
             compatibilityMode: slot.compatibilityMode,
@@ -5201,7 +5252,7 @@ export async function autoDetectAndConfigureModels(
         models = await fetchOpenAICompatModels(apiKey, baseUrl);
     } else if (models.length === 0 && apiType === 'openai') {
         // OpenAI falls back to a small built-in model list when discovery returns nothing.
-        models = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
+        models = DEFAULT_OPENAI_MODELS;
     }
 
     // Normalize the discovered models before categorizing them.

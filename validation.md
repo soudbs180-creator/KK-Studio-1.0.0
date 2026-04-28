@@ -231,13 +231,13 @@ Apply only after reviewing the proposed `hostssl` rule:
 KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" KK_APPLY_PG_CLIENT_ACCESS=true scripts/vps/repair-postgres-client-access.sh
 ```
 
-If the live client source keeps changing between probes, validate through an SSH tunnel instead of chasing public `/32` rules. The local check should point `DATABASE_URL` at a local forwarded port such as `127.0.0.1:15432`, with that port forwarded to the VPS `127.0.0.1:5432`, then rerun:
+If the live client source keeps changing between probes, validate through an SSH tunnel instead of chasing public `/32` rules. Start a local tunnel from `127.0.0.1:15432` to the VPS `127.0.0.1:5432`, then run the tunnel wrapper:
 
 ```powershell
-node scripts/dev/run-api-dev.mjs --check
+node scripts/dev/run-api-dev-vps-tunnel.mjs --check
 ```
 
-For full runtime confidence, start the API with the tunneled `DATABASE_URL` and verify `http://127.0.0.1:3001/healthz?probe=1` reports `canonicalPersistenceReady: true`.
+Use `KK_PG_TUNNEL_HOST` and `KK_PG_TUNNEL_PORT` when the local tunnel uses a non-default host or port. For full runtime confidence, start the API with the tunnel wrapper and verify `http://127.0.0.1:3001/healthz?probe=1` reports `canonicalPersistenceReady: true`.
 
 ## Settings Smoke And Admin Recharge Follow-Up
 
@@ -331,6 +331,16 @@ Run these when touching saved user-route connectivity checks, local API model di
 
 ```powershell
 node --test --test-isolation=none "tests/unit/user-route-diagnostics-routes.test.ts"
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+## Official API Default Models
+
+Run these when touching official Google/OpenAI route defaults, official route model helpers in settings, or slot channel config fallback behavior:
+
+```powershell
+node --test --test-isolation=none "tests/unit/official-route-default-models.test.ts"
 npm.cmd run typecheck
 npm.cmd run check:encoding
 ```
