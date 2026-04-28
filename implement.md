@@ -1,77 +1,73 @@
-# KK Studio Recovery Implementation Rules
+# KK-Studio v1.4.2 Refactor Implementation Rules
 
 Last updated: 2026-04-29
 
 ## Operating Mode
 
-This is a long-running recovery execution. Do not stop after initialization, one commit, or one partial milestone. Continue until all milestones in `plans.md` are complete, or until a validation blocker cannot be resolved safely in the current session.
+This is a long-running refactor execution. Do not stop after the ledger update, one hook extraction, one validation pass, or one commit. Continue through the next milestone unless a validation blocker cannot be fixed safely.
 
-The current dirty worktree contains prior-session user work. Treat every existing modification as owned by the user unless this session explicitly changes it.
+The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-## Required Loop Per Milestone
+## Milestone Loop
 
-For each milestone:
+For every milestone:
 
-1. Read the relevant specification, code, and existing tests.
-2. Write or update a failing source-contract/unit test first.
-3. Implement only the scoped milestone change.
-4. Run the milestone validation commands from `validation.md`.
-5. Fix validation failures before continuing.
-6. Update `status.md` with completed work, validation results, blockers, and next step.
-7. Stage only files belonging to that milestone.
-8. Create one scoped git commit.
-9. Continue to the next milestone without waiting for manual confirmation.
+1. Inspect the local implementation and tests relevant to that milestone.
+2. Write or update a focused test/contract first when behavior or structure changes.
+3. Implement only the scoped change.
+4. Run every command listed for the milestone in `validation.md`.
+5. Fix new failures before proceeding.
+6. Update `status.md` with:
+   - files changed,
+   - line counts before/after when applicable,
+   - validation commands and results,
+   - risks and follow-up,
+   - next milestone.
+7. Stage only the files that belong to the milestone.
+8. Create the milestone commit.
+9. Continue immediately to the next milestone.
 
-## Git And Worktree Safety
+## Refactor Rules
 
-- Stay on the current `main` branch. Do not create or switch branches while the active user instruction says branches are forbidden.
-- The historical `codex/kk-studio-recovery-convergence` branch has been merged into `main`; references to it are archival, not an instruction to branch again.
-- Never use `git reset --hard`, `git checkout --`, or destructive cleanup against uncommitted work unless explicitly requested.
-- Do not stage unrelated dirty files.
-- Prefer `git status --short` and path-limited `git diff -- <path>` before staging.
-- Local secret or tunnel files such as `.codex-tmp-*`, `.codex-ssh-*`, and `.tmp/` must not be committed.
+- Do not rewrite a subsystem when a surgical extraction is sufficient.
+- Keep `src/` as the active runtime until boundaries are stable.
+- Do not migrate to `apps/web/` during Stage One.
+- Do not change `apps/api/` unless a compatibility check proves it is required.
+- Every new custom hook must live in `src/app/` and expose explicit `UseXxxDeps` and `UseXxxResult` interfaces.
+- Hooks may receive dependencies through parameters only. Do not make hooks reach into `App.tsx` top-level state implicitly.
+- Optional arrays, maps, and objects must be defaulted inside the hook.
+- `App.tsx` should retain orchestration, rendering, and prop/event wiring, not domain business logic.
+- Delete only the code made redundant by the current extraction.
 
-## Subagent Policy
+## Git Rules
 
-Do not spawn subagents unless the active user request explicitly asks for delegated or parallel agent work. If delegation is requested, keep write scopes disjoint and let the main thread own integration, validation, and final commits.
+- Continue on the current branch unless the user explicitly asks for a new branch or worktree.
+- Never use `git reset --hard`, `git checkout --`, or destructive cleanup against uncommitted work.
+- Check `git status --short` before staging.
+- Stage path-limited files only.
+- Make one scoped commit per milestone.
+- Do not commit local secret or temporary files.
 
-Current read-only explorer domains:
+## Validation Rules
 
-- Auth/runtime/recharge.
-- Settings/API capability architecture.
-- Ecommerce framework/runtime.
-- PPT deck workflow.
-- Responsive mobile/tablet result flow.
-
-## Validation Policy
-
-- On Windows, prefer `npm.cmd` to avoid PowerShell execution policy issues.
+- Use `npm.cmd` on Windows for npm scripts.
 - Documentation/rule changes require `npm.cmd run governance:agent-docs`.
 - Code changes require `npm.cmd run typecheck`.
-- Every completed stage requires `npm.cmd run check:encoding`.
-- Full completion requires the final gate in `validation.md`.
-
-## Secret Hygiene
-
-Prior sessions may have exposed server, API, or tunnel credentials. Do not write any secret values into documentation, tests, or source. The safe recovery action is:
-
-- record that credentials must be rotated,
-- remove or ignore local temporary key files,
-- keep sample env files placeholder-only,
-- verify sensitive boundaries through existing governance checks.
-
-## Remote System Changes
-
-- Read-only VPS checks may inspect PostgreSQL configuration and runtime health when a usable shell is available.
-- Do not append `pg_hba.conf` rules, reload PostgreSQL, or otherwise change remote access control without action-time confirmation.
-- Any PostgreSQL client access repair must dry-run first and use a narrow confirmed CIDR, not a broad `0.0.0.0/0` rule.
+- Every completed milestone requires `npm.cmd run check:encoding`.
+- Code milestones also require targeted tests, `npm.cmd run test:unit`, and `npm.cmd run build` unless `validation.md` documents a known blocker.
+- If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
 
 ## Context Exhaustion Protocol
 
-If context becomes low, update `status.md` first. Then provide a resume prompt that includes:
+If context becomes low, update `status.md` first, then provide a resume prompt containing:
 
 - current branch,
 - current milestone,
+- files changed in the current milestone,
 - last validation command and result,
-- uncommitted files touched by this session,
-- next exact command or file to edit.
+- uncommitted files,
+- next exact edit or command.
+
+## Historical Recovery Note
+
+Earlier recovery-convergence work is complete and no longer the active milestone list. Preserve its safety posture: protect user work, avoid secret exposure, validate before claiming completion, and keep commits narrow.
