@@ -302,7 +302,7 @@ describe("billing http routes", () => {
 
     assert.equal(success.body.data.identity, "user-billing-admin-1");
     assert.equal(success.body.data.creditedAmount, 25);
-    assert.equal(success.body.data.balanceAfter, 125);
+    assert.equal(success.body.data.balanceAfter, 25);
   });
 
   test("static recharge handlers create, submit proof, expose admin lookup, and credit by submission id", async () => {

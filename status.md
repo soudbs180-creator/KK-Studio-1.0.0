@@ -7,7 +7,7 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Post-review persistence and manual recharge fixes complete; validation passed locally.
+- Current milestone: Post-closeout billing/account hardening and local-only persistence follow-up complete; validation passed locally.
 - Milestones 1 through 11 are complete; desktop settings smoke hardening was folded into the final close-out.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
@@ -51,6 +51,23 @@ Risk classes observed:
 
 ## Completed In This Session
 
+- Fixed the KKAI local-only persistence regression by keeping capability routes off the automatic PostgreSQL live probe path unless a request explicitly asks for `?probe=1`; local-only temp users, workspace layout sync, and active credit models now stay available with local repositories again.
+- Changed the default credit-account bootstrap balance from `100` to `0` across the domain model plus the in-memory, file-backed, and PostgreSQL repositories so only explicit recharge/admin credit actions add value.
+- Fixed PostgreSQL admin credit lookup/recharge identity handling so email-based admin actions resolve through `profiles.id`, write back the resolved account email, and stop crediting the wrong raw `user_id` key.
+- Re-verified the public VPS runtime after the account cleanup and admin deployment work:
+  - `http://172.245.156.16/healthz?probe=1` returned `200` with `status: ok`, `selfHostedCoreReady: true`, and PostgreSQL backends for admin, auth, credits, credit providers, and workspace layout.
+  - `http://172.245.156.16/api/v1/model-catalog/active-credit-models` returned `200` with an empty `items` array, so the admin catalog is reachable but still has no active credit-model rows configured.
+  - `http://172.245.156.16:4174/login` returned `200`, confirming the standalone admin login page is live.
+- Last successful direct remote database cleanup audit kept `11` real profiles, `0` `@temp.local` profiles, `0` `temp_users`, `977483863@qq.com` as `admin`, target balance `100`, and all other balances `0`.
+- A fresh direct PostgreSQL audit from this workstation is currently blocked by `pg_hba.conf` for host `47.129.196.117`, so public API health and the last successful cleanup audit are the current verification sources for the live VPS account state.
+- Validation for this billing/account follow-up passed:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-server-startup.test.ts`
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/postgres-credit-account-repository.test.ts tests/unit/billing-http-routes.test.ts`
+  - `npm.cmd run typecheck`
+  - `npm.cmd run build`
+  - `npm.cmd run test:unit`
+  - `npm.cmd run check:encoding`
+  - `npm.cmd run governance:agent-docs`
 - Resolved the post-review persistence guard regression by running the default PostgreSQL probe for guarded API routes, preserving the fast `/healthz` path unless `probe=1` is requested.
 - Resolved the manual recharge paid-flow regression by routing the user "paid" action directly to the mark-paid endpoint instead of submitting proof against `paying` orders.
 - Added regression coverage for the default persistence probe path and the manual recharge mark-paid UI contract.
@@ -181,6 +198,17 @@ Validation:
 - Tried non-interactive SSH with the available root password without writing it to source or docs; authentication was rejected, so remote `pg_hba.conf` repair still needs a working VPS shell.
 
 ## Validation Results
+
+2026-04-29 billing/account/local-only follow-up:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-server-startup.test.ts`
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/postgres-credit-account-repository.test.ts tests/unit/billing-http-routes.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit` (`966/966` tests)
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: read-only VPS HTTP checks for `/healthz?probe=1`, `/api/v1/model-catalog/active-credit-models`, and `http://172.245.156.16:4174/login`
 
 Milestone 1:
 

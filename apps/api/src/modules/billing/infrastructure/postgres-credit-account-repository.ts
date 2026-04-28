@@ -124,7 +124,7 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
   private readonly queryable: PostgresQueryable;
   private readonly initialBalance: number;
 
-  constructor(queryable: PostgresQueryable, initialBalance = 100) {
+  constructor(queryable: PostgresQueryable, initialBalance = 0) {
     this.queryable = queryable;
     this.initialBalance = initialBalance;
   }
@@ -136,14 +136,15 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     }
 
     const now = new Date().toISOString();
+    const profile = await this.findProfileByIdentity(userId);
     await this.queryable.query(
       `insert into user_credits (
-         user_id, balance, frozen, created_at, updated_at
+         user_id, email, balance, frozen, created_at, updated_at
        ) values (
-         $1, $2, 0, $3, $3
+         $1, $2, $3, 0, $4, $4
        )
        on conflict (user_id) do nothing`,
-      [userId, this.initialBalance, now],
+      [userId, profile?.email || null, this.initialBalance, now],
     );
 
     return toCreditBalanceDto(await this.getExistingAccount(userId), userId, this.initialBalance);
@@ -317,11 +318,13 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     creditAmount: number,
     description = "Admin recharge",
   ): Promise<AdminRechargeCreditsResponseDto> {
-    const subjectId = String(identity || "").trim();
+    const normalizedIdentity = String(identity || "").trim();
+    const profile = await this.findProfileByIdentity(normalizedIdentity);
+    const subjectId = profile?.id || normalizedIdentity;
     const current = await this.getOrCreate(subjectId);
     const now = new Date().toISOString();
     const nextBalance = current.balance + creditAmount;
-    await this.upsertAccount(subjectId, nextBalance, current.frozenBalance, now);
+    await this.upsertAccount(subjectId, nextBalance, current.frozenBalance, now, profile?.email);
     await this.insertTransaction({
       id: randomUUID(),
       userId: subjectId,
@@ -330,7 +333,7 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
       balanceAfter: nextBalance,
       description,
       status: "completed",
-      metadata: { source: "api_admin_recharge", identity: subjectId },
+      metadata: { source: "api_admin_recharge", identity: normalizedIdentity },
       businessRefType: "admin_recharge",
       businessRefId: subjectId,
       createdAt: now,
@@ -338,7 +341,7 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     });
 
     return {
-      identity: subjectId,
+      identity: normalizedIdentity,
       subjectId,
       balanceAfter: nextBalance,
       creditedAmount: creditAmount,
@@ -349,11 +352,13 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     identity: string,
     limit = 50,
   ): Promise<AdminCreditAccountLookupDto> {
-    const subjectId = String(identity || "").trim();
+    const normalizedIdentity = String(identity || "").trim();
+    const profile = await this.findProfileByIdentity(normalizedIdentity);
+    const subjectId = profile?.id || normalizedIdentity;
     const account = await this.getOrCreate(subjectId);
     const transactions = await this.listTransactions(subjectId, { limit });
     return {
-      identity: subjectId,
+      identity: normalizedIdentity,
       subjectId,
       balance: account.balance,
       frozenBalance: account.frozenBalance,
@@ -409,19 +414,40 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     balance: number,
     frozen: number,
     updatedAt: string,
+    email?: string | null,
   ): Promise<void> {
     await this.queryable.query(
       `insert into user_credits (
-         user_id, balance, frozen, created_at, updated_at
+         user_id, email, balance, frozen, created_at, updated_at
        ) values (
-         $1, $2, $3, $4, $4
+         $1, $2, $3, $4, $5, $5
        )
        on conflict (user_id) do update
-         set balance = excluded.balance,
+         set email = coalesce(excluded.email, user_credits.email),
+             balance = excluded.balance,
              frozen = excluded.frozen,
              updated_at = excluded.updated_at`,
-      [userId, balance, frozen, updatedAt],
+      [userId, email || null, balance, frozen, updatedAt],
     );
+  }
+
+  private async findProfileByIdentity(identity: string): Promise<{ id: string; email?: string | null } | undefined> {
+    const normalizedIdentity = String(identity || "").trim();
+    if (!normalizedIdentity) {
+      return undefined;
+    }
+
+    const result = await this.queryable.query(
+      `select id, email
+         from profiles
+        where id = $1
+           or lower(email) = lower($1)
+        order by case when id = $1 then 0 else 1 end
+        limit 1`,
+      [normalizedIdentity],
+    );
+
+    return result.rows[0] as { id: string; email?: string | null } | undefined;
   }
 
   private async insertTransaction(input: {

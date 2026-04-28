@@ -131,3 +131,47 @@ test("credit account repository factory falls back to null without postgres conf
   assert.equal(repository, null);
   assert.ok(!(repository instanceof InMemoryCreditAccountRepository));
 });
+
+test("Postgres credit account repository creates new accounts with zero default balance", async () => {
+  const fakeQueryable = new FakeQueryable();
+  fakeQueryable.nextRowsQueue = [
+    [],
+    [],
+    [{ user_id: "user-2", email: "user-2@example.com", balance: 0, frozen: 0, created_at: "2026-04-13T10:00:00.000Z", updated_at: "2026-04-13T10:00:00.000Z" }],
+  ];
+  const repository = new PostgresCreditAccountRepository(fakeQueryable as never);
+
+  const account = await repository.getOrCreate("user-2");
+
+  assert.equal(account.balance, 0);
+  const insertQuery = fakeQueryable.queries.find((entry) => /insert into user_credits/i.test(entry.sql));
+  assert.ok(insertQuery);
+  assert.equal(insertQuery?.values[2], 0);
+});
+
+test("Postgres credit account repository resolves email identities to profile ids for admin lookup and recharge", async () => {
+  const fakeQueryable = new FakeQueryable();
+  fakeQueryable.nextRowsQueue = [
+    [{ id: "user-3", email: "user-3@example.com" }],
+    [{ user_id: "user-3", email: "user-3@example.com", balance: 0, frozen: 0, created_at: "2026-04-13T10:00:00.000Z", updated_at: "2026-04-13T10:00:00.000Z" }],
+    [],
+    [{ id: "user-3", email: "user-3@example.com" }],
+    [{ user_id: "user-3", email: "user-3@example.com", balance: 0, frozen: 0, created_at: "2026-04-13T10:00:00.000Z", updated_at: "2026-04-13T10:00:00.000Z" }],
+    [],
+  ];
+  const repository = new PostgresCreditAccountRepository(fakeQueryable as never);
+
+  const lookup = await repository.adminGetAccountByIdentity("user-3@example.com", 50);
+  const recharge = await repository.adminRechargeByIdentity("user-3@example.com", 25, "admin top up");
+
+  assert.equal(lookup.identity, "user-3@example.com");
+  assert.equal(lookup.subjectId, "user-3");
+  assert.equal(recharge.identity, "user-3@example.com");
+  assert.equal(recharge.subjectId, "user-3");
+
+  const accountQueries = fakeQueryable.queries.filter((entry) => /insert into user_credits/i.test(entry.sql) || /where user_id = \\$1/i.test(entry.sql));
+  assert.ok(accountQueries.some((entry) => entry.values.includes("user-3")));
+  const rechargeInsert = fakeQueryable.queries.find((entry) => /insert into credit_transactions/i.test(entry.sql));
+  assert.ok(rechargeInsert);
+  assert.equal(rechargeInsert?.values[1], "user-3");
+});

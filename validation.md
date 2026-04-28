@@ -465,6 +465,22 @@ npm.cmd run governance:agent-docs
 
 Visual smoke expectation: in a `390x844` mobile viewport, `[data-testid="mobile-app-shell"]` should be `844px` tall, the textarea should be visible inside `[data-slot="composer"]`, `document.documentElement.scrollHeight` should equal the viewport height, and standard/detail empty modes should render different skeleton test IDs.
 
+## Billing Admin Identity And Local-Only Persistence
+
+Run these when touching credit-account bootstrap balances, admin recharge or lookup identity resolution, or KKAI local-only capability routes that should stay available without canonical PostgreSQL persistence:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/api-server-startup.test.ts" `
+  "tests/unit/postgres-credit-account-repository.test.ts" `
+  "tests/unit/billing-http-routes.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:

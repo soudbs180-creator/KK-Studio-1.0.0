@@ -106,7 +106,7 @@ export class FileBackedCreditAccountRepository implements CreditAccountRepositor
   private readonly store: FileBackedJsonStore<PersistedCreditAccountState>;
 
   constructor(options: FileBackedCreditAccountRepositoryOptions = {}) {
-    this.initialBalance = Number.isInteger(options.initialBalance) ? Number(options.initialBalance) : 100;
+    this.initialBalance = Number.isInteger(options.initialBalance) ? Number(options.initialBalance) : 0;
     this.store = new FileBackedJsonStore<PersistedCreditAccountState>({
       filePath: options.filePath?.trim() ? options.filePath.trim() : buildDefaultFilePath(),
       createEmptyState: () => createEmptyState(this.initialBalance),

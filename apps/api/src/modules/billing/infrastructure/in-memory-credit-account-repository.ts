@@ -93,7 +93,7 @@ export class InMemoryCreditAccountRepository implements CreditAccountRepository 
   private readonly transactionsByUserId = new Map<string, string[]>();
   private readonly initialBalance: number;
 
-  constructor(initialBalance = 100) {
+  constructor(initialBalance = 0) {
     this.initialBalance = initialBalance;
   }
 

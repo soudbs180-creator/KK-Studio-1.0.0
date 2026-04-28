@@ -35,7 +35,7 @@ export interface CreditRechargeResult {
 export function createCreditAccount(
   userId: string,
   now: string,
-  initialBalance = 100,
+  initialBalance = 0,
 ): CreditBalanceDto {
   return {
     accountId: randomUUID(),
