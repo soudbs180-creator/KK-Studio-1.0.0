@@ -7,8 +7,8 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Turnstile auth widget visibility follow-up complete; validation passed locally.
-- Milestones 1 through 9 are complete.
+- Current milestone: Canvas main/sub card surface parity complete; validation passed locally.
+- Milestones 1 through 10 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 
@@ -514,12 +514,25 @@ Final gate:
 - Passed: `npm.cmd run check:encoding`
 - Passed: `npm.cmd run governance:agent-docs`
 
+2026-04-29 canvas main/sub card surface parity:
+
+- Root cause confirmed: prompt cards used a prompt-only translucent dark fill (`rgba(20, 20, 24, ...)`) while image cards used the theme surface token (`var(--bg-surface)`), making main cards darker than sub cards in dark mode and preventing exact light-mode parity.
+- Added a focused canvas visual source contract that requires prompt cards and image cards to use the same `var(--bg-surface)` fill.
+- Updated `PromptNodeComponent` so both prompt-card render paths inherit the same dark gray and light white surface as image cards.
+- Passed: focused canvas visual regression (`6/6` tests).
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `git diff --check` (only Windows line-ending warnings).
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
 - Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
 - Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
 - Local image generation proxy requests can now exceed the legacy 1 MB JSON cap without failing at the HTTP boundary first.
+- Canvas prompt cards now share the same theme surface fill as image cards in dark and light modes.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.

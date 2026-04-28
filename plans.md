@@ -1,6 +1,6 @@
 # KK Studio Recovery Convergence Plan
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 Branch: `main` (current user instruction: do not create or switch branches)
 
 ## Summary
@@ -230,6 +230,27 @@ Validation:
 - `npm.cmd run typecheck`
 - `npm.cmd run check:encoding`
 - `npm.cmd run build`
+
+### 10. Canvas Main/Sub Card Surface Parity
+
+Goal: align the canvas main prompt card surface with the sub image card surface in both dark and light themes.
+
+Scope:
+- Replace the prompt card's darker translucent fill with the same `--bg-surface` theme token used by image cards.
+- Keep card layout, shadows, borders, drag behavior, and content rendering unchanged.
+- Add a focused visual source contract so future changes do not reintroduce a darker prompt-card-only fill.
+
+Acceptance:
+- Dark mode prompt cards use the same gray surface token as image cards.
+- Light mode prompt cards use the same white surface token as image cards.
+- Existing canvas visual contracts remain green.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/canvas-visual-regression.test.ts"`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run check:encoding`
+- `npm.cmd run governance:agent-docs`
 
 ## Final Gate
 

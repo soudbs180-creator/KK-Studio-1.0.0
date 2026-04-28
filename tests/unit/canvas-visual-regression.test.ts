@@ -35,14 +35,16 @@ test('canvas panning does not disable frosted card surfaces while zooming still 
   );
 });
 
-test('prompt cards keep a denser frosted tint while dragging so glass does not read as transparent in motion', () => {
+test('prompt cards use the same theme surface fill as image cards in dark and light mode', () => {
   const source = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
 
   assert.match(
     source,
-    /const promptGlassFill = isDragging\s*\?\s*'rgba\(20,\s*20,\s*24,\s*0\.62\)'\s*:\s*'rgba\(20,\s*20,\s*24,\s*0\.45\)';/,
+    /const promptGlassFill = 'var\(--bg-surface\)';/,
   );
   assert.match(source, /backgroundColor:\s*promptGlassFill,/);
+  assert.match(imageCardSource, /backgroundColor:\s*'var\(--bg-surface\)'/);
 });
 
 test('prompt cards avoid transform-focused will-change hints during drag so backdrop blur stays attached to the canvas', () => {

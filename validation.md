@@ -1,6 +1,6 @@
 # KK Studio Validation Matrix
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 Use `npm.cmd` on Windows.
 
@@ -409,6 +409,18 @@ node --test --test-isolation=none `\
 npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run test:unit
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
+## Canvas Main/Sub Card Surface Parity
+
+Run these when touching canvas prompt-card or image-card surface colors, theme background tokens, or visual source contracts:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/canvas-visual-regression.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
 npm.cmd run check:encoding
 npm.cmd run governance:agent-docs
 ```

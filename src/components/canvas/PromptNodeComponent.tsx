@@ -1019,7 +1019,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             ? 1.016
             : (highlighted ? 1.01 : 1);
     const promptCardTransform = `scale(${promptCardScale})`;
-    const promptGlassFill = isDragging ? 'rgba(20, 20, 24, 0.62)' : 'rgba(20, 20, 24, 0.45)';
+    const promptGlassFill = 'var(--bg-surface)';
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
