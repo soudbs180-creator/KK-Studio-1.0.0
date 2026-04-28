@@ -157,7 +157,10 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('const stagePrimaryActionIcon = stageMeta.primaryActionKind === \'create-official\' || stageMeta.primaryActionKind === \'create-provider\''));
   assert.ok(apiSettingsViewSource.includes('const handleStagePrimaryAction = () => {'));
   assert.ok(apiSettingsViewSource.includes('onPrimaryAction={handleStagePrimaryAction}'));
-  assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}'));
+  assert.ok(apiSettingsViewSource.includes('data-testid="api-official-provider-add"'));
+  assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled}'));
+  assert.ok(apiSettingsViewSource.includes('onClick={handleCreateOfficialAction}'));
+  assert.doesNotMatch(apiSettingsViewSource, /data-testid="api-official-empty-create"/);
   assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerEditorReadOnly}'));
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotToCloudRecord({'));

@@ -67,9 +67,14 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.doesNotMatch(viewSource, /const userApiWorkbenchStage = showDiagnostics \? 'diagnostics' : userApiViewState\.stage;/);
 });
 
-test('ApiSettingsView surfaces local APIs as the primary BYOK path and avoids duplicated create buttons in list mode', () => {
+test('ApiSettingsView surfaces a compact unified API list and keeps provider creation scoped', () => {
   const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+
+  assert.match(viewSource, /const showSimpleProviderList = !showAdvancedWorkbench;/);
+  assert.match(viewSource, /data-testid="api-simple-provider-add"/);
+  assert.match(viewSource, /data-testid="api-proxy-provider-add"/);
+  assert.match(viewSource, /thirdPartyProviders\.map\(\(provider\)/);
 
   assert.match(viewSource, /pick\('本地 API', 'Local APIs'\)/);
   assert.match(viewSource, /pick\('新增本地 API', 'Add local API'\)/);
@@ -78,10 +83,12 @@ test('ApiSettingsView surfaces local APIs as the primary BYOK path and avoids du
   assert.match(sectionsSource, /value: 'official', label: pick\('本地 API', 'Local APIs'\)/);
 
   const createOfficialButtonUsages = viewSource.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
+  const createProxyAddEntryUsages = viewSource.match(/data-testid="api-proxy-provider-add"/g) ?? [];
   const createProviderButtonUsages = viewSource.match(/onClick=\{beginCreateProvider\}/g) ?? [];
 
-  assert.equal(createOfficialButtonUsages.length, 1, 'Expected only the empty state to keep a direct local API create button');
-  assert.equal(createProviderButtonUsages.length, 1, 'Expected only the empty state to keep a direct provider create button');
+  assert.equal(createOfficialButtonUsages.length, 0, 'Expected official creation to go through the compact API add entry');
+  assert.equal(createProxyAddEntryUsages.length, 1, 'Expected simple list mode to expose one proxy add entry inside the unified add card');
+  assert.equal(createProviderButtonUsages.length, 2, 'Expected one simple-mode proxy action and one advanced empty-state create action');
 });
 
 test('ApiSettingsView keeps diagnostics and section actions owned by shared modules instead of hidden duplicate controls', () => {

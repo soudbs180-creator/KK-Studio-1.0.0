@@ -21,10 +21,14 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
   assert.match(source, /<SettingsActionButton\s+icon=\{RefreshCw\}\s+loading=\{busy === 'cloud-refresh'\}/);
 
   const createOfficialButtonUsages = source.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
+  const createOfficialAddEntryUsages = source.match(/data-testid="api-official-provider-add"/g) ?? [];
+  const createProxyAddEntryUsages = source.match(/data-testid="api-proxy-provider-add"/g) ?? [];
   const createProviderButtonUsages = source.match(/onClick=\{beginCreateProvider\}/g) ?? [];
 
-  assert.equal(createOfficialButtonUsages.length, 1);
-  assert.equal(createProviderButtonUsages.length, 1);
+  assert.equal(createOfficialButtonUsages.length, 0);
+  assert.equal(createOfficialAddEntryUsages.length, 1);
+  assert.equal(createProxyAddEntryUsages.length, 1);
+  assert.equal(createProviderButtonUsages.length, 2);
 });
 
 test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {

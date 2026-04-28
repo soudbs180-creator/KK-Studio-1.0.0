@@ -54,6 +54,10 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
   );
   assert.match(
     cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \{[\s\S]*padding: 16px 28px 18px;/,
+  );
+  assert.match(
+    cssSource,
     /\.settings-panel \.settings-shell-page--mobile \.settings-dashboard-overview-grid \{[\s\S]*display: flex;[\s\S]*flex-direction: column;/,
   );
   assert.match(
@@ -62,7 +66,51 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
   );
   assert.match(
     cssSource,
-    /\.settings-panel \.settings-shell-page--desktop \.settings-reference-rings \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(210px, 1fr\)\);/,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-secondary-grid \{[\s\S]*display: none;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 768px\) and \(max-height: 940px\) \{[\s\S]*\.settings-panel \.settings-shell-nav__title \{[\s\S]*margin-bottom: 12px !important;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 768px\) and \(max-height: 940px\) \{[\s\S]*\.settings-panel \.settings-shell-nav__title p \{[\s\S]*display: none;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 768px\) and \(max-height: 940px\) \{[\s\S]*\.settings-panel \.settings-sidebar-item \{[\s\S]*padding: 10px 12px !important;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(min-width: 768px\) and \(max-height: 940px\) \{[\s\S]*\.settings-panel \.settings-sidebar-item__icon \{[\s\S]*width: 32px !important;[\s\S]*height: 32px !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-reference-chart__frame \{[\s\S]*height: 92px;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-cockpit__status,[\s\S]*\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-live-bars \{[\s\S]*min-height: 88px;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-live-bars__track \{[\s\S]*height: 44px;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-chart-metrics,[\s\S]*\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-storage-pressure \{[\s\S]*display: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--mobile \.settings-dashboard-chart-metrics \{[\s\S]*display: grid;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-reference-rings \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(120px, 1fr\)\);/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-reference-ring \{[\s\S]*width: 58px;[\s\S]*min-width: 58px;/,
   );
   assert.match(
     cssSource,
@@ -79,5 +127,30 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
   assert.match(
     cssSource,
     /\.settings-panel \.settings-shell-mobile__title \{[\s\S]*font-size: 22px;/,
+  );
+});
+
+test('settings workbench uses frosted glass tokens and blur layers', () => {
+  const cssSource = readSource('src/index.css');
+
+  assert.match(
+    cssSource,
+    /body\.dark-mode \.settings-panel \{[\s\S]*--settings-shell-bg: rgb\(12 12 14 \/ 0\.72\);/,
+  );
+  assert.match(
+    cssSource,
+    /body\.dark-mode \.settings-panel \{[\s\S]*--settings-section-bg: rgb\(29 29 31 \/ 0\.72\);/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell,[\s\S]*\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-page--desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*backdrop-filter: blur\(30px\) saturate\(1\.22\);/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-provider-card \{[\s\S]*backdrop-filter: blur\(24px\) saturate\(1\.18\);/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-mini-metric,[\s\S]*\.settings-panel \.settings-log-entry \{[\s\S]*backdrop-filter: blur\(18px\) saturate\(1\.12\);/,
   );
 });

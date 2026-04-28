@@ -1,6 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity,
   ArrowLeft,
   ChevronDown,
   Clock3,
@@ -805,6 +804,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvancedWorkbench, setShowAdvancedWorkbench] = useState(false);
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
+  const showSimpleProviderList = !showAdvancedWorkbench;
   const [providerPricingEndpointDraft, setProviderPricingEndpointDraft] = useState('');
   const [showPricingEndpointOverride, setShowPricingEndpointOverride] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -1585,12 +1585,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return;
     }
 
-    const targetId = activeTab === 'official' ? returnHighlight?.officialId : returnHighlight?.providerId;
+    const targetId = showSimpleProviderList
+      ? (returnHighlight?.officialId || returnHighlight?.providerId)
+      : activeTab === 'official'
+        ? returnHighlight?.officialId
+        : returnHighlight?.providerId;
     if (!targetId) {
       return;
     }
 
-    const registry = activeTab === 'official' ? officialCardRegistryRef.current : providerCardRegistryRef.current;
+    const registry = showSimpleProviderList
+      ? (returnHighlight?.providerId ? providerCardRegistryRef.current : officialCardRegistryRef.current)
+      : activeTab === 'official'
+        ? officialCardRegistryRef.current
+        : providerCardRegistryRef.current;
     const targetNode = registry.get(targetId);
     if (!targetNode) {
       return;
@@ -1605,7 +1613,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, thirdPartyProviders.length]);
+  }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, showSimpleProviderList, thirdPartyProviders.length]);
 
   const run = async (
     key: string,
@@ -2593,50 +2601,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             </SettingsActionButton>
           </>
         }
-        metrics={
-          <>
-            {isUserApiPersistenceDegraded ? (
-              <SettingsMetricCard
-                label={pick('持久化状态', 'Persistence status')}
-                value={isUsingReadonlyProfileFallback ? pick('正在展示云端只读数据', 'Showing read-only cloud data') : pick('本地 API 仍在内存模式', 'Local API still uses memory mode')}
-                helper={userApiReadOnlyHelper || userApiPersistenceHelper || pick('云端配置仍会继续保留，等本地服务恢复后会重新和本地状态对齐。', 'Cloud-backed settings remain preserved and will realign with local state once the service recovers.')}
-                icon={RefreshCw}
-                tone="rose"
-              />
-            ) : null}
-            <SettingsMetricCard
-              label={pick('本地 API', 'Local APIs')}
-              value={`${officialSlots.length}`}
-              helper={pick(
-                `${officialSlots.filter((slot) => !slot.disabled).length} 条当前可参与调度`,
-                `${officialSlots.length} endpoints`
-              )}
-              icon={Shield}
-              tone={officialSlots.length > 0 ? 'indigo' : 'neutral'}
-            />
-            <SettingsMetricCard
-              label={pick('在线供应商', 'Active providers')}
-              value={`${activeProviders}/${thirdPartyProviders.length}`}
-              helper={thirdPartyProviders.length > 0
-                ? pick(
-                    `${thirdPartyProviders.filter((provider) => provider.status === 'error').length} 个存在异常`,
-                    `${thirdPartyProviders.length} providers`
-                  )
-                : pick('尚未配置第三方供应商', 'No third-party providers configured yet')}
-              icon={Globe}
-              tone={activeProviders > 0 ? 'emerald' : 'neutral'}
-            />
-            <SettingsMetricCard
-              label={pick('待处理项', 'Needs attention')}
-              value={`${attentionCount}`}
-              helper={attentionCount > 0
-                ? pick('建议优先排查异常与暂停链路', 'Review failed or paused routes first')
-                : pick('当前没有待优先处理的问题', 'No urgent routing issues right now')}
-              icon={Activity}
-              tone={attentionCount > 0 ? 'rose' : 'emerald'}
-            />
-          </>
-        }
       />
 
       {showAdvancedWorkbench ? (
@@ -2761,61 +2725,64 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         </>
       ) : null}
 
-      {activeTab === 'official' ? (
+      {showSimpleProviderList || activeTab === 'official' ? (
         <SettingsSection
-          title={pick('本地 API', 'Local APIs')}
-          eyebrow={pick('本地直连', 'Local direct routes')}
+          title={showSimpleProviderList ? pick('API 供应商', 'API providers') : pick('本地 API', 'Local APIs')}
+          eyebrow={showSimpleProviderList ? pick('简约列表', 'Simple list') : pick('本地直连', 'Local direct routes')}
           description={pick(
-            '管理本地直连接口。',
-            'Manage your local direct routes.'
+            showSimpleProviderList ? '添加 API，并管理已经接入的官方直连和中转站。' : '管理本地直连接口。',
+            showSimpleProviderList ? 'Add APIs and manage connected official or proxy providers.' : 'Manage your local direct routes.'
           )}
-          action={
-            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={userApiActionsDisabled} onClick={handleCreateOfficialAction}>
-              {pick('新增', 'Add')}
-            </SettingsActionButton>
-          }
         >
-          <div className="space-y-5">
-            <div className="space-y-3">
-              <button
-                type="button"
-                data-testid="api-official-provider-add"
-                disabled={userApiActionsDisabled}
-                onClick={handleCreateOfficialAction}
-                className="group flex min-h-[132px] w-full items-center justify-between gap-4 rounded-[var(--radius-surface-md)] border p-5 text-left transition-transform duration-200 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--settings-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-                style={SETTINGS_OVERLAY_STYLE}
-              >
-                <div className="flex min-w-0 items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-control-md)] border text-[var(--text-primary)] transition-colors group-hover:border-[var(--settings-focus-ring)]" style={SETTINGS_OVERLAY_STYLE}>
-                    <Plus size={20} />
+          <div className="space-y-3">
+            <div
+              data-testid="api-simple-provider-add"
+              className="settings-api-quick-add"
+              style={SETTINGS_OVERLAY_STYLE}
+            >
+              <div className="settings-api-quick-add__lead">
+                <div className="settings-api-quick-add__icon" style={SETTINGS_OVERLAY_STYLE}>
+                  <Plus size={18} />
+                </div>
+                <div className="min-w-0">
+                  <div className="settings-api-quick-add__title">
+                    {pick('添加 API', 'Add API')}
                   </div>
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="text-[16px] font-semibold text-[var(--text-primary)]">
-                      {pick('添加新的供应商', 'Add new provider')}
-                    </div>
-                    <div className="max-w-[620px] text-[13px] leading-6 text-[var(--text-secondary)]">
-                      {pick('统一从这里新增本地 API，再在表单里选择 Google 或 OpenAI。', 'Create a local API here, then choose Google or OpenAI in the form.')}
-                    </div>
+                  <div className="settings-api-quick-add__copy">
+                    {pick('官方直连使用默认地址；中转站需要供应商名称、请求地址和 API Key。', 'Official routes use built-in URLs. Proxy providers need a name, request URL, and API key.')}
                   </div>
                 </div>
-                <SettingsBadge tone="emerald">
-                  {pick('新增', 'Add')}
-                </SettingsBadge>
-              </button>
-
+              </div>
+              <div className="settings-api-quick-add__actions">
+                <SettingsActionButton
+                  data-testid="api-official-provider-add"
+                  icon={Shield}
+                  tone="primary"
+                  size="sm"
+                  disabled={userApiActionsDisabled}
+                  onClick={handleCreateOfficialAction}
+                >
+                  {pick('官方直连', 'Official')}
+                </SettingsActionButton>
+                {showSimpleProviderList ? (
+                  <SettingsActionButton
+                    data-testid="api-proxy-provider-add"
+                    icon={Globe}
+                    size="sm"
+                    disabled={providerActionsDisabled}
+                    onClick={beginCreateProvider}
+                  >
+                    {pick('中转站', 'Proxy')}
+                  </SettingsActionButton>
+                ) : null}
+              </div>
             </div>
 
-          {officialSlots.length === 0 ? (
-            <EmptyState
-              title={pick('当前还没有本地 API', 'No local APIs yet')}
-              description={pick(
-                '先添加一条本地 API。',
-                'Add a local API first.'
-              )}
-              action={<SettingsActionButton data-testid="api-official-empty-create" icon={Plus} tone="primary" disabled={userApiActionsDisabled} onClick={() => beginCreateOfficial()}>{pick('新增本地 API', 'Add local API')}</SettingsActionButton>}
-            />
-          ) : (
-            <div className="settings-provider-grid">
+          {officialSlots.length > 0 || (showSimpleProviderList && thirdPartyProviders.length > 0) ? (
+            <div className={[
+              'settings-provider-grid',
+              !showAdvancedWorkbench ? 'settings-provider-grid--compact' : '',
+            ].filter(Boolean).join(' ')}>
               {officialSlots.map((slot) => {
                 const mode = getMode(slot.budgetLimit, slot.tokenLimit);
                 const status = getOfficialStatus(slot);
@@ -2855,32 +2822,84 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 return (
                   <ConsoleEndpointCard
                     key={slot.id}
+                    density={showAdvancedWorkbench ? 'normal' : 'compact'}
                     cardRef={(node) => registerOfficialCardRef(slot.id, node)}
                     title={getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
-                    subtitle={slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint')}
-                    meta={isUsingReadonlyProfileFallback
-                      ? pick('只读回显：密钥已在服务端加密保存', 'Read-only view: secret is stored encrypted on the server')
-                      : pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)}
+                    subtitle={showAdvancedWorkbench
+                      ? (slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint'))
+                      : undefined}
+                    meta={showAdvancedWorkbench
+                      ? (
+                          isUsingReadonlyProfileFallback
+                            ? pick('只读回显：密钥已在服务端加密保存', 'Read-only view: secret is stored encrypted on the server')
+                            : pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)
+                        )
+                      : undefined}
                     avatar={avatar}
                     status={status}
-                    metrics={prioritizedMetrics}
-                    progress={progressData}
-                    error={slot.lastError}
+                    metrics={showAdvancedWorkbench ? prioritizedMetrics : []}
+                    progress={showAdvancedWorkbench ? progressData : undefined}
+                    error={showAdvancedWorkbench ? slot.lastError : null}
                     className={returnHighlight?.officialId === slot.id ? 'settings-provider-card--return-focus' : ''}
                     actions={
                       <>
-                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
                         <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleOfficial(slot)}>
                           {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
                         </SettingsActionButton>
+                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
+                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
                       </>
                     }
                   />
                 );
               })}
+              {showSimpleProviderList
+                ? thirdPartyProviders.map((provider) => {
+                    const status = getProviderStatus(provider);
+                    const avatar = (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
+                        {provider.name.charAt(0).toUpperCase()}
+                      </div>
+                    );
+
+                    return (
+                      <ConsoleEndpointCard
+                        key={provider.id}
+                        density="compact"
+                        cardRef={(node) => registerProviderCardRef(provider.id, node)}
+                        title={provider.name}
+                        subtitle={undefined}
+                        meta={undefined}
+                        avatar={avatar}
+                        badges={null}
+                        status={status}
+                        metrics={[]}
+                        progress={undefined}
+                        error={null}
+                        footer={null}
+                        actions={
+                          <>
+                            <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
+                              {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
+                            </SettingsActionButton>
+                            <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
+                              {pick('编辑', 'Edit')}
+                            </SettingsActionButton>
+                            <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
+                              {pick('刷新', 'Refresh')}
+                            </SettingsActionButton>
+                          </>
+                        }
+                        className={[
+                          returnHighlight?.providerId === provider.id ? 'settings-provider-card--return-focus' : '',
+                          'settings-reference-card--soft',
+                        ].filter(Boolean).join(' ')}
+                      />
+                    );
+                  })
+                : null}
             </div>
-          )}
+          ) : null}
           </div>
         </SettingsSection>
       ) : (
@@ -2891,11 +2910,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             '管理供应商、协议和价格同步。',
             'Manage providers, protocols, and pricing sync.'
           )}
-          action={
-            <SettingsActionButton style={{ display: 'none' }} icon={Plus} tone="primary" size="sm" disabled={providerActionsDisabled} onClick={() => beginCreateProvider()}>
-              {pick('新增', 'Add')}
-            </SettingsActionButton>
-          }
         >
           {thirdPartyProviders.length === 0 ? (
             <EmptyState
@@ -2935,14 +2949,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     footer={null}
                     actions={
                       <>
+                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
+                          {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
+                        </SettingsActionButton>
                         <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
                           {pick('编辑', 'Edit')}
                         </SettingsActionButton>
                         <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
                           {pick('刷新', 'Refresh')}
-                        </SettingsActionButton>
-                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
-                          {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
                         </SettingsActionButton>
                       </>
                     }

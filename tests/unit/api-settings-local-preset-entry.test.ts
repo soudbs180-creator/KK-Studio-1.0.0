@@ -16,8 +16,11 @@ test('local api management exposes one provider add entry instead of direct pres
   assert.doesNotMatch(source, /const existingOfficialByProvider = useMemo\(/);
   assert.doesNotMatch(source, /data-testid="api-official-provider-preset-google"/);
   assert.doesNotMatch(source, /data-testid="api-official-provider-preset-openai"/);
+  assert.doesNotMatch(source, /data-testid="api-official-empty-create"/);
+  assert.match(source, /data-testid="api-simple-provider-add"/);
   assert.match(source, /data-testid="api-official-provider-add"/);
+  assert.match(source, /data-testid="api-proxy-provider-add"/);
   assert.match(source, /onClick=\{handleCreateOfficialAction\}/);
-  assert.match(source, /Add new provider/);
-  assert.match(source, /Create a local API here, then choose Google or OpenAI in the form\./);
+  assert.match(source, /Add API/);
+  assert.match(source, /Official routes use built-in URLs\. Proxy providers need a name, request URL, and API key\./);
 });

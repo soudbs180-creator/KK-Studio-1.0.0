@@ -1,11 +1,11 @@
 # KK Studio Recovery Convergence Plan
 
 Last updated: 2026-04-28
-Branch: `codex/kk-studio-recovery-convergence`
+Branch: `main` (current user instruction: do not create or switch branches)
 
 ## Summary
 
-This plan merges five lost Codex work streams into one executable recovery line. The priority is to preserve the current dirty worktree, document the recovery baseline, then converge login/self-hosted runtime/recharge, settings/API architecture, ecommerce framework cards, PPT deck containers, and responsive result flows.
+This plan merges five lost Codex work streams into one executable recovery line. The priority is to preserve the current dirty worktree, document the recovery baseline, then converge login/self-hosted runtime/recharge, settings/API architecture, ecommerce framework cards, PPT deck containers, and responsive result flows. The historical recovery branch has already been merged; remaining close-out work continues directly on `main` without creating new branches.
 
 No existing uncommitted work may be reset or overwritten. Every milestone must produce tests or source contracts first, implementation second, validation third, status updates fourth, and a scoped git commit last.
 

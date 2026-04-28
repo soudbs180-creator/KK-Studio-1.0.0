@@ -11262,6 +11262,57 @@ body.dark-mode .settings-panel {
   gap: 10px;
 }
 
+.settings-panel .settings-api-quick-add {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: var(--radius-surface-md);
+  padding: 12px;
+}
+
+.settings-panel .settings-api-quick-add__lead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-panel .settings-api-quick-add__icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: var(--radius-control-md);
+  color: var(--text-primary);
+}
+
+.settings-panel .settings-api-quick-add__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.settings-panel .settings-api-quick-add__copy {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-panel .settings-api-quick-add__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .settings-panel .settings-provider-card--compact {
   min-height: 0;
   gap: 10px;
@@ -11454,23 +11505,48 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
 }
 
 .settings-panel .settings-capability-card {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
   border: none;
   border-radius: 16px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .settings-panel .settings-capability-card__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.settings-panel .settings-capability-card__identity {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-panel .settings-capability-card__avatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .settings-panel .settings-capability-card__main {
@@ -11493,30 +11569,90 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-capability-card__description {
   margin-top: 4px;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 11px;
   line-height: 1.45;
   color: var(--text-secondary);
 }
 
-.settings-panel .settings-capability-card__toggle-wrap {
-  flex: 0 0 168px;
+.settings-panel .settings-capability-card__state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
-.settings-panel .settings-capability-card__toggle {
-  border-radius: 12px;
-  border: 1px solid var(--border-light);
-  padding: 8px 10px;
+.settings-panel .settings-capability-card__switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex: 0 0 42px;
+  border: 1px solid var(--settings-border-subtle);
+  border-radius: 999px;
+  background: var(--settings-surface-overlay);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.settings-panel .settings-capability-card__switch--on {
+  border-color: rgb(var(--settings-accent-rgb) / 0.38);
+  background: rgb(var(--settings-accent-rgb) / 0.9);
+}
+
+.settings-panel .settings-capability-card__switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--text-inverse);
+  box-shadow: 0 2px 8px rgb(2 6 23 / 0.24);
+  transition: transform 160ms ease;
+}
+
+.settings-panel .settings-capability-card__switch--on .settings-capability-card__switch-thumb {
+  transform: translateX(18px);
 }
 
 .settings-panel .settings-capability-card__controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+}
+
+.settings-panel .settings-capability-card__controls label > div:first-child {
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.settings-panel .settings-capability-card__controls select {
+  min-height: var(--ui-control-height-compact);
+  padding-right: 28px;
+  padding-left: 10px;
+  font-size: var(--type-caption);
+}
+
+.settings-panel .settings-capability-card__controls label > div:last-child {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 @media (max-width: 720px) {
-  .settings-panel .settings-provider-card--compact .settings-provider-card__header,
-  .settings-panel .settings-capability-card__header {
+  .settings-panel .settings-api-quick-add {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-panel .settings-api-quick-add__actions {
+    justify-content: flex-start;
+  }
+
+  .settings-panel .settings-provider-card--compact .settings-provider-card__header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -11526,8 +11662,9 @@ body.dark-mode .settings-panel {
     justify-content: flex-start;
   }
 
-  .settings-panel .settings-capability-card__toggle-wrap {
-    flex: 1 1 auto;
+  .settings-panel .settings-capability-card__header,
+  .settings-panel .settings-capability-card__state {
+    align-items: center;
   }
 
   .settings-panel .settings-capability-card__controls {
@@ -11848,16 +11985,16 @@ body.dark-mode .settings-panel {
   --settings-accent-rgb: 41 151 255;
   --settings-accent-soft-rgb: 0 113 227;
   --settings-success-rgb: 52 211 153;
-  --settings-shell-bg: #000000;
-  --settings-page-bg: #0f0f10;
+  --settings-shell-bg: rgb(12 12 14 / 0.72);
+  --settings-page-bg: rgb(15 15 16 / 0.72);
   --settings-canvas-bg:
-    radial-gradient(circle at 14% 10%, rgb(var(--settings-accent-rgb) / 0.14), transparent 24%),
-    radial-gradient(circle at 86% 8%, rgb(var(--settings-accent-soft-rgb) / 0.1), transparent 24%),
-    linear-gradient(180deg, rgb(15 17 22 / 0.98) 0%, rgb(10 12 16 / 0.98) 100%);
-  --settings-section-bg: #1d1d1f;
-  --settings-surface-elevated: #1d1d1f;
-  --settings-surface-overlay: #161618;
-  --settings-nav-glass-bg: rgba(29, 29, 31, 0.78);
+    radial-gradient(circle at 14% 10%, rgb(var(--settings-accent-rgb) / 0.12), transparent 24%),
+    radial-gradient(circle at 86% 8%, rgb(var(--settings-accent-soft-rgb) / 0.08), transparent 24%),
+    linear-gradient(180deg, rgb(18 19 22 / 0.62) 0%, rgb(8 9 12 / 0.68) 100%);
+  --settings-section-bg: rgb(29 29 31 / 0.72);
+  --settings-surface-elevated: rgb(31 31 34 / 0.66);
+  --settings-surface-overlay: rgb(22 22 24 / 0.54);
+  --settings-nav-glass-bg: rgba(20, 20, 22, 0.62);
   --settings-nav-glass-border: rgba(255, 255, 255, 0.12);
   --settings-shell-header-bg: var(--settings-nav-glass-bg);
   --settings-sidebar-bg: var(--settings-nav-glass-bg);
@@ -11942,9 +12079,23 @@ body.dark-mode .settings-panel {
   background: var(--settings-sidebar-bg);
 }
 
+.settings-panel .settings-shell,
+.settings-panel .settings-shell-desktop,
+.settings-panel .settings-shell-page--desktop,
+.settings-panel .settings-shell-main,
+.settings-panel .settings-shell-mobile {
+  backdrop-filter: blur(30px) saturate(1.22);
+  -webkit-backdrop-filter: blur(30px) saturate(1.22);
+}
+
 .settings-panel .settings-shell-main,
 .settings-panel .settings-shell-mobile {
   background: var(--settings-canvas-bg);
+}
+
+.settings-panel .settings-shell-nav {
+  backdrop-filter: blur(26px) saturate(1.18);
+  -webkit-backdrop-filter: blur(26px) saturate(1.18);
 }
 
 .settings-panel .settings-shell-main::after,
@@ -11973,6 +12124,8 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-reference-list-item,
 .settings-panel .settings-provider-card__metric,
 .settings-panel .settings-log-entry {
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02), var(--settings-subcard-shadow) !important;
 }
 
@@ -11986,9 +12139,11 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-reference-card,
 .settings-panel .settings-provider-card {
+  backdrop-filter: blur(24px) saturate(1.18);
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.025),
-    0 0 0 1px rgb(255 255 255 / 0.015),
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 0 0 1px rgb(255 255 255 / 0.025),
     var(--settings-card-shadow);
 }
 
@@ -12075,7 +12230,11 @@ body.dark-mode .settings-panel {
 
 /* Compact settings workbench rhythm */
 .settings-panel .settings-shell-page--desktop .settings-reference-stack {
-  gap: 18px;
+  gap: 8px;
+}
+
+.settings-panel .settings-shell-page--desktop {
+  padding: 16px 28px 18px;
 }
 
 .settings-panel .settings-dashboard-overview-grid,
@@ -12101,21 +12260,53 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-hero {
-  padding: 18px !important;
+  padding: 16px !important;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-hero-card__header {
+  gap: 12px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero__mobile-action {
+  display: none;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero h2 {
+  font-size: 24px !important;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero p {
+  margin-top: 6px !important;
+  line-height: 1.42 !important;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-grid-4 {
-  gap: 12px;
+  gap: 10px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-mini-metric {
+  padding: 10px 12px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-mini-metric__value {
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-mini-metric__helper {
+  margin-top: 3px;
+  line-height: 1.35;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid {
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
-  gap: 16px;
+  gap: 14px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-secondary-grid {
   grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-  gap: 16px;
+  display: none;
+  gap: 14px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-quick-routes {
@@ -12129,13 +12320,13 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit {
   grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-  gap: 16px;
-  padding: 18px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__status,
 .settings-panel .settings-shell-page--desktop .settings-dashboard-live-bars {
-  min-height: 124px;
+  min-height: 88px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__flow {
@@ -12144,6 +12335,17 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__status {
   grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__pulse {
+  width: 40px;
+  height: 40px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__title {
+  font-size: 22px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-cockpit__readiness {
@@ -12154,7 +12356,7 @@ body.dark-mode .settings-panel {
   min-width: 0;
   border-top: 1px solid var(--settings-border-subtle);
   border-left: 0;
-  padding-top: 12px;
+  padding-top: 8px;
   padding-left: 0;
 }
 
@@ -12163,21 +12365,75 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-live-bars {
-  padding-top: 14px;
-  padding-bottom: 10px;
+  padding: 10px 10px 6px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-live-bars__track {
-  height: 92px;
+  height: 44px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-section-card {
+  padding: 16px !important;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-section-card > div:first-child {
+  gap: 10px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-section-card > div:last-child {
+  margin-top: 12px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-chart {
+  margin-top: 12px;
+  border-radius: 18px;
+  padding: 12px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-reference-chart__frame {
-  height: 210px;
+  height: 92px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-chart__labels {
+  margin-top: 8px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-chart-metrics,
+.settings-panel .settings-shell-page--desktop .settings-dashboard-storage-pressure {
+  display: none !important;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-reference-rings {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-ring-row {
+  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-ring {
+  width: 58px;
+  min-width: 58px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-ring strong {
+  font-size: 14px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-ring span {
+  font-size: 8px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-reference-ring-row .settings-reference-list-item__meta {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-reference-grid-4,
@@ -12354,6 +12610,10 @@ body.dark-mode .settings-panel {
   margin-top: 4px;
 }
 
+.settings-panel .settings-shell-page--mobile .settings-dashboard-hero__mobile-action {
+  display: inline-flex;
+}
+
 .settings-panel .settings-shell-page--mobile .settings-hero-card__actions > button {
   flex: 1 1 0;
 }
@@ -12447,6 +12707,77 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-shell-page--mobile .settings-reference-chart__frame {
   height: 148px;
   min-height: 0;
+}
+
+.settings-panel .settings-shell-page--mobile .settings-dashboard-chart-metrics {
+  display: grid;
+}
+
+@media (min-width: 768px) and (max-height: 940px) {
+  .settings-panel .settings-shell-nav {
+    gap: 10px;
+    padding: 16px 14px !important;
+  }
+
+  .settings-panel .settings-shell-nav__title {
+    margin-bottom: 12px !important;
+  }
+
+  .settings-panel .settings-shell-nav__title h1 {
+    margin-top: 8px !important;
+    font-size: 22px !important;
+    line-height: 1.08;
+  }
+
+  .settings-panel .settings-shell-nav__title p {
+    display: none;
+    margin-top: 6px !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+
+  .settings-panel .settings-shell-nav__search {
+    margin-bottom: 10px !important;
+    padding: 8px 10px !important;
+  }
+
+  .settings-panel .settings-shell-nav__list {
+    padding-right: 2px;
+  }
+
+  .settings-panel .settings-shell-nav__group {
+    gap: 6px !important;
+  }
+
+  .settings-panel .settings-shell-nav__group-list {
+    gap: 6px !important;
+  }
+
+  .settings-panel .settings-sidebar-item {
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .settings-panel .settings-sidebar-item__icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 12px !important;
+  }
+
+  .settings-panel .settings-sidebar-item__label {
+    font-size: 13px !important;
+  }
+
+  .settings-panel .settings-sidebar-item__desc {
+    margin-top: 2px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  .settings-panel .settings-shell-nav > div:last-child {
+    margin-top: 10px !important;
+  }
 }
 
 /* Partial redraw blur overlay (lightbox) */

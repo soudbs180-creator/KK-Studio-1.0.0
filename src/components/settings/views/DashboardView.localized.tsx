@@ -726,6 +726,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 {pick('刷新', 'Refresh')}
               </SettingsActionButton>
               <SettingsActionButton
+                className="settings-dashboard-hero__mobile-action"
                 icon={ArrowRight}
                 tone="primary"
                 onClick={() => onNavigate(dashboardPrimaryAction.target)}
@@ -795,7 +796,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="settings-dashboard-chart-metrics mt-5 grid gap-3 md:grid-cols-2">
               <MetricTile
                 label={pick('高峰窗口', 'Peak window')}
                 value={peakUsageBucket?.label || '00:00'}
@@ -854,7 +855,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               />
             </div>
 
-            <div className="mt-5">
+            <div className="settings-dashboard-storage-pressure mt-5">
               <div className="mb-2 flex items-center justify-between text-[length:var(--type-caption)] text-[var(--text-secondary)]">
                 <span>{pick('存储压力', 'Storage pressure')}</span>
                 <span>{storageUsageMb.toFixed(0)} MB</span>

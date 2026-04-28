@@ -19,9 +19,26 @@ test('provider list cards stay compact and keep only edit, refresh, and pause ac
   assert.match(cardSource, /settings-provider-card--compact/);
   assert.match(cardSource, /settings-provider-card__inline-actions/);
   assert.doesNotMatch(source, /<SettingsActionButton icon=\{Wand2\} size="sm"[\s\S]*provider-price:\$\{provider\.id\}/);
-  assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);
-  assert.match(source, /<SettingsActionButton icon=\{RefreshCw\} size="sm" disabled=\{routeDiagnosticsActionDisabled\} loading=\{busy === `provider-check:\$\{provider\.id\}`\} onClick=\{\(\) => void refreshProvider\(provider\)\}>/);
-  assert.match(source, /<SettingsActionButton icon=\{provider\.isActive \? Pause : Play\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => void toggleProvider\(provider\)\}>/);
+  assert.match(
+    source,
+    /<SettingsActionButton icon=\{provider\.isActive \? Pause : Play\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => void toggleProvider\(provider\)\}>[\s\S]*?<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>[\s\S]*?<SettingsActionButton icon=\{RefreshCw\} size="sm" disabled=\{routeDiagnosticsActionDisabled\} loading=\{busy === `provider-check:\$\{provider\.id\}`\} onClick=\{\(\) => void refreshProvider\(provider\)\}>/,
+    'Provider list action order should be pause/edit/refresh, with model and price sync moved into the editor.',
+  );
+});
+
+test('default local API cards use the same compact list density and hide metric details until advanced mode', () => {
+  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(source, /!showAdvancedWorkbench \? 'settings-provider-grid--compact' : ''/);
+  assert.match(source, /density=\{showAdvancedWorkbench \? 'normal' : 'compact'\}/);
+  assert.match(source, /subtitle=\{showAdvancedWorkbench[\s\S]*?undefined\}/);
+  assert.match(source, /metrics=\{showAdvancedWorkbench \? prioritizedMetrics : \[\]\}/);
+  assert.match(source, /progress=\{showAdvancedWorkbench \? progressData : undefined\}/);
+  assert.match(source, /error=\{showAdvancedWorkbench \? slot\.lastError : null\}/);
+  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add \{/);
+  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add__actions \{/);
+  assert.doesNotMatch(source, /min-h-\[132px\]/);
 });
 
 test('provider editor advanced tools expose model sync, price sync, and a custom pricing endpoint fallback', () => {
@@ -33,4 +50,17 @@ test('provider editor advanced tools expose model sync, price sync, and a custom
   assert.match(source, /showPricingEndpointOverride/);
   assert.match(source, /providerPricingEndpointDraft/);
   assert.match(source, /如果默认价格地址失败，可以在这里输入自定义价格地址。/);
+});
+
+test('capability role cards use a provider-card-like compact assignment surface', () => {
+  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(sectionSource, /settings-capability-card settings-reference-card--soft/);
+  assert.match(sectionSource, /settings-capability-card__avatar/);
+  assert.match(sectionSource, /role="switch"/);
+  assert.match(sectionSource, /aria-checked=\{item\.enabled\}/);
+  assert.match(cssSource, /\.settings-panel \.settings-capability-grid \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(260px, 1fr\)\);/);
+  assert.match(cssSource, /\.settings-panel \.settings-capability-card \{[\s\S]*padding: 10px;/);
+  assert.match(cssSource, /\.settings-panel \.settings-capability-card__controls select \{[\s\S]*min-height: var\(--ui-control-height-compact\);/);
 });

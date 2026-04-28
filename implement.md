@@ -24,7 +24,8 @@ For each milestone:
 
 ## Git And Worktree Safety
 
-- Work on `codex/kk-studio-recovery-convergence`.
+- Stay on the current `main` branch. Do not create or switch branches while the active user instruction says branches are forbidden.
+- The historical `codex/kk-studio-recovery-convergence` branch has been merged into `main`; references to it are archival, not an instruction to branch again.
 - Never use `git reset --hard`, `git checkout --`, or destructive cleanup against uncommitted work unless explicitly requested.
 - Do not stage unrelated dirty files.
 - Prefer `git status --short` and path-limited `git diff -- <path>` before staging.
@@ -32,12 +33,7 @@ For each milestone:
 
 ## Subagent Policy
 
-The user requested broad subagent use. Use subagents for independent domains and set each one to `gpt-5.5` with `xhigh` reasoning.
-
-- Use explorer agents for read-only investigation by subsystem.
-- Use worker agents only when the write scope is disjoint and explicit.
-- Tell workers they are not alone in the codebase, must not revert others' edits, and must list changed paths.
-- The main thread owns integration, validation, and final commits.
+Do not spawn subagents unless the active user request explicitly asks for delegated or parallel agent work. If delegation is requested, keep write scopes disjoint and let the main thread own integration, validation, and final commits.
 
 Current read-only explorer domains:
 

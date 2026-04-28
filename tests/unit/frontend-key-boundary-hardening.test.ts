@@ -150,7 +150,9 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const routeDiagnosticsActionDisabled = diagnosticsAvailability\.routeActionsDisabled;/);
   assert.doesNotMatch(source, /const diagnosticsActionDisabled = !isAuthenticated \|\| apiHealth\?\.reachable === false;/);
   assert.doesNotMatch(source, /const headerPrimaryActionDisabled = activeTab === 'official' \? userApiActionsDisabled : providerActionsDisabled;/);
-  assert.match(source, /data-testid="api-official-empty-create" icon=\{Plus\} tone="primary" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => beginCreateOfficial\(\)\}/);
+  assert.match(source, /data-testid="api-official-provider-add"/);
+  assert.match(source, /onClick=\{handleCreateOfficialAction\}/);
+  assert.doesNotMatch(source, /data-testid="api-official-empty-create"/);
   assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => startEditOfficial\(slot\)\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);

@@ -7,10 +7,10 @@ Last updated: 2026-04-28
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: VPS PostgreSQL client access repair is code-complete locally; recharge submission runtime schema self-healing is complete; remote apply is blocked on usable VPS shell access and action-time confirmation.
+- Current milestone: final settings/API simple UI, compact capability assignment cards, Dashboard mobile action, and PromptBar density close-out is validated on `main`; VPS public PostgreSQL access should prefer the verified SSH tunnel path because direct client egress IPs keep changing.
 - Milestones 1, 2, 3, 4, 5, and 6 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
-- Publish status: local `main` is ahead of `origin/main`; latest observed count after local follow-up commits was 22 commits.
+- Publish status: local `main` was ahead of `origin/main` by 27 commits before this follow-up commit; push status must be handled separately when publishing is desired.
 
 ## Recovered Sources
 
@@ -32,12 +32,12 @@ The original Codex threads did not reappear in the sidebar, so they are now repr
 
 ## Dirty Worktree Snapshot
 
-Snapshot command: `git status --short`
+Snapshot command: `git status --short --branch`
 
-- Total dirty entries: 515
-- Tracked dirty entries: 403
-- Untracked entries: 112
-- Deleted-file markers: 146
+- Current branch: `main`
+- Remote relation: `main...origin/main [ahead 27]`
+- Current dirty entries after this validation pass: 19 tracked paths.
+- Untracked entries visible to ordinary Git status: 0
 
 Risk classes observed:
 
@@ -315,6 +315,54 @@ Final gate:
 - Passed: `npm.cmd run verify:desktop-settings-smoke`
 - Passed: `npm.cmd run check:encoding`
 
+2026-04-28 API settings simple UI risk follow-up validation:
+
+- Red verified: `tests/unit/api-settings-simple-mode-contract.test.ts` failed before the unified simple-provider list and compact add entry existed.
+- Passed: targeted API/settings contracts (`26/26` tests):
+  - `tests/unit/api-settings-local-preset-entry.test.ts`
+  - `tests/unit/api-settings-workbench-structure.test.ts`
+  - `tests/unit/api-settings-capability-layout-regression.test.ts`
+  - `tests/unit/api-settings-stage-semantics.test.ts`
+  - `tests/unit/api-settings-simple-mode-contract.test.ts`
+  - `tests/unit/api-settings-provider-compact-ui-contract.test.ts`
+  - `tests/unit/api-settings-routing-regression.test.ts`
+  - `tests/unit/mobile-settings-browser-verify-script.test.ts`
+- Passed: related billing/BYOK/settings density/PromptBar contracts (`21/21` tests):
+  - `tests/unit/billing-remaining-balance-contract.test.ts`
+  - `tests/unit/frontend-key-boundary-hardening.test.ts`
+  - `tests/unit/settings-ui-density-regression.test.ts`
+  - `tests/unit/prompt-bar-layout-regression.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Passed with HTTP fallback because Chromium launch was blocked by `spawn EPERM`: `npm.cmd run verify:desktop-settings-smoke`
+- Passed with HTTP fallback because Chromium launch was blocked by `spawn EPERM`: `npm.cmd run verify:mobile-settings-smoke`
+
+2026-04-28 final settings/API density close-out validation:
+
+- Confirmed current branch remained `main`; no branch was created or switched for this close-out.
+- Removed hidden duplicate provider create actions and kept creation scoped to one compact simple-mode add API container with official/proxy choices plus one advanced-mode empty-state action.
+- Compressed ability assignment cards into provider-card-like role cards with avatar marks, small status switches, and compact route/model/fallback selectors.
+- Added short-height desktop/tablet settings sidebar compaction so the settings shell does not stack into oversized navigation rows.
+- Kept the Dashboard hero primary action mobile-scoped so desktop overview does not duplicate action entry points while mobile still has a direct action.
+- Existing local login CORS preflight coverage stayed green through the full unit suite.
+- Passed: expanded settings/API/BYOK/PromptBar/Dashboard contracts (`43/43` tests):
+  - `tests/unit/api-settings-local-preset-entry.test.ts`
+  - `tests/unit/api-settings-capability-layout-regression.test.ts`
+  - `tests/unit/api-settings-provider-compact-ui-contract.test.ts`
+  - `tests/unit/api-settings-routing-regression.test.ts`
+  - `tests/unit/api-settings-simple-mode-contract.test.ts`
+  - `tests/unit/api-settings-workbench-structure.test.ts`
+  - `tests/unit/billing-remaining-balance-contract.test.ts`
+  - `tests/unit/dashboard-settings-overview-regression.test.ts`
+  - `tests/unit/frontend-key-boundary-hardening.test.ts`
+  - `tests/unit/prompt-bar-layout-regression.test.ts`
+  - `tests/unit/settings-ui-density-regression.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit` (`946/946` tests)
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+
 2026-04-28 recharge PostgreSQL runtime repair validation:
 
 - Red/green verified: `node --test --test-isolation=none tests/unit/postgres-recharge-submission-repository.test.ts`
@@ -328,27 +376,39 @@ Final gate:
 - Passed: `npm.cmd run build`
 - Still blocked: `node scripts/dev/run-api-dev.mjs --check` fails because the VPS PostgreSQL server rejects the current client source in `pg_hba.conf`.
 
+2026-04-28 local API model discovery follow-up validation:
+
+- Root cause confirmed: saved user-route diagnostics accepted `data[]` and `models[]` payloads but dropped top-level model arrays, so some local `/models` endpoints returned `ok: true` with an empty model list.
+- Red/green verified: `node --test --test-isolation=none tests/unit/user-route-diagnostics-routes.test.ts`
+- Added regression coverage for a local OpenAI-compatible route that returns a top-level JSON array from `/v1/models`.
+- Passed: `node --test --test-isolation=none tests/unit/user-route-diagnostics-routes.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+
 ## In Progress
 
-- Settings smoke and admin recharge follow-up is committed locally.
+- No local settings/API, Dashboard, or PromptBar close-out gap remains after final validation.
+- Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
+- PowerShell command execution became unreliable during final staging, but `git add` succeeded through the Node REPL command path.
 - VPS PostgreSQL client-access helper is committed locally.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper.
-- Recharge submission PostgreSQL self-healing is implemented locally and awaiting a scoped commit.
-- Remote PostgreSQL access-control repair remains blocked because no usable VPS shell is available and the askpass-based SSH attempt did not establish a shell.
+- Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.
+- Direct public PostgreSQL access remains unstable because the current execution environment's source IP changes between probes. Observed rejected sources include `13.208.210.0`, `3.1.51.45`, and `13.212.119.86`.
+- Verified stable local API access through an SSH tunnel (`127.0.0.1:15432` -> VPS `127.0.0.1:5432`): `run-api-dev --check` passed and `/healthz?probe=1` returned HTTP 200 with `canonicalPersistenceReady: true`.
 
 ## Known Risks And Blockers To Verify
 
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
-- Unrelated tracked source changes are currently present in API/settings/recharge tests; keep them out of the responsive masonry commit unless explicitly requested.
+- If PowerShell reports `.git/index.lock` permission errors again, use the Node REPL command path for Git operations and verify staged files with `git status --short`.
+- The final close-out commit scope is limited to settings/API density, compact capability-card controls, Dashboard mobile action scoping, source-contract test updates, PromptBar overflow-policy regression coverage, and these ledger files.
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
-- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `3.1.51.45`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
+- Current VPS PostgreSQL status: the app can configure SSL, and the VPS has already loaded narrow `hostssl` rules for older client sources, but direct public access is brittle because the client egress IP can change between checks. Prefer the verified SSH tunnel path for local development; only append another `/32` `pg_hba.conf` rule after a fresh live probe and action-time confirmation.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
 
-1. Get a usable VPS shell, then run `KK_PG_CLIENT_CIDR="<client-cidr>" scripts/vps/repair-postgres-client-access.sh` as a dry-run.
-2. After reviewing the proposed `hostssl` rule and receiving action-time confirmation, run the same script with `KK_APPLY_PG_CLIENT_ACCESS=true`.
-3. Rerun `node scripts/dev/run-api-dev.mjs --check` and `http://127.0.0.1:3001/healthz?probe=1` after the server-side rule is fixed.
-4. Push local `main` when publishing these commits is desired.
+1. Keep using an SSH tunnel for local API development against the VPS PostgreSQL database instead of relying on the changing public client IP.
+2. If direct public PostgreSQL access is still required, rerun a live probe, dry-run `scripts/vps/repair-postgres-client-access.sh` with the latest `/32`, then apply only after action-time confirmation.
+3. Push local `main` when publishing these commits is desired.

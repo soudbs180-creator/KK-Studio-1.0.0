@@ -562,76 +562,94 @@ type ApiWorkbenchCapabilitySectionProps = {
 export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySectionProps> = ({
   pick,
   items,
-}) => (
-  <SettingsSection
-    testId="settings-workbench-capability"
-    title={pick('能力分配', 'Capability roles')}
-    eyebrow={pick('角色路由', 'Role routing')}
-    description={pick(
-      '把图片、PPT、电商、AI 助手、全局提示词优化和 OCR 各自绑定到链路与模型。',
-      'Assign image, PPT, ecommerce, assistant, Global prompt optimizer, and OCR roles to routes and models.',
-    )}
-    action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
-  >
-    <div className="settings-capability-grid">
-      {items.map((item) => (
-        <div key={item.role} className="settings-capability-card" style={SETTINGS_ELEVATED_STYLE}>
-          <div className="settings-capability-card__header">
-            <div className="settings-capability-card__main">
-              <div className="settings-capability-card__title-row">
-                <div className="settings-capability-card__title">{item.title}</div>
+}) => {
+  const getRoleMark = (item: ApiWorkbenchCapabilityDraft): string => {
+    if (item.role === 'ppt_generation') return 'PPT';
+    if (item.role === 'prompt_optimizer') return 'OPT';
+    if (item.role === 'ocr_document') return 'OCR';
+    if (item.role === 'assistant') return 'AI';
+    return item.title.slice(0, 2).toUpperCase();
+  };
+
+  return (
+    <SettingsSection
+      testId="settings-workbench-capability"
+      title={pick('能力分配', 'Capability roles')}
+      eyebrow={pick('角色路由', 'Role routing')}
+      description={pick(
+        '把图片、PPT、电商、AI 助手、全局提示词优化和 OCR 各自绑定到链路与模型。',
+        'Assign image, PPT, ecommerce, assistant, Global prompt optimizer, and OCR roles to routes and models.',
+      )}
+      action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
+    >
+      <div className="settings-capability-grid">
+        {items.map((item) => (
+          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="settings-capability-card__header">
+              <div className="settings-capability-card__identity">
+                <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
+                  {getRoleMark(item)}
+                </div>
+                <div className="settings-capability-card__main">
+                  <div className="settings-capability-card__title-row">
+                    <div className="settings-capability-card__title">{item.title}</div>
+                  </div>
+                  <div className="settings-capability-card__description">{item.description}</div>
+                </div>
+              </div>
+              <div className="settings-capability-card__state">
                 <SettingsBadge tone={item.enabled ? 'emerald' : 'neutral'}>
                   {item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
                 </SettingsBadge>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={item.enabled}
+                  aria-label={`${item.title} ${pick('启用', 'Enabled')}`}
+                  className={[
+                    'settings-capability-card__switch',
+                    item.enabled ? 'settings-capability-card__switch--on' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => item.onEnabledChange(!item.enabled)}
+                >
+                  <span className="settings-capability-card__switch-thumb" />
+                </button>
               </div>
-              <div className="settings-capability-card__description">{item.description}</div>
             </div>
-            <div className="settings-capability-card__toggle-wrap">
-              <div className="settings-capability-card__toggle" style={SETTINGS_OVERLAY_STYLE}>
-                <SettingToggle
-                  label={pick('启用', 'Enabled')}
-                  checked={item.enabled}
-                  onChange={item.onEnabledChange}
-                  helper={item.role === 'prompt_optimizer'
-                    ? pick('默认关闭时走本地 skills 提示词体系，开启后才走 AI 优化能力。', 'Disabled keeps local skills-based prompt shaping. Enable it to use AI prompt optimization.')
-                    : undefined}
-                />
-              </div>
+            <div className="settings-capability-card__controls">
+              <SettingSelect
+                label={pick('主链路', 'Primary route')}
+                value={item.primaryRouteId}
+                options={item.routeOptions}
+                onChange={item.onPrimaryRouteChange}
+                disabled={!item.enabled}
+              />
+              <SettingSelect
+                label={item.role === 'prompt_optimizer'
+                  ? pick('优化模型', 'Optimizer model')
+                  : pick('模型', 'Model')}
+                value={item.primaryModelId}
+                options={item.modelOptions}
+                onChange={item.onPrimaryModelChange}
+                disabled={!item.enabled}
+                helper={item.role === 'prompt_optimizer'
+                  ? pick('保留需求语义和专业术语。', 'Keeps requirement terms intact.')
+                  : undefined}
+              />
+              <SettingSelect
+                label={pick('备用链路', 'Fallback route')}
+                value={item.fallbackRouteId}
+                options={item.routeOptions}
+                onChange={item.onFallbackRouteChange}
+                disabled={!item.enabled}
+              />
             </div>
           </div>
-          <div className="settings-capability-card__controls">
-            <SettingSelect
-              label={pick('主链路', 'Primary route')}
-              value={item.primaryRouteId}
-              options={item.routeOptions}
-              onChange={item.onPrimaryRouteChange}
-              disabled={!item.enabled}
-            />
-            <SettingSelect
-              label={item.role === 'prompt_optimizer'
-                ? pick('优化模型', 'Optimizer model')
-                : pick('模型', 'Model')}
-              value={item.primaryModelId}
-              options={item.modelOptions}
-              onChange={item.onPrimaryModelChange}
-              disabled={!item.enabled}
-              helper={item.role === 'prompt_optimizer'
-                ? pick('Global prompt optimizer 会保留需求语义和专业术语。', 'Global prompt optimizer keeps requirement language and professional terminology intact.')
-                : undefined}
-            />
-            <SettingSelect
-              label={pick('备用链路', 'Fallback route')}
-              value={item.fallbackRouteId}
-              options={item.routeOptions}
-              onChange={item.onFallbackRouteChange}
-              disabled={!item.enabled}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  </SettingsSection>
-);
+        ))}
+      </div>
+    </SettingsSection>
+  );
+};
 
 type ApiWorkbenchOcrSectionProps = {
   pick: LocalePick;

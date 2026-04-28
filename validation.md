@@ -231,6 +231,14 @@ Apply only after reviewing the proposed `hostssl` rule:
 KK_PG_CLIENT_CIDR="<client-ip-or-cidr>/32" KK_APPLY_PG_CLIENT_ACCESS=true scripts/vps/repair-postgres-client-access.sh
 ```
 
+If the live client source keeps changing between probes, validate through an SSH tunnel instead of chasing public `/32` rules. The local check should point `DATABASE_URL` at a local forwarded port such as `127.0.0.1:15432`, with that port forwarded to the VPS `127.0.0.1:5432`, then rerun:
+
+```powershell
+node scripts/dev/run-api-dev.mjs --check
+```
+
+For full runtime confidence, start the API with the tunneled `DATABASE_URL` and verify `http://127.0.0.1:3001/healthz?probe=1` reports `canonicalPersistenceReady: true`.
+
 ## Settings Smoke And Admin Recharge Follow-Up
 
 Run these when touching settings direct routes, API simple/advanced mode, settings browser smoke scripts, or the admin recharge review surface:
@@ -266,15 +274,64 @@ npm.cmd run build
 For local API settings add-entry changes without admin recharge changes, use this narrower gate:
 
 ```powershell
-node "tests/unit/api-settings-local-preset-entry.test.ts"
-node "tests/unit/api-settings-workbench-structure.test.ts"
-node "tests/unit/api-settings-capability-layout-regression.test.ts"
-node "tests/unit/api-settings-stage-semantics.test.ts"
-node "tests/unit/api-settings-simple-mode-contract.test.ts"
-node "tests/unit/mobile-settings-browser-verify-script.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/api-settings-local-preset-entry.test.ts" `
+  "tests/unit/api-settings-workbench-structure.test.ts" `
+  "tests/unit/api-settings-capability-layout-regression.test.ts" `
+  "tests/unit/api-settings-stage-semantics.test.ts" `
+  "tests/unit/api-settings-simple-mode-contract.test.ts" `
+  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
+  "tests/unit/api-settings-routing-regression.test.ts" `
+  "tests/unit/mobile-settings-browser-verify-script.test.ts"
 npm.cmd run typecheck
 npm.cmd run verify:mobile-settings-smoke
 npm.cmd run verify:desktop-settings-smoke
+npm.cmd run check:encoding
+```
+
+For API settings simple-mode density or unified provider-list changes, also run:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/billing-remaining-balance-contract.test.ts" `
+  "tests/unit/frontend-key-boundary-hardening.test.ts" `
+  "tests/unit/settings-ui-density-regression.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts"
+```
+
+## Final Settings/API Density Close-Out
+
+Run these when closing settings/API simple mode, local API add-entry, BYOK boundary, PromptBar mobile density, or settings density contract changes:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/api-settings-local-preset-entry.test.ts" `
+  "tests/unit/api-settings-capability-layout-regression.test.ts" `
+  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
+  "tests/unit/api-settings-routing-regression.test.ts" `
+  "tests/unit/api-settings-simple-mode-contract.test.ts" `
+  "tests/unit/api-settings-workbench-structure.test.ts" `
+  "tests/unit/billing-remaining-balance-contract.test.ts" `
+  "tests/unit/dashboard-settings-overview-regression.test.ts" `
+  "tests/unit/frontend-key-boundary-hardening.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/settings-ui-density-regression.test.ts" `
+  "tests/unit/api-server-startup.test.ts" `
+  "tests/unit/user-route-diagnostics-routes.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
+## Local API Model Discovery Diagnostics
+
+Run these when touching saved user-route connectivity checks, local API model discovery, or the secure diagnostics path that powers the settings-page `Fetch models` action:
+
+```powershell
+node --test --test-isolation=none "tests/unit/user-route-diagnostics-routes.test.ts"
+npm.cmd run typecheck
 npm.cmd run check:encoding
 ```
 

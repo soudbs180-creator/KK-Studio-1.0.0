@@ -9,20 +9,25 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('capability routing cards keep their toggles inside a dedicated inner container', () => {
+test('capability routing cards keep their toggles in a compact card header state area', () => {
   const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
   const uiSource = readSource('src/components/settings/ui/index.tsx');
+  const cssSource = readSource('src/index.css');
 
   assert.match(source, /settings-capability-grid/);
   assert.match(source, /settings-capability-card/);
+  assert.match(source, /settings-capability-card__identity/);
+  assert.match(source, /settings-capability-card__avatar/);
+  assert.match(source, /settings-capability-card__state/);
+  assert.match(source, /settings-capability-card__switch/);
+  assert.match(source, /settings-capability-card__switch-thumb/);
   assert.match(source, /settings-capability-card__controls/);
   assert.doesNotMatch(source, /<div key=\{item\.role\} className="rounded-\[18px\] border p-3"/);
-  assert.match(
-    source,
-    /<div className="settings-capability-card__toggle" style=\{SETTINGS_OVERLAY_STYLE\}>\s*<SettingToggle/s,
-  );
+  assert.doesNotMatch(source, /settings-capability-card__toggle/);
   assert.match(
     uiSource,
     /className="settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-full border/,
   );
+  assert.match(cssSource, /\.settings-panel \.settings-capability-card__switch \{/);
+  assert.match(cssSource, /\.settings-panel \.settings-capability-card__switch--on \{/);
 });

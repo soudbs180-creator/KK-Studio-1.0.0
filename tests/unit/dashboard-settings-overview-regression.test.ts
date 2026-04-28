@@ -20,6 +20,7 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(source, /<SettingsHero/);
   assert.match(source, /SettingsActionButton/);
   assert.match(source, /icon=\{ArrowRight\}/);
+  assert.match(source, /className="settings-dashboard-hero__mobile-action"/);
   assert.equal((source.match(/tone="primary"/g) || []).length, 1);
   assert.match(source, /getSettingsViewMeta\('dashboard'/);
   assert.match(source, /getSettingsPrimaryActionMeta\('dashboard'/);
@@ -57,6 +58,8 @@ test('DashboardView.localized uses calmer settings primitives for the desktop ov
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-overview-grid/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-secondary-grid/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-quick-routes \{[\s\S]*display: none;/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-hero__mobile-action \{[\s\S]*display: none;/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile \.settings-dashboard-hero__mobile-action \{[\s\S]*display: inline-flex;/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-cockpit__flow \{[\s\S]*display: none;/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile \.settings-dashboard-overview-grid/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile \.settings-dashboard-mobile-flow-strip/);
