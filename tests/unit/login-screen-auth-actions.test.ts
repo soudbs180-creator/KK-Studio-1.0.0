@@ -37,6 +37,7 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
   assert.match(source, /密码长度至少 8 位。/);
   assert.match(source, /Password must be at least 8 characters\./);
   assert.match(source, /minLength=\{8\}/);
+  assert.doesNotMatch(source, /\?{3,}/);
   assert.doesNotMatch(source, /\u00e5\u00a8\u2030\u00e3\u201e\u00a5\u00e5\u201d\u00bd/);
   assert.doesNotMatch(source, /\u00e7\u2019\u2021\u00e5\u00b3\u00b0\u00e5\u017d\u203a/);
   assert.doesNotMatch(source, /if \(!user\)/);

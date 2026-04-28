@@ -35,9 +35,9 @@ The original Codex threads did not reappear in the sidebar, so they are now repr
 Snapshot command: `git status --short --branch`
 
 - Current branch: `main`
-- Remote relation: `main...origin/main [ahead 27]`
-- Current dirty entries after this validation pass: 19 tracked paths.
-- Untracked entries visible to ordinary Git status: 0
+- Remote relation: `main...origin/main [ahead 31]`
+- Current dirty entries after this validation pass: 10 tracked paths.
+- Untracked entries visible to ordinary Git status: 2
 
 Risk classes observed:
 
@@ -436,14 +436,17 @@ Final gate:
 
 2026-04-28 final official defaults, auth alignment, and VPS tunnel close-out validation:
 
-- Kept the unified settings Add API entry intact: `api-simple-provider-add` still exposes both official and proxy add actions, and stale tests no longer assert the proxy action is absent.
+- Kept the compact settings Add API entry intact: `api-simple-provider-add` exposes separate `官方直连` and `中转站` actions without restoring the older direct preset buttons.
 - Added official Google/OpenAI model defaults as the effective model list when saved official slots have no stored models yet, including settings-card helper copy for built-in defaults.
+- Tightened official OpenAI defaults so custom OpenAI-compatible proxy URLs still depend on model discovery instead of inheriting official defaults.
 - Aligned login/register password minimum copy and inputs with the server-side 8-character rule.
 - Added `KK_AUTH_REQUIRE_TURNSTILE=false` support consistently in both the auth HTTP route validator and `AuthService.register`.
-- Passed: targeted close-out unit subset (`39/39` tests).
+- Finished the `App.tsx` extraction follow-up by moving workflow actions and connector-render snapshot logic into `useWorkflowActions` and `useConnectorRenderer`, then updated source-contract tests to follow the new hook ownership.
+- Passed: targeted close-out unit subset (`40/40` tests).
+- Passed: connector extraction contract subset (`24/24` tests).
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run build`
-- Passed: `npm.cmd run test:unit` (`953/953` tests)
+- Passed: `npm.cmd run test:unit` (`954/954` tests)
 - Passed: `npm.cmd run check:encoding`
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `git diff --check`

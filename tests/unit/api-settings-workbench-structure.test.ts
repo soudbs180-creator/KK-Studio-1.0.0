@@ -73,7 +73,8 @@ test('ApiSettingsView surfaces a compact unified API list and keeps provider cre
 
   assert.match(viewSource, /const showSimpleProviderList = !showAdvancedWorkbench;/);
   assert.match(viewSource, /data-testid="api-simple-provider-add"/);
-  assert.match(viewSource, /data-testid="api-proxy-provider-add"/);
+  assert.doesNotMatch(viewSource, /data-testid="api-proxy-provider-add"/);
+  assert.match(viewSource, /pick\('添加新的供应商', 'Add new provider'\)/);
   assert.match(viewSource, /thirdPartyProviders\.map\(\(provider\)/);
 
   assert.match(viewSource, /pick\('本地 API', 'Local APIs'\)/);
@@ -87,8 +88,8 @@ test('ApiSettingsView surfaces a compact unified API list and keeps provider cre
   const createProviderButtonUsages = viewSource.match(/onClick=\{beginCreateProvider\}/g) ?? [];
 
   assert.equal(createOfficialButtonUsages.length, 0, 'Expected official creation to go through the compact API add entry');
-  assert.equal(createProxyAddEntryUsages.length, 1, 'Expected simple list mode to expose one proxy add entry inside the unified add card');
-  assert.equal(createProviderButtonUsages.length, 2, 'Expected one simple-mode proxy action and one advanced empty-state create action');
+  assert.equal(createProxyAddEntryUsages.length, 0, 'Expected simple list mode to expose only the local provider add entry');
+  assert.equal(createProviderButtonUsages.length, 1, 'Expected provider creation to remain scoped to the advanced empty-state action');
 });
 
 test('ApiSettingsView keeps diagnostics and section actions owned by shared modules instead of hidden duplicate controls', () => {

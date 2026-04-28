@@ -223,8 +223,8 @@ const LoginScreen: React.FC = () => {
       const result = await signInWithPasswordWithFallback({ email: emailValue, password, ...(captchaToken ? { captchaToken } : {}) });
       if (result.error) throw result.error;
       setMessage(hostedRuntime
-        ? t('VPS ??????????????????????', 'The VPS-backed session is active and this browser will keep you signed in automatically.')
-        : t('???????????', 'The local runtime session is now active.'));
+        ? t('VPS 会话已建立，浏览器将自动保持登录。', 'The VPS-backed session is active and this browser will keep you signed in automatically.')
+        : t('本地运行时会话已建立。', 'The local runtime session is now active.'));
       return;
     }
     throw toAuthError('AUTH_RESET_PASSWORD_UNAVAILABLE', t('当前本地运行时尚未接入重置密码接口。', 'The local runtime does not expose password reset yet.'));
@@ -269,8 +269,8 @@ const LoginScreen: React.FC = () => {
     setError(isNetworkError(lastError)
       ? (
         hostedRuntime
-          ? t(`?????????? ${MAX_RETRY} ?????? VPS ????????????`, `Network request failed after ${MAX_RETRY} attempts. Check whether the VPS sign-in service is reachable and try again.`)
-          : t(`?????????? ${MAX_RETRY} ?????????????????????????`, `Network request failed after ${MAX_RETRY} attempts. You can continue with a temporary account for local-only access.`)
+          ? t(`连续 ${MAX_RETRY} 次请求失败，请检查 VPS 登录服务是否可达后重试。`, `Network request failed after ${MAX_RETRY} attempts. Check whether the VPS sign-in service is reachable and try again.`)
+          : t(`连续 ${MAX_RETRY} 次请求失败，可先使用临时账号进入本地工作区。`, `Network request failed after ${MAX_RETRY} attempts. You can continue with a temporary account for local-only access.`)
       )
       : resolveAuthErrorMessage(lastError, view));
     if (turnstileAvailable) resetTurnstile();
@@ -366,7 +366,7 @@ const LoginScreen: React.FC = () => {
         isOpen={wechatModalOpen}
         language={language}
         title={t('使用微信扫码登录', 'Sign in with WeChat QR')}
-        description={t('???????? KK Studio?????? VPS ??????', 'After you confirm on WeChat, KK Studio restores the VPS-backed browser session directly.')}
+        description={t('微信确认后，KK Studio 会直接恢复 VPS 浏览器会话。', 'After you confirm on WeChat, KK Studio restores the VPS-backed browser session directly.')}
         authorizationUrl={wechatAuthorizationUrl}
         expiresAt={wechatExpiresAt}
         loading={wechatLoading}
@@ -377,14 +377,14 @@ const LoginScreen: React.FC = () => {
 
       <div className="auth-shader-background" aria-hidden>{showShaderBackground ? <Suspense fallback={null}><DeferredAuthShaderBackground className="auth-shader-canvas" /></Suspense> : null}</div>
       <div className="auth-background" aria-hidden><div className="auth-gradient auth-gradient-a" /><div className="auth-gradient auth-gradient-b" /><div className="auth-grid" /><div className="auth-star-layer">{stars.map((star) => <span key={star.id} className="auth-star-point" style={{ '--star-top': star.top, '--star-left': star.left, '--star-delay': star.delay, '--star-duration': star.duration, '--star-size': star.size, '--star-opacity': star.opacity } as React.CSSProperties} />)}</div></div>
-      <section className="auth-side-visual" aria-hidden><div className="auth-brand"><div className="auth-brand-icon"><Sparkles size={30} /></div><h1>{t('KK 创作平台', 'KK Creative Platform')}</h1><p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p></div><p className="auth-side-note">{hostedRuntime ? t('???????? VPS ?????? Postgres ??????', 'This build now uses VPS-backed sign-in and PostgreSQL session persistence.') : t('???????????????????????????????????????', 'The local runtime keeps your workspace state first. Account sync will be added once the backend auth routes are ready.')}</p></section>
+      <section className="auth-side-visual" aria-hidden><div className="auth-brand"><div className="auth-brand-icon"><Sparkles size={30} /></div><h1>{t('KK 创作平台', 'KK Creative Platform')}</h1><p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p></div><p className="auth-side-note">{hostedRuntime ? t('当前版本使用 VPS 登录与 PostgreSQL 会话持久化。', 'This build now uses VPS-backed sign-in and PostgreSQL session persistence.') : t('本地运行时优先保留工作区状态，后端认证接口就绪后再同步账号。', 'The local runtime keeps your workspace state first. Account sync will be added once the backend auth routes are ready.')}</p></section>
 
       <section className="auth-side-form">
         <div className="auth-panel">
           {view !== 'login' && <button type="button" className="auth-link-back" onClick={() => setView('login')}><ChevronLeft size={16} />{t('返回登录', 'Back to sign in')}</button>}
           <header className="auth-header">
             <h2>{view === 'login' ? t('欢迎回来', 'Welcome back') : view === 'register' ? t('创建账号', 'Create your account') : t('找回密码', 'Reset your password')}</h2>
-            <p>{view === 'login' ? (hostedRuntime ? t('?? VPS ???????????????????????????', 'Sign in with your VPS-backed account to enter the workspace. The browser session stays active automatically.') : t('?? KK API ??????????????', 'Use the KK API or the local runtime to continue into the workspace.')) : view === 'register' ? t('注册入口已切换到 KK API，后端未就绪时会直接提示。', 'The sign-up flow now goes through the KK API and will tell you clearly when the backend is not ready.') : t('当前仅保留占位入口，等待后端接入重置密码接口。', 'This is currently a placeholder while the backend reset-password route is still being wired up.')}</p>
+            <p>{view === 'login' ? (hostedRuntime ? t('使用 VPS 账号登录后进入工作区，浏览器会自动保持会话。', 'Sign in with your VPS-backed account to enter the workspace. The browser session stays active automatically.') : t('使用 KK API 或本地运行时继续进入工作区。', 'Use the KK API or the local runtime to continue into the workspace.')) : view === 'register' ? t('注册入口已切换到 KK API，后端未就绪时会直接提示。', 'The sign-up flow now goes through the KK API and will tell you clearly when the backend is not ready.') : t('当前仅保留占位入口，等待后端接入重置密码接口。', 'This is currently a placeholder while the backend reset-password route is still being wired up.')}</p>
           </header>
 
           <form className="auth-form" onSubmit={handleAuth}>

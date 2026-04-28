@@ -433,8 +433,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: '新密码至少 6 位。' });
+    if (newPassword.length < 8) {
+      setMessage({ type: 'error', text: '新密码至少需要 8 位。' });
       return;
     }
 

@@ -10255,7 +10255,7 @@ body.dark-mode .settings-panel {
   background-color: color-mix(in srgb, var(--bg-tertiary) 85%, white 15%);
 }
 
-/* === 输入???--bg-tertiary 背景 + --border-light === */
+/* === 输入框 --bg-tertiary 背景 + --border-light === */
 .settings-panel input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
 .settings-panel textarea,
 .settings-panel select {

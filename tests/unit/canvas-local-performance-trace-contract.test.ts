@@ -24,22 +24,22 @@ describe('canvas local performance trace contract', () => {
   })
 
   test('App instruments connector render snapshot rebuilds', () => {
-    const appSource = readSource('src/App.tsx')
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
 
     assert.match(
-      appSource,
+      hookSource,
       /traceLocalPerformance\('canvas-interaction\.connector-render-snapshot', \(\) => \{/
     )
     assert.match(
-      appSource,
+      hookSource,
       /promptCount: visiblePromptNodes\.length,/
     )
     assert.match(
-      appSource,
+      hookSource,
       /imageCount: visibleImageNodes\.length,/
     )
     assert.match(
-      appSource,
+      hookSource,
       /workflowUtilityCount: visibleWorkflowUtilityNodes\.length,/
     )
   })

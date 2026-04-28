@@ -2367,7 +2367,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             '当前要编辑的本地 API 已经不存在了，先回到列表重新选择。',
             'The local API you are editing no longer exists. Return to the list and pick another one.'
           )}
-          icon={Shield}
+          icon={Plus}
           tone="amber"
           actions={
             <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
@@ -2754,7 +2754,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               <div className="settings-api-quick-add__actions">
                 <SettingsActionButton
                   data-testid="api-official-provider-add"
-                  icon={Plus}
+                  icon={Shield}
                   tone="primary"
                   size="sm"
                   disabled={userApiActionsDisabled}

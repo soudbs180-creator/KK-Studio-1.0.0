@@ -249,9 +249,9 @@ test('App skips prompt-layout auto-repair while node drag is active', () => {
 });
 
 test('App resolves live prompt/image positions from the ref-backed live scene snapshot', () => {
-  const appSource = readSource('src/App.tsx');
+  const hookSource = readSource('src/app/useConnectorRenderer.ts');
 
-  assert.match(appSource, /resolveLiveSceneNodePosition\(\s*liveSceneRef\.current,/);
+  assert.match(hookSource, /resolveLiveSceneNodePosition\(\s*liveSceneRef\.current,/);
 });
 
 test('App reuses the last stable visible-canvas scene while node drag is active', () => {

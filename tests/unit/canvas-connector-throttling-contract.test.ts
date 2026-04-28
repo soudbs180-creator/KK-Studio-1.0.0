@@ -11,41 +11,42 @@ function readSource(relativePath: string) {
 
 describe('canvas connector throttling contract', () => {
   test('App throttles connector snapshots from the performance profile', () => {
-    const appSource = readSource('src/App.tsx')
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
 
     assert.match(
-      appSource,
+      hookSource,
       /const shouldThrottleConnectorSnapshot = canvasPerformanceProfile\.edgeMode !== 'full'\s*\|\|\s*canvasPerformanceProfile\.renderMode !== 'standard'/
     )
     assert.match(
-      appSource,
+      hookSource,
       /const connectorSnapshotThrottleMs = shouldThrottleConnectorSnapshot\s*\?\s*canvasPerformanceProfile\.edgeThrottleMs\s*:\s*0/
     )
-    assert.match(appSource, /window\.setTimeout\(\(\) => \{/)
+    assert.match(hookSource, /window\.setTimeout\(\(\) => \{/)
   })
 
   test('App derives global connector render lists from the throttled snapshot ids', () => {
-    const appSource = readSource('src/App.tsx')
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
 
     assert.match(
-      appSource,
+      hookSource,
       /const connectorRenderPromptNodes = React\.useMemo\(\s*\(\) => connectorRenderSnapshot\.promptIds/
     )
     assert.match(
-      appSource,
+      hookSource,
       /const connectorRenderVisibleImageNodes = React\.useMemo\(\s*\(\) => connectorRenderSnapshot\.imageIds/
     )
     assert.match(
-      appSource,
+      hookSource,
       /const connectorRenderWorkflowUtilityNodesById = React\.useMemo\(\s*\(\) => new Map\(\s*connectorRenderSnapshot\.workflowUtilityIds/
     )
   })
 
   test('App resolves global connector geometry from the throttled snapshot positions', () => {
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
     const appSource = readSource('src/App.tsx')
 
-    assert.match(appSource, /const resolveConnectorRenderPosition = useCallback\(/)
-    assert.match(appSource, /connectorRenderSnapshot\.positionByNodeId\[nodeId\]/)
+    assert.match(hookSource, /const resolveConnectorRenderPosition = useCallback\(/)
+    assert.match(hookSource, /connectorRenderSnapshot\.positionByNodeId\[nodeId\]/)
     assert.match(
       appSource,
       /const sourcePosition = resolveConnectorRenderPosition\(sourceNode\.id, sourceNode\.position\);/

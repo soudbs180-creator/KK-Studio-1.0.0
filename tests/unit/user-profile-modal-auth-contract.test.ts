@@ -15,6 +15,8 @@ test("UserProfileModal routes profile and password changes through KK API instea
   assert.match(source, /kkWebApiClient\.updateProfile\(/);
   assert.match(source, /kkWebApiClient\.sendPasswordChangeCode\(/);
   assert.match(source, /kkWebApiClient\.updatePassword\(/);
+  assert.match(source, /newPassword\.length < 8/);
+  assert.match(source, /新密码至少需要 8 位。/);
   assert.doesNotMatch(source, /supabase\.auth\.getSession\(/);
   assert.doesNotMatch(source, /supabase\.auth\.updateUser\(/);
 });

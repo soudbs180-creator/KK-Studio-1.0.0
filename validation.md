@@ -370,6 +370,33 @@ npm.cmd run build
 
 Expected runtime smoke: `dev-launch.ps1 -SkipVite` should report a ready remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and `http://<vps-api>/healthz?probe=1` should report `canonicalPersistenceReady: true` with PostgreSQL repository backends.
 
+## Official Defaults And VPS Tunnel Close-Out
+
+Run these when touching official-route default model fallback, auth login/register rule alignment, or VPS API/tunnel dev startup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/api-settings-local-preset-entry.test.ts" `
+  "tests/unit/api-settings-workbench-structure.test.ts" `
+  "tests/unit/api-settings-simple-mode-contract.test.ts" `
+  "tests/unit/api-settings-routing-regression.test.ts" `
+  "tests/unit/official-route-default-models.test.ts" `
+  "tests/unit/auth-http-routes.test.ts" `
+  "tests/unit/login-screen-auth-actions.test.ts" `
+  "tests/unit/dev-script-project-root.test.ts" `
+  "tests/unit/run-api-dev-config-guards.test.ts" `
+  "tests/unit/canvas-connector-throttling-contract.test.ts" `
+  "tests/unit/canvas-local-performance-trace-contract.test.ts" `
+  "tests/unit/prompt-group-regroup-behavior.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+git diff --check
+node --check scripts/dev/run-api-dev-vps-tunnel.mjs
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:
@@ -379,4 +406,5 @@ npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run test:unit
 npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
 ```
