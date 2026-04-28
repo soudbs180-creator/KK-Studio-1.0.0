@@ -20,6 +20,7 @@ import {
   syncPptSlidesFromEditablePages,
 } from '../../utils/pptEditable';
 import { useLocale } from '../../context/LocaleContext';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface PptDeckEditorModalProps {
   promptNode: PromptNode;
@@ -64,7 +65,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   const { pick } = useLocale();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
   );
   const [pages, setPages] = useState<PptEditablePage[]>(() => (
     clonePptEditablePages(buildPptEditablePages(promptNode, images))
@@ -79,7 +80,7 @@ const PptDeckEditorModal: React.FC<PptDeckEditorModalProps> = ({
   }, [initialIndex, pages.length]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

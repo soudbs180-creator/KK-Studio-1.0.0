@@ -2,6 +2,7 @@
 import { PromptNode, CanvasGroup } from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers, Hash } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface SearchPaletteProps {
     isOpen: boolean;
@@ -22,7 +23,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+        typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -73,7 +74,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     }, [isOpen]);
 
     useEffect(() => {
-        const onResize = () => setIsMobile(window.innerWidth < 768);
+        const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, []);

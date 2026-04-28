@@ -273,6 +273,26 @@ Validation:
 - `npm.cmd run check:encoding`
 - `npm.cmd run governance:agent-docs`
 
+### 12. Mobile Overlay Breakpoint Cleanup
+
+Goal: remove local mobile-width guesses from overlay UI so modal, lightbox, sidebar, search, settings shell, and canvas positioning behavior follow the shared responsive surface contract.
+
+Scope:
+- Add width-level helpers to `responsiveSurface`.
+- Route sidebar auto-retract, search palette mobile state, modal/lightbox mobile state, settings compact shell state, and canvas mobile positioning through those helpers.
+- Add unit/source coverage so these surfaces do not reintroduce hard-coded `window.innerWidth < 768` or `< 1024` checks.
+
+Acceptance:
+- `768px` remains classified as phone by one shared helper.
+- Phone surfaces call `isPhoneResponsiveWidth(window.innerWidth)` and settings compact surfaces call `isCompactResponsiveWidth(window.innerWidth)`.
+- Responsive surface tests cover phone/compact width helpers and the overlay source contract.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/responsive-surface.test.ts"`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run check:encoding`
+
 ## Final Gate
 
 After all milestones are complete:

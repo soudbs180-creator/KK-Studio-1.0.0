@@ -1,5 +1,6 @@
 // Centralized viewport center utilities
 import { getViewportPreferredPosition } from './canvasUtils'
+import { isPhoneResponsiveWidth } from './responsiveSurface'
 
 // Simple typed alias for clarity
 export type ViewportOffsets = { left: number; right: number };
@@ -54,7 +55,7 @@ export const getPromptBarFrontPosition = (
   const tx = Number.isFinite(currentTransform?.x) ? currentTransform.x : 0;
   const ty = Number.isFinite(currentTransform?.y) ? currentTransform.y : 0;
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const isMobile = typeof window !== 'undefined' && isPhoneResponsiveWidth(window.innerWidth);
   const viewportLeft = viewportRect?.left ?? 0;
 
   // on mobile, strictly use center of viewport to avoid side-shifted input boxes throwing off the layout

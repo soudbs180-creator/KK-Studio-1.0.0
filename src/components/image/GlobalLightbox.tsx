@@ -9,6 +9,7 @@ import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboa
 import { generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 import { pickByDocumentLanguage } from '../../utils/localeText';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -37,7 +38,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [showPartialRedraw, setShowPartialRedraw] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+        typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
 
     // Image loading state
@@ -98,7 +99,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, [displaySrc]);
 
     useEffect(() => {
-        const onResize = () => setIsMobile(window.innerWidth < 768);
+        const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, []);

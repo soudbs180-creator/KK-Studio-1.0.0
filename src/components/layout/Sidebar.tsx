@@ -3,6 +3,7 @@ import logo from '../../assets/logo.png';
 import { useTheme } from '../../context/ThemeContext';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 // Lucide icons replaced with SVGs
 
 interface SidebarProps {
@@ -30,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
     // Auto-retract on mobile after 4s
     useEffect(() => {
-        if (isOpen && window.innerWidth < 768) {
+        if (isOpen && typeof window !== 'undefined' && isPhoneResponsiveWidth(window.innerWidth)) {
             const timer = setTimeout(onClose, 4000);
             return () => clearTimeout(timer);
         }

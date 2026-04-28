@@ -17,6 +17,7 @@ import {
   setStorageMode,
   type StorageMode,
 } from '../../services/storage/storagePreference';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface StorageSelectionModalProps {
   isOpen: boolean;
@@ -49,13 +50,13 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
+    typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false,
   );
 
   const supportsLocal = isFileSystemAccessSupported();
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

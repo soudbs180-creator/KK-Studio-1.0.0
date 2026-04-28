@@ -35,6 +35,7 @@ import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
+import { isPhoneResponsiveWidth } from '../utils/responsiveSurface';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
 import { migrateLegacyEcommerceFrameworkCanvas } from '../services/ecommerce/frameworkRuntime.ts';
 import {
@@ -2298,7 +2299,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const cacheWrites: Array<{ storageId: string; url: string }> = [];
             const recoveredNodes: GeneratedImage[] = [];
             const parentUpdates: Record<string, Partial<PromptNode>> = {};
-            const isMobileViewport = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+            const isMobileViewport = typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false;
 
             for (const canvas of currentState.canvases) {
                 const promptById = new Map((canvas.promptNodes || []).map((promptNode) => [promptNode.id, promptNode] as const));

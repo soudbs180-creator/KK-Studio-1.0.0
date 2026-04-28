@@ -28,6 +28,14 @@ export function isCompactResponsiveSurface(surface: ResponsiveSurface): boolean 
   return surface !== 'desktop';
 }
 
+export function isPhoneResponsiveWidth(width: number): boolean {
+  return resolveResponsiveSurface(width) === 'phone';
+}
+
+export function isCompactResponsiveWidth(width: number): boolean {
+  return isCompactResponsiveSurface(resolveResponsiveSurface(width));
+}
+
 export function getAdaptiveResultColumnCount({
   surface,
   width,

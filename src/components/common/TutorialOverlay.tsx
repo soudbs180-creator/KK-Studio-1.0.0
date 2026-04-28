@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface TutorialStep {
     targetId?: string; // ID of the element to highlight
@@ -16,7 +17,9 @@ interface TutorialOverlayProps {
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [rect, setRect] = useState<DOMRect | null>(null);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
+    );
     const [tooltipSize, setTooltipSize] = useState({ width: 360, height: 320 });
     const overlayColor = 'rgba(0, 0, 0, 0.82)';
 
@@ -56,7 +59,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     const step = STEPS[currentStepIndex];
 
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        const handleResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);

@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, useLocation, useNavigate } from 'react-router-dom
 import type { Supplier } from '../../services/billing/supplierService';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
+import { isCompactResponsiveWidth } from '../../utils/responsiveSurface';
 import { pickByLanguage, useLocale } from '../../context/LocaleContext';
 import SettingsDesktopSidebar from './desktop/SettingsDesktopSidebar';
 import SettingsDesktopWorkbenchHeader from './desktop/SettingsDesktopWorkbenchHeader';
@@ -415,7 +416,9 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   presentation = 'overlay',
   initialPathname,
 }) => {
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1024 : false));
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
+  ));
   const normalizedInitialPathname = initialPathname && initialPathname.startsWith('/settings') ? initialPathname : null;
   const safeInitialView = normalizedInitialPathname
     ? getCurrentSettingsViewId(normalizedInitialPathname)
@@ -427,7 +430,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   );
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    const handleResize = () => setIsMobile(isCompactResponsiveWidth(window.innerWidth));
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);

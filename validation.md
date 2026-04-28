@@ -437,6 +437,17 @@ npm.cmd run check:encoding
 npm.cmd run governance:agent-docs
 ```
 
+## Mobile Overlay Breakpoints
+
+Run these when touching modal/lightbox/sidebar/search overlays, settings shell compact behavior, canvas mobile positioning, responsive surface helpers, or mobile/tablet breakpoint behavior:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/responsive-surface.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:

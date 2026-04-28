@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Canvas } from '../../types';
 import { X, FolderOutput, Check, Plus } from 'lucide-react';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface MigrateModalProps {
     isOpen: boolean;
@@ -20,11 +21,11 @@ export const MigrateModal: React.FC<MigrateModalProps> = ({
     onMigrate
 }) => {
     const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+        typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
 
     useEffect(() => {
-        const onResize = () => setIsMobile(window.innerWidth < 768);
+        const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, []);

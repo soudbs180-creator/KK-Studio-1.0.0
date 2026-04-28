@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tag, X, Plus, Check } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
+import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
 interface TagInputModalProps {
     isOpen: boolean;
@@ -30,7 +31,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
     const [input, setInput] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== 'undefined' ? window.innerWidth < 768 : false
+        typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
 
     useEffect(() => {
@@ -42,7 +43,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
     }, [isOpen, initialTags]);
 
     useEffect(() => {
-        const onResize = () => setIsMobile(window.innerWidth < 768);
+        const onResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, []);

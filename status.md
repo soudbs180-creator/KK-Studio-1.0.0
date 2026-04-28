@@ -556,6 +556,13 @@ Final gate:
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `git diff --check` (only Windows line-ending warnings).
 
+2026-04-29 mobile overlay breakpoint cleanup:
+
+- Root cause confirmed: several overlays and canvas/settings shell paths still used local `window.innerWidth < 768`, `<= 768`, or `< 1024` checks, which drifted from the shared `responsiveSurface` breakpoint contract where `768` is phone and `1024` is tablet/compact.
+- Added `isPhoneResponsiveWidth` and `isCompactResponsiveWidth` helpers backed by `resolveResponsiveSurface`, then routed sidebar, search palette, lightbox, PPT deck editor, modals, tutorial overlay, canvas recovery/positioning, and settings compact shell through the shared helpers.
+- Added `responsive-surface` unit coverage for the new width helpers and source contracts that reject reintroducing hard-coded phone/compact viewport checks in these surfaces.
+- Passed: `npm.cmd run test:unit -- tests/unit/responsive-surface.test.ts` (`963/963`).
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
@@ -565,6 +572,7 @@ Final gate:
 - Canvas prompt cards now share the same theme surface fill as image cards in dark and light modes.
 - API settings simple mode is back to the compact `添加 API / Add API` entry with separate official and proxy route actions, while advanced workbench sections remain gated.
 - Global app, settings, toolbar, input, navigation, and light auth support text now have source-contract contrast coverage.
+- Sidebar, search palette, modals, lightbox, PPT deck editor, tutorial overlay, canvas positioning, and settings shell mobile/compact behavior now reuse shared responsive breakpoint helpers instead of local width checks.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.
