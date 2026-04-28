@@ -540,9 +540,8 @@ Final gate:
 - Root cause confirmed: `adddf7b7 fix: simplify local api add entry` regressed the settled API settings contract by removing the proxy add entry and rewriting tests to reject `api-proxy-provider-add`.
 - Restored the compact `添加 API / Add API` card to expose separate `官方直连 / Official route` and `中转站 / Proxy` actions, preserving `Shield` and `Globe` affordances.
 - Restored source-contract tests so they require `api-simple-provider-add`, `api-official-provider-add`, and `api-proxy-provider-add`, and reject the stale single-add wording.
-- Browser-verified the default API settings page shows only simple configuration, the compact add card, one official route action, and one proxy action; stale `Add new provider` copy is absent.
-- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/*.test.ts" tests/unit/api-settings-local-preset-entry.test.ts tests/unit/api-settings-routing-regression.test.ts tests/unit/api-settings-simple-mode-contract.test.ts tests/unit/api-settings-workbench-structure.test.ts tests/unit/ppt-deck-single-container-contract.test.ts tests/unit/prompt-optimizer-capability-route-contract.test.ts tests/unit/ocr-service-settings-contract.test.ts tests/unit/canvas-visual-regression.test.ts` (`958/958`).
-- Passed: `node --check scripts/test/verify-desktop-settings-smoke.mjs`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:unit`, `npm.cmd run verify:desktop-settings-smoke`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, and `git diff --check`.
+- Passed: API settings source-contract suite (`15/15`) and stale single-add sentinel (`Add new provider`, `Create a local API here`, `doesNotMatch(...api-proxy-provider-add...)`, `createProxyAddEntryUsages.length, 0`) returned no matches.
+- Passed: `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, and `git diff --check` (only Windows line-ending warnings).
 
 2026-04-29 shared theme contrast audit:
 
@@ -561,7 +560,9 @@ Final gate:
 - Root cause confirmed: several overlays and canvas/settings shell paths still used local `window.innerWidth < 768`, `<= 768`, or `< 1024` checks, which drifted from the shared `responsiveSurface` breakpoint contract where `768` is phone and `1024` is tablet/compact.
 - Added `isPhoneResponsiveWidth` and `isCompactResponsiveWidth` helpers backed by `resolveResponsiveSurface`, then routed sidebar, search palette, lightbox, PPT deck editor, modals, tutorial overlay, canvas recovery/positioning, and settings compact shell through the shared helpers.
 - Added `responsive-surface` unit coverage for the new width helpers and source contracts that reject reintroducing hard-coded phone/compact viewport checks in these surfaces.
-- Passed: `npm.cmd run test:unit -- tests/unit/responsive-surface.test.ts` (`963/963`).
+- Passed: mobile/responsive result-flow contract suite (`33/33`) and API settings source-contract suite (`15/15`).
+- Passed: repository JS/TS breakpoint sentinel: no remaining `window.innerWidth < 768`, `<= 768`, or `< 1024` checks outside CSS media queries.
+- Passed: `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, and `git diff --check` (only Windows line-ending warnings).
 
 ## Closed State
 
