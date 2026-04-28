@@ -14,8 +14,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   overlays,
 }) => {
   const shellStyle = {
-    gridTemplateRows:
-      'minmax(0, var(--mobile-home-header-share, 10fr)) minmax(0, var(--mobile-home-feed-share, 60fr)) minmax(0, var(--mobile-home-composer-share, 30fr))',
+    gridTemplateRows: 'auto minmax(0, 1fr) auto',
     '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 12px)',
     '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
     '--mobile-tabbar-total-height': '0px',
@@ -24,7 +23,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   return (
     <div
       data-testid="mobile-app-shell"
-      className="relative isolate grid min-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] lg:hidden"
+      className="relative isolate grid h-dvh max-h-dvh grid-cols-1 overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] lg:hidden"
       style={shellStyle}
     >
       <div

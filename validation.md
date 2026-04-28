@@ -448,6 +448,23 @@ npm.cmd run build
 npm.cmd run check:encoding
 ```
 
+## Mobile Home Viewport And Empty Skeletons
+
+Run these when touching `MobileAppShell`, `MobileWorkspaceSurface`, mobile result feed empty states, or embedded mobile prompt/composer first-screen layout:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/mobile-app-shell-contract.test.ts" `
+  "tests/unit/mobile-home-three-zone-contract.test.ts" `
+  "tests/unit/mobile-result-feed-detail-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
+Visual smoke expectation: in a `390x844` mobile viewport, `[data-testid="mobile-app-shell"]` should be `844px` tall, the textarea should be visible inside `[data-slot="composer"]`, `document.documentElement.scrollHeight` should equal the viewport height, and standard/detail empty modes should render different skeleton test IDs.
+
 ## Final Gate
 
 Before declaring the recovery complete:

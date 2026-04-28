@@ -293,6 +293,29 @@ Validation:
 - `npm.cmd run build`
 - `npm.cmd run check:encoding`
 
+### 13. Mobile Home Viewport And Empty Skeleton Repair
+
+Goal: keep the mobile home shell inside one viewport, keep the composer visible on first load, and give standard/detail empty result modes distinct skeletons.
+
+Scope:
+- Replace proportional mobile home grid rows with content-sized header/composer rows and a single flexible feed row.
+- Fix the mobile shell height to the dynamic viewport so feed content cannot push the composer below the screen.
+- Split the no-result empty state into standard grid skeleton and detail card skeleton variants.
+- Add source-contract coverage for the viewport/grid contract and empty skeleton split.
+
+Acceptance:
+- A 390x844 mobile viewport keeps `[data-testid="mobile-app-shell"]` exactly one viewport tall with no page-level vertical overflow.
+- The prompt textarea is visible in the composer slot on first load.
+- Standard empty mode shows a multi-card grid skeleton, while detail empty mode shows one detail-card skeleton.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/mobile-app-shell-contract.test.ts" "tests/unit/mobile-home-three-zone-contract.test.ts" "tests/unit/mobile-result-feed-detail-contract.test.ts"`
+- Mobile Playwright viewport smoke at `390x844` for standard and detail empty states.
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run check:encoding`
+- `npm.cmd run governance:agent-docs`
+
 ## Final Gate
 
 After all milestones are complete:

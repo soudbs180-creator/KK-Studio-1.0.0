@@ -1,7 +1,5 @@
 import React from 'react';
 
-import { Sparkles } from 'lucide-react';
-
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import {
   getAdaptiveResultColumnCount,
@@ -31,6 +29,56 @@ const getFallbackWidth = (surface: ResponsiveSurface): number => {
 
   return 1280;
 };
+
+const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ columnCount }) => {
+  const skeletonCount = Math.max(4, Math.min(columnCount + 2, 6));
+
+  return (
+    <div
+      data-testid="mobile-result-empty-standard-skeleton"
+      className="min-h-0 flex-1 rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/82 p-3 shadow-[0_18px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+    >
+      <div
+        className="grid h-full min-h-[190px] gap-2.5 overflow-hidden"
+        style={{ gridTemplateColumns: `repeat(${Math.max(2, Math.min(columnCount, 4))}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: skeletonCount }, (_, index) => (
+          <div
+            key={index}
+            className={`relative overflow-hidden rounded-[18px] border border-white/8 bg-[var(--bg-tertiary)]/70 ${
+              index === 0 && columnCount >= 3 ? 'col-span-2' : ''
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/0 to-black/10" />
+            <div className="absolute inset-x-2 bottom-2 space-y-1.5">
+              <div className="h-1.5 w-2/3 rounded-full bg-white/12" />
+              <div className="h-1.5 w-1/2 rounded-full bg-white/8" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const MobileResultDetailEmptySkeleton: React.FC = () => (
+  <div
+    data-testid="mobile-result-empty-detail-skeleton"
+    className="min-h-0 flex-1 rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/82 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+  >
+    <div className="flex h-full min-h-[190px] flex-col gap-3 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border border-white/8 bg-[var(--bg-tertiary)]/75">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-white/0 to-black/12" />
+        <div className="absolute left-3 top-3 h-6 w-20 rounded-full bg-white/10" />
+      </div>
+      <div className="space-y-2 rounded-[18px] border border-white/8 bg-black/12 p-3">
+        <div className="h-2 w-3/4 rounded-full bg-white/14" />
+        <div className="h-2 w-full rounded-full bg-white/10" />
+        <div className="h-2 w-2/5 rounded-full bg-white/8" />
+      </div>
+    </div>
+  </div>
+);
 
 const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   resultEntries,
@@ -86,15 +134,11 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       </div>
 
       {totalResults === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center rounded-[28px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/82 px-6 py-8 text-center shadow-[0_22px_52px_rgba(0,0,0,0.16)] backdrop-blur-xl">
-          <div className="mb-3 rounded-full bg-[var(--bg-tertiary)] p-3 text-[var(--text-secondary)]">
-            <Sparkles size={18} />
-          </div>
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">No results yet</h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-            New generations will appear here after you send a prompt.
-          </p>
-        </div>
+        viewMode === 'detail' ? (
+          <MobileResultDetailEmptySkeleton />
+        ) : (
+          <MobileResultStandardEmptySkeleton columnCount={columnCount} />
+        )
       ) : (
         <div className="min-h-0 flex-1">
           <div

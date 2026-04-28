@@ -37,12 +37,13 @@ test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-ba
   assert.match(shellSource, /data-slot="feed"/);
   assert.match(shellSource, /data-slot="composer"/);
   assert.match(shellSource, /data-slot="overlays"/);
-  assert.match(shellSource, /min-h-dvh/);
+  assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
+  assert.doesNotMatch(shellSource, /min-h-dvh/);
   assert.match(shellSource, /env\(safe-area-inset-top\)/);
   assert.match(shellSource, /env\(safe-area-inset-bottom\)/);
   assert.match(
     shellSource,
-    /gridTemplateRows:\s*'minmax\(0, var\(--mobile-home-header-share, 10fr\)\) minmax\(0, var\(--mobile-home-feed-share, 60fr\)\) minmax\(0, var\(--mobile-home-composer-share, 30fr\)\)'/,
+    /gridTemplateRows:\s*'auto minmax\(0, 1fr\) auto'/,
   );
   assert.doesNotMatch(shellSource, /sticky top-0/);
   assert.doesNotMatch(shellSource, /sticky bottom-0/);

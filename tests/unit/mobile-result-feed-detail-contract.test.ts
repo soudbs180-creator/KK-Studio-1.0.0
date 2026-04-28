@@ -24,6 +24,9 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(feedSource, /getAdaptiveResultTileGridMetrics/);
   assert.match(feedSource, /gridAutoRows/);
   assert.doesNotMatch(feedSource, /columnCount,\s*columnGap/);
+  assert.match(feedSource, /viewMode === 'detail'\s*\?/);
+  assert.match(feedSource, /data-testid="mobile-result-empty-standard-skeleton"/);
+  assert.match(feedSource, /data-testid="mobile-result-empty-detail-skeleton"/);
   assert.match(feedSource, /import MobileResultTile from '\.\/MobileResultTile';/);
   assert.match(feedSource, /<MobileResultTile/);
   assert.match(tileSource, /interface MobileResultTileProps/);

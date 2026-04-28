@@ -572,6 +572,21 @@ Final gate:
 - Passed: repository JS/TS breakpoint sentinel: no remaining `window.innerWidth < 768`, `<= 768`, or `< 1024` checks outside CSS media queries.
 - Passed: `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, and `git diff --check` (only Windows line-ending warnings).
 
+2026-04-29 mobile home viewport and empty skeleton repair:
+
+- Root cause confirmed: the mobile shell used proportional `10fr / 60fr / 30fr` rows on a `min-h-dvh` grid, which allowed the feed/empty state to reserve too much vertical space and push the embedded composer below the first mobile viewport.
+- Added source contracts requiring a fixed dynamic viewport shell, content-sized header/composer rows, and distinct standard/detail no-result skeletons.
+- Updated `MobileAppShell` to use `auto minmax(0, 1fr) auto` rows and `h-dvh max-h-dvh`, keeping the feed as the only flexible scrolling zone.
+- Updated `MobileResultFeed` so standard empty mode renders a multi-card grid skeleton and detail empty mode renders a single detail-card skeleton.
+- Passed: focused mobile shell/result feed contracts (`7/7` tests).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `git diff --check` (only Windows line-ending warnings).
+- Visual smoke passed in a `390x844` mobile viewport: shell height `844`, textarea bounds `653-706`, composer bounds `530-844`, document scroll height `844`; standard and detail empty screenshots saved under `.tmp-playwright/`.
+- Post-commit full unit suite check is currently blocked by the pre-existing dirty API/billing worktree: `npm.cmd run test:unit` passed `965/966` tests and failed `tests/unit/api-server-startup.test.ts` at the local-only guest session route (`503` instead of `201`). This failure is outside the mobile files staged for this milestone.
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
@@ -598,6 +613,7 @@ Final gate:
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Current VPS PostgreSQL status: the app can configure SSL, and the VPS has already loaded narrow `hostssl` rules for older client sources, but direct public access is brittle because the client egress IP can change between checks. Prefer the verified SSH tunnel path for local development; only append another `/32` `pg_hba.conf` rule after a fresh live probe and action-time confirmation.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
+- Full unit suite currently has one non-mobile blocker in the unstaged API/billing worktree: `tests/unit/api-server-startup.test.ts` local-only guest session route returns `503` instead of `201`.
 
 ## Next Steps
 
