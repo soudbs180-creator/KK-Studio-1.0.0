@@ -27,8 +27,8 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
 
   assert.equal(createOfficialButtonUsages.length, 0);
   assert.equal(createOfficialAddEntryUsages.length, 1);
-  assert.equal(createProxyAddEntryUsages.length, 0);
-  assert.equal(createProviderButtonUsages.length, 1);
+  assert.equal(createProxyAddEntryUsages.length, 1);
+  assert.equal(createProviderButtonUsages.length, 2);
 });
 
 test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {

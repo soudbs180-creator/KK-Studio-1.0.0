@@ -535,13 +535,14 @@ Final gate:
 - Passed: `npm.cmd run verify:desktop-settings-smoke`
 - Passed: final gate (`npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:unit`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, `git diff --check`).
 
-2026-04-29 settings local API single-add validation:
+2026-04-29 settings local API dual-add recovery:
 
-- Root cause confirmed: the API simple list still exposed separate `官方直连 / 中转站` actions, while the current product requirement is one local `添加新的供应商 / Add new provider` entry.
-- Updated `ApiSettingsView` so the default add card has one primary `添加供应商 / Add provider` action that opens the local API editor at `/settings/api-management/official/new`; Google/OpenAI selection stays inside the editor.
-- Updated API settings source-contract tests so the default surface rejects `api-proxy-provider-add` and keeps provider creation scoped to the local editor/advanced empty state.
-- Browser-verified the local flow: the list exposes one add button, the editor shows `谷歌` and `OpenAI`, and `新增本地 API` stays disabled with inline API Key feedback until a key is provided.
-- Passed: targeted API/settings tests, `npm.cmd run typecheck`, `npm.cmd run verify:mobile-settings-smoke`, `npm.cmd run verify:desktop-settings-smoke`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding`.
+- Root cause confirmed: `adddf7b7 fix: simplify local api add entry` regressed the settled API settings contract by removing the proxy add entry and rewriting tests to reject `api-proxy-provider-add`.
+- Restored the compact `添加 API / Add API` card to expose separate `官方直连 / Official route` and `中转站 / Proxy` actions, preserving `Shield` and `Globe` affordances.
+- Restored source-contract tests so they require `api-simple-provider-add`, `api-official-provider-add`, and `api-proxy-provider-add`, and reject the stale single-add wording.
+- Browser-verified the default API settings page shows only simple configuration, the compact add card, one official route action, and one proxy action; stale `Add new provider` copy is absent.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/*.test.ts" tests/unit/api-settings-local-preset-entry.test.ts tests/unit/api-settings-routing-regression.test.ts tests/unit/api-settings-simple-mode-contract.test.ts tests/unit/api-settings-workbench-structure.test.ts tests/unit/ppt-deck-single-container-contract.test.ts tests/unit/prompt-optimizer-capability-route-contract.test.ts tests/unit/ocr-service-settings-contract.test.ts tests/unit/canvas-visual-regression.test.ts` (`958/958`).
+- Passed: `node --check scripts/test/verify-desktop-settings-smoke.mjs`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:unit`, `npm.cmd run verify:desktop-settings-smoke`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, and `git diff --check`.
 
 2026-04-29 shared theme contrast audit:
 
@@ -562,6 +563,7 @@ Final gate:
 - Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
 - Local image generation proxy requests can now exceed the legacy 1 MB JSON cap without failing at the HTTP boundary first.
 - Canvas prompt cards now share the same theme surface fill as image cards in dark and light modes.
+- API settings simple mode is back to the compact `添加 API / Add API` entry with separate official and proxy route actions, while advanced workbench sections remain gated.
 - Global app, settings, toolbar, input, navigation, and light auth support text now have source-contract contrast coverage.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
