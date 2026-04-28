@@ -75,8 +75,27 @@ Risk classes observed:
 - Fixed post-merge review blockers:
   - Portable payment release packages `sidecar_compat_bridge.js`, the payment sidecar TypeScript runtime closure, app-level `package.json` with ESM mode, and `pg` in `app/node_modules`.
   - Capability route runtime selection now ignores disabled capability assignments, including stale per-mode key memory and stale assistant `@route` model selections.
-  - Additional mojibake/control-character residues were removed from source, tests, release smoke scripts, and credits documentation.
+- Additional mojibake/control-character residues were removed from source, tests, release smoke scripts, and credits documentation.
 - Added root ignore rules for `.codex-tmp-*`, `.codex-ssh-*`, and `.tmp/` so local key/tunnel artifacts and planning previews are not accidentally staged.
+
+## Completed In 2026-04-28 Auth/VPS Follow-Up
+
+- Fixed login-screen visible `????` text by restoring Chinese copy for VPS session, retry, WeChat QR, side-note, and login helper strings.
+- Added a LoginScreen regression check that rejects raw `???` mojibake in the auth screen source.
+- Aligned profile password-change validation with the VPS API minimum password length of 8 characters.
+- Verified VPS aggregate migration counts without printing PII: `profiles=14`, `password_identities=10`, `password_identities_with_hash=10`, `profiles_with_user_apis=1`.
+- Set `/etc/kk-studio/kk-api.env` `KK_AUTH_REQUIRE_TURNSTILE=false`, deployed the auth route/service files to `/opt/kk-studio/current`, and restarted `kk-api`.
+- Verified VPS auth API health, CORS preflight, and register validation: local-origin preflight returns 204 and missing Turnstile is no longer reported when the password itself is invalid.
+- Confirmed unauthenticated forgot-password is still only a login-screen placeholder. Current password code flow is for authenticated profile password changes, and VPS email delivery is not configured.
+
+Validation:
+
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/login-screen-auth-actions.test.ts`
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-http-routes.test.ts tests/unit/login-screen-auth-actions.test.ts tests/unit/auth-localization.test.ts`
+- `node --test tests/unit/user-profile-modal-auth-contract.test.ts`
+- `npm.cmd run typecheck`
+- `npm.cmd run governance:agent-docs`
+- `npm.cmd run check:encoding`
 
 ## Completed In 2026-04-28 Turnstile Repair
 
@@ -442,8 +461,9 @@ Final gate:
 - Aligned login/register password minimum copy and inputs with the server-side 8-character rule.
 - Added `KK_AUTH_REQUIRE_TURNSTILE=false` support consistently in both the auth HTTP route validator and `AuthService.register`.
 - Finished the `App.tsx` extraction follow-up by moving workflow actions and connector-render snapshot logic into `useWorkflowActions` and `useConnectorRenderer`, then updated source-contract tests to follow the new hook ownership.
-- Passed: targeted close-out unit subset (`40/40` tests).
-- Passed: connector extraction contract subset (`24/24` tests).
+- Passed: API settings focused contract subset (`15/15` tests).
+- Passed: connector extraction contract subset (`3/3` tests).
+- Passed: user profile auth contract (`1/1` test).
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run build`
 - Passed: `npm.cmd run test:unit` (`954/954` tests)

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Clock3,
   Edit3,
+  Globe,
   Key,
   Layers3,
   Pause,
@@ -11,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Shield,
   Trash2,
   Wand2,
 } from 'lucide-react';
@@ -2367,7 +2369,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             '当前要编辑的本地 API 已经不存在了，先回到列表重新选择。',
             'The local API you are editing no longer exists. Return to the list and pick another one.'
           )}
-          icon={Plus}
+          icon={Shield}
           tone="amber"
           actions={
             <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
@@ -2442,7 +2444,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               ? pick('只编辑当前这条本地 API。', 'Edit only this local API.')
               : pick('在独立页面新增本地 API。', 'Create a local API in a focused editor.')
           }
-          icon={Shield}
+          icon={Plus}
           tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'indigo'}
           badge={
             <SettingsBadge tone={editingOfficialId ? 'indigo' : 'emerald'}>
@@ -2728,8 +2730,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           title={showSimpleProviderList ? pick('API 供应商', 'API providers') : pick('本地 API', 'Local APIs')}
           eyebrow={showSimpleProviderList ? pick('简约列表', 'Simple list') : pick('本地直连', 'Local direct routes')}
           description={pick(
-            showSimpleProviderList ? '添加 API，并管理已经接入的官方直连和中转站。' : '管理本地直连接口。',
-            showSimpleProviderList ? 'Add APIs and manage connected official or proxy providers.' : 'Manage your local direct routes.'
+            showSimpleProviderList ? '管理本地 API，并从一个入口添加官方直连或中转站。' : '管理本地直连接口。',
+            showSimpleProviderList ? 'Manage local APIs and add official routes or proxy providers from one entry.' : 'Manage your local direct routes.'
           )}
         >
           <div className="space-y-3">
@@ -2744,10 +2746,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="settings-api-quick-add__title">
-                    {pick('添加新的供应商', 'Add new provider')}
+                    {pick('添加 API', 'Add API')}
                   </div>
                   <div className="settings-api-quick-add__copy">
-                    {pick('在本地添加 API，然后在表单里选择谷歌或 OpenAI。', 'Create a local API here, then choose Google or OpenAI in the form.')}
+                    {pick('官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。', 'Official routes use built-in URLs. Proxy providers need a name, request URL, and API key.')}
                   </div>
                 </div>
               </div>
@@ -2760,7 +2762,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   disabled={userApiActionsDisabled}
                   onClick={handleCreateOfficialAction}
                 >
-                  {pick('添加供应商', 'Add provider')}
+                  {pick('官方直连', 'Official route')}
+                </SettingsActionButton>
+                <SettingsActionButton
+                  data-testid="api-proxy-provider-add"
+                  icon={Globe}
+                  tone="secondary"
+                  size="sm"
+                  disabled={providerActionsDisabled}
+                  onClick={beginCreateProvider}
+                >
+                  {pick('中转站', 'Proxy')}
                 </SettingsActionButton>
               </div>
             </div>
