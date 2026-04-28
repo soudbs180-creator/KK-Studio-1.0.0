@@ -1298,7 +1298,7 @@ function buildApiServer(
           : undefined;
         const probeRequested = isTruthyValue(url.searchParams.get("probe"));
         const shouldRunPersistenceProbe = !allowDegradedPersistence && (
-          probeRequested || Boolean(requiredCapability && options.probeServerRuntimePersistence)
+          probeRequested || Boolean(requiredCapability)
         );
         const persistenceProbe = shouldRunPersistenceProbe
           ? await (options.probeServerRuntimePersistence || probeServerRuntimePersistence)(serverRuntimeConfig)

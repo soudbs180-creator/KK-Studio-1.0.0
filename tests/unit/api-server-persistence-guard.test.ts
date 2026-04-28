@@ -3,6 +3,7 @@ import { after, before, beforeEach, afterEach, describe, test } from "node:test"
 
 import { createApiServer } from "../../apps/api/src/server.ts";
 import type { ServerRuntimePersistenceProbe } from "../../apps/api/src/lib/server-runtime-config.ts";
+import { resetSharedPostgresPoolForTests } from "../../apps/api/src/lib/postgres.ts";
 
 function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
   const address = server.address();
@@ -16,9 +17,11 @@ function getBaseUrl(server: ReturnType<typeof createApiServer>): string {
 const trackedEnvKeys = [
   "DATABASE_URL",
   "PGHOST",
+  "PGPORT",
   "PGDATABASE",
   "PGUSER",
   "PGPASSWORD",
+  "PG_CONNECTION_TIMEOUT_MS",
   "USER_API_ENCRYPTION_SECRET",
   "PROFILE_USER_APIS_ENCRYPTION_SECRET",
 ];
@@ -441,5 +444,67 @@ describe("api server healthz fast path", () => {
     assert.equal(probeCallCount, 1);
     assert.equal(forcedPayload.data.config.persistenceProbeCheckedAt, forcedProbe.checkedAt);
     assert.equal(forcedPayload.data.status, "degraded");
+  });
+});
+
+describe("api server default PostgreSQL probe guards", () => {
+  restoreTrackedEnv();
+  process.env.PGHOST = "127.0.0.1";
+  process.env.PGPORT = "1";
+  process.env.PGDATABASE = "kk_guard";
+  process.env.PGUSER = "kk_guard";
+  process.env.PG_CONNECTION_TIMEOUT_MS = "50";
+  process.env.USER_API_ENCRYPTION_SECRET = "guard-encryption-secret";
+  delete process.env.PROFILE_USER_APIS_ENCRYPTION_SECRET;
+
+  const server = withMutedConsoleWarn(() => createApiServer(0, {
+    allowDegradedPersistence: false,
+    verifyTurnstileToken: async () => ({ success: true }),
+  }));
+
+  let baseUrl = "";
+
+  before(async () => {
+    if (!server.listening) {
+      await new Promise<void>((resolve) => {
+        server.once("listening", resolve);
+      });
+    }
+
+    baseUrl = getBaseUrl(server);
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
+    await resetSharedPostgresPoolForTests();
+    restoreTrackedEnv();
+  });
+
+  test("critical shared-data routes fail closed when the default VPS probe fails", async () => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/temp-users`, {
+      method: "POST",
+      headers: {
+        "x-request-id": "req-guard-default-probe-temp-user",
+      },
+    });
+
+    assert.equal(response.status, 503);
+    const payload = await response.json();
+    assert.equal(payload.success, false);
+    assert.equal(payload.error.code, "SERVER_PERSISTENCE_REQUIRED");
+    assert.match(
+      payload.error.details[0].blockers.join(","),
+      /POSTGRES_TEMP_USERS_PROBE_FAILED/,
+    );
   });
 });

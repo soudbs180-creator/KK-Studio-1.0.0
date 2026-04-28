@@ -7,7 +7,7 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Shared theme contrast audit complete; validation passed locally.
+- Current milestone: Post-review persistence and manual recharge fixes complete; validation passed locally.
 - Milestones 1 through 11 are complete; desktop settings smoke hardening was folded into the final close-out.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
@@ -51,6 +51,14 @@ Risk classes observed:
 
 ## Completed In This Session
 
+- Resolved the post-review persistence guard regression by running the default PostgreSQL probe for guarded API routes, preserving the fast `/healthz` path unless `probe=1` is requested.
+- Resolved the manual recharge paid-flow regression by routing the user "paid" action directly to the mark-paid endpoint instead of submitting proof against `paying` orders.
+- Added regression coverage for the default persistence probe path and the manual recharge mark-paid UI contract.
+- Validation for this review-fix pass:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/api-server-persistence-guard.test.ts tests/unit/billing-remaining-balance-contract.test.ts`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run check:encoding`
 - Fixed the register form's confirm-password live validation so each input change validates against the next field value instead of stale `localErrors`.
 - Restored visible Turnstile/security-check status and hint copy for disabled or missing-site-key runtimes, replacing hidden ambiguous output with explicit labels.
 - Added auth source-contract coverage for confirm-password validation, Turnstile visibility, and no mojibake/`????` regressions.

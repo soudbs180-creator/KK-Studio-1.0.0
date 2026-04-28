@@ -90,14 +90,19 @@ test('billing credit mutations stay on the shared web API surface', () => {
   assert.doesNotMatch(billingContextSource, /supabase\.rpc\('refund_credits', \{/);
 });
 
-test('recharge modal submission success path refreshes canonical billing balance and transaction logs', () => {
+test('manual recharge paid success path refreshes canonical billing balance and transaction logs', () => {
   const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
 
   assert.match(rechargeModalSource, /const \{ showRechargeModal, setShowRechargeModal, refreshBilling \} = useBilling\(\);/);
   assert.match(
     rechargeModalSource,
-    /const response = await submitRechargeProof\([\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(response\.data,[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,
+    /const paidResponse = await markRechargeSubmissionPaid\([\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(\{ submission: paidResponse\.data\.submission \},[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,
   );
+  const handleMarkPaidIndex = rechargeModalSource.indexOf('const handleMarkPaid = async () => {');
+  const handleCreateOrderIndex = rechargeModalSource.indexOf('const baseAmount =', handleMarkPaidIndex);
+  const handleMarkPaidSource = rechargeModalSource.slice(handleMarkPaidIndex, handleCreateOrderIndex);
+  assert.ok(handleMarkPaidIndex >= 0);
+  assert.doesNotMatch(handleMarkPaidSource, /submitRechargeProof\(/);
   assert.doesNotMatch(
     rechargeModalSource,
     /paymentOrderStatus === 'paid'/,

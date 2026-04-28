@@ -20,7 +20,6 @@ import {
   listRechargePaymentChannels,
   markRechargeSubmissionPaid,
   normalizeRechargeBillSnapshot,
-  submitRechargeProof,
   type RechargeBillSnapshot,
   type RechargePaymentChannelConfig,
 } from '../../services/billing/rechargeSubmissionService';
@@ -252,40 +251,15 @@ const RechargeModal: React.FC = () => {
         throw new Error('请填写转账流水后四位。');
       }
 
-      const response = await submitRechargeProof(
-        {
-          submissionId: billSnapshot.submissionId,
-          billNumber: billSnapshot.billNumber,
-          amount: billSnapshot.amount,
-          currencyCode: billSnapshot.currencyCode,
-          paymentChannel: billSnapshot.paymentChannel,
-          transferReferenceLast4: normalizedReference,
-          note: billSnapshot.note,
-        },
+      const paidResponse = await markRechargeSubmissionPaid(
+        billSnapshot.submissionId,
         { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
       );
-      if (!response.success) {
-        if (response.error?.code === 'HTTP_404') {
-          const paidResponse = await markRechargeSubmissionPaid(
-            billSnapshot.submissionId,
-            { requestId: buildRechargeSubmissionRequestId(user?.id || 'anonymous', 'proof') },
-          );
-          if (paidResponse.success) {
-            const fallbackBill = normalizeRechargeBillSnapshot({ submission: paidResponse.data.submission }, {
-              ...billSnapshot,
-              transferReferenceLast4: normalizedReference,
-            });
-            setBillSnapshot(fallbackBill);
-            setMessage('已通知管理员，请等待处理。支付成功但积分未到账，请联系客服处理。');
-            notify.success('已通知管理员', '管理员处理后积分会自动到账。');
-            await refreshBilling({ includeTransactions: true });
-            return;
-          }
-        }
-        throw new Error(getRechargeSubmissionErrorMessage(response, '标记已支付失败，请联系客服处理。'));
+      if (!paidResponse.success) {
+        throw new Error(getRechargeSubmissionErrorMessage(paidResponse, '标记已支付失败，请联系客服处理。'));
       }
 
-      const nextBill = normalizeRechargeBillSnapshot(response.data, {
+      const nextBill = normalizeRechargeBillSnapshot({ submission: paidResponse.data.submission }, {
         ...billSnapshot,
         transferReferenceLast4: normalizedReference,
       });
