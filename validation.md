@@ -248,6 +248,21 @@ npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 ```
 
+## Recharge PostgreSQL Runtime Repair
+
+Run these when touching manual recharge PostgreSQL persistence or VPS recharge table bootstrap behavior:
+
+```powershell
+node --test --test-isolation=none `
+  "tests/unit/postgres-recharge-submission-repository.test.ts" `
+  "tests/unit/vps-postgres-audit-contract.test.ts" `
+  "tests/unit/billing-http-routes.test.ts" `
+  "apps/api/src/modules/billing/local-static-recharge.test.ts"
+npm.cmd run typecheck
+npm.cmd run check:encoding
+npm.cmd run build
+```
+
 For local API settings add-entry changes without admin recharge changes, use this narrower gate:
 
 ```powershell

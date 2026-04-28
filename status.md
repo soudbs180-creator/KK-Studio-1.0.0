@@ -7,7 +7,7 @@ Last updated: 2026-04-28
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: VPS PostgreSQL client access repair is code-complete locally; remote apply is blocked on usable VPS shell access and action-time confirmation.
+- Current milestone: VPS PostgreSQL client access repair is code-complete locally; recharge submission runtime schema self-healing is complete; remote apply is blocked on usable VPS shell access and action-time confirmation.
 - Milestones 1, 2, 3, 4, 5, and 6 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; latest observed count after local follow-up commits was 22 commits.
@@ -128,6 +128,15 @@ Risk classes observed:
 - Restored capability toggle containment inside inner overlay containers.
 - Updated desktop and mobile settings smoke scripts for the current default simple API view, then opened advanced mode before checking workbench stage/diagnostics surfaces.
 - Changed the diagnostics toggle behavior so opening diagnostics also expands the advanced details area, giving the click a visible result.
+
+## Completed In 2026-04-28 Recharge PostgreSQL Runtime Repair
+
+- Re-checked the finalized manual recharge requirement against the current implementation: dynamic Alipay/WeChat/international channels are UI-only placeholders, manual Alipay/WeChat creates a 5-minute order, paid-marked orders sort/highlight first for admins, and admin crediting remains bound to the real order `userId`.
+- Found the runtime gap for already-initialized VPS databases: `recharge_submissions` existed in bootstrap SQL, but `PostgresRechargeSubmissionRepository` did not self-create the table before first use.
+- Added a regression test proving the repository must create `recharge_submissions` and its indexes before runtime insert/select queries.
+- Added cached runtime schema ensure logic to `PostgresRechargeSubmissionRepository` so a VPS that has not rerun bootstrap can create the manual recharge table/indexes on first recharge access.
+- Confirmed the local API startup probe still fails for the remote VPS PostgreSQL connection because `pg_hba.conf` rejects the current client source, not because of the recharge table code. Current observed source: `3.1.51.45`; PostgreSQL reports no matching SSL entry for database `kkstudio` and user `kkstudio_app`.
+- Tried non-interactive SSH with the available root password without writing it to source or docs; authentication was rejected, so remote `pg_hba.conf` repair still needs a working VPS shell.
 
 ## Validation Results
 
@@ -306,12 +315,26 @@ Final gate:
 - Passed: `npm.cmd run verify:desktop-settings-smoke`
 - Passed: `npm.cmd run check:encoding`
 
+2026-04-28 recharge PostgreSQL runtime repair validation:
+
+- Red/green verified: `node --test --test-isolation=none tests/unit/postgres-recharge-submission-repository.test.ts`
+- Passed: targeted recharge/runtime tests (`26/26` tests):
+  - `tests/unit/postgres-recharge-submission-repository.test.ts`
+  - `tests/unit/vps-postgres-audit-contract.test.ts`
+  - `tests/unit/billing-http-routes.test.ts`
+  - `apps/api/src/modules/billing/local-static-recharge.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run build`
+- Still blocked: `node scripts/dev/run-api-dev.mjs --check` fails because the VPS PostgreSQL server rejects the current client source in `pg_hba.conf`.
+
 ## In Progress
 
 - Settings smoke and admin recharge follow-up is committed locally.
 - VPS PostgreSQL client-access helper is committed locally.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper.
-- Remote PostgreSQL access-control repair remains blocked because the existing temporary SSH key files cannot be read under the current Windows ACLs and the askpass-based SSH attempt did not establish a shell.
+- Recharge submission PostgreSQL self-healing is implemented locally and awaiting a scoped commit.
+- Remote PostgreSQL access-control repair remains blocked because no usable VPS shell is available and the askpass-based SSH attempt did not establish a shell.
 
 ## Known Risks And Blockers To Verify
 
@@ -320,7 +343,7 @@ Final gate:
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 - Unrelated tracked source changes are currently present in API/settings/recharge tests; keep them out of the responsive masonry commit unless explicitly requested.
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
-- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `13.208.210.0`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
+- Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `3.1.51.45`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps

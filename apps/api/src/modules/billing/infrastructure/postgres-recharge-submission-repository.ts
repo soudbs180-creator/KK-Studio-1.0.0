@@ -33,6 +33,37 @@ interface RechargeSubmissionRow {
   created_at: string;
 }
 
+const RECHARGE_SUBMISSION_SCHEMA_SQL = [
+  `create table if not exists recharge_submissions (
+     submission_id text primary key,
+     user_id text not null,
+     amount numeric(18,2) not null,
+     base_amount numeric(18,2) not null,
+     service_fee numeric(18,2) not null default 0,
+     payable_amount numeric(18,2) not null,
+     base_credits integer not null,
+     bonus_credits integer not null default 0,
+     credit_amount integer not null,
+     credits_per_unit numeric(18,6) not null,
+     currency_code text not null,
+     payment_channel text not null,
+     manual_provider text,
+     transfer_reference_last4 text,
+     note text,
+     status text not null,
+     expires_at timestamptz,
+     payment_marked_at timestamptz,
+     submitted_at timestamptz,
+     reviewed_at timestamptz,
+     review_actor_user_id text,
+     created_at timestamptz not null
+   )`,
+  `create index if not exists recharge_submissions_user_created_idx
+     on recharge_submissions(user_id, created_at desc)`,
+  `create index if not exists recharge_submissions_status_created_idx
+     on recharge_submissions(status, created_at desc)`,
+] as const;
+
 function parseNumber(value: string | number | null | undefined): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0;
@@ -77,12 +108,15 @@ function toRecord(row: RechargeSubmissionRow): RechargeSubmissionRecord {
 
 export class PostgresRechargeSubmissionRepository implements RechargeSubmissionRepository {
   private readonly queryable: PostgresQueryable;
+  private schemaReady?: Promise<void>;
 
   constructor(queryable: PostgresQueryable) {
     this.queryable = queryable;
   }
 
   async save(submission: RechargeSubmissionRecord): Promise<RechargeSubmissionRecord> {
+    await this.ensureSchema();
+
     const result = await this.queryable.query(
       `insert into recharge_submissions (
          submission_id, user_id, amount, base_amount, service_fee, payable_amount,
@@ -149,6 +183,8 @@ export class PostgresRechargeSubmissionRepository implements RechargeSubmissionR
   }
 
   async findById(submissionId: string): Promise<RechargeSubmissionRecord | undefined> {
+    await this.ensureSchema();
+
     const result = await this.queryable.query(
       `select *
          from recharge_submissions
@@ -162,6 +198,8 @@ export class PostgresRechargeSubmissionRepository implements RechargeSubmissionR
   }
 
   async listByUserId(userId: string): Promise<RechargeSubmissionRecord[]> {
+    await this.ensureSchema();
+
     const result = await this.queryable.query(
       `select *
          from recharge_submissions
@@ -174,6 +212,8 @@ export class PostgresRechargeSubmissionRepository implements RechargeSubmissionR
   }
 
   async listRecent(sinceIso?: string): Promise<RechargeSubmissionRecord[]> {
+    await this.ensureSchema();
+
     const result = await this.queryable.query(
       `select *
          from recharge_submissions
@@ -183,6 +223,23 @@ export class PostgresRechargeSubmissionRepository implements RechargeSubmissionR
     );
 
     return (result.rows as RechargeSubmissionRow[]).map((row) => toRecord(row));
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (!this.schemaReady) {
+      this.schemaReady = this.createSchema().catch((error: unknown) => {
+        this.schemaReady = undefined;
+        throw error;
+      });
+    }
+
+    await this.schemaReady;
+  }
+
+  private async createSchema(): Promise<void> {
+    for (const sql of RECHARGE_SUBMISSION_SCHEMA_SQL) {
+      await this.queryable.query(sql);
+    }
   }
 }
 
