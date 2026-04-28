@@ -3,7 +3,10 @@ import React from 'react';
 import { Sparkles } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
-import { getAdaptiveResultColumnCount } from '../../utils/responsiveSurface';
+import {
+  getAdaptiveResultColumnCount,
+  getAdaptiveResultTileGridMetrics,
+} from '../../utils/responsiveSurface';
 import MobileResultTile from './MobileResultTile';
 
 interface MobileResultFeedProps {
@@ -95,20 +98,35 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       ) : (
         <div className="min-h-0 flex-1">
           <div
-            className="pb-1"
-            style={{ columnCount, columnGap: '0.75rem' }}
+            className="grid gap-3 pb-1 [grid-auto-flow:dense]"
+            style={{
+              gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+              gridAutoRows: '8px',
+            }}
           >
-            {resultEntries.map((entry) => (
-              <MobileResultTile
-                key={entry.id}
-                entry={entry}
-                isActive={activeEntryId === entry.id}
-                isSource={activeSourceImage === entry.imageId}
-                viewMode={viewMode}
-                onEntryOpen={onEntryOpen}
-                onUseAsSource={onUseAsSource}
-              />
-            ))}
+            {resultEntries.map((entry) => {
+              const gridMetrics = getAdaptiveResultTileGridMetrics({
+                surface,
+                width: measuredWidth,
+                viewMode,
+                columnCount,
+                aspectRatio: entry.mobileLayout.aspectRatio,
+                aspectCategory: entry.mobileLayout.aspectCategory,
+              });
+
+              return (
+                <MobileResultTile
+                  key={entry.id}
+                  entry={entry}
+                  isActive={activeEntryId === entry.id}
+                  isSource={activeSourceImage === entry.imageId}
+                  viewMode={viewMode}
+                  gridMetrics={gridMetrics}
+                  onEntryOpen={onEntryOpen}
+                  onUseAsSource={onUseAsSource}
+                />
+              );
+            })}
           </div>
         </div>
       )}

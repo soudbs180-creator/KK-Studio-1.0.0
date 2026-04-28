@@ -139,6 +139,21 @@ npm.cmd run test:unit
 npm.cmd run check:encoding
 ```
 
+Strict masonry / PromptBar density follow-up:
+
+```powershell
+node --test --test-isolation=none `
+  "tests/unit/responsive-surface.test.ts" `
+  "tests/unit/mobile-home-three-zone-contract.test.ts" `
+  "tests/unit/mobile-result-feed-detail-contract.test.ts" `
+  "tests/unit/mobile-workspace-surface-contract.test.ts" `
+  "tests/unit/app-shell-surface-hook.test.ts" `
+  "tests/unit/mobile-result-feed-app-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
 ## Smoke Scripts
 
 Run when the touched surface requires browser-level confidence:

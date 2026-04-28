@@ -6,7 +6,10 @@ interface PromptBarFooterMobileProps {
 
 const PromptBarFooterMobile: React.FC<PromptBarFooterMobileProps> = ({ children }) => {
   return (
-    <div className="input-bar-footer prompt-bar-footer-frost flex w-full flex-wrap items-center gap-2 px-1 pb-1 pt-0.5 min-h-[44px]">
+    <div
+      data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"
+      className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-hidden px-1 pb-1 pt-0.5 min-h-[44px]"
+    >
       {children}
     </div>
   );

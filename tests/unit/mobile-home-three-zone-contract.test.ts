@@ -95,6 +95,7 @@ describe('mobile home three-zone contract', () => {
   test('embedded mobile composer exposes dedicated mode, input, and advanced-drawer sections', () => {
     const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
     const drawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
+    const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
 
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
     assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);
@@ -104,8 +105,12 @@ describe('mobile home three-zone contract', () => {
     assert.match(promptBarSource, /!isEmbeddedMobileComposer && \(/);
     assert.match(promptBarSource, /<DesktopComposerPromptTools/);
     assert.match(drawerSource, /data-mobile-composer-section="advanced-drawer"/);
+    assert.match(drawerSource, /data-mobile-secondary-menu="promptbar-low-frequency-actions"/);
     assert.match(drawerSource, /promptTools: React\.ReactNode;/);
     assert.match(drawerSource, /modePanel: React\.ReactNode;/);
+    assert.match(footerSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
+    assert.match(footerSource, /flex-nowrap/);
+    assert.doesNotMatch(footerSource, /flex-wrap/);
   });
 
   test('mobile prompt-bar cleanup removes the obsolete embedded composer shell file', () => {

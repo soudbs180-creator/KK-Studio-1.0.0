@@ -3,12 +3,14 @@ import React from 'react';
 import { Sparkles } from 'lucide-react';
 
 import type { MobileResultEntry, ResultViewMode } from '../../types';
+import type { AdaptiveResultTileGridMetrics } from '../../utils/responsiveSurface';
 
 interface MobileResultTileProps {
   entry: MobileResultEntry;
   isActive: boolean;
   isSource: boolean;
   viewMode: ResultViewMode;
+  gridMetrics: AdaptiveResultTileGridMetrics;
   onEntryOpen: (entryId: string) => void;
   onUseAsSource: (imageId: string) => void;
 }
@@ -49,6 +51,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   isActive,
   isSource,
   viewMode,
+  gridMetrics,
   onEntryOpen,
   onUseAsSource,
 }) => {
@@ -63,9 +66,13 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
   return (
     <article
-      className={`relative ${emphasisShadow} mb-3 break-inside-avoid overflow-hidden rounded-[20px] border bg-[var(--bg-secondary)]/92 transition-transform duration-200 ${
+      className={`relative ${emphasisShadow} min-w-0 overflow-hidden rounded-[20px] border bg-[var(--bg-secondary)]/92 transition-transform duration-200 ${
         isActive ? 'border-blue-400/55 ring-1 ring-blue-400/35' : 'border-[var(--border-light)]'
       } ${isSource ? 'border-amber-400/60 ring-1 ring-amber-400/30' : ''}`}
+      style={{
+        gridColumnEnd: `span ${gridMetrics.columnSpan}`,
+        gridRowEnd: `span ${gridMetrics.rowSpan}`,
+      }}
     >
       <button
         type="button"

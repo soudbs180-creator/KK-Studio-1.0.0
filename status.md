@@ -104,6 +104,13 @@ Risk classes observed:
 - Made the standard/detail mode switch available on phone-sized result feeds instead of hiding it below the `sm` breakpoint.
 - Updated the milestone validation matrix with the additional responsive, shell, and billing-header contract tests used for this follow-up.
 
+## Completed In 2026-04-28 Responsive Masonry And PromptBar Density Follow-Up
+
+- Replaced the interim CSS-columns result feed with ratio-aware grid masonry using shared `getAdaptiveResultTileGridMetrics` spans.
+- Wide result cards can span two compact columns when there is room; portrait cards receive taller row spans; detail mode remains single-column.
+- Changed mobile PromptBar footer primary actions to a single non-wrapping row and kept low-frequency controls in the embedded advanced drawer.
+- Added source/utility contracts for masonry metrics, tile grid spans, and mobile PromptBar secondary-menu policy.
+
 ## Completed In 2026-04-28 Settings Smoke And Admin Recharge Follow-Up
 
 - Updated desktop and mobile settings smoke scripts to seed a temporary browser session before opening authenticated settings routes.
@@ -256,6 +263,21 @@ Final gate:
 - Passed: `npm.cmd run check:encoding`
 - Passed: `npm.cmd run build`
 
+2026-04-28 responsive masonry and PromptBar density follow-up validation:
+
+- Red verified: strict masonry and PromptBar overflow contracts failed before implementation.
+- Passed: targeted responsive/mobile contract tests (`15/15` tests):
+  - `tests/unit/responsive-surface.test.ts`
+  - `tests/unit/mobile-home-three-zone-contract.test.ts`
+  - `tests/unit/mobile-result-feed-detail-contract.test.ts`
+  - `tests/unit/mobile-workspace-surface-contract.test.ts`
+  - `tests/unit/app-shell-surface-hook.test.ts`
+  - `tests/unit/mobile-result-feed-app-contract.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run build`
+- Known unrelated failure during broader targeted run: `tests/unit/billing-remaining-balance-contract.test.ts` currently fails an API settings source string assertion outside the mobile responsive scope.
+
 2026-04-28 settings smoke and admin recharge follow-up validation:
 
 - Red/green verified: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-settings-browser-verify-script.test.ts`
@@ -296,7 +318,7 @@ Final gate:
 - Prior sessions exposed operational credentials; rotate them and do not commit local key/tunnel files.
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
-- No unrelated tracked source changes are currently expected after the local follow-up commits; re-check `git status --short` before any next commit.
+- Unrelated tracked source changes are currently present in API/settings/recharge tests; keep them out of the responsive masonry commit unless explicitly requested.
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Current VPS PostgreSQL status: the app can configure SSL, but the server still needs a `hostssl` rule or equivalent firewall/tunnel path that permits the current client source to reach database `kkstudio` as `kkstudio_app`. The current rejected source observed from PostgreSQL is `13.208.210.0`; use the confirmed CIDR, ideally `/32`, before applying any `pg_hba.conf` rule.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.

@@ -21,12 +21,18 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(feedSource, /onViewModeChange:\s*\(viewMode: ResultViewMode\) => void;/);
   assert.match(feedSource, /surface:\s*ResponsiveSurface;/);
   assert.match(feedSource, /getAdaptiveResultColumnCount/);
+  assert.match(feedSource, /getAdaptiveResultTileGridMetrics/);
+  assert.match(feedSource, /gridAutoRows/);
+  assert.doesNotMatch(feedSource, /columnCount,\s*columnGap/);
   assert.match(feedSource, /import MobileResultTile from '\.\/MobileResultTile';/);
   assert.match(feedSource, /<MobileResultTile/);
   assert.match(tileSource, /interface MobileResultTileProps/);
   assert.match(tileSource, /onEntryOpen: \(entryId: string\) => void;/);
   assert.match(tileSource, /onUseAsSource: \(imageId: string\) => void;/);
   assert.match(tileSource, /viewMode:\s*ResultViewMode;/);
+  assert.match(tileSource, /gridMetrics/);
+  assert.match(tileSource, /gridColumnEnd/);
+  assert.match(tileSource, /gridRowEnd/);
   assert.match(tileSource, /mobileLayout/);
   assert.doesNotMatch(tileSource, /mobileTileSpan/);
 

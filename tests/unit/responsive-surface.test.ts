@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 
 import {
   getAdaptiveResultColumnCount,
+  getAdaptiveResultTileGridMetrics,
   isCompactResponsiveSurface,
   resolveResponsiveSurface,
 } from '../../src/utils/responsiveSurface.ts';
@@ -31,5 +32,55 @@ describe('responsive surface utilities', () => {
     assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'standard' }), 5);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 768, viewMode: 'detail' }), 1);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'detail' }), 1);
+  });
+
+  test('computes ratio-aware masonry spans without exceeding compact column caps', () => {
+    const phoneColumns = getAdaptiveResultColumnCount({ surface: 'phone', width: 768, viewMode: 'standard' });
+    const widePhoneTile = getAdaptiveResultTileGridMetrics({
+      surface: 'phone',
+      width: 768,
+      viewMode: 'standard',
+      columnCount: phoneColumns,
+      aspectRatio: 2,
+      aspectCategory: 'wide',
+    });
+    const portraitPhoneTile = getAdaptiveResultTileGridMetrics({
+      surface: 'phone',
+      width: 390,
+      viewMode: 'standard',
+      columnCount: getAdaptiveResultColumnCount({ surface: 'phone', width: 390, viewMode: 'standard' }),
+      aspectRatio: 0.75,
+      aspectCategory: 'portrait',
+    });
+    const squarePhoneTile = getAdaptiveResultTileGridMetrics({
+      surface: 'phone',
+      width: 390,
+      viewMode: 'standard',
+      columnCount: getAdaptiveResultColumnCount({ surface: 'phone', width: 390, viewMode: 'standard' }),
+      aspectRatio: 1,
+      aspectCategory: 'square',
+    });
+    const tabletWideTile = getAdaptiveResultTileGridMetrics({
+      surface: 'tablet',
+      width: 1024,
+      viewMode: 'standard',
+      columnCount: getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'standard' }),
+      aspectRatio: 2,
+      aspectCategory: 'wide',
+    });
+    const detailTile = getAdaptiveResultTileGridMetrics({
+      surface: 'tablet',
+      width: 1024,
+      viewMode: 'detail',
+      columnCount: 1,
+      aspectRatio: 1.5,
+      aspectCategory: 'landscape',
+    });
+
+    assert.equal(phoneColumns, 4);
+    assert.equal(widePhoneTile.columnSpan, 2);
+    assert.equal(tabletWideTile.columnSpan, 2);
+    assert.equal(detailTile.columnSpan, 1);
+    assert.ok(portraitPhoneTile.rowSpan > squarePhoneTile.rowSpan);
   });
 });

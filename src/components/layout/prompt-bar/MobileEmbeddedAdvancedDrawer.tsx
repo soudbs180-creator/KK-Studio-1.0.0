@@ -30,7 +30,10 @@ const MobileEmbeddedAdvancedDrawer: React.FC<MobileEmbeddedAdvancedDrawerProps> 
         </span>
       </summary>
 
-      <div className="space-y-2 px-2.5 pb-2 pt-1">
+      <div
+        data-mobile-secondary-menu="promptbar-low-frequency-actions"
+        className="space-y-2 px-2.5 pb-2 pt-1"
+      >
         <div className="flex flex-wrap items-center gap-2">
           {promptTools}
         </div>
