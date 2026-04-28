@@ -519,7 +519,7 @@ Final gate:
 - Root cause confirmed: prompt cards used a prompt-only translucent dark fill (`rgba(20, 20, 24, ...)`) while image cards used the theme surface token (`var(--bg-surface)`), making main cards darker than sub cards in dark mode and preventing exact light-mode parity.
 - Added a focused canvas visual source contract that requires prompt cards and image cards to use the same `var(--bg-surface)` fill.
 - Updated `PromptNodeComponent` so both prompt-card render paths inherit the same dark gray and light white surface as image cards.
-- Passed: focused canvas visual regression (`6/6` tests).
+- Passed: focused canvas visual regression (`7/7` tests).
 - Passed: `npm.cmd run typecheck`
 - Passed: `npm.cmd run build`
 - Passed: `npm.cmd run check:encoding`
