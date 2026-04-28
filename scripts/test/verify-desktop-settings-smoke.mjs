@@ -12,11 +12,77 @@ const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'desktop-settings-s
 const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
 const SETTINGS_API_PATH = '/settings/api-management';
+const SMOKE_PROFILE = {
+  id: 'smoke-settings-user',
+  email: 'smoke-settings-user@temp.local',
+  nickname: 'Smoke Settings User',
+  avatarUrl: 'preset-default-local',
+  role: 'user',
+  status: 'active',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+const SMOKE_AUTH_SESSION = {
+  accessToken: 'smoke-settings-access-token',
+  refreshToken: 'smoke-settings-refresh-token',
+  expiresIn: 3600,
+  sessionExpiresAt: '2099-01-01T00:00:00.000Z',
+  profile: SMOKE_PROFILE,
+};
 
 function ensureArtifactsDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     mkdirSync(ARTIFACT_DIR, { recursive: true });
   }
+}
+
+function buildSmokeEnvelope(data) {
+  return {
+    success: true,
+    data,
+    meta: {
+      requestId: `desktop-settings-smoke-${Date.now()}`,
+      clientVersion: 'desktop-settings-smoke',
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
+async function fulfillSmokeJson(route, data) {
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify(buildSmokeEnvelope(data)),
+  });
+}
+
+async function installSmokeApiRoutes(page) {
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = url.pathname.replace(/\/+$/, '');
+
+    if (pathname.endsWith('/api/v1/auth/session') || pathname.endsWith('/api/v1/auth/refresh')) {
+      await fulfillSmokeJson(route, SMOKE_AUTH_SESSION);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile')) {
+      await fulfillSmokeJson(route, SMOKE_PROFILE);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/user-apis')) {
+      await fulfillSmokeJson(route, { entries: [] });
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
+      await fulfillSmokeJson(route, { version: 1, slots: [], providers: [], entries: [] });
+      return;
+    }
+
+    await route.fallback();
+  });
 }
 
 function readSource(relativePath) {
@@ -75,6 +141,37 @@ async function assertVisible(locator, message) {
   if (!(await locator.isVisible())) {
     throw new Error(message);
   }
+}
+
+async function clickLocatorWithRetry(page, resolveLocator) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const locator = resolveLocator();
+
+    try {
+      await locator.waitFor({ state: 'visible', timeout: 5000 });
+      await locator.click({ timeout: 5000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = String(error?.message || error);
+      if (!/detached from the DOM|Timeout/i.test(message)) {
+        throw error;
+      }
+      await page.waitForTimeout(250);
+    }
+  }
+
+  throw lastError;
+}
+
+async function clickButtonByName(page, name) {
+  await clickLocatorWithRetry(page, () => page.getByRole('button', { name, exact: true }));
+}
+
+async function clickByTestId(page, testId) {
+  await clickLocatorWithRetry(page, () => page.getByTestId(testId));
 }
 
 async function assertHttpHtml(url) {
@@ -181,6 +278,7 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1600, height: 980 },
   });
+  await installSmokeApiRoutes(page);
 
   await page.addInitScript(() => {
     const now = Date.now();
@@ -256,18 +354,21 @@ try {
   await assertVisible(addProviderEntry, 'Local API add entry did not return after closing the editor.');
 
   await assertVisible(advancedModeToggle, 'Advanced mode toggle did not render.');
-  await advancedModeToggle.click();
+  await clickButtonByName(page, 'Advanced mode');
   await assertVisible(hideAdvancedModeToggle, 'Advanced mode did not switch into the expanded state.');
   await assertVisible(workbenchStage, 'API Management stage section did not render.');
   await assertVisible(diagnosticsToggle, 'Diagnostics toggle did not render.');
-  await diagnosticsToggle.click();
+  await clickByTestId(page, 'api-workbench-diagnostics-toggle');
   await assertVisible(hideMoreAdvancedItemsToggle, 'Diagnostics did not expand the advanced details section.');
   await assertVisible(diagnosticsPanel, 'Diagnostics section did not open.');
-  await diagnosticsToggle.click();
+  await clickButtonByName(page, 'Hide more advanced items');
   await diagnosticsPanel.waitFor({ state: 'hidden', timeout: 15000 });
-  await hideMoreAdvancedItemsToggle.click();
-  await hideAdvancedModeToggle.click();
-  await workbenchStage.waitFor({ state: 'hidden', timeout: 15000 });
+  try {
+    await workbenchStage.waitFor({ state: 'hidden', timeout: 3000 });
+  } catch {
+    await clickButtonByName(page, 'Hide advanced mode');
+    await workbenchStage.waitFor({ state: 'hidden', timeout: 15000 });
+  }
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'settings-direct-api-management.png'),

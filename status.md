@@ -7,8 +7,8 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: Canvas main/sub card surface parity complete; validation passed locally.
-- Milestones 1 through 10 are complete.
+- Current milestone: Canvas main/sub card surface parity and desktop settings smoke hardening complete; validation passed locally.
+- Milestones 1 through 10 are complete; desktop settings smoke hardening was folded into the final close-out.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 
@@ -525,6 +525,15 @@ Final gate:
 - Passed: `npm.cmd run check:encoding`
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `git diff --check` (only Windows line-ending warnings).
+
+2026-04-29 desktop settings smoke selector hardening:
+
+- Root cause confirmed: the live smoke path could pass while relying on exact diagnostics button copy, but the unit source contract requires the stable `api-workbench-diagnostics-toggle` selector so diagnostics coverage survives copy changes.
+- Added route-level smoke API stubs for authenticated settings data and wrapped locator clicks with retry handling for transient DOM replacement.
+- Restored the diagnostics click to `clickByTestId(page, 'api-workbench-diagnostics-toggle')`, then collapses the details area through `Hide more advanced items` before falling back to `Hide advanced mode`.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/mobile-settings-browser-verify-script.test.ts`
+- Passed: `npm.cmd run verify:desktop-settings-smoke`
+- Passed: final gate (`npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:unit`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, `git diff --check`).
 
 ## Closed State
 
