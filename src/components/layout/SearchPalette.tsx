@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { PromptNode, CanvasGroup } from '../../types';
-import { Search, MapPin, CornerDownLeft, X, Layers, Hash } from 'lucide-react';
+import { Search, MapPin, CornerDownLeft, X, Layers } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
@@ -169,13 +169,28 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[100] flex justify-center bg-black/60 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}>
+        <div className={`fixed inset-0 z-[100] flex justify-center bg-black/45 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}>
             {/* Click outside to close */}
             <div className="absolute inset-0" onClick={onClose} />
 
-            <div className={`relative w-full bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-2xl overflow-hidden animate-slideDown flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'max-w-2xl rounded-xl max-h-[60vh]'}`}>
+            <div
+                className={`relative w-full overflow-hidden border animate-slideDown flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[var(--radius-panel-xl)] rounded-b-none' : 'max-w-2xl max-h-[60vh]'}`}
+                style={{
+                    background: 'var(--search-palette-bg)',
+                    borderColor: 'var(--search-palette-border)',
+                    boxShadow: 'var(--search-palette-shadow)',
+                    borderRadius: isMobile ? undefined : 'var(--radius-surface-lg)'
+                }}
+            >
                 {/* Search Header */}
-                <div className={`flex items-center px-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)] ${isMobile ? 'mobile-sheet-header-safe' : ''}`}>
+                <div
+                    className={`flex items-center px-4 border-b focus-within:ring-2 focus-within:ring-[var(--search-palette-focus-ring)] ${isMobile ? 'mobile-sheet-header-safe' : ''}`}
+                    style={{
+                        background: 'var(--search-palette-header-bg)',
+                        borderColor: 'var(--search-palette-border)',
+                        boxShadow: 'inset 0 -1px 0 var(--search-palette-border)'
+                    }}
+                >
                     <Search className="text-[var(--text-tertiary)] w-5 h-5 mr-3" />
                     <input
                         ref={inputRef}
@@ -186,26 +201,25 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             setSelectedIndex(0);
                         }}
                         placeholder={isMultiSelectMode ? "多选模式：点击选择多个，按 Ctrl+Enter 确认整理" : "搜索提示词、标签或分组..."}
-                        className="flex-1 bg-transparent border-none py-4 text-lg focus:outline-none transition-all"
+                        className="flex-1 bg-transparent border-none py-4 text-lg focus:outline-none"
                         style={{
                             color: 'var(--text-primary)',
                             fontSize: '16px',
-                            transitionDuration: 'var(--duration-fast)'
-                        }}
-                        onFocus={(e) => {
-                            e.currentTarget.parentElement!.style.boxShadow = 'inset 0 0 0 2px var(--accent-blue)';
-                        }}
-                        onBlur={(e) => {
-                            e.currentTarget.parentElement!.style.boxShadow = 'none';
+                            transitionDuration: 'var(--motion-duration-standard)',
+                            transitionTimingFunction: 'var(--motion-ease-standard)'
                         }}
                     />
 
                     {/* Multi-Select Toggle */}
                     <button
                         onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-                        className={`mr-2 px-2 py-1 rounded text-xs font-medium border transition-colors ${isMultiSelectMode
-                            ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50'
-                            : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:bg-[var(--toolbar-hover)]'}`}
+                        className="mr-2 min-h-[32px] rounded-[var(--radius-control-sm)] border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow] hover:bg-[var(--toolbar-hover)]"
+                        style={{
+                            background: isMultiSelectMode ? 'var(--search-palette-selected-bg)' : 'var(--settings-button-secondary-bg)',
+                            borderColor: isMultiSelectMode ? 'var(--search-palette-selected-border)' : 'var(--settings-button-secondary-border)',
+                            boxShadow: isMultiSelectMode ? 'var(--search-palette-selected-shadow)' : 'none',
+                            color: isMultiSelectMode ? 'var(--state-info-text)' : 'var(--text-secondary)'
+                        }}
                         title="多选模式 (Ctrl+M)"
                     >
                         {isMultiSelectMode ? '多选已开启' : '多选'}
@@ -272,12 +286,27 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                         }
                                     }}
                                     onMouseEnter={() => setSelectedIndex(index)}
-                                    className={`flex items-start gap-3 px-4 py-3 rounded-lg cursor-pointer transition-colors ${isFocused ? 'bg-[var(--toolbar-hover)]' : ''
-                                        } ${isSelected ? 'bg-indigo-500/10 border border-indigo-500/30' : ''}`}
+                                    className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-control-md)] border px-4 py-3 transition-[background-color,border-color,box-shadow,transform]"
+                                    style={{
+                                        background: isSelected
+                                            ? 'var(--search-palette-selected-bg)'
+                                            : isFocused
+                                                ? 'var(--search-palette-hover-bg)'
+                                                : 'transparent',
+                                        borderColor: isSelected ? 'var(--search-palette-selected-border)' : 'transparent',
+                                        boxShadow: isSelected ? 'var(--search-palette-selected-shadow)' : 'none',
+                                        transitionDuration: 'var(--motion-duration-standard)',
+                                        transitionTimingFunction: 'var(--motion-ease-standard)'
+                                    }}
                                 >
                                     {isMultiSelectMode && (
-                                        <div className={`mt-1.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-[var(--text-tertiary)] bg-transparent'
-                                            }`}>
+                                        <div
+                                            className="mt-1.5 flex h-4 w-4 items-center justify-center rounded border transition-colors"
+                                            style={{
+                                                background: isSelected ? 'var(--state-info-text)' : 'transparent',
+                                                borderColor: isSelected ? 'var(--state-info-text)' : 'var(--text-tertiary)'
+                                            }}
+                                        >
                                             {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12"></polyline></svg>}
                                         </div>
                                     )}
@@ -286,7 +315,10 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                         {isGroup ? <Layers size={14} /> : <MapPin size={14} />}
                                     </div>
                                     <div className="flex-1 overflow-hidden">
-                                        <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-400' : 'text-[var(--text-primary)]'}`}>
+                                        <div
+                                            className="truncate text-sm font-medium"
+                                            style={{ color: isSelected ? 'var(--state-info-text)' : 'var(--text-primary)' }}
+                                        >
                                             {item.type === 'group' ? (item.data.label || '未命名分组') : item.data.prompt}
                                         </div>
 
@@ -337,7 +369,10 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                 </div>
 
                 {/* Footer Tips */}
-                <div className={`px-4 py-2 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] text-[var(--text-tertiary)] ${isMobile ? 'mobile-sheet-footer-safe' : ''}`}>
+                <div
+                    className={`px-4 py-2 border-t text-[10px] text-[var(--text-tertiary)] ${isMobile ? 'mobile-sheet-footer-safe' : ''}`}
+                    style={{ background: 'var(--search-palette-footer-bg)', borderColor: 'var(--search-palette-border)' }}
+                >
                     <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between gap-4'}`}>
                         <div className="flex flex-wrap gap-4">
                         <span className="flex items-center gap-1">
@@ -345,11 +380,11 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                         </span>
                         {isMultiSelectMode ? (
                             <>
-                                <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Shift+点击</kbd> 区间选择
+                                <span className="flex items-center gap-1 font-medium text-[var(--state-info-text)]">
+                                    <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--state-info-border)] font-sans text-[var(--state-info-text)]">Shift+点击</kbd> 区间选择
                                 </span>
-                                <span className="flex items-center gap-1 text-indigo-400 font-medium">
-                                    <kbd className="px-1.5 py-0.5 bg-indigo-500/20 rounded border border-indigo-500/30 font-sans text-indigo-400">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
+                                <span className="flex items-center gap-1 font-medium text-[var(--state-info-text)]">
+                                    <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--state-info-border)] font-sans text-[var(--state-info-text)]">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
                                 </span>
                             </>
                         ) : (
@@ -361,18 +396,27 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 切换多选
                         </span>
                         </div>
-                        <span className={isMobile ? 'text-right' : ''}>{results.length} 个结果</span>
+                        <div className={`flex shrink-0 items-center gap-2 ${isMobile ? 'justify-end' : ''}`}>
+                            <span>{results.length} 个结果</span>
+                            {isMultiSelectMode && multiSelectedIds.size > 0 && (
+                                <button
+                                    type="button"
+                                    className="inline-flex min-h-[32px] max-w-full items-center gap-1.5 overflow-hidden rounded-[var(--radius-control-md)] border px-3 py-1.5 text-xs font-medium text-white transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px active:translate-y-0"
+                                    style={{
+                                        background: 'var(--state-info-text)',
+                                        borderColor: 'var(--search-palette-selected-border)',
+                                        boxShadow: 'var(--search-palette-selected-shadow)'
+                                    }}
+                                    onClick={handleConfirmMultiSelect}
+                                >
+                                    <span className="min-w-0 truncate">整理 {multiSelectedIds.size} 项</span>
+                                    <CornerDownLeft size={14} className="shrink-0" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-
-            {/* Multi-Select Floating Confirmation */}
-            {isMultiSelectMode && multiSelectedIds.size > 0 && (
-                <div className="absolute bottom-20 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 animate-bounce-in cursor-pointer hover:bg-indigo-500" onClick={handleConfirmMultiSelect}>
-                    <span>已选择 {multiSelectedIds.size} 项，点击整理</span>
-                    <CornerDownLeft size={14} />
-                </div>
-            )}
         </div>
     );
 };

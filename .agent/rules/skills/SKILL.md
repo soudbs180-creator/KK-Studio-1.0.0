@@ -1,11 +1,11 @@
 ---
 trigger: glob
-description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码标准
+description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供应商与 Cadence 规则入口
 ---
 
-# KK Studio 设计系统 v2.9
+# KK Studio 设计系统 v3.0
 
-本文档定义 KK Studio 的完整设计规范，所有 AI 代码助手在修改 UI 时必须严格遵循。
+本文档定义 KK Studio 的完整工程与 UI 规则。所有 AI 代码助手在修改 UI 时，必须优先遵循下方 Airtable 风设计系统；后续历史 UI 章节只作为旧代码识别参考，不再作为新 UI 的决策来源。
 
 ---
 
@@ -24,6 +24,86 @@ description: KK Studio 完整设计系统 - 暗色主题、动效规范、代码
 - 不允许为追求“好看”而大幅改动既有 UI 动线；优先稳定、兼容、专业、可维护。
 - Windows PowerShell 默认 `cp936` 会把 UTF-8 中文规则文件误显示成乱码；读取 `.agent`、`docs` 与治理脚本时，优先使用 UTF-8 显式读取或直接运行校验脚本。
 - 修改完成后，默认执行：`npm run typecheck`、`npm run check:encoding`、`npm run build`。
+
+---
+
+## 🎨 Airtable 风 UI 规则（强制）
+
+当前 UI 方向是完整 Airtable 风，亮色优先、暗色兼容，并在关键容器和卡片保留受控磨砂玻璃。新的 UI 改动必须使用这一套规则替代旧的 Apple / dark-heavy 规则。
+
+### 颜色与信息层级
+
+```css
+--airtable-navy: #181d26;   /* 主文字 */
+--airtable-blue: #1b61c9;   /* 主交互、选中、焦点 */
+--airtable-border: #e0e2e6; /* 轻边框 */
+--airtable-canvas: #f7f8fb;
+--airtable-surface: #ffffff;
+```
+
+- 主文字使用深海军蓝 `#181d26`；辅助文字使用同色透明度。
+- 主按钮、链接、选中态、焦点环统一使用 Airtable Blue `#1b61c9`。
+- 只有成功、警告、危险等语义状态可以使用绿色、橙色、红色。
+- 禁止把普通选中态写成局部 `indigo`、`purple` 或随意蓝色。
+- 设置页和管理页要把操作区放大，把重复说明、状态摘要和低权重信息压缩或放进高级区。
+
+### 圆角 radius
+
+- 按钮、输入框、分段控件、开关：`10-12px`。
+- 普通卡片：`16px`。
+- 重要卡片、面板、shell：`20-24px`。
+- 标签、徽章：`6-8px`。
+- 只有真实圆形头像或图标按钮使用 full radius。
+- 不再使用 980px 胶囊按钮作为默认主按钮。
+
+### 阴影 shadow 与受控磨砂玻璃
+
+受控磨砂玻璃只允许出现在应用 shell、搜索 shell、重要设置面板、选中/高权重卡片。输入框、表格、密集列表、低权重模块和卡片内部的小模块必须保持实底或近实底。
+
+```css
+--ui-glass-shell-shadow: 0 16px 36px rgb(24 29 38 / 0.10);
+--ui-glass-card-shadow: 0 10px 24px rgb(24 29 38 / 0.08);
+--settings-subcard-shadow: 0 4px 12px rgb(24 29 38 / 0.06);
+```
+
+- 禁止在卡片内部再叠完整卡片阴影。
+- 悬停最多上移 1px，并使用轻量阴影或边框变化。
+- 不使用 `shadow-2xl` / `shadow-xl` / `shadow-lg` 作为常规 UI 深度。
+
+### 焦点、选中、输入
+
+- 焦点必须同时有边框和蓝色 focus ring，不能通过 JS inline 改父容器样式。
+- 输入框背景使用白色或近白色，避免彩色块。
+- 选中行、选中卡、分段控件 active 态使用 `#1b61c9` tint、蓝色边框和低阴影。
+- 多选、拖动、回收/恢复、开关、分段控件的反馈方式要一致。
+
+### 字体比例
+
+- 页面标题：`24px`。
+- 区块标题：`17-20px`。
+- 正文：`14-15px`。
+- Caption：`12px`。
+- Micro label：`11px`。
+- 正常文字 letter-spacing 为 `0`；只有已有全大写标签可使用轻微正字距。
+
+### 动画 motion
+
+```css
+--motion-duration-fast: 120ms;
+--motion-duration-standard: 180ms;
+--motion-duration-panel: 240ms;
+--motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+```
+
+- 按钮、开关、分段控件、选择、拖动、回收/恢复使用同一套 180ms 标准动效。
+- 只改 opacity 的按钮反馈不够；必须有颜色、边框、阴影或轻微位移变化。
+- 动效必须尊重 `prefers-reduced-motion` 的既有降级规则。
+
+### 关键页面规则
+
+- 全局搜索：保留轻磨砂 shell，去除重阴影、本地 indigo、inline focus mutation；确认整理按钮放在 footer/action 区，不能漂出容器。
+- 设置页：操作区视觉权重大于信息模块；卡片和容器保持统一圆角与层级磨砂；重复状态说明放入高级 disclosure。
+- API 设置：默认页只展示添加入口和已配置供应商；诊断、OCR、平台工具、路由池细节留在高级模式。
 
 ---
 
@@ -1728,10 +1808,15 @@ describe('useImageLoader', () => {
 
 ---
 
-**KK Studio Design System v2.9**
-Last updated: 2026-04-14
+**KK Studio Design System v3.0**
+Last updated: 2026-04-29
 
 ## 📋 变更日志
+
+### v3.0 (2026-04-29)
+- 将 UI 总纲切换为 Airtable 风：亮色优先、`#181d26` 深海军蓝文字、`#1b61c9` 主交互色。
+- 明确受控磨砂玻璃只用于关键 shell、重要面板和高权重卡片，限制嵌套阴影。
+- 新增 radius、shadow、focus ring、selected state、输入背景、设置页权重和 motion 强制规则。
 
 ### v2.9 (2026-04-03)
 - 新增 `.agent/rules/skills/vendor-routing/SKILL.md` 作为供应商路由专项规则文件

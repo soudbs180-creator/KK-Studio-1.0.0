@@ -9,6 +9,7 @@ The current execution line is the KK-Studio v1.4.2 progressive refactor. The goa
 
 The refactor must not become a rewrite. Each milestone is a small, verifiable extraction or cleanup with a scoped commit. `apps/api/` is structurally healthy and is only checked for compatibility when front-end contracts touch API behavior.
 
+Current user override: execute the Airtable-inspired global UI refit before continuing the staged refactor milestones. This UI refit keeps the same execution loop: failing source contracts first, scoped UI/doc implementation second, validation third, status update fourth, then one scoped commit.
 
 ## Current Baseline
 
@@ -35,6 +36,35 @@ Every milestone follows this order:
 
 ## Milestones
 
+### 0. Airtable-Inspired Global UI Refit
+
+Goal: replace the older Apple/dark-heavy UI rules with a light-first Airtable-style system while keeping controlled frosted glass on key shells and cards.
+
+Scope:
+- Create the root `DESIGN.md` Airtable reference from the cached `getdesign` Airtable guidance without running unconfirmed external code.
+- Rewrite `docs/DESIGN.md` and `.agent/rules/skills/SKILL.md` so Airtable clarity is canonical.
+- Refactor `src/index.css` tokens toward deep navy text `#181d26`, Airtable Blue `#1b61c9`, subtle borders, low blue-tinted shadows, and capped glass depth.
+- Rework `SearchPalette.tsx`, `SettingsScaffold.tsx`, `src/components/settings/ui/index.tsx`, and `ApiSettingsView.tsx` around shared motion, focus, selected-state, and operation-weighting rules.
+- Preserve unrelated billing/API backend work and do not stage unrelated paths.
+
+Acceptance:
+- New UI contract tests cover the manual/rule presence, search palette constraints, settings primitive behavior, API default weighting, and shadow/glass depth.
+- Search palette has no heavy Tailwind shadows, no local indigo selected state, no inline focus mutation, and no overflow-prone floating confirmation.
+- Settings controls share the same motion scale and overflow-safe control sizing.
+- API settings default view emphasizes add/edit/refresh actions over repeated status/explanatory blocks.
+- Documentation and agent rules name Airtable as the canonical UI system and preserve existing governance-required rule sections.
+
+Validation:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-ui-density-regression.test.ts tests/unit/api-settings-provider-compact-ui-contract.test.ts tests/unit/api-settings-simple-mode-contract.test.ts tests/unit/airtable-global-ui-refit-contract.test.ts`
+- `npm.cmd run verify:mobile-settings-smoke`
+- `npm.cmd run verify:desktop-settings-smoke`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+- `npm.cmd run governance:agent-docs`
+- `npm.cmd run check:encoding`
+
+Commit:
+- `refactor: apply airtable global ui refit`
 
 ### 1. Refactor Ledger Alignment
 

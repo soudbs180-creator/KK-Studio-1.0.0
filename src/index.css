@@ -11262,6 +11262,240 @@ body.dark-mode .settings-panel {
   gap: 10px;
 }
 
+/* ============================================
+   Airtable-Inspired Global UI Refit
+   ============================================ */
+:root {
+  --airtable-navy: #181d26;
+  --airtable-blue: #1b61c9;
+  --airtable-border: #e0e2e6;
+  --airtable-canvas: #f7f8fb;
+  --airtable-surface: #ffffff;
+
+  --bg-base: var(--airtable-canvas);
+  --bg-elevated: var(--airtable-surface);
+  --bg-surface: var(--airtable-surface);
+  --bg-overlay: rgb(255 255 255 / 0.96);
+  --bg-input: #ffffff;
+  --bg-hover: rgb(27 97 201 / 0.06);
+  --bg-canvas: var(--airtable-canvas);
+  --bg-primary: var(--bg-base);
+  --bg-secondary: var(--bg-surface);
+  --bg-tertiary: #f8fafc;
+  --text-primary: var(--airtable-navy);
+  --text-secondary: rgb(24 29 38 / 0.72);
+  --text-tertiary: rgb(24 29 38 / 0.58);
+  --text-muted: rgb(24 29 38 / 0.42);
+  --accent-blue: #1b61c9;
+  --accent-color: var(--airtable-blue);
+  --border-subtle: rgb(24 29 38 / 0.08);
+  --border-default: rgb(24 29 38 / 0.12);
+  --border-light: var(--border-subtle);
+  --toolbar-hover: rgb(27 97 201 / 0.06);
+  --toolbar-active: rgb(27 97 201 / 0.10);
+  --state-info-bg: rgb(27 97 201 / 0.08);
+  --state-info-border: rgb(27 97 201 / 0.22);
+  --state-info-text: #1b61c9;
+
+  --ui-glass-shell-bg: rgb(255 255 255 / 0.82);
+  --ui-glass-card-bg: rgb(255 255 255 / 0.76);
+  --ui-glass-subcard-bg: rgb(255 255 255 / 0.68);
+  --ui-glass-shell-shadow: 0 16px 36px rgb(24 29 38 / 0.10);
+  --ui-glass-card-shadow: 0 10px 24px rgb(24 29 38 / 0.08);
+  --ui-glass-subcard-shadow: 0 4px 12px rgb(24 29 38 / 0.06);
+  --ui-shadow-control: 0 1px 2px rgb(24 29 38 / 0.08), 0 0 0 1px rgb(24 29 38 / 0.04);
+
+  --motion-duration-fast: 120ms;
+  --motion-duration-standard: 180ms;
+  --motion-duration-panel: 240ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --settings-accent-rgb: 27 97 201;
+  --settings-accent-soft-rgb: 45 127 249;
+  --settings-page-bg: var(--airtable-canvas);
+  --settings-shell-bg: var(--ui-glass-shell-bg);
+  --settings-section-bg: var(--ui-glass-card-bg);
+  --settings-surface-elevated: var(--ui-glass-card-bg);
+  --settings-surface-overlay: rgb(255 255 255 / 0.88);
+  --settings-border-subtle: rgb(24 29 38 / 0.08);
+  --settings-shell-border: rgb(24 29 38 / 0.08);
+  --settings-card-shadow: var(--ui-glass-card-shadow);
+  --settings-shell-shadow: var(--ui-glass-shell-shadow);
+  --settings-sidebar-shadow: inset -1px 0 0 rgb(24 29 38 / 0.06);
+  --settings-subcard-shadow: 0 4px 12px rgb(24 29 38 / 0.06);
+  --settings-subcard-hover-shadow: 0 8px 18px rgb(24 29 38 / 0.08);
+  --settings-input-bg: #ffffff;
+  --settings-input-border: rgb(24 29 38 / 0.12);
+  --settings-input-shadow: inset 0 1px 2px rgb(24 29 38 / 0.05);
+  --settings-focus-border: rgb(27 97 201 / 0.52);
+  --settings-focus-ring: rgb(27 97 201 / 0.16);
+  --settings-button-primary-bg: #1b61c9;
+  --settings-button-primary-shadow: 0 4px 12px rgb(27 97 201 / 0.16);
+  --settings-button-secondary-bg: rgb(255 255 255 / 0.92);
+  --settings-button-secondary-border: rgb(24 29 38 / 0.12);
+  --settings-button-secondary-text: var(--airtable-navy);
+  --settings-segment-shell-bg: rgb(246 248 251 / 0.96);
+  --settings-segment-shell-border: rgb(24 29 38 / 0.08);
+  --settings-segment-shell-shadow: inset 0 1px 1px rgb(24 29 38 / 0.04);
+  --settings-segment-bg: transparent;
+  --settings-segment-border: transparent;
+  --settings-segment-active-bg: #ffffff;
+  --settings-segment-active-border: rgb(27 97 201 / 0.18);
+  --settings-segment-active-shadow: 0 2px 8px rgb(24 29 38 / 0.08);
+
+  --search-palette-bg: var(--ui-glass-shell-bg);
+  --search-palette-header-bg: rgb(255 255 255 / 0.92);
+  --search-palette-footer-bg: rgb(248 250 252 / 0.92);
+  --search-palette-border: rgb(24 29 38 / 0.10);
+  --search-palette-shadow: var(--ui-glass-shell-shadow);
+  --search-palette-hover-bg: rgb(27 97 201 / 0.06);
+  --search-palette-selected-bg: rgb(27 97 201 / 0.10);
+  --search-palette-selected-border: rgb(27 97 201 / 0.28);
+  --search-palette-selected-shadow: 0 0 0 1px rgb(27 97 201 / 0.08), 0 6px 14px rgb(27 97 201 / 0.08);
+  --search-palette-focus-ring: rgb(27 97 201 / 0.16);
+}
+
+body.dark-mode {
+  --bg-base: #111827;
+  --bg-elevated: #172033;
+  --bg-surface: #151f2e;
+  --bg-overlay: rgb(20 30 44 / 0.94);
+  --bg-input: #172033;
+  --bg-hover: rgb(79 144 240 / 0.10);
+  --bg-canvas: #0b1220;
+  --bg-primary: var(--bg-base);
+  --bg-secondary: var(--bg-surface);
+  --bg-tertiary: #1a2638;
+  --text-primary: #f8fbff;
+  --text-secondary: rgb(248 251 255 / 0.74);
+  --text-tertiary: rgb(248 251 255 / 0.56);
+  --text-muted: rgb(248 251 255 / 0.38);
+  --accent-blue: #4f90f0;
+  --accent-color: var(--accent-blue);
+  --border-subtle: rgb(248 251 255 / 0.08);
+  --border-default: rgb(248 251 255 / 0.12);
+  --border-light: var(--border-subtle);
+  --toolbar-hover: rgb(79 144 240 / 0.10);
+  --toolbar-active: rgb(79 144 240 / 0.16);
+  --state-info-bg: rgb(79 144 240 / 0.14);
+  --state-info-border: rgb(79 144 240 / 0.28);
+  --state-info-text: #8bb8ff;
+  --ui-glass-shell-bg: rgb(17 24 39 / 0.78);
+  --ui-glass-card-bg: rgb(23 32 51 / 0.72);
+  --ui-glass-subcard-bg: rgb(27 39 58 / 0.68);
+  --ui-glass-shell-shadow: 0 16px 36px rgb(0 0 0 / 0.22);
+  --ui-glass-card-shadow: 0 10px 24px rgb(0 0 0 / 0.18);
+  --ui-glass-subcard-shadow: 0 4px 12px rgb(0 0 0 / 0.14);
+  --search-palette-header-bg: rgb(23 32 51 / 0.86);
+  --search-palette-footer-bg: rgb(17 24 39 / 0.88);
+  --search-palette-border: rgb(248 251 255 / 0.10);
+  --search-palette-hover-bg: rgb(79 144 240 / 0.10);
+  --search-palette-selected-bg: rgb(79 144 240 / 0.16);
+  --search-palette-selected-border: rgb(79 144 240 / 0.34);
+  --search-palette-selected-shadow: 0 0 0 1px rgb(79 144 240 / 0.12), 0 6px 14px rgb(0 0 0 / 0.18);
+  --search-palette-focus-ring: rgb(79 144 240 / 0.22);
+}
+
+body.dark-mode .settings-panel {
+  --settings-accent-rgb: 79 144 240;
+  --settings-accent-soft-rgb: 139 184 255;
+  --settings-page-bg: #0b1220;
+  --settings-shell-bg: var(--ui-glass-shell-bg);
+  --settings-section-bg: var(--ui-glass-card-bg);
+  --settings-surface-elevated: var(--ui-glass-card-bg);
+  --settings-surface-overlay: rgb(27 39 58 / 0.76);
+  --settings-border-subtle: rgb(248 251 255 / 0.08);
+  --settings-shell-border: rgb(248 251 255 / 0.10);
+  --settings-card-shadow: var(--ui-glass-card-shadow);
+  --settings-shell-shadow: var(--ui-glass-shell-shadow);
+  --settings-sidebar-shadow: inset -1px 0 0 rgb(248 251 255 / 0.06);
+  --settings-subcard-shadow: 0 4px 12px rgb(0 0 0 / 0.14);
+  --settings-subcard-hover-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
+  --settings-input-bg: rgb(17 24 39 / 0.92);
+  --settings-input-border: rgb(248 251 255 / 0.10);
+  --settings-input-shadow: inset 0 1px 2px rgb(0 0 0 / 0.18);
+  --settings-focus-border: rgb(139 184 255 / 0.56);
+  --settings-focus-ring: rgb(79 144 240 / 0.22);
+  --settings-button-primary-bg: #4f90f0;
+  --settings-button-primary-shadow: 0 4px 12px rgb(79 144 240 / 0.20);
+  --settings-button-secondary-bg: rgb(27 39 58 / 0.78);
+  --settings-button-secondary-border: rgb(248 251 255 / 0.10);
+  --settings-button-secondary-text: #f8fbff;
+  --settings-segment-shell-bg: rgb(17 24 39 / 0.72);
+  --settings-segment-shell-border: rgb(248 251 255 / 0.08);
+  --settings-segment-active-bg: rgb(31 45 66 / 0.92);
+  --settings-segment-active-border: rgb(139 184 255 / 0.22);
+  --settings-segment-active-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+}
+
+.settings-control-motion {
+  transition-duration: var(--motion-duration-standard);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+.settings-control-motion:hover:not(:disabled) {
+  box-shadow: var(--ui-shadow-control);
+}
+
+.settings-panel .settings-shell,
+.settings-panel .settings-shell-desktop,
+.settings-panel .settings-shell-page--desktop,
+.settings-panel .settings-shell-mobile {
+  background: var(--settings-shell-bg) !important;
+  border: 1px solid var(--settings-shell-border) !important;
+  box-shadow: var(--settings-shell-shadow) !important;
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.settings-panel .settings-reference-card,
+.settings-panel .settings-provider-card {
+  background: var(--settings-section-bg) !important;
+  border: 1px solid var(--settings-border-subtle) !important;
+  border-radius: var(--radius-surface-md) !important;
+  box-shadow: var(--settings-card-shadow) !important;
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+}
+
+.settings-panel .settings-reference-mini-metric,
+.settings-panel .settings-log-entry,
+.settings-panel .settings-provider-card__metric,
+.settings-panel .settings-reference-list-item {
+  background: var(--settings-surface-overlay) !important;
+  border: 1px solid var(--settings-border-subtle) !important;
+  box-shadow: var(--settings-subcard-shadow) !important;
+  backdrop-filter: blur(10px) saturate(1.04);
+  -webkit-backdrop-filter: blur(10px) saturate(1.04);
+}
+
+.settings-panel .settings-api-default-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 1.35fr) minmax(260px, 0.65fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.settings-panel .settings-api-action-stage {
+  min-height: 180px;
+}
+
+.settings-panel .settings-api-info-stage {
+  opacity: 0.82;
+  align-self: start;
+  padding: 12px;
+}
+
+.settings-panel .settings-api-info-stage .settings-reference-mini-metric__value {
+  font-size: var(--type-body-1);
+}
+
+@media (max-width: 900px) {
+  .settings-panel .settings-api-default-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-panel .settings-api-quick-add {
   display: flex;
   align-items: center;

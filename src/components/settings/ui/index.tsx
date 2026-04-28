@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import {
+  SETTINGS_CONTROL_MOTION_CLASSNAME,
   SETTINGS_INPUT_CLASSNAME,
   SETTINGS_LABEL_CLASSNAME,
 } from '../SettingsScaffold';
@@ -51,7 +52,7 @@ export const SegmentedControl: React.FC<{
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className="min-w-0 overflow-hidden border px-3 py-2.5 text-ellipsis whitespace-nowrap font-medium transition-all duration-200 active:scale-95"
+            className={`min-w-0 overflow-hidden border px-3 py-2.5 text-ellipsis whitespace-nowrap font-medium ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
             style={{
               background: isActive
                 ? 'var(--settings-segment-active-bg)'
@@ -97,7 +98,7 @@ export const SegmentedControlMulti: React.FC<{
     >
       {/* 滑动背景 */}
       <div
-        className="absolute bottom-1 top-1 transition-all duration-200 ease-out"
+        className="absolute bottom-1 top-1 transition-[transform,width,box-shadow] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)]"
         style={{
           background: 'var(--settings-segment-active-bg)',
           left: slideLeft,
@@ -117,7 +118,7 @@ export const SegmentedControlMulti: React.FC<{
             }
           }}
           disabled={disabled}
-          className="relative z-10 min-w-0 flex-1 overflow-hidden px-2 py-2.5 text-ellipsis whitespace-nowrap font-medium transition-colors duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          className={`relative z-10 min-w-0 flex-1 overflow-hidden px-2 py-2.5 text-ellipsis whitespace-nowrap font-medium disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
           style={{
             color: value === option ? 'var(--text-primary)' : 'var(--text-secondary)',
             borderRadius: 'var(--radius-control-md)',
@@ -162,7 +163,7 @@ export const IconGrid: React.FC<{
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className="flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden transition-all duration-200 active:scale-95"
+              className={`flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
               style={{
                 height: '52px',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -259,16 +260,16 @@ export const SettingToggle: React.FC<{
           }
         }}
         disabled={disabled}
-        className="settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-[var(--radius-control-md)] border disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
         style={{
           background: checked ? 'rgb(var(--settings-accent-rgb))' : 'var(--settings-surface-overlay)',
           borderColor: checked ? 'rgb(var(--settings-accent-rgb) / 0.35)' : 'var(--settings-border-subtle)',
         }}
       >
         <span
-          className="settings-toggle-button__thumb absolute top-0.5 h-6 w-6 rounded-full bg-[var(--text-inverse)] shadow-sm transition-transform duration-200"
+          className="settings-toggle-button__thumb absolute top-0.5 h-6 w-6 rounded-[var(--radius-control-sm)] bg-[var(--text-inverse)] shadow-sm transition-transform duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)]"
           style={{
-            transform: checked ? 'translateX(22px)' : 'translateX(2px)',
+            transform: checked ? 'translateX(20px)' : 'translateX(2px)',
           }}
         />
       </button>
@@ -334,7 +335,7 @@ export const PrimaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
       style={{
         borderColor: 'transparent',
         background: 'var(--settings-button-primary-bg)',
@@ -363,7 +364,7 @@ export const SecondaryButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
         background: 'var(--settings-button-secondary-bg)',
@@ -389,7 +390,7 @@ export const DangerButton: React.FC<{
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
         background: 'var(--settings-button-danger-bg)',
@@ -459,7 +460,7 @@ export const IconButton: React.FC<{
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-10 w-10 items-center justify-center border text-[var(--text-secondary)] transition-all duration-200 hover:text-[var(--text-primary)] active:scale-95"
+      className={`flex h-10 w-10 items-center justify-center border text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
       style={{
         background: 'var(--settings-surface-overlay)',
         borderColor: 'var(--settings-border-subtle)',

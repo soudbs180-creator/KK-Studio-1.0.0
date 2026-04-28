@@ -1,100 +1,96 @@
-# KK-Studio UI 架构与 Apple 规范重整计划
+# KK Studio Airtable-Inspired UI System
 
-## 1. 核心系统架构与层级定义
+Last updated: 2026-04-29
 
-KK-Studio 是一个**以无限画布（Infinite Canvas）为核心的 AI 生成与排版平台**。不同于传统的按页跳转的网页，它的绝大多数操作在同一物理页面（SPA）内通过不同层级的悬浮组件完成。
+## Canonical Direction
 
-整个应用的视觉与交互层级分为以下四层：
+KK Studio now follows an Airtable-inspired interface system. The product should read as clear, operational, and dense: light-first canvas, deep navy text `#181d26`, Airtable Blue `#1b61c9` for primary interaction, subtle `#e0e2e6` borders, low blue-tinted shadows, and consistent control geometry.
 
-### P0 (画布与核心输入) - 绝对的视觉焦点
-- **Infinite Canvas (无限画布)**：承载所有生成节点（PromptNode）、图片节点（ImageNode）与连线（ConnectionDot）。这是创作的心脏，所有的结果都在此铺开。
-- **PromptBar (提示词输入栏)**：用户的核心指令入口，吸底悬浮，包含模型选择、提示词输入和生成触发器。
+This replaces the older Apple/dark-heavy UI guidance for new UI work. Dark mode remains supported, but it is a compatibility theme using the same layout, radius, focus, selected-state, and motion rules.
 
-### P1 (核心操作与外壳) - 玻璃态的控制层
-- **WorkspaceShell (工作区全局导航)**：顶部的悬浮工具栏，包括全局搜索（SearchPalette）、项目标题、快捷工具（如主题切换、网格开关）。
-- **节点浮动菜单 (SelectionMenu / Node Controls)**：选中画布上某个节点后浮出的局部操作组（如局部重绘、放大、删除）。
+## Visual Hierarchy
 
-### P2 (辅助面板与侧边栏) - 滑出的上下文
-- **侧边面板 (Drawers/Panels)**：例如右侧的 `ChatSidebar` (聊天历史与 AI 辅助对话) 和左侧的 `ProjectManager` (项目管理)。
-- **全局灯箱 (GlobalLightbox / PptStackPreviewModal)**：进入沉浸式图片预览或 PPT 幻灯片浏览时的全屏覆盖层。
+| Layer | Treatment | Examples |
+| --- | --- | --- |
+| Canvas | near-white or app canvas, no decorative color blocks | main workspace background |
+| Solid controls | white or near-white, 1px border, visible focus ring | inputs, selects, tables, dense lists |
+| Controlled frosted glass | capped blur plus low shadow | app shell, search palette, important settings panels |
+| Selected/high priority | Airtable Blue tint, blue border, low blue shadow | selected rows, active cards, primary actions |
+| Modal/sheet | frosted shell only; inner modules stay solid | search, settings panels, mobile sheets |
 
-### P3 (模态框系统) - 任务拦截点
-- **Modals (模态弹窗)**：用于打断当前工作流进行独立设置，如 `UserProfileModal` (用户中心)、`RechargeModal` (充值/积分消耗提醒)、`MigrateModal` (节点迁移) 等。
+## Color Rules
 
----
+- Primary text: `#181d26`.
+- Primary accent: `#1b61c9`.
+- Border: `#e0e2e6` or `rgb(24 29 38 / 0.08-0.12)`.
+- Canvas: `#f7f8fb`.
+- Surface: `#ffffff`.
+- Info/selected tint: `rgb(27 97 201 / 0.08-0.12)`.
+- Semantic state colors are allowed only for success, warning, danger, and health states.
+- Do not introduce local indigo/purple/blue variants when the state is simply selected or active; use semantic tokens.
 
-## 2. Apple 视觉哲学在 KK-Studio 的映射
+## Radius Rules
 
-在确定了上述架构后，我们将全面引入 Apple 的界面设计规范。Apple 的设计哲学是**克制、聚焦与纯粹**。界面本身应该隐退，让“被创作出的图片（产品）”成为唯一的英雄。
+- Inputs, buttons, toggles, segmented controls: 10-12px.
+- Cards and repeated panels: 16px.
+- Important cards and shells: 20-24px.
+- Badges and tags: 6-8px.
+- Circles only for true circular icons or avatars.
+- Avoid arbitrary `rounded-[...]` values unless a responsive sheet requires a specific top radius.
 
-### 2.1 极致的黑白灰节奏 (The Binary Rhythm)
-画布背景与外层包裹区域采用深色主导的极简风格，形成强烈的明暗对比：
-- **画布底层 (Canvas Base)**：采用 `Pure Black (#000000)` 或极深的 `Dark Surface 1 (#272729)`。在此背景下，生成的图片会像画廊中的艺术品一样发光。
-- **面板背景 (Panel Base)**：侧边栏与模态框使用浅灰 `#f5f5f7` (Light Theme) 或 `#1d1d1f` (Dark Theme)，以区分“画布区”和“控制区”。
+## Shadow And Glass Rules
 
-### 2.2 唯一的交互色 (The Singular Accent)
-整个 Studio 的界面中，除了生成的图片本身，所有的色彩预算全部交给 **Apple Blue (`#0071e3`)**：
-- **触发生成 (Generate)**、**确认充值**、**焦点状态 (Focus Rings)** 必须唯一使用 `#0071e3`。
-- 如果需要次级按钮，使用深色 `#1d1d1f` 或毛玻璃透明底，**绝对禁止引入其他强调色**（如绿色、橙色等）。
+Controlled frosted glass is intentionally limited. It belongs on app/search shells, important settings panels, and selected/high-priority cards. Inputs, dense lists, low-weight modules, and nested information blocks stay solid or near-solid.
 
-### 2.3 极致的排版约束 (Typography)
-KK-Studio 存在大量的参数和文字，必须严格遵循苹果的光学字号缩放规则：
-- **SF Pro Display**：用于画布上的节点大标题 (>=20px)，采用 `-0.28px` 极紧凑的负字距，字体加粗 (600权重)。
-- **SF Pro Text**：用于 Prompt 内容、侧边栏聊天文本、参数说明 (<20px)，采用舒适的 `1.47` 行高，便于长时间阅读。
+- Shell shadow cap: `0 16px 36px rgb(24 29 38 / 0.10)`.
+- Card shadow cap: `0 10px 24px rgb(24 29 38 / 0.08)`.
+- Nested module cap: `0 4px 12px rgb(24 29 38 / 0.06)`.
+- Do not stack full card shadows inside full card shadows.
+- Hover may lift by 1px, but opacity-only hover is not enough for controls that toggle or select.
 
----
+## Controls
 
-## 3. 核心组件重整与操作逻辑
+- Buttons use shared motion, fixed min-height, ellipsis-safe labels, and no container overflow.
+- Primary buttons use Airtable Blue and 12px radius, not oversized 980px pills.
+- Toggles use clear track/thumb movement and the same 180ms motion scale as segmented controls.
+- Segmented controls use one active indicator and a visible blue selected state.
+- Inputs use white or near-white backgrounds with a blue focus ring; no colored input blocks.
+- Icon buttons should use Lucide icons and a tooltip/title when the action is not obvious.
 
-### 3.1 PromptBar (提示词输入栏)
-**原本逻辑**：底部固定，包含输入框和一堆控制按钮。
-**重整规范**：
-- **外观**：悬浮于画布底部的圆角矩形，应用毛玻璃效果 `backdrop-filter: saturate(180%) blur(20px)`。
-- **按钮**：触发生成的发送按钮使用 **980px 胶囊形圆角**，填充 `#0071e3`，文本使用白色。
-- **尺寸**：所有点击区域 (Touch Targets) 至少保持 `44x44px` 级别，确保移动端与桌面的舒适触感。
+## Search Palette
 
-### 3.2 ImageNode & PromptNode (画布上的卡片节点)
-**原本逻辑**：方正的卡片，可能带有各种边框来区分状态。
-**重整规范**：
-- **边框消除**：Apple 极少使用线条边框。卡片的区分完全依靠**背景色对比**和**阴影**。
-- **阴影 (Shadow)**：给高优先级的节点（如当前选中的节点）加上经典的 diffused studio shadow：`rgba(0, 0, 0, 0.22) 3px 5px 30px 0px`。未选中的节点采用扁平无阴影设计。
-- **圆角 (Radius)**：卡片采用标准的 `8px` 或 `12px` 圆角，绝不使用超过 12px 的圆角（980px 专属于 CTA 按钮）。
+The global search palette is a key shell, so it may use controlled frosted glass. It must not use heavy Tailwind shadows, local indigo selected states, inline focus mutation, or floating actions that can escape the panel. Multi-select confirmation belongs in the footer/action area.
 
-### 3.3 WorkspaceShell (工作区导航)
-**原本逻辑**：顶部的固定导航，包含各类系统入口。
-**重整规范**：
-- 采用 **Navigation Glass** 效果。顶部栏始终保持半透明的黑暗毛玻璃状态（`rgba(0,0,0,0.8)` + `blur(20px)`），不管画布滑到哪里，导航栏始终悬浮。
-- 导航栏上的图标和文字统一为 `#ffffff`。
+## Settings And API Pages
 
-### 3.4 Modals (模态弹窗，如 RechargeModal)
-**原本逻辑**：居中弹出的普通对话框。
-**重整规范**：
-- 背景必须是带大圆角（`16px`）的纯净块（`#f5f5f7` 或深色 `#242426`）。
-- 模态框内部的大标题必须是 `SF Pro Display 28px` 或以上，行高压缩到 `1.14`，极具视觉冲击力。
-- 确认按钮（如：充值、应用迁移）放置于底部右侧，依然是标志性的 `#0071e3`。
+Settings pages are operational tools, not marketing pages. Action areas take visual priority. Reference cards, metrics, and explanatory modules should be compact, secondary, and hidden behind advanced disclosure when they repeat information.
 
-### 3.5 电商与特定模式 (Ecommerce Mode)
-对于电商主图、A+等具有严格尺寸要求的排版需求：
-- 取消界面的技术感线框，直接用“空白灰底”暗示工作区。
-- 所有参数调整项（如 ImageSize, AspectRatio）收纳于点击后呼出的下拉菜单中，保证常态下的界面极其干净。
+API setup defaults to a simple action-first view:
 
----
+- Add/edit/refresh actions are prominent.
+- Provider cards stay compact.
+- Diagnostics, route pool details, OCR, and platform tools stay behind advanced mode.
+- Operation area uses the larger layout weight; info modules use the smaller weight.
 
-## 4. 深度与层级关系 (Elevation & Z-Index)
+## Typography
 
-在无限画布这种空间复杂度极高的应用中，阴影和 Z 轴高度必须受到严苛控制。根据 Apple 规范重整如下：
+Use a restrained product scale:
 
-| 视图层级 | 视觉处理手段 (Treatment) | 对应组件 (Component) |
-| :--- | :--- | :--- |
-| **底层 (Level 0)** | 纯黑或极深灰背景，无阴影 | Infinite Canvas 底板 |
-| **画布元素 (Level 1)**| 扁平圆角块，仅在 Hover 或 Select 时增加弥散阴影 | ImageNode, PromptNode, AgentNode |
-| **悬浮控制 (Level 2)**| 毛玻璃底座 `backdrop-filter: blur(20px)` | PromptBar, SelectionMenu |
-| **全屏导航 (Level 3)**| 暗色毛玻璃 `rgba(0,0,0,0.8)` | WorkspaceShell 顶部导航 |
-| **全局浮层 (Level 4)**| 黑色遮罩半透明底 + 居中大圆角卡片 | Modals (用户中心、充值、迁移) |
+- Page title: 24px.
+- Section title: 17-20px.
+- Body: 14-15px.
+- Caption: 12px.
+- Micro label: 11px.
 
-## 5. 操作演示与页面切换流 (User Flow)
+Letter spacing remains 0 for normal text. All-caps labels may use slight positive tracking only when already established in the local UI.
 
-1. **进入应用**：用户直接落入深色的 Infinite Canvas，顶部是毛玻璃导航，底部是毛玻璃输入框。整个视野留给即将生成的图像，**视觉噪音降至最低**。
-2. **生成动作**：在底部 PromptBar 输入后，点击纯蓝色的胶囊 CTA。画布中心出现 Loading 态卡片，卡片无多余边框，悬浮于黑色深渊中。
-3. **查阅与操作**：图片生成后，点击单张图片。图片微微浮起（增加 `30px` 阴影），并在其附近弹出悬浮的毛玻璃工具条（重绘/放大），不打断当前画布上下文。
-4. **中断与设置**：当积分耗尽或需调整全局配置时，从屏幕中央滑出大圆角的卡片 Modal，背景采用深邃遮罩。操作完成后，卡片消失，迅速回到全沉浸的画布体验。
+## Motion
+
+Global interactive motion uses:
+
+- Fast hover: 120ms.
+- Standard controls: 180ms.
+- Panels/sheets: 240ms.
+- Ease: `cubic-bezier(0.2, 0, 0, 1)`.
+
+Selection, toggle, segmented control, drag, recycle/restore, and panel transitions must feel like the same system.

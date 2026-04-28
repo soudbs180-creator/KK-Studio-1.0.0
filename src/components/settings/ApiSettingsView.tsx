@@ -2734,7 +2734,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             showSimpleProviderList ? 'Manage local APIs and add official routes or proxy providers from one entry.' : 'Manage your local direct routes.'
           )}
         >
-          <div className="space-y-3">
+          <div className={showSimpleProviderList ? 'settings-api-default-layout' : 'space-y-3'}>
+            <div className={showSimpleProviderList ? 'settings-api-action-stage space-y-3' : 'space-y-3'}>
             <div
               data-testid="api-simple-provider-add"
               className="settings-api-quick-add"
@@ -2777,7 +2778,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               </div>
             </div>
 
-          {officialSlots.length > 0 || (showSimpleProviderList && thirdPartyProviders.length > 0) ? (
+            {officialSlots.length > 0 || (showSimpleProviderList && thirdPartyProviders.length > 0) ? (
             <div className={[
               'settings-provider-grid',
               !showAdvancedWorkbench ? 'settings-provider-grid--compact' : '',
@@ -2904,7 +2905,26 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   })
                 : null}
             </div>
-          ) : null}
+            ) : null}
+            </div>
+            {showSimpleProviderList ? (
+              <div className="settings-api-info-stage settings-reference-card settings-reference-card--soft">
+                <div className="settings-reference-card__eyebrow">
+                  {pick('配置状态', 'Setup status')}
+                </div>
+                <div className="settings-reference-card__title">
+                  {connectedChannels > 0
+                    ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
+                    : pick('等待接入 API', 'Waiting for API routes')}
+                </div>
+                <div className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                  {pick(
+                    '默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。',
+                    'The default view keeps add and management actions up front. Diagnostics, route pools, and OCR details live in advanced mode.',
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </SettingsSection>
       ) : (

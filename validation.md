@@ -28,6 +28,33 @@ Full local gate when feasible:
 npm.cmd run verify:changes
 ```
 
+## Milestone 0: Airtable-Inspired Global UI Refit
+
+Targeted UI contract tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/settings-ui-density-regression.test.ts" `
+  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
+  "tests/unit/api-settings-simple-mode-contract.test.ts" `
+  "tests/unit/airtable-global-ui-refit-contract.test.ts"
+```
+
+Browser smoke checks:
+
+```powershell
+npm.cmd run verify:mobile-settings-smoke
+npm.cmd run verify:desktop-settings-smoke
+```
+
+Final gate:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
 
 ## Milestone 1: Refactor Ledger Alignment
 
