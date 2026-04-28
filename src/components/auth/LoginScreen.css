@@ -425,11 +425,6 @@ body.auth-screen-active.auth-screen-active--light #root {
   color: #d8e3f7;
 }
 
-.auth-turnstile-head,
-.auth-turnstile-help {
-  display: none;
-}
-
 .auth-turnstile-badge {
   display: inline-flex;
   align-items: center;
@@ -450,6 +445,11 @@ body.auth-screen-active.auth-screen-active--light #root {
 .auth-turnstile-badge.is-ready {
   background: rgba(80, 214, 160, 0.18);
   color: #b7ffd7;
+}
+
+.auth-turnstile-badge.is-error {
+  background: rgba(255, 109, 109, 0.16);
+  color: #ffd9d9;
 }
 
 .auth-turnstile-shell {
@@ -476,6 +476,7 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-turnstile-help {
+  display: block;
   font-size: 12px;
   line-height: 1.5;
   color: #9fb4d8;

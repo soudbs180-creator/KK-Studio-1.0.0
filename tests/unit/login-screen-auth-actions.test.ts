@@ -57,3 +57,19 @@ test('LoginScreen styles keep temporary and admin entry points compact and group
   assert.match(source, /min-height:\s*40px;/);
   assert.match(source, /font-size:\s*13px;/);
 });
+
+test('LoginScreen keeps Turnstile status visible when the widget cannot render', () => {
+  const source = readSource(LOGIN_SCREEN_PATH);
+
+  assert.match(source, /const turnstileDisabledByRuntime = !TURNSTILE_ENABLED;/);
+  assert.match(source, /const showTurnstileBlock = turnstileAvailable \|\| turnstileMissingSiteKey \|\| turnstileDisabledByRuntime;/);
+  assert.match(source, /turnstileMissingSiteKey\s*\?\s*getTurnstileMissingSiteKeyMessage\(language\)\s*:\s*getTurnstileDisabledMessage\(language\)/);
+});
+
+test('LoginScreen styles do not hide the Turnstile module label or hint', () => {
+  const source = readSource(LOGIN_SCREEN_CSS_PATH);
+
+  assert.doesNotMatch(source, /\.auth-turnstile-head,\s*\.auth-turnstile-help\s*\{\s*display:\s*none;\s*\}/);
+  assert.match(source, /\.auth-turnstile-head \{[\s\S]*display:\s*flex;/);
+  assert.match(source, /\.auth-turnstile-help \{[\s\S]*display:\s*block;/);
+});

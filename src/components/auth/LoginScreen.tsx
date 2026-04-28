@@ -103,7 +103,8 @@ const LoginScreen: React.FC = () => {
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const turnstileAvailable = canUseTurnstile();
   const turnstileMissingSiteKey = TURNSTILE_ENABLED && !TURNSTILE_HAS_SITE_KEY;
-  const showTurnstileBlock = turnstileAvailable || turnstileMissingSiteKey;
+  const turnstileDisabledByRuntime = !TURNSTILE_ENABLED;
+  const showTurnstileBlock = turnstileAvailable || turnstileMissingSiteKey || turnstileDisabledByRuntime;
   const { token: turnstileToken, error: turnstileError, handleVerify, handleError, handleExpire, reset: resetTurnstile } = useTurnstile(language);
 
   const [view, setView] = useState<AuthView>('login');
@@ -376,7 +377,19 @@ const LoginScreen: React.FC = () => {
   };
 
   const showFieldError = (field: FieldName) => Boolean(fieldErrors[field] && (submitted || fieldTouched[field]));
-  const turnstileHint = turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('当前请求需要先完成人机验证，验证通过后再提交。', 'Complete the CAPTCHA verification before submitting this request.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
+  const turnstileStatusClass = turnstileToken ? 'is-ready' : turnstileAvailable ? 'is-pending' : 'is-error';
+  const turnstileStatusLabel = turnstileToken
+    ? t('已就绪', 'Ready')
+    : turnstileAvailable
+      ? t('加载中', 'Loading')
+      : turnstileMissingSiteKey
+        ? t('未配置', 'Not configured')
+        : t('已关闭', 'Disabled');
+  const turnstileHint = turnstileMissingSiteKey
+    ? getTurnstileMissingSiteKeyMessage(language)
+    : turnstileDisabledByRuntime
+      ? getTurnstileDisabledMessage(language)
+      : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('当前请求需要先完成人机验证，验证通过后再提交。', 'Complete the CAPTCHA verification before submitting this request.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
 
   return (
     <div className={`auth-page auth-page--${resolvedTheme}`}>
@@ -433,8 +446,8 @@ const LoginScreen: React.FC = () => {
 
             {showTurnstileBlock && (
               <div className="auth-turnstile-block">
-                <div className="auth-turnstile-head"><span>{t('安全验证', 'Security check')}</span><span className={`auth-turnstile-badge ${turnstileToken ? 'is-ready' : 'is-pending'}`}>{turnstileToken ? t('已就绪', 'Ready') : t('加载中', 'Loading')}</span></div>
-                {turnstileAvailable ? <><TurnstileWidget onVerify={handleTurnstileVerify} onError={handleTurnstileError} onExpire={handleTurnstileExpire} appearance="always" action={view === 'forgot-password' ? 'reset-password' : view} language={language} className="auth-turnstile-shell" /><div className="auth-turnstile-help">{turnstileHint}</div></> : <div className="auth-turnstile-inline-error" role="alert">{getTurnstileMissingSiteKeyMessage(language)}</div>}
+                <div className="auth-turnstile-head"><span>{t('安全验证', 'Security check')}</span><span className={`auth-turnstile-badge ${turnstileStatusClass}`}>{turnstileStatusLabel}</span></div>
+                {turnstileAvailable ? <><TurnstileWidget onVerify={handleTurnstileVerify} onError={handleTurnstileError} onExpire={handleTurnstileExpire} appearance="always" action={view === 'forgot-password' ? 'reset-password' : view} language={language} className="auth-turnstile-shell" /><div className="auth-turnstile-help">{turnstileHint}</div></> : <div className="auth-turnstile-inline-error" role="alert">{turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : getTurnstileDisabledMessage(language)}</div>}
               </div>
             )}
 
