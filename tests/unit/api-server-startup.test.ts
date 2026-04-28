@@ -119,6 +119,62 @@ test("startApiServer handles browser CORS preflight for local web login", async 
   assert.match(response.headers.get("access-control-allow-headers") || "", /\bx-client-version\b/);
 });
 
+test("model proxy routes accept image payloads larger than the default JSON body limit", async () => {
+  const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+    allowDegradedPersistence: true,
+    authDataRepository: new InMemoryAuthDataRepository(),
+    requestAuthenticator: {
+      authenticate: async () => ({
+        userId: "startup-model-proxy-user",
+        email: "startup-model-proxy-user@example.com",
+      }),
+    },
+    verifyTurnstileToken: async () => ({ success: true }),
+  }));
+  trackedServers.add(server);
+
+  const baseUrl = getBaseUrl(server);
+  const oversizedPrompt = "x".repeat(1_200_000);
+
+  const systemResponse = await fetch(`${baseUrl}/api/v1/model-proxy/system`, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer startup-model-proxy-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      mode: "image",
+      prompt: oversizedPrompt,
+    }),
+  });
+  const systemBody = await systemResponse.json() as {
+    success: boolean;
+    error?: { code?: string };
+  };
+  assert.notEqual(systemResponse.status, 413);
+  assert.equal(systemBody.success, false);
+  assert.equal(systemBody.error?.code, "INVALID_REQUEST");
+
+  const userResponse = await fetch(`${baseUrl}/api/v1/model-proxy/user`, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer startup-model-proxy-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      mode: "image",
+      prompt: oversizedPrompt,
+    }),
+  });
+  const userBody = await userResponse.json() as {
+    success: boolean;
+    error?: { code?: string };
+  };
+  assert.notEqual(userResponse.status, 413);
+  assert.equal(userBody.success, false);
+  assert.equal(userBody.error?.code, "INVALID_REQUEST");
+});
+
 test("startApiServer rejects cleanly when the port is already in use", async () => {
   const primaryServer = await withMutedConsoleWarnAsync(() => startApiServer(0, {
     allowDegradedPersistence: true,

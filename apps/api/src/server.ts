@@ -211,6 +211,7 @@ class PayloadTooLargeError extends Error {
 
 const defaultMaxJsonBodyBytes = 1024 * 1024;
 const defaultExpandedProfileJsonBodyBytes = 4 * 1024 * 1024;
+const defaultModelProxyJsonBodyBytes = 16 * 1024 * 1024;
 const corsAllowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const corsAllowedHeaders = [
   "authorization",
@@ -228,6 +229,10 @@ function resolveJsonBodyMaxBytes(pathname?: string): number {
       || process.env.KK_API_KEY_MANAGER_MAX_JSON_BODY_BYTES
       || Math.max(defaultMaxBytes, defaultExpandedProfileJsonBodyBytes),
   );
+  const expandedModelProxyMaxBytes = Number(
+    process.env.KK_API_MODEL_PROXY_MAX_JSON_BODY_BYTES
+      || Math.max(defaultMaxBytes, defaultModelProxyJsonBodyBytes),
+  );
 
   if (
     pathname === "/api/v1/profile/user-apis"
@@ -235,6 +240,13 @@ function resolveJsonBodyMaxBytes(pathname?: string): number {
     || pathname === "/api/v1/profile/key-manager-state"
   ) {
     return expandedProfileMaxBytes;
+  }
+
+  if (
+    pathname === "/api/v1/model-proxy/system"
+    || pathname === "/api/v1/model-proxy/user"
+  ) {
+    return expandedModelProxyMaxBytes;
   }
 
   return defaultMaxBytes;
@@ -1643,7 +1655,9 @@ function buildApiServer(
         }
 
         if (req.method === "POST" && pathname === "/api/v1/model-proxy/system") {
-          const body = await readJsonBody(req);
+          const body = await readJsonBody(req, {
+            maxBytes: resolveJsonBodyMaxBytes(pathname),
+          });
           const result = await handleInvokeLocalSystemProxy(
             localSystemProxyService,
             body,
@@ -1654,7 +1668,9 @@ function buildApiServer(
         }
 
         if (req.method === "POST" && pathname === "/api/v1/model-proxy/user") {
-          const body = await readJsonBody(req);
+          const body = await readJsonBody(req, {
+            maxBytes: resolveJsonBodyMaxBytes(pathname),
+          });
           const result = await handleInvokeLocalUserRouteProxy(
             localUserRouteProxyService,
             body,

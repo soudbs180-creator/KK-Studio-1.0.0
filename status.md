@@ -7,7 +7,7 @@ Last updated: 2026-04-29
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: all planned recovery milestones are complete on `main`; final validation passed after the ledger status refresh.
+- Current milestone: Turnstile auth widget visibility follow-up complete; validation passed locally.
 - Milestones 1 through 9 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
 - Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
@@ -104,6 +104,14 @@ Validation:
 - Added a failing regression contract showing that `TURNSTILE_SITE_KEY` must come from explicit runtime configuration.
 - Removed the built-in Turnstile site key fallback so missing `VITE_TURNSTILE_SITE_KEY` is surfaced as configuration error instead of rendering a broken Cloudflare widget.
 - Updated `plans.md` and `validation.md` with the Turnstile repair milestone and validation commands.
+
+## Completed In 2026-04-29 Turnstile Visibility Follow-Up
+
+- Reproduced the remaining display gap with failing login-screen source contracts: the local runtime bypass path disabled Turnstile and hid the whole security-check module, while CSS also hid the module label and hint.
+- Updated `LoginScreen` so the security-check module remains visible for three states: active widget, missing `VITE_TURNSTILE_SITE_KEY`, and runtime-disabled/local-bypass Turnstile.
+- Changed the Turnstile status badge to show ready, loading, not-configured, or disabled instead of showing a misleading loading state when the widget cannot render.
+- Removed the CSS rule that forced `.auth-turnstile-head` and `.auth-turnstile-help` to `display: none`.
+- Added regression checks in `tests/unit/login-screen-auth-actions.test.ts` for the visible fallback states and CSS visibility.
 
 ## Completed In 2026-04-28 VPS PostgreSQL Login Probe Repair
 
@@ -247,6 +255,20 @@ Final gate:
 2026-04-28 Turnstile repair validation:
 
 - Passed: targeted Turnstile/auth tests (`16/16` tests):
+  - `tests/unit/turnstile-runtime-config.test.ts`
+  - `tests/unit/local-api-turnstile-bypass.test.ts`
+  - `tests/unit/auth-http-routes.test.ts`
+  - `tests/unit/login-screen-auth-actions.test.ts`
+  - `tests/unit/local-env-contract.test.ts`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `npm.cmd run check:encoding`
+
+2026-04-29 Turnstile visibility follow-up validation:
+
+- Red verified: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/login-screen-auth-actions.test.ts` failed before the fix on the missing disabled-state render contract and hidden CSS rule.
+- Passed: targeted Turnstile/auth tests (`19/19` tests):
   - `tests/unit/turnstile-runtime-config.test.ts`
   - `tests/unit/local-api-turnstile-bypass.test.ts`
   - `tests/unit/auth-http-routes.test.ts`
@@ -473,11 +495,24 @@ Final gate:
 - Passed: `node --check scripts/dev/run-api-dev-vps-tunnel.mjs`
 - Passed: PowerShell parse check for `scripts/dev/dev-launch.ps1`
 
+2026-04-29 local image proxy payload-limit repair validation:
+
+- Root cause confirmed: `/api/v1/model-proxy/user` and `/api/v1/model-proxy/system` still used the global 1 MB JSON body limit, so image-generation requests carrying inline reference images failed at the HTTP boundary with `413 Payload Too Large`.
+- Added an actual startup regression that posts payloads larger than 1 MB to both model-proxy endpoints and asserts they fail inside business validation instead of returning HTTP 413.
+- Expanded only the model-proxy route budget to a bounded route-specific ceiling while keeping the global JSON limit unchanged.
+- Passed: focused startup/local API/official route validation (`19/19` tests).
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit` (`957/957` tests)
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
 - Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
 - Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
+- Local image generation proxy requests can now exceed the legacy 1 MB JSON cap without failing at the HTTP boundary first.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
 - `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.

@@ -397,6 +397,22 @@ git diff --check
 node --check scripts/dev/run-api-dev-vps-tunnel.mjs
 ```
 
+## Local Image Proxy Payload Limits
+
+Run these when touching `/api/v1/model-proxy/system`, `/api/v1/model-proxy/user`, secure image proxy payload sizing, or route-specific JSON body limits:
+
+```powershell
+node --test --test-isolation=none `\
+  "tests/unit/api-server-startup.test.ts" `\
+  "tests/unit/user-route-diagnostics-routes.test.ts" `\
+  "tests/unit/official-route-default-models.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run check:encoding
+npm.cmd run governance:agent-docs
+```
+
 ## Final Gate
 
 Before declaring the recovery complete:
