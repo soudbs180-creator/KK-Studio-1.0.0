@@ -94,6 +94,31 @@ test("startApiServer resolves a listening server", async () => {
   assert.equal(server.listening, true);
 });
 
+test("startApiServer handles browser CORS preflight for local web login", async () => {
+  const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+    allowDegradedPersistence: true,
+    authDataRepository: new InMemoryAuthDataRepository(),
+    verifyTurnstileToken: async () => ({ success: true }),
+  }));
+  trackedServers.add(server);
+
+  const response = await fetch(`${getBaseUrl(server)}/api/v1/auth/login`, {
+    method: "OPTIONS",
+    headers: {
+      "access-control-request-headers": "content-type,x-client-version",
+      "access-control-request-method": "POST",
+      origin: "http://localhost:5173",
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:5173");
+  assert.equal(response.headers.get("access-control-allow-credentials"), "true");
+  assert.match(response.headers.get("access-control-allow-methods") || "", /\bPOST\b/);
+  assert.match(response.headers.get("access-control-allow-headers") || "", /\bcontent-type\b/);
+  assert.match(response.headers.get("access-control-allow-headers") || "", /\bx-client-version\b/);
+});
+
 test("startApiServer rejects cleanly when the port is already in use", async () => {
   const primaryServer = await withMutedConsoleWarnAsync(() => startApiServer(0, {
     allowDegradedPersistence: true,

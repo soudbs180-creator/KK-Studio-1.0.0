@@ -211,6 +211,15 @@ class PayloadTooLargeError extends Error {
 
 const defaultMaxJsonBodyBytes = 1024 * 1024;
 const defaultExpandedProfileJsonBodyBytes = 4 * 1024 * 1024;
+const corsAllowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+const corsAllowedHeaders = [
+  "authorization",
+  "content-type",
+  "x-admin-session-token",
+  "x-client-version",
+  "x-kk-temp-user-id",
+  "x-request-id",
+].join(", ");
 
 function resolveJsonBodyMaxBytes(pathname?: string): number {
   const defaultMaxBytes = Number(process.env.KK_API_MAX_JSON_BODY_BYTES || defaultMaxJsonBodyBytes);
@@ -244,6 +253,91 @@ function writeJson(
     ...extraHeaders,
   });
   res.end(body);
+}
+
+function normalizeCorsOrigin(value: string | undefined): string | undefined {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function isLoopbackCorsOrigin(origin: string): boolean {
+  const normalizedOrigin = normalizeCorsOrigin(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "::1"
+      || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+function getConfiguredCorsOrigins(): Set<string> {
+  const configuredOrigins = [
+    process.env.KK_API_PUBLIC_ORIGIN,
+    process.env.KK_API_ALLOWED_ORIGINS,
+    process.env.KK_API_CORS_ALLOWED_ORIGINS,
+  ]
+    .flatMap((value) => String(value || "").split(","))
+    .map((value) => normalizeCorsOrigin(value))
+    .filter((value): value is string => Boolean(value));
+
+  return new Set(configuredOrigins);
+}
+
+function resolveCorsOrigin(req: IncomingMessage): string | undefined {
+  const originHeader = req.headers.origin;
+  const origin = normalizeCorsOrigin(Array.isArray(originHeader) ? originHeader[0] : originHeader);
+  if (!origin) {
+    return undefined;
+  }
+
+  if (isLoopbackCorsOrigin(origin)) {
+    return origin;
+  }
+
+  if (getConfiguredCorsOrigins().has(origin)) {
+    return origin;
+  }
+
+  return undefined;
+}
+
+function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): boolean {
+  const allowedOrigin = resolveCorsOrigin(req);
+  res.setHeader("vary", "Origin");
+  if (!allowedOrigin) {
+    return false;
+  }
+
+  res.setHeader("access-control-allow-origin", allowedOrigin);
+  res.setHeader("access-control-allow-credentials", "true");
+  res.setHeader("access-control-allow-methods", corsAllowedMethods);
+  res.setHeader("access-control-allow-headers", corsAllowedHeaders);
+  res.setHeader("access-control-max-age", "600");
+  return true;
+}
+
+function writeOptionsResponse(req: IncomingMessage, res: ServerResponse) {
+  applyCorsHeaders(req, res);
+  res.writeHead(204, {
+    "content-length": "0",
+  });
+  res.end();
 }
 
 function writeRedirect(res: ServerResponse, location: string, statusCode = 302) {
@@ -1170,6 +1264,12 @@ function buildApiServer(
 
   const server = createServer((req, res) => {
     void (async () => {
+      applyCorsHeaders(req, res);
+      if (req.method === "OPTIONS") {
+        writeOptionsResponse(req, res);
+        return;
+      }
+
       const rawHeaders = normalizeHeaders(req);
       const headers = stripAuthenticatedHeaders(rawHeaders);
       const requestId = headers["x-request-id"] || randomUUID();
