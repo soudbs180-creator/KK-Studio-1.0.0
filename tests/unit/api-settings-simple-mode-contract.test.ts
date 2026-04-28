@@ -40,9 +40,9 @@ test('ApiSettingsView simple mode keeps one compact add entry and a unified prov
 
   assert.match(viewSource, /const showSimpleProviderList = !showAdvancedWorkbench;/);
   assert.match(viewSource, /data-testid="api-simple-provider-add"/);
-  assert.match(viewSource, /pick\('添加 API', 'Add API'\)/);
-  assert.match(viewSource, /Official routes use built-in URLs\. Proxy providers need a name, request URL, and API key\./);
-  assert.match(viewSource, /data-testid="api-proxy-provider-add"/);
+  assert.match(viewSource, /pick\('添加新的供应商', 'Add new provider'\)/);
+  assert.match(viewSource, /Create a local API here, then choose Google or OpenAI in the form\./);
+  assert.doesNotMatch(viewSource, /data-testid="api-proxy-provider-add"/);
   assert.match(viewSource, /showSimpleProviderList[\s\S]*thirdPartyProviders\.map\(\(provider\)/);
   assert.doesNotMatch(viewSource, /min-h-\[132px\]/);
   assert.doesNotMatch(viewSource, /No local APIs yet/);

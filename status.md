@@ -535,6 +535,14 @@ Final gate:
 - Passed: `npm.cmd run verify:desktop-settings-smoke`
 - Passed: final gate (`npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:unit`, `npm.cmd run check:encoding`, `npm.cmd run governance:agent-docs`, `git diff --check`).
 
+2026-04-29 settings local API single-add validation:
+
+- Root cause confirmed: the API simple list still exposed separate `官方直连 / 中转站` actions, while the current product requirement is one local `添加新的供应商 / Add new provider` entry.
+- Updated `ApiSettingsView` so the default add card has one primary `添加供应商 / Add provider` action that opens the local API editor at `/settings/api-management/official/new`; Google/OpenAI selection stays inside the editor.
+- Updated API settings source-contract tests so the default surface rejects `api-proxy-provider-add` and keeps provider creation scoped to the local editor/advanced empty state.
+- Browser-verified the local flow: the list exposes one add button, the editor shows `谷歌` and `OpenAI`, and `新增本地 API` stays disabled with inline API Key feedback until a key is provided.
+- Passed: targeted API/settings tests, `npm.cmd run typecheck`, `npm.cmd run verify:mobile-settings-smoke`, `npm.cmd run verify:desktop-settings-smoke`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding`.
+
 ## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
