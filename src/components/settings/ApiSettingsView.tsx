@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Clock3,
   Edit3,
-  Globe,
   Key,
   Layers3,
   Pause,
@@ -12,7 +11,6 @@ import {
   Plus,
   RefreshCw,
   Save,
-  Shield,
   Trash2,
   Wand2,
 } from 'lucide-react';
@@ -2746,35 +2744,24 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="settings-api-quick-add__title">
-                    {pick('添加 API', 'Add API')}
+                    {pick('添加新的供应商', 'Add new provider')}
                   </div>
                   <div className="settings-api-quick-add__copy">
-                    {pick('官方直连使用默认地址；中转站需要供应商名称、请求地址和 API Key。', 'Official routes use built-in URLs. Proxy providers need a name, request URL, and API key.')}
+                    {pick('在本地添加 API，然后在表单里选择谷歌或 OpenAI。', 'Create a local API here, then choose Google or OpenAI in the form.')}
                   </div>
                 </div>
               </div>
               <div className="settings-api-quick-add__actions">
                 <SettingsActionButton
                   data-testid="api-official-provider-add"
-                  icon={Shield}
+                  icon={Plus}
                   tone="primary"
                   size="sm"
                   disabled={userApiActionsDisabled}
                   onClick={handleCreateOfficialAction}
                 >
-                  {pick('官方直连', 'Official')}
+                  {pick('添加供应商', 'Add provider')}
                 </SettingsActionButton>
-                {showSimpleProviderList ? (
-                  <SettingsActionButton
-                    data-testid="api-proxy-provider-add"
-                    icon={Globe}
-                    size="sm"
-                    disabled={providerActionsDisabled}
-                    onClick={beginCreateProvider}
-                  >
-                    {pick('中转站', 'Proxy')}
-                  </SettingsActionButton>
-                ) : null}
               </div>
             </div>
 

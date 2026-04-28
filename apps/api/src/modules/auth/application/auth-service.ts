@@ -85,6 +85,18 @@ function isTruthyEnvValue(value: string | undefined): boolean {
     || normalized === "on";
 }
 
+function isFalsyEnvValue(value: string | undefined): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "0"
+    || normalized === "false"
+    || normalized === "no"
+    || normalized === "off";
+}
+
+function isTurnstileRequirementDisabled(): boolean {
+  return isFalsyEnvValue(process.env.KK_AUTH_REQUIRE_TURNSTILE);
+}
+
 function isLocalTurnstileBypassActive(): boolean {
   return isTruthyEnvValue(process.env.KKAI_LOCAL_ONLY)
     && isTruthyEnvValue(process.env.VITE_TURNSTILE_LOCAL_BYPASS);
@@ -110,7 +122,7 @@ export class AuthService {
     input: RegisterRequestDto,
     context: AuthRequestContext,
   ): Promise<AuthHandlerResult<RegisterResponseDto>> {
-    const requireTurnstileToken = !isLocalTurnstileBypassActive();
+    const requireTurnstileToken = !isTurnstileRequirementDisabled() && !isLocalTurnstileBypassActive();
 
     if (!input.email || !input.password || (requireTurnstileToken && !input.turnstileToken)) {
       return this.badRequest("Missing required fields: email, password, turnstileToken.");

@@ -255,6 +255,34 @@ describe("auth http routes", () => {
     assert.equal(result.body.success, false);
   });
 
+  test("allows self-hosted register requests without turnstileToken when Turnstile is explicitly disabled", async () => {
+    const previousRequireTurnstile = process.env.KK_AUTH_REQUIRE_TURNSTILE;
+    process.env.KK_AUTH_REQUIRE_TURNSTILE = "false";
+
+    try {
+      const authService = new AuthService({
+        verifyTurnstileToken: async () => ({ success: false }),
+        identityStore: new InMemoryAuthIdentityStore(),
+      });
+
+      const result = await handleVersionedRegister(authService, {
+        email: "register-self-hosted-bypass@example.com",
+        password: "password-123",
+      }, {
+        "x-request-id": "req-register-self-hosted-bypass",
+      }, "127.0.0.1");
+
+      assert.equal(result.statusCode, 201);
+      assert.equal(result.body.success, true);
+    } finally {
+      if (typeof previousRequireTurnstile === "string") {
+        process.env.KK_AUTH_REQUIRE_TURNSTILE = previousRequireTurnstile;
+      } else {
+        delete process.env.KK_AUTH_REQUIRE_TURNSTILE;
+      }
+    }
+  });
+
   test("allows local-only register requests without turnstileToken when local bypass is enabled", async () => {
     const previousLocalOnly = process.env.KKAI_LOCAL_ONLY;
     const previousTurnstileBypass = process.env.VITE_TURNSTILE_LOCAL_BYPASS;

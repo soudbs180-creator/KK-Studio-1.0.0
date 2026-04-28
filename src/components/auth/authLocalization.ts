@@ -201,7 +201,7 @@ export function mapAuthErrorMessage(
   }
 
   if (message.includes("Password should be at least")) {
-    return pick(language, "密码长度至少 6 位。", "Password must be at least 6 characters.");
+    return pick(language, "密码长度至少 8 位。", "Password must be at least 8 characters.");
   }
 
   if (message.includes("For security purposes")) {

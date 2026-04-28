@@ -345,6 +345,31 @@ npm.cmd run typecheck
 npm.cmd run check:encoding
 ```
 
+## VPS API Dev Start Fail-Closed
+
+Run these when touching `scripts/dev/dev-launch.ps1`, local API startup policy, remote VPS API routing, auth bootstrap, or manual recharge runtime wiring:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/dev-script-project-root.test.ts" `
+  "tests/unit/dev-script-port-owner-guards.test.ts" `
+  "tests/unit/dev-start-entrypoint.test.ts" `
+  "tests/unit/hosted-release-guardrails.test.ts" `
+  "tests/unit/auth-http-routes.test.ts" `
+  "tests/unit/login-screen-auth-actions.test.ts" `
+  "tests/unit/run-api-dev-config-guards.test.ts" `
+  "tests/unit/billing-http-routes.test.ts" `
+  "apps/api/src/modules/billing/local-static-recharge.test.ts" `
+  "tests/unit/kkai-billing-ui-surface.test.ts"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -SkipVite
+npm.cmd run governance:agent-docs
+npm.cmd run typecheck
+npm.cmd run check:encoding
+npm.cmd run build
+```
+
+Expected runtime smoke: `dev-launch.ps1 -SkipVite` should report a ready remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and `http://<vps-api>/healthz?probe=1` should report `canonicalPersistenceReady: true` with PostgreSQL repository backends.
+
 ## Final Gate
 
 Before declaring the recovery complete:

@@ -206,6 +206,31 @@ Validation:
 - `node scripts/dev/run-api-dev.mjs --check` after VPS access-control repair.
 - `npm.cmd run check:encoding`
 
+### 9. VPS API Dev Start Fail-Closed Runtime
+
+Goal: keep local development pointed at the real VPS API/PostgreSQL runtime and prevent a local-only API from masking database access failures.
+
+Scope:
+- Detect non-local `VITE_KK_API_BASE_URL` during `dev:start` and verify the remote API through `/healthz?probe=1`.
+- Do not start `run-api-local.mjs` after PostgreSQL preflight failure unless `-AllowLocalOnlyFallback` is explicitly requested.
+- Refresh setup docs and env examples so active runtime setup references VPS API/PostgreSQL, not Supabase.
+- Verify login/auth, manual recharge/admin handling, dev launcher, hosted guardrails, typecheck, build, and encoding.
+
+Acceptance:
+- `dev-launch.ps1 -SkipVite` reports the configured remote VPS API as ready when `VITE_KK_API_BASE_URL` points off localhost.
+- Local-only fallback is opt-in and clearly labeled.
+- Frontend on `127.0.0.1:3000` uses the VPS API path for login, billing, workspace persistence, and admin operations.
+- The VPS `/healthz?probe=1` reports `canonicalPersistenceReady: true` and PostgreSQL repository backends.
+
+Validation:
+- Dev launcher and hosted guardrail contract tests.
+- Auth, runtime wrapper, billing, manual recharge, and admin recharge UI contract tests.
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -SkipVite`
+- `npm.cmd run governance:agent-docs`
+- `npm.cmd run typecheck`
+- `npm.cmd run check:encoding`
+- `npm.cmd run build`
+
 ## Final Gate
 
 After all milestones are complete:

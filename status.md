@@ -391,13 +391,16 @@ Final gate:
 - Added regression coverage for:
   - built-in Google official model defaults in the runtime resolver
   - built-in OpenAI official model defaults in the runtime resolver
+  - custom OpenAI-compatible proxy URLs so they do not get mistaken for official default-model routes
   - official route cards in settings so they show built-in model readiness instead of requiring a manual fetch first
   - official OpenAI slot channel configs so an empty saved `baseUrl` still resolves to `https://api.openai.com`
 - Red/green verified: `node --test --test-isolation=none tests/unit/official-route-default-models.test.ts`
-- Passed: focused local API + official route validation (`7/7` tests):
+- Passed: focused local API + official route validation (`8/8` tests):
   - `tests/unit/user-route-diagnostics-routes.test.ts`
   - `tests/unit/official-route-default-models.test.ts`
 - Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit` (`954/954` tests)
 - Passed: `npm.cmd run check:encoding`
 
 2026-04-28 VPS PostgreSQL tunnel wrapper validation:
@@ -413,14 +416,47 @@ Final gate:
 - Passed: `npm.cmd run governance:agent-docs`
 - Passed: `npm.cmd run check:encoding`
 
+2026-04-28 VPS API dev-start fail-closed validation:
+
+- Root cause confirmed: the local launcher could start `run-api-local.mjs` after PostgreSQL preflight failure, leaving a local-only `127.0.0.1:3001` API that looked healthy while the real VPS PostgreSQL probe was blocked by changing client egress IPs.
+- Updated `scripts/dev/dev-launch.ps1` so a non-local `VITE_KK_API_BASE_URL` is treated as the canonical VPS API and verified with `/healthz?probe=1`; it no longer starts a misleading local API in that mode.
+- Local-only fallback now requires explicit `-AllowLocalOnlyFallback`; otherwise a failed local PostgreSQL preflight fails closed with the probe error.
+- Cleaned root and local API env examples plus README runtime wording so setup points at VPS API/PostgreSQL instead of Supabase.
+- Runtime smoke after cleanup:
+  - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -SkipVite` returned that the configured remote VPS API was ready.
+  - `http://127.0.0.1:3000/` returned HTTP 200.
+  - The configured VPS `/healthz?probe=1` returned `status: ok`, `canonicalPersistenceReady: true`, and all critical repositories as `postgres`.
+  - Stale local-only API on `127.0.0.1:3001` was stopped; local API probing now fails instead of masking VPS state.
+- Passed: dev launcher and hosted guardrail contracts (`16/16` tests).
+- Passed: auth, runtime wrapper, billing, manual recharge, and admin recharge UI contracts (`31/31` tests).
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run build`
+
+2026-04-28 final official defaults, auth alignment, and VPS tunnel close-out validation:
+
+- Kept the unified settings Add API entry intact: `api-simple-provider-add` still exposes both official and proxy add actions, and stale tests no longer assert the proxy action is absent.
+- Added official Google/OpenAI model defaults as the effective model list when saved official slots have no stored models yet, including settings-card helper copy for built-in defaults.
+- Aligned login/register password minimum copy and inputs with the server-side 8-character rule.
+- Added `KK_AUTH_REQUIRE_TURNSTILE=false` support consistently in both the auth HTTP route validator and `AuthService.register`.
+- Passed: targeted close-out unit subset (`39/39` tests).
+- Passed: `npm.cmd run typecheck`
+- Passed: `npm.cmd run build`
+- Passed: `npm.cmd run test:unit` (`953/953` tests)
+- Passed: `npm.cmd run check:encoding`
+- Passed: `npm.cmd run governance:agent-docs`
+- Passed: `git diff --check`
+- Passed: `node --check scripts/dev/run-api-dev-vps-tunnel.mjs`
+- Passed: PowerShell parse check for `scripts/dev/dev-launch.ps1`
+
 ## In Progress
 
-- No local settings/API, Dashboard, or PromptBar close-out gap remains after final validation.
+- No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
 - Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
 - Official Google/OpenAI routes now have built-in model defaults in the runtime resolver, and the settings card no longer implies a manual model fetch is required before use.
-- PowerShell command execution became unreliable during final staging, but `git add` succeeded through the Node REPL command path.
-- VPS PostgreSQL client-access helper is committed locally.
 - VPS PostgreSQL login probe repair is code-complete locally, including a dry-run `pg_hba.conf` repair helper and a local SSH tunnel wrapper for changing client source IPs.
+- `dev:start` now prefers the configured remote VPS API when `VITE_KK_API_BASE_URL` is non-local, and fails closed instead of silently launching local-only persistence.
 - Paramiko-based read-only VPS shell access is available through the ignored `.tmp/pydeps` dependency and `.tmp/codex-vps-key-readable` copy; do not commit these local credential/tunnel artifacts.
 - Direct public PostgreSQL access remains unstable because the current execution environment's source IP changes between probes. Observed rejected sources include `13.208.210.0`, `3.1.51.45`, and `13.212.119.86`.
 - Added `scripts/dev/run-api-dev-vps-tunnel.mjs`, which validates an existing local SSH tunnel, rewrites `DATABASE_URL` to that tunnel, disables PostgreSQL SSL for the localhost hop, and delegates to `run-api-dev.mjs`.
@@ -432,13 +468,13 @@ Final gate:
 - Supabase deletion and PostgreSQL replacement must be validated together to avoid leaving private front-end Supabase paths.
 - Local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 - If PowerShell reports `.git/index.lock` permission errors again, use the Node REPL command path for Git operations and verify staged files with `git status --short`.
-- The final close-out commit scope is limited to settings/API density, compact capability-card controls, Dashboard mobile action scoping, source-contract test updates, PromptBar overflow-policy regression coverage, and these ledger files.
 - Ignored local files remain on disk: `.codex-tmp-vps-key*`, `.codex-ssh-*`, `.codex-tmp-ssh-askpass.cmd`, and `.tmp/`. They are excluded from ordinary Git status; deleting them requires explicit user confirmation.
 - Current VPS PostgreSQL status: the app can configure SSL, and the VPS has already loaded narrow `hostssl` rules for older client sources, but direct public access is brittle because the client egress IP can change between checks. Prefer the verified SSH tunnel path for local development; only append another `/32` `pg_hba.conf` rule after a fresh live probe and action-time confirmation.
 - Manual product acceptance is still not recorded for real-device mobile touch feel, external login callback behavior, and final settings/PPT visual acceptance.
 
 ## Next Steps
 
-1. Keep using `node scripts/dev/run-api-dev-vps-tunnel.mjs` with an existing SSH tunnel for local API development against the VPS PostgreSQL database instead of relying on the changing public client IP.
-2. If direct public PostgreSQL access is still required, rerun a live probe, dry-run `scripts/vps/repair-postgres-client-access.sh` with the latest `/32`, then apply only after action-time confirmation.
-3. Push local `main` when publishing these commits is desired.
+1. Use `http://127.0.0.1:3000/` for the frontend; it is configured to use the ready VPS API rather than local-only persistence.
+2. Keep using `node scripts/dev/run-api-dev-vps-tunnel.mjs` with an existing SSH tunnel only when a local API process must connect directly to VPS PostgreSQL.
+3. If direct public PostgreSQL access is still required, rerun a live probe, dry-run `scripts/vps/repair-postgres-client-access.sh` with the latest `/32`, then apply only after action-time confirmation.
+4. Push local `main` when publishing these commits is desired.

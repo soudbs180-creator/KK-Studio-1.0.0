@@ -31,6 +31,18 @@ function isTruthyEnvValue(value: string | undefined): boolean {
     || normalized === "on";
 }
 
+function isFalsyEnvValue(value: string | undefined): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "0"
+    || normalized === "false"
+    || normalized === "no"
+    || normalized === "off";
+}
+
+function isTurnstileRequirementDisabled(): boolean {
+  return isFalsyEnvValue(process.env.KK_AUTH_REQUIRE_TURNSTILE);
+}
+
 function isLocalTurnstileBypassActive(): boolean {
   return isTruthyEnvValue(process.env.KKAI_LOCAL_ONLY)
     && isTruthyEnvValue(process.env.VITE_TURNSTILE_LOCAL_BYPASS);
@@ -95,7 +107,7 @@ export function buildErrorEnvelope<T>(
 
 function validateRegisterRequest(body: RegisterRequestDto): ApiErrorDetail[] {
   const details: ApiErrorDetail[] = [];
-  const requireTurnstileToken = !isLocalTurnstileBypassActive();
+  const requireTurnstileToken = !isTurnstileRequirementDisabled() && !isLocalTurnstileBypassActive();
 
   if (!body || typeof body !== "object") {
     return [{ field: "body", reason: "Request body must be an object." }];

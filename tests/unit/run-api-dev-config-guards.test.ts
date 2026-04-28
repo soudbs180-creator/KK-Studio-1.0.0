@@ -35,3 +35,20 @@ test("run-api-dev only uses primary env files and fails fast on missing VPS Post
   assert.doesNotMatch(localOnlyCliSource, /assertLocalApiConfig/);
   assert.match(localOnlyCliSource, /await startLocalApiServer\(\{ skipConfigCheck: true \}\)/);
 });
+
+test("VPS tunnel dev wrapper rewrites DATABASE_URL to an existing local PostgreSQL tunnel", () => {
+  const tunnelCliSource = readFileSync(path.join(ROOT_DIR, "scripts", "dev", "run-api-dev-vps-tunnel.mjs"), "utf-8");
+
+  assert.match(tunnelCliSource, /run-api-dev\.mjs/);
+  assert.match(tunnelCliSource, /applyPrimaryEnvToProcess/);
+  assert.match(tunnelCliSource, /DATABASE_URL/);
+  assert.match(tunnelCliSource, /KK_PG_TUNNEL_HOST/);
+  assert.match(tunnelCliSource, /KK_PG_TUNNEL_PORT/);
+  assert.match(tunnelCliSource, /127\.0\.0\.1/);
+  assert.match(tunnelCliSource, /15432/);
+  assert.match(tunnelCliSource, /PGSSLMODE/);
+  assert.match(tunnelCliSource, /disable/);
+  assert.match(tunnelCliSource, /net\.createConnection/);
+  assert.doesNotMatch(tunnelCliSource, /\.codex-tmp-vps-key/);
+  assert.doesNotMatch(tunnelCliSource, /codex-vps-key-readable/);
+});

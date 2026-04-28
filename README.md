@@ -6,7 +6,7 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 
 - Visual canvas for prompts, assets, and generated results
 - Multiple model routes, including official endpoints and third-party providers
-- Local-first workflows with Supabase auth plus API-mediated cloud storage and sync
+- VPS-backed login, billing, workspace sync, and admin operations through the KK API
 - Built-in settings surfaces for billing, diagnostics, logging, and provider management
 
 ## Tech Stack
@@ -15,7 +15,7 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 - TypeScript 6.0.2
 - Vite 8.0.8
 - Node.js 24.x
-- Supabase JS 2.103.0
+- PostgreSQL-backed VPS API runtime
 
 ## Current runtime truth
 
@@ -29,11 +29,11 @@ KK Studio is a multimodal canvas workspace for image, video, audio, and presenta
 
 1. Copy `.env.example` to `.env` if you need frontend-level overrides.
 2. Copy `apps/api/.env.local.example` to `apps/api/.env.local`.
-3. Fill in a real `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env.local`.
+3. Fill in a real VPS PostgreSQL `DATABASE_URL` in `apps/api/.env.local`, or point `VITE_KK_API_BASE_URL` at a ready VPS API.
 4. Install dependencies with `npm install`.
 5. Start the local stack with `npm run dev:start`.
 
-The local API startup is now strict: it only reads root `.env` / `.env.local` and `apps/api/.env` / `apps/api/.env.local`, and it intentionally ignores legacy `server/.env` files.
+The local API startup is strict: it only reads root `.env` / `.env.local` and `apps/api/.env` / `apps/api/.env.local`, and it intentionally ignores legacy `server/.env` files. If `VITE_KK_API_BASE_URL` is a non-local URL, `npm run dev:start` verifies that VPS API with `/healthz?probe=1` and does not start a misleading local fallback API.
 
 For local API JSON body limits, the default startup behavior is:
 
@@ -63,7 +63,7 @@ npm run check:encoding
 - `apps/payment-sidecar/`: canonical payment runtime
 - `payment-server/`: transitional payment bridge and webhook shell
 - `server/`, `api/`: transitional compatibility layers
-- `supabase/`: migrations and edge-function assets
+- `supabase/`: archived legacy migration and edge-function assets, not the active runtime
 - `scripts/`: development, verification, and release scripts
 - `tests/`: unit, integration, contract, and e2e coverage
 - `docs/`: runbooks, reports, and implementation notes

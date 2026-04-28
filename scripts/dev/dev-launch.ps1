@@ -1,7 +1,8 @@
 param(
     [switch]$OpenBrowser,
     [switch]$Restart,
-    [switch]$SkipVite
+    [switch]$SkipVite,
+    [switch]$AllowLocalOnlyFallback
 )
 
 $ErrorActionPreference = 'Stop'
@@ -408,6 +409,100 @@ function Test-KkApiHealth {
     return $false
 }
 
+function Test-KkApiCanonicalHealth {
+    param(
+        [string]$Url,
+        [int]$Attempts = 1,
+        [int]$DelayMilliseconds = 250
+    )
+
+    for ($attempt = 0; $attempt -lt $Attempts; $attempt += 1) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
+            $content = [string]$response.Content
+            if (
+                $response.StatusCode -eq 200 `
+                -and $content -match '"success"\s*:\s*true' `
+                -and $content -match '"service"\s*:\s*"kk-studio-api"' `
+                -and $content -match '"status"\s*:\s*"ok"' `
+                -and $content -match '"selfHostedCoreReady"\s*:\s*true' `
+                -and $content -match '"canonicalPersistenceReady"\s*:\s*true'
+            ) {
+                return $true
+            }
+        } catch {
+        }
+
+        if ($attempt -lt ($Attempts - 1)) {
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return $false
+}
+
+function Get-FrontendApiBaseUrl {
+    $resolvedValue = $null
+    foreach ($relativePath in @('.env', '.env.local')) {
+        $envPath = Join-Path $projectRoot $relativePath
+        if (-not (Test-Path -LiteralPath $envPath)) {
+            continue
+        }
+
+        $lines = @(Get-Content -LiteralPath $envPath -Encoding UTF8 -ErrorAction SilentlyContinue)
+        foreach ($line in $lines) {
+            $trimmed = ([string]$line).Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) {
+                continue
+            }
+
+            if ($trimmed -match '^\s*VITE_KK_API_BASE_URL\s*=\s*(.*)\s*$') {
+                $value = ([string]$Matches[1]).Trim()
+                if (
+                    ($value.StartsWith('"') -and $value.EndsWith('"')) `
+                    -or ($value.StartsWith("'") -and $value.EndsWith("'"))
+                ) {
+                    $value = $value.Substring(1, $value.Length - 2)
+                }
+
+                $resolvedValue = $value.Trim()
+            }
+        }
+    }
+
+    return $resolvedValue
+}
+
+function Test-LocalApiBaseUrl {
+    param([string]$BaseUrl)
+
+    if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
+        return $true
+    }
+
+    try {
+        $uri = [Uri]$BaseUrl
+    } catch {
+        return $true
+    }
+
+    if (-not $uri.IsAbsoluteUri) {
+        return $true
+    }
+
+    $hostName = $uri.Host.ToLowerInvariant()
+    return $hostName -eq 'localhost' -or $hostName -eq '127.0.0.1' -or $hostName -eq '::1'
+}
+
+function Join-KkApiUrl {
+    param(
+        [string]$BaseUrl,
+        [string]$Path
+    )
+
+    return $BaseUrl.TrimEnd('/') + '/' + $Path.TrimStart('/')
+}
+
 function Wait-UrlReadyOrExit {
     param(
         [string]$Url,
@@ -522,6 +617,9 @@ $apiLocalScript = Join-Path $projectRoot 'scripts\dev\run-api-local.mjs'
 $apiRunnerScript = Join-Path $projectRoot 'scripts\dev\run-api-runner.ps1'
 $apiScript = $apiDevScript
 $apiMode = 'canonical'
+$apiPid = $null
+$apiUsesWatch = $true
+$apiReusedExistingListener = $false
 
 if (-not (Test-Path -LiteralPath $viteCli)) {
     throw "Vite CLI was not found at $viteCli. Run npm install first."
@@ -547,36 +645,56 @@ Reset-LogFile -Path $apiOutLog
 Reset-LogFile -Path $apiErrLog
 
 $apiEnabled = $true
-$originalPathUpper = [string]$env:PATH
-$originalPathMixed = [string]$env:Path
-try {
-    if ($originalPathUpper -and $originalPathMixed) {
-        Remove-Item Env:PATH -ErrorAction SilentlyContinue
+$frontendApiBaseUrl = Get-FrontendApiBaseUrl
+
+if (-not (Test-LocalApiBaseUrl -BaseUrl $frontendApiBaseUrl)) {
+    $apiEnabled = $false
+    $apiMode = 'remote'
+    $remoteApiHealthUrl = Join-KkApiUrl -BaseUrl $frontendApiBaseUrl -Path 'healthz?probe=1'
+    if (-not (Test-KkApiCanonicalHealth -Url $remoteApiHealthUrl -Attempts 6 -DelayMilliseconds 500)) {
+        throw "Configured VITE_KK_API_BASE_URL is not a ready VPS PostgreSQL API: $remoteApiHealthUrl"
+    }
+} else {
+    $originalPathUpper = [string]$env:PATH
+    $originalPathMixed = [string]$env:Path
+    try {
+        if ($originalPathUpper -and $originalPathMixed) {
+            Remove-Item Env:PATH -ErrorAction SilentlyContinue
+        }
+
+        $apiPreflight = Start-Process `
+            -FilePath $nodeExe `
+            -ArgumentList @($apiScript, '--check') `
+            -WorkingDirectory $projectRoot `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $apiOutLog `
+            -RedirectStandardError $apiErrLog `
+            -PassThru `
+            -Wait
+    } finally {
+        if ($originalPathUpper) {
+            $env:PATH = $originalPathUpper
+        }
+
+        if ($originalPathMixed) {
+            $env:Path = $originalPathMixed
+        }
     }
 
-    $apiPreflight = Start-Process `
-        -FilePath $nodeExe `
-        -ArgumentList @($apiScript, '--check') `
-        -WorkingDirectory $projectRoot `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $apiOutLog `
-        -RedirectStandardError $apiErrLog `
-        -PassThru `
-        -Wait
-} finally {
-    if ($originalPathUpper) {
-        $env:PATH = $originalPathUpper
-    }
+    if ($apiPreflight.ExitCode -ne 0) {
+        if (-not $AllowLocalOnlyFallback) {
+            $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+            if ($apiLogSnippet) {
+                throw "Local API config preflight failed and local-only fallback is disabled. Latest error output:`n$apiLogSnippet"
+            }
 
-    if ($originalPathMixed) {
-        $env:Path = $originalPathMixed
-    }
-}
+            throw "Local API config preflight failed and local-only fallback is disabled. Set VITE_KK_API_BASE_URL to a ready VPS API or fix apps/api/.env.local."
+        }
 
-if ($apiPreflight.ExitCode -ne 0) {
-    $apiScript = $apiLocalScript
-    $apiMode = 'local-only'
-    Write-Warning "Local API config preflight failed. Starting Vite with the local-only API fallback. Update apps/api/.env.local to restore canonical API routes."
+        $apiScript = $apiLocalScript
+        $apiMode = 'local-only'
+        Write-Warning "Local API config preflight failed. Starting Vite with the local-only API fallback because -AllowLocalOnlyFallback was set."
+    }
 }
 
 if ($Restart) {
@@ -584,74 +702,80 @@ if ($Restart) {
     Stop-TrackedProcess -PidFile $apiPidFile
 }
 
-$apiPid = Get-AliveProcessId -PidFile $apiPidFile
-if ($apiPid) {
-    $apiCommandLine = [string](Get-ProcessCommandLine -ProcessId $apiPid)
-    $apiUsesWatch = $apiCommandLine -match '--watch'
-} else {
-    $apiUsesWatch = $true
-}
-
-if ($apiPid -and -not (Test-UrlReady -Url $apiUrl)) {
-    Stop-TrackedProcess -PidFile $apiPidFile
-    $apiPid = $null
-    $apiUsesWatch = $true
-}
-
-$apiReusedExistingListener = $false
-if (-not $apiPid -and (Test-KkApiHealth -Url $apiUrl)) {
-    $existingApiPid = Get-ListeningProcessIdByPort -Port 3001
-    if ($existingApiPid) {
-        $apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $existingApiPid
+if ($apiEnabled) {
+    $apiPid = Get-AliveProcessId -PidFile $apiPidFile
+    if ($apiPid) {
+        $apiCommandLine = [string](Get-ProcessCommandLine -ProcessId $apiPid)
+        $apiUsesWatch = $apiCommandLine -match '--watch'
     } else {
-        Remove-StalePidFile -PidFile $apiPidFile
+        $apiUsesWatch = $true
     }
 
-    $apiReusedExistingListener = $true
-    Write-Warning "Reusing the local API listener that is already healthy on port 3001."
-}
-
-if (-not $apiPid -and -not $apiReusedExistingListener) {
-    Clear-KnownDevPortConflicts -Port 3001
-    Assert-PortAvailable -Port 3001
-    $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $true
-}
-
-if (-not $apiReusedExistingListener -and -not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
-    $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
-    if ($apiUsesWatch -and (Test-ApiWatchSpawnError -LogSnippet $apiLogSnippet)) {
-        Write-Warning "Node watch mode is unavailable on this machine. Restarting the local API without watch mode."
+    if ($apiPid -and -not (Test-UrlReady -Url $apiUrl)) {
         Stop-TrackedProcess -PidFile $apiPidFile
-        $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $false
-        $apiUsesWatch = $false
+        $apiPid = $null
+        $apiUsesWatch = $true
+    }
 
-        if (-not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
-            $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+    if (-not $apiPid -and (Test-KkApiHealth -Url $apiUrl)) {
+        $existingApiPid = Get-ListeningProcessIdByPort -Port 3001
+        if ($existingApiPid) {
+            $apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $existingApiPid
+        } else {
+            Remove-StalePidFile -PidFile $apiPidFile
+        }
+
+        $apiReusedExistingListener = $true
+        Write-Warning "Reusing the local API listener that is already healthy on port 3001."
+    }
+
+    if (-not $apiPid -and -not $apiReusedExistingListener) {
+        Clear-KnownDevPortConflicts -Port 3001
+        Assert-PortAvailable -Port 3001
+        $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $true
+    }
+
+    if (-not $apiReusedExistingListener -and -not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
+        $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+        if ($apiUsesWatch -and (Test-ApiWatchSpawnError -LogSnippet $apiLogSnippet)) {
+            Write-Warning "Node watch mode is unavailable on this machine. Restarting the local API without watch mode."
+            Stop-TrackedProcess -PidFile $apiPidFile
+            $apiPid = Start-ApiProcess -ApiScript $apiScript -UseWatch $false
+            $apiUsesWatch = $false
+
+            if (-not (Wait-UrlReadyOrExit -Url $apiUrl -ProcessId $apiPid -Attempts 80 -DelayMilliseconds 500)) {
+                $apiLogSnippet = Get-LogSnippet -Path $apiErrLog
+                if ($apiLogSnippet) {
+                    throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
+                }
+
+                throw "The local API server did not become ready in time. Check $apiErrLog"
+            }
+        } else {
             if ($apiLogSnippet) {
                 throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
             }
 
             throw "The local API server did not become ready in time. Check $apiErrLog"
         }
-    } else {
-        if ($apiLogSnippet) {
-            throw "The local API server did not become ready. Latest error output:`n$apiLogSnippet"
-        }
-
-        throw "The local API server did not become ready in time. Check $apiErrLog"
     }
+
+    # Keep the API pid file pinned to the currently active API process.
+    $apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $apiPid
 }
 
-# Keep the API pid file pinned to the currently active API process.
-$apiPid = Sync-PidFileToPortOwner -PidFile $apiPidFile -Port 3001 -FallbackProcessId $apiPid
-
 if ($SkipVite) {
-    Write-Host "KK Studio local API is ready at http://localhost:3001"
-    if ($apiReusedExistingListener -and -not $apiPid) {
+    if ($apiMode -eq 'remote') {
+        Write-Host "KK Studio remote VPS API is ready at $frontendApiBaseUrl"
+        Write-Host "API: remote VPS"
+    } elseif ($apiReusedExistingListener -and -not $apiPid) {
+        Write-Host "KK Studio local API is ready at http://localhost:3001"
         Write-Host "API PID: external healthy listener on port 3001"
     } elseif ($apiMode -eq 'local-only') {
+        Write-Host "KK Studio local API is ready at http://localhost:3001"
         Write-Host "API PID: $apiPid (local-only fallback)"
     } else {
+        Write-Host "KK Studio local API is ready at http://localhost:3001"
         Write-Host "API PID: $apiPid"
     }
     Write-Host "Logs: $logDir"
@@ -699,6 +823,8 @@ Write-Host "KK Studio dev server is ready at http://localhost:3000"
 Write-Host "Vite PID: $vitePid"
 if ($apiReusedExistingListener -and -not $apiPid) {
     Write-Host "API PID: external healthy listener on port 3001"
+} elseif ($apiMode -eq 'remote') {
+    Write-Host "API: remote VPS ($frontendApiBaseUrl)"
 } elseif ($apiMode -eq 'local-only') {
     Write-Host "API PID: $apiPid (local-only fallback)"
 } else {

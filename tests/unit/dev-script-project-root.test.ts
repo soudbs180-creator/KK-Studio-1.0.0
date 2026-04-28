@@ -49,7 +49,7 @@ test("dev powershell scripts resolve the repository root from scripts/dev", () =
   assert.match(stopBatSource, /powershell -NoProfile -ExecutionPolicy Bypass/);
 });
 
-test("dev launch keeps frontend startup alive when local API preflight is unavailable", () => {
+test("dev launch fails closed instead of silently falling back to local-only persistence", () => {
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
 
   assert.match(devLaunchSource, /Write-Warning/);
@@ -58,9 +58,26 @@ test("dev launch keeps frontend startup alive when local API preflight is unavai
   assert.doesNotMatch(devLaunchSource, /& \$nodeExe \$apiScript --check/);
   assert.match(devLaunchSource, /\$apiScript = \$apiDevScript/);
   assert.match(devLaunchSource, /\$apiScript = \$apiLocalScript/);
-  assert.match(devLaunchSource, /Starting Vite with the local-only API fallback/);
+  assert.match(devLaunchSource, /\[switch\]\$AllowLocalOnlyFallback/);
+  assert.match(devLaunchSource, /local-only fallback is disabled/);
+  assert.match(devLaunchSource, /Starting Vite with the local-only API fallback because -AllowLocalOnlyFallback was set/);
   assert.doesNotMatch(devLaunchSource, /API PID: disabled \(missing local API config\)/);
-  assert.doesNotMatch(devLaunchSource, /throw "Local API config preflight failed/);
+  assert.match(devLaunchSource, /throw "Local API config preflight failed/);
+});
+
+test("dev launch uses a configured remote VPS API instead of starting a misleading local API", () => {
+  const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
+
+  assert.match(devLaunchSource, /function Get-FrontendApiBaseUrl/);
+  assert.match(devLaunchSource, /VITE_KK_API_BASE_URL/);
+  assert.match(devLaunchSource, /function Test-KkApiCanonicalHealth/);
+  assert.match(devLaunchSource, /healthz\?probe=1/);
+  assert.match(devLaunchSource, /selfHostedCoreReady/);
+  assert.match(devLaunchSource, /canonicalPersistenceReady/);
+  assert.match(devLaunchSource, /\$apiEnabled = \$false/);
+  assert.match(devLaunchSource, /\$apiMode = 'remote'/);
+  assert.match(devLaunchSource, /Configured VITE_KK_API_BASE_URL is not a ready VPS PostgreSQL API/);
+  assert.match(devLaunchSource, /API: remote VPS/);
 });
 
 test("dev launch reuses an already-healthy local API listener before treating port 3001 as a conflict", () => {
