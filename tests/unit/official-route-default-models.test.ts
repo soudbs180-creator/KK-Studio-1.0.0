@@ -25,7 +25,17 @@ test("keyManager keeps built-in defaults for official OpenAI routes when saved m
   assert.match(source, /const DEFAULT_OPENAI_MODELS = \['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'\];/);
   assert.match(
     source,
-    /runtime\.strategyId === 'openai'[\s\S]*return DEFAULT_OPENAI_MODELS;/,
+    /runtime\.strategyId === 'openai' && \(!runtime\.baseUrl \|\| runtime\.host === 'api\.openai\.com'\)[\s\S]*return DEFAULT_OPENAI_MODELS;/,
+  );
+});
+
+test("keyManager does not treat custom OpenAI-compatible proxy URLs as official default-model routes", () => {
+  const source = readSource("src/services/auth/keyManager.ts");
+
+  assert.match(source, /runtime\.host === 'api\.openai\.com'/);
+  assert.doesNotMatch(
+    source,
+    /runtime\.strategyId === 'openai'\) \{\s*return DEFAULT_OPENAI_MODELS;/,
   );
 });
 

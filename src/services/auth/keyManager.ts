@@ -657,11 +657,11 @@ export function getDocumentedStaticModelsForProvider(strategyId: string): string
 }
 
 function getDefaultOfficialModelsForRuntime(runtime: ReturnType<typeof resolveProviderRuntime>): string[] {
-    if (runtime.strategyId === 'google') {
+    if (runtime.strategyId === 'google' && runtime.providerFamily === 'google-official') {
         return DEFAULT_GOOGLE_MODELS;
     }
 
-    if (runtime.strategyId === 'openai') {
+    if (runtime.strategyId === 'openai' && (!runtime.baseUrl || runtime.host === 'api.openai.com')) {
         return DEFAULT_OPENAI_MODELS;
     }
 
