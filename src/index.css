@@ -41,7 +41,7 @@
   /* ===== 文字 ===== */
   --text-primary: #111827;
   --text-secondary: rgba(17, 24, 39, 0.76);
-  --text-tertiary: rgba(55, 65, 81, 0.68);
+  --text-tertiary: rgba(55, 65, 81, 0.72);
   --text-muted: rgba(107, 114, 128, 0.58);
   --text-disabled: rgba(148, 163, 184, 0.56);
   --text-color: var(--text-primary);
