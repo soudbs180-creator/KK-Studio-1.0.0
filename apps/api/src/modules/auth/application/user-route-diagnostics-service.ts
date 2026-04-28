@@ -299,10 +299,19 @@ function normalizeModels(payload: unknown): string[] {
     ? record.data
     : Array.isArray(record?.models)
       ? record.models
-      : [];
+      : Array.isArray(payload)
+        ? payload
+        : [];
 
   return models
-    .map((item: any) => String(item?.id || item?.name || item?.model || "").replace(/^models\//i, ""))
+    .map((item: any) => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      return String(item?.id || item?.name || item?.model || "").trim();
+    })
+    .map((item) => item.replace(/^models\//i, ""))
     .filter(Boolean);
 }
 

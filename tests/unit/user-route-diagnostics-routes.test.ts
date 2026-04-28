@@ -91,6 +91,64 @@ describe("user route diagnostics routes", () => {
     assert.deepEqual(result.body.data.models, ["gpt-4.1", "gpt-4.1-mini"]);
   });
 
+  test("normalizes successful connectivity checks when a local route returns a top-level model array", async () => {
+    const repository = new InMemoryAuthDataRepository();
+    const authDataService = new AuthDataService(repository);
+    const diagnosticsService = new UserRouteDiagnosticsService(authDataService);
+    const headers = {
+      "x-request-id": "req-connectivity-array-models",
+      [AUTHENTICATED_USER_ID_HEADER]: "user-diagnostics-array",
+      [AUTHENTICATED_USER_EMAIL_HEADER]: "user-diagnostics-array@example.com",
+    };
+
+    await authDataService.replaceKeyManagerCloudState(
+      "user-diagnostics-array",
+      "user-diagnostics-array@example.com",
+      {
+        version: 2,
+        slots: [],
+        providers: [
+          {
+            id: "provider-array",
+            name: "Local Array Provider",
+            baseUrl: "http://127.0.0.1:1234/v1",
+            apiKey: "local-secret",
+            format: "openai",
+            models: [],
+            isActive: true,
+          },
+        ],
+      },
+      "req-seed-connectivity-array-models",
+    );
+
+    globalThis.fetch = async () => new Response(JSON.stringify([
+      { id: "qwen3-32b" },
+      { name: "deepseek-r1" },
+      "glm-4.5-air",
+    ]), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+
+    const result = await handleCheckUserRouteConnectivity(
+      diagnosticsService,
+      "provider-array",
+      headers,
+    );
+
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.success, true);
+    if (!result.body.success) {
+      return;
+    }
+
+    assert.equal(result.body.data.ok, true);
+    assert.deepEqual(result.body.data.models, ["qwen3-32b", "deepseek-r1", "glm-4.5-air"]);
+  });
+
   test("syncs pricing with the persisted provider secret", async () => {
     const repository = new InMemoryAuthDataRepository();
     const authDataService = new AuthDataService(repository);
