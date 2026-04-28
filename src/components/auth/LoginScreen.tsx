@@ -210,6 +210,24 @@ const LoginScreen: React.FC = () => {
   const handleTurnstileError = useCallback((nextError: string) => { handleError(nextError); if (captchaRequiredByBackend) setError(nextError); }, [captchaRequiredByBackend, handleError]);
   const handleTurnstileExpire = useCallback(() => { handleExpire(); setCaptchaRequiredByBackend(true); }, [handleExpire]);
 
+  const handleEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextEmail = event.target.value;
+    setEmail(nextEmail);
+    setFieldErrors(validateFields(view, nextEmail, password, confirmPassword, language));
+  }, [confirmPassword, language, password, view]);
+
+  const handlePasswordChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextPassword = event.target.value;
+    setPassword(nextPassword);
+    setFieldErrors(validateFields(view, email, nextPassword, confirmPassword, language));
+  }, [confirmPassword, email, language, view]);
+
+  const handleConfirmPasswordChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextConfirmPassword = event.target.value;
+    setConfirmPassword(nextConfirmPassword);
+    setFieldErrors(validateFields(view, email, password, nextConfirmPassword, language));
+  }, [email, language, password, view]);
+
   const attemptAuth = async (captchaToken?: string) => {
     const emailValue = email.trim();
     if (view === 'register') {
@@ -393,14 +411,14 @@ const LoginScreen: React.FC = () => {
 
             <label className="auth-field">
               <span>{t('邮箱地址', 'Email')}</span>
-              <div className={`auth-input-wrap ${showFieldError('email') ? 'auth-input-error' : ''}`}><Mail size={18} /><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors(localErrors); }} onBlur={() => setFieldTouched((current) => ({ ...current, email: true }))} placeholder={t('请输入邮箱地址', 'Enter your email')} required autoComplete="email" /></div>
+              <div className={`auth-input-wrap ${showFieldError('email') ? 'auth-input-error' : ''}`}><Mail size={18} /><input type="email" value={email} onChange={handleEmailChange} onBlur={() => setFieldTouched((current) => ({ ...current, email: true }))} placeholder={t('请输入邮箱地址', 'Enter your email')} required autoComplete="email" /></div>
               <div className="auth-field-help">{showFieldError('email') ? <span className="auth-field-error">{fieldErrors.email}</span> : <span>　</span>}</div>
             </label>
 
             {view !== 'forgot-password' && (
               <label className="auth-field">
                 <span>{t('登录密码', 'Password')}</span>
-                <div className={`auth-input-wrap ${showFieldError('password') ? 'auth-input-error' : ''}`}><Lock size={18} /><input type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => { setPassword(event.target.value); setFieldErrors(localErrors); }} onBlur={() => setFieldTouched((current) => ({ ...current, password: true }))} placeholder={t('请输入登录密码', 'Enter your password')} required minLength={8} autoComplete={view === 'register' ? 'new-password' : 'current-password'} /><button type="button" className="auth-eye-btn" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
+                <div className={`auth-input-wrap ${showFieldError('password') ? 'auth-input-error' : ''}`}><Lock size={18} /><input type={showPassword ? 'text' : 'password'} value={password} onChange={handlePasswordChange} onBlur={() => setFieldTouched((current) => ({ ...current, password: true }))} placeholder={t('请输入登录密码', 'Enter your password')} required minLength={8} autoComplete={view === 'register' ? 'new-password' : 'current-password'} /><button type="button" className="auth-eye-btn" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
                 <div className="auth-field-help">{showFieldError('password') ? <span className="auth-field-error">{fieldErrors.password}</span> : <span>　</span>}</div>
               </label>
             )}
@@ -408,7 +426,7 @@ const LoginScreen: React.FC = () => {
             {view === 'register' && (
               <label className="auth-field">
                 <span>{t('确认密码', 'Confirm password')}</span>
-                <div className={`auth-input-wrap ${showFieldError('confirmPassword') ? 'auth-input-error' : ''}`}><Lock size={18} /><input type="password" value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setFieldErrors(localErrors); }} onBlur={() => setFieldTouched((current) => ({ ...current, confirmPassword: true }))} placeholder={t('请再次输入密码', 'Enter your password again')} required minLength={8} autoComplete="new-password" /></div>
+                <div className={`auth-input-wrap ${showFieldError('confirmPassword') ? 'auth-input-error' : ''}`}><Lock size={18} /><input type="password" value={confirmPassword} onChange={handleConfirmPasswordChange} onBlur={() => setFieldTouched((current) => ({ ...current, confirmPassword: true }))} placeholder={t('请再次输入密码', 'Enter your password again')} required minLength={8} autoComplete="new-password" /></div>
                 <div className="auth-field-help">{showFieldError('confirmPassword') ? <span className="auth-field-error">{fieldErrors.confirmPassword}</span> : <span>　</span>}</div>
               </label>
             )}

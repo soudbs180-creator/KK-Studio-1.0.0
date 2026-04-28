@@ -23,6 +23,7 @@ test('shared settings ui primitives use a calmer desktop density scale', () => {
 
 test('settings workbench compacts mobile surfaces instead of stacking oversized cards', () => {
   const cssSource = readSource('src/index.css');
+  const panelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(
     cssSource,
@@ -127,6 +128,10 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
   assert.match(
     cssSource,
     /\.settings-panel \.settings-shell-mobile__title \{[\s\S]*font-size: 22px;/,
+  );
+  assert.match(
+    panelSource,
+    /inline-flex min-h-\[32px\] items-center gap-1 rounded-full px-3 py-1\.5 text-xs font-medium/,
   );
 });
 

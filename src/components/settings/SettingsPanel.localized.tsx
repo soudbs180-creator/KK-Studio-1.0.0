@@ -60,7 +60,7 @@ const ViewFallback: React.FC = () => (
 const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { language, setLanguage, pick } = useLocale();
   const buttonClassName = compact
-    ? 'inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium'
+    ? 'inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium'
     : 'inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium';
 
   return (

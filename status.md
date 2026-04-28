@@ -1,16 +1,16 @@
 # KK Studio Recovery Status
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Current Position
 
 - Branch: `main`
 - Baseline commit: `b630dd8a 00000000000`
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
-- Current milestone: final settings/API simple UI, compact capability assignment cards, Dashboard mobile action, and PromptBar density close-out is validated on `main`; VPS public PostgreSQL access should prefer the verified SSH tunnel path because direct client egress IPs keep changing.
-- Milestones 1, 2, 3, 4, 5, and 6 are complete.
+- Current milestone: all planned recovery milestones are complete on `main`; final validation passed after the ledger status refresh.
+- Milestones 1 through 9 are complete.
 - Merge status: local branch `codex/kk-studio-recovery-convergence` is an ancestor of `main`.
-- Publish status: local `main` was ahead of `origin/main` by 27 commits before this follow-up commit; push status must be handled separately when publishing is desired.
+- Publish status: local `main` is ahead of `origin/main`; push status must be handled separately when publishing is desired.
 
 ## Recovered Sources
 
@@ -35,9 +35,9 @@ The original Codex threads did not reappear in the sidebar, so they are now repr
 Snapshot command: `git status --short --branch`
 
 - Current branch: `main`
-- Remote relation: `main...origin/main [ahead 31]`
-- Current dirty entries after this validation pass: 10 tracked paths.
-- Untracked entries visible to ordinary Git status: 2
+- Remote relation: `main...origin/main` ahead of `origin/main`
+- Expected dirty entries after this close-out commit: 0 tracked paths.
+- Untracked entries visible to ordinary Git status: 0
 
 Risk classes observed:
 
@@ -473,7 +473,7 @@ Final gate:
 - Passed: `node --check scripts/dev/run-api-dev-vps-tunnel.mjs`
 - Passed: PowerShell parse check for `scripts/dev/dev-launch.ps1`
 
-## In Progress
+## Closed State
 
 - No local settings/API, Dashboard, PromptBar, official-default-model, auth-alignment, or VPS tunnel close-out gap remains after final validation.
 - Local API model discovery parsing is fixed for top-level array payloads in the secure route diagnostics path.
