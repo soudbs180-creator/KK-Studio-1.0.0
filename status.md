@@ -51,6 +51,13 @@ Risk classes observed:
 
 ## Completed In This Session
 
+- Fixed the register form's confirm-password live validation so each input change validates against the next field value instead of stale `localErrors`.
+- Restored visible Turnstile/security-check status and hint copy for disabled or missing-site-key runtimes, replacing hidden ambiguous output with explicit labels.
+- Added auth source-contract coverage for confirm-password validation, Turnstile visibility, and no mojibake/`????` regressions.
+- Validation for this auth follow-up passed:
+  - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/login-screen-auth-actions.test.ts tests/unit/auth-localization.test.ts`
+  - `npm.cmd run typecheck`
+  - `npm.cmd run check:encoding`
 - Created recovery branch `codex/kk-studio-recovery-convergence`.
 - Loaded execution, TDD, verification, worktree, and parallel-agent rules.
 - Created `plans.md`, `implement.md`, `status.md`, and `validation.md`.
