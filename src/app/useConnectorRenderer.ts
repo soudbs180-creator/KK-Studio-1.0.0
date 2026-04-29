@@ -2,15 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as React from 'react';
 import type { GeneratedImage, PromptNode } from '../types';
 import type { WorkflowUtilityCanvasNode } from './appCanvasTypes';
-import type { LiveSceneSnapshot } from '../canvas/liveScene';
+import type { CanvasPoint, LiveSceneSnapshot } from '../canvas/liveScene';
 import { resolveLiveSceneNodePosition } from '../canvas/liveScene';
+import type { CanvasPerformanceProfile } from '../canvas/performanceProfile';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 
 type ConnectorRenderSnapshot = {
   promptIds: string[];
   imageIds: string[];
   workflowUtilityIds: string[];
-  positionByNodeId: Record<string, { x: number; y: number }>;
+  positionByNodeId: Record<string, CanvasPoint>;
 };
 
 const EMPTY_CONNECTOR_RENDER_SNAPSHOT: ConnectorRenderSnapshot = {
@@ -30,18 +31,29 @@ interface UseConnectorRendererDeps {
   promptNodesById: Map<string, PromptNode>;
   imageNodesById: Map<string, GeneratedImage>;
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode>;
-  canvasPerformanceProfile: {
-    edgeMode: string;
-    renderMode: string;
-    edgeThrottleMs: number;
-  };
+  canvasPerformanceProfile: CanvasPerformanceProfile;
   resolveCurrentPromptChildImages: (
     promptNode: PromptNode | undefined | null,
     imageNodes: GeneratedImage[],
   ) => GeneratedImage[];
 }
 
-export function useConnectorRenderer(deps: UseConnectorRendererDeps) {
+interface UseConnectorRendererResult {
+  connectorRenderSnapshot: ConnectorRenderSnapshot;
+  connectorRenderPromptNodes: PromptNode[];
+  connectorRenderVisibleImageNodes: GeneratedImage[];
+  connectorRenderWorkflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode>;
+  connectorVisibleImageNodeIds: Set<string>;
+  connectorChildImagesByPromptId: Map<string, GeneratedImage[]>;
+  resolveLivePromptPosition: (promptNode: PromptNode | undefined | null) => CanvasPoint | null;
+  resolveLiveImagePosition: (imageNode: GeneratedImage | undefined | null) => CanvasPoint | null;
+  resolveConnectorRenderPosition: (
+    nodeId: string | undefined | null,
+    fallbackPosition: CanvasPoint | undefined | null
+  ) => CanvasPoint | null;
+}
+
+export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnectorRendererResult {
   const {
     activeCanvas,
     liveSceneState,
@@ -237,7 +249,7 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps) {
 
   const resolveConnectorRenderPosition = useCallback((
     nodeId: string | undefined | null,
-    fallbackPosition: { x: number; y: number } | undefined | null
+    fallbackPosition: CanvasPoint | undefined | null
   ) => {
     if (!nodeId) return fallbackPosition ?? null;
     return connectorRenderSnapshot.positionByNodeId[nodeId] ?? fallbackPosition ?? null;

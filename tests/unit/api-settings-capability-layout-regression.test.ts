@@ -26,7 +26,7 @@ test('capability routing cards keep their toggles in a compact card header state
   assert.doesNotMatch(source, /settings-capability-card__toggle/);
   assert.match(
     uiSource,
-    /className="settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-full border/,
+    /settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-\[var\(--radius-control-md\)\] border/,
   );
   assert.match(cssSource, /\.settings-panel \.settings-capability-card__switch \{/);
   assert.match(cssSource, /\.settings-panel \.settings-capability-card__switch--on \{/);
