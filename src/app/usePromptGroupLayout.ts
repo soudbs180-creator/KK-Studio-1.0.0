@@ -106,15 +106,12 @@ interface UsePromptGroupLayoutResult {
   liveSceneInteractionPhase: CanvasInteractionPhase;
   liveSceneState: LiveSceneSnapshot;
   liveSceneRef: RefObject<LiveSceneSnapshot>;
-  actualChildImagesByPromptId: Map<string, GeneratedImage[]>;
   actualChildImageIdsByPromptId: Map<string, string[]>;
   expandedSelectedNodeIds: string[];
-  visibleChildImagesByPromptId: Map<string, GeneratedImage[]>;
   standaloneVisibleImageNodes: GeneratedImage[];
   promptGroupNodeIdsById: Map<string, string[]>;
   promptGroupRegroupLayoutsById: Map<string, Map<string, PromptGroupRegroupLayout>>;
   promptGroupBoundsById: Map<string, PromptGroupBounds>;
-  promptGroupViews: PromptGroupView[];
   visiblePromptGroupViews: PromptGroupView[];
   syncLiveNodePositionState: () => void;
   resolvePromptGroupIdForNodeId: (nodeId: string) => string | null;
@@ -1202,20 +1199,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       });
   }, [currentVisibleImageNodes, currentVisiblePromptNodes, promptGroupViews]);
 
-  const visibleChildImagesByPromptId = useMemo(() => {
-    const childMap = new Map<string, GeneratedImage[]>();
-    if (!activeCanvas) return childMap;
-
-    currentVisiblePromptNodes.forEach((promptNode) => {
-      const images = resolveCurrentPromptChildImages(promptNode, currentVisibleImageNodes);
-      if (images.length > 0) {
-        childMap.set(promptNode.id, images);
-      }
-    });
-
-    return childMap;
-  }, [activeCanvas, currentVisibleImageNodes, currentVisiblePromptNodes, resolveCurrentPromptChildImages]);
-
   const standaloneVisibleImageNodes = useMemo(() => {
     const promptGroupIdSet = new Set(promptGroupViews.map((groupView) => groupView.id));
 
@@ -1340,15 +1323,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     liveSceneInteractionPhase,
     liveSceneState,
     liveSceneRef,
-    actualChildImagesByPromptId,
     actualChildImageIdsByPromptId,
     expandedSelectedNodeIds,
-    visibleChildImagesByPromptId,
     standaloneVisibleImageNodes,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
     promptGroupBoundsById,
-    promptGroupViews,
     visiblePromptGroupViews,
     syncLiveNodePositionState,
     resolvePromptGroupIdForNodeId,

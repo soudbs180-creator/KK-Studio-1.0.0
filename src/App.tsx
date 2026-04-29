@@ -7543,14 +7543,11 @@ ${paragraphs}
   const {
     liveSceneState,
     liveSceneRef,
-    actualChildImagesByPromptId,
     actualChildImageIdsByPromptId,
     expandedSelectedNodeIds,
-    visibleChildImagesByPromptId,
     standaloneVisibleImageNodes,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
-    promptGroupViews,
     visiblePromptGroupViews,
     resolvePromptGroupIdForNodeId,
     applyLiveNodeDeltaToDraggedSet,
@@ -7598,16 +7595,6 @@ ${paragraphs}
     visiblePromptNodes,
     workflowUtilityNodesById,
   });
-
-  const visibleImageNodesById = React.useMemo(
-    () => new Map(visibleImageNodes.map(node => [node.id, node])),
-    [visibleImageNodes]
-  );
-
-  const visibleImageNodeIds = React.useMemo(
-    () => new Set(visibleImageNodes.map(node => node.id)),
-    [visibleImageNodes]
-  );
 
   const visibleWorkflowUtilityNodesById = React.useMemo(
     () => new Map(visibleWorkflowUtilityNodes.map((node) => [node.id, node])),

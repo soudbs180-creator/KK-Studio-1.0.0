@@ -234,9 +234,9 @@ test('usePromptGroupLayout owns prompt-group child node maps', () => {
   assert.match(promptGroupLayoutSource, /const actualChildImagesByPromptId = useMemo/);
   assert.match(promptGroupLayoutSource, /const actualChildImageIdsByPromptId = useMemo/);
   assert.match(promptGroupLayoutSource, /const promptGroupNodeIdsById = useMemo/);
-  assert.match(appSource, /actualChildImagesByPromptId,/);
   assert.match(appSource, /actualChildImageIdsByPromptId,/);
   assert.match(appSource, /promptGroupNodeIdsById,/);
+  assert.doesNotMatch(appSource, /actualChildImagesByPromptId,/);
   assert.doesNotMatch(appSource, /const actualChildImagesByPromptId = React\.useMemo/);
   assert.doesNotMatch(appSource, /const actualChildImageIdsByPromptId = React\.useMemo/);
   assert.doesNotMatch(appSource, /const promptGroupNodeIdsById = React\.useMemo/);
@@ -345,11 +345,11 @@ test('usePromptGroupLayout owns prompt-group visible derived views', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(promptGroupLayoutSource, /const visibleChildImagesByPromptId = useMemo/);
   assert.match(promptGroupLayoutSource, /const standaloneVisibleImageNodes = useMemo/);
-  assert.match(promptGroupLayoutSource, /visibleChildImagesByPromptId,/);
   assert.match(promptGroupLayoutSource, /standaloneVisibleImageNodes,/);
+  assert.doesNotMatch(promptGroupLayoutSource, /visibleChildImagesByPromptId/);
   assert.doesNotMatch(appSource, /const visibleChildImagesByPromptId = React\.useMemo/);
+  assert.doesNotMatch(appSource, /visibleChildImagesByPromptId,/);
   assert.doesNotMatch(appSource, /const standaloneVisibleImageNodes = React\.useMemo/);
 });
 
@@ -360,6 +360,9 @@ test('App removes hidden legacy prompt-group render branches', () => {
   assert.doesNotMatch(appSource, /\{false && visiblePromptNodes\.map/);
   assert.doesNotMatch(appSource, /\{false && standaloneVisibleImageNodes\.map/);
   assert.doesNotMatch(appSource, /const expandedSelectedIds = Array\.from\(new Set/);
+  assert.doesNotMatch(appSource, /promptGroupViews,/);
+  assert.doesNotMatch(appSource, /const visibleImageNodesById = React\.useMemo/);
+  assert.doesNotMatch(appSource, /const visibleImageNodeIds = React\.useMemo/);
 });
 
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
