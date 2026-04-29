@@ -300,10 +300,21 @@ test('App freezes overlap-map recomputation while node drag is active', () => {
   assert.match(promptGroupLayoutSource, /if \(isNodeDragActive\) \{\s*return currentGroupOverlapMap;/);
 });
 
-test('App skips prompt-layout auto-repair while node drag is active', () => {
-  const appSource = readSource('src/App.tsx');
+test('usePromptGroupLayout skips prompt-layout auto-repair while node drag is active', () => {
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /useEffect\(\(\) => \{\s*if \(!activeCanvas \|\| isNodeDragActive\) return;/);
+  assert.match(promptGroupLayoutSource, /useEffect\(\(\) => \{\s*if \(!activeCanvas \|\| isNodeDragActive\) return;/);
+});
+
+test('usePromptGroupLayout owns prompt-layout auto-repair', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>\(new Set\(\)\);/);
+  assert.match(promptGroupLayoutSource, /buildGeneratedImageBatchPositions\(\{/);
+  assert.match(promptGroupLayoutSource, /updateImageNodePosition\(imageNode\.id, expectedPosition, \{ ignoreSelection: true \}\);/);
+  assert.match(promptGroupLayoutSource, /if \(!activeCanvas \|\| isNodeDragActive\) return;/);
+  assert.doesNotMatch(appSource, /const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>\(new Set\(\)\);/);
 });
 
 test('App resolves live prompt/image positions from the ref-backed live scene snapshot', () => {
@@ -334,7 +345,7 @@ test('App reuses the last stable prompt-group bounds and views while node drag i
 test('App only builds prompt-group regroup layouts for groups with active presentation state', () => {
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const regroupMemoStart = promptGroupLayoutSource.indexOf('const promptGroupRegroupLayoutsById = useMemo(() => {');
-  const regroupMemoEnd = promptGroupLayoutSource.indexOf('const promptGroupBoundsById = useMemo(() => {');
+  const regroupMemoEnd = promptGroupLayoutSource.indexOf('const syncLiveNodePositionState = useCallback(() => {');
 
   assert.notEqual(regroupMemoStart, -1);
   assert.notEqual(regroupMemoEnd, -1);

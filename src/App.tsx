@@ -7655,6 +7655,7 @@ ${paragraphs}
     setImageCardHeightById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
+    updateImageNodePosition,
     visibleImageNodes,
     visiblePromptNodes,
     workflowUtilityNodesById,
@@ -7829,71 +7830,6 @@ ${paragraphs}
 
     clearPromptGroupRegroup(promptNode.id);
   }, [activeCanvas, clearPromptGroupRegroup, settlePromptGroupRegroup, updateImageNodePosition, updatePromptNode]);
-
-  const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    autoRepairedPromptLayoutKeysRef.current.clear();
-  }, [activeCanvas?.id]);
-
-  useEffect(() => {
-    if (!activeCanvas || isNodeDragActive) return;
-
-    const repairKeys = autoRepairedPromptLayoutKeysRef.current;
-    const activeCanvasId = activeCanvas.id;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
-      if (childImages.length === 0) return;
-
-      const hasLiveDragInGroup = Boolean(liveNodePositionByIdRef.current[promptNode.id])
-        || childImages.some((imageNode) => Boolean(liveNodePositionByIdRef.current[imageNode.id]));
-      const hasManualLayoutOverride = Boolean(promptNode.userMoved)
-        || childImages.some((imageNode) => Boolean(imageNode.userMoved));
-      const hasPromptGroupPresentationState = Boolean(promptGroupLayoutStateByIdRef.current[promptNode.id]);
-
-      if (hasLiveDragInGroup || hasManualLayoutOverride || hasPromptGroupPresentationState) return;
-
-      const repairKey = [
-        activeCanvasId,
-        promptNode.id,
-        promptNode.position.x,
-        promptNode.position.y,
-        childImages.map((imageNode) => imageNode.id).join(','),
-      ].join(':');
-
-      if (repairKeys.has(repairKey)) return;
-
-      const expectedPositions = buildGeneratedImageBatchPositions({
-        basePosition: promptNode.position,
-        items: childImages.map((imageNode) => ({
-          aspectRatio: imageNode.aspectRatio,
-          exactDimensions: imageNode.exactDimensions || parseImageDimensions(imageNode.dimensions),
-        })),
-        mode: promptNode.mode,
-        isMobile,
-      });
-
-      const hasSevereLayoutDrift = childImages.some((imageNode, index) => {
-        const expectedPosition = expectedPositions[index];
-        if (!expectedPosition) return false;
-
-        const dx = Math.abs(imageNode.position.x - expectedPosition.x);
-        const dy = Math.abs(imageNode.position.y - expectedPosition.y);
-
-        return dx > 220 || dy > 260;
-      });
-
-      if (!hasSevereLayoutDrift) return;
-
-      repairKeys.add(repairKey);
-      expectedPositions.forEach((expectedPosition, index) => {
-        const imageNode = childImages[index];
-        if (!imageNode || !expectedPosition) return;
-        updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
-      });
-    });
-  }, [activeCanvas, actualChildImagesByPromptId, isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
   const visibleImageNodesById = React.useMemo(
     () => new Map(visibleImageNodes.map(node => [node.id, node])),

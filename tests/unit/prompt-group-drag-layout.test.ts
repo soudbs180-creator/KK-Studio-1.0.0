@@ -27,12 +27,12 @@ test("prompt-group drag keeps child cards on their live positions", () => {
 });
 
 test("prompt-group layout repair skips active drags and manually moved cards", () => {
-  const appSource = readSource("src/App.tsx");
+  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
 
-  assert.match(appSource, /const hasLiveDragInGroup = Boolean\(liveNodePositionByIdRef\.current\[promptNode\.id\]\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(liveNodePositionByIdRef\.current\[imageNode\.id\]\)\)/);
-  assert.match(appSource, /const hasManualLayoutOverride = Boolean\(promptNode\.userMoved\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(imageNode\.userMoved\)\)/);
-  assert.match(appSource, /const hasPromptGroupPresentationState = Boolean\(promptGroupLayoutStateByIdRef\.current\[promptNode\.id\]\)/);
-  assert.match(appSource, /if \(hasLiveDragInGroup \|\| hasManualLayoutOverride \|\| hasPromptGroupPresentationState\) return;/);
+  assert.match(promptGroupLayoutSource, /const hasLiveDragInGroup = Boolean\(liveNodePositionByIdRef\.current\[promptNode\.id\]\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(liveNodePositionByIdRef\.current\[imageNode\.id\]\)\)/);
+  assert.match(promptGroupLayoutSource, /const hasManualLayoutOverride = Boolean\(promptNode\.userMoved\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(imageNode\.userMoved\)\)/);
+  assert.match(promptGroupLayoutSource, /const hasPromptGroupPresentationState = Boolean\(promptGroupLayoutStateByIdRef\.current\[promptNode\.id\]\)/);
+  assert.match(promptGroupLayoutSource, /if \(hasLiveDragInGroup \|\| hasManualLayoutOverride \|\| hasPromptGroupPresentationState\) return;/);
 });
 
 test("dragged image cards mark manual layout overrides in canvas state", () => {

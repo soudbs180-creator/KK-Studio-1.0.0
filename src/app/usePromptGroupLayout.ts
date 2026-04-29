@@ -10,6 +10,7 @@ import {
 import { getCardDimensions } from '../utils/styleUtils';
 import {
   buildDockedPromptChildRegroupLayout,
+  buildGeneratedImageBatchPositions,
   resolveRegroupTargetSlotIndices,
 } from '../utils/generatedImageLayout';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
@@ -58,7 +59,7 @@ const boundsIntersect = (
 );
 
 interface UsePromptGroupLayoutDeps {
-  activeCanvas: { promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
+  activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   canvasInteractionPhase: CanvasInteractionPhase;
   focusedGroupId: string | null | undefined;
   generatingGroupIds: string[] | null | undefined;
@@ -85,6 +86,11 @@ interface UsePromptGroupLayoutDeps {
   setImageCardHeightById: Dispatch<SetStateAction<Record<string, number>>>;
   setPromptGroupLayoutVersion: Dispatch<SetStateAction<number>>;
   setLiveNodePositionVersion: Dispatch<SetStateAction<number>>;
+  updateImageNodePosition: (
+    imageId: string,
+    position: Point,
+    options?: { ignoreSelection?: boolean }
+  ) => void;
   visibleImageNodes: GeneratedImage[] | null | undefined;
   visiblePromptNodes: PromptNode[] | null | undefined;
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode> | null | undefined;
@@ -145,6 +151,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     setImageCardHeightById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
+    updateImageNodePosition,
     visibleImageNodes,
     visiblePromptNodes,
     workflowUtilityNodesById,
@@ -164,6 +171,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const stablePromptGroupBoundsByIdRef = useRef(new Map<string, PromptGroupBounds>());
   const stablePromptGroupViewsRef = useRef<PromptGroupView[]>([]);
   const groupOverlapStateSignatureRef = useRef('');
+  const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>(new Set());
 
   const actualChildImagesByPromptId = useMemo(() => {
     const childMap = new Map<string, GeneratedImage[]>();
@@ -474,6 +482,69 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     }
     selectNodes(options.nodeIds, 'replace');
   }, [selectNodes, setFocusedGroupId]);
+
+  useEffect(() => {
+    autoRepairedPromptLayoutKeysRef.current.clear();
+  }, [activeCanvas?.id]);
+
+  useEffect(() => {
+    if (!activeCanvas || isNodeDragActive) return;
+
+    const repairKeys = autoRepairedPromptLayoutKeysRef.current;
+    const activeCanvasId = activeCanvas.id;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
+      if (childImages.length === 0) return;
+
+      const hasLiveDragInGroup = Boolean(liveNodePositionByIdRef.current[promptNode.id])
+        || childImages.some((imageNode) => Boolean(liveNodePositionByIdRef.current[imageNode.id]));
+      const hasManualLayoutOverride = Boolean(promptNode.userMoved)
+        || childImages.some((imageNode) => Boolean(imageNode.userMoved));
+      const hasPromptGroupPresentationState = Boolean(promptGroupLayoutStateByIdRef.current[promptNode.id]);
+
+      if (hasLiveDragInGroup || hasManualLayoutOverride || hasPromptGroupPresentationState) return;
+
+      const repairKey = [
+        activeCanvasId,
+        promptNode.id,
+        promptNode.position.x,
+        promptNode.position.y,
+        childImages.map((imageNode) => imageNode.id).join(','),
+      ].join(':');
+
+      if (repairKeys.has(repairKey)) return;
+
+      const expectedPositions = buildGeneratedImageBatchPositions({
+        basePosition: promptNode.position,
+        items: childImages.map((imageNode) => ({
+          aspectRatio: imageNode.aspectRatio,
+          exactDimensions: imageNode.exactDimensions || parseImageDimensions(imageNode.dimensions),
+        })),
+        mode: promptNode.mode,
+        isMobile,
+      });
+
+      const hasSevereLayoutDrift = childImages.some((imageNode, index) => {
+        const expectedPosition = expectedPositions[index];
+        if (!expectedPosition) return false;
+
+        const dx = Math.abs(imageNode.position.x - expectedPosition.x);
+        const dy = Math.abs(imageNode.position.y - expectedPosition.y);
+
+        return dx > 220 || dy > 260;
+      });
+
+      if (!hasSevereLayoutDrift) return;
+
+      repairKeys.add(repairKey);
+      expectedPositions.forEach((expectedPosition, index) => {
+        const imageNode = childImages[index];
+        if (!imageNode || !expectedPosition) return;
+        updateImageNodePosition(imageNode.id, expectedPosition, { ignoreSelection: true });
+      });
+    });
+  }, [activeCanvas, actualChildImagesByPromptId, isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
   const syncPromptGroupLayoutState = useCallback((
     updater: Record<string, PromptGroupLayoutPresentationState>
