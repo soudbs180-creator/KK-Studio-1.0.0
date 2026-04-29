@@ -228,6 +228,21 @@ test('usePromptGroupLayout owns prompt-group presentation state mutations', () =
   assert.doesNotMatch(appSource, /const clearPromptGroupRegroup = useCallback/);
 });
 
+test('usePromptGroupLayout owns prompt-group child node maps', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const actualChildImagesByPromptId = useMemo/);
+  assert.match(promptGroupLayoutSource, /const actualChildImageIdsByPromptId = useMemo/);
+  assert.match(promptGroupLayoutSource, /const promptGroupNodeIdsById = useMemo/);
+  assert.match(appSource, /actualChildImagesByPromptId,/);
+  assert.match(appSource, /actualChildImageIdsByPromptId,/);
+  assert.match(appSource, /promptGroupNodeIdsById,/);
+  assert.doesNotMatch(appSource, /const actualChildImagesByPromptId = React\.useMemo/);
+  assert.doesNotMatch(appSource, /const actualChildImageIdsByPromptId = React\.useMemo/);
+  assert.doesNotMatch(appSource, /const promptGroupNodeIdsById = React\.useMemo/);
+});
+
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');

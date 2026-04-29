@@ -123,7 +123,7 @@ Validation passed:
 
 ### Milestone 3: Prompt Group Layout Extraction
 
-Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice validated and ready for scoped commit.
+Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice committed as `c8e6ca9f refactor: extract prompt group presentation state`; fourth child-map slice validated and ready for scoped commit.
 
 Scope completed in the first slice:
 - Added `src/app/usePromptGroupLayout.ts` with explicit `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
@@ -141,12 +141,19 @@ Scope completed in the third slice:
 - Kept drag commit persistence, auto-repair, render wiring, and selection behavior in `src/App.tsx`.
 - Added a failing source-contract test first, verified it failed, then migrated implementation and updated existing contract anchors.
 
-Line count change after third slice:
+Scope completed in the fourth slice:
+- Moved prompt-group child image and node id map derivation into `src/app/usePromptGroupLayout.ts`: `actualChildImagesByPromptId`, `actualChildImageIdsByPromptId`, and `promptGroupNodeIdsById`.
+- Kept callers in `src/App.tsx` unchanged by returning the derived maps from the hook.
+- Added a failing source-contract test first, verified it failed, then migrated implementation.
+
+Line count change after fourth slice:
 - `src/App.tsx`: `10395` baseline lines to `10333` lines after first slice.
 - `src/App.tsx`: `10044` lines after second slice.
 - `src/app/usePromptGroupLayout.ts`: `529` lines after second slice.
 - `src/App.tsx`: `9882` lines after third slice.
 - `src/app/usePromptGroupLayout.ts`: `699` lines after third slice.
+- `src/App.tsx`: `9845` lines after fourth slice.
+- `src/app/usePromptGroupLayout.ts`: `749` lines after fourth slice.
 
 Validation passed:
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
@@ -157,6 +164,8 @@ Validation passed:
 - `npm.cmd run check:encoding`
 - Third slice RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed as expected before implementation because `usePromptGroupLayout.ts` did not own presentation state mutation helpers.
 - Third slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `42` tests.
+- Fourth slice RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed as expected before implementation because `usePromptGroupLayout.ts` did not own prompt-group child maps.
+- Fourth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `43` tests.
 
 Validation not used as a commit gate:
 - `npm.cmd run verify:prompt-group-drag`: failed in the local browser path because `http://127.0.0.1:3000` opened the auth/login screen and `[data-canvas-surface="prompt"]` never became visible within 30s. This is recorded as an environment/auth precondition issue for this browser smoke, not a unit/type/build regression.
@@ -166,8 +175,8 @@ Current risk:
 - The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
 
 Next step:
-- Commit this slice as `refactor: extract prompt group presentation state`.
-- Continue Milestone 3 by extracting the remaining prompt-group drag commit/live-position side-effect helpers only if a narrow contract can be added first.
+- Commit this slice as `refactor: derive prompt group child maps in hook`.
+- Continue Milestone 3 by extracting the remaining prompt-group live-position helper block only if a narrow contract can be added first.
 
 ### Milestones 4-9
 
@@ -212,6 +221,14 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - Prompt-group/live-scene/performance targeted tests: passed, 42 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 972 tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-29 Milestone 3 fourth slice:
+  - RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before implementation because `usePromptGroupLayout.ts` did not own prompt-group child maps.
+  - Prompt-group/live-scene/performance targeted tests: passed, 43 tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, 973 tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.

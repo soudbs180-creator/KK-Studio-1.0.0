@@ -7612,33 +7612,12 @@ ${paragraphs}
     moveSelectedNodes(delta, sourceNodeId);
   }, [activeCanvas, moveSelectedNodes, selectedNodeIds]);
 
-  const actualChildImagesByPromptId = React.useMemo(() => {
-    const childMap = new Map<string, GeneratedImage[]>();
-    if (!activeCanvas) return childMap;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = resolveCurrentPromptChildImages(promptNode, activeCanvas.imageNodes);
-      if (childImages.length > 0) {
-        childMap.set(promptNode.id, childImages);
-      }
-    });
-
-    return childMap;
-  }, [activeCanvas, resolveCurrentPromptChildImages]);
-
-  const actualChildImageIdsByPromptId = React.useMemo(() => {
-    const childIdMap = new Map<string, string[]>();
-
-    actualChildImagesByPromptId.forEach((images, promptId) => {
-      childIdMap.set(promptId, images.map((imageNode) => imageNode.id));
-    });
-
-    return childIdMap;
-  }, [actualChildImagesByPromptId]);
-
   const {
     liveSceneState,
     liveSceneRef,
+    actualChildImagesByPromptId,
+    actualChildImageIdsByPromptId,
+    promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
     promptGroupBoundsById,
     promptGroupViews,
@@ -7649,7 +7628,6 @@ ${paragraphs}
     clearPromptGroupRegroup,
   } = usePromptGroupLayout({
     activeCanvas,
-    actualChildImagesByPromptId,
     canvasInteractionPhase,
     focusedGroupId,
     generatingGroupIds,
@@ -7664,6 +7642,7 @@ ${paragraphs}
     promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
     promptNodesById,
+    resolveCurrentPromptChildImages,
     setGroupOverlapMap,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
@@ -7902,22 +7881,6 @@ ${paragraphs}
       };
     });
   }, []);
-
-  const promptGroupNodeIdsById = React.useMemo(() => {
-    const nodeIdsByGroupId = new Map<string, string[]>();
-
-    activeCanvas?.promptNodes.forEach((promptNode) => {
-      if (promptNode.isDraft && !promptNode.isGenerating) {
-        return;
-      }
-      nodeIdsByGroupId.set(promptNode.id, [
-        promptNode.id,
-        ...(actualChildImageIdsByPromptId.get(promptNode.id) || []),
-      ]);
-    });
-
-    return nodeIdsByGroupId;
-  }, [activeCanvas, actualChildImageIdsByPromptId]);
 
   const handleFocusPromptGroup = useCallback((groupId: string | null, options?: {
     nodeIds?: string[];
