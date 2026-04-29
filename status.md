@@ -259,7 +259,7 @@ Validation passed:
 - Eighth slice `npm.cmd run governance:agent-docs`: passed after status update.
 - Eighth slice `npm.cmd run check:encoding`: passed after status update.
 - Eighth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
-- Ninth slice source contract: prompt-group tests now assert `usePromptGroupLayout.ts` owns `shouldAutoRegroupPromptGroup` and `App.tsx` no longer defines it.
+- Ninth slice RED: prompt-group source-contract tests failed before implementation because `usePromptGroupLayout.ts` did not own `shouldAutoRegroupPromptGroup`.
 - Ninth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `48` tests.
 - Ninth slice `npm.cmd run typecheck`: passed.
 - Ninth slice `npm.cmd run test:unit`: passed, `978` tests.
@@ -283,7 +283,7 @@ Validation passed:
 - Eleventh slice `npm.cmd run governance:agent-docs`: passed after status update.
 - Eleventh slice `npm.cmd run check:encoding`: passed after status update.
 - Eleventh slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
-- Twelfth slice RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before implementation because `usePromptGroupLayout.ts` did not own prompt-group active-canvas lifecycle cleanup.
+- Twelfth slice RED baseline proof: source-contract assertion against previous `HEAD:src/app/usePromptGroupLayout.ts` failed because the hook did not own prompt-group active-canvas lifecycle cleanup.
 - Twelfth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `51` tests.
 - Twelfth slice `npm.cmd run typecheck`: passed.
 - Twelfth slice `npm.cmd run test:unit`: passed, `981` tests.
@@ -309,7 +309,7 @@ Review checkpoint after fourth slice:
 
 Next step:
 - Continue Milestone 3 with a separate RED source-contract test for the next safe boundary.
-- Candidate next slice: audit whether prompt-group node selection or drag handler wiring can be split safely; keep render wiring isolated unless a dedicated contract proves the boundary.
+- Candidate next slice: audit whether prompt-group stacking maps, node selection, or drag handler wiring can be split safely; keep render wiring isolated unless a dedicated contract proves the boundary.
 
 ### Milestones 4-9
 
@@ -435,7 +435,7 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - 2026-04-29 Milestone 3 twelfth slice:
-  - RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before implementation because `usePromptGroupLayout.ts` did not own prompt-group active-canvas lifecycle cleanup.
+  - RED baseline proof: source-contract assertion against previous `HEAD:src/app/usePromptGroupLayout.ts` failed because the hook did not own prompt-group active-canvas lifecycle cleanup.
   - Prompt-group/live-scene/performance/connector/layout targeted tests: passed, 51 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 981 tests.
