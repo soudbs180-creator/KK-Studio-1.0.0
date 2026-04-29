@@ -7619,12 +7619,11 @@ ${paragraphs}
     actualChildImageIdsByPromptId,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
-    promptGroupBoundsById,
     promptGroupViews,
     visiblePromptGroupViews,
-    syncLiveNodePositionState,
     resolvePromptGroupIdForNodeId,
     applyLiveNodeDeltaToDraggedSet,
+    handleLiveNodePositionChange,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,
@@ -7643,6 +7642,7 @@ ${paragraphs}
     lockedGroupBoundsById,
     liveNodePositionByIdRef,
     liveNodePositionVersion,
+    moveSelectedNodesImmediate,
     parseImageDimensions,
     promptGroupLayerById,
     promptGroupLayoutStateByIdRef,
@@ -7653,6 +7653,7 @@ ${paragraphs}
     setFocusedGroupId,
     setGroupOverlapMap,
     setImageCardHeightById,
+    setLockedGroupBoundsById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     updateImageNodePosition,
@@ -7699,94 +7700,6 @@ ${paragraphs}
       setFocusedGroupId(null);
     }
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
-
-  const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
-    const groupId = resolvePromptGroupIdForNodeId(nodeId);
-
-    let nextLivePositions = liveNodePositionByIdRef.current;
-    let hasLivePositionChanged = false;
-
-    if (!position) {
-      const derivedNodeIds = liveDerivedNodeIdsByOwnerRef.current[nodeId] || [];
-
-      if (nodeId in nextLivePositions) {
-        nextLivePositions = { ...nextLivePositions };
-        delete nextLivePositions[nodeId];
-        hasLivePositionChanged = true;
-      }
-
-      derivedNodeIds.forEach((derivedNodeId) => {
-        if (!(derivedNodeId in nextLivePositions)) {
-          return;
-        }
-
-        if (nextLivePositions === liveNodePositionByIdRef.current) {
-          nextLivePositions = { ...nextLivePositions };
-        }
-        delete nextLivePositions[derivedNodeId];
-        hasLivePositionChanged = true;
-      });
-
-      if (nodeId in liveDerivedNodeIdsByOwnerRef.current) {
-        const nextDerivedNodeIdsByOwner = { ...liveDerivedNodeIdsByOwnerRef.current };
-        delete nextDerivedNodeIdsByOwner[nodeId];
-        liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
-      }
-
-    } else {
-      const previous = nextLivePositions[nodeId];
-      if (!previous || previous.x !== position.x || previous.y !== position.y) {
-        nextLivePositions = {
-          ...nextLivePositions,
-          [nodeId]: position,
-        };
-        hasLivePositionChanged = true;
-      }
-    }
-
-    if (!position && hasLivePositionChanged) {
-      // Flush the last queued drag delta before we clear the live snapshot so
-      // cards and connectors do not briefly fall back to stale persisted coords.
-      moveSelectedNodesImmediate({ x: 0, y: 0 });
-    }
-
-    if (hasLivePositionChanged) {
-      liveNodePositionByIdRef.current = nextLivePositions;
-      syncLiveNodePositionState();
-    }
-
-    if (!groupId) {
-      return;
-    }
-
-    setLockedGroupBoundsById((prev) => {
-      if (position) {
-        if (prev[groupId]) return prev;
-        const currentBounds = promptGroupBoundsById.get(groupId);
-        if (!currentBounds) return prev;
-        return {
-          ...prev,
-          [groupId]: currentBounds,
-        };
-      }
-
-      const hasOtherLiveNodeInGroup = Object.keys(liveNodePositionByIdRef.current).some((liveNodeId) => {
-        if (liveNodeId === nodeId) return false;
-
-        const liveGroupId = resolvePromptGroupIdForNodeId(liveNodeId);
-
-        return liveGroupId === groupId;
-      });
-
-      if (hasOtherLiveNodeInGroup || !(groupId in prev)) {
-        return prev;
-      }
-
-      const next = { ...prev };
-      delete next[groupId];
-      return next;
-    });
-  }, [moveSelectedNodesImmediate, promptGroupBoundsById, resolvePromptGroupIdForNodeId, syncLiveNodePositionState]);
 
   const shouldAutoRegroupPromptGroup = useCallback((
     promptNode: PromptNode,

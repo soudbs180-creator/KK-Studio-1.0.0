@@ -71,6 +71,7 @@ interface UsePromptGroupLayoutDeps {
   lockedGroupBoundsById: Record<string, PromptGroupBounds> | null | undefined;
   liveNodePositionByIdRef: RefObject<Record<string, { x: number; y: number }>>;
   liveNodePositionVersion: number;
+  moveSelectedNodesImmediate: (delta: Point) => void;
   parseImageDimensions: (dimensions?: string | null) => { width: number; height: number } | undefined;
   promptGroupLayerById: Map<string, number> | null | undefined;
   promptGroupLayoutStateByIdRef: RefObject<Record<string, PromptGroupLayoutPresentationState>>;
@@ -84,6 +85,7 @@ interface UsePromptGroupLayoutDeps {
   setFocusedGroupId: Dispatch<SetStateAction<string | null>>;
   setGroupOverlapMap: Dispatch<SetStateAction<Record<string, string[]>>>;
   setImageCardHeightById: Dispatch<SetStateAction<Record<string, number>>>;
+  setLockedGroupBoundsById: Dispatch<SetStateAction<Record<string, PromptGroupBounds>>>;
   setPromptGroupLayoutVersion: Dispatch<SetStateAction<number>>;
   setLiveNodePositionVersion: Dispatch<SetStateAction<number>>;
   updateImageNodePosition: (
@@ -115,6 +117,7 @@ interface UsePromptGroupLayoutResult {
     nodeIds: string[] | null | undefined,
     delta: Point | null | undefined
   ) => void;
+  handleLiveNodePositionChange: (nodeId: string, position: Point | null) => void;
   handleImageCardHeightChange: (imageId: string, height: number) => void;
   handleFocusPromptGroup: (
     groupId: string | null,
@@ -139,6 +142,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     lockedGroupBoundsById,
     liveNodePositionByIdRef,
     liveNodePositionVersion,
+    moveSelectedNodesImmediate,
     parseImageDimensions,
     promptGroupLayerById,
     promptGroupLayoutStateByIdRef,
@@ -149,6 +153,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     setFocusedGroupId,
     setGroupOverlapMap,
     setImageCardHeightById,
+    setLockedGroupBoundsById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     updateImageNodePosition,
@@ -787,6 +792,101 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupRegroupLayoutsById,
   ]);
 
+  const handleLiveNodePositionChange = useCallback((nodeId: string, position: Point | null) => {
+    const groupId = resolvePromptGroupIdForNodeId(nodeId);
+
+    let nextLivePositions = liveNodePositionByIdRef.current;
+    let hasLivePositionChanged = false;
+
+    if (!position) {
+      const derivedNodeIds = liveDerivedNodeIdsByOwnerRef.current[nodeId] || [];
+
+      if (nodeId in nextLivePositions) {
+        nextLivePositions = { ...nextLivePositions };
+        delete nextLivePositions[nodeId];
+        hasLivePositionChanged = true;
+      }
+
+      derivedNodeIds.forEach((derivedNodeId) => {
+        if (!(derivedNodeId in nextLivePositions)) {
+          return;
+        }
+
+        if (nextLivePositions === liveNodePositionByIdRef.current) {
+          nextLivePositions = { ...nextLivePositions };
+        }
+        delete nextLivePositions[derivedNodeId];
+        hasLivePositionChanged = true;
+      });
+
+      if (nodeId in liveDerivedNodeIdsByOwnerRef.current) {
+        const nextDerivedNodeIdsByOwner = { ...liveDerivedNodeIdsByOwnerRef.current };
+        delete nextDerivedNodeIdsByOwner[nodeId];
+        liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
+      }
+
+    } else {
+      const previous = nextLivePositions[nodeId];
+      if (!previous || previous.x !== position.x || previous.y !== position.y) {
+        nextLivePositions = {
+          ...nextLivePositions,
+          [nodeId]: position,
+        };
+        hasLivePositionChanged = true;
+      }
+    }
+
+    if (!position && hasLivePositionChanged) {
+      // Flush the last queued drag delta before clearing the live snapshot.
+      moveSelectedNodesImmediate({ x: 0, y: 0 });
+    }
+
+    if (hasLivePositionChanged) {
+      liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
+    }
+
+    if (!groupId) {
+      return;
+    }
+
+    setLockedGroupBoundsById((prev) => {
+      if (position) {
+        if (prev[groupId]) return prev;
+        const currentBounds = promptGroupBoundsById.get(groupId);
+        if (!currentBounds) return prev;
+        return {
+          ...prev,
+          [groupId]: currentBounds,
+        };
+      }
+
+      const hasOtherLiveNodeInGroup = Object.keys(liveNodePositionByIdRef.current).some((liveNodeId) => {
+        if (liveNodeId === nodeId) return false;
+
+        const liveGroupId = resolvePromptGroupIdForNodeId(liveNodeId);
+
+        return liveGroupId === groupId;
+      });
+
+      if (hasOtherLiveNodeInGroup || !(groupId in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+  }, [
+    liveDerivedNodeIdsByOwnerRef,
+    liveNodePositionByIdRef,
+    moveSelectedNodesImmediate,
+    promptGroupBoundsById,
+    resolvePromptGroupIdForNodeId,
+    setLockedGroupBoundsById,
+    syncLiveNodePositionState,
+  ]);
+
   const computedGroupOverlapMap = useMemo(() => {
     if (isNodeDragActive) {
       return currentGroupOverlapMap;
@@ -984,6 +1084,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     resolvePromptGroupIdForNodeId,
     resolveCanvasNodePositionForLiveDrag,
     applyLiveNodeDeltaToDraggedSet,
+    handleLiveNodePositionChange,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,

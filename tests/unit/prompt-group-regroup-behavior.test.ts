@@ -256,6 +256,17 @@ test('usePromptGroupLayout owns prompt-group live drag position helpers', () => 
   assert.doesNotMatch(appSource, /const applyLiveNodeDeltaToDraggedSet = useCallback/);
 });
 
+test('usePromptGroupLayout owns live node position change handling', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const handleLiveNodePositionChange = useCallback/);
+  assert.match(promptGroupLayoutSource, /delete nextDerivedNodeIdsByOwner\[nodeId\];/);
+  assert.match(promptGroupLayoutSource, /moveSelectedNodesImmediate\(\{ x: 0, y: 0 \}\);/);
+  assert.match(promptGroupLayoutSource, /setLockedGroupBoundsById\(\(prev\) => \{/);
+  assert.doesNotMatch(appSource, /const handleLiveNodePositionChange = useCallback/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');

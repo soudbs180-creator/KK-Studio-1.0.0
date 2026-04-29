@@ -6,7 +6,7 @@ Last updated: 2026-04-29
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 3 prompt group layout extraction in progress; seventh auto-repair slice is complete in the current scoped change
+- Current milestone: Milestone 3 prompt group layout extraction in progress; eighth live-position-change handler slice is complete in the current scoped change
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -123,7 +123,7 @@ Validation passed:
 
 ### Milestone 3: Prompt Group Layout Extraction
 
-Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice committed as `c8e6ca9f refactor: extract prompt group presentation state`; fourth child-map slice committed as `1944deb4 refactor: derive prompt group child maps in hook`; fifth live-position helper slice committed as `e74eafe9 refactor: extract prompt group live drag helpers`; sixth focus/height handler slice committed as `28386927 refactor: extract prompt group focus handlers`; seventh auto-repair slice completed in the current scoped change.
+Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice committed as `c8e6ca9f refactor: extract prompt group presentation state`; fourth child-map slice committed as `1944deb4 refactor: derive prompt group child maps in hook`; fifth live-position helper slice committed as `e74eafe9 refactor: extract prompt group live drag helpers`; sixth focus/height handler slice committed as `28386927 refactor: extract prompt group focus handlers`; seventh auto-repair slice committed as `ec0f1a60 refactor: move prompt layout auto repair into hook`; eighth live-position-change handler slice completed in the current scoped change.
 
 Scope completed in the first slice:
 - Added `src/app/usePromptGroupLayout.ts` with explicit `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
@@ -164,7 +164,13 @@ Scope completed in the seventh slice:
 - Kept `handleLiveNodePositionChange`, drag commit persistence, render wiring, and selection behavior in `src/App.tsx`.
 - Added a failing source-contract test first, verified it failed, then migrated implementation and tightened the regroup-layout source slice boundary.
 
-Line count change after seventh slice:
+Scope completed in the eighth slice:
+- Moved `handleLiveNodePositionChange` ownership into `src/app/usePromptGroupLayout.ts`.
+- Injected `moveSelectedNodesImmediate` and `setLockedGroupBoundsById` through `UsePromptGroupLayoutDeps` so the hook owns live-position cleanup, derived-live cleanup, final queued-delta flush, and locked bounds updates.
+- Kept drag commit persistence, render wiring, selection behavior, and broader canvas reset/focus lifecycle in `src/App.tsx`.
+- Added a failing source-contract test first, verified it failed, then migrated implementation.
+
+Line count change after eighth slice:
 - `src/App.tsx`: `10395` baseline lines to `10333` lines after first slice.
 - `src/App.tsx`: `10044` lines after second slice.
 - `src/app/usePromptGroupLayout.ts`: `529` lines after second slice.
@@ -178,6 +184,8 @@ Line count change after seventh slice:
 - `src/app/usePromptGroupLayout.ts`: `923` lines after sixth slice.
 - `src/App.tsx`: `9675` lines after seventh slice.
 - `src/app/usePromptGroupLayout.ts`: `994` lines after seventh slice.
+- `src/App.tsx`: `9588` lines after eighth slice.
+- `src/app/usePromptGroupLayout.ts`: `1095` lines after eighth slice.
 
 Validation passed:
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
@@ -211,25 +219,33 @@ Validation passed:
 - Seventh slice `npm.cmd run governance:agent-docs`: passed after status update.
 - Seventh slice `npm.cmd run check:encoding`: passed after status update.
 - Seventh slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- Eighth slice RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed as expected before implementation because `usePromptGroupLayout.ts` did not own `handleLiveNodePositionChange`.
+- Eighth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `47` tests.
+- Eighth slice `npm.cmd run typecheck`: passed.
+- Eighth slice `npm.cmd run test:unit`: passed, `977` tests.
+- Eighth slice `npm.cmd run build`: passed.
+- Eighth slice `npm.cmd run governance:agent-docs`: passed after status update.
+- Eighth slice `npm.cmd run check:encoding`: passed after status update.
+- Eighth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 Validation not used as a commit gate:
 - `npm.cmd run verify:prompt-group-drag`: failed in the local browser path because `http://127.0.0.1:3000` opened the auth/login screen and `[data-canvas-surface="prompt"]` never became visible within 30s. This is recorded as an environment/auth precondition issue for this browser smoke, not a unit/type/build regression.
 
 Current risk:
-- This slice intentionally does not move prompt-group drag commit persistence, `handleLiveNodePositionChange`, render wiring, or selection behavior yet, so `App.tsx` still owns the final prompt-group drag lifecycle controls and side effects.
+- This slice intentionally does not move prompt-group drag commit persistence, render wiring, selection behavior, or the broader canvas reset/focus lifecycle yet, so `App.tsx` still owns the final prompt-group drag commit controls and several side effects.
 - The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
 - The source-contract tests cover ownership boundaries, but the browser drag smoke is still blocked by a local auth/login precondition and should not be treated as behavioral proof until a valid session fixture exists.
-- Auto-repair now lives in `usePromptGroupLayout.ts`; future slices should not move drag commit or live-position cleanup without dedicated RED contracts because they touch persistence timing and locked bounds.
+- Auto-repair and live-position change handling now live in `usePromptGroupLayout.ts`; future slices should not move drag commit persistence without a dedicated RED contract because it touches persisted prompt/image positions.
 
 Review checkpoint after fourth slice:
 - `src/App.tsx` now remains at `9845` lines and `src/app/usePromptGroupLayout.ts` at `749` lines.
 - Confirmed `buildConnectorRenderSnapshot`, connector snapshot commit/schedule helpers, and connector position resolvers remain owned by `src/app/useConnectorRenderer.ts`.
 - Confirmed `buildPromptGroupRegroupLayouts`, presentation-state mutation helpers, stable bounds/views caches, live-scene derivation, and child maps remain owned by `src/app/usePromptGroupLayout.ts`.
-- Confirmed `App.tsx` still owns drag commit persistence, render wiring, selection behavior, and `handleLiveNodePositionChange`.
+- Confirmed `App.tsx` still owns drag commit persistence, render wiring, selection behavior, and broader canvas reset/focus lifecycle.
 
 Next step:
 - Continue Milestone 3 with a separate RED source-contract test for the next safe boundary.
-- Candidate next slice: audit `handleLiveNodePositionChange` before splitting it because it still touches locked bounds, live ref cleanup, and immediate persistence flushing; keep drag commit persistence isolated unless a dedicated contract proves the boundary.
+- Candidate next slice: audit whether `shouldAutoRegroupPromptGroup` and `commitPromptGroupDrag` can be split safely; keep drag commit persistence isolated unless a dedicated contract proves the boundary.
 
 ### Milestones 4-9
 
@@ -314,6 +330,15 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - Prompt-group/live-scene/performance/connector targeted tests: passed, 46 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 976 tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-29 Milestone 3 eighth slice:
+  - RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before implementation because `usePromptGroupLayout.ts` did not own `handleLiveNodePositionChange`.
+  - Prompt-group/live-scene/performance/connector targeted tests: passed, 47 tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, 977 tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `npm.cmd run check:encoding`: passed after status update.
