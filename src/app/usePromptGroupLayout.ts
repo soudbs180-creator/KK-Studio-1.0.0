@@ -137,6 +137,12 @@ interface UsePromptGroupLayoutResult {
     groupId: string | null,
     options?: { nodeIds?: string[]; keepSelection?: boolean }
   ) => void;
+  handlePromptGroupNodeHeightChange: (
+    fallbackNode: PromptNode,
+    id: string,
+    height: number
+  ) => void;
+  handlePromptGroupTagRemove: (id: string, tag: string) => void;
   beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
   settlePromptGroupRegroup: (groupId: string) => void;
   clearPromptGroupRegroup: (groupId: string) => void;
@@ -504,6 +510,25 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     }
     selectNodes(options.nodeIds, 'replace');
   }, [selectNodes, setFocusedGroupId]);
+
+  const handlePromptGroupNodeHeightChange = useCallback((fallbackNode: PromptNode, id: string, height: number) => {
+    const targetNode = currentPromptNodesById.get(id) ?? fallbackNode;
+    if (targetNode.height !== height) {
+      void updatePromptNode({ ...targetNode, height });
+    }
+  }, [currentPromptNodesById, updatePromptNode]);
+
+  const handlePromptGroupTagRemove = useCallback((id: string, tag: string) => {
+    const promptNode = currentPromptNodesById.get(id);
+    if (!promptNode?.tags) {
+      return;
+    }
+
+    void updatePromptNode({
+      ...promptNode,
+      tags: promptNode.tags.filter((currentTag) => currentTag !== tag),
+    });
+  }, [currentPromptNodesById, updatePromptNode]);
 
   useEffect(() => {
     autoRepairedPromptLayoutKeysRef.current.clear();
@@ -1157,6 +1182,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     commitPromptGroupDrag,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
+    handlePromptGroupNodeHeightChange,
+    handlePromptGroupTagRemove,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,

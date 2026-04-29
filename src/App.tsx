@@ -7628,6 +7628,8 @@ ${paragraphs}
     commitPromptGroupDrag,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
+    handlePromptGroupNodeHeightChange,
+    handlePromptGroupTagRemove,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,
@@ -7961,25 +7963,6 @@ ${paragraphs}
     setFocusedGroupId(groupId);
     handleCanvasNodeSelect(nodeId);
   }, [handleCanvasNodeSelect]);
-
-  const handlePromptGroupNodeHeightChange = useCallback((fallbackNode: PromptNode, id: string, height: number) => {
-    const targetNode = promptNodesById.get(id) ?? fallbackNode;
-    if (targetNode.height !== height) {
-      void updatePromptNode({ ...targetNode, height });
-    }
-  }, [promptNodesById, updatePromptNode]);
-
-  const handlePromptGroupTagRemove = useCallback((id: string, tag: string) => {
-    const promptNode = promptNodesById.get(id);
-    if (!promptNode?.tags) {
-      return;
-    }
-
-    void updatePromptNode({
-      ...promptNode,
-      tags: promptNode.tags.filter((currentTag) => currentTag !== tag),
-    });
-  }, [promptNodesById, updatePromptNode]);
 
   const handleRootMouseMove = useCallback((e: React.MouseEvent) => {
     handleSelectionMouseMove(e);

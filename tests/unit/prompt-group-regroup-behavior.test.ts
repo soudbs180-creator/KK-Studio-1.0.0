@@ -288,6 +288,19 @@ test('usePromptGroupLayout owns prompt-group drag commit persistence', () => {
   assert.doesNotMatch(appSource, /const commitPromptGroupDrag = useCallback/);
 });
 
+test('usePromptGroupLayout owns prompt-group prompt node edit handlers', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const handlePromptGroupNodeHeightChange = useCallback/);
+  assert.match(promptGroupLayoutSource, /const targetNode = currentPromptNodesById\.get\(id\) \?\? fallbackNode;/);
+  assert.match(promptGroupLayoutSource, /void updatePromptNode\(\{ \.\.\.targetNode, height \}\);/);
+  assert.match(promptGroupLayoutSource, /const handlePromptGroupTagRemove = useCallback/);
+  assert.match(promptGroupLayoutSource, /tags: promptNode\.tags\.filter\(\(currentTag\) => currentTag !== tag\),/);
+  assert.doesNotMatch(appSource, /const handlePromptGroupNodeHeightChange = useCallback/);
+  assert.doesNotMatch(appSource, /const handlePromptGroupTagRemove = useCallback/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
