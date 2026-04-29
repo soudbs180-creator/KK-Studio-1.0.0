@@ -132,11 +132,14 @@ describe('canvas live scene contract', () => {
 
   test('App tracks prompt-group regrouping states explicitly', () => {
     const appSource = readSource('src/App.tsx')
+    const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts')
     const liveSceneSource = readSource('src/canvas/liveScene.ts')
     const dragHandlerSource = readSource('src/app/usePromptGroupDragHandlers.ts')
 
     assert.match(liveSceneSource, /export type PromptGroupLayoutMode = 'expanded' \| 'regrouping' \| 'docked'/)
-    assert.match(appSource, /type PromptGroupLayoutMode,/)
+    assert.match(appSource, /usePromptGroupLayout\(\{/)
+    assert.match(promptGroupLayoutSource, /type PromptGroupLayoutMode,/)
+    assert.match(promptGroupLayoutSource, /buildPromptGroupLiveSceneSnapshot/)
     assert.match(appSource, /promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>/)
     assert.match(appSource, /regroupProgress/)
     assert.match(appSource, /promptGroupRegroupLayoutsById/)

@@ -63,11 +63,8 @@ import {
   toReferenceImageDataUrl,
 } from './utils/referenceImageStorage';
 import {
-  buildPromptGroupLiveSceneSnapshot,
   resolveLiveSceneNodePosition,
   type CanvasInteractionPhase,
-  type LiveSceneSnapshot,
-  type PromptGroupLayoutMode,
 } from './canvas/liveScene';
 import AppPromptComposer from './app/AppPromptComposer';
 import AppGlobalModals, { type AppGlobalModalsProps } from './app/AppGlobalModals';
@@ -115,6 +112,7 @@ import { useSelectionMenuOverlay } from './app/useSelectionMenuOverlay';
 import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
+import { usePromptGroupLayout } from './app/usePromptGroupLayout';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -8476,80 +8474,20 @@ ${paragraphs}
     });
   }, [activeCanvas, actualChildImagesByPromptId, isMobile, isNodeDragActive, liveNodePositionVersion, parseImageDimensions, promptGroupLayoutVersion, updateImageNodePosition]);
 
-  const liveSceneInteractionPhase: CanvasInteractionPhase = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => state.layoutMode === 'docked')
-    ? 'regroup-settle'
-    : isNodeDragActive
-      ? 'node-drag'
-      : canvasInteractionPhase;
-
-  const liveSceneState = React.useMemo<LiveSceneSnapshot>(() => {
-    const liveNodePositions = liveNodePositionByIdRef.current;
-    const promptGroups: LiveSceneSnapshot['promptGroups'] = {};
-    const nodeRenderPositionById: LiveSceneSnapshot['nodeRenderPositionById'] = {};
-
-    if (!activeCanvas) {
-      return {
-        interactionPhase: liveSceneInteractionPhase,
-        liveNodePositionById: liveNodePositions,
-        nodeRenderPositionById,
-        promptGroups,
-      };
-    }
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const childImages = actualChildImagesByPromptId.get(promptNode.id) || [];
-      if (childImages.length === 0) {
-        return;
-      }
-
-      const promptPosition = liveNodePositions[promptNode.id] ?? promptNode.position;
-      const regroupLayoutsById = promptGroupRegroupLayoutsById.get(promptNode.id) ?? new Map();
-      const groupSnapshot = buildPromptGroupLiveSceneSnapshot({
-        promptId: promptNode.id,
-        promptPosition,
-        interactionPhase: liveSceneInteractionPhase,
-        layoutMode: (promptGroupLayoutStateByIdRef.current[promptNode.id]?.layoutMode ?? 'expanded') as PromptGroupLayoutMode,
-        regroupProgress: promptGroupLayoutStateByIdRef.current[promptNode.id]?.regroupProgress ?? 0,
-        liveNodePositionById: liveNodePositions,
-        childNodes: childImages.map((imageNode) => {
-          const livePosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
-          const regroupLayout = regroupLayoutsById.get(imageNode.id);
-
-          return {
-            id: imageNode.id,
-            logicalPosition: livePosition,
-            dockedPosition: regroupLayout?.settledPosition ?? livePosition,
-            renderPosition: regroupLayout?.renderPosition,
-          };
-        }),
-      });
-
-      Object.assign(promptGroups, groupSnapshot.promptGroups);
-      Object.assign(nodeRenderPositionById, groupSnapshot.nodeRenderPositionById);
-    });
-
-    return {
-      interactionPhase: liveSceneInteractionPhase,
-      liveNodePositionById: liveNodePositions,
-      nodeRenderPositionById,
-      promptGroups,
-    };
-  }, [
+  const {
+    liveSceneState,
+    liveSceneRef,
+  } = usePromptGroupLayout({
     activeCanvas,
     actualChildImagesByPromptId,
     canvasInteractionPhase,
     isNodeDragActive,
+    liveNodePositionByIdRef,
     liveNodePositionVersion,
-    liveSceneInteractionPhase,
-    promptGroupRegroupLayoutsById,
+    promptGroupLayoutStateByIdRef,
     promptGroupLayoutVersion,
-  ]);
-
-  const liveSceneRef = useRef(liveSceneState);
-
-  useEffect(() => {
-    liveSceneRef.current = liveSceneState;
-  }, [liveSceneState]);
+    promptGroupRegroupLayoutsById,
+  });
 
   const visibleImageNodesById = React.useMemo(
     () => new Map(visibleImageNodes.map(node => [node.id, node])),

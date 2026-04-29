@@ -95,7 +95,7 @@ Notes:
 
 ### Milestone 2: Connector Renderer Extraction Hardening
 
-Status: complete; preparing scoped commit.
+Status: complete and committed as `db0d9247 refactor: harden connector renderer extraction`.
 
 Known baseline:
 - `src/app/useConnectorRenderer.ts` already exists.
@@ -121,10 +121,38 @@ Validation passed:
 - `npm.cmd run build`
 - `npm.cmd run check:encoding`
 
-### Milestones 3-9
+### Milestone 3: Prompt Group Layout Extraction
+
+Status: in progress. First low-risk slice implemented; preparing scoped commit.
+
+Scope completed in this slice:
+- Added `src/app/usePromptGroupLayout.ts` with explicit `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
+- Moved prompt-group live scene snapshot derivation and `liveSceneRef` synchronization out of `src/App.tsx`.
+- Kept `App.tsx` as the hook orchestrator for this slice and left bounds/overlap/regroup behavior in place for later extraction.
+- Updated the live-scene contract test to assert the prompt-group live-scene builder is owned by the new hook.
+
+Line count change:
+- `src/App.tsx`: `10395` baseline lines to `10333` lines after this slice.
+- `src/app/usePromptGroupLayout.ts`: new file, `126` lines.
+
+Validation passed before status update:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
+- `npm.cmd run typecheck`
+- `npm.cmd run test:unit` (`971` tests passed)
+- `npm.cmd run build`
+- `npm.cmd run check:encoding`
+
+Current risk:
+- This slice intentionally does not move prompt-group bounds, overlap, drag, or regroup mutation logic yet, so `App.tsx` still owns most prompt-group layout behavior.
+- The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
+
+Next step:
+- Commit this slice as `refactor: extract prompt group live scene layout`.
+- Continue Milestone 3 by extracting the next isolated prompt-group layout block after read-only subagent review.
+
+### Milestones 4-9
 
 Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation where they can work independently. See `plans.md` for the full ordered list:
-- `usePromptGroupLayout`
 - `useGenerationRuntime`
 - `usePptRuntime`
 - `useEcommerceRuntime`
@@ -144,6 +172,13 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `npm.cmd run test:unit`: passed, 971 tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed.
+- 2026-04-29 Milestone 3 first slice:
+  - Prompt-group/live-scene targeted tests: passed.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, 971 tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 
