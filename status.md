@@ -72,6 +72,11 @@ Validation passed:
 - `npm.cmd run governance:agent-docs`
 - `npm.cmd run check:encoding`
 
+Post-commit follow-up:
+- With user confirmation, `npx getdesign@latest add airtable` was executed on 2026-04-29.
+- The tool wrote `airtable/DESIGN.md` because the root `DESIGN.md` already existed.
+- The generated file matched the Airtable reference direction already merged into root `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and UI tokens, so the isolated `airtable/` reference folder was removed after review.
+
 ### Milestone 1: Refactor Ledger Alignment
 
 Status: complete and committed as `33afff9b docs: align v1.4.2 refactor plan`.
