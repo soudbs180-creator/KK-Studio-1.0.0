@@ -256,6 +256,18 @@ test('usePromptGroupLayout owns prompt-group live drag position helpers', () => 
   assert.doesNotMatch(appSource, /const applyLiveNodeDeltaToDraggedSet = useCallback/);
 });
 
+test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const handleImageCardHeightChange = useCallback/);
+  assert.match(promptGroupLayoutSource, /const handleFocusPromptGroup = useCallback/);
+  assert.match(promptGroupLayoutSource, /setImageCardHeightById\(\(prev\) => \{/);
+  assert.match(promptGroupLayoutSource, /selectNodes\(options\.nodeIds, 'replace'\)/);
+  assert.doesNotMatch(appSource, /const handleImageCardHeightChange = useCallback/);
+  assert.doesNotMatch(appSource, /const handleFocusPromptGroup = useCallback/);
+});
+
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');

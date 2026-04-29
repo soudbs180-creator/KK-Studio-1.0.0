@@ -8,7 +8,10 @@ import {
   type PromptGroupLayoutMode,
 } from '../canvas/liveScene';
 import { getCardDimensions } from '../utils/styleUtils';
-import { buildDockedPromptChildRegroupLayout, resolveRegroupTargetSlotIndices } from '../utils/generatedImageLayout';
+import {
+  buildDockedPromptChildRegroupLayout,
+  resolveRegroupTargetSlotIndices,
+} from '../utils/generatedImageLayout';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import type {
   Point,
@@ -20,6 +23,7 @@ import type {
 } from './appCanvasTypes';
 
 type PromptGroupBounds = { x: number; y: number; width: number; height: number };
+type SelectNodes = (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
 
 const EMPTY_CHILD_IMAGES_BY_PROMPT_ID = new Map<string, GeneratedImage[]>();
 const EMPTY_GENERATING_GROUP_IDS: string[] = [];
@@ -75,7 +79,10 @@ interface UsePromptGroupLayoutDeps {
     promptNode: PromptNode | undefined | null,
     imageNodes: GeneratedImage[],
   ) => GeneratedImage[];
+  selectNodes: SelectNodes;
+  setFocusedGroupId: Dispatch<SetStateAction<string | null>>;
   setGroupOverlapMap: Dispatch<SetStateAction<Record<string, string[]>>>;
+  setImageCardHeightById: Dispatch<SetStateAction<Record<string, number>>>;
   setPromptGroupLayoutVersion: Dispatch<SetStateAction<number>>;
   setLiveNodePositionVersion: Dispatch<SetStateAction<number>>;
   visibleImageNodes: GeneratedImage[] | null | undefined;
@@ -102,6 +109,11 @@ interface UsePromptGroupLayoutResult {
     nodeIds: string[] | null | undefined,
     delta: Point | null | undefined
   ) => void;
+  handleImageCardHeightChange: (imageId: string, height: number) => void;
+  handleFocusPromptGroup: (
+    groupId: string | null,
+    options?: { nodeIds?: string[]; keepSelection?: boolean }
+  ) => void;
   beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
   settlePromptGroupRegroup: (groupId: string) => void;
   clearPromptGroupRegroup: (groupId: string) => void;
@@ -127,7 +139,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupLayoutVersion,
     promptNodesById,
     resolveCurrentPromptChildImages,
+    selectNodes,
+    setFocusedGroupId,
     setGroupOverlapMap,
+    setImageCardHeightById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     visibleImageNodes,
@@ -432,6 +447,33 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     resolveCanvasNodePositionForLiveDrag,
     syncLiveNodePositionState,
   ]);
+
+  const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
+    if (!(height > 0)) return;
+
+    setImageCardHeightById((prev) => {
+      const previousHeight = prev[imageId];
+      if (previousHeight && Math.abs(previousHeight - height) <= 1) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [imageId]: height,
+      };
+    });
+  }, [setImageCardHeightById]);
+
+  const handleFocusPromptGroup = useCallback((
+    groupId: string | null,
+    options?: { nodeIds?: string[]; keepSelection?: boolean }
+  ) => {
+    setFocusedGroupId(groupId);
+    if (!groupId || options?.keepSelection || !options?.nodeIds?.length) {
+      return;
+    }
+    selectNodes(options.nodeIds, 'replace');
+  }, [selectNodes, setFocusedGroupId]);
 
   const syncPromptGroupLayoutState = useCallback((
     updater: Record<string, PromptGroupLayoutPresentationState>
@@ -871,6 +913,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     resolvePromptGroupIdForNodeId,
     resolveCanvasNodePositionForLiveDrag,
     applyLiveNodeDeltaToDraggedSet,
+    handleImageCardHeightChange,
+    handleFocusPromptGroup,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,

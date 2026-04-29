@@ -7625,6 +7625,8 @@ ${paragraphs}
     syncLiveNodePositionState,
     resolvePromptGroupIdForNodeId,
     applyLiveNodeDeltaToDraggedSet,
+    handleImageCardHeightChange,
+    handleFocusPromptGroup,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,
@@ -7647,7 +7649,10 @@ ${paragraphs}
     promptGroupLayoutVersion,
     promptNodesById,
     resolveCurrentPromptChildImages,
+    selectNodes,
+    setFocusedGroupId,
     setGroupOverlapMap,
+    setImageCardHeightById,
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     visibleImageNodes,
@@ -7781,33 +7786,6 @@ ${paragraphs}
       return next;
     });
   }, [moveSelectedNodesImmediate, promptGroupBoundsById, resolvePromptGroupIdForNodeId, syncLiveNodePositionState]);
-
-  const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
-    if (!(height > 0)) return;
-
-    setImageCardHeightById((prev) => {
-      const previousHeight = prev[imageId];
-      if (previousHeight && Math.abs(previousHeight - height) <= 1) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        [imageId]: height,
-      };
-    });
-  }, []);
-
-  const handleFocusPromptGroup = useCallback((groupId: string | null, options?: {
-    nodeIds?: string[];
-    keepSelection?: boolean;
-  }) => {
-    setFocusedGroupId(groupId);
-    if (!groupId || options?.keepSelection || !options?.nodeIds?.length) {
-      return;
-    }
-    selectNodes(options.nodeIds, 'replace');
-  }, [selectNodes]);
 
   const shouldAutoRegroupPromptGroup = useCallback((
     promptNode: PromptNode,
