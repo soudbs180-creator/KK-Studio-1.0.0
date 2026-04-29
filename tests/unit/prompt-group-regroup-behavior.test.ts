@@ -315,6 +315,32 @@ test('usePromptGroupLayout owns prompt-group active-canvas lifecycle cleanup', (
   assert.doesNotMatch(appSource, /const hadPromptGroupLayouts = Object\.keys\(promptGroupLayoutStateByIdRef\.current\)\.length > 0;/);
 });
 
+test('usePromptGroupLayout owns prompt-group expanded selection derivation', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const expandedSelectedNodeIds = useMemo/);
+  assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.flatMap/);
+  assert.match(promptGroupLayoutSource, /actualChildImageIdsByPromptId\.get\(selectedPrompt\.id\)/);
+  assert.match(promptGroupLayoutSource, /expandedSelectedNodeIds,/);
+  assert.doesNotMatch(appSource, /const expandedSelectedNodeIds = React\.useMemo/);
+});
+
+test('usePromptGroupStacking owns prompt-group stacking maps', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(appSource, /usePromptGroupStacking\(\{/);
+  assert.match(promptGroupLayoutSource, /export function usePromptGroupStacking/);
+  assert.match(promptGroupLayoutSource, /const promptGroupLayerById = useMemo\(\(\) => \{/);
+  assert.match(promptGroupLayoutSource, /const promptGroupStackZIndexById = useMemo\(\(\) => \{/);
+  assert.match(promptGroupLayoutSource, /currentFloatingStackBandSize \* 2/);
+  assert.match(promptGroupLayoutSource, /promptGroupLayerById,/);
+  assert.match(promptGroupLayoutSource, /promptGroupStackZIndexById,/);
+  assert.doesNotMatch(appSource, /const promptGroupLayerById = React\.useMemo/);
+  assert.doesNotMatch(appSource, /const promptGroupStackZIndexById = React\.useMemo/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');

@@ -75,7 +75,6 @@ import {
   type PreviewRenderItem,
   type PromptGroupLayoutPresentationState,
   type PromptGroupRenderItem,
-  type PromptGroupTier,
   type SaveRenderItem,
   type ScheduledImageLoadState,
   type WorkflowUtilityCanvasNode,
@@ -110,7 +109,7 @@ import { useSelectionMenuOverlay } from './app/useSelectionMenuOverlay';
 import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
-import { usePromptGroupLayout } from './app/usePromptGroupLayout';
+import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -288,12 +287,6 @@ const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceG
       aPlusControlMode: 'auto',
     },
   };
-};
-
-const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
-  base: 1,
-  focused: 2,
-  generating: 3,
 };
 
 // Lucide icons replaced with SVGs
@@ -7084,26 +7077,6 @@ ${paragraphs}
     };
   }, [activeCanvas, imageNodesById, promptNodesById]);
 
-  const promptGroupLayerById = React.useMemo(() => {
-    const groupLayerMap = new Map<string, number>();
-    if (!activeCanvas) return groupLayerMap;
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      groupLayerMap.set(promptNode.id, promptNode.zIndex ?? 0);
-    });
-
-    activeCanvas.imageNodes.forEach((imageNode) => {
-      if (!imageNode.parentPromptId) return;
-      const currentLayer = groupLayerMap.get(imageNode.parentPromptId) ?? 0;
-      const imageLayer = imageNode.zIndex ?? 0;
-      if (imageLayer > currentLayer) {
-        groupLayerMap.set(imageNode.parentPromptId, imageLayer);
-      }
-    });
-
-    return groupLayerMap;
-  }, [activeCanvas]);
-
   const isPptDeckChildImageNode = useCallback((imageNode: GeneratedImage) => {
     if (!imageNode.parentPromptId) {
       return false;
@@ -7206,14 +7179,11 @@ ${paragraphs}
     let maxLayer = 0;
 
     activeCanvas.promptNodes.forEach((promptNode) => {
-      maxLayer = Math.max(maxLayer, promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0);
+      maxLayer = Math.max(maxLayer, promptNode.zIndex ?? 0);
     });
 
     activeCanvas.imageNodes.forEach((imageNode) => {
-      const baseLayer = imageNode.parentPromptId
-        ? (promptGroupLayerById.get(imageNode.parentPromptId) ?? imageNode.zIndex ?? 0)
-        : (imageNode.zIndex ?? 0);
-      maxLayer = Math.max(maxLayer, baseLayer);
+      maxLayer = Math.max(maxLayer, imageNode.zIndex ?? 0);
     });
 
     (activeCanvas.workflow?.nodes || []).forEach((workflowNode) => {
@@ -7225,38 +7195,23 @@ ${paragraphs}
     });
 
     return maxLayer;
-  }, [activeCanvas, promptGroupLayerById]);
+  }, [activeCanvas]);
 
   const floatingStackBandSize = React.useMemo(
     () => (maxPersistedCanvasLayer + 1) * 100,
     [maxPersistedCanvasLayer]
   );
 
-  const promptGroupStackZIndexById = React.useMemo(() => {
-    const stackMap = new Map<string, number>();
-    if (!activeCanvas) return stackMap;
-    const generatingGroupIdSet = new Set(generatingGroupIds);
-
-    activeCanvas.promptNodes.forEach((promptNode) => {
-      const baseLayer = promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0;
-      const isOverlapping = (groupOverlapMap[promptNode.id] || []).length > 0;
-      const tier: PromptGroupTier = focusedGroupId === promptNode.id && isOverlapping
-        ? 'focused'
-        : generatingGroupIdSet.has(promptNode.id)
-          ? 'generating'
-          : 'base';
-      const floatingBonus = tier === 'generating'
-        ? floatingStackBandSize * 2
-        : tier === 'focused'
-          ? floatingStackBandSize
-          : 0;
-      const stackZIndex = (baseLayer * 100) + (PROMPT_GROUP_TIER_WEIGHT[tier] * 10) + floatingBonus;
-
-      stackMap.set(promptNode.id, stackZIndex);
-    });
-
-    return stackMap;
-  }, [activeCanvas, floatingStackBandSize, focusedGroupId, generatingGroupIds, groupOverlapMap, promptGroupLayerById]);
+  const {
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+  } = usePromptGroupStacking({
+    activeCanvas,
+    focusedGroupId,
+    floatingStackBandSize,
+    generatingGroupIds,
+    groupOverlapMap,
+  });
 
   const standaloneImageStackZIndexById = React.useMemo(() => {
     const stackMap = new Map<string, number>();
@@ -7617,6 +7572,7 @@ ${paragraphs}
     liveSceneRef,
     actualChildImagesByPromptId,
     actualChildImageIdsByPromptId,
+    expandedSelectedNodeIds,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
     promptGroupViews,
@@ -7874,21 +7830,6 @@ ${paragraphs}
     promptBarUiBusy,
     selectionBox?.active,
   ]);
-
-  const expandedSelectedNodeIds = React.useMemo(
-    () => Array.from(new Set(
-      selectedNodeIds.flatMap((selectedId) => {
-        const selectedPrompt = activeCanvas?.promptNodes.find((promptNode) => promptNode.id === selectedId);
-        if (!selectedPrompt) return [selectedId];
-
-        return [
-          selectedId,
-          ...(actualChildImageIdsByPromptId.get(selectedPrompt.id) || []),
-        ];
-      })
-    )),
-    [activeCanvas, actualChildImageIdsByPromptId, selectedNodeIds]
-  );
 
   const {
     getSelectionScreenCenter,

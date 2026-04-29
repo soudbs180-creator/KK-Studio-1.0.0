@@ -34,6 +34,7 @@ const EMPTY_IMAGE_NODES_BY_ID = new Map<string, GeneratedImage>();
 const EMPTY_LOCKED_GROUP_BOUNDS_BY_ID: Record<string, PromptGroupBounds> = {};
 const EMPTY_PROMPT_GROUP_LAYER_BY_ID = new Map<string, number>();
 const EMPTY_PROMPT_NODES_BY_ID = new Map<string, PromptNode>();
+const EMPTY_SELECTED_NODE_IDS: string[] = [];
 const EMPTY_VISIBLE_IMAGE_NODES: GeneratedImage[] = [];
 const EMPTY_VISIBLE_PROMPT_NODES: PromptNode[] = [];
 const EMPTY_WORKFLOW_UTILITY_NODES_BY_ID = new Map<string, WorkflowUtilityCanvasNode>();
@@ -107,6 +108,7 @@ interface UsePromptGroupLayoutResult {
   liveSceneRef: RefObject<LiveSceneSnapshot>;
   actualChildImagesByPromptId: Map<string, GeneratedImage[]>;
   actualChildImageIdsByPromptId: Map<string, string[]>;
+  expandedSelectedNodeIds: string[];
   promptGroupNodeIdsById: Map<string, string[]>;
   promptGroupRegroupLayoutsById: Map<string, Map<string, PromptGroupRegroupLayout>>;
   promptGroupBoundsById: Map<string, PromptGroupBounds>;
@@ -146,6 +148,89 @@ interface UsePromptGroupLayoutResult {
   beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
   settlePromptGroupRegroup: (groupId: string) => void;
   clearPromptGroupRegroup: (groupId: string) => void;
+}
+
+interface UsePromptGroupStackingDeps {
+  activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
+  focusedGroupId: string | null | undefined;
+  floatingStackBandSize: number;
+  generatingGroupIds: string[] | null | undefined;
+  groupOverlapMap: Record<string, string[]> | null | undefined;
+}
+
+interface UsePromptGroupStackingResult {
+  promptGroupLayerById: Map<string, number>;
+  promptGroupStackZIndexById: Map<string, number>;
+}
+
+export function usePromptGroupStacking({
+  activeCanvas,
+  focusedGroupId,
+  floatingStackBandSize,
+  generatingGroupIds,
+  groupOverlapMap,
+}: UsePromptGroupStackingDeps): UsePromptGroupStackingResult {
+  const currentFloatingStackBandSize = Number.isFinite(floatingStackBandSize) ? floatingStackBandSize : 0;
+  const currentGeneratingGroupIds = generatingGroupIds ?? EMPTY_GENERATING_GROUP_IDS;
+  const currentGroupOverlapMap = groupOverlapMap ?? EMPTY_GROUP_OVERLAP_MAP;
+
+  const promptGroupLayerById = useMemo(() => {
+    const groupLayerMap = new Map<string, number>();
+    if (!activeCanvas) return groupLayerMap;
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      groupLayerMap.set(promptNode.id, promptNode.zIndex ?? 0);
+    });
+
+    activeCanvas.imageNodes.forEach((imageNode) => {
+      if (!imageNode.parentPromptId) return;
+      const currentLayer = groupLayerMap.get(imageNode.parentPromptId) ?? 0;
+      const imageLayer = imageNode.zIndex ?? 0;
+      if (imageLayer > currentLayer) {
+        groupLayerMap.set(imageNode.parentPromptId, imageLayer);
+      }
+    });
+
+    return groupLayerMap;
+  }, [activeCanvas]);
+
+  const promptGroupStackZIndexById = useMemo(() => {
+    const stackMap = new Map<string, number>();
+    if (!activeCanvas) return stackMap;
+    const generatingGroupIdSet = new Set(currentGeneratingGroupIds);
+
+    activeCanvas.promptNodes.forEach((promptNode) => {
+      const baseLayer = promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0;
+      const isOverlapping = (currentGroupOverlapMap[promptNode.id] || []).length > 0;
+      const tier: PromptGroupTier = focusedGroupId === promptNode.id && isOverlapping
+        ? 'focused'
+        : generatingGroupIdSet.has(promptNode.id)
+          ? 'generating'
+          : 'base';
+      const floatingBonus = tier === 'generating'
+        ? currentFloatingStackBandSize * 2
+        : tier === 'focused'
+          ? currentFloatingStackBandSize
+          : 0;
+      const stackZIndex = (baseLayer * 100) + (PROMPT_GROUP_TIER_WEIGHT[tier] * 10) + floatingBonus;
+
+      stackMap.set(promptNode.id, stackZIndex);
+    });
+
+    return stackMap;
+  }, [
+    activeCanvas,
+    currentFloatingStackBandSize,
+    currentGeneratingGroupIds,
+    currentGroupOverlapMap,
+    focusedGroupId,
+    promptGroupLayerById,
+  ]);
+
+  return {
+    promptGroupLayerById,
+    promptGroupStackZIndexById,
+  };
 }
 
 export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptGroupLayoutResult {
@@ -190,7 +275,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const currentLockedGroupBoundsById = lockedGroupBoundsById ?? EMPTY_LOCKED_GROUP_BOUNDS_BY_ID;
   const currentPromptGroupLayerById = promptGroupLayerById ?? EMPTY_PROMPT_GROUP_LAYER_BY_ID;
   const currentPromptNodesById = promptNodesById ?? EMPTY_PROMPT_NODES_BY_ID;
-  const currentSelectedNodeIds = selectedNodeIds ?? [];
+  const currentSelectedNodeIds = selectedNodeIds ?? EMPTY_SELECTED_NODE_IDS;
   const currentVisibleImageNodes = visibleImageNodes ?? EMPTY_VISIBLE_IMAGE_NODES;
   const currentVisiblePromptNodes = visiblePromptNodes ?? EMPTY_VISIBLE_PROMPT_NODES;
   const currentWorkflowUtilityNodesById = workflowUtilityNodesById ?? EMPTY_WORKFLOW_UTILITY_NODES_BY_ID;
@@ -224,6 +309,21 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
     return childIdMap;
   }, [actualChildImagesByPromptId]);
+
+  const expandedSelectedNodeIds = useMemo(
+    () => Array.from(new Set(
+      currentSelectedNodeIds.flatMap((selectedId) => {
+        const selectedPrompt = activeCanvas?.promptNodes.find((promptNode) => promptNode.id === selectedId);
+        if (!selectedPrompt) return [selectedId];
+
+        return [
+          selectedId,
+          ...(actualChildImageIdsByPromptId.get(selectedPrompt.id) || []),
+        ];
+      })
+    )),
+    [activeCanvas, actualChildImageIdsByPromptId, currentSelectedNodeIds]
+  );
 
   const promptGroupNodeIdsById = useMemo(() => {
     const nodeIdsByGroupId = new Map<string, string[]>();
@@ -1218,6 +1318,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     liveSceneRef,
     actualChildImagesByPromptId,
     actualChildImageIdsByPromptId,
+    expandedSelectedNodeIds,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
     promptGroupBoundsById,
