@@ -101,12 +101,13 @@ test('prompt-group settle phase keeps animating after drop instead of snapping t
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /if \(state\.layoutMode === 'docked' && state\.settleUntil !== null\) \{/);
-  assert.match(appSource, /const settleDuration = Math\.max\(1, state\.settleUntil - state\.startedAt\);/);
-  assert.match(appSource, /regroupProgress: nextProgress,/);
-  assert.match(appSource, /layoutMode: 'docked',\s*regroupProgress: 0,/);
+  assert.match(promptGroupLayoutSource, /if \(state\.layoutMode === 'docked' && state\.settleUntil !== null\) \{/);
+  assert.match(promptGroupLayoutSource, /const settleDuration = Math\.max\(1, state\.settleUntil - state\.startedAt\);/);
+  assert.match(promptGroupLayoutSource, /regroupProgress: nextProgress,/);
+  assert.match(promptGroupLayoutSource, /layoutMode: 'docked',\s*regroupProgress: 0,/);
   assert.match(promptGroupLayoutSource, /const fastRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*0/);
   assert.match(promptGroupLayoutSource, /const settleRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*layoutState\.regroupProgress/);
+  assert.match(appSource, /settlePromptGroupRegroup\(promptNode\.id\)/);
 });
 
 test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
@@ -194,22 +195,37 @@ test('recycle motion can have layered speed while still converging to one final 
 });
 
 test('App locks regroup slot assignment when recycle starts', () => {
-  const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
 
-  assert.match(appSource, /targetSlotIndicesByChildId/);
+  assert.match(promptGroupLayoutSource, /targetSlotIndicesByChildId/);
   assert.match(promptGroupLayoutSource, /targetSlotIndices:\s*childImages\.map\(\(imageNode\) => layoutState\.targetSlotIndicesByChildId\[imageNode\.id\]/);
   assert.match(dragHookSource, /beginPromptGroupRegroup\(node\.id,\s*childImages\)/);
 });
 
 test('App does not recreate regroup presentation state on every drag frame when slot targets stay the same', () => {
-  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /const hasSameTargetSlots = Boolean\(existing\?\.targetSlotIndicesByChildId\)/);
-  assert.match(appSource, /existing\.layoutMode === 'regrouping'/);
-  assert.match(appSource, /hasSameTargetSlots/);
-  assert.match(appSource, /return prev;/);
+  assert.match(promptGroupLayoutSource, /const hasSameTargetSlots = Boolean\(existing\?\.targetSlotIndicesByChildId\)/);
+  assert.match(promptGroupLayoutSource, /existing\.layoutMode === 'regrouping'/);
+  assert.match(promptGroupLayoutSource, /hasSameTargetSlots/);
+  assert.match(promptGroupLayoutSource, /return prev;/);
+});
+
+test('usePromptGroupLayout owns prompt-group presentation state mutations', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const syncPromptGroupLayoutState = useCallback/);
+  assert.match(promptGroupLayoutSource, /const schedulePromptGroupRegroupAnimation = useCallback/);
+  assert.match(promptGroupLayoutSource, /const beginPromptGroupRegroup = useCallback/);
+  assert.match(promptGroupLayoutSource, /const settlePromptGroupRegroup = useCallback/);
+  assert.match(promptGroupLayoutSource, /const clearPromptGroupRegroup = useCallback/);
+  assert.doesNotMatch(appSource, /const syncPromptGroupLayoutState = useCallback/);
+  assert.doesNotMatch(appSource, /const schedulePromptGroupRegroupAnimation = useCallback/);
+  assert.doesNotMatch(appSource, /const beginPromptGroupRegroup = useCallback/);
+  assert.doesNotMatch(appSource, /const settlePromptGroupRegroup = useCallback/);
+  assert.doesNotMatch(appSource, /const clearPromptGroupRegroup = useCallback/);
 });
 
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {

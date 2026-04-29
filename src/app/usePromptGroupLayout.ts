@@ -8,7 +8,7 @@ import {
   type PromptGroupLayoutMode,
 } from '../canvas/liveScene';
 import { getCardDimensions } from '../utils/styleUtils';
-import { buildDockedPromptChildRegroupLayout } from '../utils/generatedImageLayout';
+import { buildDockedPromptChildRegroupLayout, resolveRegroupTargetSlotIndices } from '../utils/generatedImageLayout';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import type {
   PromptGroupLayoutPresentationState,
@@ -31,6 +31,7 @@ const EMPTY_VISIBLE_PROMPT_NODES: PromptNode[] = [];
 const PROMPT_GROUP_REGROUP_FAST_MS = 110;
 const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
 const PROMPT_GROUP_REGROUP_TOTAL_MS = PROMPT_GROUP_REGROUP_FAST_MS + PROMPT_GROUP_REGROUP_SLOW_MS;
+const PROMPT_GROUP_REGROUP_SETTLE_MS = 180;
 
 const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   base: 1,
@@ -66,6 +67,7 @@ interface UsePromptGroupLayoutDeps {
   promptGroupLayoutVersion: number;
   promptNodesById: Map<string, PromptNode> | null | undefined;
   setGroupOverlapMap: Dispatch<SetStateAction<Record<string, string[]>>>;
+  setPromptGroupLayoutVersion: Dispatch<SetStateAction<number>>;
   setLiveNodePositionVersion: Dispatch<SetStateAction<number>>;
   visibleImageNodes: GeneratedImage[] | null | undefined;
   visiblePromptNodes: PromptNode[] | null | undefined;
@@ -80,6 +82,9 @@ interface UsePromptGroupLayoutResult {
   promptGroupViews: PromptGroupView[];
   visiblePromptGroupViews: PromptGroupView[];
   syncLiveNodePositionState: () => void;
+  beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
+  settlePromptGroupRegroup: (groupId: string) => void;
+  clearPromptGroupRegroup: (groupId: string) => void;
 }
 
 export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptGroupLayoutResult {
@@ -101,6 +106,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupLayoutVersion,
     promptNodesById,
     setGroupOverlapMap,
+    setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     visibleImageNodes,
     visiblePromptNodes,
@@ -115,6 +121,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const currentVisibleImageNodes = visibleImageNodes ?? EMPTY_VISIBLE_IMAGE_NODES;
   const currentVisiblePromptNodes = visiblePromptNodes ?? EMPTY_VISIBLE_PROMPT_NODES;
   const liveSceneFrameRef = useRef<number | null>(null);
+  const promptGroupRegroupFrameRef = useRef<number | null>(null);
   const stablePromptGroupBoundsByIdRef = useRef(new Map<string, PromptGroupBounds>());
   const stablePromptGroupViewsRef = useRef<PromptGroupView[]>([]);
   const groupOverlapStateSignatureRef = useRef('');
@@ -252,10 +259,170 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     });
   }, [isNodeDragActive, promptGroupLayoutStateByIdRef, setLiveNodePositionVersion]);
 
+  const syncPromptGroupLayoutState = useCallback((
+    updater: Record<string, PromptGroupLayoutPresentationState>
+    | ((prev: Record<string, PromptGroupLayoutPresentationState>) => Record<string, PromptGroupLayoutPresentationState>)
+  ) => {
+    const prev = promptGroupLayoutStateByIdRef.current;
+    const next = typeof updater === 'function'
+      ? updater(prev)
+      : updater;
+    if (next === prev) {
+      return;
+    }
+    promptGroupLayoutStateByIdRef.current = next;
+    setPromptGroupLayoutVersion((version) => version + 1);
+  }, [promptGroupLayoutStateByIdRef, setPromptGroupLayoutVersion]);
+
+  const schedulePromptGroupRegroupAnimation = useCallback(() => {
+    if (promptGroupRegroupFrameRef.current !== null) {
+      return;
+    }
+
+    promptGroupRegroupFrameRef.current = requestAnimationFrame(() => {
+      promptGroupRegroupFrameRef.current = null;
+      const now = performance.now();
+
+      syncPromptGroupLayoutState((prev) => {
+        let next = prev;
+
+        Object.entries(prev).forEach(([groupId, state]) => {
+          if (state.layoutMode === 'regrouping') {
+            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / PROMPT_GROUP_REGROUP_TOTAL_MS));
+            if (nextProgress !== state.regroupProgress) {
+              if (next === prev) next = { ...prev };
+              next[groupId] = {
+                ...state,
+                regroupProgress: nextProgress,
+              };
+            }
+            return;
+          }
+
+          if (state.layoutMode === 'docked' && state.settleUntil !== null) {
+            const settleDuration = Math.max(1, state.settleUntil - state.startedAt);
+            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / settleDuration));
+
+            if (nextProgress !== state.regroupProgress) {
+              if (next === prev) next = { ...prev };
+              next[groupId] = {
+                ...state,
+                regroupProgress: nextProgress,
+              };
+            }
+
+            if (now >= state.settleUntil) {
+              if (next === prev) next = { ...prev };
+              delete next[groupId];
+            }
+          }
+        });
+
+        return next;
+      });
+
+      const hasAnimatedGroup = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
+        state.layoutMode === 'regrouping'
+        || (state.layoutMode === 'docked' && state.settleUntil !== null)
+      ));
+
+      if (hasAnimatedGroup) {
+        schedulePromptGroupRegroupAnimation();
+      }
+    });
+  }, [promptGroupLayoutStateByIdRef, syncPromptGroupLayoutState]);
+
+  const beginPromptGroupRegroup = useCallback((groupId: string, childImages: GeneratedImage[]) => {
+    const now = performance.now();
+    const promptNode = activeCanvas?.promptNodes.find((candidate) => candidate.id === groupId) ?? null;
+    syncPromptGroupLayoutState((prev) => {
+      const existing = prev[groupId];
+      const hasStableTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
+        && childImages.every((imageNode) => typeof existing?.targetSlotIndicesByChildId?.[imageNode.id] === 'number');
+      const regroupStartPositions = childImages.map((imageNode) => (
+        liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
+      ));
+      const targetSlotIndices = hasStableTargetSlots
+        ? childImages.map((imageNode) => existing!.targetSlotIndicesByChildId[imageNode.id])
+        : resolveRegroupTargetSlotIndices(
+            regroupStartPositions,
+            isMobile || promptNode?.mode === GenerationMode.PPT ? 1 : childImages.length,
+            childImages.length,
+          );
+      const targetSlotIndicesByChildId = childImages.reduce<Record<string, number>>((acc, imageNode, index) => {
+        acc[imageNode.id] = targetSlotIndices[index] ?? index;
+        return acc;
+      }, {});
+      const hasSameTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
+        && childImages.every((imageNode) => (
+          existing?.targetSlotIndicesByChildId?.[imageNode.id] === targetSlotIndicesByChildId[imageNode.id]
+        ));
+
+      if (
+        existing
+        && existing.layoutMode === 'regrouping'
+        && existing.settleUntil === null
+        && hasSameTargetSlots
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [groupId]: {
+          layoutMode: 'regrouping',
+          regroupProgress: existing?.regroupProgress ?? 0,
+          startedAt: existing?.startedAt ?? now,
+          settleUntil: null,
+          targetSlotIndicesByChildId,
+        },
+      };
+    });
+    schedulePromptGroupRegroupAnimation();
+  }, [activeCanvas, isMobile, liveNodePositionByIdRef, schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
+
+  const settlePromptGroupRegroup = useCallback((groupId: string) => {
+    const now = performance.now();
+    syncPromptGroupLayoutState((prev) => {
+      const existing = prev[groupId];
+      if (!existing) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [groupId]: {
+          ...existing,
+          layoutMode: 'docked',
+          regroupProgress: 0,
+          startedAt: now,
+          settleUntil: now + PROMPT_GROUP_REGROUP_SETTLE_MS,
+        },
+      };
+    });
+    schedulePromptGroupRegroupAnimation();
+  }, [schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
+
+  const clearPromptGroupRegroup = useCallback((groupId: string) => {
+    syncPromptGroupLayoutState((prev) => {
+      if (!(groupId in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+  }, [syncPromptGroupLayoutState]);
+
   useEffect(() => () => {
     if (liveSceneFrameRef.current !== null) {
       cancelAnimationFrame(liveSceneFrameRef.current);
       liveSceneFrameRef.current = null;
+    }
+    if (promptGroupRegroupFrameRef.current !== null) {
+      cancelAnimationFrame(promptGroupRegroupFrameRef.current);
+      promptGroupRegroupFrameRef.current = null;
     }
   }, []);
 
@@ -524,5 +691,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupViews,
     visiblePromptGroupViews,
     syncLiveNodePositionState,
+    beginPromptGroupRegroup,
+    settlePromptGroupRegroup,
+    clearPromptGroupRegroup,
   };
 }

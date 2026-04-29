@@ -49,7 +49,7 @@ import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { appendUploadFilesWithinLimit } from './components/ecommerce/ecommerceImportPreview.ts';
 import { getCardDimensions } from './utils/styleUtils';
-import { buildGeneratedImageBatchPositions, resolveRegroupTargetSlotIndices } from './utils/generatedImageLayout';
+import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition } from './utils/canvasUtils';
 import { getViewportOffsets } from './utils/canvasCenter';
 import { clampGenerationDurationMs } from './utils/timeUtils';
@@ -290,11 +290,6 @@ const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceG
   };
 };
 
-const PROMPT_GROUP_REGROUP_FAST_MS = 110;
-const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
-const PROMPT_GROUP_REGROUP_TOTAL_MS = PROMPT_GROUP_REGROUP_FAST_MS + PROMPT_GROUP_REGROUP_SLOW_MS;
-const PROMPT_GROUP_REGROUP_SETTLE_MS = 180;
-
 const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   base: 1,
   focused: 2,
@@ -402,7 +397,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const nodeDragReleaseFrameRef = useRef<number | null>(null);
   const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
-  const promptGroupRegroupFrameRef = useRef<number | null>(null);
 
 
 
@@ -3139,9 +3133,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     return () => {
       if (nodeDragReleaseFrameRef.current !== null) {
         cancelAnimationFrame(nodeDragReleaseFrameRef.current);
-      }
-      if (promptGroupRegroupFrameRef.current !== null) {
-        cancelAnimationFrame(promptGroupRegroupFrameRef.current);
       }
     };
   }, []);
@@ -7653,6 +7644,9 @@ ${paragraphs}
     promptGroupViews,
     visiblePromptGroupViews,
     syncLiveNodePositionState,
+    beginPromptGroupRegroup,
+    settlePromptGroupRegroup,
+    clearPromptGroupRegroup,
   } = usePromptGroupLayout({
     activeCanvas,
     actualChildImagesByPromptId,
@@ -7671,6 +7665,7 @@ ${paragraphs}
     promptGroupLayoutVersion,
     promptNodesById,
     setGroupOverlapMap,
+    setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     visibleImageNodes,
     visiblePromptNodes,
@@ -7891,162 +7886,6 @@ ${paragraphs}
       return next;
     });
   }, [moveSelectedNodesImmediate, promptGroupBoundsById, resolvePromptGroupIdForNodeId, syncLiveNodePositionState]);
-
-  const syncPromptGroupLayoutState = useCallback((
-    updater: Record<string, PromptGroupLayoutPresentationState>
-    | ((prev: Record<string, PromptGroupLayoutPresentationState>) => Record<string, PromptGroupLayoutPresentationState>)
-  ) => {
-    const prev = promptGroupLayoutStateByIdRef.current;
-    const next = typeof updater === 'function'
-      ? updater(prev)
-      : updater;
-    if (next === prev) {
-      return;
-    }
-    promptGroupLayoutStateByIdRef.current = next;
-    setPromptGroupLayoutVersion((version) => version + 1);
-  }, []);
-
-  const schedulePromptGroupRegroupAnimation = useCallback(() => {
-    if (promptGroupRegroupFrameRef.current !== null) {
-      return;
-    }
-
-    promptGroupRegroupFrameRef.current = requestAnimationFrame(() => {
-      promptGroupRegroupFrameRef.current = null;
-      const now = performance.now();
-
-      syncPromptGroupLayoutState((prev) => {
-        let next = prev;
-
-        Object.entries(prev).forEach(([groupId, state]) => {
-          if (state.layoutMode === 'regrouping') {
-            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / PROMPT_GROUP_REGROUP_TOTAL_MS));
-            if (nextProgress !== state.regroupProgress) {
-              if (next === prev) next = { ...prev };
-              next[groupId] = {
-                ...state,
-                regroupProgress: nextProgress,
-              };
-            }
-            return;
-          }
-
-          if (state.layoutMode === 'docked' && state.settleUntil !== null) {
-            const settleDuration = Math.max(1, state.settleUntil - state.startedAt);
-            const nextProgress = Math.min(1, Math.max(state.regroupProgress, (now - state.startedAt) / settleDuration));
-
-            if (nextProgress !== state.regroupProgress) {
-              if (next === prev) next = { ...prev };
-              next[groupId] = {
-                ...state,
-                regroupProgress: nextProgress,
-              };
-            }
-
-            if (now >= state.settleUntil) {
-              if (next === prev) next = { ...prev };
-              delete next[groupId];
-            }
-          }
-        });
-
-        return next;
-      });
-
-      const hasAnimatedGroup = Object.values(promptGroupLayoutStateByIdRef.current).some((state) => (
-        state.layoutMode === 'regrouping'
-        || (state.layoutMode === 'docked' && state.settleUntil !== null)
-      ));
-
-      if (hasAnimatedGroup) {
-        schedulePromptGroupRegroupAnimation();
-      }
-    });
-  }, [syncPromptGroupLayoutState]);
-
-  const beginPromptGroupRegroup = useCallback((groupId: string, childImages: GeneratedImage[]) => {
-    const now = performance.now();
-    const promptNode = activeCanvas?.promptNodes.find((candidate) => candidate.id === groupId) ?? null;
-    syncPromptGroupLayoutState((prev) => {
-      const existing = prev[groupId];
-      const hasStableTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
-        && childImages.every((imageNode) => typeof existing?.targetSlotIndicesByChildId?.[imageNode.id] === 'number');
-      const regroupStartPositions = childImages.map((imageNode) => (
-        liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
-      ));
-      const targetSlotIndices = hasStableTargetSlots
-        ? childImages.map((imageNode) => existing!.targetSlotIndicesByChildId[imageNode.id])
-        : resolveRegroupTargetSlotIndices(
-            regroupStartPositions,
-            isMobile || promptNode?.mode === GenerationMode.PPT ? 1 : childImages.length,
-            childImages.length,
-          );
-      const targetSlotIndicesByChildId = childImages.reduce<Record<string, number>>((acc, imageNode, index) => {
-        acc[imageNode.id] = targetSlotIndices[index] ?? index;
-        return acc;
-      }, {});
-      const hasSameTargetSlots = Boolean(existing?.targetSlotIndicesByChildId)
-        && childImages.every((imageNode) => (
-          existing?.targetSlotIndicesByChildId?.[imageNode.id] === targetSlotIndicesByChildId[imageNode.id]
-        ));
-
-      if (
-        existing
-        && existing.layoutMode === 'regrouping'
-        && existing.settleUntil === null
-        && hasSameTargetSlots
-      ) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        [groupId]: {
-          layoutMode: 'regrouping',
-          regroupProgress: existing?.regroupProgress ?? 0,
-          startedAt: existing?.startedAt ?? now,
-          settleUntil: null,
-          targetSlotIndicesByChildId,
-        },
-      };
-    });
-    schedulePromptGroupRegroupAnimation();
-  }, [activeCanvas, isMobile, schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
-
-  const settlePromptGroupRegroup = useCallback((groupId: string) => {
-    const now = performance.now();
-    syncPromptGroupLayoutState((prev) => {
-      const existing = prev[groupId];
-      if (!existing) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        [groupId]: {
-          ...existing,
-          layoutMode: 'docked',
-          regroupProgress: 0,
-          startedAt: now,
-          settleUntil: now + PROMPT_GROUP_REGROUP_SETTLE_MS,
-        },
-      };
-    });
-    schedulePromptGroupRegroupAnimation();
-  }, [schedulePromptGroupRegroupAnimation, syncPromptGroupLayoutState]);
-
-  const clearPromptGroupRegroup = useCallback((groupId: string) => {
-    syncPromptGroupLayoutState((prev) => {
-      if (!(groupId in prev)) {
-        return prev;
-      }
-
-      const next = { ...prev };
-      delete next[groupId];
-      return next;
-    });
-  }, [syncPromptGroupLayoutState]);
 
   const handleImageCardHeightChange = useCallback((imageId: string, height: number) => {
     if (!(height > 0)) return;

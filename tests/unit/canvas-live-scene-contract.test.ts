@@ -142,7 +142,7 @@ describe('canvas live scene contract', () => {
     assert.match(promptGroupLayoutSource, /buildPromptGroupLiveSceneSnapshot/)
     assert.match(promptGroupLayoutSource, /buildPromptGroupRegroupLayouts\(/)
     assert.match(appSource, /promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>/)
-    assert.match(appSource, /regroupProgress/)
+    assert.match(promptGroupLayoutSource, /regroupProgress/)
     assert.match(appSource, /promptGroupRegroupLayoutsById/)
     assert.equal(appSource.match(/buildPromptGroupRegroupLayouts\(/g)?.length ?? 0, 0)
     assert.ok((promptGroupLayoutSource.match(/buildPromptGroupRegroupLayouts\(/g)?.length ?? 0) >= 1)
