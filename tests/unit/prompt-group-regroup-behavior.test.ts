@@ -301,6 +301,20 @@ test('usePromptGroupLayout owns prompt-group prompt node edit handlers', () => {
   assert.doesNotMatch(appSource, /const handlePromptGroupTagRemove = useCallback/);
 });
 
+test('usePromptGroupLayout owns prompt-group active-canvas lifecycle cleanup', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /setImageCardHeightById\(\{\}\);/);
+  assert.match(promptGroupLayoutSource, /liveNodePositionByIdRef\.current = \{\};/);
+  assert.match(promptGroupLayoutSource, /liveDerivedNodeIdsByOwnerRef\.current = \{\};/);
+  assert.match(promptGroupLayoutSource, /promptGroupLayoutStateByIdRef\.current = \{\};/);
+  assert.match(promptGroupLayoutSource, /setLockedGroupBoundsById\(\(current\) => \(/);
+  assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.length === 0 && focusedGroupId/);
+  assert.doesNotMatch(appSource, /setImageCardHeightById\(\{\}\);/);
+  assert.doesNotMatch(appSource, /const hadPromptGroupLayouts = Object\.keys\(promptGroupLayoutStateByIdRef\.current\)\.length > 0;/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');

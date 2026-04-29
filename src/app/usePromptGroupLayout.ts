@@ -531,6 +531,56 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   }, [currentPromptNodesById, updatePromptNode]);
 
   useEffect(() => {
+    setImageCardHeightById({});
+  }, [activeCanvas?.id, setImageCardHeightById]);
+
+  useEffect(() => {
+    if (!activeCanvas) {
+      setFocusedGroupId((current) => (current === null ? current : null));
+
+      const hadLivePositions = Object.keys(liveNodePositionByIdRef.current).length > 0
+        || Object.keys(liveDerivedNodeIdsByOwnerRef.current).length > 0;
+      const hadPromptGroupLayouts = Object.keys(promptGroupLayoutStateByIdRef.current).length > 0;
+
+      if (hadLivePositions) {
+        liveNodePositionByIdRef.current = {};
+        liveDerivedNodeIdsByOwnerRef.current = {};
+        setLiveNodePositionVersion((prev) => prev + 1);
+      }
+
+      if (hadPromptGroupLayouts) {
+        promptGroupLayoutStateByIdRef.current = {};
+        setPromptGroupLayoutVersion((prev) => prev + 1);
+      }
+
+      setLockedGroupBoundsById((current) => (
+        Object.keys(current).length === 0 ? current : {}
+      ));
+      return;
+    }
+
+    if (focusedGroupId && !activeCanvas.promptNodes.some((promptNode) => promptNode.id === focusedGroupId)) {
+      setFocusedGroupId(null);
+      return;
+    }
+
+    if (currentSelectedNodeIds.length === 0 && focusedGroupId) {
+      setFocusedGroupId(null);
+    }
+  }, [
+    activeCanvas,
+    currentSelectedNodeIds.length,
+    focusedGroupId,
+    liveDerivedNodeIdsByOwnerRef,
+    liveNodePositionByIdRef,
+    promptGroupLayoutStateByIdRef,
+    setFocusedGroupId,
+    setLiveNodePositionVersion,
+    setLockedGroupBoundsById,
+    setPromptGroupLayoutVersion,
+  ]);
+
+  useEffect(() => {
     autoRepairedPromptLayoutKeysRef.current.clear();
   }, [activeCanvas?.id]);
 
