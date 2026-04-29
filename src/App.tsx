@@ -7623,6 +7623,8 @@ ${paragraphs}
     promptGroupViews,
     visiblePromptGroupViews,
     syncLiveNodePositionState,
+    resolvePromptGroupIdForNodeId,
+    applyLiveNodeDeltaToDraggedSet,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,
@@ -7632,8 +7634,10 @@ ${paragraphs}
     focusedGroupId,
     generatingGroupIds,
     groupOverlapMap,
+    imageNodesById,
     isMobile,
     isNodeDragActive,
+    liveDerivedNodeIdsByOwnerRef,
     lockedGroupBoundsById,
     liveNodePositionByIdRef,
     liveNodePositionVersion,
@@ -7648,6 +7652,7 @@ ${paragraphs}
     setLiveNodePositionVersion,
     visibleImageNodes,
     visiblePromptNodes,
+    workflowUtilityNodesById,
   });
 
   useEffect(() => {
@@ -7688,95 +7693,6 @@ ${paragraphs}
       setFocusedGroupId(null);
     }
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
-
-  const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
-    if (promptNodesById.has(nodeId)) {
-      return nodeId;
-    }
-
-    return imageNodesById.get(nodeId)?.parentPromptId || null;
-  }, [imageNodesById, promptNodesById]);
-
-  const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
-    const livePosition = liveNodePositionByIdRef.current[nodeId];
-    if (livePosition) {
-      return livePosition;
-    }
-
-    const promptNode = promptNodesById.get(nodeId);
-    if (promptNode) {
-      return promptNode.position;
-    }
-
-    const imageNode = imageNodesById.get(nodeId);
-    if (imageNode) {
-      return imageNode.position;
-    }
-
-    const workflowNode = workflowUtilityNodesById.get(nodeId);
-    return workflowNode?.position ?? null;
-  }, [imageNodesById, promptNodesById, workflowUtilityNodesById]);
-
-  const applyLiveNodeDeltaToDraggedSet = useCallback((
-    ownerId: string,
-    nodeIds: string[],
-    delta: { x: number; y: number },
-  ) => {
-    if (!ownerId || nodeIds.length === 0 || (delta.x === 0 && delta.y === 0)) {
-      return;
-    }
-
-    const companionIds = Array.from(new Set(
-      nodeIds.filter((nodeId) => Boolean(nodeId) && nodeId !== ownerId)
-    ));
-
-    const previousCompanionIds = liveDerivedNodeIdsByOwnerRef.current[ownerId] || [];
-    let nextLivePositions = liveNodePositionByIdRef.current;
-    let hasLivePositionChanged = false;
-
-    previousCompanionIds.forEach((nodeId) => {
-      if (companionIds.includes(nodeId) || !(nodeId in nextLivePositions)) {
-        return;
-      }
-
-      if (nextLivePositions === liveNodePositionByIdRef.current) {
-        nextLivePositions = { ...nextLivePositions };
-      }
-      delete nextLivePositions[nodeId];
-      hasLivePositionChanged = true;
-    });
-
-    companionIds.forEach((nodeId) => {
-      const basePosition = resolveCanvasNodePositionForLiveDrag(nodeId);
-      if (!basePosition) {
-        return;
-      }
-
-      const nextPosition = {
-        x: basePosition.x + delta.x,
-        y: basePosition.y + delta.y,
-      };
-      const previousPosition = nextLivePositions[nodeId];
-
-      if (!previousPosition || previousPosition.x !== nextPosition.x || previousPosition.y !== nextPosition.y) {
-        if (nextLivePositions === liveNodePositionByIdRef.current) {
-          nextLivePositions = { ...nextLivePositions };
-        }
-        nextLivePositions[nodeId] = nextPosition;
-        hasLivePositionChanged = true;
-      }
-    });
-
-    liveDerivedNodeIdsByOwnerRef.current = {
-      ...liveDerivedNodeIdsByOwnerRef.current,
-      [ownerId]: companionIds,
-    };
-
-    if (hasLivePositionChanged) {
-      liveNodePositionByIdRef.current = nextLivePositions;
-      syncLiveNodePositionState();
-    }
-  }, [resolveCanvasNodePositionForLiveDrag, syncLiveNodePositionState]);
 
   const handleLiveNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number } | null) => {
     const groupId = resolvePromptGroupIdForNodeId(nodeId);

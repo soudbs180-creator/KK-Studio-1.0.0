@@ -243,6 +243,19 @@ test('usePromptGroupLayout owns prompt-group child node maps', () => {
   assert.doesNotMatch(appSource, /const promptGroupNodeIdsById = React\.useMemo/);
 });
 
+test('usePromptGroupLayout owns prompt-group live drag position helpers', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const resolvePromptGroupIdForNodeId = useCallback/);
+  assert.match(promptGroupLayoutSource, /const resolveCanvasNodePositionForLiveDrag = useCallback/);
+  assert.match(promptGroupLayoutSource, /const applyLiveNodeDeltaToDraggedSet = useCallback/);
+  assert.match(promptGroupLayoutSource, /liveDerivedNodeIdsByOwnerRef\.current/);
+  assert.doesNotMatch(appSource, /const resolvePromptGroupIdForNodeId = useCallback/);
+  assert.doesNotMatch(appSource, /const resolveCanvasNodePositionForLiveDrag = useCallback/);
+  assert.doesNotMatch(appSource, /const applyLiveNodeDeltaToDraggedSet = useCallback/);
+});
+
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');

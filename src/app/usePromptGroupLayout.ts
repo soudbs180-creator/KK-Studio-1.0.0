@@ -11,10 +11,12 @@ import { getCardDimensions } from '../utils/styleUtils';
 import { buildDockedPromptChildRegroupLayout, resolveRegroupTargetSlotIndices } from '../utils/generatedImageLayout';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import type {
+  Point,
   PromptGroupLayoutPresentationState,
   PromptGroupRegroupLayout,
   PromptGroupTier,
   PromptGroupView,
+  WorkflowUtilityCanvasNode,
 } from './appCanvasTypes';
 
 type PromptGroupBounds = { x: number; y: number; width: number; height: number };
@@ -22,11 +24,13 @@ type PromptGroupBounds = { x: number; y: number; width: number; height: number }
 const EMPTY_CHILD_IMAGES_BY_PROMPT_ID = new Map<string, GeneratedImage[]>();
 const EMPTY_GENERATING_GROUP_IDS: string[] = [];
 const EMPTY_GROUP_OVERLAP_MAP: Record<string, string[]> = {};
+const EMPTY_IMAGE_NODES_BY_ID = new Map<string, GeneratedImage>();
 const EMPTY_LOCKED_GROUP_BOUNDS_BY_ID: Record<string, PromptGroupBounds> = {};
 const EMPTY_PROMPT_GROUP_LAYER_BY_ID = new Map<string, number>();
 const EMPTY_PROMPT_NODES_BY_ID = new Map<string, PromptNode>();
 const EMPTY_VISIBLE_IMAGE_NODES: GeneratedImage[] = [];
 const EMPTY_VISIBLE_PROMPT_NODES: PromptNode[] = [];
+const EMPTY_WORKFLOW_UTILITY_NODES_BY_ID = new Map<string, WorkflowUtilityCanvasNode>();
 
 const PROMPT_GROUP_REGROUP_FAST_MS = 110;
 const PROMPT_GROUP_REGROUP_SLOW_MS = 180;
@@ -55,8 +59,10 @@ interface UsePromptGroupLayoutDeps {
   focusedGroupId: string | null | undefined;
   generatingGroupIds: string[] | null | undefined;
   groupOverlapMap: Record<string, string[]> | null | undefined;
+  imageNodesById: Map<string, GeneratedImage> | null | undefined;
   isMobile: boolean;
   isNodeDragActive: boolean;
+  liveDerivedNodeIdsByOwnerRef: RefObject<Record<string, string[]>>;
   lockedGroupBoundsById: Record<string, PromptGroupBounds> | null | undefined;
   liveNodePositionByIdRef: RefObject<Record<string, { x: number; y: number }>>;
   liveNodePositionVersion: number;
@@ -74,6 +80,7 @@ interface UsePromptGroupLayoutDeps {
   setLiveNodePositionVersion: Dispatch<SetStateAction<number>>;
   visibleImageNodes: GeneratedImage[] | null | undefined;
   visiblePromptNodes: PromptNode[] | null | undefined;
+  workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode> | null | undefined;
 }
 
 interface UsePromptGroupLayoutResult {
@@ -88,6 +95,13 @@ interface UsePromptGroupLayoutResult {
   promptGroupViews: PromptGroupView[];
   visiblePromptGroupViews: PromptGroupView[];
   syncLiveNodePositionState: () => void;
+  resolvePromptGroupIdForNodeId: (nodeId: string) => string | null;
+  resolveCanvasNodePositionForLiveDrag: (nodeId: string) => Point | null;
+  applyLiveNodeDeltaToDraggedSet: (
+    ownerId: string,
+    nodeIds: string[] | null | undefined,
+    delta: Point | null | undefined
+  ) => void;
   beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
   settlePromptGroupRegroup: (groupId: string) => void;
   clearPromptGroupRegroup: (groupId: string) => void;
@@ -100,8 +114,10 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     focusedGroupId,
     generatingGroupIds,
     groupOverlapMap,
+    imageNodesById,
     isMobile,
     isNodeDragActive,
+    liveDerivedNodeIdsByOwnerRef,
     lockedGroupBoundsById,
     liveNodePositionByIdRef,
     liveNodePositionVersion,
@@ -116,15 +132,18 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     setLiveNodePositionVersion,
     visibleImageNodes,
     visiblePromptNodes,
+    workflowUtilityNodesById,
   } = deps;
 
   const currentGeneratingGroupIds = generatingGroupIds ?? EMPTY_GENERATING_GROUP_IDS;
   const currentGroupOverlapMap = groupOverlapMap ?? EMPTY_GROUP_OVERLAP_MAP;
+  const currentImageNodesById = imageNodesById ?? EMPTY_IMAGE_NODES_BY_ID;
   const currentLockedGroupBoundsById = lockedGroupBoundsById ?? EMPTY_LOCKED_GROUP_BOUNDS_BY_ID;
   const currentPromptGroupLayerById = promptGroupLayerById ?? EMPTY_PROMPT_GROUP_LAYER_BY_ID;
   const currentPromptNodesById = promptNodesById ?? EMPTY_PROMPT_NODES_BY_ID;
   const currentVisibleImageNodes = visibleImageNodes ?? EMPTY_VISIBLE_IMAGE_NODES;
   const currentVisiblePromptNodes = visiblePromptNodes ?? EMPTY_VISIBLE_PROMPT_NODES;
+  const currentWorkflowUtilityNodesById = workflowUtilityNodesById ?? EMPTY_WORKFLOW_UTILITY_NODES_BY_ID;
   const liveSceneFrameRef = useRef<number | null>(null);
   const promptGroupRegroupFrameRef = useRef<number | null>(null);
   const stablePromptGroupBoundsByIdRef = useRef(new Map<string, PromptGroupBounds>());
@@ -305,6 +324,114 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       setLiveNodePositionVersion((prev) => prev + 1);
     });
   }, [isNodeDragActive, promptGroupLayoutStateByIdRef, setLiveNodePositionVersion]);
+
+  const resolvePromptGroupIdForNodeId = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return null;
+    }
+
+    if (currentPromptNodesById.has(nodeId)) {
+      return nodeId;
+    }
+
+    return currentImageNodesById.get(nodeId)?.parentPromptId || null;
+  }, [currentImageNodesById, currentPromptNodesById]);
+
+  const resolveCanvasNodePositionForLiveDrag = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return null;
+    }
+
+    const livePosition = liveNodePositionByIdRef.current[nodeId];
+    if (livePosition) {
+      return livePosition;
+    }
+
+    const promptNode = currentPromptNodesById.get(nodeId);
+    if (promptNode) {
+      return promptNode.position;
+    }
+
+    const imageNode = currentImageNodesById.get(nodeId);
+    if (imageNode) {
+      return imageNode.position;
+    }
+
+    const workflowNode = currentWorkflowUtilityNodesById.get(nodeId);
+    return workflowNode?.position ?? null;
+  }, [
+    currentImageNodesById,
+    currentPromptNodesById,
+    currentWorkflowUtilityNodesById,
+    liveNodePositionByIdRef,
+  ]);
+
+  const applyLiveNodeDeltaToDraggedSet = useCallback((
+    ownerId: string,
+    nodeIds: string[] | null | undefined,
+    delta: Point | null | undefined,
+  ) => {
+    const currentNodeIds = nodeIds ?? [];
+    if (!ownerId || currentNodeIds.length === 0 || !delta || (delta.x === 0 && delta.y === 0)) {
+      return;
+    }
+
+    const companionIds = Array.from(new Set(
+      currentNodeIds.filter((nodeId) => Boolean(nodeId) && nodeId !== ownerId)
+    ));
+
+    const previousCompanionIds = liveDerivedNodeIdsByOwnerRef.current[ownerId] || [];
+    let nextLivePositions = liveNodePositionByIdRef.current;
+    let hasLivePositionChanged = false;
+
+    previousCompanionIds.forEach((nodeId) => {
+      if (companionIds.includes(nodeId) || !(nodeId in nextLivePositions)) {
+        return;
+      }
+
+      if (nextLivePositions === liveNodePositionByIdRef.current) {
+        nextLivePositions = { ...nextLivePositions };
+      }
+      delete nextLivePositions[nodeId];
+      hasLivePositionChanged = true;
+    });
+
+    companionIds.forEach((nodeId) => {
+      const basePosition = resolveCanvasNodePositionForLiveDrag(nodeId);
+      if (!basePosition) {
+        return;
+      }
+
+      const nextPosition = {
+        x: basePosition.x + delta.x,
+        y: basePosition.y + delta.y,
+      };
+      const previousPosition = nextLivePositions[nodeId];
+
+      if (!previousPosition || previousPosition.x !== nextPosition.x || previousPosition.y !== nextPosition.y) {
+        if (nextLivePositions === liveNodePositionByIdRef.current) {
+          nextLivePositions = { ...nextLivePositions };
+        }
+        nextLivePositions[nodeId] = nextPosition;
+        hasLivePositionChanged = true;
+      }
+    });
+
+    liveDerivedNodeIdsByOwnerRef.current = {
+      ...liveDerivedNodeIdsByOwnerRef.current,
+      [ownerId]: companionIds,
+    };
+
+    if (hasLivePositionChanged) {
+      liveNodePositionByIdRef.current = nextLivePositions;
+      syncLiveNodePositionState();
+    }
+  }, [
+    liveDerivedNodeIdsByOwnerRef,
+    liveNodePositionByIdRef,
+    resolveCanvasNodePositionForLiveDrag,
+    syncLiveNodePositionState,
+  ]);
 
   const syncPromptGroupLayoutState = useCallback((
     updater: Record<string, PromptGroupLayoutPresentationState>
@@ -741,6 +868,9 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptGroupViews,
     visiblePromptGroupViews,
     syncLiveNodePositionState,
+    resolvePromptGroupIdForNodeId,
+    resolveCanvasNodePositionForLiveDrag,
+    applyLiveNodeDeltaToDraggedSet,
     beginPromptGroupRegroup,
     settlePromptGroupRegroup,
     clearPromptGroupRegroup,
