@@ -105,6 +105,7 @@ import { useDraftNodeSync } from './app/useDraftNodeSync';
 import { useGenerationPlacement } from './app/useGenerationPlacement';
 import { useGenerationReferenceImages } from './app/useGenerationReferenceImages';
 import { usePromptGroupDragHandlers } from './app/usePromptGroupDragHandlers';
+import { usePromptGroupSelection } from './app/usePromptGroupSelection';
 import { useSelectionMenuOverlay } from './app/useSelectionMenuOverlay';
 import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
@@ -7606,13 +7607,10 @@ ${paragraphs}
     connectorRenderPromptNodes,
     connectorRenderVisibleImageNodes,
     connectorRenderWorkflowUtilityNodesById,
-    connectorVisibleImageNodeIds,
-    connectorChildImagesByPromptId,
     resolveLivePromptPosition,
     resolveLiveImagePosition,
     resolveConnectorRenderPosition,
   } = useConnectorRenderer({
-    activeCanvas,
     liveSceneState,
     liveSceneRef,
     visiblePromptNodes,
@@ -7622,7 +7620,6 @@ ${paragraphs}
     imageNodesById,
     workflowUtilityNodesById,
     canvasPerformanceProfile,
-    resolveCurrentPromptChildImages,
   });
 
   const imageLoadSchedulingById = React.useMemo(() => {
@@ -7798,10 +7795,12 @@ ${paragraphs}
     commitPromptGroupDrag,
   });
 
-  const handlePromptGroupNodeSelect = useCallback((groupId: string, nodeId: string) => {
-    setFocusedGroupId(groupId);
-    handleCanvasNodeSelect(nodeId);
-  }, [handleCanvasNodeSelect]);
+  const {
+    handlePromptGroupNodeSelect,
+  } = usePromptGroupSelection({
+    handleCanvasNodeSelect,
+    setFocusedGroupId,
+  });
 
   const handleRootMouseMove = useCallback((e: React.MouseEvent) => {
     handleSelectionMouseMove(e);
@@ -8871,68 +8870,7 @@ ${paragraphs}
             />
           )}
 
-          {/* Prompt -> Image connections now render inside each prompt-group container. */}
-          {false && connectorRenderPromptNodes.map(pn => {
-            const childNodes = connectorChildImagesByPromptId.get(pn.id) || [];
-
-            return childNodes.map((childNode) => {
-              if (!childNode || !connectorVisibleImageNodeIds.has(childNode.id)) return null;
-
-              // Flowith-style: Prompt Bottom 鈫?Image Top
-              // Prompt Anchor: Bottom Center (pn.position)
-              // Image Anchor: Bottom Center (childNode.position)
-
-              // Start: Prompt Bottom Center
-              const startX = pn.position.x + 5000;
-              const startY = pn.position.y + 5000;
-
-              // End: Image Top Center (Bottom - Height)
-              const { width: cardWidth, totalHeight: theoreticalHeight } = getCardDimensions(childNode.aspectRatio, true);
-              let imageHeight = theoreticalHeight;
-
-              if (childNode.dimensions && typeof childNode.dimensions === 'string') {
-                // 🎯 [Fix Bug] Extract purely the dimension part: "1:1 路 4096x4096" -> "4096x4096"
-                // Then split by 'x' to avoid parsing the "1:1" as "1"
-                const match = childNode.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-                if (match && match[1] && match[2]) {
-                  const w = parseInt(match[1], 10);
-                  const h = parseInt(match[2], 10);
-                  if (w > 0 && h > 0) {
-                    const aspect = w / h;
-                    const realParams = getCardDimensions(childNode.aspectRatio, false);
-                    imageHeight = (realParams.width / aspect) + 40; // 40px for footer
-                  }
-                }
-              }
-              /* Keep parent-child card connectors light gray. */
-
-              if (isNaN(imageHeight) || imageHeight <= 0) {
-                imageHeight = theoreticalHeight;
-              }
-              const endX = childNode.position.x + 5000;
-              const endY = (childNode.position.y - imageHeight) + 5005;
-              const d = buildSoftConnectorPath(startX, startY, endX, endY);
-
-              return (
-                <g key={`${pn.id}-${childNode.id}`}>
-                  <circle cx={startX} cy={startY} r={connectorDotEnd} fill="var(--connector-color, #6366f1)" opacity="0.8" />
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke="var(--connector-color, #6366f1)"
-                    strokeWidth={connectorStroke}
-                    strokeDasharray={connectorStrokeDasharray}
-                    strokeLinecap={connectorStrokeLinecap}
-                    opacity="0.6"
-                    className={showConnectorButtons ? 'group-hover:opacity-100' : undefined}
-                  />
-                  {showConnectorHitAreas && (
-                    <path d={d} stroke="transparent" strokeWidth={connectorHitStroke} fill="none" className="pointer-events-auto cursor-pointer" />
-                  )}
-                </g>
-              );
-            });
-          })}
+          {/* Prompt -> image connections render inside each prompt-group container. */}
 
           {/* 2. Image -> Prompt/Pending Connections (Follow-up Flow) */}
           {/* A. Existing Prompts */}
@@ -9129,41 +9067,7 @@ ${paragraphs}
 
 
 
-        {/* 2. Group layer (behind the cards) */}
-        {false && visibleGroups.map(group => (
-          <CanvasGroupComponent
-            key={group.id}
-            group={group}
-            zoom={canvasTransform.scale}
-            highlighted={highlightedId === group.id}
-            onUngroup={removeGroup}
-            onDragStart={(id, e) => {
-              const nodeIds = group.nodeIds;
-              const isMultiSelect = e.shiftKey || e.ctrlKey || e.metaKey;
-              const alreadySelected = selectedNodeIds || [];
-
-              // If dragging an already selected group (part of a multi-selection), ensure we don't wipe selection
-              // Unless we are holding shift (toggling)
-              const allNodesSelected = nodeIds.every(nid => alreadySelected.includes(nid));
-
-              if (isMultiSelect) {
-                selectNodes(nodeIds, 'replace');
-                return;
-              }
-
-              if (alreadySelected.length > 0 && allNodesSelected) {
-                return;
-              }
-
-              selectNodes(nodeIds, 'toggle');
-            }}
-            onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
-            onUpdateGroup={updateGroup}
-            computedBounds={getComputedGroupBounds(group)}
-          />
-        ))}
-
-        {/* 3. 持久化提示词节点 */}
+        {/* 2. Canvas items */}
         {renderedVisibleGroups}
         {renderedCanvasItems}
 

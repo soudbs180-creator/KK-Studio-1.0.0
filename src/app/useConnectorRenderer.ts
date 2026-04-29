@@ -22,7 +22,6 @@ const EMPTY_CONNECTOR_RENDER_SNAPSHOT: ConnectorRenderSnapshot = {
 };
 
 interface UseConnectorRendererDeps {
-  activeCanvas: { promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   liveSceneState: LiveSceneSnapshot;
   liveSceneRef: React.RefObject<LiveSceneSnapshot>;
   visiblePromptNodes: PromptNode[];
@@ -32,10 +31,6 @@ interface UseConnectorRendererDeps {
   imageNodesById: Map<string, GeneratedImage>;
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode>;
   canvasPerformanceProfile: CanvasPerformanceProfile;
-  resolveCurrentPromptChildImages: (
-    promptNode: PromptNode | undefined | null,
-    imageNodes: GeneratedImage[],
-  ) => GeneratedImage[];
 }
 
 interface UseConnectorRendererResult {
@@ -43,8 +38,6 @@ interface UseConnectorRendererResult {
   connectorRenderPromptNodes: PromptNode[];
   connectorRenderVisibleImageNodes: GeneratedImage[];
   connectorRenderWorkflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode>;
-  connectorVisibleImageNodeIds: Set<string>;
-  connectorChildImagesByPromptId: Map<string, GeneratedImage[]>;
   resolveLivePromptPosition: (promptNode: PromptNode | undefined | null) => CanvasPoint | null;
   resolveLiveImagePosition: (imageNode: GeneratedImage | undefined | null) => CanvasPoint | null;
   resolveConnectorRenderPosition: (
@@ -55,7 +48,6 @@ interface UseConnectorRendererResult {
 
 export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnectorRendererResult {
   const {
-    activeCanvas,
     liveSceneState,
     liveSceneRef,
     visiblePromptNodes,
@@ -65,7 +57,6 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
     imageNodesById,
     workflowUtilityNodesById,
     canvasPerformanceProfile,
-    resolveCurrentPromptChildImages,
   } = deps;
 
   const buildConnectorRenderSnapshot = useCallback((): ConnectorRenderSnapshot => {
@@ -224,11 +215,6 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
     [connectorRenderSnapshot, workflowUtilityNodesById]
   );
 
-  const connectorVisibleImageNodeIds = React.useMemo(
-    () => new Set(connectorRenderVisibleImageNodes.map((node) => node.id)),
-    [connectorRenderVisibleImageNodes]
-  );
-
   const resolveLivePromptPosition = useCallback((promptNode: PromptNode | undefined | null) => {
     if (!promptNode) return null;
     return resolveLiveSceneNodePosition(
@@ -255,27 +241,11 @@ export function useConnectorRenderer(deps: UseConnectorRendererDeps): UseConnect
     return connectorRenderSnapshot.positionByNodeId[nodeId] ?? fallbackPosition ?? null;
   }, [connectorRenderSnapshot]);
 
-  const connectorChildImagesByPromptId = React.useMemo(() => {
-    const childMap = new Map<string, GeneratedImage[]>();
-    if (!activeCanvas) return childMap;
-
-    connectorRenderPromptNodes.forEach((promptNode) => {
-      const images = resolveCurrentPromptChildImages(promptNode, connectorRenderVisibleImageNodes);
-      if (images.length > 0) {
-        childMap.set(promptNode.id, images);
-      }
-    });
-
-    return childMap;
-  }, [activeCanvas, connectorRenderPromptNodes, connectorRenderVisibleImageNodes, resolveCurrentPromptChildImages]);
-
   return {
     connectorRenderSnapshot,
     connectorRenderPromptNodes,
     connectorRenderVisibleImageNodes,
     connectorRenderWorkflowUtilityNodesById,
-    connectorVisibleImageNodeIds,
-    connectorChildImagesByPromptId,
     resolveLivePromptPosition,
     resolveLiveImagePosition,
     resolveConnectorRenderPosition,

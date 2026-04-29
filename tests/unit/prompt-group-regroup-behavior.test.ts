@@ -355,14 +355,19 @@ test('usePromptGroupLayout owns prompt-group visible derived views', () => {
 
 test('App removes hidden legacy prompt-group render branches', () => {
   const appSource = readSource('src/App.tsx');
+  const connectorRendererSource = readSource('src/app/useConnectorRenderer.ts');
 
   assert.doesNotMatch(appSource, /const handleLegacyImageRelativeDrag = useCallback/);
   assert.doesNotMatch(appSource, /\{false && visiblePromptNodes\.map/);
   assert.doesNotMatch(appSource, /\{false && standaloneVisibleImageNodes\.map/);
+  assert.doesNotMatch(appSource, /\{false && connectorRenderPromptNodes\.map/);
+  assert.doesNotMatch(appSource, /\{false && visibleGroups\.map/);
   assert.doesNotMatch(appSource, /const expandedSelectedIds = Array\.from\(new Set/);
   assert.doesNotMatch(appSource, /promptGroupViews,/);
   assert.doesNotMatch(appSource, /const visibleImageNodesById = React\.useMemo/);
   assert.doesNotMatch(appSource, /const visibleImageNodeIds = React\.useMemo/);
+  assert.doesNotMatch(connectorRendererSource, /connectorVisibleImageNodeIds/);
+  assert.doesNotMatch(connectorRendererSource, /connectorChildImagesByPromptId/);
 });
 
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
@@ -375,6 +380,19 @@ test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   assert.match(promptGroupLayoutSource, /selectNodes\(options\.nodeIds, 'replace'\)/);
   assert.doesNotMatch(appSource, /const handleImageCardHeightChange = useCallback/);
   assert.doesNotMatch(appSource, /const handleFocusPromptGroup = useCallback/);
+});
+
+test('usePromptGroupSelection owns prompt-group node selection wrapper', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupSelectionSource = readSource('src/app/usePromptGroupSelection.ts');
+
+  assert.match(appSource, /usePromptGroupSelection\(\{/);
+  assert.match(promptGroupSelectionSource, /interface UsePromptGroupSelectionDeps/);
+  assert.match(promptGroupSelectionSource, /interface UsePromptGroupSelectionResult/);
+  assert.match(promptGroupSelectionSource, /const handlePromptGroupNodeSelect = useCallback/);
+  assert.match(promptGroupSelectionSource, /setFocusedGroupId\(groupId\);/);
+  assert.match(promptGroupSelectionSource, /handleCanvasNodeSelect\(nodeId\);/);
+  assert.doesNotMatch(appSource, /const handlePromptGroupNodeSelect = useCallback/);
 });
 
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
