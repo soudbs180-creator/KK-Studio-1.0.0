@@ -82,6 +82,7 @@ interface UsePromptGroupLayoutDeps {
     imageNodes: GeneratedImage[],
   ) => GeneratedImage[];
   selectNodes: SelectNodes;
+  selectedNodeIds: string[] | null | undefined;
   setFocusedGroupId: Dispatch<SetStateAction<string | null>>;
   setGroupOverlapMap: Dispatch<SetStateAction<Record<string, string[]>>>;
   setImageCardHeightById: Dispatch<SetStateAction<Record<string, number>>>;
@@ -118,6 +119,11 @@ interface UsePromptGroupLayoutResult {
     delta: Point | null | undefined
   ) => void;
   handleLiveNodePositionChange: (nodeId: string, position: Point | null) => void;
+  shouldAutoRegroupPromptGroup: (
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    sourceNodeId: string
+  ) => boolean;
   handleImageCardHeightChange: (imageId: string, height: number) => void;
   handleFocusPromptGroup: (
     groupId: string | null,
@@ -150,6 +156,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptNodesById,
     resolveCurrentPromptChildImages,
     selectNodes,
+    selectedNodeIds,
     setFocusedGroupId,
     setGroupOverlapMap,
     setImageCardHeightById,
@@ -168,6 +175,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
   const currentLockedGroupBoundsById = lockedGroupBoundsById ?? EMPTY_LOCKED_GROUP_BOUNDS_BY_ID;
   const currentPromptGroupLayerById = promptGroupLayerById ?? EMPTY_PROMPT_GROUP_LAYER_BY_ID;
   const currentPromptNodesById = promptNodesById ?? EMPTY_PROMPT_NODES_BY_ID;
+  const currentSelectedNodeIds = selectedNodeIds ?? [];
   const currentVisibleImageNodes = visibleImageNodes ?? EMPTY_VISIBLE_IMAGE_NODES;
   const currentVisiblePromptNodes = visiblePromptNodes ?? EMPTY_VISIBLE_PROMPT_NODES;
   const currentWorkflowUtilityNodesById = workflowUtilityNodesById ?? EMPTY_WORKFLOW_UTILITY_NODES_BY_ID;
@@ -887,6 +895,16 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     syncLiveNodePositionState,
   ]);
 
+  const shouldAutoRegroupPromptGroup = useCallback((
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    sourceNodeId: string,
+  ) => (
+    sourceNodeId === promptNode.id
+    && currentSelectedNodeIds.length <= 1
+    && childImages.length > 0
+  ), [currentSelectedNodeIds.length]);
+
   const computedGroupOverlapMap = useMemo(() => {
     if (isNodeDragActive) {
       return currentGroupOverlapMap;
@@ -1085,6 +1103,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     resolveCanvasNodePositionForLiveDrag,
     applyLiveNodeDeltaToDraggedSet,
     handleLiveNodePositionChange,
+    shouldAutoRegroupPromptGroup,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,

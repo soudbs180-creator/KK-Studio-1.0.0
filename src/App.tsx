@@ -7624,6 +7624,7 @@ ${paragraphs}
     resolvePromptGroupIdForNodeId,
     applyLiveNodeDeltaToDraggedSet,
     handleLiveNodePositionChange,
+    shouldAutoRegroupPromptGroup,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,
@@ -7650,6 +7651,7 @@ ${paragraphs}
     promptNodesById,
     resolveCurrentPromptChildImages,
     selectNodes,
+    selectedNodeIds,
     setFocusedGroupId,
     setGroupOverlapMap,
     setImageCardHeightById,
@@ -7700,16 +7702,6 @@ ${paragraphs}
       setFocusedGroupId(null);
     }
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
-
-  const shouldAutoRegroupPromptGroup = useCallback((
-    promptNode: PromptNode,
-    childImages: GeneratedImage[],
-    sourceNodeId: string,
-  ) => (
-    sourceNodeId === promptNode.id
-    && selectedNodeIds.length <= 1
-    && childImages.length > 0
-  ), [selectedNodeIds.length]);
 
   const commitPromptGroupDrag = useCallback((
     promptNode: PromptNode,

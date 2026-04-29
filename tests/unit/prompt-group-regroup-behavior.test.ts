@@ -267,6 +267,16 @@ test('usePromptGroupLayout owns live node position change handling', () => {
   assert.doesNotMatch(appSource, /const handleLiveNodePositionChange = useCallback/);
 });
 
+test('usePromptGroupLayout owns prompt-group regroup predicate', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
+  assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
+  assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.length <= 1/);
+  assert.doesNotMatch(appSource, /const shouldAutoRegroupPromptGroup = useCallback/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');

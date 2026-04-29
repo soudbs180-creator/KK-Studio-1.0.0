@@ -42,11 +42,11 @@ test("dragged image cards mark manual layout overrides in canvas state", () => {
 });
 
 test("main-card regroup is not blocked by previously moved child cards", () => {
-  const appSource = readSource("src/App.tsx");
+  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
 
-  assert.match(appSource, /const shouldAutoRegroupPromptGroup = useCallback/);
-  assert.match(appSource, /sourceNodeId === promptNode\.id/);
-  assert.doesNotMatch(appSource, /childImages\.some\(\(imageNode\) => !imageNode\.userMoved\)/);
+  assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
+  assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
+  assert.doesNotMatch(promptGroupLayoutSource, /childImages\.some\(\(imageNode\) => !imageNode\.userMoved\)/);
 });
 
 test("child-card drag clears regroup presentation state so connectors follow live positions", () => {
