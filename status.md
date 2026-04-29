@@ -123,32 +123,42 @@ Validation passed:
 
 ### Milestone 3: Prompt Group Layout Extraction
 
-Status: in progress. First low-risk slice implemented; preparing scoped commit.
+Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice validated, but the scoped commit is blocked by the current sandbox being unable to create `.git/index.lock`.
 
-Scope completed in this slice:
+Scope completed in the first slice:
 - Added `src/app/usePromptGroupLayout.ts` with explicit `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
 - Moved prompt-group live scene snapshot derivation and `liveSceneRef` synchronization out of `src/App.tsx`.
 - Kept `App.tsx` as the hook orchestrator for this slice and left bounds/overlap/regroup behavior in place for later extraction.
 - Updated the live-scene contract test to assert the prompt-group live-scene builder is owned by the new hook.
 
-Line count change:
-- `src/App.tsx`: `10395` baseline lines to `10333` lines after this slice.
-- `src/app/usePromptGroupLayout.ts`: new file, `126` lines.
+Scope completed in the second slice:
+- Moved prompt-group regroup layout building, regroup-layout trace instrumentation, bounds calculation, stable bounds/views caches, overlap recomputation, visible prompt-group views, and live-scene frame synchronization into `src/app/usePromptGroupLayout.ts`.
+- Kept prompt-group drag commit, begin/settle/clear presentation mutations, and render wiring in `src/App.tsx` for the next isolated slice.
+- Updated source-contract tests so App remains responsible for orchestration while `usePromptGroupLayout.ts` owns regroup layouts, bounds, views, overlap freeze, and live sync.
 
-Validation passed before status update:
+Line count change after second slice:
+- `src/App.tsx`: `10395` baseline lines to `10333` lines after this slice.
+- `src/App.tsx`: `10044` lines after second slice.
+- `src/app/usePromptGroupLayout.ts`: `529` lines after second slice.
+
+Validation passed:
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-layout.test.ts tests/unit/canvas-local-performance-trace-contract.test.ts`
 - `npm.cmd run typecheck`
 - `npm.cmd run test:unit` (`971` tests passed)
 - `npm.cmd run build`
 - `npm.cmd run check:encoding`
 
+Validation not used as a commit gate:
+- `npm.cmd run verify:prompt-group-drag`: failed in the local browser path because `http://127.0.0.1:3000` opened the auth/login screen and `[data-canvas-surface="prompt"]` never became visible within 30s. This is recorded as an environment/auth precondition issue for this browser smoke, not a unit/type/build regression.
+
 Current risk:
-- This slice intentionally does not move prompt-group bounds, overlap, drag, or regroup mutation logic yet, so `App.tsx` still owns most prompt-group layout behavior.
+- This slice intentionally does not move prompt-group begin/settle/clear presentation mutation or drag commit persistence yet, so `App.tsx` still owns the final prompt-group drag lifecycle controls.
 - The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
 
 Next step:
-- Commit this slice as `refactor: extract prompt group live scene layout`.
-- Continue Milestone 3 by extracting the next isolated prompt-group layout block after read-only subagent review.
+- Commit this slice as `refactor: extract prompt group layout runtime` once `.git/index.lock` creation is allowed again. Current failed command: `git add -- src/App.tsx src/app/usePromptGroupLayout.ts status.md tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-local-performance-trace-contract.test.ts tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-behavior.test.ts; git commit -m "refactor: extract prompt group layout runtime"`.
+- Continue Milestone 3 by extracting prompt-group presentation state mutation helpers (`syncPromptGroupLayoutState`, `schedulePromptGroupRegroupAnimation`, `beginPromptGroupRegroup`, `settlePromptGroupRegroup`, `clearPromptGroupRegroup`) into `usePromptGroupLayout.ts` with drag commit persistence still in `App.tsx`.
 
 ### Milestones 4-9
 
@@ -179,6 +189,15 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-29 Milestone 3 second slice:
+  - Prompt-group/live-scene/performance targeted tests: passed, 38 tests.
+  - `tests/unit/prompt-group-regroup-layout.test.ts`: passed, 3 tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, 971 tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after final status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+  - `npm.cmd run verify:prompt-group-drag`: failed on local auth/login precondition, recorded outside the commit gate.
 
 ## Risk Log
 

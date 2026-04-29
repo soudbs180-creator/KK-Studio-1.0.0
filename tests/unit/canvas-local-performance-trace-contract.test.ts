@@ -11,14 +11,14 @@ function readSource(relativePath: string) {
 
 describe('canvas local performance trace contract', () => {
   test('App instruments prompt-group regroup layout recomputation', () => {
-    const appSource = readSource('src/App.tsx')
+    const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts')
 
     assert.match(
-      appSource,
+      promptGroupLayoutSource,
       /traceLocalPerformance\('canvas-interaction\.prompt-group-regroup-layouts', \(\) => \{/
     )
     assert.match(
-      appSource,
+      promptGroupLayoutSource,
       /activeLayoutStateCount: promptGroupLayoutEntries\.length/
     )
   })

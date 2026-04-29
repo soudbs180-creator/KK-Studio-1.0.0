@@ -11,10 +11,11 @@ function readSource(relativePath: string) {
 
 test("prompt-group drag keeps child cards on their live positions", () => {
   const appSource = readSource("src/App.tsx");
+  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
   const renderLayoutSource = readSource("src/app/promptGroupRenderLayout.ts");
 
-  assert.match(appSource, /const promptGroupRegroupLayoutsById = React\.useMemo/);
-  assert.match(appSource, /regroupLayoutMap\.set\(/);
+  assert.match(promptGroupLayoutSource, /const promptGroupRegroupLayoutsById = useMemo/);
+  assert.match(promptGroupLayoutSource, /regroupLayoutMap\.set\(/);
   assert.match(appSource, /regroupLayoutsById: promptGroupRegroupLayoutsById\.get\(node\.id\) \?\? new Map\(\)/);
   assert.match(renderLayoutSource, /const regroupLayout = regroupLayoutsById\.get\(childNode\.id\);/);
   assert.match(renderLayoutSource, /visualPosition: regroupLayout\?\.renderPosition \?\? livePosition/);

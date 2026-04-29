@@ -99,13 +99,14 @@ test('prompt-group connector svg uses stable group bounds during regroup renderi
 
 test('prompt-group settle phase keeps animating after drop instead of snapping to the final layout', () => {
   const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
   assert.match(appSource, /if \(state\.layoutMode === 'docked' && state\.settleUntil !== null\) \{/);
   assert.match(appSource, /const settleDuration = Math\.max\(1, state\.settleUntil - state\.startedAt\);/);
   assert.match(appSource, /regroupProgress: nextProgress,/);
   assert.match(appSource, /layoutMode: 'docked',\s*regroupProgress: 0,/);
-  assert.match(appSource, /const fastRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*0/);
-  assert.match(appSource, /const settleRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*layoutState\.regroupProgress/);
+  assert.match(promptGroupLayoutSource, /const fastRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*0/);
+  assert.match(promptGroupLayoutSource, /const settleRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*layoutState\.regroupProgress/);
 });
 
 test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
@@ -194,10 +195,11 @@ test('recycle motion can have layered speed while still converging to one final 
 
 test('App locks regroup slot assignment when recycle starts', () => {
   const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
 
   assert.match(appSource, /targetSlotIndicesByChildId/);
-  assert.match(appSource, /targetSlotIndices:\s*childImages\.map\(\(imageNode\) => layoutState\.targetSlotIndicesByChildId\[imageNode\.id\]/);
+  assert.match(promptGroupLayoutSource, /targetSlotIndices:\s*childImages\.map\(\(imageNode\) => layoutState\.targetSlotIndicesByChildId\[imageNode\.id\]/);
   assert.match(dragHookSource, /beginPromptGroupRegroup\(node\.id,\s*childImages\)/);
 });
 
@@ -211,11 +213,11 @@ test('App does not recreate regroup presentation state on every drag frame when 
 });
 
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
-  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
 
-  assert.match(appSource, /const renderPosition = !layout/);
-  assert.match(appSource, /:\s*layout\.position;/);
+  assert.match(promptGroupLayoutSource, /const renderPosition = !layout/);
+  assert.match(promptGroupLayoutSource, /:\s*layout\.position;/);
   assert.match(layoutSource, /visualPosition:\s*regroupLayout\?\.renderPosition \?\? livePosition/);
   assert.match(layoutSource, /settledPosition:\s*regroupLayout\?\.settledPosition \?\? livePosition/);
 });
@@ -228,18 +230,18 @@ test('App keeps child live positions owned by regroup layout during single main-
 });
 
 test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
-  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /const hasActivePromptGroupDragPresentation = isNodeDragActive/);
-  assert.match(appSource, /Object\.values\(promptGroupLayoutStateByIdRef\.current\)\.some/);
-  assert.match(appSource, /if \(hasActivePromptGroupDragPresentation\) \{/);
-  assert.match(appSource, /setLiveNodePositionVersion\(\(prev\) => prev \+ 1\)/);
+  assert.match(promptGroupLayoutSource, /const hasActivePromptGroupDragPresentation = isNodeDragActive/);
+  assert.match(promptGroupLayoutSource, /Object\.values\(promptGroupLayoutStateByIdRef\.current\)\.some/);
+  assert.match(promptGroupLayoutSource, /if \(hasActivePromptGroupDragPresentation\) \{/);
+  assert.match(promptGroupLayoutSource, /setLiveNodePositionVersion\(\(prev\) => prev \+ 1\)/);
 });
 
 test('App freezes overlap-map recomputation while node drag is active', () => {
-  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /if \(isNodeDragActive\) \{\s*return groupOverlapMap;/);
+  assert.match(promptGroupLayoutSource, /if \(isNodeDragActive\) \{\s*return currentGroupOverlapMap;/);
 });
 
 test('App skips prompt-layout auto-repair while node drag is active', () => {
@@ -263,30 +265,30 @@ test('App reuses the last stable visible-canvas scene while node drag is active'
 });
 
 test('App reuses the last stable prompt-group bounds and views while node drag is active', () => {
-  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
-  assert.match(appSource, /const stablePromptGroupBoundsByIdRef = useRef\(new Map<string/);
-  assert.match(appSource, /if \(isNodeDragActive && stablePromptGroupBoundsByIdRef\.current\.size > 0\) \{\s*return stablePromptGroupBoundsByIdRef\.current;/);
-  assert.match(appSource, /stablePromptGroupBoundsByIdRef\.current = boundsMap;/);
-  assert.match(appSource, /const stablePromptGroupViewsRef = useRef<PromptGroupView\[]>\(\[]\);/);
-  assert.match(appSource, /if \(isNodeDragActive && stablePromptGroupViewsRef\.current\.length > 0\) \{\s*return stablePromptGroupViewsRef\.current;/);
-  assert.match(appSource, /stablePromptGroupViewsRef\.current = nextPromptGroupViews;/);
+  assert.match(promptGroupLayoutSource, /const stablePromptGroupBoundsByIdRef = useRef\(new Map<string/);
+  assert.match(promptGroupLayoutSource, /if \(isNodeDragActive && stablePromptGroupBoundsByIdRef\.current\.size > 0\) \{\s*return stablePromptGroupBoundsByIdRef\.current;/);
+  assert.match(promptGroupLayoutSource, /stablePromptGroupBoundsByIdRef\.current = boundsMap;/);
+  assert.match(promptGroupLayoutSource, /const stablePromptGroupViewsRef = useRef<PromptGroupView\[]>\(\[]\);/);
+  assert.match(promptGroupLayoutSource, /if \(isNodeDragActive && stablePromptGroupViewsRef\.current\.length > 0\) \{\s*return stablePromptGroupViewsRef\.current;/);
+  assert.match(promptGroupLayoutSource, /stablePromptGroupViewsRef\.current = nextPromptGroupViews;/);
 });
 
 test('App only builds prompt-group regroup layouts for groups with active presentation state', () => {
-  const appSource = readSource('src/App.tsx');
-  const regroupMemoStart = appSource.indexOf('const promptGroupRegroupLayoutsById = React.useMemo(() => {');
-  const regroupMemoEnd = appSource.indexOf('const promptGroupBoundsById = React.useMemo(() => {');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const regroupMemoStart = promptGroupLayoutSource.indexOf('const promptGroupRegroupLayoutsById = useMemo(() => {');
+  const regroupMemoEnd = promptGroupLayoutSource.indexOf('const promptGroupBoundsById = useMemo(() => {');
 
   assert.notEqual(regroupMemoStart, -1);
   assert.notEqual(regroupMemoEnd, -1);
 
-  const regroupMemoSource = appSource.slice(regroupMemoStart, regroupMemoEnd);
+  const regroupMemoSource = promptGroupLayoutSource.slice(regroupMemoStart, regroupMemoEnd);
 
   assert.match(regroupMemoSource, /const promptGroupLayoutEntries = Object\.entries\(promptGroupLayoutStateByIdRef\.current\);/);
   assert.match(regroupMemoSource, /if \(promptGroupLayoutEntries\.length === 0\) \{\s*return regroupLayoutMap;\s*\}/);
   assert.match(regroupMemoSource, /promptGroupLayoutEntries\.forEach\(\(\[promptNodeId, layoutState\]\) => \{/);
-  assert.match(regroupMemoSource, /const promptNode = promptNodesById\.get\(promptNodeId\);/);
+  assert.match(regroupMemoSource, /const promptNode = currentPromptNodesById\.get\(promptNodeId\);/);
   assert.doesNotMatch(regroupMemoSource, /activeCanvas\.promptNodes\.forEach/);
   assert.match(regroupMemoSource, /buildPromptGroupRegroupLayouts\(\s*promptNode,\s*childImages,\s*promptPosition,\s*layoutState,/s);
 });
