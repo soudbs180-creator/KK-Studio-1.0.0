@@ -184,7 +184,7 @@ Scope completed in the tenth slice:
 
 Scope completed in the eleventh slice:
 - Moved prompt-group prompt-node edit handler ownership into `src/app/usePromptGroupLayout.ts`: `handlePromptGroupNodeHeightChange` and `handlePromptGroupTagRemove`.
-- Reused the hook's existing `promptNodesById` and `updatePromptNode` dependencies for prompt height persistence and tag removal.
+- Reused the hook-owned `currentPromptNodesById` map and injected `updatePromptNode` dependency for prompt height persistence and tag removal.
 - Kept prompt-group node selection, drag handler wiring, render wiring, and broader canvas reset/focus lifecycle in `src/App.tsx`.
 - Added a failing source-contract test first, verified it failed, then migrated implementation.
 
