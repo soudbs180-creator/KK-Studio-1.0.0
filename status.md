@@ -331,10 +331,13 @@ Validation passed:
 - Fourteenth slice `npm.cmd run check:encoding`: passed after status update.
 - Fourteenth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - Fifteenth slice source contract: prompt-group tests now assert App and `usePromptGroupLayout.ts` no longer expose unused visible/child prompt-group derived values.
-- Fifteenth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `55` tests.
+- Fifteenth slice targeted tests: prompt-group/live-scene/performance/connector/layout tests passed, `61` tests.
 - Fifteenth slice `npm.cmd run typecheck`: passed.
 - Fifteenth slice `npm.cmd run test:unit`: passed, `985` tests.
 - Fifteenth slice `npm.cmd run build`: passed.
+- Fifteenth slice `npm.cmd run governance:agent-docs`: passed after status update.
+- Fifteenth slice `npm.cmd run check:encoding`: passed after status update.
+- Fifteenth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 Validation not used as a commit gate:
 - `npm.cmd run verify:prompt-group-drag`: failed in the local browser path because `http://127.0.0.1:3000` opened the auth/login screen and `[data-canvas-surface="prompt"]` never became visible within 30s. This is recorded as an environment/auth precondition issue for this browser smoke, not a unit/type/build regression.
@@ -507,10 +510,13 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - 2026-04-29 Milestone 3 fifteenth slice:
   - Source contract: prompt-group tests assert App and `usePromptGroupLayout.ts` no longer expose unused visible/child prompt-group derived values.
-  - Prompt-group/live-scene/performance/connector/layout targeted tests: passed, 55 tests.
+  - Prompt-group/live-scene/performance/connector/layout targeted tests: passed, 61 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 985 tests.
   - `npm.cmd run build`: passed.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 
