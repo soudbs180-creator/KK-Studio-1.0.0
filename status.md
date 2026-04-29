@@ -6,7 +6,7 @@ Last updated: 2026-04-29
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 2 complete; Milestone 3 prompt group layout extraction next
+- Current milestone: Milestone 3 prompt group layout extraction in progress; fourth child-map slice is committed and review checkpoint is complete before the next narrow extraction
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -123,7 +123,7 @@ Validation passed:
 
 ### Milestone 3: Prompt Group Layout Extraction
 
-Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice committed as `c8e6ca9f refactor: extract prompt group presentation state`; fourth child-map slice validated and ready for scoped commit.
+Status: in progress. First live-scene slice committed as `8d0f80e3 refactor: extract prompt group live scene layout`; second layout-runtime slice committed as `023fe7c3 refactor: extract prompt group layout runtime`; third presentation-state slice committed as `c8e6ca9f refactor: extract prompt group presentation state`; fourth child-map slice committed as `1944deb4 refactor: derive prompt group child maps in hook`.
 
 Scope completed in the first slice:
 - Added `src/app/usePromptGroupLayout.ts` with explicit `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
@@ -173,10 +173,17 @@ Validation not used as a commit gate:
 Current risk:
 - This slice intentionally does not move prompt-group drag commit persistence, auto-repair, render wiring, or selection behavior yet, so `App.tsx` still owns the final prompt-group drag lifecycle controls and side effects.
 - The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
+- The source-contract tests cover ownership boundaries, but the browser drag smoke is still blocked by a local auth/login precondition and should not be treated as behavioral proof until a valid session fixture exists.
+
+Review checkpoint after fourth slice:
+- `src/App.tsx` now remains at `9845` lines and `src/app/usePromptGroupLayout.ts` at `749` lines.
+- Confirmed `buildConnectorRenderSnapshot`, connector snapshot commit/schedule helpers, and connector position resolvers remain owned by `src/app/useConnectorRenderer.ts`.
+- Confirmed `buildPromptGroupRegroupLayouts`, presentation-state mutation helpers, stable bounds/views caches, live-scene derivation, and child maps remain owned by `src/app/usePromptGroupLayout.ts`.
+- Confirmed `App.tsx` still owns the remaining prompt-group live-position helper block, drag commit persistence, focus/height handlers, and auto-repair effect; these are the next extraction candidates.
 
 Next step:
-- Commit this slice as `refactor: derive prompt group child maps in hook`.
-- Continue Milestone 3 by extracting the remaining prompt-group live-position helper block only if a narrow contract can be added first.
+- Continue Milestone 3 by adding a RED source-contract test and then extracting the remaining prompt-group live-position helper block: `resolvePromptGroupIdForNodeId`, `resolveCanvasNodePositionForLiveDrag`, and `applyLiveNodeDeltaToDraggedSet`.
+- Keep `handleLiveNodePositionChange`, drag commit persistence, auto-repair, render wiring, and selection behavior in `App.tsx` unless the next contract explicitly proves a safe boundary.
 
 ### Milestones 4-9
 
@@ -231,6 +238,12 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `npm.cmd run test:unit`: passed, 973 tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-29 Milestone 3 review checkpoint after fourth slice:
+  - Prompt-group/live-scene/performance/connector targeted tests: passed, 43 tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run governance:agent-docs`: passed after correcting stale status wording.
+  - `npm.cmd run check:encoding`: passed after correcting stale status wording.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
