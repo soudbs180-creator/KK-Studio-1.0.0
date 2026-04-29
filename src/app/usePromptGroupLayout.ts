@@ -109,6 +109,8 @@ interface UsePromptGroupLayoutResult {
   actualChildImagesByPromptId: Map<string, GeneratedImage[]>;
   actualChildImageIdsByPromptId: Map<string, string[]>;
   expandedSelectedNodeIds: string[];
+  visibleChildImagesByPromptId: Map<string, GeneratedImage[]>;
+  standaloneVisibleImageNodes: GeneratedImage[];
   promptGroupNodeIdsById: Map<string, string[]>;
   promptGroupRegroupLayoutsById: Map<string, Map<string, PromptGroupRegroupLayout>>;
   promptGroupBoundsById: Map<string, PromptGroupBounds>;
@@ -1200,6 +1202,28 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       });
   }, [currentVisibleImageNodes, currentVisiblePromptNodes, promptGroupViews]);
 
+  const visibleChildImagesByPromptId = useMemo(() => {
+    const childMap = new Map<string, GeneratedImage[]>();
+    if (!activeCanvas) return childMap;
+
+    currentVisiblePromptNodes.forEach((promptNode) => {
+      const images = resolveCurrentPromptChildImages(promptNode, currentVisibleImageNodes);
+      if (images.length > 0) {
+        childMap.set(promptNode.id, images);
+      }
+    });
+
+    return childMap;
+  }, [activeCanvas, currentVisibleImageNodes, currentVisiblePromptNodes, resolveCurrentPromptChildImages]);
+
+  const standaloneVisibleImageNodes = useMemo(() => {
+    const promptGroupIdSet = new Set(promptGroupViews.map((groupView) => groupView.id));
+
+    return currentVisibleImageNodes.filter((imageNode) => (
+      !imageNode.parentPromptId || !promptGroupIdSet.has(imageNode.parentPromptId)
+    ));
+  }, [currentVisibleImageNodes, promptGroupViews]);
+
   const liveSceneState = useMemo<LiveSceneSnapshot>(() => {
     const liveNodePositions = liveNodePositionByIdRef.current;
     const promptGroups: LiveSceneSnapshot['promptGroups'] = {};
@@ -1319,6 +1343,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     actualChildImagesByPromptId,
     actualChildImageIdsByPromptId,
     expandedSelectedNodeIds,
+    visibleChildImagesByPromptId,
+    standaloneVisibleImageNodes,
     promptGroupNodeIdsById,
     promptGroupRegroupLayoutsById,
     promptGroupBoundsById,

@@ -341,6 +341,27 @@ test('usePromptGroupStacking owns prompt-group stacking maps', () => {
   assert.doesNotMatch(appSource, /const promptGroupStackZIndexById = React\.useMemo/);
 });
 
+test('usePromptGroupLayout owns prompt-group visible derived views', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const visibleChildImagesByPromptId = useMemo/);
+  assert.match(promptGroupLayoutSource, /const standaloneVisibleImageNodes = useMemo/);
+  assert.match(promptGroupLayoutSource, /visibleChildImagesByPromptId,/);
+  assert.match(promptGroupLayoutSource, /standaloneVisibleImageNodes,/);
+  assert.doesNotMatch(appSource, /const visibleChildImagesByPromptId = React\.useMemo/);
+  assert.doesNotMatch(appSource, /const standaloneVisibleImageNodes = React\.useMemo/);
+});
+
+test('App removes hidden legacy prompt-group render branches', () => {
+  const appSource = readSource('src/App.tsx');
+
+  assert.doesNotMatch(appSource, /const handleLegacyImageRelativeDrag = useCallback/);
+  assert.doesNotMatch(appSource, /\{false && visiblePromptNodes\.map/);
+  assert.doesNotMatch(appSource, /\{false && standaloneVisibleImageNodes\.map/);
+  assert.doesNotMatch(appSource, /const expandedSelectedIds = Array\.from\(new Set/);
+});
+
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
   const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
