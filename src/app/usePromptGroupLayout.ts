@@ -25,6 +25,7 @@ import type {
 
 type PromptGroupBounds = { x: number; y: number; width: number; height: number };
 type SelectNodes = (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
+type UpdatePromptNode = (promptNode: PromptNode) => void | Promise<unknown>;
 
 const EMPTY_CHILD_IMAGES_BY_PROMPT_ID = new Map<string, GeneratedImage[]>();
 const EMPTY_GENERATING_GROUP_IDS: string[] = [];
@@ -94,6 +95,7 @@ interface UsePromptGroupLayoutDeps {
     position: Point,
     options?: { ignoreSelection?: boolean }
   ) => void;
+  updatePromptNode: UpdatePromptNode;
   visibleImageNodes: GeneratedImage[] | null | undefined;
   visiblePromptNodes: PromptNode[] | null | undefined;
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode> | null | undefined;
@@ -124,6 +126,12 @@ interface UsePromptGroupLayoutResult {
     childImages: GeneratedImage[],
     sourceNodeId: string
   ) => boolean;
+  commitPromptGroupDrag: (
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    finalPromptPosition: Point,
+    shouldRegroup: boolean
+  ) => void;
   handleImageCardHeightChange: (imageId: string, height: number) => void;
   handleFocusPromptGroup: (
     groupId: string | null,
@@ -164,6 +172,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     updateImageNodePosition,
+    updatePromptNode,
     visibleImageNodes,
     visiblePromptNodes,
     workflowUtilityNodesById,
@@ -1087,6 +1096,47 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     liveSceneRef.current = liveSceneState;
   }, [liveSceneState]);
 
+  const commitPromptGroupDrag = useCallback((
+    promptNode: PromptNode,
+    childImages: GeneratedImage[],
+    finalPromptPosition: Point,
+    shouldRegroup: boolean,
+  ) => {
+    const latestPrompt = activeCanvas?.promptNodes.find((candidate) => candidate.id === promptNode.id) ?? promptNode;
+    const promptGroupSnapshot = liveSceneRef.current.promptGroups[promptNode.id];
+
+    void updatePromptNode({
+      ...latestPrompt,
+      position: finalPromptPosition,
+      userMoved: true,
+    });
+
+    childImages.forEach((imageNode) => {
+      const fallbackPosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
+      const commitPosition = shouldRegroup
+        ? promptGroupSnapshot?.childRenderPositionsById[imageNode.id]
+          ?? promptGroupSnapshot?.childLogicalPositionsById[imageNode.id]
+          ?? fallbackPosition
+        : fallbackPosition;
+      updateImageNodePosition(imageNode.id, commitPosition, { ignoreSelection: true });
+    });
+
+    if (shouldRegroup && childImages.length > 0) {
+      settlePromptGroupRegroup(promptNode.id);
+      return;
+    }
+
+    clearPromptGroupRegroup(promptNode.id);
+  }, [
+    activeCanvas,
+    clearPromptGroupRegroup,
+    liveNodePositionByIdRef,
+    liveSceneRef,
+    settlePromptGroupRegroup,
+    updateImageNodePosition,
+    updatePromptNode,
+  ]);
+
   return {
     liveSceneInteractionPhase,
     liveSceneState,
@@ -1104,6 +1154,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     applyLiveNodeDeltaToDraggedSet,
     handleLiveNodePositionChange,
     shouldAutoRegroupPromptGroup,
+    commitPromptGroupDrag,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,

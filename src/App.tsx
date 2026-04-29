@@ -7625,6 +7625,7 @@ ${paragraphs}
     applyLiveNodeDeltaToDraggedSet,
     handleLiveNodePositionChange,
     shouldAutoRegroupPromptGroup,
+    commitPromptGroupDrag,
     handleImageCardHeightChange,
     handleFocusPromptGroup,
     beginPromptGroupRegroup,
@@ -7659,6 +7660,7 @@ ${paragraphs}
     setPromptGroupLayoutVersion,
     setLiveNodePositionVersion,
     updateImageNodePosition,
+    updatePromptNode,
     visibleImageNodes,
     visiblePromptNodes,
     workflowUtilityNodesById,
@@ -7702,39 +7704,6 @@ ${paragraphs}
       setFocusedGroupId(null);
     }
   }, [activeCanvas, focusedGroupId, selectedNodeIds]);
-
-  const commitPromptGroupDrag = useCallback((
-    promptNode: PromptNode,
-    childImages: GeneratedImage[],
-    finalPromptPosition: { x: number; y: number },
-    shouldRegroup: boolean,
-  ) => {
-    const latestPrompt = activeCanvas?.promptNodes.find((candidate) => candidate.id === promptNode.id) ?? promptNode;
-    const promptGroupSnapshot = liveSceneRef.current.promptGroups[promptNode.id];
-
-    void updatePromptNode({
-      ...latestPrompt,
-      position: finalPromptPosition,
-      userMoved: true,
-    });
-
-    childImages.forEach((imageNode) => {
-      const fallbackPosition = liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position;
-      const commitPosition = shouldRegroup
-        ? promptGroupSnapshot?.childRenderPositionsById[imageNode.id]
-          ?? promptGroupSnapshot?.childLogicalPositionsById[imageNode.id]
-          ?? fallbackPosition
-        : fallbackPosition;
-      updateImageNodePosition(imageNode.id, commitPosition, { ignoreSelection: true });
-    });
-
-    if (shouldRegroup && childImages.length > 0) {
-      settlePromptGroupRegroup(promptNode.id);
-      return;
-    }
-
-    clearPromptGroupRegroup(promptNode.id);
-  }, [activeCanvas, clearPromptGroupRegroup, settlePromptGroupRegroup, updateImageNodePosition, updatePromptNode]);
 
   const visibleImageNodesById = React.useMemo(
     () => new Map(visibleImageNodes.map(node => [node.id, node])),

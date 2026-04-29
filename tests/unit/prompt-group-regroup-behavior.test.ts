@@ -98,7 +98,6 @@ test('prompt-group connector svg uses stable group bounds during regroup renderi
 });
 
 test('prompt-group settle phase keeps animating after drop instead of snapping to the final layout', () => {
-  const appSource = readSource('src/App.tsx');
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /if \(state\.layoutMode === 'docked' && state\.settleUntil !== null\) \{/);
@@ -107,7 +106,7 @@ test('prompt-group settle phase keeps animating after drop instead of snapping t
   assert.match(promptGroupLayoutSource, /layoutMode: 'docked',\s*regroupProgress: 0,/);
   assert.match(promptGroupLayoutSource, /const fastRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*0/);
   assert.match(promptGroupLayoutSource, /const settleRegroupProgress = layoutState\.layoutMode === 'docked'\s*\?\s*layoutState\.regroupProgress/);
-  assert.match(appSource, /settlePromptGroupRegroup\(promptNode\.id\)/);
+  assert.match(promptGroupLayoutSource, /settlePromptGroupRegroup\(promptNode\.id\)/);
 });
 
 test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
@@ -275,6 +274,18 @@ test('usePromptGroupLayout owns prompt-group regroup predicate', () => {
   assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
   assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.length <= 1/);
   assert.doesNotMatch(appSource, /const shouldAutoRegroupPromptGroup = useCallback/);
+});
+
+test('usePromptGroupLayout owns prompt-group drag commit persistence', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+
+  assert.match(promptGroupLayoutSource, /const commitPromptGroupDrag = useCallback/);
+  assert.match(promptGroupLayoutSource, /void updatePromptNode\(\{/);
+  assert.match(promptGroupLayoutSource, /promptGroupSnapshot\?\.childRenderPositionsById\[imageNode\.id\]/);
+  assert.match(promptGroupLayoutSource, /settlePromptGroupRegroup\(promptNode\.id\);/);
+  assert.match(promptGroupLayoutSource, /clearPromptGroupRegroup\(promptNode\.id\);/);
+  assert.doesNotMatch(appSource, /const commitPromptGroupDrag = useCallback/);
 });
 
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
