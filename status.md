@@ -212,6 +212,13 @@ Scope completed in the fifteenth slice:
 - Removed unused App-side `visibleImageNodesById` and `visibleImageNodeIds` memo caches.
 - Tightened source-contract tests so App cannot keep stale prompt-group derived values it no longer consumes.
 
+Scope completed in the sixteenth slice:
+- Added `src/app/usePromptGroupSelection.ts` with explicit `UsePromptGroupSelectionDeps` and `UsePromptGroupSelectionResult`.
+- Moved `handlePromptGroupNodeSelect` out of `src/App.tsx` so prompt-group selection focus wrapping is hook-owned.
+- Removed the remaining hidden connector and group render branches from `src/App.tsx`.
+- Removed `useConnectorRenderer` outputs and dependencies that only supported the deleted hidden connector branch.
+- Tightened source-contract tests for the selection hook, hidden legacy branches, and connector dead outputs.
+
 Line count change during Milestone 3:
 - `src/App.tsx`: `10395` baseline lines to `10333` lines after first slice.
 - `src/App.tsx`: `10044` lines after second slice.
@@ -242,6 +249,9 @@ Line count change during Milestone 3:
 - `src/app/usePromptGroupLayout.ts`: `1369` lines after fourteenth slice.
 - `src/App.tsx`: `9272` lines after fifteenth slice.
 - `src/app/usePromptGroupLayout.ts`: `1349` lines after fifteenth slice.
+- `src/App.tsx`: `9175` lines after sixteenth slice.
+- `src/app/useConnectorRenderer.ts`: `253` lines after sixteenth slice.
+- `src/app/usePromptGroupSelection.ts`: `25` lines after sixteenth slice.
 
 Validation passed:
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
