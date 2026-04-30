@@ -211,6 +211,11 @@ export interface FinalizeRetryGeneratedMediaAttemptGuardParams {
   timeoutGuard: CreateRetryGenerationTimeoutGuardResult;
 }
 
+export interface RunRetryGeneratedMediaAttemptWithGuardParams<T> {
+  timeoutGuard: CreateRetryGenerationTimeoutGuardResult;
+  run: () => Promise<T>;
+}
+
 export interface PrepareRetryGeneratedMediaAttemptContextParams {
   currentNodeId: string;
   executionNode: PromptNode;
@@ -380,6 +385,33 @@ export interface BuildRetryImageGenerationResultContextParams {
 
 export type BuildRetryImageGenerationResultContextResult = RetryGeneratedMediaResultContext;
 
+export type RetryGeneratedMediaGenerateImage = (...args: [
+  ...PrepareRetryImageGenerationRequestResult['args'],
+  PrepareRetryImageGenerationRequestResult['grounding'],
+  PrepareRetryImageGenerationRequestResult['options'],
+]) => Promise<GenerateImageResult>;
+
+export type RetryGeneratedMediaGenerateVideo = (request: PrepareRetryVideoGenerationRequestResult) => Promise<VideoGenerationResult>;
+
+export interface ExecuteRetryGeneratedMediaRequestParams {
+  currentMode: GenerationMode;
+  executionNode: PrepareRetryVideoGenerationRequestParams['executionNode']
+    & BuildRetryVideoGenerationResultContextParams['executionNode']
+    & PrepareRetryImageGenerationRequestParams['executionNode']
+    & BuildRetryImageGenerationResultContextParams['executionNode'];
+  generateImage: RetryGeneratedMediaGenerateImage;
+  generateVideo: RetryGeneratedMediaGenerateVideo;
+  requestId: string;
+  resolveModelDisplayName: BuildRetryImageGenerationResultContextParams['resolveModelDisplayName'];
+  taskPrompt: string;
+}
+
+export interface ExecuteRetryGeneratedMediaRequestResult {
+  currentMode: GenerationMode;
+  generatedMediaContext: RetryGeneratedMediaResultContext;
+  taskPrompt: string;
+}
+
 export interface PrepareRetryGeneratedMediaPersistenceParams {
   b64: string;
   calculateImageHash: (source: string) => Promise<string>;
@@ -492,6 +524,22 @@ export interface BuildRetryCompletedPromptPatchParams {
   resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
 }
 
+export interface PrepareRetryGeneratedMediaSuccessCommitContextParams extends Omit<
+  BuildRetryGeneratedMediaLayoutParams,
+  'executionNode' | 'latestLayoutPrompt'
+> {
+  canvasSnapshot?: Pick<Canvas, 'promptNodes'> | null;
+  executionNode: BuildRetryGeneratedMediaLayoutParams['executionNode']
+    & BuildRetryCompletedPromptPatchParams['executionNode']
+    & ResolveRetryGeneratedMediaLayoutPromptParams['executionNode'];
+  resolveModelDisplayName: BuildRetryCompletedPromptPatchParams['resolveModelDisplayName'];
+}
+
+export interface PrepareRetryGeneratedMediaSuccessCommitContextResult {
+  alignedImageNodes: RetryGeneratedMediaLayoutNode[];
+  retryCompletedPromptPatch: Partial<PromptNode>;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -540,6 +588,7 @@ export interface UseGenerationRuntimeResult {
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
   finalizeRetryGeneratedMediaAttemptGuard: (params: FinalizeRetryGeneratedMediaAttemptGuardParams) => void;
+  runRetryGeneratedMediaAttemptWithGuard: <T>(params: RunRetryGeneratedMediaAttemptWithGuardParams<T>) => Promise<T>;
   prepareRetryGeneratedMediaAttemptContext: (params: PrepareRetryGeneratedMediaAttemptContextParams) => PrepareRetryGeneratedMediaAttemptContextResult;
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
@@ -552,6 +601,7 @@ export interface UseGenerationRuntimeResult {
   resolveRetryGeneratedMediaGenerationTime: (params: ResolveRetryGeneratedMediaGenerationTimeParams) => number;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   buildRetryImageGenerationResultContext: (params: BuildRetryImageGenerationResultContextParams) => BuildRetryImageGenerationResultContextResult;
+  executeRetryGeneratedMediaRequest: (params: ExecuteRetryGeneratedMediaRequestParams) => Promise<ExecuteRetryGeneratedMediaRequestResult>;
   applyRetryGeneratedMediaAuthoritativeBalance: (params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams) => void;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
@@ -561,6 +611,7 @@ export interface UseGenerationRuntimeResult {
   resolveRetryGeneratedMediaLayoutPrompt: (params: ResolveRetryGeneratedMediaLayoutPromptParams) => ResolveRetryGeneratedMediaLayoutPromptResult;
   buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
   buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
+  prepareRetryGeneratedMediaSuccessCommitContext: (params: PrepareRetryGeneratedMediaSuccessCommitContextParams) => PrepareRetryGeneratedMediaSuccessCommitContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -817,6 +868,17 @@ export function useGenerationRuntime({
     params.timeoutGuard.clear();
   }, []);
 
+  const runRetryGeneratedMediaAttemptWithGuard = useCallback(async <T,>(params: RunRetryGeneratedMediaAttemptWithGuardParams<T>): Promise<T> => {
+    try {
+      const result = await params.run();
+      finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard: params.timeoutGuard });
+      return result;
+    } catch (e) {
+      finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard: params.timeoutGuard });
+      throw e;
+    }
+  }, [finalizeRetryGeneratedMediaAttemptGuard]);
+
   const commitRetryGenerationStart = useCallback((params: CommitRetryGenerationStartParams) => {
     updatePromptNode({
       ...params.executionNode,
@@ -1022,6 +1084,44 @@ export function useGenerationRuntime({
       },
     };
   }, []);
+
+  const executeRetryGeneratedMediaRequest = useCallback(async (
+    params: ExecuteRetryGeneratedMediaRequestParams,
+  ): Promise<ExecuteRetryGeneratedMediaRequestResult> => {
+    let generatedMediaContext: RetryGeneratedMediaResultContext;
+
+    if (params.currentMode === GenerationMode.VIDEO) {
+      const videoRequest = prepareRetryVideoGenerationRequest({ executionNode: params.executionNode, taskPrompt: params.taskPrompt });
+      const videoResult = await params.generateVideo(videoRequest);
+      generatedMediaContext = buildRetryVideoGenerationResultContext({
+        executionNode: params.executionNode,
+        videoResult,
+      });
+    } else {
+      const imageRequest = prepareRetryImageGenerationRequest({ executionNode: params.executionNode, requestId: params.requestId, taskPrompt: params.taskPrompt });
+      const result = await params.generateImage(
+        ...imageRequest.args,
+        imageRequest.grounding,
+        imageRequest.options,
+      );
+      generatedMediaContext = buildRetryImageGenerationResultContext({
+        executionNode: params.executionNode,
+        result,
+        resolveModelDisplayName: params.resolveModelDisplayName,
+      });
+    }
+
+    return {
+      currentMode: params.currentMode,
+      taskPrompt: params.taskPrompt,
+      generatedMediaContext,
+    };
+  }, [
+    buildRetryImageGenerationResultContext,
+    buildRetryVideoGenerationResultContext,
+    prepareRetryImageGenerationRequest,
+    prepareRetryVideoGenerationRequest,
+  ]);
 
   const applyRetryGeneratedMediaAuthoritativeBalance = useCallback((params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams): void => {
     if (typeof params.generatedMediaContext.balanceAfter === 'number') {
@@ -1333,6 +1433,32 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareRetryGeneratedMediaSuccessCommitContext = useCallback((params: PrepareRetryGeneratedMediaSuccessCommitContextParams): PrepareRetryGeneratedMediaSuccessCommitContextResult => {
+    const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt({
+      canvasSnapshot: params.canvasSnapshot,
+      executionNode: params.executionNode,
+    });
+    const alignedImageNodes = buildRetryGeneratedMediaLayout({
+      buildGeneratedImageBatchPositions: params.buildGeneratedImageBatchPositions,
+      count: params.count,
+      executionNode: params.executionNode,
+      getCardDimensions: params.getCardDimensions,
+      isMobile: params.isMobile,
+      latestLayoutPrompt,
+      results: params.results,
+    });
+    const retryCompletedPromptPatch = buildRetryCompletedPromptPatch({
+      alignedImageNodes,
+      executionNode: params.executionNode,
+      resolveModelDisplayName: params.resolveModelDisplayName,
+    });
+
+    return {
+      alignedImageNodes,
+      retryCompletedPromptPatch,
+    };
+  }, [buildRetryCompletedPromptPatch, buildRetryGeneratedMediaLayout, resolveRetryGeneratedMediaLayoutPrompt]);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -1562,6 +1688,7 @@ export function useGenerationRuntime({
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
     finalizeRetryGeneratedMediaAttemptGuard,
+    runRetryGeneratedMediaAttemptWithGuard,
     prepareRetryGeneratedMediaAttemptContext,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
@@ -1574,6 +1701,7 @@ export function useGenerationRuntime({
     resolveRetryGeneratedMediaGenerationTime,
     prepareRetryImageGenerationRequest,
     buildRetryImageGenerationResultContext,
+    executeRetryGeneratedMediaRequest,
     applyRetryGeneratedMediaAuthoritativeBalance,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
@@ -1583,6 +1711,7 @@ export function useGenerationRuntime({
     resolveRetryGeneratedMediaLayoutPrompt,
     buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
+    prepareRetryGeneratedMediaSuccessCommitContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

@@ -1776,6 +1776,30 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+  - Committed as `5e45207c fix: await retry media success commit`.
+- 2026-04-30 Milestone 4 thirty-eighth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not expose `runRetryGeneratedMediaAttemptWithGuard`, while `App.tsx` still owned the per-attempt guard `try/catch` and direct finalization calls.
+  - Added `RunRetryGeneratedMediaAttemptWithGuardParams` and `runRetryGeneratedMediaAttemptWithGuard` to `src/app/useGenerationRuntime.ts`, centralizing guarded attempt execution and failure cleanup next to `finalizeRetryGeneratedMediaAttemptGuard`.
+  - Updated `App.tsx` to run only the media generation/result-context stage inside the new helper so the timeout guard is finalized before retry media persistence and dimension detection, matching the prior success timing.
+  - Removed the inner per-attempt `catch (e: any)` and direct `finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard })` calls from `handleRetryNode`; the outer retry failure path remains unchanged.
+  - Added `PrepareRetryGeneratedMediaSuccessCommitContextParams`, `PrepareRetryGeneratedMediaSuccessCommitContextResult`, and `prepareRetryGeneratedMediaSuccessCommitContext` to prepare layout prompt, aligned retry image nodes, and completed prompt patch inside the runtime Hook before the existing success commit helper.
+  - Updated `App.tsx` to consume `{ alignedImageNodes, retryCompletedPromptPatch }` from the Hook helper instead of directly chaining `resolveRetryGeneratedMediaLayoutPrompt`, `buildRetryGeneratedMediaLayout`, and `buildRetryCompletedPromptPatch`.
+  - Strengthened source-contract coverage so the new success-commit context helper stays pure and cannot call `addImageNodes`, `commitRetryGeneratedMediaSuccess`, or `reportRetryGenerationSuccess`; the mutation boundary remains in `commitRetryGeneratedMediaSuccess`.
+  - Review fix: retry result assembly now uses `activeCanvasRef.current?.id` instead of `activeCanvas?.id`, avoiding stale canvas id capture inside the retry callback dependency boundary.
+  - Added `RetryGeneratedMediaGenerateImage`, `RetryGeneratedMediaGenerateVideo`, `ExecuteRetryGeneratedMediaRequestParams`, `ExecuteRetryGeneratedMediaRequestResult`, and `executeRetryGeneratedMediaRequest` so the runtime Hook owns retry media request execution for video and image branches while `App.tsx` keeps prompt preparation and authoritative balance application at the current orchestration boundary.
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before the request-execution extraction because `useGenerationRuntime.ts` did not expose `executeRetryGeneratedMediaRequest`, while `App.tsx` still owned direct `llmService.generateVideo(videoRequest)`, `generateImage(...imageRequest.args, ...)`, and retry media result-context normalization.
+  - Updated `App.tsx` to pass `generateImage` and a `generateVideo` adapter into the Hook helper; PPT single-page retry remains on its existing direct path.
+  - Current line counts: `src/App.tsx` 8564, `src/app/useGenerationRuntime.ts` 1718, `tests/unit/generation-runtime-contract.test.ts` 990.
+  - Targeted generation runtime contract test: passed, `40` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `54` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1031` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry guard execution, request execution, and success commit context refactor.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+  - Commit status: blocked locally because the sandbox user cannot create `.git/index.lock` (`fatal: Unable to create .../.git/index.lock: Permission denied`). A direct `.git` write probe also returns `Access is denied`; retry the scoped commit after `.git` write permission is restored.
 
 ## Risk Log
 

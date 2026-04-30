@@ -107,7 +107,7 @@ import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
-import { useGenerationRuntime, type RetryGeneratedMediaResultContext } from './app/useGenerationRuntime';
+import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -3304,26 +3304,21 @@ const AppContent: React.FC<AppContentProps> = () => {
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
-    finalizeRetryGeneratedMediaAttemptGuard,
+    runRetryGeneratedMediaAttemptWithGuard,
     prepareRetryGeneratedMediaAttemptContext,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
     commitRetryGeneratedMediaSuccess,
     prepareRetryGenerationTaskPromptContext,
-    prepareRetryVideoGenerationRequest,
-    buildRetryVideoGenerationResultContext,
     resolveRetryGeneratedMediaGenerationTime,
-    prepareRetryImageGenerationRequest,
-    buildRetryImageGenerationResultContext,
+    executeRetryGeneratedMediaRequest,
     applyRetryGeneratedMediaAuthoritativeBalance,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResultFromContext,
-    resolveRetryGeneratedMediaLayoutPrompt,
-    buildRetryGeneratedMediaLayout,
-    buildRetryCompletedPromptPatch,
+    prepareRetryGeneratedMediaSuccessCommitContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4575,105 +4570,83 @@ const AppContent: React.FC<AppContentProps> = () => {
           timeoutMs: GENERATE_TIMEOUT_MS,
         });
 
-        try {
-          const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
-            count,
-            executionNode,
-            index,
-            sourcePrompt: node.prompt,
-          });
-          let generatedMediaContext: RetryGeneratedMediaResultContext;
+        const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
+          count,
+          executionNode,
+          index,
+          sourcePrompt: node.prompt,
+        });
 
-          if (currentMode === GenerationMode.VIDEO) {
-            const videoRequest = prepareRetryVideoGenerationRequest({ executionNode, taskPrompt });
-            const videoResult = await llmService.generateVideo(videoRequest);
-            generatedMediaContext = buildRetryVideoGenerationResultContext({
+        const { generatedMediaContext } = await runRetryGeneratedMediaAttemptWithGuard({
+          timeoutGuard,
+          run: async () => {
+            const { generatedMediaContext } = await executeRetryGeneratedMediaRequest({
+              currentMode,
               executionNode,
-              videoResult,
-            });
-          } else {
-            const imageRequest = prepareRetryImageGenerationRequest({ executionNode, requestId, taskPrompt });
-            const result = await generateImage(
-              ...imageRequest.args,
-              imageRequest.grounding,
-              imageRequest.options,
-            );
-            generatedMediaContext = buildRetryImageGenerationResultContext({
-              executionNode,
-              result,
+              generateImage,
+              generateVideo: (videoRequest) => llmService.generateVideo(videoRequest),
+              requestId,
               resolveModelDisplayName,
+              taskPrompt,
             });
-          }
-          applyRetryGeneratedMediaAuthoritativeBalance({
-            generatedMediaContext,
-            applyAuthoritativeBalance,
-          });
-          const { apiDurationMs, b64 } = generatedMediaContext;
+            applyRetryGeneratedMediaAuthoritativeBalance({
+              generatedMediaContext,
+              applyAuthoritativeBalance,
+            });
+            return { generatedMediaContext };
+          },
+        });
+        const { apiDurationMs, b64 } = generatedMediaContext;
 
-          finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard });
+        const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
+          b64,
+          currentMode,
+          normalizePersistableMediaSource,
+          calculateImageHash,
+          saveOriginalImage,
+        });
 
-          const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
-            b64,
-            currentMode,
-            normalizePersistableMediaSource,
-            calculateImageHash,
-            saveOriginalImage,
-          });
+        scheduleRetryGeneratedMediaCloudSync({
+          b64,
+          currentMode,
+          index,
+        });
 
-          scheduleRetryGeneratedMediaCloudSync({
-            b64,
-            currentMode,
-            index,
-          });
+        const generationTime = resolveRetryGeneratedMediaGenerationTime({
+          apiDurationMs,
+          startedAtMs: startTime,
+        });
 
-          const generationTime = resolveRetryGeneratedMediaGenerationTime({
-            apiDurationMs,
-            startedAtMs: startTime,
-          });
+        const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
+          b64,
+          executionNode,
+          url: mediaPersistence.url,
+        });
 
-          const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
-            b64,
-            executionNode,
-            url: mediaPersistence.url,
-          });
-
-          const generatedResult = buildRetryGeneratedMediaResultFromContext({
-            buildPptPageAlias,
-            canvasId: activeCanvas?.id,
-            currentMode,
-            executionNode,
-            generatedMediaContext,
-            generationTime,
-            index,
-            mediaDimensions,
-            mediaPersistence,
-            prompt: taskPrompt,
-          });
-          return generatedResult;
-        } catch (e: any) {
-          finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard });
-          throw e;
-        }
+        const generatedResult = buildRetryGeneratedMediaResultFromContext({
+          buildPptPageAlias,
+          canvasId: activeCanvasRef.current?.id,
+          currentMode,
+          executionNode,
+          generatedMediaContext,
+          generationTime,
+          index,
+          mediaDimensions,
+          mediaPersistence,
+          prompt: taskPrompt,
+        });
+        return generatedResult;
       }));
 
-      const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt({
+      const { alignedImageNodes, retryCompletedPromptPatch } = prepareRetryGeneratedMediaSuccessCommitContext({
         canvasSnapshot: activeCanvasRef.current,
-        executionNode,
-      });
-      const alignedImageNodes = buildRetryGeneratedMediaLayout({
         buildGeneratedImageBatchPositions,
         count,
         executionNode,
         getCardDimensions,
         isMobile,
-        latestLayoutPrompt,
-        results,
-      });
-
-      const retryCompletedPromptPatch = buildRetryCompletedPromptPatch({
-        alignedImageNodes,
-        executionNode,
         resolveModelDisplayName,
+        results,
       });
 
       await commitRetryGeneratedMediaSuccess({
@@ -4692,7 +4665,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyAuthoritativeBalance, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, finalizeRetryGeneratedMediaAttemptGuard, prepareRetryGeneratedMediaAttemptContext, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, commitRetryGeneratedMediaSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, resolveRetryGeneratedMediaGenerationTime, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, applyRetryGeneratedMediaAuthoritativeBalance, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, resolveRetryGeneratedMediaLayoutPrompt, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, addImageNodes, extractErrorDetails, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyAuthoritativeBalance, resolveCreditCostForModel, commitRetryGenerationFailure, runRetryGeneratedMediaAttemptWithGuard, prepareRetryGeneratedMediaAttemptContext, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, commitRetryGeneratedMediaSuccess, prepareRetryGenerationTaskPromptContext, resolveRetryGeneratedMediaGenerationTime, executeRetryGeneratedMediaRequest, applyRetryGeneratedMediaAuthoritativeBalance, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, prepareRetryGeneratedMediaSuccessCommitContext, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
