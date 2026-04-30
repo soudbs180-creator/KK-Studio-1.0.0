@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; initial credit settlement slice is complete in the current commit line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; initial billing attempt context slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8981 lines after Milestone 4 initial-credit-settlement extraction
+- `src/App.tsx`: 8981 lines after Milestone 4 initial billing attempt context extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -398,7 +398,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Generation runtime guard, billing helper, initial credit settlement, and draft-context slices are extracted and validated.
+Status: in progress. Generation runtime guard, billing helper, initial credit settlement, draft-context, and initial billing attempt context slices are extracted and validated.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -478,6 +478,7 @@ Current risk:
 Fourth slice scope:
 - Added hook-owned `prepareGenerationDraftContext` with explicit `PrepareGenerationDraftContextArgs` and `PrepareGenerationDraftContextResult`.
 - Moved follow-up detection, existing draft lookup, reusable draft detection, and new prompt node id creation out of `src/App.tsx`.
+- Preserved reusable follow-up draft behavior by reading `activeCanvasRef.current?.promptNodes` through an injected method argument, not through hidden hook scope.
 - Kept prompt placement, billing, prompt node construction, persistence, retry, PPT, ecommerce, and execution behavior in `App.tsx`.
 
 Line count change during Milestone 4 fourth slice:
@@ -486,16 +487,49 @@ Line count change during Milestone 4 fourth slice:
 - `tests/unit/generation-runtime-contract.test.ts`: `111` lines -> `133` lines.
 
 Validation passed:
-- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `10` tests.
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because draft-context ownership still lived in `App.tsx`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `16` tests.
 - `npm.cmd run typecheck`: passed.
 - `npm.cmd run test:unit`: passed, `992` tests.
 - `npm.cmd run build`: passed.
-- `npm.cmd run governance:agent-docs`: passed after status update.
 - `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
 - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
+Current risk:
+- `prepareGenerationDraftContext` still accepts `activeCanvasRef` from `App.tsx` because this slice preserves the existing async fresh-state access pattern; a later broader runtime extraction can revisit that dependency once prompt persistence is moved.
+- The next slice should target another narrow shared generation boundary without touching PPT/ecommerce execution bodies.
+
+Fifth slice scope:
+- Added hook-owned `prepareInitialBillingAttemptContext` with explicit `PrepareInitialBillingAttemptContextParams` and `PrepareInitialBillingAttemptContextResult`.
+- Moved initial credit-route snapshot lookup, billing attempt construction, execution lane extraction, and server-side settlement flag extraction into `src/app/useGenerationRuntime.ts`.
+- Updated generation billing and credit-route source contracts so `buildGenerationBillingAttempt` and execution-lane ownership follow the new hook boundary.
+- Kept selected-key resolution, billing-state resolution, prompt node construction, persistence, retry, PPT, ecommerce, and execution behavior in `App.tsx`.
+
+Line count change during Milestone 4 fifth slice:
+- `src/App.tsx`: `8982` lines after fourth slice -> `8981` lines.
+- `src/app/useGenerationRuntime.ts`: `357` lines -> `403` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `133` lines -> `155` lines.
+- `tests/unit/generation-billing-runtime-contract.test.ts`: `63` lines -> `64` lines.
+- `tests/unit/generation-billing-coordinator.test.ts`: unchanged at `115` lines.
+- `tests/unit/credit-route-classification.test.ts`: unchanged at `78` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because initial billing attempt context ownership still lived in `App.tsx`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `17` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `993` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `prepareInitialBillingAttemptContext` intentionally calls `adminModelService.getCreditRouteSnapshot` from the generation runtime hook; this is a shared generation billing concern, but later slices should avoid pulling unrelated model/provider UI logic into the same hook.
+- The next slice should avoid moving the full `handleGenerate` body; a pure prompt-node assembly helper is still the safer boundary.
+
 Next step:
-- Continue M4 with the next RED source contract around retry-timeout cancellation, result patch assembly, or another small shared generation runtime boundary.
+- Continue M4 with the next RED source contract around initial prompt-node assembly, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
 
 ### Milestones 5-9
 
@@ -702,6 +736,24 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed.
   - `npm.cmd run governance:agent-docs`: passed.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 fourth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because draft-context ownership still lived in `App.tsx`.
+  - Targeted M4 billing/runtime tests: passed, `16` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `992` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 fifth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because initial billing attempt context still lived in `App.tsx`.
+  - Targeted M4 billing/runtime tests: passed, `17` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `993` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log

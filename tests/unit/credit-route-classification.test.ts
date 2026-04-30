@@ -40,6 +40,7 @@ describe('credit route classification', () => {
 
   test('frontend generation flow persists execution-lane and credit spec markers on prompt nodes', () => {
     const appSource = readSource('src/App.tsx');
+    const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
     const resolveBillingStateSource = readSource('src/app/resolveGenerationBillingState.ts');
     const geminiServiceSource = readSource('src/services/llm/geminiService.ts');
     const llmAdapterSource = readSource('src/services/llm/LLMAdapter.ts');
@@ -53,7 +54,8 @@ describe('credit route classification', () => {
     assert.match(resolveBillingStateSource, /import \{ type ModelExecutionLane, resolveModelExecutionLane \} from '\.\.\/services\/model\/modelExecutionLane';/);
     assert.match(resolveBillingStateSource, /const executionLane = resolveModelExecutionLane\(/);
     assert.match(appSource, /executionLane,/);
-    assert.match(appSource, /const executionLane = generationBillingState\.executionLane;/);
+    assert.match(generationRuntimeSource, /executionLane: params\.generationBillingState\.executionLane,/);
+    assert.match(appSource, /const executionLane = billingAttemptContext\.executionLane;/);
     assert.match(appSource, /creditRouteSpecId: resolvedCreditSpecId,/);
     assert.match(appSource, /creditRouteUnitId: resolvedCreditRoute\?\.routeUnitId,/);
     assert.match(geminiServiceSource, /executionLane: options\?\.executionLane,/);

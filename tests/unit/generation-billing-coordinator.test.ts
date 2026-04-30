@@ -100,7 +100,7 @@ describe("generation billing coordinator", () => {
 
     assert.match(typesSource, /billingAttemptId\?: string;/);
     assert.match(typesSource, /balanceAfter\?: number;/);
-    assert.match(appSource, /buildGenerationBillingAttempt\(/);
+    assert.match(generationRuntimeSource, /buildGenerationBillingAttempt\(/);
     assert.match(generationRuntimeSource, /resolveGenerationAttemptFailureState\(/);
     assert.match(appSource, /billingAttemptId: billingAttempt\.attemptId,/);
     assert.match(imageGenerationSource, /buildGenerationAttemptRequestId\(/);

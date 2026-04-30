@@ -18,6 +18,7 @@ test('frontend generation flow uses the shared billing coordinator and persists 
   const typesSource = readSource('src/types.ts');
   const billingAttemptCallCount =
     (appSource.split('buildGenerationBillingAttempt(').length - 1)
+    + (generationRuntimeSource.split('buildGenerationBillingAttempt(').length - 1)
     + (retryHelperSource.split('buildGenerationBillingAttempt(').length - 1);
 
   assert.match(appSource, /from '\.\/services\/billing\/generationBillingCoordinator';/);

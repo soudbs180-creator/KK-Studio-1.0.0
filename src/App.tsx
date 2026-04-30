@@ -302,10 +302,7 @@ import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
 import { formatRemainingCredits } from './services/billing/remainingBalance';
-import {
-  buildGenerationBillingAttempt,
-  buildGenerationAttemptRequestId,
-} from './services/billing/generationBillingCoordinator';
+import { buildGenerationAttemptRequestId } from './services/billing/generationBillingCoordinator';
 import {
   isCapabilityRouteAssignmentRouteDisabled,
   resolveEnabledCapabilityRouteAssignment,
@@ -3302,6 +3299,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     ensureCreditAttemptCharged,
     prepareInitialCreditSettlement,
     prepareGenerationDraftContext,
+    prepareInitialBillingAttemptContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4293,16 +4291,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     let requiredCredits = generationBillingState.requiredCredits;
     let perImageCreditCost = generationBillingState.perImageCreditCost;
     let paymentTransactionId: string | undefined = undefined;
-    const resolvedCreditRoute = generationBillingState.isCreditModel
-      ? adminModelService.getCreditRouteSnapshot(config.model, config.imageSize)
-      : null;
-    const resolvedCreditSpecId = resolvedCreditRoute?.specId;
-    const billingAttempt = buildGenerationBillingAttempt({
-      nodeId: promptNodeId,
-      phase: 'initial',
+    const billingAttemptContext = prepareInitialBillingAttemptContext({
+      generationBillingState,
+      imageSize: config.imageSize,
+      modelId: config.model,
+      promptNodeId,
     });
-    const executionLane = generationBillingState.executionLane;
-    const useServerSideCreditSettlement = generationBillingState.useServerSideCreditSettlement;
+    const resolvedCreditRoute = billingAttemptContext.resolvedCreditRoute;
+    const resolvedCreditSpecId = billingAttemptContext.resolvedCreditSpecId;
+    const billingAttempt = billingAttemptContext.billingAttempt;
+    const executionLane = billingAttemptContext.executionLane;
+    const useServerSideCreditSettlement = billingAttemptContext.useServerSideCreditSettlement;
     const initialCreditSettlement = await prepareInitialCreditSettlement({
       isCreditModel: generationBillingState.isCreditModel,
       modelId: config.model,
@@ -4430,7 +4429,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

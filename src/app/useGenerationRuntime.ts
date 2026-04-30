@@ -1,8 +1,13 @@
 import { useCallback } from 'react';
 
 import type { CreditConsumeResult, CreditRefundResult } from '../context/BillingContext';
-import { resolveGenerationAttemptFailureState } from '../services/billing/generationBillingCoordinator';
-import type { Canvas, PromptNode } from '../types';
+import {
+  buildGenerationBillingAttempt,
+  resolveGenerationAttemptFailureState,
+} from '../services/billing/generationBillingCoordinator';
+import { adminModelService } from '../services/model/adminModelService';
+import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
+import type { Canvas, ImageSize, PromptNode } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 
 type CreditBillingAttempt = {
@@ -66,6 +71,27 @@ export interface PrepareGenerationDraftContextResult {
   promptNodeId: string;
 }
 
+interface InitialBillingGenerationState {
+  executionLane: ModelExecutionLane;
+  isCreditModel: boolean;
+  useServerSideCreditSettlement: boolean;
+}
+
+export interface PrepareInitialBillingAttemptContextParams {
+  generationBillingState: InitialBillingGenerationState;
+  imageSize?: ImageSize | string | null;
+  modelId: string;
+  promptNodeId: string;
+}
+
+export interface PrepareInitialBillingAttemptContextResult {
+  billingAttempt: CreditBillingAttempt;
+  executionLane: ModelExecutionLane;
+  resolvedCreditRoute: ReturnType<typeof adminModelService.getCreditRouteSnapshot> | null;
+  resolvedCreditSpecId: string | undefined;
+  useServerSideCreditSettlement: boolean;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -99,6 +125,7 @@ export interface UseGenerationRuntimeResult {
   ensureCreditAttemptCharged: (params: EnsureCreditAttemptChargedParams) => Promise<EnsureCreditAttemptChargedResult>;
   prepareInitialCreditSettlement: (params: PrepareInitialCreditSettlementParams) => Promise<PrepareInitialCreditSettlementResult>;
   prepareGenerationDraftContext: (args: PrepareGenerationDraftContextArgs) => PrepareGenerationDraftContextResult;
+  prepareInitialBillingAttemptContext: (params: PrepareInitialBillingAttemptContextParams) => PrepareInitialBillingAttemptContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -298,6 +325,24 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareInitialBillingAttemptContext = useCallback((params: PrepareInitialBillingAttemptContextParams) => {
+    const resolvedCreditRoute = params.generationBillingState.isCreditModel
+      ? adminModelService.getCreditRouteSnapshot(params.modelId, params.imageSize)
+      : null;
+    const billingAttempt = buildGenerationBillingAttempt({
+      nodeId: params.promptNodeId,
+      phase: 'initial',
+    });
+
+    return {
+      resolvedCreditRoute,
+      resolvedCreditSpecId: resolvedCreditRoute?.specId,
+      billingAttempt,
+      executionLane: params.generationBillingState.executionLane,
+      useServerSideCreditSettlement: params.generationBillingState.useServerSideCreditSettlement,
+    };
+  }, []);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -350,6 +395,7 @@ export function useGenerationRuntime({
     ensureCreditAttemptCharged,
     prepareInitialCreditSettlement,
     prepareGenerationDraftContext,
+    prepareInitialBillingAttemptContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

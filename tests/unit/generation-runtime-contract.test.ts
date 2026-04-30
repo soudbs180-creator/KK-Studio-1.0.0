@@ -129,4 +129,26 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /const existingPromptDraft = existingPromptDraftId/);
     assert.doesNotMatch(appSource, /let promptNodeId = hasReusablePromptDraft/);
   });
+
+  test('initial generation billing attempt context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareInitialBillingAttemptContext: \(params: PrepareInitialBillingAttemptContextParams\) => PrepareInitialBillingAttemptContextResult;/);
+    assert.match(hookSource, /const prepareInitialBillingAttemptContext = useCallback\(\(params: PrepareInitialBillingAttemptContextParams\)/);
+    assert.match(hookSource, /const resolvedCreditRoute = params\.generationBillingState\.isCreditModel/);
+    assert.match(hookSource, /adminModelService\.getCreditRouteSnapshot\(params\.modelId, params\.imageSize\)/);
+    assert.match(hookSource, /const billingAttempt = buildGenerationBillingAttempt\(\{/);
+    assert.match(hookSource, /nodeId: params\.promptNodeId,/);
+    assert.match(hookSource, /phase: 'initial',/);
+    assert.match(hookSource, /useServerSideCreditSettlement: params\.generationBillingState\.useServerSideCreditSettlement,/);
+
+    assert.match(appSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
+    assert.match(appSource, /const resolvedCreditRoute = billingAttemptContext\.resolvedCreditRoute;/);
+    assert.match(appSource, /const billingAttempt = billingAttemptContext\.billingAttempt;/);
+    assert.match(appSource, /const useServerSideCreditSettlement = billingAttemptContext\.useServerSideCreditSettlement;/);
+    assert.doesNotMatch(appSource, /const resolvedCreditRoute = generationBillingState\.isCreditModel/);
+    assert.doesNotMatch(appSource, /adminModelService\.getCreditRouteSnapshot\(config\.model, config\.imageSize\)/);
+    assert.doesNotMatch(appSource, /const billingAttempt = buildGenerationBillingAttempt\(\{/);
+  });
 });
