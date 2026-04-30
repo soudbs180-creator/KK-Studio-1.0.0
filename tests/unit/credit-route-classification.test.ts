@@ -49,8 +49,9 @@ describe('credit route classification', () => {
     const typesSource = readSource('src/types.ts');
     const adminModelServiceSource = readSource('src/services/model/adminModelService.ts');
 
-    assert.match(appSource, /import \{ resolveGenerationBillingState \} from '\.\/app\/resolveGenerationBillingState';/);
-    assert.match(appSource, /const generationBillingState = resolveGenerationBillingState\(/);
+    assert.match(generationRuntimeSource, /import \{ resolveGenerationBillingState \} from '\.\/resolveGenerationBillingState';/);
+    assert.match(generationRuntimeSource, /const generationBillingState = resolveGenerationBillingState\(/);
+    assert.match(appSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
     assert.match(resolveBillingStateSource, /import \{ type ModelExecutionLane, resolveModelExecutionLane \} from '\.\.\/services\/model\/modelExecutionLane';/);
     assert.match(resolveBillingStateSource, /const executionLane = resolveModelExecutionLane\(/);
     assert.match(appSource, /executionLane,/);

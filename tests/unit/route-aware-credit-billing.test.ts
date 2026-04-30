@@ -11,16 +11,21 @@ function readSource(relativePath: string): string {
 
 test('generation and result billing logic stays route-aware for user-owned keys', () => {
   const appSource = readSource('src/App.tsx');
+  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
   const billingSource = readSource('src/utils/creditBilling.ts');
   const pricingSource = readSource('src/services/model/modelPricing.ts');
 
   assert.match(
-    appSource,
-    /const selectedKeyForBilling = keyManager\.getNextKey\(config\.model, preferredKeyIdForBilling\);/,
+    generationRuntimeSource,
+    /const selectedKeyForBilling = keyManager\.getNextKey\(params\.config\.model, preferredKeyIdForBilling\);/,
+  );
+  assert.match(
+    generationRuntimeSource,
+    /selectedKeyForBilling\?\.id \|\| preferredKeyIdForBilling/,
   );
   assert.match(
     appSource,
-    /selectedKeyForBilling\?\.id \|\| preferredKeyIdForBilling/,
+    /const selectedKeyForBilling = billingStateContext\.selectedKeyForBilling;/,
   );
   assert.match(
     billingSource,

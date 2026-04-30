@@ -1,14 +1,16 @@
 import { useCallback } from 'react';
 
 import type { CreditConsumeResult, CreditRefundResult } from '../context/BillingContext';
+import { keyManager } from '../services/auth/keyManager';
 import {
   buildGenerationBillingAttempt,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
 import { adminModelService } from '../services/model/adminModelService';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
-import type { Canvas, ImageSize, PromptNode } from '../types';
+import type { Canvas, GenerationConfig, ImageSize, PromptNode } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
+import { resolveGenerationBillingState } from './resolveGenerationBillingState';
 
 type CreditBillingAttempt = {
   attemptId: string;
@@ -92,6 +94,18 @@ export interface PrepareInitialBillingAttemptContextResult {
   useServerSideCreditSettlement: boolean;
 }
 
+export interface PrepareGenerationBillingStateContextParams {
+  config: Pick<GenerationConfig, 'model' | 'imageSize' | 'mode' | 'parallelCount'>;
+  getPreferredKeyForMode: (mode: GenerationConfig['mode']) => string | undefined;
+  hasExplicitModelRoute: (modelId: string) => boolean;
+  resolveCreditCostForModel: (modelId: string, imageSize?: ImageSize | string) => number;
+}
+
+export interface PrepareGenerationBillingStateContextResult {
+  selectedKeyForBilling: ReturnType<typeof keyManager.getNextKey>;
+  generationBillingState: ReturnType<typeof resolveGenerationBillingState>;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -126,6 +140,7 @@ export interface UseGenerationRuntimeResult {
   prepareInitialCreditSettlement: (params: PrepareInitialCreditSettlementParams) => Promise<PrepareInitialCreditSettlementResult>;
   prepareGenerationDraftContext: (args: PrepareGenerationDraftContextArgs) => PrepareGenerationDraftContextResult;
   prepareInitialBillingAttemptContext: (params: PrepareInitialBillingAttemptContextParams) => PrepareInitialBillingAttemptContextResult;
+  prepareGenerationBillingStateContext: (params: PrepareGenerationBillingStateContextParams) => PrepareGenerationBillingStateContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -343,6 +358,44 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareGenerationBillingStateContext = useCallback((params: PrepareGenerationBillingStateContextParams) => {
+    const customLocal = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('kk_model_customizations') || '{}')[params.config.model] || {};
+      } catch {
+        return {};
+      }
+    })();
+
+    const preferredKeyIdForBilling = params.hasExplicitModelRoute(params.config.model)
+      ? undefined
+      : params.getPreferredKeyForMode(params.config.mode);
+    const selectedKeyForBilling = keyManager.getNextKey(params.config.model, preferredKeyIdForBilling);
+    const generationBillingState = resolveGenerationBillingState({
+      modelId: params.config.model,
+      imageSize: params.config.imageSize,
+      mode: params.config.mode,
+      parallelCount: params.config.parallelCount,
+      customAlias: customLocal.alias,
+      preferredKeyId: selectedKeyForBilling?.id || preferredKeyIdForBilling,
+      resolveCreditCostForModel: params.resolveCreditCostForModel,
+    });
+
+    console.log('[handleGenerate] 计费检查', {
+      model: params.config.model,
+      provider: generationBillingState.resolvedProvider,
+      selectedKeyId: selectedKeyForBilling?.id,
+      hasCustomUserKey: generationBillingState.hasCustomUserKey,
+      isCreditModel: generationBillingState.isCreditModel,
+      mode: params.config.mode,
+    });
+
+    return {
+      selectedKeyForBilling,
+      generationBillingState,
+    };
+  }, []);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -396,6 +449,7 @@ export function useGenerationRuntime({
     prepareInitialCreditSettlement,
     prepareGenerationDraftContext,
     prepareInitialBillingAttemptContext,
+    prepareGenerationBillingStateContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

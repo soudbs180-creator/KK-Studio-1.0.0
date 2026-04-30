@@ -91,7 +91,6 @@ import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
 import { buildRetryExecutionNode } from './app/buildRetryExecutionNode';
 import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
 import { persistGeneratingPromptNode } from './app/persistGeneratingPromptNode';
-import { resolveGenerationBillingState } from './app/resolveGenerationBillingState';
 import { resolveGenerationPreviewState } from './app/resolveGenerationPreviewState';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
@@ -3300,6 +3299,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareInitialCreditSettlement,
     prepareGenerationDraftContext,
     prepareInitialBillingAttemptContext,
+    prepareGenerationBillingStateContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4250,34 +4250,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
     // it must never enter the system-credit deduction flow.
-    const customLocal = (() => {
-      try {
-        return JSON.parse(localStorage.getItem('kk_model_customizations') || '{}')[config.model] || {};
-      } catch { return {}; }
-    })();
-
-    const preferredKeyIdForBilling = hasExplicitModelRoute(config.model)
-      ? undefined
-      : getPreferredKeyForMode(config.mode);
-    const selectedKeyForBilling = keyManager.getNextKey(config.model, preferredKeyIdForBilling);
-    const generationBillingState = resolveGenerationBillingState({
-      modelId: config.model,
-      imageSize: config.imageSize,
-      mode: config.mode,
-      parallelCount: config.parallelCount,
-      customAlias: customLocal.alias,
-      preferredKeyId: selectedKeyForBilling?.id || preferredKeyIdForBilling,
+    const billingStateContext = prepareGenerationBillingStateContext({
+      config,
+      getPreferredKeyForMode,
+      hasExplicitModelRoute,
       resolveCreditCostForModel,
     });
-
-    console.log('[handleGenerate] 计费检查', {
-      model: config.model,
-      provider: generationBillingState.resolvedProvider,
-      selectedKeyId: selectedKeyForBilling?.id,
-      hasCustomUserKey: generationBillingState.hasCustomUserKey,
-      isCreditModel: generationBillingState.isCreditModel,
-      mode: config.mode
-    });
+    const selectedKeyForBilling = billingStateContext.selectedKeyForBilling;
+    const generationBillingState = billingStateContext.generationBillingState;
 
     const draftContext = prepareGenerationDraftContext({
       activeCanvasRef,
@@ -4429,7 +4409,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
