@@ -207,6 +207,10 @@ export interface CreateRetryGenerationTimeoutGuardResult {
   clear: () => void;
 }
 
+export interface FinalizeRetryGeneratedMediaAttemptGuardParams {
+  timeoutGuard: CreateRetryGenerationTimeoutGuardResult;
+}
+
 export interface PrepareRetryGeneratedMediaAttemptContextParams {
   currentNodeId: string;
   executionNode: PromptNode;
@@ -518,6 +522,7 @@ export interface UseGenerationRuntimeResult {
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
+  finalizeRetryGeneratedMediaAttemptGuard: (params: FinalizeRetryGeneratedMediaAttemptGuardParams) => void;
   prepareRetryGeneratedMediaAttemptContext: (params: PrepareRetryGeneratedMediaAttemptContextParams) => PrepareRetryGeneratedMediaAttemptContextResult;
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
@@ -787,6 +792,11 @@ export function useGenerationRuntime({
       }),
     };
   }, [createRetryGenerationTimeoutGuard]);
+
+  const finalizeRetryGeneratedMediaAttemptGuard = useCallback((params: FinalizeRetryGeneratedMediaAttemptGuardParams): void => {
+    params.timeoutGuard.markFinished();
+    params.timeoutGuard.clear();
+  }, []);
 
   const commitRetryGenerationStart = useCallback((params: CommitRetryGenerationStartParams) => {
     updatePromptNode({
@@ -1514,6 +1524,7 @@ export function useGenerationRuntime({
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
+    finalizeRetryGeneratedMediaAttemptGuard,
     prepareRetryGeneratedMediaAttemptContext,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,

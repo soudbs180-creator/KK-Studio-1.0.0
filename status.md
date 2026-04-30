@@ -1731,6 +1731,19 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-fifth slice:
+  - Contract: `tests/unit/generation-runtime-contract.test.ts` now covers Hook-owned retry generated-media attempt guard finalization and prevents `App.tsx` from directly calling `timeoutGuard.markFinished()` / `timeoutGuard.clear()`.
+  - Added `FinalizeRetryGeneratedMediaAttemptGuardParams` and `finalizeRetryGeneratedMediaAttemptGuard` to `src/app/useGenerationRuntime.ts`, keeping guard cleanup sequencing inside the runtime Hook.
+  - Updated `App.tsx` to call `finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard })` in both retry success and per-attempt catch paths.
+  - Current line counts: `src/App.tsx` 8592, `src/app/useGenerationRuntime.ts` 1551, `tests/unit/generation-runtime-contract.test.ts` 816.
+  - Targeted generation runtime contract test: passed, `36` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1027` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry guard cleanup refactor.
+  - `npm.cmd run governance:agent-docs`: passed.
+  - `npm.cmd run check:encoding`: passed.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 

@@ -3304,6 +3304,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
+    finalizeRetryGeneratedMediaAttemptGuard,
     prepareRetryGeneratedMediaAttemptContext,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
@@ -4607,8 +4608,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           }
           const { apiDurationMs, b64 } = generatedMediaContext;
 
-          timeoutGuard.markFinished();
-          timeoutGuard.clear();
+          finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard });
 
           const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
             b64,
@@ -4649,8 +4649,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           });
           return generatedResult;
         } catch (e: any) {
-          timeoutGuard.markFinished();
-          timeoutGuard.clear();
+          finalizeRetryGeneratedMediaAttemptGuard({ timeoutGuard });
           throw e;
         }
       }));
@@ -4693,7 +4692,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, prepareRetryGeneratedMediaAttemptContext, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, resolveRetryGeneratedMediaGenerationTime, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, resolveRetryGeneratedMediaLayoutPrompt, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, finalizeRetryGeneratedMediaAttemptGuard, prepareRetryGeneratedMediaAttemptContext, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, resolveRetryGeneratedMediaGenerationTime, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, resolveRetryGeneratedMediaLayoutPrompt, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

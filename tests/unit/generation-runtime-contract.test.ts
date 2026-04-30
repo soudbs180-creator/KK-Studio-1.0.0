@@ -330,12 +330,32 @@ describe('generation runtime extraction contract', () => {
 
     assert.match(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
     assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
-    assert.match(retryNodeSource, /timeoutGuard\.markFinished\(\);/);
-    assert.match(retryNodeSource, /timeoutGuard\.clear\(\);/);
     assert.doesNotMatch(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
     assert.doesNotMatch(retryNodeSource, /const timer = setTimeout\(\(\) => \{/);
     assert.doesNotMatch(retryNodeSource, /cancelGeneration\(requestId\);/);
     assert.doesNotMatch(retryNodeSource, /Retry request exceeded 600000ms timeout/);
+  });
+
+  test('retry generated media attempt guard finalization is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /finalizeRetryGeneratedMediaAttemptGuard: \(params: FinalizeRetryGeneratedMediaAttemptGuardParams\) => void;/);
+    assert.match(hookSource, /const finalizeRetryGeneratedMediaAttemptGuard = useCallback\(\(params: FinalizeRetryGeneratedMediaAttemptGuardParams\): void => \{/);
+    assert.match(hookSource, /params\.timeoutGuard\.markFinished\(\);/);
+    assert.match(hookSource, /params\.timeoutGuard\.clear\(\);/);
+    assert.match(hookSource, /finalizeRetryGeneratedMediaAttemptGuard,/);
+
+    assert.equal(
+      (retryNodeSource.match(/finalizeRetryGeneratedMediaAttemptGuard\(\{ timeoutGuard \}\);/g) || []).length,
+      2,
+    );
+    assert.doesNotMatch(retryNodeSource, /timeoutGuard\.markFinished\(\);/);
+    assert.doesNotMatch(retryNodeSource, /timeoutGuard\.clear\(\);/);
   });
 
   test('retry generated media attempt context is owned by useGenerationRuntime', () => {
