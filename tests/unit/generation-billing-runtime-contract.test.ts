@@ -23,7 +23,7 @@ test('frontend generation flow uses the shared billing coordinator and persists 
 
   assert.match(appSource, /from '\.\/services\/billing\/generationBillingCoordinator';/);
   assert.ok(billingAttemptCallCount >= 2);
-  assert.match(appSource, /billingAttemptId: billingAttempt\.attemptId,/);
+  assert.match(generationRuntimeSource, /billingAttemptId: params\.billingAttempt\.attemptId,/);
   assert.match(retryHelperSource, /from '\.\.\/services\/billing\/generationBillingCoordinator';/);
   assert.match(retryHelperSource, /billingAttemptId: billingAttempt\.attemptId,/);
   assert.match(generationRuntimeSource, /attemptId: params\.billingAttempt\?\.attemptId,/);

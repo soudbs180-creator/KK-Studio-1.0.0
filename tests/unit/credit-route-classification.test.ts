@@ -57,8 +57,8 @@ describe('credit route classification', () => {
     assert.match(appSource, /executionLane,/);
     assert.match(generationRuntimeSource, /executionLane: params\.generationBillingState\.executionLane,/);
     assert.match(appSource, /const executionLane = billingAttemptContext\.executionLane;/);
-    assert.match(appSource, /creditRouteSpecId: resolvedCreditSpecId,/);
-    assert.match(appSource, /creditRouteUnitId: resolvedCreditRoute\?\.routeUnitId,/);
+    assert.match(generationRuntimeSource, /creditRouteSpecId: params\.resolvedCreditSpecId,/);
+    assert.match(generationRuntimeSource, /creditRouteUnitId: params\.resolvedCreditRoute\?\.routeUnitId,/);
     assert.match(geminiServiceSource, /executionLane: options\?\.executionLane,/);
     assert.match(geminiServiceSource, /creditRouteSpecId: options\?\.creditRouteSpecId,/);
     assert.match(geminiServiceSource, /creditRouteUnitId: options\?\.creditRouteUnitId,/);

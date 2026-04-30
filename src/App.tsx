@@ -86,12 +86,10 @@ import AppMobileWorkspace from './app/AppMobileWorkspace';
 import { buildPptSlidesPreviewHtml } from './app/buildPptSlidesPreviewHtml';
 import { buildPptxSlideRelationshipsXml, buildPptxSlideXml } from './app/buildPptxSlideDocuments';
 import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
-import { buildGeneratingPromptNode } from './app/buildGeneratingPromptNode';
 import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
 import { buildRetryExecutionNode } from './app/buildRetryExecutionNode';
 import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
 import { persistGeneratingPromptNode } from './app/persistGeneratingPromptNode';
-import { resolveGenerationPreviewState } from './app/resolveGenerationPreviewState';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
 import { writePptxPackageSkeleton } from './app/writePptxPackageSkeleton';
@@ -3300,6 +3298,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareGenerationDraftContext,
     prepareInitialBillingAttemptContext,
     prepareGenerationBillingStateContext,
+    prepareInitialGeneratingPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4316,8 +4315,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 立即创建卡片，参考图异步加载。
       const finalReferenceImages = prepareGenerationReferenceImages(config.referenceImages);
 
-      const isNewAnim = true; // Always set for standard generation
-
       const rawPrompt = trimmedPrompt;
       const {
         optimizedPromptEn,
@@ -4346,43 +4343,28 @@ const AppContent: React.FC<AppContentProps> = () => {
         },
       });
 
-      const generationPreviewState = resolveGenerationPreviewState({
+      const initialGeneratingNode = prepareInitialGeneratingPromptNode({
+        activeSourceImage,
+        billingAttempt,
         config,
+        currentPos,
+        executionLane,
+        finalReferenceImages,
+        generationBillingState,
+        optimizedPromptEn,
+        optimizedPromptZh,
+        paymentTransactionId,
+        perImageCreditCost,
+        promptNodeId,
+        promptOptimizerResult,
         rawPrompt,
+        requiredCredits,
+        resolvedCreditRoute,
+        resolvedCreditSpecId,
         selectedKeyForBilling,
         useServerSideCreditSettlement,
       });
-
-      const generatingNode = buildGeneratingPromptNode({
-        promptNodeId,
-        prompt: rawPrompt,
-        optimizedPromptEn,
-        optimizedPromptZh,
-        promptOptimizerResult,
-        promptOptimizationEnabled: !!(config.enablePromptOptimization && (optimizedPromptEn || promptOptimizerResult)),
-        position: currentPos,
-        config,
-        previewModelLabel: generationPreviewState.previewModelLabel,
-        previewModelMeta: generationPreviewState.previewColorMeta,
-        previewProvider: generationPreviewState.previewProvider,
-        previewProviderLabel: generationPreviewState.previewProviderLabel,
-        keySlotId: generationPreviewState.keySlotId,
-        referenceImages: finalReferenceImages,
-        creditSettlement: useServerSideCreditSettlement ? 'server' : 'client',
-        executionLane,
-        billingAttemptId: billingAttempt.attemptId,
-        creditRouteSpecId: resolvedCreditSpecId,
-        creditRouteUnitId: resolvedCreditRoute?.routeUnitId,
-        paymentTransactionId,
-        isNew: isNewAnim,
-        parallelCount: generationPreviewState.parallelCount,
-        sourceImageId: activeSourceImage || undefined,
-        pptSlides: generationPreviewState.pptSlides,
-        cost: requiredCredits,
-        billingMode: generationBillingState.isCreditModel ? 'credits' : 'currency',
-        creditCost: generationBillingState.isCreditModel ? perImageCreditCost : undefined,
-        isPaymentProcessed: requiredCredits > 0 && !useServerSideCreditSettlement,
-      });
+      const generatingNode = initialGeneratingNode.generatingNode;
 
       const persistedGeneratingNode = await persistGeneratingPromptNode({
         generatingNode,
@@ -4409,7 +4391,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

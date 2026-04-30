@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; generation billing state context slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; initial generating prompt-node assembly slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8961 lines after Milestone 4 generation billing state context extraction
+- `src/App.tsx`: 8943 lines after Milestone 4 initial generating prompt-node assembly extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -398,7 +398,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Generation runtime guard, billing helper, initial credit settlement, draft-context, initial billing attempt context, and generation billing state context slices are extracted and validated.
+Status: in progress. Generation runtime guard, billing helper, initial credit settlement, draft-context, initial billing attempt context, generation billing state context, and initial generating prompt-node assembly slices are extracted and validated.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -543,7 +543,7 @@ Line count change during Milestone 4 sixth slice:
 
 Validation passed:
 - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because generation billing state context still lived in `App.tsx`.
-- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/credit-route-classification.test.ts`: passed, `20` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `21` tests.
 - `npm.cmd run typecheck`: passed.
 - `npm.cmd run test:unit`: passed, `994` tests.
 - `npm.cmd run build`: passed.
@@ -555,8 +555,36 @@ Current risk:
 - `prepareGenerationBillingStateContext` reads `localStorage` inside the hook to preserve the existing customization lookup; future hardening can inject a storage adapter if this runtime becomes easier to unit test directly.
 - The next safe boundary remains initial prompt-node assembly or failure patch preparation; do not merge PPT/ecommerce extraction into generation runtime.
 
+Seventh slice scope:
+- Added hook-owned `prepareInitialGeneratingPromptNode` with explicit `PrepareInitialGeneratingPromptNodeParams` and `PrepareInitialGeneratingPromptNodeResult`.
+- Moved initial `resolveGenerationPreviewState` and `buildGeneratingPromptNode` assembly out of `src/App.tsx` and into `src/app/useGenerationRuntime.ts`.
+- Updated billing coordinator, billing runtime, and credit-route contracts so prompt-node billing markers are asserted at the new hook boundary.
+- Kept prompt optimization, generation reference preparation, prompt-node persistence, optimistic debit, execution, retry, PPT, and ecommerce bodies in `App.tsx`.
+
+Line count change during Milestone 4 seventh slice:
+- `src/App.tsx`: `8961` lines after sixth slice -> `8943` lines.
+- `src/app/useGenerationRuntime.ts`: `457` lines -> `529` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `175` lines -> `194` lines.
+- `tests/unit/generation-billing-runtime-contract.test.ts`: unchanged at `64` lines.
+- `tests/unit/generation-billing-coordinator.test.ts`: unchanged at `115` lines.
+- `tests/unit/credit-route-classification.test.ts`: unchanged at `79` lines.
+
+Validation passed:
+- RED baseline proof: source-contract checks against `HEAD` showed `useGenerationRuntime.ts` did not own `prepareInitialGeneratingPromptNode`, while `App.tsx` still owned `resolveGenerationPreviewState` and `buildGeneratingPromptNode`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/credit-route-classification.test.ts tests/unit/route-aware-credit-billing.test.ts`: passed, `22` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `995` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `prepareInitialGeneratingPromptNode` has a deliberately wide params surface because it preserves existing prompt-node metadata exactly; do not expand it into persistence or execution until those boundaries have separate contracts.
+- The next safe slice should target prompt-node persistence wrapping or initial post-persist cleanup, not retry/PPT/ecommerce bodies.
+
 Next step:
-- Continue M4 with the next RED source contract around initial prompt-node assembly, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
+- Continue M4 with the next RED source contract around prompt-node persistence wrapping, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
 
 ### Milestones 5-9
 
@@ -784,9 +812,18 @@ Status: pending. See `plans.md` for the full ordered list:
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - 2026-04-30 Milestone 4 sixth slice:
   - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because generation billing state context still lived in `App.tsx`.
-  - Targeted M4 billing/runtime/route tests: passed, `20` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `21` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `994` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 seventh slice:
+  - RED baseline proof: source-contract checks against `HEAD` showed `useGenerationRuntime.ts` did not own `prepareInitialGeneratingPromptNode`, while `App.tsx` still owned `resolveGenerationPreviewState` and `buildGeneratingPromptNode`.
+  - Targeted M4 billing/runtime/route tests: passed, `22` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `995` tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.

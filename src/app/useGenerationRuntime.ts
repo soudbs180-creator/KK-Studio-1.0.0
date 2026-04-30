@@ -8,9 +8,11 @@ import {
 } from '../services/billing/generationBillingCoordinator';
 import { adminModelService } from '../services/model/adminModelService';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
-import type { Canvas, GenerationConfig, ImageSize, PromptNode } from '../types';
+import type { Canvas, GenerationConfig, ImageSize, PromptNode, ReferenceImage } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
+import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
+import { resolveGenerationPreviewState } from './resolveGenerationPreviewState';
 
 type CreditBillingAttempt = {
   attemptId: string;
@@ -106,6 +108,32 @@ export interface PrepareGenerationBillingStateContextResult {
   generationBillingState: ReturnType<typeof resolveGenerationBillingState>;
 }
 
+export interface PrepareInitialGeneratingPromptNodeParams {
+  activeSourceImage?: string | null;
+  billingAttempt: CreditBillingAttempt;
+  config: GenerationConfig;
+  currentPos: PromptNode['position'];
+  executionLane: ModelExecutionLane;
+  finalReferenceImages: ReferenceImage[];
+  generationBillingState: Pick<ReturnType<typeof resolveGenerationBillingState>, 'isCreditModel'>;
+  optimizedPromptEn?: string;
+  optimizedPromptZh?: string;
+  paymentTransactionId?: string;
+  perImageCreditCost: number;
+  promptNodeId: string;
+  promptOptimizerResult?: PromptNode['promptOptimizerResult'];
+  rawPrompt: string;
+  requiredCredits: number;
+  resolvedCreditRoute: ReturnType<typeof adminModelService.getCreditRouteSnapshot> | null;
+  resolvedCreditSpecId?: string;
+  selectedKeyForBilling: ReturnType<typeof keyManager.getNextKey>;
+  useServerSideCreditSettlement: boolean;
+}
+
+export interface PrepareInitialGeneratingPromptNodeResult {
+  generatingNode: PromptNode;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -141,6 +169,7 @@ export interface UseGenerationRuntimeResult {
   prepareGenerationDraftContext: (args: PrepareGenerationDraftContextArgs) => PrepareGenerationDraftContextResult;
   prepareInitialBillingAttemptContext: (params: PrepareInitialBillingAttemptContextParams) => PrepareInitialBillingAttemptContextResult;
   prepareGenerationBillingStateContext: (params: PrepareGenerationBillingStateContextParams) => PrepareGenerationBillingStateContextResult;
+  prepareInitialGeneratingPromptNode: (params: PrepareInitialGeneratingPromptNodeParams) => PrepareInitialGeneratingPromptNodeResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -396,6 +425,48 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareInitialGeneratingPromptNode = useCallback((params: PrepareInitialGeneratingPromptNodeParams) => {
+    const generationPreviewState = resolveGenerationPreviewState({
+      config: params.config,
+      rawPrompt: params.rawPrompt,
+      selectedKeyForBilling: params.selectedKeyForBilling,
+      useServerSideCreditSettlement: params.useServerSideCreditSettlement,
+    });
+
+    const generatingNode = buildGeneratingPromptNode({
+      promptNodeId: params.promptNodeId,
+      prompt: params.rawPrompt,
+      optimizedPromptEn: params.optimizedPromptEn,
+      optimizedPromptZh: params.optimizedPromptZh,
+      promptOptimizerResult: params.promptOptimizerResult,
+      promptOptimizationEnabled: !!(params.config.enablePromptOptimization && (params.optimizedPromptEn || params.promptOptimizerResult)),
+      position: params.currentPos,
+      config: params.config,
+      previewModelLabel: generationPreviewState.previewModelLabel,
+      previewModelMeta: generationPreviewState.previewColorMeta,
+      previewProvider: generationPreviewState.previewProvider,
+      previewProviderLabel: generationPreviewState.previewProviderLabel,
+      keySlotId: generationPreviewState.keySlotId,
+      referenceImages: params.finalReferenceImages,
+      creditSettlement: params.useServerSideCreditSettlement ? 'server' : 'client',
+      executionLane: params.executionLane,
+      billingAttemptId: params.billingAttempt.attemptId,
+      creditRouteSpecId: params.resolvedCreditSpecId,
+      creditRouteUnitId: params.resolvedCreditRoute?.routeUnitId,
+      paymentTransactionId: params.paymentTransactionId,
+      isNew: true,
+      parallelCount: generationPreviewState.parallelCount,
+      sourceImageId: params.activeSourceImage || undefined,
+      pptSlides: generationPreviewState.pptSlides,
+      cost: params.requiredCredits,
+      billingMode: params.generationBillingState.isCreditModel ? 'credits' : 'currency',
+      creditCost: params.generationBillingState.isCreditModel ? params.perImageCreditCost : undefined,
+      isPaymentProcessed: params.requiredCredits > 0 && !params.useServerSideCreditSettlement,
+    });
+
+    return { generatingNode };
+  }, []);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -450,6 +521,7 @@ export function useGenerationRuntime({
     prepareGenerationDraftContext,
     prepareInitialBillingAttemptContext,
     prepareGenerationBillingStateContext,
+    prepareInitialGeneratingPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

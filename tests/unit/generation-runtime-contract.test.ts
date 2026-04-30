@@ -171,4 +171,23 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /const selectedKeyForBilling = keyManager\.getNextKey\(config\.model, preferredKeyIdForBilling\);/);
     assert.doesNotMatch(appSource, /const generationBillingState = resolveGenerationBillingState\(\{/);
   });
+
+  test('initial generating prompt node assembly is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareInitialGeneratingPromptNode: \(params: PrepareInitialGeneratingPromptNodeParams\) => PrepareInitialGeneratingPromptNodeResult;/);
+    assert.match(hookSource, /const prepareInitialGeneratingPromptNode = useCallback\(\(params: PrepareInitialGeneratingPromptNodeParams\)/);
+    assert.match(hookSource, /const generationPreviewState = resolveGenerationPreviewState\(\{/);
+    assert.match(hookSource, /const generatingNode = buildGeneratingPromptNode\(\{/);
+    assert.match(hookSource, /promptNodeId: params\.promptNodeId,/);
+    assert.match(hookSource, /prompt: params\.rawPrompt,/);
+    assert.match(hookSource, /paymentTransactionId: params\.paymentTransactionId,/);
+    assert.match(hookSource, /billingMode: params\.generationBillingState\.isCreditModel \? 'credits' : 'currency',/);
+
+    assert.match(appSource, /const initialGeneratingNode = prepareInitialGeneratingPromptNode\(\{/);
+    assert.match(appSource, /const generatingNode = initialGeneratingNode\.generatingNode;/);
+    assert.doesNotMatch(appSource, /const generationPreviewState = resolveGenerationPreviewState\(\{/);
+    assert.doesNotMatch(appSource, /const generatingNode = buildGeneratingPromptNode\(\{/);
+  });
 });
