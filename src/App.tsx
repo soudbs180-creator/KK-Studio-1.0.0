@@ -3313,6 +3313,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryVideoGenerationRequest,
     buildRetryVideoGenerationResultContext,
     prepareRetryImageGenerationRequest,
+    buildRetryImageGenerationResultContext,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
@@ -4622,31 +4623,28 @@ const AppContent: React.FC<AppContentProps> = () => {
               imageRequest.grounding,
               imageRequest.options,
             );
-            b64 = result.url;
-            requestPath = result.requestPath;
-            requestBodyPreview = result.requestBodyPreview;
-            pythonSnippet = result.pythonSnippet;
-            apiDurationMs = result.apiDurationMs;
-            actualKeySlotId = result.keySlotId || actualKeySlotId;
-            actualProvider = result.provider || actualProvider;
-            actualProviderLabel = result.providerName || actualProviderLabel;
-            actualModel = result.effectiveModel || actualModel;
-            actualModelLabel = resolveModelDisplayName(actualModel, result.modelName || actualModelLabel);
-            actualCost = typeof result.cost === 'number' && Number.isFinite(result.cost)
-              ? result.cost
-              : undefined;
-            actualTokens = typeof result.tokens === 'number' && Number.isFinite(result.tokens)
-              ? result.tokens
-              : undefined;
-            actualPromptTokens = typeof result.promptTokens === 'number' && Number.isFinite(result.promptTokens)
-              ? result.promptTokens
-              : undefined;
-            actualCompletionTokens = typeof result.completionTokens === 'number' && Number.isFinite(result.completionTokens)
-              ? result.completionTokens
-              : undefined;
-            actualCostSource = actualCost !== undefined ? 'explicit' : 'none';
-            if (typeof result.balanceAfter === 'number') {
-              applyAuthoritativeBalance(result.balanceAfter);
+            const imageResultContext = buildRetryImageGenerationResultContext({
+              executionNode,
+              result,
+              resolveModelDisplayName,
+            });
+            b64 = imageResultContext.b64;
+            requestPath = imageResultContext.requestTrace.requestPath;
+            requestBodyPreview = imageResultContext.requestTrace.requestBodyPreview;
+            pythonSnippet = imageResultContext.requestTrace.pythonSnippet;
+            apiDurationMs = imageResultContext.apiDurationMs;
+            actualKeySlotId = imageResultContext.resultMetadata.keySlotId;
+            actualProvider = imageResultContext.resultMetadata.provider;
+            actualProviderLabel = imageResultContext.resultMetadata.providerLabel;
+            actualModel = imageResultContext.resultMetadata.model;
+            actualModelLabel = imageResultContext.resultMetadata.modelLabel;
+            actualCost = imageResultContext.resultMetadata.cost;
+            actualTokens = imageResultContext.resultMetadata.tokens;
+            actualPromptTokens = imageResultContext.resultMetadata.promptTokens;
+            actualCompletionTokens = imageResultContext.resultMetadata.completionTokens;
+            actualCostSource = imageResultContext.resultMetadata.costSource;
+            if (typeof imageResultContext.balanceAfter === 'number') {
+              applyAuthoritativeBalance(imageResultContext.balanceAfter);
             }
           }
 
@@ -4744,7 +4742,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

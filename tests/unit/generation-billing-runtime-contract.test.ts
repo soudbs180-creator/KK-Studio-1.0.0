@@ -59,5 +59,6 @@ test('system proxy image generation preserves billing metadata through llm and b
   assert.match(generationHookSource, /const \{ refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance \} = useBilling\(\);/);
   assert.match(generationHookSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
   assert.match(appSource, /const \{[\s\S]*applyAuthoritativeBalance,[\s\S]*\} = useBilling\(\);/);
-  assert.ok((appSource.match(/if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/g) || []).length >= 2);
+  assert.match(appSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
+  assert.match(appSource, /if \(typeof imageResultContext\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(imageResultContext\.balanceAfter\);\s*\}/);
 });

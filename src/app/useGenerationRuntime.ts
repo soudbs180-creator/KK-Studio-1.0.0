@@ -6,6 +6,7 @@ import {
   buildGenerationBillingAttempt,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
+import type { GenerateImageResult } from '../services/llm/geminiService';
 import type { VideoGenerationResult } from '../services/llm/LLMAdapter';
 import { adminModelService } from '../services/model/adminModelService';
 import { getModelCapabilities } from '../services/model/modelCapabilities';
@@ -326,6 +327,20 @@ export interface PrepareRetryImageGenerationRequestResult {
   };
 }
 
+export interface BuildRetryImageGenerationResultContextParams {
+  executionNode: Pick<PromptNode, 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>;
+  result: GenerateImageResult;
+  resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
+}
+
+export interface BuildRetryImageGenerationResultContextResult {
+  apiDurationMs?: number;
+  b64: string;
+  balanceAfter?: number;
+  requestTrace: RetryGenerationSuccessDebugResult;
+  resultMetadata: RetryGeneratedMediaResultMetadata;
+}
+
 export interface PrepareRetryGeneratedMediaPersistenceParams {
   b64: string;
   calculateImageHash: (source: string) => Promise<string>;
@@ -477,6 +492,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   buildRetryVideoGenerationResultContext: (params: BuildRetryVideoGenerationResultContextParams) => BuildRetryVideoGenerationResultContextResult;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
+  buildRetryImageGenerationResultContext: (params: BuildRetryImageGenerationResultContextParams) => BuildRetryImageGenerationResultContextResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
@@ -870,6 +886,39 @@ export function useGenerationRuntime({
       thinkingMode: params.executionNode.thinkingMode || 'minimal'
     }
   }), []);
+
+  const buildRetryImageGenerationResultContext = useCallback((
+    params: BuildRetryImageGenerationResultContextParams,
+  ): BuildRetryImageGenerationResultContextResult => {
+    const model = params.result.effectiveModel || params.executionNode.model;
+    const cost = resolveFiniteNumber(params.result.cost);
+
+    return {
+      apiDurationMs: params.result.apiDurationMs,
+      b64: params.result.url,
+      balanceAfter: params.result.balanceAfter,
+      requestTrace: {
+        requestPath: params.result.requestPath,
+        requestBodyPreview: params.result.requestBodyPreview,
+        pythonSnippet: params.result.pythonSnippet,
+      },
+      resultMetadata: {
+        completionTokens: resolveFiniteNumber(params.result.completionTokens),
+        cost,
+        costSource: cost !== undefined ? 'explicit' : 'none',
+        keySlotId: params.result.keySlotId || params.executionNode.keySlotId,
+        model,
+        modelLabel: params.resolveModelDisplayName(
+          model,
+          params.result.modelName || params.executionNode.modelLabel,
+        ),
+        promptTokens: resolveFiniteNumber(params.result.promptTokens),
+        provider: params.result.provider || params.executionNode.provider,
+        providerLabel: params.result.providerName || params.executionNode.providerLabel,
+        tokens: resolveFiniteNumber(params.result.tokens),
+      },
+    };
+  }, []);
 
   const prepareRetryGeneratedMediaPersistence = useCallback(async (
     params: PrepareRetryGeneratedMediaPersistenceParams,
@@ -1390,6 +1439,7 @@ export function useGenerationRuntime({
     prepareRetryVideoGenerationRequest,
     buildRetryVideoGenerationResultContext,
     prepareRetryImageGenerationRequest,
+    buildRetryImageGenerationResultContext,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,

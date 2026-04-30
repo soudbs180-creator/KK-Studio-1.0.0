@@ -515,6 +515,33 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /thinkingMode: executionNode\.thinkingMode \|\| 'minimal'/);
   });
 
+  test('retry image generation result normalization is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryImageGenerationResultContext: \(params: BuildRetryImageGenerationResultContextParams\) => BuildRetryImageGenerationResultContextResult;/);
+    assert.match(hookSource, /const buildRetryImageGenerationResultContext = useCallback\(\(\s*params: BuildRetryImageGenerationResultContextParams,\s*\): BuildRetryImageGenerationResultContextResult => \{/);
+    assert.match(hookSource, /b64: params\.result\.url,/);
+    assert.match(hookSource, /apiDurationMs: params\.result\.apiDurationMs,/);
+    assert.match(hookSource, /const model = params\.result\.effectiveModel \|\| params\.executionNode\.model;/);
+    assert.match(hookSource, /model,/);
+    assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
+    assert.match(hookSource, /balanceAfter: params\.result\.balanceAfter,/);
+
+    assert.match(retryNodeSource, /const imageResultContext = buildRetryImageGenerationResultContext\(\{/);
+    assert.match(retryNodeSource, /resolveModelDisplayName,/);
+    assert.match(retryNodeSource, /b64 = imageResultContext\.b64;/);
+    assert.match(retryNodeSource, /if \(typeof imageResultContext\.balanceAfter === 'number'\) \{/);
+    assert.match(retryNodeSource, /applyAuthoritativeBalance\(imageResultContext\.balanceAfter\);/);
+    assert.doesNotMatch(retryNodeSource, /actualProvider = result\.provider \|\| actualProvider;/);
+    assert.doesNotMatch(retryNodeSource, /actualModel = result\.effectiveModel \|\| actualModel;/);
+    assert.doesNotMatch(retryNodeSource, /actualCost = typeof result\.cost === 'number'/);
+  });
+
   test('retry generated media persistence context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
