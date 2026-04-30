@@ -748,12 +748,32 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const generatedPositions = params\.buildGeneratedImageBatchPositions\(\{/);
     assert.match(hookSource, /basePosition: \(params\.latestLayoutPrompt \|\| params\.executionNode\)\.position \|\| params\.executionNode\.position,/);
 
-    assert.match(retryNodeSource, /const latestLayoutPrompt = activeCanvasRef\.current\?\.promptNodes\.find/);
+    assert.match(retryNodeSource, /const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt\(\{/);
     assert.match(retryNodeSource, /const alignedImageNodes = buildRetryGeneratedMediaLayout\(\{/);
     assert.match(retryNodeSource, /buildGeneratedImageBatchPositions,/);
     assert.match(retryNodeSource, /getCardDimensions,/);
     assert.doesNotMatch(retryNodeSource, /const newImageNodes = results\.map\(\(img, i\) => \{/);
     assert.doesNotMatch(retryNodeSource, /let exactImageHeight = cardHeight;/);
     assert.doesNotMatch(retryNodeSource, /const generatedPositions = buildGeneratedImageBatchPositions\(\{/);
+  });
+
+  test('retry generated media layout prompt resolution is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface ResolveRetryGeneratedMediaLayoutPromptParams \{/);
+    assert.match(hookSource, /canvasSnapshot\?: Pick<Canvas, 'promptNodes'> \| null;/);
+    assert.match(hookSource, /resolveRetryGeneratedMediaLayoutPrompt: \(params: ResolveRetryGeneratedMediaLayoutPromptParams\) => ResolveRetryGeneratedMediaLayoutPromptResult;/);
+    assert.match(hookSource, /const resolveRetryGeneratedMediaLayoutPrompt = useCallback\(\(params: ResolveRetryGeneratedMediaLayoutPromptParams\): ResolveRetryGeneratedMediaLayoutPromptResult => \{/);
+    assert.match(hookSource, /params\.canvasSnapshot\?\.promptNodes\.find/);
+
+    assert.match(retryNodeSource, /const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt\(\{/);
+    assert.match(retryNodeSource, /canvasSnapshot: activeCanvasRef\.current,/);
+    assert.match(retryNodeSource, /executionNode,/);
+    assert.doesNotMatch(retryNodeSource, /activeCanvasRef\.current\?\.promptNodes\.find/);
   });
 });

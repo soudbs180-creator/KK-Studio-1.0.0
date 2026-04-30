@@ -422,6 +422,13 @@ export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
   width: number;
 };
 
+export interface ResolveRetryGeneratedMediaLayoutPromptParams {
+  canvasSnapshot?: Pick<Canvas, 'promptNodes'> | null;
+  executionNode: Pick<PromptNode, 'id' | 'position'>;
+}
+
+export type ResolveRetryGeneratedMediaLayoutPromptResult = Pick<PromptNode, 'position'>;
+
 interface RetryGeneratedMediaLayoutCardDimensions {
   width: number;
   totalHeight: number;
@@ -520,6 +527,7 @@ export interface UseGenerationRuntimeResult {
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
   buildRetryGeneratedMediaResultFromContext: (params: BuildRetryGeneratedMediaResultFromContextParams) => RetryGeneratedMediaResult;
+  resolveRetryGeneratedMediaLayoutPrompt: (params: ResolveRetryGeneratedMediaLayoutPromptParams) => ResolveRetryGeneratedMediaLayoutPromptResult;
   buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
   buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
@@ -1137,6 +1145,11 @@ export function useGenerationRuntime({
     });
   }, [buildRetryGeneratedMediaResult]);
 
+  const resolveRetryGeneratedMediaLayoutPrompt = useCallback((params: ResolveRetryGeneratedMediaLayoutPromptParams): ResolveRetryGeneratedMediaLayoutPromptResult => {
+    return params.canvasSnapshot?.promptNodes.find((promptNode) => promptNode.id === params.executionNode.id)
+      || params.executionNode;
+  }, []);
+
   const buildRetryGeneratedMediaLayout = useCallback((params: BuildRetryGeneratedMediaLayoutParams): RetryGeneratedMediaLayoutNode[] => {
     const gapToImages = 20;
     const gap = 16;
@@ -1502,6 +1515,7 @@ export function useGenerationRuntime({
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
     buildRetryGeneratedMediaResultFromContext,
+    resolveRetryGeneratedMediaLayoutPrompt,
     buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,

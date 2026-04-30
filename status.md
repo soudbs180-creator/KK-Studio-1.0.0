@@ -1703,6 +1703,20 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-third slice:
+  - Contract: `tests/unit/generation-runtime-contract.test.ts` now covers Hook-owned retry generated-media layout prompt resolution and prevents `App.tsx` from directly searching `activeCanvasRef.current?.promptNodes` inside the retry handler.
+  - Added `ResolveRetryGeneratedMediaLayoutPromptParams`, `ResolveRetryGeneratedMediaLayoutPromptResult`, and `resolveRetryGeneratedMediaLayoutPrompt` to `src/app/useGenerationRuntime.ts`, keeping the live prompt fallback logic inside the runtime Hook.
+  - Updated `App.tsx` to pass `activeCanvasRef.current` and `executionNode` into the Hook helper before `buildRetryGeneratedMediaLayout`.
+  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1525, `tests/unit/generation-runtime-contract.test.ts` 780.
+  - Targeted generation runtime contract test: passed, `34` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `48` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1025` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry layout prompt resolution refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 
