@@ -1759,6 +1759,23 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-seventh slice:
+  - Review fix: `commitRetryGeneratedMediaSuccess` previously accepted a Promise-returning `addImageNodes` dependency but did not await it before recording retry success side effects.
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `commitRetryGeneratedMediaSuccess` still returned `void`, called `params.addImageNodes(...)` without `await`, and `App.tsx` did not await the helper.
+  - Updated `UseGenerationRuntimeResult` and `commitRetryGeneratedMediaSuccess` to return `Promise<void>`, await the canvas mutation, and only then call `reportRetryGenerationSuccess`.
+  - Updated `App.tsx` to await `commitRetryGeneratedMediaSuccess(...)` so a failed canvas commit flows into the existing retry failure path instead of reporting success early.
+  - Kept the adjacent retry authoritative-balance extraction in the runtime Hook: `applyRetryGeneratedMediaAuthoritativeBalance` now owns the `balanceAfter` guard and `App.tsx` delegates to it after retry media result context normalization.
+  - Updated `tests/unit/generation-billing-runtime-contract.test.ts` so system-proxy billing metadata coverage follows the runtime-owned retry balance application boundary.
+  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1589, `tests/unit/generation-runtime-contract.test.ts` 856, `tests/unit/generation-billing-runtime-contract.test.ts` 66.
+  - Targeted generation runtime contract test: passed, `38` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `52` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1029` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry success sequencing and billing metadata refactor.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 

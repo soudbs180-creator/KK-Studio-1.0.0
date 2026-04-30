@@ -332,6 +332,11 @@ export interface RetryGeneratedMediaResultContext {
   resultMetadata: RetryGeneratedMediaResultMetadata;
 }
 
+export interface ApplyRetryGeneratedMediaAuthoritativeBalanceParams {
+  generatedMediaContext: Pick<RetryGeneratedMediaResultContext, 'balanceAfter'>;
+  applyAuthoritativeBalance: (balance: number) => void;
+}
+
 export type BuildRetryVideoGenerationResultContextResult = RetryGeneratedMediaResultContext;
 
 export interface ResolveRetryGeneratedMediaGenerationTimeParams {
@@ -540,13 +545,14 @@ export interface UseGenerationRuntimeResult {
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
-  commitRetryGeneratedMediaSuccess: (params: CommitRetryGeneratedMediaSuccessParams) => void;
+  commitRetryGeneratedMediaSuccess: (params: CommitRetryGeneratedMediaSuccessParams) => Promise<void>;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   buildRetryVideoGenerationResultContext: (params: BuildRetryVideoGenerationResultContextParams) => BuildRetryVideoGenerationResultContextResult;
   resolveRetryGeneratedMediaGenerationTime: (params: ResolveRetryGeneratedMediaGenerationTimeParams) => number;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   buildRetryImageGenerationResultContext: (params: BuildRetryImageGenerationResultContextParams) => BuildRetryImageGenerationResultContextResult;
+  applyRetryGeneratedMediaAuthoritativeBalance: (params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams) => void;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
@@ -871,8 +877,8 @@ export function useGenerationRuntime({
     });
   }, []);
 
-  const commitRetryGeneratedMediaSuccess = useCallback((params: CommitRetryGeneratedMediaSuccessParams): void => {
-    params.addImageNodes(params.alignedImageNodes, {
+  const commitRetryGeneratedMediaSuccess = useCallback(async (params: CommitRetryGeneratedMediaSuccessParams): Promise<void> => {
+    await params.addImageNodes(params.alignedImageNodes, {
       [params.parentNodeId]: params.retryCompletedPromptPatch,
     });
 
@@ -1015,6 +1021,12 @@ export function useGenerationRuntime({
         tokens: resolveFiniteNumber(params.result.tokens),
       },
     };
+  }, []);
+
+  const applyRetryGeneratedMediaAuthoritativeBalance = useCallback((params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams): void => {
+    if (typeof params.generatedMediaContext.balanceAfter === 'number') {
+      params.applyAuthoritativeBalance(params.generatedMediaContext.balanceAfter);
+    }
   }, []);
 
   const prepareRetryGeneratedMediaPersistence = useCallback(async (
@@ -1562,6 +1574,7 @@ export function useGenerationRuntime({
     resolveRetryGeneratedMediaGenerationTime,
     prepareRetryImageGenerationRequest,
     buildRetryImageGenerationResultContext,
+    applyRetryGeneratedMediaAuthoritativeBalance,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,

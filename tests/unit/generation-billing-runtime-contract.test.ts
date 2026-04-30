@@ -46,6 +46,7 @@ test('system proxy image generation preserves billing metadata through llm and b
   const geminiServiceSource = readSource('src/services/llm/geminiService.ts');
   const billingContextSource = readSource('src/context/BillingContext.tsx');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
+  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
   const appSource = readSource('src/App.tsx');
 
   assert.match(llmAdapterSource, /ledgerId\?: string;/);
@@ -60,5 +61,6 @@ test('system proxy image generation preserves billing metadata through llm and b
   assert.match(generationHookSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
   assert.match(appSource, /const \{[\s\S]*applyAuthoritativeBalance,[\s\S]*\} = useBilling\(\);/);
   assert.match(appSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
-  assert.match(appSource, /if \(typeof generatedMediaContext\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(generatedMediaContext\.balanceAfter\);\s*\}/);
+  assert.match(generationRuntimeSource, /if \(typeof params\.generatedMediaContext\.balanceAfter === 'number'\) \{\s*params\.applyAuthoritativeBalance\(params\.generatedMediaContext\.balanceAfter\);\s*\}/);
+  assert.match(appSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext,[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
 });

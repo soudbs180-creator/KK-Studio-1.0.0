@@ -473,14 +473,19 @@ describe('generation runtime extraction contract', () => {
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf('const handleExportPptPackage = useCallback'),
     );
+    const commitSuccessSource = hookSource.slice(
+      hookSource.indexOf('const commitRetryGeneratedMediaSuccess = useCallback'),
+      hookSource.indexOf('const prepareRetryGenerationTaskPromptContext = useCallback'),
+    );
 
-    assert.match(hookSource, /commitRetryGeneratedMediaSuccess: \(params: CommitRetryGeneratedMediaSuccessParams\) => void;/);
-    assert.match(hookSource, /const commitRetryGeneratedMediaSuccess = useCallback\(\(params: CommitRetryGeneratedMediaSuccessParams\): void => \{/);
-    assert.match(hookSource, /params\.addImageNodes\(params\.alignedImageNodes, \{/);
+    assert.match(hookSource, /commitRetryGeneratedMediaSuccess: \(params: CommitRetryGeneratedMediaSuccessParams\) => Promise<void>;/);
+    assert.match(hookSource, /const commitRetryGeneratedMediaSuccess = useCallback\(async \(params: CommitRetryGeneratedMediaSuccessParams\): Promise<void> => \{/);
+    assert.match(hookSource, /await params\.addImageNodes\(params\.alignedImageNodes, \{/);
     assert.match(hookSource, /\[params\.parentNodeId\]: params\.retryCompletedPromptPatch,/);
     assert.match(hookSource, /reportRetryGenerationSuccess\(\{/);
+    assert.match(commitSuccessSource, /await params\.addImageNodes\([\s\S]*reportRetryGenerationSuccess\(\{/);
 
-    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{/);
+    assert.match(retryNodeSource, /await commitRetryGeneratedMediaSuccess\(\{/);
     assert.match(retryNodeSource, /retryCompletedPromptPatch,/);
     assert.doesNotMatch(retryNodeSource, /addImageNodes\(alignedImageNodes, \{/);
     assert.doesNotMatch(retryNodeSource, /reportRetryGenerationSuccess\(\{/);
@@ -595,11 +600,28 @@ describe('generation runtime extraction contract', () => {
     assert.match(retryNodeSource, /generatedMediaContext = buildRetryImageGenerationResultContext\(\{/);
     assert.match(retryNodeSource, /resolveModelDisplayName,/);
     assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
-    assert.match(retryNodeSource, /if \(typeof generatedMediaContext\.balanceAfter === 'number'\) \{/);
-    assert.match(retryNodeSource, /applyAuthoritativeBalance\(generatedMediaContext\.balanceAfter\);/);
+    assert.match(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
     assert.doesNotMatch(retryNodeSource, /actualProvider = result\.provider \|\| actualProvider;/);
     assert.doesNotMatch(retryNodeSource, /actualModel = result\.effectiveModel \|\| actualModel;/);
     assert.doesNotMatch(retryNodeSource, /actualCost = typeof result\.cost === 'number'/);
+  });
+
+  test('retry generated media authoritative balance is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /applyRetryGeneratedMediaAuthoritativeBalance: \(params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams\) => void;/);
+    assert.match(hookSource, /const applyRetryGeneratedMediaAuthoritativeBalance = useCallback\(\(params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams\): void => \{/);
+    assert.match(hookSource, /typeof params\.generatedMediaContext\.balanceAfter === 'number'/);
+    assert.match(hookSource, /params\.applyAuthoritativeBalance\(params\.generatedMediaContext\.balanceAfter\);/);
+
+    assert.match(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext,[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
+    assert.doesNotMatch(retryNodeSource, /typeof generatedMediaContext\.balanceAfter === 'number'/);
+    assert.doesNotMatch(retryNodeSource, /applyAuthoritativeBalance\(generatedMediaContext\.balanceAfter\);/);
   });
 
   test('retry generated media result context is consolidated before result assembly', () => {
