@@ -247,4 +247,28 @@ describe('generation runtime extraction contract', () => {
       /setDraftNodeId\(null\); \/\/ Detach status NOW[\s\S]*setConfig\(prev => \(\{ \.\.\.prev, prompt: '', referenceImages: \[\] \}\)\);[\s\S]*setActiveSourceImage\(null\);/,
     );
   });
+
+  test('retry generation failure commit is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /commitRetryGenerationFailure: \(params: CommitRetryGenerationFailureParams\) => Promise<void>;/);
+    assert.match(hookSource, /const commitRetryGenerationFailure = useCallback\(async \(params: CommitRetryGenerationFailureParams\)/);
+    assert.match(hookSource, /const failedBillingState = await resolveFailedCreditAttempt\(params\.executionNode\);/);
+    assert.match(hookSource, /await updatePromptNode\(\{/);
+    assert.match(hookSource, /\.\.\.params\.executionNode,/);
+    assert.match(hookSource, /error: errorMessage,/);
+    assert.match(hookSource, /errorDetails: params\.extractErrorDetails\(params\.error, params\.executionNode\.model\),/);
+    assert.match(hookSource, /notify\.error\('重试失败', notifyMessage\);/);
+
+    assert.match(appSource, /await commitRetryGenerationFailure\(\{/);
+    assert.match(appSource, /executionNode,/);
+    assert.match(appSource, /extractErrorDetails,/);
+    assert.doesNotMatch(retryNodeSource, /const failedBillingState = await resolveFailedCreditAttempt\(executionNode\);/);
+    assert.doesNotMatch(retryNodeSource, /notify\.error\('重试失败', error\.message\);/);
+  });
 });

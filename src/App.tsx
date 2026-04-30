@@ -3301,6 +3301,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     persistInitialGeneratingPromptNode,
     prepareInitialGenerationPromptOptimization,
     completeInitialGenerationPromptSubmission,
+    commitRetryGenerationFailure,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -5016,20 +5017,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
 
     } catch (error: any) {
-      const failedBillingState = await resolveFailedCreditAttempt(executionNode);
-      updatePromptNode({
-        ...executionNode,
-        isGenerating: false,
-        isDraft: false, // 🎯 [Fix] Prevent disappearance on error
-        error: error.message || 'Retry failed',
-        errorDetails: extractErrorDetails(error, executionNode.model),
-        ...failedBillingState
-      });
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('重试失败', error.message);
+      await commitRetryGenerationFailure({
+        executionNode,
+        error,
+        extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, resolveFailedCreditAttempt]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

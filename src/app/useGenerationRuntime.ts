@@ -174,6 +174,12 @@ export interface CompleteInitialGenerationPromptSubmissionParams {
   setDraftNodeId: (id: string | null) => void;
 }
 
+export interface CommitRetryGenerationFailureParams {
+  error: unknown;
+  executionNode: PromptNode;
+  extractErrorDetails: (error: unknown, fallbackModel?: string) => PromptNode['errorDetails'];
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -213,6 +219,7 @@ export interface UseGenerationRuntimeResult {
   persistInitialGeneratingPromptNode: (params: PersistInitialGeneratingPromptNodeParams) => Promise<PersistInitialGeneratingPromptNodeResult>;
   prepareInitialGenerationPromptOptimization: (params: PrepareInitialGenerationPromptOptimizationParams) => Promise<PrepareInitialGenerationPromptOptimizationResult>;
   completeInitialGenerationPromptSubmission: (params: CompleteInitialGenerationPromptSubmissionParams) => void;
+  commitRetryGenerationFailure: (params: CommitRetryGenerationFailureParams) => Promise<void>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -381,6 +388,25 @@ export function useGenerationRuntime({
 
     return failureState;
   }, [refundCreditsByTransaction, refreshBilling]);
+
+  const commitRetryGenerationFailure = useCallback(async (params: CommitRetryGenerationFailureParams) => {
+    const failedBillingState = await resolveFailedCreditAttempt(params.executionNode);
+    const rawMessage = (params.error as { message?: unknown } | null | undefined)?.message;
+    const errorMessage = typeof rawMessage === 'string' && rawMessage ? rawMessage : 'Retry failed';
+    const notifyMessage = errorMessage;
+
+    await updatePromptNode({
+      ...params.executionNode,
+      isGenerating: false,
+      isDraft: false,
+      error: errorMessage,
+      errorDetails: params.extractErrorDetails(params.error, params.executionNode.model),
+      ...failedBillingState
+    });
+    import('../services/system/notificationService').then(({ notify }) => {
+      notify.error('重试失败', notifyMessage);
+    });
+  }, [resolveFailedCreditAttempt, updatePromptNode]);
 
   const applyOptimisticServerCreditDebit = useCallback((requiredCredits: number, useServerSideCreditSettlement: boolean) => {
     if (useServerSideCreditSettlement && requiredCredits > 0) {
@@ -612,6 +638,7 @@ export function useGenerationRuntime({
     persistInitialGeneratingPromptNode,
     prepareInitialGenerationPromptOptimization,
     completeInitialGenerationPromptSubmission,
+    commitRetryGenerationFailure,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
