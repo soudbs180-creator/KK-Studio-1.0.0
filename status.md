@@ -1,12 +1,12 @@
 # KK-Studio v1.4.2 Refactor Status
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Current Position
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 3 prompt group layout extraction in progress; sixteenth legacy branch and selection-wrapper cleanup slice is complete in the current scoped change
+- Current milestone: Milestone 3 prompt group layout extraction in progress; seventeenth prompt-group renderer dependency cleanup slice is complete in the current scoped change
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -219,6 +219,11 @@ Scope completed in the sixteenth slice:
 - Removed `useConnectorRenderer` outputs and dependencies that only supported the deleted hidden connector branch.
 - Tightened source-contract tests for the selection hook, hidden legacy branches, and connector dead outputs.
 
+Scope completed in the seventeenth slice:
+- Added a RED source-contract test that fails when `renderPromptGroupWorkflowItem` carries dependencies it does not read.
+- Removed stale dependency-array entries from the prompt-group renderer callback without changing JSX or workflow behavior.
+- Kept animation-forcing dependencies such as `nowTimestamp` and `promptGroupLayoutVersion` in place because they intentionally refresh ref-backed prompt-group render state.
+
 Line count change during Milestone 3:
 - `src/App.tsx`: `10395` baseline lines to `10333` lines after first slice.
 - `src/App.tsx`: `10044` lines after second slice.
@@ -249,9 +254,12 @@ Line count change during Milestone 3:
 - `src/app/usePromptGroupLayout.ts`: `1369` lines after fourteenth slice.
 - `src/App.tsx`: `9272` lines after fifteenth slice.
 - `src/app/usePromptGroupLayout.ts`: `1349` lines after fifteenth slice.
-- `src/App.tsx`: `9175` lines after sixteenth slice.
-- `src/app/useConnectorRenderer.ts`: `253` lines after sixteenth slice.
-- `src/app/usePromptGroupSelection.ts`: `25` lines after sixteenth slice.
+- `src/App.tsx`: `9176` lines after sixteenth slice.
+- `src/app/useConnectorRenderer.ts`: `254` lines after sixteenth slice.
+- `src/app/usePromptGroupSelection.ts`: `26` lines after sixteenth slice.
+- `src/App.tsx`: `9166` lines after seventeenth slice.
+- `src/App.tsx`: `9165` lines after seventeenth slice.
+- `tests/unit/prompt-group-regroup-behavior.test.ts`: `515` lines after seventeenth slice.
 
 Validation passed:
 - `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-group-regroup-behavior.test.ts tests/unit/canvas-live-scene-contract.test.ts tests/unit/canvas-connector-throttling-contract.test.ts`
@@ -358,25 +366,34 @@ Validation passed:
 - Sixteenth slice `npm.cmd run governance:agent-docs`: passed after status update.
 - Sixteenth slice `npm.cmd run check:encoding`: passed after status update.
 - Sixteenth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- Seventeenth slice RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before cleanup because `renderPromptGroupWorkflowItem` still listed stale dependencies such as `deleteImageNode`.
+- Seventeenth slice source contract: prompt-group tests assert the renderer callback dependency array excludes values that are not read by the renderer body.
+- Seventeenth slice targeted tests: prompt-group/live-scene/performance/connector/layout targeted tests passed, `57` tests.
+- Seventeenth slice `npm.cmd run typecheck`: passed.
+- Seventeenth slice `npm.cmd run test:unit`: passed, `987` tests.
+- Seventeenth slice `npm.cmd run build`: passed.
+- Seventeenth slice `npm.cmd run governance:agent-docs`: passed after status update.
+- Seventeenth slice `npm.cmd run check:encoding`: passed after status update.
+- Seventeenth slice `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 Validation not used as a commit gate:
 - `npm.cmd run verify:prompt-group-drag`: failed in the local browser path because `http://127.0.0.1:3000` opened the auth/login screen and `[data-canvas-surface="prompt"]` never became visible within 30s. This is recorded as an environment/auth precondition issue for this browser smoke, not a unit/type/build regression.
 
 Current risk:
-- This slice moved only the prompt-group node selection wrapper; `App.tsx` still owns prompt-group render wiring and broader canvas reset/focus lifecycle.
+- This slice only narrows the prompt-group renderer dependency array; `App.tsx` still owns prompt-group render wiring and broader canvas reset/focus lifecycle.
 - The next slice should remain narrow and avoid generation/PPT/ecommerce runtime code.
 - The source-contract tests cover ownership boundaries, but the browser drag smoke is still blocked by a local auth/login precondition and should not be treated as behavioral proof until a valid session fixture exists.
-- Auto-repair, live-position change handling, regroup predicate checks, drag commit persistence, prompt-node edit handlers, active-canvas lifecycle cleanup, expanded selection, standalone visible image derivation, prompt-group stacking derivation, and prompt-group node selection now live in prompt-group hooks; hidden legacy prompt-group render branches and unused prompt-group/connector return values have been removed. Future slices should keep prompt-group changes narrow because remaining wiring still crosses active render behavior.
+- Auto-repair, live-position change handling, regroup predicate checks, drag commit persistence, prompt-node edit handlers, active-canvas lifecycle cleanup, expanded selection, standalone visible image derivation, prompt-group stacking derivation, and prompt-group node selection now live in prompt-group hooks; hidden legacy prompt-group render branches, hidden connector/group branches, unused prompt-group return values, connector dead outputs, and stale prompt-group renderer dependencies have been removed. Future slices should keep prompt-group changes narrow because remaining wiring still crosses active render and drag behavior.
 
-Review checkpoint after fourth slice:
-- `src/App.tsx` now remains at `9175` lines, `src/app/usePromptGroupLayout.ts` at `749` lines, `src/app/useConnectorRenderer.ts` at `253` lines, and `src/app/usePromptGroupSelection.ts` at `25` lines.
+Review checkpoint after seventeenth slice:
+- `src/App.tsx` now remains at `9165` lines, `src/app/usePromptGroupLayout.ts` at `1349` lines, `src/app/useConnectorRenderer.ts` at `253` lines, and `src/app/usePromptGroupSelection.ts` at `25` lines.
 - Confirmed `buildConnectorRenderSnapshot`, connector snapshot commit/schedule helpers, and connector position resolvers remain owned by `src/app/useConnectorRenderer.ts`.
 - Confirmed `buildPromptGroupRegroupLayouts`, presentation-state mutation helpers, stable bounds/views caches, live-scene derivation, and child maps remain owned by `src/app/usePromptGroupLayout.ts`.
 - Confirmed `App.tsx` still owns render wiring and broader canvas reset/focus lifecycle.
 
 Next step:
 - Continue Milestone 3 with a separate RED source-contract test for the next safe boundary.
-- Candidate next slice: audit whether remaining prompt-group drag handler dependencies or render wiring can be split safely; keep render wiring isolated unless a dedicated contract proves the boundary.
+- Candidate next slice: audit whether remaining prompt-group render wiring can be split safely; keep it isolated unless a dedicated contract proves the boundary.
 
 ### Milestones 4-9
 
@@ -467,7 +484,7 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - 2026-04-29 Milestone 3 eighth slice:
   - Source contract: `tests/unit/prompt-group-regroup-behavior.test.ts` asserts `usePromptGroupLayout.ts` owns `handleLiveNodePositionChange` and `App.tsx` no longer defines it.
-  - Prompt-group/live-scene/performance/connector targeted tests: passed, 47 tests.
+  - Prompt-group/live-scene/performance/connector/layout targeted tests: passed, 63 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 978 tests.
   - `npm.cmd run build`: passed.
@@ -543,6 +560,16 @@ Status: pending. GPT-5.5 xhigh subagents are used for exploration/implementation
   - Prompt-group/live-scene/performance/connector targeted tests: passed, 47 tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, 986 tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 3 seventeenth slice:
+  - RED: `tests/unit/prompt-group-regroup-behavior.test.ts` failed before cleanup because `renderPromptGroupWorkflowItem` still carried stale dependency-array entries.
+  - Source contract: prompt-group tests assert the renderer dependency array excludes dependencies not read by the renderer body.
+  - Prompt-group/live-scene/performance/connector/layout targeted tests: passed, 57 tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, 987 tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `npm.cmd run check:encoding`: passed after status update.

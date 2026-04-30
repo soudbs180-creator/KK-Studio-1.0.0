@@ -395,6 +395,33 @@ test('usePromptGroupSelection owns prompt-group node selection wrapper', () => {
   assert.doesNotMatch(appSource, /const handlePromptGroupNodeSelect = useCallback/);
 });
 
+test('App keeps prompt-group renderer dependencies scoped to values read by the renderer', () => {
+  const appSource = readSource('src/App.tsx');
+  const rendererStart = appSource.indexOf('const renderPromptGroupWorkflowItem = useCallback(');
+  const rendererEnd = appSource.indexOf('const renderPreviewWorkflowItem = useCallback(', rendererStart);
+
+  assert.notEqual(rendererStart, -1);
+  assert.notEqual(rendererEnd, -1);
+
+  const rendererSource = appSource.slice(rendererStart, rendererEnd);
+  const unusedDependencyNames = [
+    'deleteImageNode',
+    'handleConnectEnd',
+    'handleDownloadPptComposite',
+    'handleOpenPptStackPreview',
+    'handleOpenPreview',
+    'handleImageClick',
+    'updatePromptNode',
+    'updateImageNode',
+    'updateImageNodeDisplayMeta',
+    'updateImageNodePosition',
+  ];
+
+  unusedDependencyNames.forEach((dependencyName) => {
+    assert.doesNotMatch(rendererSource, new RegExp(`\\n\\s+${dependencyName},`));
+  });
+});
+
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
   const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
   const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
