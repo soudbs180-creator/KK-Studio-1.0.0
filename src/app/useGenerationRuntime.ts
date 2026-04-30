@@ -180,6 +180,13 @@ export interface CommitRetryGenerationFailureParams {
   extractErrorDetails: (error: unknown, fallbackModel?: string) => PromptNode['errorDetails'];
 }
 
+export interface ExecuteInitialGenerationPromptNodeParams {
+  executeGeneration: (node: PromptNode) => Promise<void>;
+  persistedGeneratingNode: PromptNode;
+  requiredCredits: number;
+  useServerSideCreditSettlement: boolean;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -220,6 +227,7 @@ export interface UseGenerationRuntimeResult {
   prepareInitialGenerationPromptOptimization: (params: PrepareInitialGenerationPromptOptimizationParams) => Promise<PrepareInitialGenerationPromptOptimizationResult>;
   completeInitialGenerationPromptSubmission: (params: CompleteInitialGenerationPromptSubmissionParams) => void;
   commitRetryGenerationFailure: (params: CommitRetryGenerationFailureParams) => Promise<void>;
+  executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -413,6 +421,11 @@ export function useGenerationRuntime({
       adjustBalanceOptimistically(-requiredCredits);
     }
   }, [adjustBalanceOptimistically]);
+
+  const executeInitialGenerationPromptNode = useCallback(async (params: ExecuteInitialGenerationPromptNodeParams) => {
+    applyOptimisticServerCreditDebit(params.requiredCredits, params.useServerSideCreditSettlement);
+    await params.executeGeneration(params.persistedGeneratingNode);
+  }, [applyOptimisticServerCreditDebit]);
 
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
@@ -639,6 +652,7 @@ export function useGenerationRuntime({
     prepareInitialGenerationPromptOptimization,
     completeInitialGenerationPromptSubmission,
     commitRetryGenerationFailure,
+    executeInitialGenerationPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

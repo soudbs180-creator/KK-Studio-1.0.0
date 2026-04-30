@@ -3302,6 +3302,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareInitialGenerationPromptOptimization,
     completeInitialGenerationPromptSubmission,
     commitRetryGenerationFailure,
+    executeInitialGenerationPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4366,9 +4367,12 @@ const AppContent: React.FC<AppContentProps> = () => {
         setDraftNodeId,
       });
 
-      // Execute immediately after save completed
-      applyOptimisticServerCreditDebit(requiredCredits, useServerSideCreditSettlement);
-      await executeGeneration(persistedGeneratingNode);
+      await executeInitialGenerationPromptNode({
+        persistedGeneratingNode,
+        requiredCredits,
+        useServerSideCreditSettlement,
+        executeGeneration,
+      });
     } catch (e: any) {
       console.error('[handleGenerate] failed:', e);
       import('./services/system/notificationService').then(({ notify }) => {
@@ -4378,7 +4382,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, prepareInitialGenerationPromptOptimization, completeInitialGenerationPromptSubmission, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, prepareInitialGenerationPromptOptimization, completeInitialGenerationPromptSubmission, executeInitialGenerationPromptNode, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

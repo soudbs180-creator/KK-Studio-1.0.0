@@ -271,4 +271,24 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const failedBillingState = await resolveFailedCreditAttempt\(executionNode\);/);
     assert.doesNotMatch(retryNodeSource, /notify\.error\('重试失败', error\.message\);/);
   });
+
+  test('initial generation execution kickoff is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /executeInitialGenerationPromptNode: \(params: ExecuteInitialGenerationPromptNodeParams\) => Promise<void>;/);
+    assert.match(hookSource, /const executeInitialGenerationPromptNode = useCallback\(async \(params: ExecuteInitialGenerationPromptNodeParams\)/);
+    assert.match(hookSource, /applyOptimisticServerCreditDebit\(params\.requiredCredits, params\.useServerSideCreditSettlement\);/);
+    assert.match(hookSource, /await params\.executeGeneration\(params\.persistedGeneratingNode\);/);
+
+    assert.match(appSource, /await executeInitialGenerationPromptNode\(\{/);
+    assert.match(appSource, /persistedGeneratingNode,/);
+    assert.match(appSource, /requiredCredits,/);
+    assert.match(appSource, /useServerSideCreditSettlement,/);
+    assert.match(appSource, /executeGeneration,/);
+    assert.doesNotMatch(
+      appSource,
+      /\/\/ Execute immediately after save completed\s*applyOptimisticServerCreditDebit\(requiredCredits, useServerSideCreditSettlement\);\s*await executeGeneration\(persistedGeneratingNode\);/,
+    );
+  });
 });
