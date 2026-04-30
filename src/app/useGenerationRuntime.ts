@@ -224,6 +224,18 @@ export interface PrepareRetryGenerationRequestContextResult {
   count: number;
 }
 
+export interface RetryGenerationSuccessDebugResult {
+  requestPath?: string;
+  requestBodyPreview?: string;
+  pythonSnippet?: string;
+}
+
+export interface ReportRetryGenerationSuccessParams {
+  executionNode: Pick<PromptNode, 'model' | 'prompt' | 'referenceImages' | 'imageSize' | 'keySlotId'>;
+  alignedImageNodes: Array<Pick<GeneratedImage, 'imageSize' | 'keySlotId'>>;
+  results: RetryGenerationSuccessDebugResult[];
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -270,6 +282,7 @@ export interface UseGenerationRuntimeResult {
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
+  reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -540,6 +553,31 @@ export function useGenerationRuntime({
     return { currentNodeId, requestedCount, count };
   }, []);
 
+  const reportRetryGenerationSuccess = useCallback((params: ReportRetryGenerationSuccessParams) => {
+    const effectiveSize = params.alignedImageNodes[0]?.imageSize || params.executionNode.imageSize;
+
+    import('../services/billing/costService').then(({ recordCost }) => {
+      const firstDebug = params.results[0] || {};
+      recordCost(
+        params.executionNode.model,
+        effectiveSize as ImageSize,
+        params.alignedImageNodes.length,
+        params.executionNode.prompt,
+        params.executionNode.referenceImages?.length || 0,
+        undefined,
+        {
+          requestPath: firstDebug.requestPath,
+          requestBodyPreview: firstDebug.requestBodyPreview,
+          pythonSnippet: firstDebug.pythonSnippet
+        },
+        params.alignedImageNodes[0]?.keySlotId || params.executionNode.keySlotId
+      );
+    });
+    import('../services/system/notificationService').then(({ notify }) => {
+      notify.success('生成完成', '重新生成成功');
+    });
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -771,6 +809,7 @@ export function useGenerationRuntime({
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
+    reportRetryGenerationSuccess,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

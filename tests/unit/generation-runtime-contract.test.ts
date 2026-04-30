@@ -404,4 +404,25 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const requestedCount = node\.parallelCount \|\| config\.parallelCount \|\| 1;/);
     assert.doesNotMatch(retryNodeSource, /const count = node\.mode === GenerationMode\.PPT \? Math\.min\(20, Math\.max\(1, requestedCount\)\) : requestedCount;/);
   });
+
+  test('retry generation success side effects are owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /reportRetryGenerationSuccess: \(params: ReportRetryGenerationSuccessParams\) => void;/);
+    assert.match(hookSource, /const reportRetryGenerationSuccess = useCallback\(\(params: ReportRetryGenerationSuccessParams\)/);
+    assert.match(hookSource, /const effectiveSize = params\.alignedImageNodes\[0\]\?\.imageSize \|\| params\.executionNode\.imageSize;/);
+    assert.match(hookSource, /import\('\.\.\/services\/billing\/costService'\)\.then\(\(\{ recordCost \}\) => \{/);
+    assert.match(hookSource, /recordCost\(/);
+    assert.match(hookSource, /notify\.success\('生成完成', '重新生成成功'\);/);
+
+    assert.match(retryNodeSource, /reportRetryGenerationSuccess\(\{[\s\S]*executionNode,[\s\S]*alignedImageNodes,[\s\S]*results,[\s\S]*\}\);/);
+    assert.doesNotMatch(retryNodeSource, /const effectiveSize = alignedImageNodes\[0\]\?\.imageSize \|\| executionNode\.imageSize;/);
+    assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/billing\/costService'\)/);
+    assert.doesNotMatch(retryNodeSource, /notify\.success\('生成完成', '重新生成成功'\);/);
+  });
 });

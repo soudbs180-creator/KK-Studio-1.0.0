@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generation request context slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generation success side effects slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8902 lines after Milestone 4 retry generation request context extraction
+- `src/App.tsx`: 8884 lines after Milestone 4 retry generation success side effects extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -399,7 +399,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Seventeen narrow generation-runtime slices are extracted and validated, through retry generation request context ownership.
+Status: in progress. Eighteen narrow generation-runtime slices are extracted and validated, through retry generation success side-effect ownership.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -828,6 +828,7 @@ Validation passed:
 - `npm.cmd run typecheck`: passed.
 - `npm.cmd run test:unit`: passed, `1005` tests.
 - `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
 - `npm.cmd run check:encoding`: passed after status update.
 - `npm.cmd run governance:agent-docs`: passed after status update.
 - `git diff --check`: passed with LF/CRLF working-copy warnings only.
@@ -836,8 +837,35 @@ Current risk:
 - `prepareRetryGenerationRequestContext` keeps PPT count clamping in runtime but does not yet own billing preparation or generated-result layout. Those remain separate future slices.
 - The next safe slice should target retry success side effects or another small retry bookkeeping boundary, not PPT/ecommerce bodies.
 
+Eighteenth slice scope:
+- Added hook-owned `reportRetryGenerationSuccess` with explicit success params and debug-result types.
+- Moved retry success cost recording and `notify.success('生成完成', '重新生成成功')` into `src/app/useGenerationRuntime.ts`.
+- Replaced inline cost-service and notification imports in `App.tsx` with a single runtime side-effect call.
+- Kept generated image result construction, layout alignment, `addImageNodes`, failure handling, PPT retry, and ecommerce flows unchanged.
+
+Line count change during Milestone 4 eighteenth slice:
+- `src/App.tsx`: `8902` lines after seventeenth slice -> `8884` lines.
+- `src/app/useGenerationRuntime.ts`: `777` lines -> `816` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `407` lines -> `428` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `reportRetryGenerationSuccess`, while `App.tsx` still imported cost and notification services directly in the retry success path.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `19` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `33` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `1006` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- Retry success result construction and layout alignment remain in `App.tsx`. Extracting them is larger and should be split behind separate contracts.
+- The next safe slice should target retry request execution metadata or another narrow retry bookkeeping boundary, not PPT/ecommerce bodies.
+
 Next step:
-- Continue M4 with the next RED source contract around retry success side effects or another small retry bookkeeping boundary.
+- Continue M4 with the next RED source contract around retry request execution metadata or another small retry bookkeeping boundary.
 
 ### Milestones 5-9
 
@@ -1174,6 +1202,17 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `1005` tests.
   - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 eighteenth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `reportRetryGenerationSuccess`, while `App.tsx` still imported cost and notification services directly in the retry success path.
+  - Targeted M4 billing/runtime/route tests: passed, `33` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1006` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.

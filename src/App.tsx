@@ -3308,6 +3308,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
+    reportRetryGenerationSuccess,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4971,29 +4972,10 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       });
 
-      // Record cost
-      // 🎯 [Fair Billing] Use the computed/effective size from the first result (assuming all in batch are same)
-      const effectiveSize = alignedImageNodes[0]?.imageSize || executionNode.imageSize; // fallback
-
-      import('./services/billing/costService').then(({ recordCost }) => {
-        const firstDebug = (results as any[])[0] || {};
-        recordCost(
-          executionNode.model,
-          effectiveSize as any, // Cast to ImageSize
-          alignedImageNodes.length,
-          executionNode.prompt,
-          executionNode.referenceImages?.length || 0,
-          undefined,
-          {
-            requestPath: firstDebug.requestPath,
-            requestBodyPreview: firstDebug.requestBodyPreview,
-            pythonSnippet: firstDebug.pythonSnippet
-          },
-          alignedImageNodes[0]?.keySlotId || executionNode.keySlotId
-        );
-      });
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('生成完成', '重新生成成功');
+      reportRetryGenerationSuccess({
+        executionNode,
+        alignedImageNodes,
+        results,
       });
 
     } catch (error: any) {
@@ -5003,7 +4985,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
