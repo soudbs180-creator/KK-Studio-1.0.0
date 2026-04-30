@@ -310,4 +310,31 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(handleGenerateSource, /console\.error\('\[handleGenerate\] failed:', e\);/);
     assert.doesNotMatch(handleGenerateSource, /notify\.error\('发送失败', e\?\.message \|\| '请重试'\);/);
   });
+
+  test('retry generation timeout guard is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /createRetryGenerationTimeoutGuard: \(params: CreateRetryGenerationTimeoutGuardParams\) => CreateRetryGenerationTimeoutGuardResult;/);
+    assert.match(hookSource, /const createRetryGenerationTimeoutGuard = useCallback\(\(params: CreateRetryGenerationTimeoutGuardParams\)/);
+    assert.match(hookSource, /const timer = setTimeout\(\(\) => \{/);
+    assert.match(hookSource, /cancelGenerationRequest\(params\.requestId\);/);
+    assert.match(hookSource, /void updatePromptNode\(\{/);
+    assert.match(hookSource, /responseBody: `Retry request exceeded \$\{params\.timeoutMs\}ms timeout`,/);
+    assert.match(hookSource, /markFinished: \(\) => \{/);
+    assert.match(hookSource, /clear: \(\) => clearTimeout\(timer\),/);
+
+    assert.match(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
+    assert.match(retryNodeSource, /requestId,/);
+    assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
+    assert.match(retryNodeSource, /timeoutGuard\.markFinished\(\);/);
+    assert.match(retryNodeSource, /timeoutGuard\.clear\(\);/);
+    assert.doesNotMatch(retryNodeSource, /const timer = setTimeout\(\(\) => \{/);
+    assert.doesNotMatch(retryNodeSource, /cancelGeneration\(requestId\);/);
+    assert.doesNotMatch(retryNodeSource, /Retry request exceeded 600000ms timeout/);
+  });
 });

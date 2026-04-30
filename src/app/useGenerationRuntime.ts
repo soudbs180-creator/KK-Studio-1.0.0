@@ -191,6 +191,17 @@ export interface ReportInitialGenerationFailureParams {
   error: unknown;
 }
 
+export interface CreateRetryGenerationTimeoutGuardParams {
+  executionNode: PromptNode;
+  requestId: string;
+  timeoutMs: number;
+}
+
+export interface CreateRetryGenerationTimeoutGuardResult {
+  markFinished: () => void;
+  clear: () => void;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -233,6 +244,7 @@ export interface UseGenerationRuntimeResult {
   commitRetryGenerationFailure: (params: CommitRetryGenerationFailureParams) => Promise<void>;
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
+  createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -439,6 +451,34 @@ export function useGenerationRuntime({
       notify.error('发送失败', message);
     });
   }, []);
+
+  const createRetryGenerationTimeoutGuard = useCallback((params: CreateRetryGenerationTimeoutGuardParams) => {
+    let isFinished = false;
+    const timer = setTimeout(() => {
+      if (!isFinished) {
+        cancelGenerationRequest(params.requestId);
+        void updatePromptNode({
+          ...params.executionNode,
+          isGenerating: false,
+          isDraft: false,
+          error: '生成超时',
+          errorDetails: {
+            code: 'TIMEOUT',
+            responseBody: `Retry request exceeded ${params.timeoutMs}ms timeout`,
+            model: params.executionNode.model,
+            timestamp: Date.now()
+          }
+        });
+      }
+    }, params.timeoutMs);
+
+    return {
+      markFinished: () => {
+        isFinished = true;
+      },
+      clear: () => clearTimeout(timer),
+    };
+  }, [cancelGenerationRequest, updatePromptNode]);
 
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
@@ -667,6 +707,7 @@ export function useGenerationRuntime({
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
+    createRetryGenerationTimeoutGuard,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

@@ -3304,6 +3304,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
+    createRetryGenerationTimeoutGuard,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4566,24 +4567,11 @@ const AppContent: React.FC<AppContentProps> = () => {
           index,
         );
 
-        let isFinished = false;
-        const timer = setTimeout(() => {
-          if (!isFinished) {
-            cancelGeneration(requestId);
-            updatePromptNode({
-              ...executionNode,
-              isGenerating: false,
-              isDraft: false, // 🎯 [Fix] Prevent disappearance on timeout
-              error: '生成超时',
-              errorDetails: {
-                code: 'TIMEOUT',
-                responseBody: 'Retry request exceeded 600000ms timeout',
-                model: executionNode.model,
-                timestamp: Date.now()
-              }
-            });
-          }
-        }, GENERATE_TIMEOUT_MS);
+        const timeoutGuard = createRetryGenerationTimeoutGuard({
+          executionNode,
+          requestId,
+          timeoutMs: GENERATE_TIMEOUT_MS,
+        });
 
         try {
           let b64 = '';
@@ -4702,8 +4690,8 @@ const AppContent: React.FC<AppContentProps> = () => {
             }
           }
 
-          isFinished = true;
-          clearTimeout(timer);
+          timeoutGuard.markFinished();
+          timeoutGuard.clear();
 
           // Upload (non-blocking for latency)
           let url = b64;
@@ -4840,8 +4828,8 @@ const AppContent: React.FC<AppContentProps> = () => {
             pythonSnippet
           };
         } catch (e: any) {
-          isFinished = true;
-          clearTimeout(timer);
+          timeoutGuard.markFinished();
+          timeoutGuard.clear();
           throw e;
         }
       }));
@@ -5025,7 +5013,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
