@@ -227,4 +227,24 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /enabled: \(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT\)/);
     assert.doesNotMatch(appSource, /supportsThinking: !!getModelCapabilities\(config\.model\)\?\.supportsThinking,/);
   });
+
+  test('initial post-persist prompt cleanup is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /completeInitialGenerationPromptSubmission: \(params: CompleteInitialGenerationPromptSubmissionParams\) => void;/);
+    assert.match(hookSource, /const completeInitialGenerationPromptSubmission = useCallback\(\(params: CompleteInitialGenerationPromptSubmissionParams\)/);
+    assert.match(hookSource, /params\.setDraftNodeId\(null\);/);
+    assert.match(hookSource, /params\.setConfig\(prev => \(\{ \.\.\.prev, prompt: '', referenceImages: \[\] \}\)\);/);
+    assert.match(hookSource, /params\.setActiveSourceImage\(null\);/);
+
+    assert.match(appSource, /completeInitialGenerationPromptSubmission\(\{/);
+    assert.match(appSource, /setDraftNodeId,/);
+    assert.match(appSource, /setConfig,/);
+    assert.match(appSource, /setActiveSourceImage,/);
+    assert.doesNotMatch(
+      appSource,
+      /setDraftNodeId\(null\); \/\/ Detach status NOW[\s\S]*setConfig\(prev => \(\{ \.\.\.prev, prompt: '', referenceImages: \[\] \}\)\);[\s\S]*setActiveSourceImage\(null\);/,
+    );
+  });
 });
