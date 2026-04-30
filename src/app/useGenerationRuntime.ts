@@ -273,6 +273,34 @@ export interface PrepareRetryVideoGenerationRequestResult {
   };
 }
 
+export interface PrepareRetryImageGenerationRequestParams {
+  executionNode: Pick<
+    PromptNode,
+    'aspectRatio' | 'enableGrounding' | 'enableImageSearch' | 'imageSize' | 'keySlotId' | 'model' | 'referenceImages' | 'thinkingMode'
+  >;
+  requestId: string;
+  taskPrompt: string;
+}
+
+export interface PrepareRetryImageGenerationRequestResult {
+  args: [
+    string,
+    PromptNode['aspectRatio'],
+    PromptNode['imageSize'],
+    ReferenceImage[],
+    PromptNode['model'],
+    string,
+    string,
+  ];
+  grounding: boolean;
+  options: {
+    preferredKeyId?: string;
+    enableWebSearch: boolean;
+    enableImageSearch: boolean;
+    thinkingMode: 'minimal' | 'high';
+  };
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -322,6 +350,7 @@ export interface UseGenerationRuntimeResult {
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
+  prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -665,6 +694,25 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareRetryImageGenerationRequest = useCallback((params: PrepareRetryImageGenerationRequestParams): PrepareRetryImageGenerationRequestResult => ({
+    args: [
+      params.taskPrompt,
+      params.executionNode.aspectRatio,
+      params.executionNode.imageSize,
+      params.executionNode.referenceImages || [],
+      params.executionNode.model,
+      '',
+      params.requestId,
+    ],
+    grounding: !!params.executionNode.enableGrounding || !!params.executionNode.enableImageSearch,
+    options: {
+      preferredKeyId: params.executionNode.keySlotId,
+      enableWebSearch: !!params.executionNode.enableGrounding,
+      enableImageSearch: !!params.executionNode.enableImageSearch,
+      thinkingMode: params.executionNode.thinkingMode || 'minimal'
+    }
+  }), []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -899,6 +947,7 @@ export function useGenerationRuntime({
     reportRetryGenerationSuccess,
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
+    prepareRetryImageGenerationRequest,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

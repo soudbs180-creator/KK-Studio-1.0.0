@@ -469,4 +469,26 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const videoAspect = executionNode\.aspectRatio === '9:16' \? '9:16' : '16:9';/);
     assert.doesNotMatch(retryNodeSource, /providerConfig: \{[\s\S]*google: \{[\s\S]*imageConfig: \{ imageSize: videoResolution \}/);
   });
+
+  test('retry image generation request options are owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryImageGenerationRequest: \(params: PrepareRetryImageGenerationRequestParams\) => PrepareRetryImageGenerationRequestResult;/);
+    assert.match(hookSource, /const prepareRetryImageGenerationRequest = useCallback\(\(params: PrepareRetryImageGenerationRequestParams\)/);
+    assert.match(hookSource, /grounding: !!params\.executionNode\.enableGrounding \|\| !!params\.executionNode\.enableImageSearch,/);
+    assert.match(hookSource, /preferredKeyId: params\.executionNode\.keySlotId,/);
+    assert.match(hookSource, /enableWebSearch: !!params\.executionNode\.enableGrounding,/);
+    assert.match(hookSource, /thinkingMode: params\.executionNode\.thinkingMode \|\| 'minimal'/);
+
+    assert.match(retryNodeSource, /const imageRequest = prepareRetryImageGenerationRequest\(\{ executionNode, requestId, taskPrompt \}\);/);
+    assert.match(retryNodeSource, /const result = await generateImage\([\s\S]*\.\.\.imageRequest\.args,[\s\S]*imageRequest\.grounding,[\s\S]*imageRequest\.options,[\s\S]*\);/);
+    assert.doesNotMatch(retryNodeSource, /!!executionNode\.enableGrounding \|\| !!executionNode\.enableImageSearch/);
+    assert.doesNotMatch(retryNodeSource, /preferredKeyId: executionNode\.keySlotId/);
+    assert.doesNotMatch(retryNodeSource, /thinkingMode: executionNode\.thinkingMode \|\| 'minimal'/);
+  });
 });
