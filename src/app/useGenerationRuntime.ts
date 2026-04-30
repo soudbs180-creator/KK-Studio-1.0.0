@@ -6,6 +6,7 @@ import {
   buildGenerationBillingAttempt,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
+import type { VideoGenerationResult } from '../services/llm/LLMAdapter';
 import { adminModelService } from '../services/model/adminModelService';
 import { getModelCapabilities } from '../services/model/modelCapabilities';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
@@ -274,6 +275,29 @@ export interface PrepareRetryVideoGenerationRequestResult {
   };
 }
 
+export interface RetryGeneratedMediaResultMetadata {
+  completionTokens?: number;
+  cost?: number;
+  costSource?: GeneratedImage['costSource'];
+  keySlotId?: string;
+  model: GeneratedImage['model'];
+  modelLabel?: string;
+  promptTokens?: number;
+  provider?: string;
+  providerLabel?: string;
+  tokens?: number;
+}
+
+export interface BuildRetryVideoGenerationResultContextParams {
+  executionNode: Pick<PromptNode, 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>;
+  videoResult: VideoGenerationResult;
+}
+
+export interface BuildRetryVideoGenerationResultContextResult {
+  b64: string;
+  resultMetadata: RetryGeneratedMediaResultMetadata;
+}
+
 export interface PrepareRetryImageGenerationRequestParams {
   executionNode: Pick<
     PromptNode,
@@ -352,18 +376,7 @@ export interface BuildRetryGeneratedMediaResultParams {
   mediaPersistence: PrepareRetryGeneratedMediaPersistenceResult;
   prompt: string;
   requestTrace: RetryGenerationSuccessDebugResult;
-  resultMetadata: {
-    completionTokens?: number;
-    cost?: number;
-    costSource?: GeneratedImage['costSource'];
-    keySlotId?: string;
-    model: GeneratedImage['model'];
-    modelLabel?: string;
-    promptTokens?: number;
-    provider?: string;
-    providerLabel?: string;
-    tokens?: number;
-  };
+  resultMetadata: RetryGeneratedMediaResultMetadata;
 }
 
 export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
@@ -416,6 +429,10 @@ interface RefreshBillingOptions {
 
 const createGenerationPromptNodeId = () => `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 
+const resolveFiniteNumber = (value: unknown): number | undefined => (
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined
+);
+
 export interface UseGenerationRuntimeDeps {
   activeCanvas?: Pick<Canvas, 'promptNodes'> | null;
   updatePromptNode: (node: PromptNode) => void | Promise<void>;
@@ -458,6 +475,7 @@ export interface UseGenerationRuntimeResult {
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
+  buildRetryVideoGenerationResultContext: (params: BuildRetryVideoGenerationResultContextParams) => BuildRetryVideoGenerationResultContextResult;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
@@ -805,6 +823,32 @@ export function useGenerationRuntime({
           imageConfig: { imageSize: videoResolution }
         }
       }
+    };
+  }, []);
+
+  const buildRetryVideoGenerationResultContext = useCallback((
+    params: BuildRetryVideoGenerationResultContextParams,
+  ): BuildRetryVideoGenerationResultContextResult => {
+    const usage = params.videoResult.usage as (VideoGenerationResult['usage'] & {
+      promptTokens?: number;
+      completionTokens?: number;
+    }) | undefined;
+    const cost = resolveFiniteNumber(usage?.cost);
+
+    return {
+      b64: params.videoResult.url,
+      resultMetadata: {
+        completionTokens: resolveFiniteNumber(usage?.completionTokens),
+        cost,
+        costSource: cost !== undefined ? 'explicit' : 'none',
+        keySlotId: params.videoResult.keySlotId || params.executionNode.keySlotId,
+        model: params.videoResult.model || params.executionNode.model,
+        modelLabel: params.videoResult.modelName || params.executionNode.modelLabel,
+        promptTokens: resolveFiniteNumber(usage?.promptTokens),
+        provider: params.videoResult.provider || params.executionNode.provider,
+        providerLabel: params.videoResult.providerName || params.executionNode.providerLabel,
+        tokens: resolveFiniteNumber(usage?.totalTokens),
+      },
     };
   }, []);
 
@@ -1344,6 +1388,7 @@ export function useGenerationRuntime({
     reportRetryGenerationSuccess,
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
+    buildRetryVideoGenerationResultContext,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,

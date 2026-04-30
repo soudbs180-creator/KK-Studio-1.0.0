@@ -470,6 +470,29 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /providerConfig: \{[\s\S]*google: \{[\s\S]*imageConfig: \{ imageSize: videoResolution \}/);
   });
 
+  test('retry video generation result normalization is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryVideoGenerationResultContext: \(params: BuildRetryVideoGenerationResultContextParams\) => BuildRetryVideoGenerationResultContextResult;/);
+    assert.match(hookSource, /const buildRetryVideoGenerationResultContext = useCallback\(\(\s*params: BuildRetryVideoGenerationResultContextParams,\s*\): BuildRetryVideoGenerationResultContextResult => \{/);
+    assert.match(hookSource, /const usage = params\.videoResult\.usage as/);
+    assert.match(hookSource, /b64: params\.videoResult\.url,/);
+    assert.match(hookSource, /keySlotId: params\.videoResult\.keySlotId \|\| params\.executionNode\.keySlotId,/);
+    assert.match(hookSource, /costSource: cost !== undefined \? 'explicit' : 'none',/);
+
+    assert.match(retryNodeSource, /const videoResultContext = buildRetryVideoGenerationResultContext\(\{/);
+    assert.match(retryNodeSource, /videoResult,/);
+    assert.match(retryNodeSource, /b64 = videoResultContext\.b64;/);
+    assert.doesNotMatch(retryNodeSource, /actualKeySlotId = videoResult\.keySlotId \|\| actualKeySlotId;/);
+    assert.doesNotMatch(retryNodeSource, /actualProvider = videoResult\.provider \|\| actualProvider;/);
+    assert.doesNotMatch(retryNodeSource, /\(videoResult as any\)\.usage\?\.cost/);
+  });
+
   test('retry image generation request options are owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');

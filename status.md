@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media cloud sync scheduling slice is validated in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry video generation result normalization slice is validated in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8646 lines after Milestone 4 retry generated media cloud sync scheduling extraction
+- `src/App.tsx`: 8643 lines after Milestone 4 retry video generation result normalization extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -1105,8 +1105,36 @@ Current risk:
 - `scheduleRetryGeneratedMediaCloudSync` preserves fire-and-forget upload behavior but still relies on dynamic import/fetch side effects; deeper upload error observability should remain out of this refactor slice.
 - `addImageNodes` and retry success orchestration remain in `App.tsx`; extracting them should be done only with explicit canvas mutation contracts.
 
+Twenty-eighth slice scope:
+- Added hook-owned `buildRetryVideoGenerationResultContext` with explicit params/result interfaces.
+- Added shared `RetryGeneratedMediaResultMetadata` typing and reused it in `buildRetryGeneratedMediaResult`.
+- Moved retry video result URL, provider/model fallback metadata, finite cost/token extraction, and `costSource` derivation into `src/app/useGenerationRuntime.ts`.
+- Replaced inline video-result assignment logic in `App.tsx` with `const videoResultContext = buildRetryVideoGenerationResultContext(...)`.
+- Kept image result normalization and `balanceAfter` handling in `App.tsx` because it has a separate authoritative-balance side effect.
+
+Line count change during Milestone 4 twenty-eighth slice:
+- `src/App.tsx`: `8646` lines after twenty-seventh slice -> `8643` lines.
+- `src/app/useGenerationRuntime.ts`: `1357` lines -> `1402` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `638` lines -> `661` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `buildRetryVideoGenerationResultContext`, while `App.tsx` still normalized `videoResult` metadata inline.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `29` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `43` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `1016` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime metadata refactor.
+- `npm.cmd run check:encoding`: passed before status update.
+- `npm.cmd run governance:agent-docs`: passed before status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- Image result normalization still lives in `App.tsx` and should be extracted separately because it includes `resolveModelDisplayName` and `applyAuthoritativeBalance(result.balanceAfter)`.
+- `addImageNodes` remains the canvas mutation boundary and should not be moved without a dedicated canvas mutation contract.
+
 Next step:
-- Continue M4 with a RED contract around the next narrow retry success orchestration boundary, or stop retry slicing before `addImageNodes` if the remaining canvas mutation risk is better left for a dedicated layout/runtime milestone.
+- Continue M4 with a RED contract around image result normalization, explicitly preserving `balanceAfter` handling, or stop retry slicing before `addImageNodes` if the remaining canvas mutation risk is better left for a dedicated runtime integration step.
 
 ### Milestones 5-9
 
@@ -1542,6 +1570,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run test:unit`: passed, `1015` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI sync scheduling refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twenty-eighth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `buildRetryVideoGenerationResultContext`, while `App.tsx` still normalized `videoResult` metadata inline.
+  - Targeted M4 billing/runtime/route tests: passed, `43` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1016` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime metadata refactor.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.

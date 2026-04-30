@@ -3311,6 +3311,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     reportRetryGenerationSuccess,
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
+    buildRetryVideoGenerationResultContext,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
@@ -4599,25 +4600,21 @@ const AppContent: React.FC<AppContentProps> = () => {
           if (currentMode === GenerationMode.VIDEO) {
             const videoRequest = prepareRetryVideoGenerationRequest({ executionNode, taskPrompt });
             const videoResult = await llmService.generateVideo(videoRequest);
-            b64 = videoResult.url;
-            actualKeySlotId = videoResult.keySlotId || actualKeySlotId;
-            actualProvider = videoResult.provider || actualProvider;
-            actualProviderLabel = videoResult.providerName || actualProviderLabel;
-            actualModelLabel = videoResult.modelName || actualModelLabel;
-            actualModel = videoResult.model || actualModel;
-            actualCost = typeof (videoResult as any).usage?.cost === 'number' && Number.isFinite((videoResult as any).usage.cost)
-              ? (videoResult as any).usage.cost
-              : undefined;
-            actualTokens = typeof (videoResult as any).usage?.totalTokens === 'number' && Number.isFinite((videoResult as any).usage.totalTokens)
-              ? (videoResult as any).usage.totalTokens
-              : undefined;
-            actualPromptTokens = typeof (videoResult as any).usage?.promptTokens === 'number' && Number.isFinite((videoResult as any).usage.promptTokens)
-              ? (videoResult as any).usage.promptTokens
-              : undefined;
-            actualCompletionTokens = typeof (videoResult as any).usage?.completionTokens === 'number' && Number.isFinite((videoResult as any).usage.completionTokens)
-              ? (videoResult as any).usage.completionTokens
-              : undefined;
-            actualCostSource = actualCost !== undefined ? 'explicit' : 'none';
+            const videoResultContext = buildRetryVideoGenerationResultContext({
+              executionNode,
+              videoResult,
+            });
+            b64 = videoResultContext.b64;
+            actualKeySlotId = videoResultContext.resultMetadata.keySlotId;
+            actualProvider = videoResultContext.resultMetadata.provider;
+            actualProviderLabel = videoResultContext.resultMetadata.providerLabel;
+            actualModelLabel = videoResultContext.resultMetadata.modelLabel;
+            actualModel = videoResultContext.resultMetadata.model;
+            actualCost = videoResultContext.resultMetadata.cost;
+            actualTokens = videoResultContext.resultMetadata.tokens;
+            actualPromptTokens = videoResultContext.resultMetadata.promptTokens;
+            actualCompletionTokens = videoResultContext.resultMetadata.completionTokens;
+            actualCostSource = videoResultContext.resultMetadata.costSource;
           } else {
             const imageRequest = prepareRetryImageGenerationRequest({ executionNode, requestId, taskPrompt });
             const result = await generateImage(
@@ -4747,7 +4744,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
