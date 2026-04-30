@@ -364,4 +364,23 @@ describe('generation runtime extraction contract', () => {
       /\/\/ 1\. Reset state to generating[\s\S]*?updatePromptNode\(\{[\s\S]*?applyOptimisticServerCreditDebit\(/,
     );
   });
+
+  test('retry recovery notification is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /reportRetryRecoveryResult: \(params: ReportRetryRecoveryResultParams\) => void;/);
+    assert.match(hookSource, /const reportRetryRecoveryResult = useCallback\(\(params: ReportRetryRecoveryResultParams\)/);
+    assert.match(hookSource, /if \(params\.recoveredCount <= 0 && params\.pendingCount <= 0\) \{/);
+    assert.match(hookSource, /const message = params\.pendingCount > 0/);
+    assert.match(hookSource, /notify\.info\('恢复历史结果', message\);/);
+
+    assert.match(retryNodeSource, /reportRetryRecoveryResult\(\{ recoveredCount: recovered\.recoveredCount, pendingCount: recovered\.pendingCount \}\);/);
+    assert.doesNotMatch(retryNodeSource, /notify\.info\('恢复历史结果', message\);/);
+    assert.doesNotMatch(retryNodeSource, /已重新接管 \$\{recovered\.pendingCount\}/);
+  });
 });
