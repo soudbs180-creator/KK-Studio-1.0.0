@@ -1717,6 +1717,20 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-fourth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own retry generated-media timing, while `App.tsx` still called `clampGenerationDurationMs` and `Date.now() - startTime` inline.
+  - Added `ResolveRetryGeneratedMediaGenerationTimeParams` and `resolveRetryGeneratedMediaGenerationTime` to `src/app/useGenerationRuntime.ts`, preserving the API-duration-first fallback and shared duration clamp behavior inside the Hook.
+  - Updated `App.tsx` to pass `apiDurationMs` and `startedAtMs` into the Hook helper before retry result assembly.
+  - Current line counts: `src/App.tsx` 8593, `src/app/useGenerationRuntime.ts` 1540, `tests/unit/generation-runtime-contract.test.ts` 800.
+  - Targeted generation runtime contract test: passed, `35` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `49` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1026` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry timing refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 

@@ -590,6 +590,26 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /resultMetadata: \{[\s\S]*actualKeySlotId[\s\S]*\}/);
   });
 
+  test('retry generated media timing is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /resolveRetryGeneratedMediaGenerationTime: \(params: ResolveRetryGeneratedMediaGenerationTimeParams\) => number;/);
+    assert.match(hookSource, /const resolveRetryGeneratedMediaGenerationTime = useCallback\(\(params: ResolveRetryGeneratedMediaGenerationTimeParams\): number => \{/);
+    assert.match(hookSource, /return clampGenerationDurationMs\(/);
+    assert.match(hookSource, /apiDurationMs && apiDurationMs > 0/);
+
+    assert.match(retryNodeSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
+    assert.match(retryNodeSource, /apiDurationMs,/);
+    assert.match(retryNodeSource, /startedAtMs: startTime,/);
+    assert.doesNotMatch(retryNodeSource, /const generationTime = clampGenerationDurationMs\(/);
+    assert.doesNotMatch(retryNodeSource, /Date\.now\(\) - startTime/);
+  });
+
   test('retry generated media persistence context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');

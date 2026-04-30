@@ -20,6 +20,7 @@ import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
 import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
 import { resolveGenerationPreviewState } from './resolveGenerationPreviewState';
+import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 type CreditBillingAttempt = {
   attemptId: string;
@@ -317,6 +318,11 @@ export interface RetryGeneratedMediaResultContext {
 
 export type BuildRetryVideoGenerationResultContextResult = RetryGeneratedMediaResultContext;
 
+export interface ResolveRetryGeneratedMediaGenerationTimeParams {
+  apiDurationMs?: number;
+  startedAtMs: number;
+}
+
 export interface PrepareRetryImageGenerationRequestParams {
   executionNode: Pick<
     PromptNode,
@@ -520,6 +526,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   buildRetryVideoGenerationResultContext: (params: BuildRetryVideoGenerationResultContextParams) => BuildRetryVideoGenerationResultContextResult;
+  resolveRetryGeneratedMediaGenerationTime: (params: ResolveRetryGeneratedMediaGenerationTimeParams) => number;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   buildRetryImageGenerationResultContext: (params: BuildRetryImageGenerationResultContextParams) => BuildRetryImageGenerationResultContextResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
@@ -914,6 +921,13 @@ export function useGenerationRuntime({
         tokens: resolveFiniteNumber(usage?.totalTokens),
       },
     };
+  }, []);
+
+  const resolveRetryGeneratedMediaGenerationTime = useCallback((params: ResolveRetryGeneratedMediaGenerationTimeParams): number => {
+    const { apiDurationMs } = params;
+    return clampGenerationDurationMs((apiDurationMs && apiDurationMs > 0)
+      ? apiDurationMs
+      : (Date.now() - params.startedAtMs));
   }, []);
 
   const prepareRetryImageGenerationRequest = useCallback((params: PrepareRetryImageGenerationRequestParams): PrepareRetryImageGenerationRequestResult => ({
@@ -1508,6 +1522,7 @@ export function useGenerationRuntime({
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
     buildRetryVideoGenerationResultContext,
+    resolveRetryGeneratedMediaGenerationTime,
     prepareRetryImageGenerationRequest,
     buildRetryImageGenerationResultContext,
     prepareRetryGeneratedMediaPersistence,
