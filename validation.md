@@ -1,6 +1,6 @@
 # KK-Studio v1.4.2 Refactor Validation Matrix
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 Use `npm.cmd` for npm scripts on Windows.
 
@@ -21,6 +21,15 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run check:encoding
 ```
+
+UI or visual changes:
+
+```powershell
+npm.cmd run build
+npm.cmd run dev
+```
+
+Then open the local app in the Codex in-app Browser and inspect the changed surface directly. For responsive UI work, check a desktop viewport and a mobile-sized viewport. Record the browser URL, viewport/surface checked, and any visual issues or pass result in `status.md` before committing.
 
 Full local gate when feasible:
 

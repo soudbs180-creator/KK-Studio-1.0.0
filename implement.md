@@ -1,6 +1,6 @@
 # KK-Studio v1.4.2 Refactor Implementation Rules
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Operating Mode
 
@@ -55,6 +55,8 @@ For every milestone:
 - Code changes require `npm.cmd run typecheck`.
 - Every completed milestone requires `npm.cmd run check:encoding`.
 - Code milestones also require targeted tests, `npm.cmd run test:unit`, and `npm.cmd run build` unless `validation.md` documents a known blocker.
+- UI or visual changes require a real browser inspection before commit. Start the app locally, open it through the Codex in-app Browser (`browser-use` with the `iab` backend), inspect the changed surface on desktop and mobile-sized viewports when applicable, and record the browser result in `status.md`.
+- Do not claim a UI optimization is complete from source-contract tests, screenshots, build output, or smoke scripts alone. The browser check is mandatory for new UI work and can only be skipped for non-UI logic/docs changes with an explicit note.
 - If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
 
 ## Context Exhaustion Protocol

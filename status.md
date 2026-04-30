@@ -10,6 +10,7 @@ Last updated: 2026-04-30
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
+- UI/visual optimization policy: browser inspection through the Codex in-app Browser is mandatory for UI changes before commit; non-UI runtime refactors may skip it with an explicit note.
 
 ## Baseline Snapshot
 
@@ -398,7 +399,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Generation runtime guard, billing helper, initial credit settlement, draft-context, initial billing attempt context, generation billing state context, and initial generating prompt-node assembly slices are extracted and validated.
+Status: in progress. Sixteen narrow generation-runtime slices are extracted and validated, through retry recovery notification ownership.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -1134,6 +1135,12 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 UI validation policy update:
+  - Added mandatory browser inspection rules for UI/visual optimization work to `implement.md` and `validation.md`.
+  - Current change is documentation/governance only; no browser run required because no UI surface changed.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
