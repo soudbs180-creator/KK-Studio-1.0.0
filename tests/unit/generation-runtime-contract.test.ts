@@ -80,7 +80,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /refreshBilling,/);
     assert.match(hookSource, /adjustBalanceOptimistically\(-requiredCredits\)/);
 
-    assert.match(appSource, /ensureCreditAttemptCharged,\s*resolveFailedCreditAttempt,\s*applyOptimisticServerCreditDebit,/);
+    assert.match(appSource, /ensureCreditAttemptCharged,[\s\S]*?resolveFailedCreditAttempt,[\s\S]*?applyOptimisticServerCreditDebit,/);
     assert.match(appSource, /consumeCreditsDetailed,/);
     assert.match(appSource, /refundCreditsByTransaction,/);
     assert.match(appSource, /refreshBilling,/);
@@ -89,5 +89,23 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /const resolveFailedCreditAttempt = useCallback\(async/);
     assert.doesNotMatch(appSource, /const applyOptimisticServerCreditDebit = useCallback\(/);
     assert.doesNotMatch(appSource, /resolveGenerationAttemptFailureState\(node, \{/);
+  });
+
+  test('initial generation credit settlement is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareInitialCreditSettlement: \(params: PrepareInitialCreditSettlementParams\) => Promise<PrepareInitialCreditSettlementResult>;/);
+    assert.match(hookSource, /const prepareInitialCreditSettlement = useCallback\(async \(params: PrepareInitialCreditSettlementParams\)/);
+    assert.match(hookSource, /if \(!params\.isCreditModel\) \{/);
+    assert.match(hookSource, /notify\.error\('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。'\)/);
+    assert.match(hookSource, /const chargeAttempt = await ensureCreditAttemptCharged\(\{/);
+    assert.match(hookSource, /paymentTransactionId: chargeAttempt\.transactionId,/);
+
+    assert.match(appSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
+    assert.match(appSource, /if \(!initialCreditSettlement\.allowed\) \{/);
+    assert.match(appSource, /paymentTransactionId = initialCreditSettlement\.paymentTransactionId;/);
+    assert.doesNotMatch(appSource, /if \(generationBillingState\.isCreditModel\) \{\s*if \(authLoading\)/);
+    assert.doesNotMatch(appSource, /const chargeAttempt = await ensureCreditAttemptCharged\(\{\s*modelId: config\.model,/);
   });
 });

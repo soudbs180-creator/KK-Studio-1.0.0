@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; billing helper slice is complete in the current commit line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; initial credit settlement slice is complete in the current commit line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 9012 lines after Milestone 4 billing-helper extraction
+- `src/App.tsx`: 8981 lines after Milestone 4 initial-credit-settlement extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -450,6 +450,31 @@ Current risk:
 - The runtime hook now receives a broad billing/auth dependency set; the next extraction should not add PPT/ecommerce-specific dependencies to the same hook unless they are truly shared generation runtime concerns.
 - `App.tsx` still owns the large `handleGenerate`, `handleRetryNode`, and PPT retry bodies; the next safe slice should isolate a pure/shared helper rather than moving the whole execution body.
 
+Third slice scope:
+- Added hook-owned `prepareInitialCreditSettlement` with explicit `PrepareInitialCreditSettlementParams` and `PrepareInitialCreditSettlementResult`.
+- Moved the initial `handleGenerate` credit auth/loading/balance/client-precharge branch into `src/app/useGenerationRuntime.ts`.
+- Preserved the previous notification copy and early-return order for managed credit models.
+- Kept generation billing-state resolution, route selection, prompt node construction, persistence, and `executeGeneration` in `App.tsx`.
+
+Line count change during Milestone 4 third slice:
+- `src/App.tsx`: `9012` lines after second slice -> `8981` lines.
+- `src/app/useGenerationRuntime.ts`: `236` lines -> `312` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `93` lines -> `111` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because initial credit settlement still lived in `App.tsx`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `15` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `991` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `npm.cmd run governance:agent-docs`: passed.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `prepareInitialCreditSettlement` intentionally calls `ensureCreditAttemptCharged` after preserving the existing pre-checks, so the helper still shares the canonical debit/idempotency path.
+- The next slice should avoid combining retry result persistence, PPT retry, and initial generation persistence in one change.
+
 Next step:
 - Continue M4 with the next RED source contract around retry-timeout cancellation, result patch assembly, or another small shared generation runtime boundary.
 
@@ -646,6 +671,15 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing tests: passed, `14` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `990` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed.
+  - `npm.cmd run governance:agent-docs`: passed.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 third slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because initial credit settlement still lived in `App.tsx`.
+  - Targeted M4 billing tests: passed, `15` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `991` tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed.
   - `npm.cmd run governance:agent-docs`: passed.

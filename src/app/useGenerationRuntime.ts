@@ -25,6 +25,14 @@ export type EnsureCreditAttemptChargedResult =
   | { success: true; transactionId: string | undefined }
   | { success: false; transactionId?: undefined };
 
+export interface PrepareInitialCreditSettlementParams extends EnsureCreditAttemptChargedParams {
+  isCreditModel: boolean;
+}
+
+export type PrepareInitialCreditSettlementResult =
+  | { allowed: true; paymentTransactionId: string | undefined }
+  | { allowed: false; paymentTransactionId?: undefined };
+
 export type GenerationCreditAttemptNode = Pick<
   PromptNode,
   | 'id'
@@ -71,6 +79,7 @@ export interface UseGenerationRuntimeDeps {
 export interface UseGenerationRuntimeResult {
   handleCancelGeneration: (id?: string) => Promise<void>;
   ensureCreditAttemptCharged: (params: EnsureCreditAttemptChargedParams) => Promise<EnsureCreditAttemptChargedResult>;
+  prepareInitialCreditSettlement: (params: PrepareInitialCreditSettlementParams) => Promise<PrepareInitialCreditSettlementResult>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -156,6 +165,72 @@ export function useGenerationRuntime({
     };
   }, [authLoading, balance, billingLoading, consumeCreditsDetailed, isTempUser, setShowRechargeModal, user]);
 
+  const prepareInitialCreditSettlement = useCallback(async (params: PrepareInitialCreditSettlementParams) => {
+    if (!params.isCreditModel) {
+      return { allowed: true as const, paymentTransactionId: undefined };
+    }
+
+    if (authLoading) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
+      });
+      return { allowed: false as const };
+    }
+
+    if (!user || isTempUser) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
+      });
+      return { allowed: false as const };
+    }
+
+    if (params.requiredCredits > 0 && billingLoading) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
+      });
+      return { allowed: false as const };
+    }
+
+    if (params.requiredCredits > 0 && balance < params.requiredCredits) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('生成失败', '您的账户余额不足，请先充值积分。');
+      });
+      setShowRechargeModal(true);
+      return { allowed: false as const };
+    }
+
+    if (params.requiredCredits > 0 && !params.useServerSideCreditSettlement) {
+      const chargeAttempt = await ensureCreditAttemptCharged({
+        modelId: params.modelId,
+        modelLabel: params.modelLabel,
+        providerId: params.providerId,
+        provider: params.provider,
+        requiredCredits: params.requiredCredits,
+        useServerSideCreditSettlement: params.useServerSideCreditSettlement,
+        billingAttempt: params.billingAttempt,
+      });
+
+      if (!chargeAttempt.success) {
+        return { allowed: false as const };
+      }
+
+      return {
+        allowed: true as const,
+        paymentTransactionId: chargeAttempt.transactionId,
+      };
+    }
+
+    return { allowed: true as const, paymentTransactionId: undefined };
+  }, [
+    authLoading,
+    balance,
+    billingLoading,
+    ensureCreditAttemptCharged,
+    isTempUser,
+    setShowRechargeModal,
+    user,
+  ]);
+
   const resolveFailedCreditAttempt = useCallback(async (node: GenerationCreditAttemptNode) => {
     const failureState = await resolveGenerationAttemptFailureState(node, {
       refundCreditsByTransaction,
@@ -230,6 +305,7 @@ export function useGenerationRuntime({
   return {
     handleCancelGeneration,
     ensureCreditAttemptCharged,
+    prepareInitialCreditSettlement,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

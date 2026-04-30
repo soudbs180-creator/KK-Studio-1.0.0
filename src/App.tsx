@@ -3300,6 +3300,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     handleCancelGeneration,
     ensureCreditAttemptCharged,
+    prepareInitialCreditSettlement,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4302,54 +4303,22 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
     const executionLane = generationBillingState.executionLane;
     const useServerSideCreditSettlement = generationBillingState.useServerSideCreditSettlement;
-    if (generationBillingState.isCreditModel) {
-      if (authLoading) {
-        import('./services/system/notificationService').then(({ notify }) => {
-          notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
-        });
-        return;
-      }
+    const initialCreditSettlement = await prepareInitialCreditSettlement({
+      isCreditModel: generationBillingState.isCreditModel,
+      modelId: config.model,
+      modelLabel: config.model,
+      providerId: generationBillingState.resolvedProvider || selectedKeyForBilling?.id || 'managed',
+      provider: generationBillingState.resolvedProvider,
+      requiredCredits,
+      useServerSideCreditSettlement,
+      billingAttempt,
+    });
 
-      if (!user || isTempUser) {
-        import('./services/system/notificationService').then(({ notify }) => {
-          notify.error('请先登录', '管理员配置的积分模型需要登录账号后使用积分调用。');
-        });
-        return;
-      }
-
-      if (requiredCredits > 0 && billingLoading) {
-        import('./services/system/notificationService').then(({ notify }) => {
-          notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
-        });
-        return;
-      }
-      if (requiredCredits > 0 && balance < requiredCredits) {
-        import('./services/system/notificationService').then(({ notify }) => {
-          notify.error('生成失败', '您的账户余额不足，请先充值积分。');
-        });
-        setShowRechargeModal(true);
-        return;
-      }
-
-      // Non-system routed credit models still use the legacy client-side pre-charge flow
-      if (requiredCredits > 0 && !useServerSideCreditSettlement) {
-        const chargeAttempt = await ensureCreditAttemptCharged({
-          modelId: config.model,
-          modelLabel: config.model,
-          providerId: generationBillingState.resolvedProvider || selectedKeyForBilling?.id || 'managed',
-          provider: generationBillingState.resolvedProvider,
-          requiredCredits,
-          useServerSideCreditSettlement,
-          billingAttempt,
-        });
-
-        if (!chargeAttempt.success) {
-          return;
-        }
-
-        paymentTransactionId = chargeAttempt.transactionId;
-      }
+    if (!initialCreditSettlement.allowed) {
+      return;
     }
+
+    paymentTransactionId = initialCreditSettlement.paymentTransactionId;
     // setIsGenerating(true); // Removed, handled by hook
     try {
 
@@ -4461,7 +4430,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, ensureCreditAttemptCharged, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
