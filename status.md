@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; initial generating prompt-node persistence slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; initial prompt optimization context slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8943 lines after Milestone 4 initial generating prompt-node persistence extraction
+- `src/App.tsx`: 8925 lines after Milestone 4 initial prompt optimization context extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -608,8 +608,33 @@ Current risk:
 - `persistInitialGeneratingPromptNode` intentionally closes over `updatePromptNode` from hook deps while keeping other canvas mutation callbacks as call params; this preserves current behavior but should not be expanded into execution or retry logic without a separate contract.
 - The next safe slice should target prompt optimization wrapping or initial post-persist cleanup, not PPT/ecommerce bodies.
 
+Ninth slice scope:
+- Added hook-owned `prepareInitialGenerationPromptOptimization` with explicit `PrepareInitialGenerationPromptOptimizationParams` and `PrepareInitialGenerationPromptOptimizationResult`.
+- Moved initial generation prompt optimization enablement, options assembly, model capability lookup, and fallback notification wiring into `src/app/useGenerationRuntime.ts`.
+- Kept retry/ecommerce prompt optimization paths in `src/App.tsx`, because they use different context and should be split under separate contracts.
+- Kept reference image preparation, prompt-node assembly, persistence, post-persist cleanup, optimistic debit, execution, retry, PPT, and ecommerce bodies unchanged.
+
+Line count change during Milestone 4 ninth slice:
+- `src/App.tsx`: `8942` lines after eighth slice -> `8925` lines.
+- `src/app/useGenerationRuntime.ts`: `564` lines -> `604` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `212` lines -> `230` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `prepareInitialGenerationPromptOptimization`, while `App.tsx` still owned initial optimization enablement and `getModelCapabilities(config.model)`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `24` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `997` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `prepareInitialGenerationPromptOptimization` imports `GenerationMode` and `getModelCapabilities` into the runtime hook for the initial path only; retry/ecommerce optimization should remain separate until their own contract is added.
+- The next safe slice should target initial post-persist cleanup or failure patch preparation, not PPT/ecommerce bodies.
+
 Next step:
-- Continue M4 with the next RED source contract around prompt optimization wrapping, initial post-persist cleanup, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
+- Continue M4 with the next RED source contract around initial post-persist cleanup, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
 
 ### Milestones 5-9
 
@@ -858,6 +883,15 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `23` tests.
   - `npm.cmd run typecheck`: passed after tightening the persistence wrapper `getCanvas` return type.
   - `npm.cmd run test:unit`: passed, `996` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 ninth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `prepareInitialGenerationPromptOptimization`, while `App.tsx` still owned initial optimization enablement and `getModelCapabilities(config.model)`.
+  - Targeted M4 billing/runtime/route tests: passed, `24` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `997` tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.

@@ -7,10 +7,12 @@ import {
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
 import { adminModelService } from '../services/model/adminModelService';
+import { getModelCapabilities } from '../services/model/modelCapabilities';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
-import type { Canvas, GeneratedImage, GenerationConfig, ImageSize, PromptNode, ReferenceImage } from '../types';
+import { GenerationMode, type Canvas, type GeneratedImage, type GenerationConfig, type ImageSize, type PromptNode, type ReferenceImage } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
+import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
 import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
 import { resolveGenerationPreviewState } from './resolveGenerationPreviewState';
@@ -155,6 +157,17 @@ export interface PersistInitialGeneratingPromptNodeResult {
   persistedGeneratingNode: PromptNode;
 }
 
+export interface PrepareInitialGenerationPromptOptimizationParams {
+  config: Pick<
+    GenerationConfig,
+    'aspectRatio' | 'enablePromptOptimization' | 'imageSize' | 'mode' | 'model' | 'thinkingMode'
+  >;
+  finalReferenceImages: ReferenceImage[];
+  rawPrompt: string;
+}
+
+export type PrepareInitialGenerationPromptOptimizationResult = Awaited<ReturnType<typeof optimizeGenerationPrompt>>;
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -192,6 +205,7 @@ export interface UseGenerationRuntimeResult {
   prepareGenerationBillingStateContext: (params: PrepareGenerationBillingStateContextParams) => PrepareGenerationBillingStateContextResult;
   prepareInitialGeneratingPromptNode: (params: PrepareInitialGeneratingPromptNodeParams) => PrepareInitialGeneratingPromptNodeResult;
   persistInitialGeneratingPromptNode: (params: PersistInitialGeneratingPromptNodeParams) => Promise<PersistInitialGeneratingPromptNodeResult>;
+  prepareInitialGenerationPromptOptimization: (params: PrepareInitialGenerationPromptOptimizationParams) => Promise<PrepareInitialGenerationPromptOptimizationResult>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -502,6 +516,31 @@ export function useGenerationRuntime({
     return { persistedGeneratingNode };
   }, [updatePromptNode]);
 
+  const prepareInitialGenerationPromptOptimization = useCallback(async (params: PrepareInitialGenerationPromptOptimizationParams) => {
+    return optimizeGenerationPrompt({
+      enabled: (params.config.mode === GenerationMode.IMAGE || params.config.mode === GenerationMode.PPT)
+        && params.config.enablePromptOptimization
+        && !!params.rawPrompt,
+      rawPrompt: params.rawPrompt,
+      referenceImages: params.finalReferenceImages,
+      options: {
+        preferredModelId: params.config.model,
+        aspectRatio: params.config.aspectRatio,
+        imageSize: params.config.imageSize,
+        mode: params.config.mode,
+        supportsThinking: !!getModelCapabilities(params.config.model)?.supportsThinking,
+        thinkingMode: params.config.thinkingMode || 'minimal',
+      },
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : String(error || '');
+        console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', error);
+        import('../services/system/notificationService').then(({ notify }) => {
+          notify.error('Prompt optimization failed', 'Fell back to the original prompt: ' + message);
+        });
+      },
+    });
+  }, []);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -558,6 +597,7 @@ export function useGenerationRuntime({
     prepareGenerationBillingStateContext,
     prepareInitialGeneratingPromptNode,
     persistInitialGeneratingPromptNode,
+    prepareInitialGenerationPromptOptimization,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

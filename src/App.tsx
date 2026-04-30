@@ -3299,6 +3299,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareGenerationBillingStateContext,
     prepareInitialGeneratingPromptNode,
     persistInitialGeneratingPromptNode,
+    prepareInitialGenerationPromptOptimization,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4316,32 +4317,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       const finalReferenceImages = prepareGenerationReferenceImages(config.referenceImages);
 
       const rawPrompt = trimmedPrompt;
-      const {
-        optimizedPromptEn,
-        optimizedPromptZh,
-        promptOptimizerResult,
-      } = await optimizeGenerationPrompt({
-        enabled: (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT)
-          && config.enablePromptOptimization
-          && !!rawPrompt,
+      const initialPromptOptimization = await prepareInitialGenerationPromptOptimization({
+        config,
         rawPrompt,
-        referenceImages: finalReferenceImages,
-        options: {
-          preferredModelId: config.model,
-          aspectRatio: config.aspectRatio,
-          imageSize: config.imageSize,
-          mode: config.mode,
-          supportsThinking: !!getModelCapabilities(config.model)?.supportsThinking,
-          thinkingMode: config.thinkingMode || 'minimal',
-        },
-        onError: (error) => {
-          const message = error instanceof Error ? error.message : String(error || '');
-          console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', error);
-          import('./services/system/notificationService').then(({ notify }) => {
-            notify.error('Prompt optimization failed', 'Fell back to the original prompt: ' + message);
-          });
-        },
+        finalReferenceImages,
       });
+      const optimizedPromptEn = initialPromptOptimization.optimizedPromptEn;
+      const optimizedPromptZh = initialPromptOptimization.optimizedPromptZh;
+      const promptOptimizerResult = initialPromptOptimization.promptOptimizerResult;
 
       const initialGeneratingNode = prepareInitialGeneratingPromptNode({
         activeSourceImage,
@@ -4391,7 +4374,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, prepareInitialGenerationPromptOptimization, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

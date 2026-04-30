@@ -209,4 +209,22 @@ describe('generation runtime extraction contract', () => {
     assert.match(appSource, /const persistedGeneratingNode = persistedGeneration\.persistedGeneratingNode;/);
     assert.doesNotMatch(appSource, /const persistedGeneratingNode = await persistGeneratingPromptNode\(\{/);
   });
+
+  test('initial prompt optimization context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareInitialGenerationPromptOptimization: \(params: PrepareInitialGenerationPromptOptimizationParams\) => Promise<PrepareInitialGenerationPromptOptimizationResult>;/);
+    assert.match(hookSource, /const prepareInitialGenerationPromptOptimization = useCallback\(async \(params: PrepareInitialGenerationPromptOptimizationParams\)/);
+    assert.match(hookSource, /return optimizeGenerationPrompt\(\{/);
+    assert.match(hookSource, /enabled: \(params\.config\.mode === GenerationMode\.IMAGE \|\| params\.config\.mode === GenerationMode\.PPT\)\s*&& params\.config\.enablePromptOptimization/);
+    assert.match(hookSource, /referenceImages: params\.finalReferenceImages,/);
+    assert.match(hookSource, /supportsThinking: !!getModelCapabilities\(params\.config\.model\)\?\.supportsThinking,/);
+    assert.match(hookSource, /notify\.error\('Prompt optimization failed'/);
+
+    assert.match(appSource, /const initialPromptOptimization = await prepareInitialGenerationPromptOptimization\(\{/);
+    assert.match(appSource, /const optimizedPromptEn = initialPromptOptimization\.optimizedPromptEn;/);
+    assert.doesNotMatch(appSource, /enabled: \(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT\)/);
+    assert.doesNotMatch(appSource, /supportsThinking: !!getModelCapabilities\(config\.model\)\?\.supportsThinking,/);
+  });
 });
