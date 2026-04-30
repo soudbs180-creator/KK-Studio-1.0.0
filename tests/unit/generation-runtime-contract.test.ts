@@ -383,4 +383,25 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /notify\.info\('恢复历史结果', message\);/);
     assert.doesNotMatch(retryNodeSource, /已重新接管 \$\{recovered\.pendingCount\}/);
   });
+
+  test('retry generation request context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryGenerationRequestContext: \(params: PrepareRetryGenerationRequestContextParams\) => PrepareRetryGenerationRequestContextResult;/);
+    assert.match(hookSource, /const prepareRetryGenerationRequestContext = useCallback\(\(params: PrepareRetryGenerationRequestContextParams\)/);
+    assert.match(hookSource, /const currentNodeId = params\.node\.id;/);
+    assert.match(hookSource, /const requestedCount = params\.node\.parallelCount \|\| params\.defaultParallelCount \|\| 1;/);
+    assert.match(hookSource, /const count = params\.node\.mode === GenerationMode\.PPT \? Math\.min\(20, Math\.max\(1, requestedCount\)\) : requestedCount;/);
+
+    assert.match(retryNodeSource, /const \{ currentNodeId, count \} = prepareRetryGenerationRequestContext\(\{/);
+    assert.match(retryNodeSource, /defaultParallelCount: config\.parallelCount,/);
+    assert.doesNotMatch(retryNodeSource, /const currentNodeId = node\.id;/);
+    assert.doesNotMatch(retryNodeSource, /const requestedCount = node\.parallelCount \|\| config\.parallelCount \|\| 1;/);
+    assert.doesNotMatch(retryNodeSource, /const count = node\.mode === GenerationMode\.PPT \? Math\.min\(20, Math\.max\(1, requestedCount\)\) : requestedCount;/);
+  });
 });

@@ -3307,6 +3307,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     createRetryGenerationTimeoutGuard,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
+    prepareRetryGenerationRequestContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4521,9 +4522,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       return;
     }
 
-    const currentNodeId = node.id;
-    const requestedCount = node.parallelCount || config.parallelCount || 1;
-    const count = node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
+    const { currentNodeId, count } = prepareRetryGenerationRequestContext({
+      node,
+      defaultParallelCount: config.parallelCount,
+    });
     const preparedRetry = await prepareRetriedExecutionNode({
       executionNode,
       nodeId: currentNodeId,
@@ -5001,7 +5003,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

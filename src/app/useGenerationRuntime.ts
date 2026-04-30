@@ -213,6 +213,17 @@ export interface ReportRetryRecoveryResultParams {
   pendingCount: number;
 }
 
+export interface PrepareRetryGenerationRequestContextParams {
+  node: Pick<PromptNode, 'id' | 'mode' | 'parallelCount'>;
+  defaultParallelCount: number;
+}
+
+export interface PrepareRetryGenerationRequestContextResult {
+  currentNodeId: string;
+  requestedCount: number;
+  count: number;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -258,6 +269,7 @@ export interface UseGenerationRuntimeResult {
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
+  prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -521,6 +533,13 @@ export function useGenerationRuntime({
     });
   }, []);
 
+  const prepareRetryGenerationRequestContext = useCallback((params: PrepareRetryGenerationRequestContextParams) => {
+    const currentNodeId = params.node.id;
+    const requestedCount = params.node.parallelCount || params.defaultParallelCount || 1;
+    const count = params.node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
+    return { currentNodeId, requestedCount, count };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -751,6 +770,7 @@ export function useGenerationRuntime({
     createRetryGenerationTimeoutGuard,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
+    prepareRetryGenerationRequestContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
