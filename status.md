@@ -1674,6 +1674,20 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run governance:agent-docs`: passed.
   - `npm.cmd run check:encoding`: passed.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-first slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `App.tsx` still called `buildRetryGeneratedMediaResult` directly and unpacked `requestTrace` / `resultMetadata` from `generatedMediaContext`.
+  - Added `BuildRetryGeneratedMediaResultFromContextParams` and `buildRetryGeneratedMediaResultFromContext` to `src/app/useGenerationRuntime.ts`, so retry media result assembly consumes the consolidated `generatedMediaContext` boundary inside the Hook.
+  - Updated `App.tsx` to pass `generatedMediaContext` through the Hook result assembler and removed direct retry result metadata wiring from the retry handler.
+  - Updated source-contract coverage so older result-assembly tests and the new context-boundary test agree on the same Hook boundary.
+  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1480, `tests/unit/generation-runtime-contract.test.ts` 740.
+  - Targeted M4 billing/runtime/route tests: passed, `46` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1023` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry result assembly refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 

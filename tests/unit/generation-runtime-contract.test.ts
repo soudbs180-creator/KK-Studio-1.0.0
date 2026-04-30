@@ -487,7 +487,7 @@ describe('generation runtime extraction contract', () => {
 
     assert.match(retryNodeSource, /generatedMediaContext = buildRetryVideoGenerationResultContext\(\{/);
     assert.match(retryNodeSource, /videoResult,/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64, requestTrace, resultMetadata \} = generatedMediaContext;/);
+    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
     assert.doesNotMatch(retryNodeSource, /actualKeySlotId = videoResult\.keySlotId \|\| actualKeySlotId;/);
     assert.doesNotMatch(retryNodeSource, /actualProvider = videoResult\.provider \|\| actualProvider;/);
     assert.doesNotMatch(retryNodeSource, /\(videoResult as any\)\.usage\?\.cost/);
@@ -534,7 +534,7 @@ describe('generation runtime extraction contract', () => {
 
     assert.match(retryNodeSource, /generatedMediaContext = buildRetryImageGenerationResultContext\(\{/);
     assert.match(retryNodeSource, /resolveModelDisplayName,/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64, requestTrace, resultMetadata \} = generatedMediaContext;/);
+    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
     assert.match(retryNodeSource, /if \(typeof generatedMediaContext\.balanceAfter === 'number'\) \{/);
     assert.match(retryNodeSource, /applyAuthoritativeBalance\(generatedMediaContext\.balanceAfter\);/);
     assert.doesNotMatch(retryNodeSource, /actualProvider = result\.provider \|\| actualProvider;/);
@@ -558,9 +558,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(retryNodeSource, /let generatedMediaContext: RetryGeneratedMediaResultContext;/);
     assert.match(retryNodeSource, /generatedMediaContext = buildRetryVideoGenerationResultContext\(\{/);
     assert.match(retryNodeSource, /generatedMediaContext = buildRetryImageGenerationResultContext\(\{/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64, requestTrace, resultMetadata \} = generatedMediaContext;/);
-    assert.match(retryNodeSource, /requestTrace,/);
-    assert.match(retryNodeSource, /resultMetadata,/);
+    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
+    assert.match(retryNodeSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /requestTrace,/);
+    assert.doesNotMatch(retryNodeSource, /resultMetadata,/);
 
     assert.doesNotMatch(retryNodeSource, /let b64 = '';/);
     assert.doesNotMatch(retryNodeSource, /let requestPath: string \| undefined = undefined;/);
@@ -660,12 +661,35 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /id: `\$\{Date\.now\(\)\}_\$\{params\.index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
     assert.match(hookSource, /mimeType: params\.mediaPersistence\.mimeType,/);
 
-    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
+    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
     assert.match(retryNodeSource, /mediaDimensions,/);
     assert.match(retryNodeSource, /mediaPersistence,/);
     assert.match(retryNodeSource, /return generatedResult;/);
+    assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
     assert.doesNotMatch(retryNodeSource, /sourceReferenceStorageIds: \(executionNode\.referenceImages \|\| \[\]\)\.map/);
     assert.doesNotMatch(retryNodeSource, /id: `\$\{Date\.now\(\)\}_\$\{index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
+  });
+
+  test('retry generated media result assembly uses the consolidated context boundary', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryGeneratedMediaResultFromContext: \(params: BuildRetryGeneratedMediaResultFromContextParams\) => RetryGeneratedMediaResult;/);
+    assert.match(hookSource, /const buildRetryGeneratedMediaResultFromContext = useCallback\(\(params: BuildRetryGeneratedMediaResultFromContextParams\): RetryGeneratedMediaResult => \{/);
+    assert.match(hookSource, /alias: params\.currentMode === GenerationMode\.PPT \? params\.buildPptPageAlias/);
+    assert.match(hookSource, /requestTrace: params\.generatedMediaContext\.requestTrace,/);
+    assert.match(hookSource, /resultMetadata: params\.generatedMediaContext\.resultMetadata,/);
+
+    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
+    assert.match(retryNodeSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
+    assert.doesNotMatch(retryNodeSource, /alias: currentMode === GenerationMode\.PPT \? buildPptPageAlias/);
+    assert.doesNotMatch(retryNodeSource, /requestTrace,/);
+    assert.doesNotMatch(retryNodeSource, /resultMetadata,/);
   });
 
   test('retry completed prompt patch assembly is owned by useGenerationRuntime', () => {

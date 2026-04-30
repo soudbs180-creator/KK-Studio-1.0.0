@@ -3317,7 +3317,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
-    buildRetryGeneratedMediaResult,
+    buildRetryGeneratedMediaResultFromContext,
     buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,
@@ -4607,7 +4607,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           if (typeof generatedMediaContext.balanceAfter === 'number') {
             applyAuthoritativeBalance(generatedMediaContext.balanceAfter);
           }
-          const { apiDurationMs, b64, requestTrace, resultMetadata } = generatedMediaContext;
+          const { apiDurationMs, b64 } = generatedMediaContext;
 
           timeoutGuard.markFinished();
           timeoutGuard.clear();
@@ -4636,18 +4636,17 @@ const AppContent: React.FC<AppContentProps> = () => {
             url: mediaPersistence.url,
           });
 
-          const generatedResult = buildRetryGeneratedMediaResult({
-            alias: currentMode === GenerationMode.PPT ? buildPptPageAlias(executionNode.pptSlides?.[index], index) : undefined,
+          const generatedResult = buildRetryGeneratedMediaResultFromContext({
+            buildPptPageAlias,
             canvasId: activeCanvas?.id,
             currentMode,
             executionNode,
+            generatedMediaContext,
             generationTime,
             index,
             mediaDimensions,
             mediaPersistence,
             prompt: taskPrompt,
-            requestTrace,
-            resultMetadata,
           });
           return generatedResult;
         } catch (e: any) {
@@ -4692,7 +4691,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, buildRetryVideoGenerationResultContext, prepareRetryImageGenerationRequest, buildRetryImageGenerationResultContext, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

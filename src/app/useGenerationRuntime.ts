@@ -393,6 +393,15 @@ export interface BuildRetryGeneratedMediaResultParams {
   resultMetadata: RetryGeneratedMediaResultMetadata;
 }
 
+export interface BuildRetryGeneratedMediaResultFromContextParams extends Omit<
+  BuildRetryGeneratedMediaResultParams,
+  'alias' | 'executionNode' | 'requestTrace' | 'resultMetadata'
+> {
+  buildPptPageAlias: (raw: string | undefined, pageIndex: number) => string;
+  executionNode: BuildRetryGeneratedMediaResultParams['executionNode'] & Pick<PromptNode, 'pptSlides'>;
+  generatedMediaContext: RetryGeneratedMediaResultContext;
+}
+
 export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
   height: number;
   index: number;
@@ -496,6 +505,7 @@ export interface UseGenerationRuntimeResult {
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
+  buildRetryGeneratedMediaResultFromContext: (params: BuildRetryGeneratedMediaResultFromContextParams) => RetryGeneratedMediaResult;
   buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
   buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
@@ -1081,6 +1091,22 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const buildRetryGeneratedMediaResultFromContext = useCallback((params: BuildRetryGeneratedMediaResultFromContextParams): RetryGeneratedMediaResult => {
+    return buildRetryGeneratedMediaResult({
+      alias: params.currentMode === GenerationMode.PPT ? params.buildPptPageAlias(params.executionNode.pptSlides?.[params.index], params.index) : undefined,
+      canvasId: params.canvasId,
+      currentMode: params.currentMode,
+      executionNode: params.executionNode,
+      generationTime: params.generationTime,
+      index: params.index,
+      mediaDimensions: params.mediaDimensions,
+      mediaPersistence: params.mediaPersistence,
+      prompt: params.prompt,
+      requestTrace: params.generatedMediaContext.requestTrace,
+      resultMetadata: params.generatedMediaContext.resultMetadata,
+    });
+  }, [buildRetryGeneratedMediaResult]);
+
   const buildRetryGeneratedMediaLayout = useCallback((params: BuildRetryGeneratedMediaLayoutParams): RetryGeneratedMediaLayoutNode[] => {
     const gapToImages = 20;
     const gap = 16;
@@ -1444,6 +1470,7 @@ export function useGenerationRuntime({
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
+    buildRetryGeneratedMediaResultFromContext,
     buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,
