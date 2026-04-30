@@ -398,7 +398,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. First generation runtime slice committed as `e27cea39 refactor: extract generation runtime guards`; billing helper slice is validated and ready to continue from the next boundary.
+Status: in progress. Generation runtime guard, billing helper, initial credit settlement, and draft-context slices are extracted and validated.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -474,6 +474,25 @@ Validation passed:
 Current risk:
 - `prepareInitialCreditSettlement` intentionally calls `ensureCreditAttemptCharged` after preserving the existing pre-checks, so the helper still shares the canonical debit/idempotency path.
 - The next slice should avoid combining retry result persistence, PPT retry, and initial generation persistence in one change.
+
+Fourth slice scope:
+- Added hook-owned `prepareGenerationDraftContext` with explicit `PrepareGenerationDraftContextArgs` and `PrepareGenerationDraftContextResult`.
+- Moved follow-up detection, existing draft lookup, reusable draft detection, and new prompt node id creation out of `src/App.tsx`.
+- Kept prompt placement, billing, prompt node construction, persistence, retry, PPT, ecommerce, and execution behavior in `App.tsx`.
+
+Line count change during Milestone 4 fourth slice:
+- `src/App.tsx`: `8981` lines after third slice -> `8982` lines.
+- `src/app/useGenerationRuntime.ts`: `312` lines -> `357` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `111` lines -> `133` lines.
+
+Validation passed:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `10` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `992` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `npm.cmd run check:encoding`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 Next step:
 - Continue M4 with the next RED source contract around retry-timeout cancellation, result patch assembly, or another small shared generation runtime boundary.

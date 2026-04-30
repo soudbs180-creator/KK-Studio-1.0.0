@@ -50,10 +50,28 @@ export type GenerationCreditAttemptFailurePatch = {
   paymentTransactionId?: string;
 };
 
+export interface PrepareGenerationDraftContextArgs {
+  activeCanvasRef: {
+    current?: Pick<Canvas, 'promptNodes'> | null;
+  };
+  activeSourceImage?: string | null;
+  draftNodeId?: string | null;
+}
+
+export interface PrepareGenerationDraftContextResult {
+  isFollowUp: boolean;
+  existingPromptDraftId: string;
+  existingPromptDraft: PromptNode | null;
+  hasReusablePromptDraft: boolean;
+  promptNodeId: string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
 }
+
+const createGenerationPromptNodeId = () => `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
 
 export interface UseGenerationRuntimeDeps {
   activeCanvas?: Pick<Canvas, 'promptNodes'> | null;
@@ -80,6 +98,7 @@ export interface UseGenerationRuntimeResult {
   handleCancelGeneration: (id?: string) => Promise<void>;
   ensureCreditAttemptCharged: (params: EnsureCreditAttemptChargedParams) => Promise<EnsureCreditAttemptChargedResult>;
   prepareInitialCreditSettlement: (params: PrepareInitialCreditSettlementParams) => Promise<PrepareInitialCreditSettlementResult>;
+  prepareGenerationDraftContext: (args: PrepareGenerationDraftContextArgs) => PrepareGenerationDraftContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -255,6 +274,30 @@ export function useGenerationRuntime({
     }
   }, [adjustBalanceOptimistically]);
 
+  const prepareGenerationDraftContext = useCallback(({
+    activeCanvasRef,
+    activeSourceImage,
+    draftNodeId,
+  }: PrepareGenerationDraftContextArgs) => {
+    const isFollowUp = !!activeSourceImage;
+    const existingPromptDraftId = String(draftNodeId || '').trim();
+    const existingPromptDraft = existingPromptDraftId
+      ? activeCanvasRef.current?.promptNodes.find((node) => node.id === existingPromptDraftId) ?? null
+      : null;
+    const hasReusablePromptDraft = Boolean(isFollowUp && existingPromptDraft);
+    const promptNodeId = hasReusablePromptDraft
+      ? existingPromptDraftId
+      : createGenerationPromptNodeId();
+
+    return {
+      isFollowUp,
+      existingPromptDraftId,
+      existingPromptDraft,
+      hasReusablePromptDraft,
+      promptNodeId,
+    };
+  }, []);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -306,6 +349,7 @@ export function useGenerationRuntime({
     handleCancelGeneration,
     ensureCreditAttemptCharged,
     prepareInitialCreditSettlement,
+    prepareGenerationDraftContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

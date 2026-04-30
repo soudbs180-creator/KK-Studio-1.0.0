@@ -108,4 +108,25 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /if \(generationBillingState\.isCreditModel\) \{\s*if \(authLoading\)/);
     assert.doesNotMatch(appSource, /const chargeAttempt = await ensureCreditAttemptCharged\(\{\s*modelId: config\.model,/);
   });
+
+  test('initial generation draft context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareGenerationDraftContext: \(args: PrepareGenerationDraftContextArgs\) => PrepareGenerationDraftContextResult;/);
+    assert.match(hookSource, /const createGenerationPromptNodeId = \(\) => `node_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(16\)\.slice\(2, 8\)\}`;/);
+    assert.match(hookSource, /const prepareGenerationDraftContext = useCallback\(\(\{/);
+    assert.match(hookSource, /const isFollowUp = !!activeSourceImage;/);
+    assert.match(hookSource, /const existingPromptDraftId = String\(draftNodeId \|\| ''\)\.trim\(\);/);
+    assert.match(hookSource, /activeCanvasRef\.current\?\.promptNodes\.find\(\(node\) => node\.id === existingPromptDraftId\)/);
+    assert.match(hookSource, /const hasReusablePromptDraft = Boolean\(isFollowUp && existingPromptDraft\);/);
+
+    assert.match(appSource, /const draftContext = prepareGenerationDraftContext\(\{/);
+    assert.match(appSource, /let promptNodeId = draftContext\.promptNodeId;/);
+    assert.match(appSource, /const isFollowUp = draftContext\.isFollowUp;/);
+    assert.match(appSource, /const hasReusablePromptDraft = draftContext\.hasReusablePromptDraft;/);
+    assert.doesNotMatch(appSource, /const existingPromptDraftId = String\(draftNodeId \|\| ''\)\.trim\(\);/);
+    assert.doesNotMatch(appSource, /const existingPromptDraft = existingPromptDraftId/);
+    assert.doesNotMatch(appSource, /let promptNodeId = hasReusablePromptDraft/);
+  });
 });

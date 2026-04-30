@@ -3301,6 +3301,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleCancelGeneration,
     ensureCreditAttemptCharged,
     prepareInitialCreditSettlement,
+    prepareGenerationDraftContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4280,15 +4281,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       mode: config.mode
     });
 
-    const isFollowUp = !!activeSourceImage;
-    const existingPromptDraftId = String(draftNodeId || '').trim();
-    const existingPromptDraft = existingPromptDraftId
-      ? activeCanvasRef.current?.promptNodes.find((node) => node.id === existingPromptDraftId)
-      : null;
-    const hasReusablePromptDraft = Boolean(isFollowUp && existingPromptDraft);
-    let promptNodeId = hasReusablePromptDraft
-      ? existingPromptDraftId
-      : `node_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+    const draftContext = prepareGenerationDraftContext({
+      activeCanvasRef,
+      activeSourceImage,
+      draftNodeId,
+    });
+    const isFollowUp = draftContext.isFollowUp;
+    const hasReusablePromptDraft = draftContext.hasReusablePromptDraft;
+    let promptNodeId = draftContext.promptNodeId;
 
     let requiredCredits = generationBillingState.requiredCredits;
     let perImageCreditCost = generationBillingState.perImageCreditCost;
@@ -4430,7 +4430,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
