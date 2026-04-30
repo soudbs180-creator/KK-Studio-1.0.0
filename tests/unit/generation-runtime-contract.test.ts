@@ -337,4 +337,31 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /cancelGeneration\(requestId\);/);
     assert.doesNotMatch(retryNodeSource, /Retry request exceeded 600000ms timeout/);
   });
+
+  test('retry generation start commit is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /commitRetryGenerationStart: \(params: CommitRetryGenerationStartParams\) => void;/);
+    assert.match(hookSource, /const commitRetryGenerationStart = useCallback\(\(params: CommitRetryGenerationStartParams\)/);
+    assert.match(hookSource, /updatePromptNode\(\{/);
+    assert.match(hookSource, /\.\.\.params\.executionNode,/);
+    assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(params\.executionNode\.model, params\.executionNode\.modelLabel \|\| params\.executionNode\.model\),/);
+    assert.match(hookSource, /isGenerating: true,/);
+    assert.match(hookSource, /timestamp: Date\.now\(\)/);
+    assert.match(hookSource, /applyOptimisticServerCreditDebit\(\s*params\.retryBillingState\.requiredCredits,\s*params\.retryBillingState\.useServerSideCreditSettlement,\s*\);/);
+
+    assert.match(retryNodeSource, /commitRetryGenerationStart\(\{/);
+    assert.match(retryNodeSource, /executionNode,/);
+    assert.match(retryNodeSource, /retryBillingState,/);
+    assert.match(retryNodeSource, /resolveModelDisplayName,/);
+    assert.doesNotMatch(
+      retryNodeSource,
+      /\/\/ 1\. Reset state to generating[\s\S]*?updatePromptNode\(\{[\s\S]*?applyOptimisticServerCreditDebit\(/,
+    );
+  });
 });

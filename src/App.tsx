@@ -3305,6 +3305,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
+    commitRetryGenerationStart,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4543,20 +4544,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     const { billingAttempt: retryBillingAttempt, billingState: retryBillingState } = preparedRetry;
     executionNode = preparedRetry.executionNode;
 
-    // 1. Reset state to generating
-    updatePromptNode({
-      ...executionNode,
-      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
-      isGenerating: true,
-      error: undefined,
-      errorDetails: undefined,
-      isDraft: false, // 🎯 [Fix] Ensure visibility
-      timestamp: Date.now() // Reset timer
+    commitRetryGenerationStart({
+      executionNode,
+      retryBillingState,
+      resolveModelDisplayName,
     });
-    applyOptimisticServerCreditDebit(
-      retryBillingState.requiredCredits,
-      retryBillingState.useServerSideCreditSettlement,
-    );
 
     const startTime = Date.now();
 
@@ -5013,7 +5005,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

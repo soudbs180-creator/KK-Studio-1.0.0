@@ -202,6 +202,12 @@ export interface CreateRetryGenerationTimeoutGuardResult {
   clear: () => void;
 }
 
+export interface CommitRetryGenerationStartParams {
+  executionNode: PromptNode;
+  retryBillingState: Pick<ReturnType<typeof resolveGenerationBillingState>, 'requiredCredits' | 'useServerSideCreditSettlement'>;
+  resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -245,6 +251,7 @@ export interface UseGenerationRuntimeResult {
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
+  commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -480,6 +487,22 @@ export function useGenerationRuntime({
     };
   }, [cancelGenerationRequest, updatePromptNode]);
 
+  const commitRetryGenerationStart = useCallback((params: CommitRetryGenerationStartParams) => {
+    updatePromptNode({
+      ...params.executionNode,
+      modelLabel: params.resolveModelDisplayName(params.executionNode.model, params.executionNode.modelLabel || params.executionNode.model),
+      isGenerating: true,
+      error: undefined,
+      errorDetails: undefined,
+      isDraft: false,
+      timestamp: Date.now()
+    });
+    applyOptimisticServerCreditDebit(
+      params.retryBillingState.requiredCredits,
+      params.retryBillingState.useServerSideCreditSettlement,
+    );
+  }, [applyOptimisticServerCreditDebit, updatePromptNode]);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -708,6 +731,7 @@ export function useGenerationRuntime({
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
+    commitRetryGenerationStart,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
