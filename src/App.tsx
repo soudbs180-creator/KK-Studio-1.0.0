@@ -3315,6 +3315,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryGeneratedMediaPersistence,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
+    buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
@@ -4722,135 +4723,16 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       }));
 
-      // Calculate Positions
-      const gapToImages = 20; // Reduced to minimum for tight layout
-      const gap = 16;
-
-      const { width: cardWidth, totalHeight: cardHeight } = getCardDimensions(executionNode.aspectRatio, true);
-
-      const newImageNodes = results.map((img, i) => {
-        let x, y;
-
-        // STRICT LAYOUT LOGIC (Matching arrangeAllNodes)
-        // 1. Calculate Image Height strictly based on dimensions/aspectRatio (Footer included +40)
-        let exactImageHeight = cardHeight;
-        if (img.dimensions) {
-          const match = img.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-          if (match && match[1] && match[2]) {
-            const w = parseInt(match[1], 10);
-            const h = parseInt(match[2], 10);
-            if (w > 0 && h > 0) {
-              const ratio = w / h;
-              const displayWidth = ratio > 1 ? 320 : (ratio < 1 ? 200 : 280);
-              exactImageHeight = (displayWidth / ratio) + 40;
-            }
-          }
-        } else {
-          // Fallback
-          // Use shared utility
-          const { totalHeight } = getCardDimensions(executionNode.aspectRatio, true);
-          exactImageHeight = totalHeight;
-        }
-
-        // 2. Position:
-        // Y: Prompt Bottom + Gap + Image Height (Because Image Y is anchor bottom!)
-        // Note: node.position.y is Prompt Bottom.
-        // So Image Y = node.position.y + gapToImages + exactImageHeight.
-
-        const isPptMode = (executionNode.mode || GenerationMode.IMAGE) === GenerationMode.PPT;
-
-        if (isPptMode) {
-          const pptGap = 28;
-          const offsetY = gapToImages + exactImageHeight + i * (exactImageHeight + pptGap);
-          x = executionNode.position.x;
-          y = executionNode.position.y + offsetY;
-        } else if (isMobile) {
-          // Mobile: Maintain Desktop Size but Single Column
-          const cols = 1; // Force single column to fit screen
-          const col = 0; // Always col 0
-          const row = i; // Row increments with index
-          const mobileCardWidth = cardWidth; // Use full desktop width
-
-          const mobileGap = 20;
-          const startX = -mobileCardWidth / 2;
-          const offsetX = startX + mobileCardWidth / 2;
-
-          // 🎯 [Fix] Image Y should be exactly below Prompt Y, without adding promptCardHeight
-          // Because Prompt Y is already its bottom edge.
-          const offsetY = gapToImages + exactImageHeight + row * (exactImageHeight + mobileGap);
-          x = executionNode.position.x + offsetX;
-          y = executionNode.position.y + offsetY;
-        } else {
-          // DESKTOP LOGIC
-          const cols = Math.min(count, 2);
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-          const itemsInRow = Math.min(cols, count - row * cols);
-
-          // Get actual dimensions for this specific image
-          let actualCardWidth = cardWidth;
-          let actualCardHeight = cardHeight;
-          
-          // Calculate actual width based on image dimensions (matching ImageCard2 logic)
-          if (img.dimensions) {
-            const match = img.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
-            if (match && match[1] && match[2]) {
-              const w = parseInt(match[1], 10);
-              const h = parseInt(match[2], 10);
-              if (w > 0 && h > 0) {
-                const aspect = w / h;
-                const { width: baseWidth } = getCardDimensions(executionNode.aspectRatio, false);
-                actualCardWidth = baseWidth;
-                actualCardHeight = (baseWidth / aspect) + 40; // 40px for footer
-              }
-            }
-          }
-
-          // For single image, always center it relative to prompt
-          if (count === 1) {
-            // 🎯 [Fix] 单列时直接居中：x = basePosition.x (主卡中心点)
-            x = executionNode.position.x;
-            y = executionNode.position.y + gapToImages + actualCardHeight;
-          } else {
-            // Multiple images: use grid layout with the first image's width for consistent grid
-            const gridCardWidth = cardWidth;
-            const currentGridWidth = itemsInRow * gridCardWidth + (itemsInRow - 1) * gap;
-            const startX = executionNode.position.x - currentGridWidth / 2;
-            const offsetX = startX + col * (gridCardWidth + gap) + gridCardWidth / 2 - executionNode.position.x;
-            
-            const rowHeight = exactImageHeight;
-            const rowOffsetY = row * (rowHeight + gap);
-            const offsetY = gapToImages + exactImageHeight + rowOffsetY;
-
-            x = executionNode.position.x + offsetX;
-            y = executionNode.position.y + offsetY;
-          }
-        }
-        return {
-          ...img,
-          position: { x, y }
-        };
+      const latestLayoutPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === executionNode.id) || executionNode;
+      const alignedImageNodes = buildRetryGeneratedMediaLayout({
+        buildGeneratedImageBatchPositions,
+        count,
+        executionNode,
+        getCardDimensions,
+        isMobile,
+        latestLayoutPrompt,
+        results,
       });
-
-      const alignedImageNodes = (() => {
-        const latestLayoutPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === executionNode.id) || executionNode;
-        const generatedPositions = buildGeneratedImageBatchPositions({
-          basePosition: latestLayoutPrompt.position || executionNode.position,
-          items: newImageNodes.map((img) => ({
-            aspectRatio: img.aspectRatio,
-            exactDimensions: (typeof img.width === 'number' && typeof img.height === 'number' && img.width > 0 && img.height > 0)
-              ? { width: img.width, height: img.height }
-              : undefined,
-          })),
-          mode: executionNode.mode,
-          isMobile,
-        });
-
-        return newImageNodes.map((img, index) => ({
-          ...img,
-          position: generatedPositions[index] || img.position,
-        }));
-      })();
 
       const retryCompletedPromptPatch = buildRetryCompletedPromptPatch({
         alignedImageNodes,
@@ -4876,7 +4758,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

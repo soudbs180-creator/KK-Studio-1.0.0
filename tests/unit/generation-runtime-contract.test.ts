@@ -585,4 +585,28 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
     assert.doesNotMatch(retryNodeSource, /modelLabel: resolveModelDisplayName\(/);
   });
+
+  test('retry generated media layout preparation is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryGeneratedMediaLayout: \(params: BuildRetryGeneratedMediaLayoutParams\) => RetryGeneratedMediaLayoutNode\[\];/);
+    assert.match(hookSource, /const buildRetryGeneratedMediaLayout = useCallback\(\(params: BuildRetryGeneratedMediaLayoutParams\): RetryGeneratedMediaLayoutNode\[\] => \{/);
+    assert.match(hookSource, /const newImageNodes = params\.results\.map\(\(img, i\) => \{/);
+    assert.match(hookSource, /let exactImageHeight = cardHeight;/);
+    assert.match(hookSource, /const generatedPositions = params\.buildGeneratedImageBatchPositions\(\{/);
+    assert.match(hookSource, /basePosition: \(params\.latestLayoutPrompt \|\| params\.executionNode\)\.position \|\| params\.executionNode\.position,/);
+
+    assert.match(retryNodeSource, /const latestLayoutPrompt = activeCanvasRef\.current\?\.promptNodes\.find/);
+    assert.match(retryNodeSource, /const alignedImageNodes = buildRetryGeneratedMediaLayout\(\{/);
+    assert.match(retryNodeSource, /buildGeneratedImageBatchPositions,/);
+    assert.match(retryNodeSource, /getCardDimensions,/);
+    assert.doesNotMatch(retryNodeSource, /const newImageNodes = results\.map\(\(img, i\) => \{/);
+    assert.doesNotMatch(retryNodeSource, /let exactImageHeight = cardHeight;/);
+    assert.doesNotMatch(retryNodeSource, /const generatedPositions = buildGeneratedImageBatchPositions\(\{/);
+  });
 });

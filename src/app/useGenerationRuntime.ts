@@ -367,6 +367,36 @@ export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
   width: number;
 };
 
+interface RetryGeneratedMediaLayoutCardDimensions {
+  width: number;
+  totalHeight: number;
+}
+
+interface RetryGeneratedMediaLayoutPosition {
+  x: number;
+  y: number;
+}
+
+export type RetryGeneratedMediaLayoutNode = RetryGeneratedMediaResult & Pick<GeneratedImage, 'position'>;
+
+export interface BuildRetryGeneratedMediaLayoutParams {
+  buildGeneratedImageBatchPositions: (params: {
+    basePosition: RetryGeneratedMediaLayoutPosition;
+    items: Array<{
+      aspectRatio?: GeneratedImage['aspectRatio'];
+      exactDimensions?: { width: number; height: number };
+    }>;
+    mode?: GenerationMode;
+    isMobile?: boolean;
+  }) => RetryGeneratedMediaLayoutPosition[];
+  count: number;
+  executionNode: Pick<PromptNode, 'aspectRatio' | 'mode' | 'position'>;
+  getCardDimensions: (aspectRatio: PromptNode['aspectRatio'], includeFooter?: boolean) => RetryGeneratedMediaLayoutCardDimensions;
+  isMobile: boolean;
+  latestLayoutPrompt?: Pick<PromptNode, 'position'> | null;
+  results: RetryGeneratedMediaResult[];
+}
+
 export interface BuildRetryCompletedPromptPatchParams {
   alignedImageNodes: Array<Pick<GeneratedImage, 'id' | 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>>;
   executionNode: Pick<PromptNode, 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>;
@@ -426,6 +456,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
+  buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
   buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
@@ -925,6 +956,109 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const buildRetryGeneratedMediaLayout = useCallback((params: BuildRetryGeneratedMediaLayoutParams): RetryGeneratedMediaLayoutNode[] => {
+    const gapToImages = 20;
+    const gap = 16;
+    const { width: cardWidth, totalHeight: cardHeight } = params.getCardDimensions(params.executionNode.aspectRatio, true);
+
+    const newImageNodes = params.results.map((img, i) => {
+      let x;
+      let y;
+      let exactImageHeight = cardHeight;
+
+      if (img.dimensions) {
+        const match = img.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
+        if (match && match[1] && match[2]) {
+          const w = parseInt(match[1], 10);
+          const h = parseInt(match[2], 10);
+          if (w > 0 && h > 0) {
+            const ratio = w / h;
+            const displayWidth = ratio > 1 ? 320 : (ratio < 1 ? 200 : 280);
+            exactImageHeight = (displayWidth / ratio) + 40;
+          }
+        }
+      } else {
+        const { totalHeight } = params.getCardDimensions(params.executionNode.aspectRatio, true);
+        exactImageHeight = totalHeight;
+      }
+
+      const isPptMode = (params.executionNode.mode || GenerationMode.IMAGE) === GenerationMode.PPT;
+
+      if (isPptMode) {
+        const pptGap = 28;
+        const offsetY = gapToImages + exactImageHeight + i * (exactImageHeight + pptGap);
+        x = params.executionNode.position.x;
+        y = params.executionNode.position.y + offsetY;
+      } else if (params.isMobile) {
+        const row = i;
+        const mobileCardWidth = cardWidth;
+        const mobileGap = 20;
+        const startX = -mobileCardWidth / 2;
+        const offsetX = startX + mobileCardWidth / 2;
+        const offsetY = gapToImages + exactImageHeight + row * (exactImageHeight + mobileGap);
+        x = params.executionNode.position.x + offsetX;
+        y = params.executionNode.position.y + offsetY;
+      } else {
+        const cols = Math.min(params.count, 2);
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const itemsInRow = Math.min(cols, params.count - row * cols);
+        let actualCardHeight = cardHeight;
+
+        if (img.dimensions) {
+          const match = img.dimensions.match(/(\d+)\s*[xX]\s*(\d+)/);
+          if (match && match[1] && match[2]) {
+            const w = parseInt(match[1], 10);
+            const h = parseInt(match[2], 10);
+            if (w > 0 && h > 0) {
+              const aspect = w / h;
+              const { width: baseWidth } = params.getCardDimensions(params.executionNode.aspectRatio, false);
+              actualCardHeight = (baseWidth / aspect) + 40;
+            }
+          }
+        }
+
+        if (params.count === 1) {
+          x = params.executionNode.position.x;
+          y = params.executionNode.position.y + gapToImages + actualCardHeight;
+        } else {
+          const gridCardWidth = cardWidth;
+          const currentGridWidth = itemsInRow * gridCardWidth + (itemsInRow - 1) * gap;
+          const startX = params.executionNode.position.x - currentGridWidth / 2;
+          const offsetX = startX + col * (gridCardWidth + gap) + gridCardWidth / 2 - params.executionNode.position.x;
+          const rowHeight = exactImageHeight;
+          const rowOffsetY = row * (rowHeight + gap);
+          const offsetY = gapToImages + exactImageHeight + rowOffsetY;
+
+          x = params.executionNode.position.x + offsetX;
+          y = params.executionNode.position.y + offsetY;
+        }
+      }
+
+      return {
+        ...img,
+        position: { x, y },
+      };
+    });
+
+    const generatedPositions = params.buildGeneratedImageBatchPositions({
+      basePosition: (params.latestLayoutPrompt || params.executionNode).position || params.executionNode.position,
+      items: newImageNodes.map((img) => ({
+        aspectRatio: img.aspectRatio,
+        exactDimensions: (typeof img.width === 'number' && typeof img.height === 'number' && img.width > 0 && img.height > 0)
+          ? { width: img.width, height: img.height }
+          : undefined,
+      })),
+      mode: params.executionNode.mode,
+      isMobile: params.isMobile,
+    });
+
+    return newImageNodes.map((img, index) => ({
+      ...img,
+      position: generatedPositions[index] || img.position,
+    }));
+  }, []);
+
   const buildRetryCompletedPromptPatch = useCallback((params: BuildRetryCompletedPromptPatchParams): Partial<PromptNode> => {
     const primaryImageNode = params.alignedImageNodes[0];
     const modelId = primaryImageNode?.model || params.executionNode.model;
@@ -1182,6 +1316,7 @@ export function useGenerationRuntime({
     prepareRetryGeneratedMediaPersistence,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
+    buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
