@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media persistence preparation slice is validated in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media dimension detection slice is validated in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8845 lines after Milestone 4 retry generated media persistence preparation extraction
+- `src/App.tsx`: 8807 lines after Milestone 4 retry generated media dimension detection extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -974,8 +974,36 @@ Current risk:
 - The sync-service upload block remains in `App.tsx` because moving it would couple dynamic service import, fetch/blob handling, and persistence metadata in one larger behavior change.
 - Actual-dimension detection, generated-image result object construction, layout alignment, and `addImageNodes` remain in `App.tsx`; split those only behind separate source contracts.
 
+Twenty-third slice scope:
+- Added hook-owned `resolveRetryGeneratedMediaDimensions` with explicit params/result interfaces.
+- Moved retry generated media actual pixel detection, display-dimension derivation, and fair-billing image-size tier selection into `src/app/useGenerationRuntime.ts`.
+- Replaced inline `createImageBitmap`/`Image` probing in `App.tsx` with a single runtime call and kept the returned dimensions wired into the generated result object.
+- Kept the sync-service upload block, generated-image result object assembly, layout alignment, `addImageNodes`, PPT retry, and ecommerce flows unchanged.
+- Tightened `computedImageSize` to `PromptNode['imageSize']` and used `ImageSize.SIZE_1K` as the legal fallback after `typecheck` caught the widened string return.
+
+Line count change during Milestone 4 twenty-third slice:
+- `src/App.tsx`: `8845` lines after twenty-second slice -> `8807` lines.
+- `src/app/useGenerationRuntime.ts`: `1014` lines -> `1080` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `519` lines -> `544` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `resolveRetryGeneratedMediaDimensions`, while `App.tsx` still performed actual-dimension detection directly.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `24` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `38` tests.
+- `npm.cmd run typecheck`: failed once because `computedImageSize` widened to `string`; passed after returning `PromptNode['imageSize']` with a valid `ImageSize.SIZE_1K` fallback.
+- `npm.cmd run test:unit`: passed, `1011` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- Generated result object assembly and layout alignment still live in `App.tsx`; they should be split separately because they mix metadata, positioning, mobile/PPT branching, and canvas mutation.
+- The legal `ImageSize.SIZE_1K` fallback is stricter than the old unreachable string fallback and aligns the helper with `GeneratedImage.imageSize`.
+
 Next step:
-- Continue M4 with the next RED source contract around retry generated result object assembly or actual-dimension/result-layout preparation, keeping PPT/ecommerce execution bodies untouched.
+- Continue M4 with the next RED source contract around retry generated result object assembly or layout preparation, keeping PPT/ecommerce execution bodies untouched.
 
 ### Milestones 5-9
 
@@ -1362,6 +1390,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `37` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `1010` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twenty-third slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `resolveRetryGeneratedMediaDimensions`, while `App.tsx` still performed actual-dimension detection directly.
+  - Targeted M4 billing/runtime/route tests: passed, `38` tests.
+  - `npm.cmd run typecheck`: failed once because `computedImageSize` widened to `string`; passed after returning `PromptNode['imageSize']` with a valid `ImageSize.SIZE_1K` fallback.
+  - `npm.cmd run test:unit`: passed, `1011` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI runtime refactor.
   - `npm.cmd run check:encoding`: passed after status update.

@@ -3313,6 +3313,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
+    resolveRetryGeneratedMediaDimensions,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4689,57 +4690,17 @@ const AppContent: React.FC<AppContentProps> = () => {
             ? apiDurationMs
             : (Date.now() - startTime));
 
-          // 🎯 [Fair Billing] Detect ACTUAL dimensions from the blob/image
-          // This ensures we bill for what was received (e.g. 1K), not what was requested (e.g. 4K)
-          // if the API downgraded it.
-          let actualWidth = 1024;
-          let actualHeight = 1024;
-          let displayDimensions = `${node.aspectRatio} · ${node.imageSize || '1K'}`;
-          let computedImageSize = node.imageSize || 'SIZE_1K'; // Default fallback
-          displayDimensions = `${executionNode.aspectRatio} · ${executionNode.imageSize || '1K'}`;
-          computedImageSize = executionNode.imageSize || 'SIZE_1K';
-
-          try {
-            if (typeof createImageBitmap !== 'undefined' && b64.startsWith('blob:')) {
-              // Fast path for Blobs
-              const res = await fetch(b64);
-              const blob = await res.blob();
-              const bitmap = await createImageBitmap(blob);
-              actualWidth = bitmap.width;
-              actualHeight = bitmap.height;
-              bitmap.close();
-            } else {
-              // Slow path for Data URLs / Remote URLs
-              const img = new Image();
-              await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = url;
-              });
-              actualWidth = img.naturalWidth;
-              actualHeight = img.naturalHeight;
-            }
-
-            // Update display string to show REAL pixels
-            displayDimensions = `${actualWidth}x${actualHeight}`;
-
-            // Determine Billing Tier based on Max Dimension
-            // 1K Tier: max <= 1500 (approx)
-            // 2K Tier: max > 1500 && max <= 3000
-            // 4K Tier: max > 3000
-            const maxDim = Math.max(actualWidth, actualHeight);
-            if (maxDim > 3000) {
-              computedImageSize = ImageSize.SIZE_4K; // Map to enum manually or use string
-            } else if (maxDim > 1500) {
-              computedImageSize = ImageSize.SIZE_2K;
-            } else {
-              computedImageSize = ImageSize.SIZE_1K;
-            }
-            console.log(`[Fair Billing] Requested: ${executionNode.imageSize}, Received: ${actualWidth}x${actualHeight}, Billed As: ${computedImageSize}`);
-
-          } catch (e) {
-            console.warn('[App] Failed to detect actual dimensions, falling back to requested', e);
-          }
+          const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
+            b64,
+            executionNode,
+            url,
+          });
+          const {
+            actualWidth,
+            actualHeight,
+            displayDimensions,
+            computedImageSize,
+          } = mediaDimensions;
 
           return {
             canvasId: activeCanvas?.id || 'default',
@@ -4946,7 +4907,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

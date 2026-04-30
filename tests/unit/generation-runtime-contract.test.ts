@@ -516,4 +516,28 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const storageId = await calculateImageHash\(normalizedOriginalSource \|\| url\);/);
     assert.doesNotMatch(retryNodeSource, /void saveOriginalImage\(storageId, normalizedOriginalSource\)\.catch\(\(\) => undefined\);/);
   });
+
+  test('retry generated media dimension detection is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /resolveRetryGeneratedMediaDimensions: \(params: ResolveRetryGeneratedMediaDimensionsParams\) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;/);
+    assert.match(hookSource, /const resolveRetryGeneratedMediaDimensions = useCallback/);
+    assert.match(hookSource, /Promise<ResolveRetryGeneratedMediaDimensionsResult> => \{/);
+    assert.match(hookSource, /let actualWidth = 1024;/);
+    assert.match(hookSource, /const bitmap = await createImageBitmap\(blob\);/);
+    assert.match(hookSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
+    assert.match(hookSource, /computedImageSize = ImageSize\.SIZE_4K;/);
+
+    assert.match(retryNodeSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
+    assert.match(retryNodeSource, /executionNode,/);
+    assert.match(retryNodeSource, /url,/);
+    assert.doesNotMatch(retryNodeSource, /let actualWidth = 1024;/);
+    assert.doesNotMatch(retryNodeSource, /const bitmap = await createImageBitmap\(blob\);/);
+    assert.doesNotMatch(retryNodeSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
+  });
 });

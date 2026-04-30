@@ -9,7 +9,7 @@ import {
 import { adminModelService } from '../services/model/adminModelService';
 import { getModelCapabilities } from '../services/model/modelCapabilities';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
-import { GenerationMode, type Canvas, type GeneratedImage, type GenerationConfig, type ImageSize, type PromptNode, type ReferenceImage } from '../types';
+import { GenerationMode, ImageSize, type Canvas, type GeneratedImage, type GenerationConfig, type PromptNode, type ReferenceImage } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
 import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
@@ -318,6 +318,19 @@ export interface PrepareRetryGeneratedMediaPersistenceResult {
   url: string;
 }
 
+export interface ResolveRetryGeneratedMediaDimensionsParams {
+  b64: string;
+  executionNode: Pick<PromptNode, 'aspectRatio' | 'imageSize'>;
+  url: string;
+}
+
+export interface ResolveRetryGeneratedMediaDimensionsResult {
+  actualHeight: number;
+  actualWidth: number;
+  computedImageSize: PromptNode['imageSize'];
+  displayDimensions: string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -369,6 +382,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
+  resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -772,6 +786,56 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const resolveRetryGeneratedMediaDimensions = useCallback(async (
+    params: ResolveRetryGeneratedMediaDimensionsParams,
+  ): Promise<ResolveRetryGeneratedMediaDimensionsResult> => {
+    let actualWidth = 1024;
+    let actualHeight = 1024;
+    let displayDimensions = `${params.executionNode.aspectRatio} · ${params.executionNode.imageSize || '1K'}`;
+    let computedImageSize: PromptNode['imageSize'] = params.executionNode.imageSize || ImageSize.SIZE_1K;
+
+    try {
+      if (typeof createImageBitmap !== 'undefined' && params.b64.startsWith('blob:')) {
+        const res = await fetch(params.b64);
+        const blob = await res.blob();
+        const bitmap = await createImageBitmap(blob);
+        actualWidth = bitmap.width;
+        actualHeight = bitmap.height;
+        bitmap.close();
+      } else {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = params.url;
+        });
+        actualWidth = img.naturalWidth;
+        actualHeight = img.naturalHeight;
+      }
+
+      displayDimensions = `${actualWidth}x${actualHeight}`;
+
+      const maxDim = Math.max(actualWidth, actualHeight);
+      if (maxDim > 3000) {
+        computedImageSize = ImageSize.SIZE_4K;
+      } else if (maxDim > 1500) {
+        computedImageSize = ImageSize.SIZE_2K;
+      } else {
+        computedImageSize = ImageSize.SIZE_1K;
+      }
+      console.log(`[Fair Billing] Requested: ${params.executionNode.imageSize}, Received: ${actualWidth}x${actualHeight}, Billed As: ${computedImageSize}`);
+    } catch (e) {
+      console.warn('[App] Failed to detect actual dimensions, falling back to requested', e);
+    }
+
+    return {
+      actualHeight,
+      actualWidth,
+      computedImageSize,
+      displayDimensions,
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -1008,6 +1072,7 @@ export function useGenerationRuntime({
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
+    resolveRetryGeneratedMediaDimensions,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
