@@ -1,17 +1,78 @@
 import { useCallback } from 'react';
 
-import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
+import type { CreditConsumeResult, CreditRefundResult } from '../context/BillingContext';
+import { resolveGenerationAttemptFailureState } from '../services/billing/generationBillingCoordinator';
 import type { Canvas, PromptNode } from '../types';
+import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
+
+type CreditBillingAttempt = {
+  attemptId: string;
+  businessRefId: string;
+  idempotencyKey: string;
+};
+
+export interface EnsureCreditAttemptChargedParams {
+  modelId: string;
+  modelLabel?: string;
+  providerId?: string;
+  provider?: string;
+  requiredCredits: number;
+  useServerSideCreditSettlement: boolean;
+  billingAttempt?: CreditBillingAttempt;
+}
+
+export type EnsureCreditAttemptChargedResult =
+  | { success: true; transactionId: string | undefined }
+  | { success: false; transactionId?: undefined };
+
+export type GenerationCreditAttemptNode = Pick<
+  PromptNode,
+  | 'id'
+  | 'billingMode'
+  | 'creditSettlement'
+  | 'isPaymentProcessed'
+  | 'paymentTransactionId'
+  | 'refundStatus'
+  | 'cost'
+>;
+
+export type GenerationCreditAttemptFailurePatch = {
+  refundStatus?: PromptNode['refundStatus'];
+  isPaymentProcessed?: boolean;
+  paymentTransactionId?: string;
+};
+
+interface RefreshBillingOptions {
+  includeTransactions?: boolean;
+  silent?: boolean;
+}
 
 export interface UseGenerationRuntimeDeps {
   activeCanvas?: Pick<Canvas, 'promptNodes'> | null;
   updatePromptNode: (node: PromptNode) => void | Promise<void>;
   cancelGenerationRequest: (requestId: string) => void;
   cancelSystemProxyTask: (jobId: string) => Promise<unknown>;
+  authLoading: boolean;
+  user: unknown;
+  isTempUser: boolean;
+  billingLoading: boolean;
+  balance: number;
+  setShowRechargeModal: (show: boolean) => void;
+  consumeCreditsDetailed: (
+    modelId: string,
+    count: number,
+    details?: Record<string, unknown>,
+  ) => Promise<CreditConsumeResult>;
+  refundCreditsByTransaction: (transactionId: string, reason: string) => Promise<CreditRefundResult>;
+  refreshBilling: (options?: RefreshBillingOptions) => Promise<void>;
+  adjustBalanceOptimistically: (delta: number) => void;
 }
 
 export interface UseGenerationRuntimeResult {
   handleCancelGeneration: (id?: string) => Promise<void>;
+  ensureCreditAttemptCharged: (params: EnsureCreditAttemptChargedParams) => Promise<EnsureCreditAttemptChargedResult>;
+  resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
+  applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
 
 export function useGenerationRuntime({
@@ -19,7 +80,106 @@ export function useGenerationRuntime({
   updatePromptNode,
   cancelGenerationRequest,
   cancelSystemProxyTask,
+  authLoading,
+  user,
+  isTempUser,
+  billingLoading,
+  balance,
+  setShowRechargeModal,
+  consumeCreditsDetailed,
+  refundCreditsByTransaction,
+  refreshBilling,
+  adjustBalanceOptimistically,
 }: UseGenerationRuntimeDeps): UseGenerationRuntimeResult {
+  const ensureCreditAttemptCharged = useCallback(async (params: EnsureCreditAttemptChargedParams) => {
+    if (params.requiredCredits <= 0) {
+      return { success: true as const, transactionId: undefined };
+    }
+
+    if (authLoading) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.info('账户状态确认中', '正在校验登录状态，请稍后再试。');
+      });
+      return { success: false as const };
+    }
+
+    if (!user || isTempUser) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('请先登录', '积分模型需要登录正式账号后使用。');
+      });
+      return { success: false as const };
+    }
+
+    if (billingLoading) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
+      });
+      return { success: false as const };
+    }
+
+    if (balance < params.requiredCredits) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('生成失败', '您的账户余额不足，请先充值积分。');
+      });
+      setShowRechargeModal(true);
+      return { success: false as const };
+    }
+
+    if (params.useServerSideCreditSettlement) {
+      return { success: true as const, transactionId: undefined };
+    }
+
+    const chargeResult = await consumeCreditsDetailed(params.modelId, params.requiredCredits, {
+      feature: `模型调用：${params.modelLabel || params.modelId}`,
+      modelName: params.modelLabel || params.modelId,
+      providerId: params.providerId || params.provider || 'managed',
+      provider: params.provider,
+      keySlotId: params.providerId,
+      attemptId: params.billingAttempt?.attemptId,
+      businessRefId: params.billingAttempt?.businessRefId,
+      idempotencyKey: params.billingAttempt?.idempotencyKey,
+    });
+
+    if (!chargeResult.success) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('生成失败', chargeResult.message || '积分扣费失败，请稍后重试。');
+      });
+      if ((chargeResult.newBalance ?? balance) < params.requiredCredits) {
+        setShowRechargeModal(true);
+      }
+      return { success: false as const };
+    }
+
+    return {
+      success: true as const,
+      transactionId: chargeResult.transactionId,
+    };
+  }, [authLoading, balance, billingLoading, consumeCreditsDetailed, isTempUser, setShowRechargeModal, user]);
+
+  const resolveFailedCreditAttempt = useCallback(async (node: GenerationCreditAttemptNode) => {
+    const failureState = await resolveGenerationAttemptFailureState(node, {
+      refundCreditsByTransaction,
+      refreshBilling,
+    });
+
+    if (
+      failureState.refundStatus === 'failed'
+      && node.billingMode === 'credits'
+      && node.creditSettlement === 'server'
+      && (node.cost || 0) > 0
+    ) {
+      console.error('[resolveFailedCreditAttempt] Failed to refresh billing after server-side credit failure:', node.id);
+    }
+
+    return failureState;
+  }, [refundCreditsByTransaction, refreshBilling]);
+
+  const applyOptimisticServerCreditDebit = useCallback((requiredCredits: number, useServerSideCreditSettlement: boolean) => {
+    if (useServerSideCreditSettlement && requiredCredits > 0) {
+      adjustBalanceOptimistically(-requiredCredits);
+    }
+  }, [adjustBalanceOptimistically]);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -38,7 +198,7 @@ export function useGenerationRuntime({
         }
       }
 
-      updatePromptNode({
+      await updatePromptNode({
         ...node,
         ...buildCancelledPromptNodePatch(node.model),
       });
@@ -60,14 +220,17 @@ export function useGenerationRuntime({
         }
       }
 
-      updatePromptNode({
+      await updatePromptNode({
         ...node,
         ...buildCancelledPromptNodePatch(node.model),
       });
     }));
-  }, [activeCanvas, updatePromptNode, cancelGenerationRequest, cancelSystemProxyTask]);
+  }, [activeCanvas, cancelGenerationRequest, cancelSystemProxyTask, updatePromptNode]);
 
   return {
     handleCancelGeneration,
+    ensureCreditAttemptCharged,
+    resolveFailedCreditAttempt,
+    applyOptimisticServerCreditDebit,
   };
 }

@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; first generation runtime slice is complete through `e27cea39`
+- Current milestone: Milestone 4 generation runtime extraction is in progress; billing helper slice is complete in the current commit line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 9101 lines after Milestone 4 first-slice extraction
+- `src/App.tsx`: 9012 lines after Milestone 4 billing-helper extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -398,7 +398,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. First generation runtime slice committed as `e27cea39 refactor: extract generation runtime guards`.
+Status: in progress. First generation runtime slice committed as `e27cea39 refactor: extract generation runtime guards`; billing helper slice is validated and ready to continue from the next boundary.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -425,8 +425,33 @@ Current risk:
 - The submit guard intentionally treats ecommerce mode as an allowed early branch before empty-prompt rejection, matching previous `handleGenerate` behavior.
 - `App.tsx` still owns the billing and execution path; the next slice should avoid moving billing/PPT/ecommerce logic together.
 
+Second slice scope:
+- Extended `src/app/useGenerationRuntime.ts` with generation credit helper ownership: `ensureCreditAttemptCharged`, `resolveFailedCreditAttempt`, and `applyOptimisticServerCreditDebit`.
+- Injected billing/auth dependencies through `UseGenerationRuntimeDeps` instead of reading `App.tsx` scope.
+- Updated generation billing source contracts so attempt id/idempotency and failure-state assertions follow the new hook boundary.
+- Kept billing protocol, `BillingContext`, `generationBillingCoordinator`, storage, retry body, PPT body, ecommerce body, and provider routing behavior unchanged.
+
+Line count change during Milestone 4 second slice:
+- `src/App.tsx`: `9101` lines after first slice -> `9012` lines.
+- `src/app/useGenerationRuntime.ts`: `73` lines -> `236` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `67` lines -> `93` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because billing helper ownership was still in `App.tsx`.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `14` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `990` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed.
+- `npm.cmd run governance:agent-docs`: passed.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- The runtime hook now receives a broad billing/auth dependency set; the next extraction should not add PPT/ecommerce-specific dependencies to the same hook unless they are truly shared generation runtime concerns.
+- `App.tsx` still owns the large `handleGenerate`, `handleRetryNode`, and PPT retry bodies; the next safe slice should isolate a pure/shared helper rather than moving the whole execution body.
+
 Next step:
-- Continue M4 with the next RED source contract around a small generation boundary, likely retry-timeout cancellation or billing-preparation orchestration, not the full `handleGenerate` body.
+- Continue M4 with the next RED source contract around retry-timeout cancellation, result patch assembly, or another small shared generation runtime boundary.
 
 ### Milestones 5-9
 
@@ -615,6 +640,15 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed.
   - `npm.cmd run governance:agent-docs`: passed after final status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 second slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because billing helper ownership was still in `App.tsx`.
+  - Targeted M4 billing tests: passed, `14` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `990` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed.
+  - `npm.cmd run governance:agent-docs`: passed.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log

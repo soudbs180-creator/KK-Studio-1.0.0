@@ -305,7 +305,6 @@ import { formatRemainingCredits } from './services/billing/remainingBalance';
 import {
   buildGenerationBillingAttempt,
   buildGenerationAttemptRequestId,
-  resolveGenerationAttemptFailureState,
 } from './services/billing/generationBillingCoordinator';
 import {
   isCapabilityRouteAssignmentRouteDisabled,
@@ -560,107 +559,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     const separatorIndex = rawModelId.indexOf('@');
     return separatorIndex !== -1 && rawModelId.slice(separatorIndex + 1).trim().length > 0;
   }, []);
-
-  const ensureCreditAttemptCharged = useCallback(async (params: {
-    modelId: string;
-    modelLabel?: string;
-    providerId?: string;
-    provider?: string;
-    requiredCredits: number;
-    useServerSideCreditSettlement: boolean;
-    billingAttempt?: {
-      attemptId: string;
-      businessRefId: string;
-      idempotencyKey: string;
-    };
-  }) => {
-    if (params.requiredCredits <= 0) {
-      return { success: true as const, transactionId: undefined as string | undefined };
-    }
-
-    if (authLoading) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.info('账户状态确认中', '正在校验登录状态，请稍后再试。');
-      });
-      return { success: false as const };
-    }
-
-    if (!user || isTempUser) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('请先登录', '积分模型需要登录正式账号后使用。');
-      });
-      return { success: false as const };
-    }
-
-    if (billingLoading) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.info('余额同步中', '正在刷新账户余额，请稍后重试。');
-      });
-      return { success: false as const };
-    }
-
-    if (balance < params.requiredCredits) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('生成失败', '您的账户余额不足，请先充值积分。');
-      });
-      setShowRechargeModal(true);
-      return { success: false as const };
-    }
-
-    if (params.useServerSideCreditSettlement) {
-      return { success: true as const, transactionId: undefined as string | undefined };
-    }
-
-    const chargeResult = await consumeCreditsDetailed(params.modelId, params.requiredCredits, {
-      feature: `模型调用：${params.modelLabel || params.modelId}`,
-      modelName: params.modelLabel || params.modelId,
-      providerId: params.providerId || params.provider || 'managed',
-      provider: params.provider,
-      keySlotId: params.providerId,
-      attemptId: params.billingAttempt?.attemptId,
-      businessRefId: params.billingAttempt?.businessRefId,
-      idempotencyKey: params.billingAttempt?.idempotencyKey,
-    });
-
-    if (!chargeResult.success) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('生成失败', chargeResult.message || '积分扣费失败，请稍后重试。');
-      });
-      if ((chargeResult.newBalance ?? balance) < params.requiredCredits) {
-        setShowRechargeModal(true);
-      }
-      return { success: false as const };
-    }
-
-    return {
-      success: true as const,
-      transactionId: chargeResult.transactionId,
-    };
-  }, [authLoading, user, isTempUser, balance, setShowRechargeModal, consumeCreditsDetailed]);
-
-  const resolveFailedCreditAttempt = useCallback(async (node: Pick<PromptNode, 'id' | 'billingMode' | 'creditSettlement' | 'isPaymentProcessed' | 'paymentTransactionId' | 'refundStatus' | 'cost'>) => {
-    const failureState = await resolveGenerationAttemptFailureState(node, {
-      refundCreditsByTransaction,
-      refreshBilling,
-    });
-
-    if (
-      failureState.refundStatus === 'failed'
-      && node.billingMode === 'credits'
-      && node.creditSettlement === 'server'
-      && (node.cost || 0) > 0
-    ) {
-      console.error('[resolveFailedCreditAttempt] Failed to refresh billing after server-side credit failure:', node.id);
-    }
-
-    return failureState;
-  }, [refundCreditsByTransaction, refreshBilling]);
-
-  const applyOptimisticServerCreditDebit = useCallback((requiredCredits: number, useServerSideCreditSettlement: boolean) => {
-    if (useServerSideCreditSettlement && requiredCredits > 0) {
-      adjustBalanceOptimistically(-requiredCredits);
-    }
-  }, [adjustBalanceOptimistically]);
 
   const showNoPptPagesWarning = useCallback(() => {
     import('./services/system/notificationService').then(({ notify }) => {
@@ -3401,11 +3299,24 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const {
     handleCancelGeneration,
+    ensureCreditAttemptCharged,
+    resolveFailedCreditAttempt,
+    applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
     activeCanvas,
     updatePromptNode,
     cancelGenerationRequest: cancelGeneration,
     cancelSystemProxyTask: cancelSecureSystemProxyTask,
+    authLoading,
+    user,
+    isTempUser,
+    billingLoading,
+    balance,
+    setShowRechargeModal,
+    consumeCreditsDetailed,
+    refundCreditsByTransaction,
+    refreshBilling,
+    adjustBalanceOptimistically,
   });
 
 
@@ -4550,7 +4461,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, ensureCreditAttemptCharged, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

@@ -27,7 +27,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /buildCancelledPromptNodePatch\(node\.model\)/);
 
     assert.match(appSource, /import \{ useGenerationRuntime \} from '\.\/app\/useGenerationRuntime';/);
-    assert.match(appSource, /const \{\s*handleCancelGeneration,\s*\} = useGenerationRuntime\(\{/);
+    assert.match(appSource, /const \{[\s\S]*?handleCancelGeneration,[\s\S]*?\} = useGenerationRuntime\(\{/);
     assert.match(appSource, /cancelGenerationRequest: cancelGeneration,/);
     assert.match(appSource, /cancelSystemProxyTask: cancelSecureSystemProxyTask,/);
     assert.doesNotMatch(appSource, /const handleCancelGeneration = useCallback\(async \(id\?: string\) => \{/);
@@ -63,5 +63,31 @@ describe('generation runtime extraction contract', () => {
     assert.match(guardSource, /const submitSignature = JSON\.stringify\(\{/);
     assert.match(guardSource, /lastSignature\.value === submitSignature/);
     assert.match(guardSource, /notify\.warning\('已拦截重复发送'/);
+  });
+
+  test('generation billing helpers are owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /ensureCreditAttemptCharged: \(params: EnsureCreditAttemptChargedParams\) => Promise<EnsureCreditAttemptChargedResult>;/);
+    assert.match(hookSource, /resolveFailedCreditAttempt: \(node: GenerationCreditAttemptNode\) => Promise<GenerationCreditAttemptFailurePatch>;/);
+    assert.match(hookSource, /applyOptimisticServerCreditDebit: \(requiredCredits: number, useServerSideCreditSettlement: boolean\) => void;/);
+    assert.match(hookSource, /const ensureCreditAttemptCharged = useCallback\(async \(params: EnsureCreditAttemptChargedParams\)/);
+    assert.match(hookSource, /const resolveFailedCreditAttempt = useCallback\(async \(node: GenerationCreditAttemptNode\)/);
+    assert.match(hookSource, /const applyOptimisticServerCreditDebit = useCallback\(\(requiredCredits: number, useServerSideCreditSettlement: boolean\)/);
+    assert.match(hookSource, /resolveGenerationAttemptFailureState\(node, \{/);
+    assert.match(hookSource, /refundCreditsByTransaction,/);
+    assert.match(hookSource, /refreshBilling,/);
+    assert.match(hookSource, /adjustBalanceOptimistically\(-requiredCredits\)/);
+
+    assert.match(appSource, /ensureCreditAttemptCharged,\s*resolveFailedCreditAttempt,\s*applyOptimisticServerCreditDebit,/);
+    assert.match(appSource, /consumeCreditsDetailed,/);
+    assert.match(appSource, /refundCreditsByTransaction,/);
+    assert.match(appSource, /refreshBilling,/);
+    assert.match(appSource, /adjustBalanceOptimistically,/);
+    assert.doesNotMatch(appSource, /const ensureCreditAttemptCharged = useCallback\(async/);
+    assert.doesNotMatch(appSource, /const resolveFailedCreditAttempt = useCallback\(async/);
+    assert.doesNotMatch(appSource, /const applyOptimisticServerCreditDebit = useCallback\(/);
+    assert.doesNotMatch(appSource, /resolveGenerationAttemptFailureState\(node, \{/);
   });
 });
