@@ -85,7 +85,6 @@ import AppCanvasOverlays from './app/AppCanvasOverlays';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
 import { buildPptSlidesPreviewHtml } from './app/buildPptSlidesPreviewHtml';
 import { buildPptxSlideRelationshipsXml, buildPptxSlideXml } from './app/buildPptxSlideDocuments';
-import { buildCancelledPromptNodePatch } from './app/buildCancelledPromptNodePatch';
 import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
 import { buildGeneratingPromptNode } from './app/buildGeneratingPromptNode';
 import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
@@ -104,6 +103,7 @@ import { useCanvasNodeSelection } from './app/useCanvasNodeSelection';
 import { useDraftNodeSync } from './app/useDraftNodeSync';
 import { useGenerationPlacement } from './app/useGenerationPlacement';
 import { useGenerationReferenceImages } from './app/useGenerationReferenceImages';
+import { useGenerationSubmitGuard } from './app/useGenerationSubmitGuard';
 import { usePromptGroupDragHandlers } from './app/usePromptGroupDragHandlers';
 import { usePromptGroupSelection } from './app/usePromptGroupSelection';
 import { useSelectionMenuOverlay } from './app/useSelectionMenuOverlay';
@@ -111,11 +111,10 @@ import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
+import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
-const GENERATE_TRIGGER_COOLDOWN_MS = 500;
-const GENERATE_SIGNATURE_DEDUP_MS = 4000;
 const GENERATE_TIMEOUT_MS = 600000;
 
 type EcommerceRuntimeState = {
@@ -1828,8 +1827,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Connection Dragging State
   const [isNodeDragActive, setIsNodeDragActive] = useState(false);
-  const lastGenerateAtRef = useRef(0);
-  const lastGenerateSignatureRef = useRef<{ value: string; at: number } | null>(null);
+  const { tryStartGenerationSubmission } = useGenerationSubmitGuard();
 
   // error state removed, using notify service
   const {
@@ -3401,54 +3399,14 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   
 
-  const handleCancelGeneration = useCallback(async (id?: string) => {
-    // If ID provided, cancel specific
-    if (id) {
-      cancelGeneration(id);
-      if (activeCanvas) {
-        const node = activeCanvas.promptNodes.find(n => n.id === id);
-        if (node) {
-          if (node.jobId?.startsWith('system_proxy:')) {
-            try {
-              await cancelSecureSystemProxyTask(node.jobId);
-            } catch (error) {
-              console.warn('[handleCancelGeneration] 取消系统任务失败:', error);
-            }
-          }
-          updatePromptNode({
-            ...node,
-            ...buildCancelledPromptNodePatch(node.model)
-          });
-        }
-      }
-    } else {
-      // If no ID, cancel ALL generating nodes (Global Stop)
-      if (activeCanvas) {
-        const generatingNodes = activeCanvas.promptNodes.filter(n => n.isGenerating);
-        await Promise.allSettled(generatingNodes.map(async (node) => {
-          // Cancel all parallel requests for this node
-          const count = node.parallelCount || 1;
-          for (let i = 0; i < count; i++) {
-            cancelGeneration(`${node.id}-${i}`);
-          }
-
-          if (node.jobId?.startsWith('system_proxy:')) {
-            try {
-              await cancelSecureSystemProxyTask(node.jobId);
-            } catch (error) {
-              console.warn('[handleCancelGeneration] 批量取消系统任务失败:', error);
-            }
-          }
-
-          updatePromptNode({
-            ...node,
-            ...buildCancelledPromptNodePatch(node.model)
-          });
-        }));
-      }
-
-    }
-  }, [activeCanvas, updatePromptNode, cancelGeneration]);
+  const {
+    handleCancelGeneration,
+  } = useGenerationRuntime({
+    activeCanvas,
+    updatePromptNode,
+    cancelGenerationRequest: cancelGeneration,
+    cancelSystemProxyTask: cancelSecureSystemProxyTask,
+  });
 
 
 
@@ -4360,15 +4318,14 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Extracted Execution Logic
 
   const handleGenerate = useCallback(async (promptOverride?: string) => {
-    const now = Date.now();
-    const cooldownRemaining = GENERATE_TRIGGER_COOLDOWN_MS - (now - lastGenerateAtRef.current);
-    if (cooldownRemaining > 0) {
-      console.warn('[handleGenerate] blocked duplicate trigger');
-      return;
-    }
-    const promptText = promptOverride ?? config.prompt;
-    const trimmedPrompt = promptText.trim();
-    if (config.mode === GenerationMode.ECOMMERCE) {
+    const submitGuard = tryStartGenerationSubmission({
+      config,
+      promptOverride,
+      activeSourceImage,
+    });
+    if (!submitGuard.allowed) return;
+
+    if (submitGuard.isEcommerce) {
       if (!ecommerceState.analysis) {
         await handleAnalyzeEcommerceRequirement();
         return;
@@ -4376,29 +4333,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       await handleConfirmEcommerceAnalysis();
       return;
     }
-    if (!trimmedPrompt) return;
-    const submitSignature = JSON.stringify({
-      prompt: trimmedPrompt,
-      model: config.model,
-      mode: config.mode,
-      aspectRatio: config.aspectRatio,
-      imageSize: config.imageSize,
-      parallelCount: config.parallelCount || 1,
-      sourceImageId: activeSourceImage || '',
-      referenceImages: (config.referenceImages || [])
-        .map(img => img.id || img.storageId || img.url || '')
-        .sort()
-    });
-    const lastSignature = lastGenerateSignatureRef.current;
-    if (lastSignature && lastSignature.value === submitSignature && (now - lastSignature.at) < GENERATE_SIGNATURE_DEDUP_MS) {
-      console.warn('[handleGenerate] blocked repeated identical submission');
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('已拦截重复发送', '检测到相同内容短时间内重复提交，已阻止再次请求以避免重复扣费。');
-      });
-      return;
-    }
-    lastGenerateAtRef.current = now;
-    lastGenerateSignatureRef.current = { value: submitSignature, at: now };
+
+    const trimmedPrompt = submitGuard.trimmedPrompt;
 
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
@@ -4612,9 +4548,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
     } finally {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
-      // Request throttling is controlled by lastGenerateAtRef instead of waiting for the full run to settle.
+      // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode]);
+  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, normalizePptSlidesForCount, getPreferredKeyForMode, consumeCreditsDetailed, balance, setShowRechargeModal, user, isTempUser, authLoading, billingLoading, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is next; Milestone 3 prompt group layout extraction is complete through `5a4287f1`
+- Current milestone: Milestone 4 generation runtime extraction is in progress; first generation runtime slice is ready for commit
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 10395 lines
+- `src/App.tsx`: 9101 lines after Milestone 4 first-slice extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -26,6 +26,8 @@ Last updated: 2026-04-30
   - `useDraftNodeSync.ts`
   - `useGenerationPlacement.ts`
   - `useGenerationReferenceImages.ts`
+  - `useGenerationRuntime.ts`
+  - `useGenerationSubmitGuard.ts`
   - `usePromptGroupDragHandlers.ts`
   - `usePromptGroupSelection.ts`
   - `useSelectionMenuOverlay.ts`
@@ -396,12 +398,37 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: starting. GPT-5.5 xhigh subagents are used for exploration/implementation where they can work independently.
+Status: in progress. First generation runtime slice extracted and validated; commit pending.
 
-Planned first slice:
-- Inspect `src/App.tsx` generation orchestration, existing `src/app/useGenerationPlacement.ts`, `src/app/useGenerationReferenceImages.ts`, and `src/hooks/useImageGeneration.ts`.
-- Add or update a source-contract test before moving code.
-- Keep PPT and ecommerce generation branches untouched unless the first contract proves a shared boundary.
+First slice scope:
+- Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
+- Added `src/app/useGenerationRuntime.ts` with explicit `UseGenerationRuntimeDeps` and `UseGenerationRuntimeResult`.
+- Moved `handleCancelGeneration` out of `src/App.tsx`, including per-node cancellation, global generating-node cancellation, system proxy cancellation, and cancelled-node patching.
+- Added `src/app/useGenerationSubmitGuard.ts` with explicit `UseGenerationSubmitGuardDeps` and `UseGenerationSubmitGuardResult`.
+- Moved generation submit cooldown, duplicate-signature detection, submit signature construction, and duplicate-send warning out of `src/App.tsx`.
+- Kept billing, retry execution, PPT, ecommerce confirmation, partial redraw, provider routing, and actual `executeGeneration` orchestration in `src/App.tsx` for later narrower slices.
+
+Line count change during Milestone 4 first slice:
+- `src/App.tsx`: `9165` lines at previous `HEAD` -> `9101` lines.
+- `src/app/useGenerationRuntime.ts`: new, `73` lines.
+- `src/app/useGenerationSubmitGuard.ts`: new, `96` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: new, `67` lines.
+
+Validation passed:
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts`: passed, `13` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `989` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed.
+
+Current risk:
+- The submit guard intentionally treats ecommerce mode as an allowed early branch before empty-prompt rejection, matching previous `handleGenerate` behavior.
+- `App.tsx` still owns the billing and execution path; the next slice should avoid moving billing/PPT/ecommerce logic together.
+
+Next step:
+- Run documentation governance and diff whitespace checks after this status update.
+- Commit the first M4 slice.
+- Continue M4 with the next RED source contract around a small generation boundary, likely retry-timeout cancellation or billing-preparation orchestration, not the full `handleGenerate` body.
 
 ### Milestones 5-9
 
@@ -580,6 +607,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run build`: passed.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 first slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because the generation runtime/submit guard boundaries did not exist.
+  - Source contract: generation runtime tests assert cancellation ownership lives in `useGenerationRuntime.ts` and submit cooldown/signature state lives in `useGenerationSubmitGuard.ts`.
+  - Targeted M4 tests: passed, `13` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `989` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed.
+  - `npm.cmd run governance:agent-docs`: passed after final status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
