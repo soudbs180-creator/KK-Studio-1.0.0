@@ -248,6 +248,31 @@ export interface PrepareRetryGenerationTaskPromptContextResult {
   taskPrompt: string;
 }
 
+export interface PrepareRetryVideoGenerationRequestParams {
+  executionNode: Pick<
+    PromptNode,
+    'aspectRatio' | 'imageSize' | 'keySlotId' | 'model' | 'referenceImages' | 'videoDuration' | 'videoResolution'
+  >;
+  taskPrompt: string;
+}
+
+export interface PrepareRetryVideoGenerationRequestResult {
+  modelId: string;
+  prompt: string;
+  aspectRatio: string;
+  imageUrl?: string;
+  imageTailUrl?: string;
+  videoDuration?: string;
+  preferredKeyId?: string;
+  providerConfig: {
+    google: {
+      imageConfig: {
+        imageSize: string;
+      };
+    };
+  };
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -296,6 +321,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
+  prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -613,6 +639,32 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareRetryVideoGenerationRequest = useCallback((params: PrepareRetryVideoGenerationRequestParams) => {
+    const videoResolution = (() => {
+      if (params.executionNode.videoResolution) return params.executionNode.videoResolution;
+      const size = params.executionNode.imageSize?.toLowerCase() || '';
+      if (size.includes('4k') || size.includes('ultra')) return '4k';
+      if (size.includes('1080') || size.includes('hd')) return '1080p';
+      return '720p';
+    })();
+    const videoAspect = params.executionNode.aspectRatio === '9:16' ? '9:16' : '16:9';
+
+    return {
+      modelId: params.executionNode.model,
+      prompt: params.taskPrompt,
+      aspectRatio: videoAspect,
+      imageUrl: params.executionNode.referenceImages?.[0]?.data,
+      imageTailUrl: params.executionNode.referenceImages?.[1]?.data,
+      videoDuration: params.executionNode.videoDuration,
+      preferredKeyId: params.executionNode.keySlotId,
+      providerConfig: {
+        google: {
+          imageConfig: { imageSize: videoResolution }
+        }
+      }
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -846,6 +898,7 @@ export function useGenerationRuntime({
     prepareRetryGenerationRequestContext,
     reportRetryGenerationSuccess,
     prepareRetryGenerationTaskPromptContext,
+    prepareRetryVideoGenerationRequest,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

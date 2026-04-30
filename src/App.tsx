@@ -3310,6 +3310,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryGenerationRequestContext,
     reportRetryGenerationSuccess,
     prepareRetryGenerationTaskPromptContext,
+    prepareRetryVideoGenerationRequest,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4589,28 +4590,8 @@ const AppContent: React.FC<AppContentProps> = () => {
           });
 
           if (currentMode === GenerationMode.VIDEO) {
-            const videoResolution = (() => {
-              if (executionNode.videoResolution) return executionNode.videoResolution;
-              const size = executionNode.imageSize?.toLowerCase() || '';
-              if (size.includes('4k') || size.includes('ultra')) return '4k';
-              if (size.includes('1080') || size.includes('hd')) return '1080p';
-              return '720p'; // Default to 720p
-            })();
-            const videoAspect = executionNode.aspectRatio === '9:16' ? '9:16' : '16:9';
-            const videoResult = await llmService.generateVideo({
-              modelId: executionNode.model,
-              prompt: taskPrompt,
-              aspectRatio: videoAspect,
-              imageUrl: executionNode.referenceImages?.[0]?.data,
-              imageTailUrl: executionNode.referenceImages?.[1]?.data,
-              videoDuration: executionNode.videoDuration,
-              preferredKeyId: executionNode.keySlotId,
-              providerConfig: {
-                google: {
-                  imageConfig: { imageSize: videoResolution }
-                }
-              }
-            });
+            const videoRequest = prepareRetryVideoGenerationRequest({ executionNode, taskPrompt });
+            const videoResult = await llmService.generateVideo(videoRequest);
             b64 = videoResult.url;
             actualKeySlotId = videoResult.keySlotId || actualKeySlotId;
             actualProvider = videoResult.provider || actualProvider;
@@ -4979,7 +4960,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

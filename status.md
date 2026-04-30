@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generation task prompt context slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry video request options slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8878 lines after Milestone 4 retry generation task prompt context extraction
+- `src/App.tsx`: 8859 lines after Milestone 4 retry video request options extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -399,7 +399,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Nineteen narrow generation-runtime slices are extracted and validated, through retry generation task prompt context ownership.
+Status: in progress. Twenty narrow generation-runtime slices are extracted and validated, through retry video request option ownership.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -891,8 +891,35 @@ Current risk:
 - Request execution and result normalization still live in `App.tsx`; moving them needs smaller follow-up contracts because it touches provider-specific image/video fields.
 - The next safe slice should target retry video request options or another narrow request-metadata helper, not result layout.
 
+Twentieth slice scope:
+- Added hook-owned `prepareRetryVideoGenerationRequest` with explicit params/result interfaces.
+- Moved retry video resolution fallback, video aspect normalization, image/tail references, duration, preferred key, and Google image config request payload into `src/app/useGenerationRuntime.ts`.
+- Replaced inline video request option construction in `App.tsx` with `const videoRequest = prepareRetryVideoGenerationRequest({ executionNode, taskPrompt })`.
+- Kept `llmService.generateVideo`, video result normalization, image request branch, result construction, layout alignment, success/failure side effects, PPT retry, and ecommerce flows unchanged.
+
+Line count change during Milestone 4 twentieth slice:
+- `src/App.tsx`: `8878` lines after nineteenth slice -> `8859` lines.
+- `src/app/useGenerationRuntime.ts`: `852` lines -> `905` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `450` lines -> `472` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `prepareRetryVideoGenerationRequest`, while `App.tsx` still built retry video request options directly.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `21` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `35` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `1008` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- Image request options and result normalization still live in `App.tsx`. Extracting image request options is a safe next slice; result normalization should remain separate.
+- The next safe slice should target retry image request options, not result layout.
+
 Next step:
-- Continue M4 with the next RED source contract around retry video request options or another narrow request-metadata helper.
+- Continue M4 with the next RED source contract around retry image request options.
 
 ### Milestones 5-9
 
@@ -1248,6 +1275,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `34` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `1007` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twentieth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `prepareRetryVideoGenerationRequest`, while `App.tsx` still built retry video request options directly.
+  - Targeted M4 billing/runtime/route tests: passed, `35` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1008` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI runtime refactor.
   - `npm.cmd run check:encoding`: passed after status update.

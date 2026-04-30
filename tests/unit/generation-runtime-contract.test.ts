@@ -447,4 +447,26 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const taskPrompt = currentMode === GenerationMode\.PPT/);
     assert.doesNotMatch(retryNodeSource, /const styleDirective = executionNode\.pptStyleLocked !== false/);
   });
+
+  test('retry video generation request options are owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryVideoGenerationRequest: \(params: PrepareRetryVideoGenerationRequestParams\) => PrepareRetryVideoGenerationRequestResult;/);
+    assert.match(hookSource, /const prepareRetryVideoGenerationRequest = useCallback\(\(params: PrepareRetryVideoGenerationRequestParams\)/);
+    assert.match(hookSource, /if \(params\.executionNode\.videoResolution\) return params\.executionNode\.videoResolution;/);
+    assert.match(hookSource, /const size = params\.executionNode\.imageSize\?\.toLowerCase\(\) \|\| '';/);
+    assert.match(hookSource, /const videoAspect = params\.executionNode\.aspectRatio === '9:16' \? '9:16' : '16:9';/);
+    assert.match(hookSource, /providerConfig: \{[\s\S]*google: \{[\s\S]*imageConfig: \{ imageSize: videoResolution \}[\s\S]*\}[\s\S]*\}/);
+
+    assert.match(retryNodeSource, /const videoRequest = prepareRetryVideoGenerationRequest\(\{ executionNode, taskPrompt \}\);/);
+    assert.match(retryNodeSource, /const videoResult = await llmService\.generateVideo\(videoRequest\);/);
+    assert.doesNotMatch(retryNodeSource, /const videoResolution = \(\(\) => \{/);
+    assert.doesNotMatch(retryNodeSource, /const videoAspect = executionNode\.aspectRatio === '9:16' \? '9:16' : '16:9';/);
+    assert.doesNotMatch(retryNodeSource, /providerConfig: \{[\s\S]*google: \{[\s\S]*imageConfig: \{ imageSize: videoResolution \}/);
+  });
 });
