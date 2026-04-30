@@ -540,4 +540,28 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const bitmap = await createImageBitmap\(blob\);/);
     assert.doesNotMatch(retryNodeSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
   });
+
+  test('retry generated media result assembly is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryGeneratedMediaResult: \(params: BuildRetryGeneratedMediaResultParams\) => RetryGeneratedMediaResult;/);
+    assert.match(hookSource, /const buildRetryGeneratedMediaResult = useCallback\(\(params: BuildRetryGeneratedMediaResultParams\): RetryGeneratedMediaResult => \{/);
+    assert.match(hookSource, /canvasId: params\.canvasId \|\| 'default',/);
+    assert.match(hookSource, /dimensions: params\.mediaDimensions\.displayDimensions,/);
+    assert.match(hookSource, /const sourceReferenceStorageIds = \(params\.executionNode\.referenceImages \|\| \[\]\)[\s\S]*\.map/);
+    assert.match(hookSource, /id: `\$\{Date\.now\(\)\}_\$\{params\.index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
+    assert.match(hookSource, /mimeType: params\.mediaPersistence\.mimeType,/);
+
+    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
+    assert.match(retryNodeSource, /mediaDimensions,/);
+    assert.match(retryNodeSource, /mediaPersistence,/);
+    assert.match(retryNodeSource, /return generatedResult;/);
+    assert.doesNotMatch(retryNodeSource, /sourceReferenceStorageIds: \(executionNode\.referenceImages \|\| \[\]\)\.map/);
+    assert.doesNotMatch(retryNodeSource, /id: `\$\{Date\.now\(\)\}_\$\{index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
+  });
 });

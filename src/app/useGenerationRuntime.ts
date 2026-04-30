@@ -331,6 +331,41 @@ export interface ResolveRetryGeneratedMediaDimensionsResult {
   displayDimensions: string;
 }
 
+export interface BuildRetryGeneratedMediaResultParams {
+  alias?: string;
+  canvasId?: string;
+  currentMode: GenerationMode;
+  executionNode: Pick<
+    PromptNode,
+    'aspectRatio' | 'billingMode' | 'creditCost' | 'id' | 'referenceImages'
+  >;
+  generationTime: number;
+  index: number;
+  mediaDimensions: ResolveRetryGeneratedMediaDimensionsResult;
+  mediaPersistence: PrepareRetryGeneratedMediaPersistenceResult;
+  prompt: string;
+  requestTrace: RetryGenerationSuccessDebugResult;
+  resultMetadata: {
+    completionTokens?: number;
+    cost?: number;
+    costSource?: GeneratedImage['costSource'];
+    keySlotId?: string;
+    model: GeneratedImage['model'];
+    modelLabel?: string;
+    promptTokens?: number;
+    provider?: string;
+    providerLabel?: string;
+    tokens?: number;
+  };
+}
+
+export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
+  height: number;
+  index: number;
+  seed: number;
+  width: number;
+};
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -383,6 +418,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
+  buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -836,6 +872,51 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const buildRetryGeneratedMediaResult = useCallback((params: BuildRetryGeneratedMediaResultParams): RetryGeneratedMediaResult => {
+    const sourceReferenceStorageIds = (params.executionNode.referenceImages || [])
+      .map(ref => ref.storageId || ref.id)
+      .filter((id): id is string => Boolean(id));
+
+    return {
+      canvasId: params.canvasId || 'default',
+      parentPromptId: params.executionNode.id,
+      dimensions: params.mediaDimensions.displayDimensions,
+      generationTime: params.generationTime,
+      index: params.index,
+      url: params.mediaPersistence.url,
+      originalUrl: params.mediaPersistence.originalUrl,
+      apiResultUrl: params.mediaPersistence.apiResultUrl,
+      prompt: params.prompt,
+      width: params.mediaDimensions.actualWidth,
+      height: params.mediaDimensions.actualHeight,
+      aspectRatio: params.executionNode.aspectRatio,
+      imageSize: params.mediaDimensions.computedImageSize,
+      model: params.resultMetadata.model,
+      modelLabel: params.resultMetadata.modelLabel,
+      provider: params.resultMetadata.provider,
+      providerLabel: params.resultMetadata.providerLabel,
+      tokens: params.resultMetadata.tokens,
+      promptTokens: params.resultMetadata.promptTokens,
+      completionTokens: params.resultMetadata.completionTokens,
+      cost: params.resultMetadata.cost,
+      costSource: params.resultMetadata.costSource,
+      billingMode: params.executionNode.billingMode,
+      creditCost: params.executionNode.creditCost,
+      keySlotId: params.resultMetadata.keySlotId,
+      sourceReferenceStorageIds,
+      alias: params.alias,
+      seed: -1,
+      id: `${Date.now()}_${params.index}_${Math.random().toString(36).substr(2, 5)}`,
+      storageId: params.mediaPersistence.storageId,
+      mimeType: params.mediaPersistence.mimeType,
+      timestamp: Date.now(),
+      mode: params.currentMode,
+      requestPath: params.requestTrace.requestPath,
+      requestBodyPreview: params.requestTrace.requestBodyPreview,
+      pythonSnippet: params.requestTrace.pythonSnippet,
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -1073,6 +1154,7 @@ export function useGenerationRuntime({
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
     resolveRetryGeneratedMediaDimensions,
+    buildRetryGeneratedMediaResult,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

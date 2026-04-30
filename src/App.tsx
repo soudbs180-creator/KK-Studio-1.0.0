@@ -3314,6 +3314,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
     resolveRetryGeneratedMediaDimensions,
+    buildRetryGeneratedMediaResult,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4659,14 +4660,6 @@ const AppContent: React.FC<AppContentProps> = () => {
             calculateImageHash,
             saveOriginalImage,
           });
-          const {
-            apiResultUrl,
-            normalizedOriginalSource,
-            originalUrl,
-            storageId,
-            url,
-            mimeType,
-          } = mediaPersistence;
 
           // Upload (non-blocking for latency)
           if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
@@ -4693,53 +4686,34 @@ const AppContent: React.FC<AppContentProps> = () => {
           const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
             b64,
             executionNode,
-            url,
+            url: mediaPersistence.url,
           });
-          const {
-            actualWidth,
-            actualHeight,
-            displayDimensions,
-            computedImageSize,
-          } = mediaDimensions;
 
-          return {
-            canvasId: activeCanvas?.id || 'default',
-            parentPromptId: executionNode.id,
-            dimensions: displayDimensions, // 🎯 Use Real Dimensions
+          const generatedResult = buildRetryGeneratedMediaResult({
+            alias: currentMode === GenerationMode.PPT ? buildPptPageAlias(executionNode.pptSlides?.[index], index) : undefined,
+            canvasId: activeCanvas?.id,
+            currentMode,
+            executionNode,
             generationTime,
             index,
-            url,
-            originalUrl,
-            apiResultUrl,
+            mediaDimensions,
+            mediaPersistence,
             prompt: taskPrompt,
-            width: actualWidth,
-            height: actualHeight,
-            aspectRatio: executionNode.aspectRatio,
-            imageSize: computedImageSize, // 🎯 Use Computed Cost Tier
-            model: actualModel,
-            modelLabel: actualModelLabel,
-            provider: actualProvider,
-            providerLabel: actualProviderLabel,
-            tokens: actualTokens,
-            promptTokens: actualPromptTokens,
-            completionTokens: actualCompletionTokens,
-            cost: actualCost,
-            costSource: actualCostSource,
-            billingMode: executionNode.billingMode,
-            creditCost: executionNode.creditCost,
-            keySlotId: actualKeySlotId,
-            sourceReferenceStorageIds: (executionNode.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean),
-            alias: currentMode === GenerationMode.PPT ? buildPptPageAlias(executionNode.pptSlides?.[index], index) : undefined,
-            seed: -1,
-            id: `${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
-            storageId, // Content-Based ID
-            mimeType,
-            timestamp: Date.now(),
-            mode: currentMode,
-            requestPath,
-            requestBodyPreview,
-            pythonSnippet
-          };
+            requestTrace: { requestPath, requestBodyPreview, pythonSnippet },
+            resultMetadata: {
+              completionTokens: actualCompletionTokens,
+              cost: actualCost,
+              costSource: actualCostSource,
+              keySlotId: actualKeySlotId,
+              model: actualModel,
+              modelLabel: actualModelLabel,
+              promptTokens: actualPromptTokens,
+              provider: actualProvider,
+              providerLabel: actualProviderLabel,
+              tokens: actualTokens,
+            },
+          });
+          return generatedResult;
         } catch (e: any) {
           timeoutGuard.markFinished();
           timeoutGuard.clear();
@@ -4907,7 +4881,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildPptPageAlias]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;
