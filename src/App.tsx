@@ -89,7 +89,6 @@ import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePat
 import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
 import { buildRetryExecutionNode } from './app/buildRetryExecutionNode';
 import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
-import { persistGeneratingPromptNode } from './app/persistGeneratingPromptNode';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
 import { writePptxPackageSkeleton } from './app/writePptxPackageSkeleton';
@@ -3299,6 +3298,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareInitialBillingAttemptContext,
     prepareGenerationBillingStateContext,
     prepareInitialGeneratingPromptNode,
+    persistInitialGeneratingPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4366,14 +4366,14 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
       const generatingNode = initialGeneratingNode.generatingNode;
 
-      const persistedGeneratingNode = await persistGeneratingPromptNode({
+      const persistedGeneration = await persistInitialGeneratingPromptNode({
         generatingNode,
-        getCanvas: () => activeCanvasRef.current,
-        updatePromptNode,
+        getCanvas: () => activeCanvasRef.current || undefined,
         addPromptNode,
         updateImageNodePosition,
         deletePromptNode,
       });
+      const persistedGeneratingNode = persistedGeneration.persistedGeneratingNode;
 
       setDraftNodeId(null); // Detach status NOW that the node is updated in canvas
       setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
@@ -4391,7 +4391,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // executeGeneration manages isGenerating internally; avoid resetting it here.
       // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
     }
-  }, [config, draftNodeId, addPromptNode, updatePromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, applyOptimisticServerCreditDebit, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

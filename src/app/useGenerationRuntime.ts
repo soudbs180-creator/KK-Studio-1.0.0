@@ -8,9 +8,10 @@ import {
 } from '../services/billing/generationBillingCoordinator';
 import { adminModelService } from '../services/model/adminModelService';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
-import type { Canvas, GenerationConfig, ImageSize, PromptNode, ReferenceImage } from '../types';
+import type { Canvas, GeneratedImage, GenerationConfig, ImageSize, PromptNode, ReferenceImage } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
+import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
 import { resolveGenerationPreviewState } from './resolveGenerationPreviewState';
 
@@ -134,6 +135,26 @@ export interface PrepareInitialGeneratingPromptNodeResult {
   generatingNode: PromptNode;
 }
 
+type GenerationPersistenceCanvasSnapshot = Pick<Canvas, 'promptNodes'> & {
+  imageNodes: GeneratedImage[];
+};
+
+export interface PersistInitialGeneratingPromptNodeParams {
+  addPromptNode: (node: PromptNode) => void | Promise<void>;
+  deletePromptNode: (id: string) => void | Promise<void>;
+  generatingNode: PromptNode;
+  getCanvas: () => GenerationPersistenceCanvasSnapshot | undefined;
+  updateImageNodePosition: (
+    id: string,
+    position: { x: number; y: number },
+    options?: { ignoreSelection?: boolean },
+  ) => void | Promise<void>;
+}
+
+export interface PersistInitialGeneratingPromptNodeResult {
+  persistedGeneratingNode: PromptNode;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -170,6 +191,7 @@ export interface UseGenerationRuntimeResult {
   prepareInitialBillingAttemptContext: (params: PrepareInitialBillingAttemptContextParams) => PrepareInitialBillingAttemptContextResult;
   prepareGenerationBillingStateContext: (params: PrepareGenerationBillingStateContextParams) => PrepareGenerationBillingStateContextResult;
   prepareInitialGeneratingPromptNode: (params: PrepareInitialGeneratingPromptNodeParams) => PrepareInitialGeneratingPromptNodeResult;
+  persistInitialGeneratingPromptNode: (params: PersistInitialGeneratingPromptNodeParams) => Promise<PersistInitialGeneratingPromptNodeResult>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -467,6 +489,19 @@ export function useGenerationRuntime({
     return { generatingNode };
   }, []);
 
+  const persistInitialGeneratingPromptNode = useCallback(async (params: PersistInitialGeneratingPromptNodeParams) => {
+    const persistedGeneratingNode = await persistGeneratingPromptNode({
+      generatingNode: params.generatingNode,
+      getCanvas: params.getCanvas,
+      updatePromptNode,
+      addPromptNode: params.addPromptNode,
+      updateImageNodePosition: params.updateImageNodePosition,
+      deletePromptNode: params.deletePromptNode,
+    });
+
+    return { persistedGeneratingNode };
+  }, [updatePromptNode]);
+
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
 
@@ -522,6 +557,7 @@ export function useGenerationRuntime({
     prepareInitialBillingAttemptContext,
     prepareGenerationBillingStateContext,
     prepareInitialGeneratingPromptNode,
+    persistInitialGeneratingPromptNode,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

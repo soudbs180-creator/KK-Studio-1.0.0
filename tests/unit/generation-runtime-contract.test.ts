@@ -190,4 +190,23 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /const generationPreviewState = resolveGenerationPreviewState\(\{/);
     assert.doesNotMatch(appSource, /const generatingNode = buildGeneratingPromptNode\(\{/);
   });
+
+  test('initial generating prompt node persistence is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /persistInitialGeneratingPromptNode: \(params: PersistInitialGeneratingPromptNodeParams\) => Promise<PersistInitialGeneratingPromptNodeResult>;/);
+    assert.match(hookSource, /const persistInitialGeneratingPromptNode = useCallback\(async \(params: PersistInitialGeneratingPromptNodeParams\)/);
+    assert.match(hookSource, /const persistedGeneratingNode = await persistGeneratingPromptNode\(\{/);
+    assert.match(hookSource, /generatingNode: params\.generatingNode,/);
+    assert.match(hookSource, /getCanvas: params\.getCanvas,/);
+    assert.match(hookSource, /updatePromptNode,/);
+    assert.match(hookSource, /addPromptNode: params\.addPromptNode,/);
+    assert.match(hookSource, /updateImageNodePosition: params\.updateImageNodePosition,/);
+    assert.match(hookSource, /deletePromptNode: params\.deletePromptNode,/);
+
+    assert.match(appSource, /const persistedGeneration = await persistInitialGeneratingPromptNode\(\{/);
+    assert.match(appSource, /const persistedGeneratingNode = persistedGeneration\.persistedGeneratingNode;/);
+    assert.doesNotMatch(appSource, /const persistedGeneratingNode = await persistGeneratingPromptNode\(\{/);
+  });
 });

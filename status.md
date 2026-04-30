@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; initial generating prompt-node assembly slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; initial generating prompt-node persistence slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8943 lines after Milestone 4 initial generating prompt-node assembly extraction
+- `src/App.tsx`: 8943 lines after Milestone 4 initial generating prompt-node persistence extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -583,8 +583,33 @@ Current risk:
 - `prepareInitialGeneratingPromptNode` has a deliberately wide params surface because it preserves existing prompt-node metadata exactly; do not expand it into persistence or execution until those boundaries have separate contracts.
 - The next safe slice should target prompt-node persistence wrapping or initial post-persist cleanup, not retry/PPT/ecommerce bodies.
 
+Eighth slice scope:
+- Added hook-owned `persistInitialGeneratingPromptNode` with explicit `PersistInitialGeneratingPromptNodeParams` and `PersistInitialGeneratingPromptNodeResult`.
+- Moved the initial `persistGeneratingPromptNode` call and its `updatePromptNode` closure dependency from `src/App.tsx` into `src/app/useGenerationRuntime.ts`.
+- Kept prompt optimization, prompt-node assembly, post-persist draft cleanup, optimistic debit, execution, retry, PPT, and ecommerce bodies unchanged.
+- Tightened the wrapper `getCanvas` contract to return `undefined` instead of `null`, matching the underlying persistence helper.
+
+Line count change during Milestone 4 eighth slice:
+- `src/App.tsx`: `8943` lines after seventh slice -> `8943` lines.
+- `src/app/useGenerationRuntime.ts`: `529` lines -> `565` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `194` lines -> `213` lines.
+
+Validation passed:
+- RED baseline proof: source-contract checks against `HEAD` showed `useGenerationRuntime.ts` did not own `persistInitialGeneratingPromptNode`, while `App.tsx` still imported and called `persistGeneratingPromptNode` directly.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `23` tests.
+- `npm.cmd run typecheck`: passed after tightening the persistence wrapper `getCanvas` return type.
+- `npm.cmd run test:unit`: passed, `996` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `persistInitialGeneratingPromptNode` intentionally closes over `updatePromptNode` from hook deps while keeping other canvas mutation callbacks as call params; this preserves current behavior but should not be expanded into execution or retry logic without a separate contract.
+- The next safe slice should target prompt optimization wrapping or initial post-persist cleanup, not PPT/ecommerce bodies.
+
 Next step:
-- Continue M4 with the next RED source contract around prompt-node persistence wrapping, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
+- Continue M4 with the next RED source contract around prompt optimization wrapping, initial post-persist cleanup, failure patch preparation, retry-timeout cancellation, or another small shared generation runtime boundary.
 
 ### Milestones 5-9
 
@@ -824,6 +849,15 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `22` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `995` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 eighth slice:
+  - RED baseline proof: source-contract checks against `HEAD` showed `useGenerationRuntime.ts` did not own `persistInitialGeneratingPromptNode`, while `App.tsx` still imported and called `persistGeneratingPromptNode` directly.
+  - Targeted M4 billing/runtime/route tests: passed, `23` tests.
+  - `npm.cmd run typecheck`: passed after tightening the persistence wrapper `getCanvas` return type.
+  - `npm.cmd run test:unit`: passed, `996` tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
