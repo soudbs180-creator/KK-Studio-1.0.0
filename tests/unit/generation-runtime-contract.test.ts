@@ -291,4 +291,23 @@ describe('generation runtime extraction contract', () => {
       /\/\/ Execute immediately after save completed\s*applyOptimisticServerCreditDebit\(requiredCredits, useServerSideCreditSettlement\);\s*await executeGeneration\(persistedGeneratingNode\);/,
     );
   });
+
+  test('initial generation failure reporting is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('// Handle reference images'),
+    );
+
+    assert.match(hookSource, /reportInitialGenerationFailure: \(params: ReportInitialGenerationFailureParams\) => void;/);
+    assert.match(hookSource, /const reportInitialGenerationFailure = useCallback\(\(params: ReportInitialGenerationFailureParams\)/);
+    assert.match(hookSource, /console\.error\('\[handleGenerate\] failed:', params\.error\);/);
+    assert.match(hookSource, /notify\.error\('发送失败', message\);/);
+    assert.match(hookSource, /String\(\(params\.error as \{ message\?: unknown \} \| null \| undefined\)\?\.message \|\| '请重试'\)/);
+
+    assert.match(handleGenerateSource, /reportInitialGenerationFailure\(\{ error: e \}\);/);
+    assert.doesNotMatch(handleGenerateSource, /console\.error\('\[handleGenerate\] failed:', e\);/);
+    assert.doesNotMatch(handleGenerateSource, /notify\.error\('发送失败', e\?\.message \|\| '请重试'\);/);
+  });
 });

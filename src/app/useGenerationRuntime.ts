@@ -187,6 +187,10 @@ export interface ExecuteInitialGenerationPromptNodeParams {
   useServerSideCreditSettlement: boolean;
 }
 
+export interface ReportInitialGenerationFailureParams {
+  error: unknown;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -228,6 +232,7 @@ export interface UseGenerationRuntimeResult {
   completeInitialGenerationPromptSubmission: (params: CompleteInitialGenerationPromptSubmissionParams) => void;
   commitRetryGenerationFailure: (params: CommitRetryGenerationFailureParams) => Promise<void>;
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
+  reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -426,6 +431,14 @@ export function useGenerationRuntime({
     applyOptimisticServerCreditDebit(params.requiredCredits, params.useServerSideCreditSettlement);
     await params.executeGeneration(params.persistedGeneratingNode);
   }, [applyOptimisticServerCreditDebit]);
+
+  const reportInitialGenerationFailure = useCallback((params: ReportInitialGenerationFailureParams) => {
+    console.error('[handleGenerate] failed:', params.error);
+    const message = String((params.error as { message?: unknown } | null | undefined)?.message || '请重试');
+    import('../services/system/notificationService').then(({ notify }) => {
+      notify.error('发送失败', message);
+    });
+  }, []);
 
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
@@ -653,6 +666,7 @@ export function useGenerationRuntime({
     completeInitialGenerationPromptSubmission,
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
+    reportInitialGenerationFailure,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
