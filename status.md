@@ -1660,6 +1660,20 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 UI correction slice:
+  - RED: `tests/unit/airtable-global-ui-refit-contract.test.ts`, `tests/unit/settings-entry-surface-style-regression.test.ts`, and `tests/unit/responsive-surface.test.ts` failed before implementation on dark canvas tint, legacy heavy canvas shadows, storage modal theme leakage, and mixed mobile/desktop tutorial steps.
+  - Fixed dark Airtable canvas tokens so the infinite canvas uses neutral dark depth instead of the blue-tinted `#0b1220` workspace background.
+  - Replaced legacy canvas card cinematic shadows with capped Airtable-style depth and reduced duplicated settings card shadow overrides.
+  - Isolated `StorageSelectionModal` behind `storage-selection-modal` light/dark variables so text and card surfaces cannot mix inherited light backgrounds with dark-theme text.
+  - Split `TutorialOverlay` into explicit desktop and mobile onboarding step arrays, with viewport-surface selection and step index clamping.
+  - Targeted UI contract tests: passed, `16` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1022` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: preview restarted and loaded at `http://127.0.0.1:4173/`; DOM showed the workspace shell and dark-theme toggle state, theme toggle smoke produced no console error/warning logs. Screenshot capture through both Playwright and CUA Browser APIs returned `undefined`, so the run used DOM and console-log inspection rather than an image artifact.
+  - `npm.cmd run governance:agent-docs`: passed.
+  - `npm.cmd run check:encoding`: passed.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 

@@ -30,12 +30,12 @@ const FeatureRow: React.FC<{ icon: React.ReactNode; title: string; desc: string 
   desc,
 }) => (
   <div className="flex items-start gap-2.5">
-    <div className="mt-0.5 text-[var(--text-secondary)]">{icon}</div>
+    <div className="mt-0.5 text-[var(--storage-selection-text-secondary)]">{icon}</div>
     <div>
-      <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+      <div className="text-xs font-medium" style={{ color: 'var(--storage-selection-text-primary)' }}>
         {title}
       </div>
-      <div className="text-[11px] leading-5" style={{ color: 'var(--text-tertiary)' }}>
+      <div className="text-[11px] leading-5" style={{ color: 'var(--storage-selection-text-muted)' }}>
         {desc}
       </div>
     </div>
@@ -114,46 +114,44 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
   };
 
   const optionBaseStyle = {
-    borderColor: 'var(--settings-border-subtle, var(--border-light))',
-    background: 'var(--settings-section-bg, var(--bg-surface))',
+    borderColor: 'var(--storage-selection-border)',
+    background: 'var(--storage-selection-option-bg)',
   } as const;
 
   const optionSelectedStyle = {
-    borderColor: 'var(--settings-focus-border, var(--settings-shell-border, var(--border-light)))',
-    background:
-      'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-surface-overlay, var(--bg-elevated))',
+    borderColor: 'var(--storage-selection-border-strong)',
+    background: 'var(--storage-selection-option-selected-bg)',
   } as const;
 
   return (
     <div
-      className={`fixed inset-0 z-[3000] flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
-      style={{ background: 'rgb(3 8 15 / 0.72)', backdropFilter: 'blur(14px)' }}
+      className={`storage-selection-modal fixed inset-0 z-[3000] flex justify-center ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-4 py-4'}`}
+      style={{ background: 'var(--storage-selection-overlay-bg)', backdropFilter: 'blur(14px)' }}
     >
       <div
         className={`w-full border ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none' : 'max-w-[640px] rounded-3xl p-6'}`}
         style={{
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-section-bg, var(--bg-surface))',
-          borderColor: 'var(--settings-border-subtle, var(--border-light))',
-          boxShadow: '0 28px 64px rgb(2 6 23 / 0.18)',
+          background: 'var(--storage-selection-card-bg)',
+          borderColor: 'var(--storage-selection-border)',
+          boxShadow: 'var(--storage-selection-shadow)',
         }}
       >
         <div className={`${isMobile ? 'mobile-sheet-header-safe px-4 pb-4 pt-4 text-center' : 'mb-5 text-center'}`}>
           <div
             className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border"
             style={{
-              borderColor: 'var(--settings-border-subtle, var(--border-light))',
-              background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-              color: 'var(--text-primary)',
-              boxShadow: '0 14px 30px rgb(2 6 23 / 0.12)',
+              borderColor: 'var(--storage-selection-border)',
+              background: 'var(--storage-selection-icon-bg)',
+              color: 'var(--storage-selection-text-primary)',
+              boxShadow: 'var(--storage-selection-icon-shadow)',
             }}
           >
             <HardDrive size={24} />
           </div>
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--storage-selection-text-primary)' }}>
             选择你的存储方案
           </h2>
-          <p className="mx-auto mt-2 max-w-[500px] text-xs leading-6" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="mx-auto mt-2 max-w-[500px] text-xs leading-6" style={{ color: 'var(--storage-selection-text-muted)' }}>
             默认使用浏览器缓存就可以开始使用；如果你更在意原图安全，可以启用本地存储，为原图增加一层额外备份。
           </p>
         </div>
@@ -171,37 +169,37 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
                   <div
                     className="rounded-xl border p-2"
                     style={{
-                      borderColor: 'var(--settings-border-subtle, var(--border-light))',
-                      background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-                      color: 'var(--text-secondary)',
+                      borderColor: 'var(--storage-selection-border)',
+                      background: 'var(--storage-selection-icon-bg)',
+                      color: 'var(--storage-selection-text-secondary)',
                     }}
                   >
                     <Globe size={18} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      <div className="text-sm font-semibold" style={{ color: 'var(--storage-selection-text-primary)' }}>
                         浏览器缓存
                       </div>
                       <span
                         className="rounded-full border px-2 py-0.5 text-[11px]"
                         style={{
-                          borderColor: 'var(--settings-border-subtle, var(--border-light))',
-                          background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-                          color: 'var(--text-secondary)',
+                          borderColor: 'var(--storage-selection-border)',
+                          background: 'var(--storage-selection-icon-bg)',
+                          color: 'var(--storage-selection-text-secondary)',
                         }}
                       >
                         默认
                       </span>
                     </div>
-                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-tertiary)' }}>
+                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--storage-selection-text-muted)' }}>
                       零配置，直接可用。图片保存在当前浏览器本地数据库，适合快速开始和日常使用。
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="mt-4 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--storage-selection-border)' }}>
                 <FeatureRow icon={<Zap size={14} />} title="适合人群" desc="想先快速用起来，不想额外选择文件夹。" />
                 <FeatureRow icon={<Shield size={14} />} title="风险提示" desc="如果清理浏览器缓存或更换浏览器，原图可能丢失。" />
               </div>
@@ -219,30 +217,30 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
                   <div
                     className="rounded-xl border p-2"
                     style={{
-                      borderColor: 'var(--settings-border-subtle, var(--border-light))',
-                      background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-                      color: 'var(--text-secondary)',
+                      borderColor: 'var(--storage-selection-border)',
+                      background: 'var(--storage-selection-icon-bg)',
+                      color: 'var(--storage-selection-text-secondary)',
                     }}
                   >
                     <FolderOpen size={18} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      <div className="text-sm font-semibold" style={{ color: 'var(--storage-selection-text-primary)' }}>
                         本地存储
                       </div>
                       <span
                         className="rounded-full border px-2 py-0.5 text-[11px]"
                         style={{
-                          borderColor: 'var(--settings-border-subtle, var(--border-light))',
-                          background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-                          color: 'var(--text-secondary)',
+                          borderColor: 'var(--storage-selection-border)',
+                          background: 'var(--storage-selection-icon-bg)',
+                          color: 'var(--storage-selection-text-secondary)',
                         }}
                       >
                         双层保护
                       </span>
                     </div>
-                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-tertiary)' }}>
+                    <div className="mt-1 text-xs leading-5" style={{ color: 'var(--storage-selection-text-muted)' }}>
                       在浏览器缓存之外，再把原图额外备份到你选择的本地文件夹，更适合长期保存和防止原图丢失。
                     </div>
                   </div>
@@ -262,7 +260,7 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
                 ) : null}
               </div>
 
-              <div className="mt-4 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="mt-4 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--storage-selection-border)' }}>
                 <FeatureRow icon={<Shield size={14} />} title="适合人群" desc="有长期保存需求，或担心浏览器缓存被清理。" />
                 <FeatureRow icon={<FolderOpen size={14} />} title="恢复能力" desc="即使浏览器缓存丢失，也可以优先从本地备份恢复原图。" />
               </div>
@@ -272,14 +270,14 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           <div
             className="mt-4 rounded-2xl border p-4"
             style={{
-              borderColor: 'var(--settings-border-subtle, var(--border-light))',
-              background: 'var(--settings-surface-overlay, var(--bg-elevated))',
+              borderColor: 'var(--storage-selection-border)',
+              background: 'var(--storage-selection-option-bg)',
             }}
           >
-            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-sm font-medium" style={{ color: 'var(--storage-selection-text-primary)' }}>
               当前推荐
             </div>
-            <div className="mt-1 text-xs leading-6" style={{ color: 'var(--text-tertiary)' }}>
+            <div className="mt-1 text-xs leading-6" style={{ color: 'var(--storage-selection-text-muted)' }}>
               如果你只是先体验，直接用“浏览器缓存”就行；如果你的重点是保住原图，建议开启“本地存储（双层保护）”，这样即使浏览器缓存丢失，也还能从本地恢复。
             </div>
           </div>
@@ -322,9 +320,9 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
             className="inline-flex h-11 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-5 text-sm font-medium disabled:opacity-60"
             style={{
               borderColor: 'transparent',
-              background: 'var(--settings-button-primary-bg, var(--bg-elevated))',
-              color: 'var(--settings-button-primary-text, var(--text-primary))',
-              boxShadow: 'var(--settings-button-primary-shadow, none)',
+              background: 'var(--storage-selection-primary-bg)',
+              color: 'var(--storage-selection-primary-text)',
+              boxShadow: 'var(--storage-selection-primary-shadow)',
             }}
           >
             {(selectingLocal || saving) ? <Loader2 size={15} className="shrink-0 animate-spin" /> : null}

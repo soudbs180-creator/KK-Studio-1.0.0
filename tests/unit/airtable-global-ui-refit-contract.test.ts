@@ -40,6 +40,35 @@ test('global tokens use Airtable light-first colors and capped glass depth', () 
   assert.match(cssSource, /--settings-subcard-shadow:\s*0 4px 12px rgb\(24 29 38 \/ 0\.06\);/);
   assert.match(cssSource, /--motion-duration-standard:\s*180ms;/);
   assert.match(cssSource, /--motion-ease-standard:\s*cubic-bezier\(0\.2, 0, 0, 1\);/);
+  assert.doesNotMatch(cssSource, /--settings-card-shadow:\s*0 18px 42px/);
+  assert.doesNotMatch(cssSource, /--settings-card-shadow:\s*0 20px 44px/);
+  assert.doesNotMatch(cssSource, /--settings-subcard-shadow:\s*0 16px 36px/);
+  assert.doesNotMatch(cssSource, /--settings-subcard-hover-shadow:\s*0 22px 48px/);
+});
+
+test('dark canvas keeps neutral Airtable depth instead of blue-tinted workspace chrome', () => {
+  const cssSource = readSource('src/index.css');
+  const darkModeBlock = cssSource.slice(
+    cssSource.indexOf('body.dark-mode {', cssSource.indexOf('Airtable-Inspired Global UI Refit')),
+    cssSource.indexOf('}', cssSource.indexOf('body.dark-mode {', cssSource.indexOf('Airtable-Inspired Global UI Refit'))),
+  );
+
+  assert.match(darkModeBlock, /--bg-canvas:\s*#0b0f16;/);
+  assert.doesNotMatch(darkModeBlock, /--bg-canvas:\s*#0b1220;/);
+  assert.doesNotMatch(darkModeBlock, /--bg-canvas:\s*#1[0-9a-f]{5};/i);
+  assert.match(cssSource, /\.canvas-container\s*\{[\s\S]*background-color:\s*var\(--bg-canvas\);/);
+});
+
+test('canvas card shadows follow Airtable capped depth instead of legacy cinematic shadows', () => {
+  const shadowSource = readSource('src/utils/canvasCardShadow.ts');
+
+  assert.match(shadowSource, /Airtable canvas card shadow/i);
+  assert.match(shadowSource, /rgba\(24, 29, 38, 0\.10\)/);
+  assert.match(shadowSource, /rgba\(0, 0, 0, 0\.18\)/);
+  assert.doesNotMatch(shadowSource, /Apple Cinematic/i);
+  assert.doesNotMatch(shadowSource, /0,\s*16 \* scale,\s*48 \* scale/);
+  assert.doesNotMatch(shadowSource, /rgba\(0, 0, 0, 0\.45\)/);
+  assert.doesNotMatch(shadowSource, /rgba\(0, 0, 0, 0\.6\)/);
 });
 
 test('search palette uses shared Airtable tokens without heavy shadows or inline focus mutation', () => {

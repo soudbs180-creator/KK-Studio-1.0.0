@@ -64,6 +64,34 @@ describe('responsive surface utilities', () => {
     }
   });
 
+  test('tutorial overlay keeps separate mobile and desktop onboarding flows', () => {
+    const source = readFileSync('src/components/common/TutorialOverlay.tsx', 'utf8');
+
+    assert.match(source, /const DESKTOP_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
+    assert.match(source, /const MOBILE_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
+    assert.match(source, /const getTutorialSteps = \(surface: TutorialSurface\)/);
+    assert.match(source, /const tutorialSurface: TutorialSurface = isMobile \? 'mobile' : 'desktop'/);
+    assert.match(source, /setCurrentStepIndex\(\(current\) => Math\.min\(current, STEPS\.length - 1\)\)/);
+
+    assert.doesNotMatch(source, /targetId:\s*isMobile\s*\?/);
+    assert.doesNotMatch(source, /position:\s*isMobile\s*\?/);
+
+    const mobileSteps = source.slice(
+      source.indexOf('const MOBILE_TUTORIAL_STEPS'),
+      source.indexOf('const getTutorialSteps'),
+    );
+    const desktopSteps = source.slice(
+      source.indexOf('const DESKTOP_TUTORIAL_STEPS'),
+      source.indexOf('const MOBILE_TUTORIAL_STEPS'),
+    );
+
+    assert.match(mobileSteps, /mobile-tab-bar/);
+    assert.match(mobileSteps, /mobile-prompt-sheet|移动端|底部/);
+    assert.doesNotMatch(mobileSteps, /project-manager-container/);
+    assert.match(desktopSteps, /project-manager-container/);
+    assert.doesNotMatch(desktopSteps, /mobile-tab-bar/);
+  });
+
   test('caps standard result columns by compact surface while detail mode is single column', () => {
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 320, viewMode: 'standard' }), 2);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 520, viewMode: 'standard' }), 3);

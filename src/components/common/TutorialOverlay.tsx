@@ -14,6 +14,69 @@ interface TutorialOverlayProps {
     onComplete: () => void;
 }
 
+type TutorialSurface = 'mobile' | 'desktop';
+
+const DESKTOP_TUTORIAL_STEPS: TutorialStep[] = [
+    {
+        title: "欢迎使用无限画布",
+        description: "这是您的自由创作空间，没有任何边界限制。\n\n• 🖱️ 双击空白处：快速创建新的图像卡片\n• 🔍 滚轮缩放：自由缩放查看细节\n• ✋ 按住空格拖拽：平移画布视角\n• 💡 这不仅仅是一个画板，更是一个思维导图式的创作流工具。",
+        position: "center"
+    },
+    {
+        targetId: "prompt-bar-container",
+        title: "指令创作中心",
+        description: "这是桌面端的控制台。支持图片与视频双模式创作。\n\n• 🎨 输入描述：在中间输入框描述画面\n• 📐 比例与尺寸：左侧灵活调整画幅与分辨率\n• 🖼️ 参考图：右侧上传参考图，支持多图混搭\n• ⚡ 快捷键：Enter 发送，Shift+Enter 换行",
+        position: "top"
+    },
+    {
+        targetId: "project-manager-container",
+        title: "桌面项目与工具栏",
+        description: "桌面端把项目管理、搜索和视图工具集中在侧栏。\n\n• 📁 项目管理：新建、切换与归档不同项目\n• 🔍 全局搜索：Ctrl+K 快速查找历史提示词\n• 📏 视图工具：网格对齐、一键归位、主题切换\n• 📂 导入导出：支持 .kk 格式项目文档",
+        position: "right"
+    },
+    {
+        targetId: "chat-trigger-button",
+        title: "AI 创意助手",
+        description: "您的全天候创作伙伴。\n\n• 🤖 灵感对话：不知道画什么？问问它\n• ✨ 提示词优化：帮您优化简陋的描述词\n• 📝 自动补全：基于上下文智能建议后续内容",
+        position: "top"
+    },
+    {
+        targetId: "header-user-menu",
+        title: "账户与设置",
+        description: "桌面端从右上角进入个人偏好与资源管理。\n\n• 🔑 API 管理：配置与切换不同的 AI 模型 Key\n• 📊 成本监控：实时查看今日消耗与剩余预算\n• ☁️ 云端同步：开启多设备自动同步功能",
+        position: "bottom"
+    }
+];
+
+const MOBILE_TUTORIAL_STEPS: TutorialStep[] = [
+    {
+        title: "欢迎使用移动端画布",
+        description: "移动端引导专门围绕触控和底部操作区设计。\n\n• 👆 轻点卡片：查看或继续编辑\n• 🤏 双指缩放：放大查看细节\n• 🧭 底部导航：在项目、结果和工具之间切换\n• 💡 移动端会优先保持关键操作在拇指可达区域。",
+        position: "center"
+    },
+    {
+        targetId: "prompt-bar-container",
+        title: "移动端底部指令区",
+        description: "这是移动端底部 prompt sheet，用来输入提示词、切换模式和上传参考图。\n\n• 🎨 输入描述：在底部输入框描述画面\n• 🖼️ 添加参考图：从移动端入口上传或选择素材\n• ⚡ 发送前确认比例、模型和生成模式",
+        position: "top"
+    },
+    {
+        targetId: "mobile-tab-bar",
+        title: "移动端底部导航",
+        description: "手机端不使用桌面侧栏，核心入口都在底部导航。\n\n• 📁 项目：切换当前项目\n• 🖼️ 结果：查看最近生成内容\n• ⚙️ 工具：进入搜索、设置和账户入口",
+        position: "top"
+    },
+    {
+        targetId: "header-user-menu",
+        title: "移动端账户入口",
+        description: "移动端账户与设置入口保留在顶部，避免和底部创作流程混在一起。\n\n• 🔑 管理 API Key\n• 📊 查看成本与余额\n• ☁️ 检查同步状态",
+        position: "bottom"
+    }
+];
+
+const getTutorialSteps = (surface: TutorialSurface) =>
+    surface === 'mobile' ? MOBILE_TUTORIAL_STEPS : DESKTOP_TUTORIAL_STEPS;
+
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [rect, setRect] = useState<DOMRect | null>(null);
@@ -22,41 +85,15 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     );
     const [tooltipSize, setTooltipSize] = useState({ width: 360, height: 320 });
     const overlayColor = 'rgba(0, 0, 0, 0.82)';
+    const tutorialSurface: TutorialSurface = isMobile ? 'mobile' : 'desktop';
+    const STEPS = React.useMemo(() => getTutorialSteps(tutorialSurface), [tutorialSurface]);
 
-    const STEPS: TutorialStep[] = React.useMemo(() => [
-        {
-            // Removed targetId for "Infinite Canvas" to show centered text on dark overlay (better intro)
-            title: "欢迎使用无限画布",
-            description: "这是您的自由创作空间，没有任何边界限制。\n\n• 🖱️ 双击空白处：快速创建新的图像卡片\n• 🔍 滚轮缩放：自由缩放查看细节\n• ✋ 按住空格拖拽：平移画布视角\n• 💡这不仅仅是一个画板，更是一个思维导图式的创作流工具。",
-            position: "center"
-        },
-        {
-            targetId: "prompt-bar-container",
-            title: "指令创作中心",
-            description: "这是您的控制台。支持图片与视频双模式创作。\n\n• 🎨 输入描述：在中间输入框描述画面\n• 📐 比例与尺寸：左侧灵活调整画幅与分辨率\n• 🖼️ 参考图：右侧上传参考图，支持多图混搭\n• ⚡ 快捷键：Enter 发送，Shift+Enter 换行",
-            position: "top"
-        },
-        {
-            targetId: isMobile ? "mobile-tab-bar" : "project-manager-container",
-            title: "左侧工具栏",
-            description: "管理您的创意资产与视图设置。\n\n• 📁 项目管理：新建、切换与归档不同项目\n• 🔍 全局搜索：Ctrl+K 快速查找历史提示词\n• 📏 视图工具：网格对齐、一键归位、主题切换\n• 📂 导入导出：支持 .kk 格式项目文档",
-            position: isMobile ? "top" : "right"
-        },
-        {
-            targetId: "chat-trigger-button",
-            title: "AI 创意助手",
-            description: "您的全天候创作伙伴。\n\n• 🤖 灵感对话：不知道画什么？问问它\n• ✨ 提示词通过：帮您优化简陋的描述词\n• 📝 自动补全：基于上下文智能建议后续内容",
-            position: "top"
-        },
-        {
-            targetId: "header-user-menu",
-            title: "账户与设置",
-            description: "管理您的个人偏好与资源。\n\n• 🔑 API 管理：配置与切换不同的 AI 模型 Key\n• 📊 成本监控：实时查看今日消耗与剩余预算\n• ☁️ 云端同步：开启多设备自动同步功能",
-            position: isMobile ? "bottom" : "bottom"
-        }
-    ], [isMobile]);
+    useEffect(() => {
+        setCurrentStepIndex((current) => Math.min(current, STEPS.length - 1));
+    }, [STEPS.length]);
 
-    const step = STEPS[currentStepIndex];
+    const displayStepIndex = Math.min(currentStepIndex, STEPS.length - 1);
+    const step = STEPS[displayStepIndex];
 
     useEffect(() => {
         const handleResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
@@ -120,12 +157,12 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             window.removeEventListener('resize', throttledUpdate);
             window.removeEventListener('scroll', throttledUpdate, true);
         };
-    }, [currentStepIndex, step.targetId]);
+    }, [displayStepIndex, step.targetId]);
 
 
     const handleNext = () => {
-        if (currentStepIndex < STEPS.length - 1) {
-            setCurrentStepIndex(prev => prev + 1);
+        if (displayStepIndex < STEPS.length - 1) {
+            setCurrentStepIndex(prev => Math.min(prev + 1, STEPS.length - 1));
         } else {
             onComplete();
         }
@@ -170,7 +207,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             window.removeEventListener('resize', updateTooltipSize);
             resizeObserver?.disconnect();
         };
-    }, [currentStepIndex, step.title, step.description, isMobile]);
+    }, [displayStepIndex, step.title, step.description, isMobile]);
 
     // Calculate position for the tooltip - use transform for GPU acceleration
     const getTooltipTransform = (): React.CSSProperties => {
@@ -367,7 +404,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                         <div className="flex items-center gap-2">
                             <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
                             <span className="text-[10px] font-bold tracking-widest text-[var(--text-tertiary)] uppercase">
-                                Step {currentStepIndex + 1} of {STEPS.length}
+                                Step {displayStepIndex + 1} of {STEPS.length}
                             </span>
                         </div>
                         <button
@@ -386,8 +423,8 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                     <div className="flex justify-between items-center gap-3">
                         <button
                             onClick={handlePrev}
-                            disabled={currentStepIndex === 0}
-                            className={`flex items-center justify-center w-10 h-10 rounded-full border border-[var(--border-light)] leading-none transition-transform ${currentStepIndex === 0
+                            disabled={displayStepIndex === 0}
+                            className={`flex items-center justify-center w-10 h-10 rounded-full border border-[var(--border-light)] leading-none transition-transform ${displayStepIndex === 0
                                 ? 'opacity-20 cursor-not-allowed'
                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] active:scale-90'
                                 }`}
@@ -399,7 +436,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                             onClick={handleNext}
                             className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full bg-[var(--text-primary)] text-[14px] font-bold leading-none text-[var(--bg-primary)] transition-transform shadow-lg active:scale-[0.98]"
                         >
-                            {currentStepIndex === STEPS.length - 1 ? (
+                            {displayStepIndex === STEPS.length - 1 ? (
                                 <>
                                     <span className="leading-none">开始探索</span>
                                     <Check size={18} className="shrink-0" />

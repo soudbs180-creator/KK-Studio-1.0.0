@@ -19,6 +19,31 @@ test('startup screen and storage selection modal avoid bright blue accents in th
   assert.doesNotMatch(storageModalSource, /bg-indigo-600|shadow-indigo|text-indigo-300|border-indigo-500|bg-indigo-500/);
   assert.match(
     storageModalSource,
-    /var\(--settings-button-primary-bg(?:,\s*var\(--bg-elevated\))?\)|var\(--settings-button-secondary-bg(?:,\s*var\(--bg-elevated\))?\)|var\(--settings-surface-overlay(?:,\s*var\(--bg-elevated\))?\)/,
+    /var\(--storage-selection-primary-bg\)|var\(--storage-selection-option-bg\)|var\(--storage-selection-card-bg\)/,
   );
+});
+
+test('storage selection modal owns its light and dark theme surface contract', () => {
+  const storageModalSource = readSource('src/components/modals/StorageSelectionModal.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(storageModalSource, /storage-selection-modal/);
+  assert.match(storageModalSource, /--storage-selection-card-bg/);
+  assert.match(storageModalSource, /--storage-selection-text-primary/);
+  assert.match(storageModalSource, /--storage-selection-text-secondary/);
+  assert.match(storageModalSource, /--storage-selection-text-muted/);
+  assert.match(storageModalSource, /--storage-selection-border/);
+  assert.match(storageModalSource, /--storage-selection-option-bg/);
+  assert.match(storageModalSource, /--storage-selection-overlay-bg/);
+
+  assert.match(cssSource, /body:not\(\.dark-mode\) \.storage-selection-modal\s*\{/);
+  assert.match(cssSource, /body\.dark-mode \.storage-selection-modal\s*\{/);
+  assert.match(cssSource, /--storage-selection-card-bg:\s*#ffffff;/);
+  assert.match(cssSource, /--storage-selection-text-primary:\s*#181d26;/);
+  assert.match(cssSource, /--storage-selection-card-bg:\s*#111827;/);
+  assert.match(cssSource, /--storage-selection-text-primary:\s*#f8fbff;/);
+
+  const modalBody = storageModalSource.slice(storageModalSource.indexOf('return ('));
+  assert.doesNotMatch(modalBody, /var\(--settings-section-bg/);
+  assert.doesNotMatch(modalBody, /var\(--text-primary/);
 });

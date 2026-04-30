@@ -548,7 +548,7 @@ body.dark-mode {
   --bg-overlay: #2a2a2d;
   --bg-input: #343b40;
   --bg-hover: #3d454b;
-  --bg-canvas: #05070c;
+  --bg-canvas: #0b0f16;
 
   /* 兼容旧变*/
   --bg-primary: var(--bg-base);
@@ -11356,16 +11356,16 @@ body.dark-mode .settings-panel {
 }
 
 body.dark-mode {
-  --bg-base: #111827;
-  --bg-elevated: #172033;
-  --bg-surface: #151f2e;
-  --bg-overlay: rgb(20 30 44 / 0.94);
-  --bg-input: #172033;
-  --bg-hover: rgb(79 144 240 / 0.10);
-  --bg-canvas: #0b1220;
+  --bg-base: #101113;
+  --bg-elevated: #17191d;
+  --bg-surface: #1d2025;
+  --bg-overlay: rgb(22 24 28 / 0.94);
+  --bg-input: #17191d;
+  --bg-hover: rgb(255 255 255 / 0.07);
+  --bg-canvas: #0b0f16;
   --bg-primary: var(--bg-base);
   --bg-secondary: var(--bg-surface);
-  --bg-tertiary: #1a2638;
+  --bg-tertiary: #22262d;
   --text-primary: #f8fbff;
   --text-secondary: rgb(248 251 255 / 0.74);
   --text-tertiary: rgb(248 251 255 / 0.56);
@@ -11380,9 +11380,9 @@ body.dark-mode {
   --state-info-bg: rgb(79 144 240 / 0.14);
   --state-info-border: rgb(79 144 240 / 0.28);
   --state-info-text: #8bb8ff;
-  --ui-glass-shell-bg: rgb(17 24 39 / 0.78);
-  --ui-glass-card-bg: rgb(23 32 51 / 0.72);
-  --ui-glass-subcard-bg: rgb(27 39 58 / 0.68);
+  --ui-glass-shell-bg: rgb(16 17 19 / 0.78);
+  --ui-glass-card-bg: rgb(23 25 29 / 0.72);
+  --ui-glass-subcard-bg: rgb(29 32 37 / 0.68);
   --ui-glass-shell-shadow: 0 16px 36px rgb(0 0 0 / 0.22);
   --ui-glass-card-shadow: 0 10px 24px rgb(0 0 0 / 0.18);
   --ui-glass-subcard-shadow: 0 4px 12px rgb(0 0 0 / 0.14);
@@ -11426,6 +11426,42 @@ body.dark-mode .settings-panel {
   --settings-segment-active-bg: rgb(31 45 66 / 0.92);
   --settings-segment-active-border: rgb(139 184 255 / 0.22);
   --settings-segment-active-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+}
+
+body:not(.dark-mode) .storage-selection-modal {
+  --storage-selection-overlay-bg: rgb(24 29 38 / 0.38);
+  --storage-selection-card-bg: #ffffff;
+  --storage-selection-option-bg: #f8fafc;
+  --storage-selection-option-selected-bg: linear-gradient(180deg, rgb(27 97 201 / 0.06) 0%, rgb(255 255 255 / 0.96) 100%);
+  --storage-selection-text-primary: #181d26;
+  --storage-selection-text-secondary: rgb(24 29 38 / 0.72);
+  --storage-selection-text-muted: rgb(24 29 38 / 0.56);
+  --storage-selection-border: rgb(24 29 38 / 0.10);
+  --storage-selection-border-strong: rgb(27 97 201 / 0.34);
+  --storage-selection-icon-bg: #f7f8fb;
+  --storage-selection-shadow: 0 16px 36px rgb(24 29 38 / 0.10);
+  --storage-selection-icon-shadow: 0 4px 12px rgb(24 29 38 / 0.06);
+  --storage-selection-primary-bg: #1b61c9;
+  --storage-selection-primary-text: #ffffff;
+  --storage-selection-primary-shadow: 0 4px 12px rgb(27 97 201 / 0.16);
+}
+
+body.dark-mode .storage-selection-modal {
+  --storage-selection-overlay-bg: rgb(3 7 12 / 0.72);
+  --storage-selection-card-bg: #111827;
+  --storage-selection-option-bg: #17191d;
+  --storage-selection-option-selected-bg: linear-gradient(180deg, rgb(79 144 240 / 0.12) 0%, rgb(29 32 37 / 0.96) 100%);
+  --storage-selection-text-primary: #f8fbff;
+  --storage-selection-text-secondary: rgb(248 251 255 / 0.74);
+  --storage-selection-text-muted: rgb(248 251 255 / 0.56);
+  --storage-selection-border: rgb(248 251 255 / 0.10);
+  --storage-selection-border-strong: rgb(139 184 255 / 0.34);
+  --storage-selection-icon-bg: #1d2025;
+  --storage-selection-shadow: 0 16px 36px rgb(0 0 0 / 0.22);
+  --storage-selection-icon-shadow: 0 4px 12px rgb(0 0 0 / 0.14);
+  --storage-selection-primary-bg: #4f90f0;
+  --storage-selection-primary-text: #07111f;
+  --storage-selection-primary-shadow: 0 4px 12px rgb(79 144 240 / 0.18);
 }
 
 .settings-control-motion {
@@ -12140,8 +12176,8 @@ body:not(.dark-mode) {
   --settings-shell-border: rgba(29, 29, 31, 0.08);
   --settings-sidebar-border: var(--settings-nav-glass-border);
   --settings-border-subtle: rgba(29, 29, 31, 0.08);
-  --settings-card-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
-  --settings-shell-shadow: 0 28px 72px rgba(0, 0, 0, 0.12);
+  --settings-card-shadow: var(--ui-glass-card-shadow);
+  --settings-shell-shadow: var(--ui-glass-shell-shadow);
   --settings-sidebar-shadow: none;
   --settings-focus-border: rgba(0, 113, 227, 0.48);
   --settings-focus-ring: rgba(0, 113, 227, 0.14);
@@ -12204,8 +12240,8 @@ body:not(.dark-mode) {
   --settings-avatar-text: #ffffff;
   --settings-notification-dot-border: #ffffff;
   --settings-backdrop-bg: rgba(245, 245, 247, 0.86);
-  --settings-subcard-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
-  --settings-subcard-hover-shadow: 0 16px 32px rgba(0, 0, 0, 0.12);
+  --settings-subcard-shadow: var(--ui-glass-subcard-shadow);
+  --settings-subcard-hover-shadow: 0 8px 18px rgb(24 29 38 / 0.08);
   --settings-chart-bg: #ffffff;
   --settings-chart-border: rgba(29, 29, 31, 0.08);
   --settings-chart-grid: rgba(29, 29, 31, 0.08);
@@ -12235,8 +12271,8 @@ body.dark-mode .settings-panel {
   --settings-shell-border: rgba(255, 255, 255, 0.12);
   --settings-sidebar-border: var(--settings-nav-glass-border);
   --settings-border-subtle: rgb(255 255 255 / 0.1);
-  --settings-card-shadow: 0 20px 44px rgb(0 0 0 / 0.16);
-  --settings-shell-shadow: 0 28px 72px rgb(0 0 0 / 0.26);
+  --settings-card-shadow: var(--ui-glass-card-shadow);
+  --settings-shell-shadow: var(--ui-glass-shell-shadow);
   --settings-sidebar-shadow: none;
   --settings-focus-border: rgba(41, 151, 255, 0.48);
   --settings-focus-ring: rgba(41, 151, 255, 0.16);
@@ -12298,8 +12334,8 @@ body.dark-mode .settings-panel {
   --settings-avatar-text: #f3f4f6;
   --settings-notification-dot-border: rgb(6 10 16);
   --settings-backdrop-bg: rgb(2 3 5 / 0.84);
-  --settings-subcard-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
-  --settings-subcard-hover-shadow: 0 22px 48px rgba(0, 0, 0, 0.24);
+  --settings-subcard-shadow: var(--ui-glass-subcard-shadow);
+  --settings-subcard-hover-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
   --settings-chart-bg: #161618;
   --settings-chart-border: rgb(255 255 255 / 0.08);
   --settings-chart-grid: rgb(255 255 255 / 0.08);
