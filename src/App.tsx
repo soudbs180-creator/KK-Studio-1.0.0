@@ -107,7 +107,7 @@ import { useWorkflowSourceResolvers } from './app/useWorkflowSourceResolvers';
 import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
-import { useGenerationRuntime } from './app/useGenerationRuntime';
+import { useGenerationRuntime, type RetryGeneratedMediaResultContext } from './app/useGenerationRuntime';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -4576,46 +4576,21 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
 
         try {
-          let b64 = '';
-          let requestPath: string | undefined = undefined;
-          let requestBodyPreview: string | undefined = undefined;
-          let pythonSnippet: string | undefined = undefined;
-          let apiDurationMs: number | undefined = undefined;
-          let actualKeySlotId = executionNode.keySlotId;
-          let actualProvider = executionNode.provider;
-          let actualProviderLabel = executionNode.providerLabel;
-          let actualModelLabel = executionNode.modelLabel;
-          let actualModel = executionNode.model;
-          let actualCost: number | undefined = undefined;
-          let actualCostSource: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none' | undefined = undefined;
-          let actualTokens: number | undefined = undefined;
-          let actualPromptTokens: number | undefined = undefined;
-          let actualCompletionTokens: number | undefined = undefined;
           const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
             count,
             executionNode,
             index,
             sourcePrompt: node.prompt,
           });
+          let generatedMediaContext: RetryGeneratedMediaResultContext;
 
           if (currentMode === GenerationMode.VIDEO) {
             const videoRequest = prepareRetryVideoGenerationRequest({ executionNode, taskPrompt });
             const videoResult = await llmService.generateVideo(videoRequest);
-            const videoResultContext = buildRetryVideoGenerationResultContext({
+            generatedMediaContext = buildRetryVideoGenerationResultContext({
               executionNode,
               videoResult,
             });
-            b64 = videoResultContext.b64;
-            actualKeySlotId = videoResultContext.resultMetadata.keySlotId;
-            actualProvider = videoResultContext.resultMetadata.provider;
-            actualProviderLabel = videoResultContext.resultMetadata.providerLabel;
-            actualModelLabel = videoResultContext.resultMetadata.modelLabel;
-            actualModel = videoResultContext.resultMetadata.model;
-            actualCost = videoResultContext.resultMetadata.cost;
-            actualTokens = videoResultContext.resultMetadata.tokens;
-            actualPromptTokens = videoResultContext.resultMetadata.promptTokens;
-            actualCompletionTokens = videoResultContext.resultMetadata.completionTokens;
-            actualCostSource = videoResultContext.resultMetadata.costSource;
           } else {
             const imageRequest = prepareRetryImageGenerationRequest({ executionNode, requestId, taskPrompt });
             const result = await generateImage(
@@ -4623,30 +4598,16 @@ const AppContent: React.FC<AppContentProps> = () => {
               imageRequest.grounding,
               imageRequest.options,
             );
-            const imageResultContext = buildRetryImageGenerationResultContext({
+            generatedMediaContext = buildRetryImageGenerationResultContext({
               executionNode,
               result,
               resolveModelDisplayName,
             });
-            b64 = imageResultContext.b64;
-            requestPath = imageResultContext.requestTrace.requestPath;
-            requestBodyPreview = imageResultContext.requestTrace.requestBodyPreview;
-            pythonSnippet = imageResultContext.requestTrace.pythonSnippet;
-            apiDurationMs = imageResultContext.apiDurationMs;
-            actualKeySlotId = imageResultContext.resultMetadata.keySlotId;
-            actualProvider = imageResultContext.resultMetadata.provider;
-            actualProviderLabel = imageResultContext.resultMetadata.providerLabel;
-            actualModel = imageResultContext.resultMetadata.model;
-            actualModelLabel = imageResultContext.resultMetadata.modelLabel;
-            actualCost = imageResultContext.resultMetadata.cost;
-            actualTokens = imageResultContext.resultMetadata.tokens;
-            actualPromptTokens = imageResultContext.resultMetadata.promptTokens;
-            actualCompletionTokens = imageResultContext.resultMetadata.completionTokens;
-            actualCostSource = imageResultContext.resultMetadata.costSource;
-            if (typeof imageResultContext.balanceAfter === 'number') {
-              applyAuthoritativeBalance(imageResultContext.balanceAfter);
-            }
           }
+          if (typeof generatedMediaContext.balanceAfter === 'number') {
+            applyAuthoritativeBalance(generatedMediaContext.balanceAfter);
+          }
+          const { apiDurationMs, b64, requestTrace, resultMetadata } = generatedMediaContext;
 
           timeoutGuard.markFinished();
           timeoutGuard.clear();
@@ -4685,19 +4646,8 @@ const AppContent: React.FC<AppContentProps> = () => {
             mediaDimensions,
             mediaPersistence,
             prompt: taskPrompt,
-            requestTrace: { requestPath, requestBodyPreview, pythonSnippet },
-            resultMetadata: {
-              completionTokens: actualCompletionTokens,
-              cost: actualCost,
-              costSource: actualCostSource,
-              keySlotId: actualKeySlotId,
-              model: actualModel,
-              modelLabel: actualModelLabel,
-              promptTokens: actualPromptTokens,
-              provider: actualProvider,
-              providerLabel: actualProviderLabel,
-              tokens: actualTokens,
-            },
+            requestTrace,
+            resultMetadata,
           });
           return generatedResult;
         } catch (e: any) {

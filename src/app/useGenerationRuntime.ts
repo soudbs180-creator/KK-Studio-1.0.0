@@ -294,10 +294,15 @@ export interface BuildRetryVideoGenerationResultContextParams {
   videoResult: VideoGenerationResult;
 }
 
-export interface BuildRetryVideoGenerationResultContextResult {
+export interface RetryGeneratedMediaResultContext {
+  apiDurationMs?: number;
   b64: string;
+  balanceAfter?: number;
+  requestTrace: RetryGenerationSuccessDebugResult;
   resultMetadata: RetryGeneratedMediaResultMetadata;
 }
+
+export type BuildRetryVideoGenerationResultContextResult = RetryGeneratedMediaResultContext;
 
 export interface PrepareRetryImageGenerationRequestParams {
   executionNode: Pick<
@@ -333,13 +338,7 @@ export interface BuildRetryImageGenerationResultContextParams {
   resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
 }
 
-export interface BuildRetryImageGenerationResultContextResult {
-  apiDurationMs?: number;
-  b64: string;
-  balanceAfter?: number;
-  requestTrace: RetryGenerationSuccessDebugResult;
-  resultMetadata: RetryGeneratedMediaResultMetadata;
-}
+export type BuildRetryImageGenerationResultContextResult = RetryGeneratedMediaResultContext;
 
 export interface PrepareRetryGeneratedMediaPersistenceParams {
   b64: string;
@@ -852,6 +851,7 @@ export function useGenerationRuntime({
     const cost = resolveFiniteNumber(usage?.cost);
 
     return {
+      requestTrace: {},
       b64: params.videoResult.url,
       resultMetadata: {
         completionTokens: resolveFiniteNumber(usage?.completionTokens),
