@@ -11,6 +11,7 @@ import { getModelCapabilities } from '../services/model/modelCapabilities';
 import type { ModelExecutionLane } from '../services/model/modelExecutionLane';
 import { GenerationMode, ImageSize, type Canvas, type GeneratedImage, type GenerationConfig, type PromptNode, type ReferenceImage } from '../types';
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
+import { buildCompletedPromptNodePatch } from './buildCompletedPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
 import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
 import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
@@ -366,6 +367,12 @@ export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
   width: number;
 };
 
+export interface BuildRetryCompletedPromptPatchParams {
+  alignedImageNodes: Array<Pick<GeneratedImage, 'id' | 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>>;
+  executionNode: Pick<PromptNode, 'keySlotId' | 'model' | 'modelLabel' | 'provider' | 'providerLabel'>;
+  resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -419,6 +426,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
+  buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -917,6 +925,25 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const buildRetryCompletedPromptPatch = useCallback((params: BuildRetryCompletedPromptPatchParams): Partial<PromptNode> => {
+    const primaryImageNode = params.alignedImageNodes[0];
+    const modelId = primaryImageNode?.model || params.executionNode.model;
+
+    return {
+      isGenerating: false,
+      isDraft: false,
+      childImageIds: params.alignedImageNodes.map(n => n.id),
+      ...buildCompletedPromptNodePatch(),
+      keySlotId: primaryImageNode?.keySlotId || params.executionNode.keySlotId,
+      provider: primaryImageNode?.provider || params.executionNode.provider,
+      providerLabel: primaryImageNode?.providerLabel || params.executionNode.providerLabel,
+      modelLabel: params.resolveModelDisplayName(
+        modelId,
+        primaryImageNode?.modelLabel || params.executionNode.modelLabel,
+      ),
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -1155,6 +1182,7 @@ export function useGenerationRuntime({
     prepareRetryGeneratedMediaPersistence,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
+    buildRetryCompletedPromptPatch,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

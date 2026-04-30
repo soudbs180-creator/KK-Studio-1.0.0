@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media result assembly slice is validated in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry completed prompt patch assembly slice is validated in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8781 lines after Milestone 4 retry generated media result assembly extraction
+- `src/App.tsx`: 8776 lines after Milestone 4 retry completed prompt patch assembly extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -1029,8 +1029,35 @@ Current risk:
 - Result layout and `addImageNodes` remain in `App.tsx`; moving them is a higher-risk layout/canvas mutation slice and should have separate contract coverage.
 - `buildRetryGeneratedMediaResult` has a broad parameter object because it preserves existing metadata exactly; future cleanup can group provider/debug metadata only after behavior contracts are stable.
 
+Twenty-fifth slice scope:
+- Added hook-owned `buildRetryCompletedPromptPatch` with explicit params and `Partial<PromptNode>` result typing.
+- Moved retry parent prompt completion patch assembly into `src/app/useGenerationRuntime.ts`, including `childImageIds`, completed billing/error cleanup fields, key/provider fallback metadata, and resolved model label.
+- Replaced inline parent patch object in `App.tsx` with `const retryCompletedPromptPatch = buildRetryCompletedPromptPatch(...)` while keeping `addImageNodes` itself in `App.tsx`.
+- Imported `buildCompletedPromptNodePatch` into the runtime hook for this retry completion boundary.
+
+Line count change during Milestone 4 twenty-fifth slice:
+- `src/App.tsx`: `8781` lines after twenty-fourth slice -> `8776` lines.
+- `src/app/useGenerationRuntime.ts`: `1162` lines -> `1190` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `568` lines -> `589` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `buildRetryCompletedPromptPatch`, while `App.tsx` still assembled the parent completion patch inline.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `26` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `40` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `1013` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `addImageNodes` and the retry result layout algorithm remain in `App.tsx`; moving either changes canvas mutation/layout ownership and should be handled in a separate contract.
+- `buildRetryCompletedPromptPatch` accepts `resolveModelDisplayName` as a dependency parameter so the runtime hook does not import display-name logic directly.
+
 Next step:
-- Continue M4 with a separate layout-preparation contract or a smaller prompt-completion patch helper; keep `addImageNodes`, PPT runtime, and ecommerce runtime untouched unless the next contract explicitly covers them.
+- Continue M4 by either extracting retry layout preparation behind explicit layout contracts or stopping M4 retry slicing before `addImageNodes` if the remaining layout risk is better left for a dedicated layout milestone.
 
 ### Milestones 5-9
 
@@ -1437,6 +1464,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `39` tests.
   - `npm.cmd run typecheck`: failed once because `seed` was an existing runtime field outside `GeneratedImage`; passed after adding it to `RetryGeneratedMediaResult`.
   - `npm.cmd run test:unit`: passed, `1012` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twenty-fifth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `buildRetryCompletedPromptPatch`, while `App.tsx` still assembled the parent completion patch inline.
+  - Targeted M4 billing/runtime/route tests: passed, `40` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1013` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI runtime refactor.
   - `npm.cmd run check:encoding`: passed after status update.

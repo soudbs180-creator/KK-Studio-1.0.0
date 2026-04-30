@@ -564,4 +564,25 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /sourceReferenceStorageIds: \(executionNode\.referenceImages \|\| \[\]\)\.map/);
     assert.doesNotMatch(retryNodeSource, /id: `\$\{Date\.now\(\)\}_\$\{index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
   });
+
+  test('retry completed prompt patch assembly is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /buildRetryCompletedPromptPatch: \(params: BuildRetryCompletedPromptPatchParams\) => Partial<PromptNode>;/);
+    assert.match(hookSource, /const buildRetryCompletedPromptPatch = useCallback\(\(params: BuildRetryCompletedPromptPatchParams\): Partial<PromptNode> => \{/);
+    assert.match(hookSource, /childImageIds: params\.alignedImageNodes\.map\(n => n\.id\),/);
+    assert.match(hookSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
+    assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
+
+    assert.match(retryNodeSource, /const retryCompletedPromptPatch = buildRetryCompletedPromptPatch\(\{/);
+    assert.match(retryNodeSource, /addImageNodes\(alignedImageNodes, \{\s*\[node\.id\]: retryCompletedPromptPatch,\s*\}\);/);
+    assert.doesNotMatch(retryNodeSource, /childImageIds: alignedImageNodes\.map\(n => n\.id\),/);
+    assert.doesNotMatch(retryNodeSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
+    assert.doesNotMatch(retryNodeSource, /modelLabel: resolveModelDisplayName\(/);
+  });
 });
