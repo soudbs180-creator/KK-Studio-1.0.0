@@ -425,4 +425,26 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/billing\/costService'\)/);
     assert.doesNotMatch(retryNodeSource, /notify\.success\('生成完成', '重新生成成功'\);/);
   });
+
+  test('retry generation task prompt context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryGenerationTaskPromptContext: \(params: PrepareRetryGenerationTaskPromptContextParams\) => PrepareRetryGenerationTaskPromptContextResult;/);
+    assert.match(hookSource, /const prepareRetryGenerationTaskPromptContext = useCallback\(\(params: PrepareRetryGenerationTaskPromptContextParams\)/);
+    assert.match(hookSource, /const currentMode = params\.executionNode\.mode \|\| GenerationMode\.IMAGE;/);
+    assert.match(hookSource, /const slideLines = \(params\.executionNode\.pptSlides \|\| \[\]\)[\s\S]*?\.map/);
+    assert.match(hookSource, /params\.executionNode\.pptStyleLocked !== false/);
+    assert.match(hookSource, /PPT 第 \$\{params\.index \+ 1\}\/\$\{params\.count\} 页/);
+
+    assert.match(retryNodeSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
+    assert.match(retryNodeSource, /sourcePrompt: node\.prompt,/);
+    assert.doesNotMatch(retryNodeSource, /const currentMode: GenerationMode = executionNode\.mode \|\| GenerationMode\.IMAGE;/);
+    assert.doesNotMatch(retryNodeSource, /const taskPrompt = currentMode === GenerationMode\.PPT/);
+    assert.doesNotMatch(retryNodeSource, /const styleDirective = executionNode\.pptStyleLocked !== false/);
+  });
 });

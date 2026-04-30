@@ -3309,6 +3309,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
     reportRetryGenerationSuccess,
+    prepareRetryGenerationTaskPromptContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4580,19 +4581,12 @@ const AppContent: React.FC<AppContentProps> = () => {
           let actualTokens: number | undefined = undefined;
           let actualPromptTokens: number | undefined = undefined;
           let actualCompletionTokens: number | undefined = undefined;
-          const currentMode: GenerationMode = executionNode.mode || GenerationMode.IMAGE;
-          const taskPrompt = currentMode === GenerationMode.PPT
-            ? (() => {
-              const slideLines = (executionNode.pptSlides || []).map(line => String(line || '').trim()).filter(Boolean);
-              const styleDirective = executionNode.pptStyleLocked !== false
-                ? '与整套 PPT 保持完全统一的视觉语言'
-                : '保持整体风格统一，但允许当前页面有适度变化';
-              const picked = slideLines.length > 0
-                ? slideLines[Math.min(index, slideLines.length - 1)]
-                : `主题：${node.prompt}。保持同一套视觉风格，页面内容独立不重复。`;
-              return `PPT 第 ${index + 1}/${count} 页。${picked}。16:9。${styleDirective}。`;
-            })()
-            : executionNode.prompt;
+          const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
+            count,
+            executionNode,
+            index,
+            sourcePrompt: node.prompt,
+          });
 
           if (currentMode === GenerationMode.VIDEO) {
             const videoResolution = (() => {
@@ -4985,7 +4979,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

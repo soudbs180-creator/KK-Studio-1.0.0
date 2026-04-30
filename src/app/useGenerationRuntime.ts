@@ -236,6 +236,18 @@ export interface ReportRetryGenerationSuccessParams {
   results: RetryGenerationSuccessDebugResult[];
 }
 
+export interface PrepareRetryGenerationTaskPromptContextParams {
+  count: number;
+  executionNode: Pick<PromptNode, 'mode' | 'pptSlides' | 'pptStyleLocked' | 'prompt'>;
+  index: number;
+  sourcePrompt: string;
+}
+
+export interface PrepareRetryGenerationTaskPromptContextResult {
+  currentMode: GenerationMode;
+  taskPrompt: string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -283,6 +295,7 @@ export interface UseGenerationRuntimeResult {
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
+  prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -578,6 +591,28 @@ export function useGenerationRuntime({
     });
   }, []);
 
+  const prepareRetryGenerationTaskPromptContext = useCallback((params: PrepareRetryGenerationTaskPromptContextParams) => {
+    const currentMode = params.executionNode.mode || GenerationMode.IMAGE;
+    if (currentMode !== GenerationMode.PPT) {
+      return { currentMode, taskPrompt: params.executionNode.prompt };
+    }
+
+    const slideLines = (params.executionNode.pptSlides || [])
+      .map((line) => String(line || '').trim())
+      .filter(Boolean);
+    const styleDirective = params.executionNode.pptStyleLocked !== false
+      ? '与整套 PPT 保持完全统一的视觉语言'
+      : '保持整体风格统一，但允许当前页面有适度变化';
+    const picked = slideLines.length > 0
+      ? slideLines[Math.min(params.index, slideLines.length - 1)]
+      : `主题：${params.sourcePrompt}。保持同一套视觉风格，页面内容独立不重复。`;
+
+    return {
+      currentMode,
+      taskPrompt: `PPT 第 ${params.index + 1}/${params.count} 页。${picked}。16:9。${styleDirective}。`,
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -810,6 +845,7 @@ export function useGenerationRuntime({
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
     reportRetryGenerationSuccess,
+    prepareRetryGenerationTaskPromptContext,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
