@@ -3312,6 +3312,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
+    prepareRetryGeneratedMediaPersistence,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4650,14 +4651,25 @@ const AppContent: React.FC<AppContentProps> = () => {
           timeoutGuard.markFinished();
           timeoutGuard.clear();
 
-          // Upload (non-blocking for latency)
-          let url = b64;
-          let originalUrl = '';
-          let apiResultUrl: string | undefined = undefined;
+          const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
+            b64,
+            currentMode,
+            normalizePersistableMediaSource,
+            calculateImageHash,
+            saveOriginalImage,
+          });
+          const {
+            apiResultUrl,
+            normalizedOriginalSource,
+            originalUrl,
+            storageId,
+            url,
+            mimeType,
+          } = mediaPersistence;
 
+          // Upload (non-blocking for latency)
           if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
             if (b64.startsWith('data:')) {
-              originalUrl = b64;
               import('./services/system/syncService').then(async ({ syncService }) => {
                 try {
                   const res = await fetch(b64);
@@ -4669,30 +4681,13 @@ const AppContent: React.FC<AppContentProps> = () => {
                 }
               }).catch(() => { });
             } else if (/^https?:\/\//i.test(b64)) {
-              apiResultUrl = b64;
+              // Already captured in mediaPersistence for persisted result metadata.
             }
-          } else {
-            // For video, assume URL is remote or data URI
-            url = b64;
-            originalUrl = b64;
           }
 
           const generationTime = clampGenerationDurationMs((apiDurationMs && apiDurationMs > 0)
             ? apiDurationMs
             : (Date.now() - startTime));
-
-          // Calculate Hash/StorageID
-          const normalizedOriginalSource = normalizePersistableMediaSource(
-            originalUrl || url,
-            currentMode === GenerationMode.VIDEO ? 'video/mp4' : 'image/png'
-          );
-          const storageId = await calculateImageHash(normalizedOriginalSource || url);
-
-          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
-            if (normalizedOriginalSource) {
-              void saveOriginalImage(storageId, normalizedOriginalSource).catch(() => undefined);
-            }
-          }
 
           // 🎯 [Fair Billing] Detect ACTUAL dimensions from the blob/image
           // This ensures we bill for what was received (e.g. 1K), not what was requested (e.g. 4K)
@@ -4777,7 +4772,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             seed: -1,
             id: `${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
             storageId, // Content-Based ID
-            mimeType: currentMode === GenerationMode.VIDEO ? 'video/mp4' : 'image/png',
+            mimeType,
             timestamp: Date.now(),
             mode: currentMode,
             requestPath,
@@ -4951,7 +4946,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

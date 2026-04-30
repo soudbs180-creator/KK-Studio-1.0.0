@@ -301,6 +301,23 @@ export interface PrepareRetryImageGenerationRequestResult {
   };
 }
 
+export interface PrepareRetryGeneratedMediaPersistenceParams {
+  b64: string;
+  calculateImageHash: (source: string) => Promise<string>;
+  currentMode: GenerationMode;
+  normalizePersistableMediaSource: (source: string, mimeType: string) => string | undefined;
+  saveOriginalImage: (storageId: string, originalSource: string) => Promise<unknown>;
+}
+
+export interface PrepareRetryGeneratedMediaPersistenceResult {
+  apiResultUrl?: string;
+  mimeType: 'image/png' | 'video/mp4';
+  normalizedOriginalSource?: string;
+  originalUrl: string;
+  storageId: string;
+  url: string;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -351,6 +368,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
+  prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -713,6 +731,47 @@ export function useGenerationRuntime({
     }
   }), []);
 
+  const prepareRetryGeneratedMediaPersistence = useCallback(async (
+    params: PrepareRetryGeneratedMediaPersistenceParams,
+  ): Promise<PrepareRetryGeneratedMediaPersistenceResult> => {
+    let url = params.b64;
+    let originalUrl = '';
+    let apiResultUrl: string | undefined = undefined;
+
+    if (params.currentMode === GenerationMode.IMAGE || params.currentMode === GenerationMode.PPT || params.currentMode === GenerationMode.ECOMMERCE) {
+      if (params.b64.startsWith('data:')) {
+        originalUrl = params.b64;
+      } else if (/^https?:\/\//i.test(params.b64)) {
+        apiResultUrl = params.b64;
+      }
+    } else {
+      url = params.b64;
+      originalUrl = params.b64;
+    }
+
+    const mimeType = params.currentMode === GenerationMode.VIDEO ? 'video/mp4' : 'image/png';
+    const normalizedOriginalSource = params.normalizePersistableMediaSource(
+      originalUrl || url,
+      mimeType,
+    );
+    const storageId = await params.calculateImageHash(normalizedOriginalSource || url);
+
+    if (params.currentMode === GenerationMode.IMAGE || params.currentMode === GenerationMode.PPT || params.currentMode === GenerationMode.ECOMMERCE) {
+      if (normalizedOriginalSource) {
+        void params.saveOriginalImage(storageId, normalizedOriginalSource).catch(() => undefined);
+      }
+    }
+
+    return {
+      apiResultUrl,
+      mimeType,
+      normalizedOriginalSource,
+      originalUrl,
+      storageId,
+      url,
+    };
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -948,6 +1007,7 @@ export function useGenerationRuntime({
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
+    prepareRetryGeneratedMediaPersistence,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

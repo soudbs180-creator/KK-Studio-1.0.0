@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry image request options slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media persistence preparation slice is validated in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8850 lines after Milestone 4 retry image request options extraction
+- `src/App.tsx`: 8845 lines after Milestone 4 retry generated media persistence preparation extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -946,8 +946,36 @@ Current risk:
 - Image/video result normalization still lives in `App.tsx`; extracting it is larger because it mutates multiple local variables. Prefer a separate result-metadata helper before attempting layout extraction.
 - The next safe slice should target retry media persistence preparation or another narrow post-result helper, not generated layout.
 
+Twenty-second slice scope:
+- Added hook-owned `prepareRetryGeneratedMediaPersistence` with explicit params/result interfaces.
+- Moved retry generated media URL/original URL/API-result URL resolution, MIME selection, persistable source normalization, storage-id hashing, and non-blocking original-image save scheduling into `src/app/useGenerationRuntime.ts`.
+- Replaced inline retry media persistence preparation in `App.tsx` with a single runtime call and reused the returned `mimeType` for generated result metadata.
+- Kept the existing non-blocking sync-service upload block, actual-dimension detection, generated image result construction, layout alignment, PPT retry, and ecommerce flows unchanged.
+- Tightened the source contract so the hook signature remains explicitly typed while allowing formatter-safe multi-line signatures.
+
+Line count change during Milestone 4 twenty-second slice:
+- `src/App.tsx`: `8850` lines after twenty-first slice -> `8845` lines.
+- `src/app/useGenerationRuntime.ts`: `954` lines -> `1014` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `494` lines -> `519` lines.
+
+Validation passed:
+- RED/contract: `tests/unit/generation-runtime-contract.test.ts` initially exposed missing ownership for `prepareRetryGeneratedMediaPersistence`; the final contract passed after the hook extraction and formatter-safe signature assertion.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `23` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `37` tests.
+- `npm.cmd run typecheck`: initially failed because `mimeType` widened to `string`; passed after adding the explicit `Promise<PrepareRetryGeneratedMediaPersistenceResult>` return type.
+- `npm.cmd run test:unit`: passed, `1010` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped; this slice is a non-UI runtime refactor.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- The sync-service upload block remains in `App.tsx` because moving it would couple dynamic service import, fetch/blob handling, and persistence metadata in one larger behavior change.
+- Actual-dimension detection, generated-image result object construction, layout alignment, and `addImageNodes` remain in `App.tsx`; split those only behind separate source contracts.
+
 Next step:
-- Continue M4 with the next RED source contract around retry media persistence preparation or another narrow post-result helper.
+- Continue M4 with the next RED source contract around retry generated result object assembly or actual-dimension/result-layout preparation, keeping PPT/ecommerce execution bodies untouched.
 
 ### Milestones 5-9
 
@@ -965,7 +993,7 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed.
 - 2026-04-29 Milestone 2:
   - Connector/live-scene targeted tests: passed, 13 tests.
-  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run typecheck`: initially failed because `mimeType` widened to `string`; passed after adding the explicit `Promise<PrepareRetryGeneratedMediaPersistenceResult>` return type.
   - UI contract regression rerun: passed, 6 tests.
   - `npm.cmd run test:unit`: passed, 971 tests.
   - `npm.cmd run build`: passed.
@@ -1324,6 +1352,16 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run typecheck`: failed once because the helper returned a widened array instead of the expected tuple; fixed by adding the explicit `PrepareRetryImageGenerationRequestResult` return type.
   - `npm.cmd run typecheck`: passed after the tuple return fix.
   - `npm.cmd run test:unit`: passed, `1009` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twenty-second slice:
+  - RED/contract: `tests/unit/generation-runtime-contract.test.ts` exposed missing ownership for `prepareRetryGeneratedMediaPersistence` before the hook extraction was finalized.
+  - Targeted M4 billing/runtime/route tests: passed, `37` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1010` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI runtime refactor.
   - `npm.cmd run check:encoding`: passed after status update.

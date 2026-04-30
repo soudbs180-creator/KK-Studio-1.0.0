@@ -491,4 +491,29 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /preferredKeyId: executionNode\.keySlotId/);
     assert.doesNotMatch(retryNodeSource, /thinkingMode: executionNode\.thinkingMode \|\| 'minimal'/);
   });
+
+  test('retry generated media persistence context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryGeneratedMediaPersistence: \(params: PrepareRetryGeneratedMediaPersistenceParams\) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;/);
+    assert.match(hookSource, /const prepareRetryGeneratedMediaPersistence = useCallback/);
+    assert.match(hookSource, /Promise<PrepareRetryGeneratedMediaPersistenceResult> => \{/);
+    assert.match(hookSource, /const normalizedOriginalSource = params\.normalizePersistableMediaSource\(/);
+    assert.match(hookSource, /const storageId = await params\.calculateImageHash\(normalizedOriginalSource \|\| url\);/);
+    assert.match(hookSource, /void params\.saveOriginalImage\(storageId, normalizedOriginalSource\)\.catch\(\(\) => undefined\);/);
+    assert.match(hookSource, /const mimeType = params\.currentMode === GenerationMode\.VIDEO \? 'video\/mp4' : 'image\/png';/);
+
+    assert.match(retryNodeSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
+    assert.match(retryNodeSource, /normalizePersistableMediaSource,/);
+    assert.match(retryNodeSource, /calculateImageHash,/);
+    assert.match(retryNodeSource, /saveOriginalImage,/);
+    assert.doesNotMatch(retryNodeSource, /const normalizedOriginalSource = normalizePersistableMediaSource\(/);
+    assert.doesNotMatch(retryNodeSource, /const storageId = await calculateImageHash\(normalizedOriginalSource \|\| url\);/);
+    assert.doesNotMatch(retryNodeSource, /void saveOriginalImage\(storageId, normalizedOriginalSource\)\.catch\(\(\) => undefined\);/);
+  });
 });
