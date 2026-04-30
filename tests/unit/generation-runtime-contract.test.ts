@@ -151,4 +151,24 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(appSource, /adminModelService\.getCreditRouteSnapshot\(config\.model, config\.imageSize\)/);
     assert.doesNotMatch(appSource, /const billingAttempt = buildGenerationBillingAttempt\(\{/);
   });
+
+  test('initial generation billing state context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.match(hookSource, /prepareGenerationBillingStateContext: \(params: PrepareGenerationBillingStateContextParams\) => PrepareGenerationBillingStateContextResult;/);
+    assert.match(hookSource, /const prepareGenerationBillingStateContext = useCallback\(\(params: PrepareGenerationBillingStateContextParams\)/);
+    assert.match(hookSource, /localStorage\.getItem\('kk_model_customizations'\)/);
+    assert.match(hookSource, /params\.hasExplicitModelRoute\(params\.config\.model\)/);
+    assert.match(hookSource, /keyManager\.getNextKey\(params\.config\.model, preferredKeyIdForBilling\)/);
+    assert.match(hookSource, /resolveGenerationBillingState\(\{/);
+    assert.match(hookSource, /console\.log\('\[handleGenerate\] 计费检查'/);
+
+    assert.match(appSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.match(appSource, /const selectedKeyForBilling = billingStateContext\.selectedKeyForBilling;/);
+    assert.match(appSource, /const generationBillingState = billingStateContext\.generationBillingState;/);
+    assert.doesNotMatch(appSource, /localStorage\.getItem\('kk_model_customizations'\)/);
+    assert.doesNotMatch(appSource, /const selectedKeyForBilling = keyManager\.getNextKey\(config\.model, preferredKeyIdForBilling\);/);
+    assert.doesNotMatch(appSource, /const generationBillingState = resolveGenerationBillingState\(\{/);
+  });
 });
