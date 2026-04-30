@@ -460,10 +460,30 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /recordCost\(/);
     assert.match(hookSource, /notify\.success\('生成完成', '重新生成成功'\);/);
 
-    assert.match(retryNodeSource, /reportRetryGenerationSuccess\(\{[\s\S]*executionNode,[\s\S]*alignedImageNodes,[\s\S]*results,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{[\s\S]*executionNode,[\s\S]*alignedImageNodes,[\s\S]*results,[\s\S]*\}\);/);
     assert.doesNotMatch(retryNodeSource, /const effectiveSize = alignedImageNodes\[0\]\?\.imageSize \|\| executionNode\.imageSize;/);
     assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/billing\/costService'\)/);
     assert.doesNotMatch(retryNodeSource, /notify\.success\('生成完成', '重新生成成功'\);/);
+  });
+
+  test('retry generated media success commit is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /commitRetryGeneratedMediaSuccess: \(params: CommitRetryGeneratedMediaSuccessParams\) => void;/);
+    assert.match(hookSource, /const commitRetryGeneratedMediaSuccess = useCallback\(\(params: CommitRetryGeneratedMediaSuccessParams\): void => \{/);
+    assert.match(hookSource, /params\.addImageNodes\(params\.alignedImageNodes, \{/);
+    assert.match(hookSource, /\[params\.parentNodeId\]: params\.retryCompletedPromptPatch,/);
+    assert.match(hookSource, /reportRetryGenerationSuccess\(\{/);
+
+    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{/);
+    assert.match(retryNodeSource, /retryCompletedPromptPatch,/);
+    assert.doesNotMatch(retryNodeSource, /addImageNodes\(alignedImageNodes, \{/);
+    assert.doesNotMatch(retryNodeSource, /reportRetryGenerationSuccess\(\{/);
   });
 
   test('retry generation task prompt context is owned by useGenerationRuntime', () => {
@@ -767,7 +787,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
 
     assert.match(retryNodeSource, /const retryCompletedPromptPatch = buildRetryCompletedPromptPatch\(\{/);
-    assert.match(retryNodeSource, /addImageNodes\(alignedImageNodes, \{\s*\[node\.id\]: retryCompletedPromptPatch,\s*\}\);/);
+    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{[\s\S]*retryCompletedPromptPatch,[\s\S]*\}\);/);
     assert.doesNotMatch(retryNodeSource, /childImageIds: alignedImageNodes\.map\(n => n\.id\),/);
     assert.doesNotMatch(retryNodeSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
     assert.doesNotMatch(retryNodeSource, /modelLabel: resolveModelDisplayName\(/);

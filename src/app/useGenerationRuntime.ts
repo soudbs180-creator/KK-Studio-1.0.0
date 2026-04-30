@@ -257,6 +257,18 @@ export interface ReportRetryGenerationSuccessParams {
   results: RetryGenerationSuccessDebugResult[];
 }
 
+export interface CommitRetryGeneratedMediaSuccessParams {
+  addImageNodes: (
+    nodes: RetryGeneratedMediaLayoutNode[],
+    parentUpdates?: Record<string, Partial<PromptNode>>,
+  ) => void | Promise<void>;
+  alignedImageNodes: RetryGeneratedMediaLayoutNode[];
+  executionNode: ReportRetryGenerationSuccessParams['executionNode'];
+  parentNodeId: string;
+  results: RetryGenerationSuccessDebugResult[];
+  retryCompletedPromptPatch: Partial<PromptNode>;
+}
+
 export interface PrepareRetryGenerationTaskPromptContextParams {
   count: number;
   executionNode: Pick<PromptNode, 'mode' | 'pptSlides' | 'pptStyleLocked' | 'prompt'>;
@@ -528,6 +540,7 @@ export interface UseGenerationRuntimeResult {
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
+  commitRetryGeneratedMediaSuccess: (params: CommitRetryGeneratedMediaSuccessParams) => void;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   buildRetryVideoGenerationResultContext: (params: BuildRetryVideoGenerationResultContextParams) => BuildRetryVideoGenerationResultContextResult;
@@ -857,6 +870,18 @@ export function useGenerationRuntime({
       notify.success('生成完成', '重新生成成功');
     });
   }, []);
+
+  const commitRetryGeneratedMediaSuccess = useCallback((params: CommitRetryGeneratedMediaSuccessParams): void => {
+    params.addImageNodes(params.alignedImageNodes, {
+      [params.parentNodeId]: params.retryCompletedPromptPatch,
+    });
+
+    reportRetryGenerationSuccess({
+      executionNode: params.executionNode,
+      alignedImageNodes: params.alignedImageNodes,
+      results: params.results,
+    });
+  }, [reportRetryGenerationSuccess]);
 
   const prepareRetryGenerationTaskPromptContext = useCallback((params: PrepareRetryGenerationTaskPromptContextParams) => {
     const currentMode = params.executionNode.mode || GenerationMode.IMAGE;
@@ -1530,6 +1555,7 @@ export function useGenerationRuntime({
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,
     reportRetryGenerationSuccess,
+    commitRetryGeneratedMediaSuccess,
     prepareRetryGenerationTaskPromptContext,
     prepareRetryVideoGenerationRequest,
     buildRetryVideoGenerationResultContext,

@@ -1744,6 +1744,21 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run governance:agent-docs`: passed.
   - `npm.cmd run check:encoding`: passed.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 thirty-sixth slice:
+  - Contract: `tests/unit/generation-runtime-contract.test.ts` now covers Hook-owned retry generated-media success commit and prevents `App.tsx` from directly pairing `addImageNodes(alignedImageNodes, ...)` with `reportRetryGenerationSuccess(...)` inside the retry handler.
+  - Added `CommitRetryGeneratedMediaSuccessParams` and `commitRetryGeneratedMediaSuccess` to `src/app/useGenerationRuntime.ts`, keeping the retry success canvas mutation wrapper and success reporting sequence inside the runtime Hook while preserving the existing `addImageNodes` mutation dependency injection boundary.
+  - Updated `App.tsx` to pass `addImageNodes`, `executionNode`, `alignedImageNodes`, `node.id`, `results`, and `retryCompletedPromptPatch` into the Hook helper instead of coordinating the success commit inline.
+  - Updated source-contract coverage so success side effects and completed-prompt patch tests agree that `App.tsx` no longer owns inline success commit wiring.
+  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1563, `tests/unit/generation-runtime-contract.test.ts` 839.
+  - Targeted generation runtime contract test: passed, `37` tests.
+  - Targeted M4 billing/runtime/route tests: passed, `51` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1028` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI retry success commit refactor.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log
 
