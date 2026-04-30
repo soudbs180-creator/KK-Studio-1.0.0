@@ -3313,6 +3313,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
+    scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
     buildRetryGeneratedMediaLayout,
@@ -4663,23 +4664,11 @@ const AppContent: React.FC<AppContentProps> = () => {
             saveOriginalImage,
           });
 
-          // Upload (non-blocking for latency)
-          if (currentMode === GenerationMode.IMAGE || currentMode === GenerationMode.PPT || currentMode === GenerationMode.ECOMMERCE) {
-            if (b64.startsWith('data:')) {
-              import('./services/system/syncService').then(async ({ syncService }) => {
-                try {
-                  const res = await fetch(b64);
-                  const blob = await res.blob();
-                  const id = `${Date.now()}_${index}`;
-                  await syncService.uploadImagePair(id, blob);
-                } catch (e) {
-                  console.warn('Cloud image sync skipped because no real upload backend is configured yet.', e);
-                }
-              }).catch(() => { });
-            } else if (/^https?:\/\//i.test(b64)) {
-              // Already captured in mediaPersistence for persisted result metadata.
-            }
-          }
+          scheduleRetryGeneratedMediaCloudSync({
+            b64,
+            currentMode,
+            index,
+          });
 
           const generationTime = clampGenerationDurationMs((apiDurationMs && apiDurationMs > 0)
             ? apiDurationMs
@@ -4758,7 +4747,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, reportRetryGenerationSuccess, prepareRetryGenerationTaskPromptContext, prepareRetryVideoGenerationRequest, prepareRetryImageGenerationRequest, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResult, buildRetryGeneratedMediaLayout, buildRetryCompletedPromptPatch, buildPptPageAlias, resolveModelDisplayName]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

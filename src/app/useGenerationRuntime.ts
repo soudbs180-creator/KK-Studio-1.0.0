@@ -319,6 +319,12 @@ export interface PrepareRetryGeneratedMediaPersistenceResult {
   url: string;
 }
 
+export interface ScheduleRetryGeneratedMediaCloudSyncParams {
+  b64: string;
+  currentMode: GenerationMode;
+  index: number;
+}
+
 export interface ResolveRetryGeneratedMediaDimensionsParams {
   b64: string;
   executionNode: Pick<PromptNode, 'aspectRatio' | 'imageSize'>;
@@ -454,6 +460,7 @@ export interface UseGenerationRuntimeResult {
   prepareRetryVideoGenerationRequest: (params: PrepareRetryVideoGenerationRequestParams) => PrepareRetryVideoGenerationRequestResult;
   prepareRetryImageGenerationRequest: (params: PrepareRetryImageGenerationRequestParams) => PrepareRetryImageGenerationRequestResult;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
+  scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
   buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
@@ -859,6 +866,31 @@ export function useGenerationRuntime({
       storageId,
       url,
     };
+  }, []);
+
+  const scheduleRetryGeneratedMediaCloudSync = useCallback((params: ScheduleRetryGeneratedMediaCloudSyncParams): void => {
+    const shouldSyncImageMedia = params.currentMode === GenerationMode.IMAGE
+      || params.currentMode === GenerationMode.PPT
+      || params.currentMode === GenerationMode.ECOMMERCE;
+
+    if (!shouldSyncImageMedia) {
+      return;
+    }
+
+    if (!params.b64.startsWith('data:')) {
+      return;
+    }
+
+    import('../services/system/syncService').then(async ({ syncService }) => {
+      try {
+        const res = await fetch(params.b64);
+        const blob = await res.blob();
+        const id = `${Date.now()}_${params.index}`;
+        await syncService.uploadImagePair(id, blob);
+      } catch (e) {
+        console.warn('Cloud image sync skipped because no real upload backend is configured yet.', e);
+      }
+    }).catch(() => { });
   }, []);
 
   const resolveRetryGeneratedMediaDimensions = useCallback(async (
@@ -1314,6 +1346,7 @@ export function useGenerationRuntime({
     prepareRetryVideoGenerationRequest,
     prepareRetryImageGenerationRequest,
     prepareRetryGeneratedMediaPersistence,
+    scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
     buildRetryGeneratedMediaLayout,

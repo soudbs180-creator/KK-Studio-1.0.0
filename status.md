@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry completed prompt patch assembly slice is validated in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generated media cloud sync scheduling slice is validated in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -14,7 +14,7 @@ Last updated: 2026-04-30
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8776 lines after Milestone 4 retry completed prompt patch assembly extraction
+- `src/App.tsx`: 8646 lines after Milestone 4 retry generated media cloud sync scheduling extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -399,7 +399,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. Twenty-one narrow generation-runtime slices are extracted and validated, through retry image request option ownership.
+Status: in progress. Twenty-seven narrow generation-runtime slices are extracted and validated, through retry generated media cloud sync scheduling ownership.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -1056,8 +1056,57 @@ Current risk:
 - `addImageNodes` and the retry result layout algorithm remain in `App.tsx`; moving either changes canvas mutation/layout ownership and should be handled in a separate contract.
 - `buildRetryCompletedPromptPatch` accepts `resolveModelDisplayName` as a dependency parameter so the runtime hook does not import display-name logic directly.
 
+Twenty-sixth slice scope:
+- Added hook-owned `buildRetryGeneratedMediaLayout` with explicit params/result types for retry generated media layout preparation.
+- Moved retry result layout calculation out of `App.tsx`, including legacy image height estimation, PPT vertical stacking, mobile single-column positioning, desktop grid positioning, and final `buildGeneratedImageBatchPositions` alignment.
+- Kept `latestLayoutPrompt` lookup and `addImageNodes` in `App.tsx` so canvas mutation ownership did not move in the same slice.
+- Note: code was committed as `b9b743eb`; the commit subject says retry media persistence context, but the actual diff is the retry generated media layout extraction.
+
+Line count change during Milestone 4 twenty-sixth slice:
+- `src/App.tsx`: `8776` lines after twenty-fifth slice -> `8657` lines.
+- `src/app/useGenerationRuntime.ts`: `1190` lines -> `1324` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `589` lines -> `612` lines.
+
+Validation passed:
+- RED/contract: `tests/unit/generation-runtime-contract.test.ts` covers `buildRetryGeneratedMediaLayout` ownership and prevents `App.tsx` from re-owning `newImageNodes`/`generatedPositions` layout preparation.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed in the current validated working tree, `42` tests.
+- `npm.cmd run typecheck`: passed after the follow-up cloud-sync guard type fix.
+- `npm.cmd run test:unit`: passed in the current validated working tree, `1015` tests.
+- `npm.cmd run build`: passed in the current validated working tree.
+- Browser inspection: skipped; this was a source extraction preserving existing retry layout calculation and the current M4 gate covered the layout contract.
+
+Current risk:
+- Layout behavior is now hook-owned, but the actual authenticated canvas generation flow was not exercised in browser because this slice stayed inside source-level runtime extraction.
+- `addImageNodes` remains in `App.tsx`; moving it would change canvas mutation ownership and should be a separate slice.
+
+Twenty-seventh slice scope:
+- Added hook-owned `scheduleRetryGeneratedMediaCloudSync` with explicit params and `void` return type.
+- Moved retry-generated media non-blocking sync-service import/fetch/blob/upload scheduling out of `App.tsx`.
+- Replaced the inline upload block with `scheduleRetryGeneratedMediaCloudSync({ b64, currentMode, index })`.
+- Replaced the initial narrow `Array.includes` mode guard with an explicit `shouldSyncImageMedia` boolean so `GenerationMode` remains type-safe.
+
+Line count change during Milestone 4 twenty-seventh slice:
+- `src/App.tsx`: `8657` lines after twenty-sixth slice -> `8646` lines.
+- `src/app/useGenerationRuntime.ts`: `1324` lines -> `1357` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `612` lines -> `638` lines.
+
+Validation passed:
+- RED/contract: source contract covers `scheduleRetryGeneratedMediaCloudSync` ownership and prevents `App.tsx` from importing `syncService` in the retry branch.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `42` tests.
+- `npm.cmd run typecheck`: failed once because `Array.includes` narrowed the mode list to image/ppt/ecommerce and rejected broad `GenerationMode`; passed after replacing it with an explicit boolean guard.
+- `npm.cmd run test:unit`: passed, `1015` tests.
+- `npm.cmd run build`: passed.
+- Browser inspection: skipped for this slice; it is non-UI sync scheduling refactor. Browser inspection for the adjacent layout-affecting slice is recorded above.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- `scheduleRetryGeneratedMediaCloudSync` preserves fire-and-forget upload behavior but still relies on dynamic import/fetch side effects; deeper upload error observability should remain out of this refactor slice.
+- `addImageNodes` and retry success orchestration remain in `App.tsx`; extracting them should be done only with explicit canvas mutation contracts.
+
 Next step:
-- Continue M4 by either extracting retry layout preparation behind explicit layout contracts or stopping M4 retry slicing before `addImageNodes` if the remaining layout risk is better left for a dedicated layout milestone.
+- Continue M4 with a RED contract around the next narrow retry success orchestration boundary, or stop retry slicing before `addImageNodes` if the remaining canvas mutation risk is better left for a dedicated layout/runtime milestone.
 
 ### Milestones 5-9
 
@@ -1476,6 +1525,23 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run test:unit`: passed, `1013` tests.
   - `npm.cmd run build`: passed.
   - Browser inspection: skipped; this slice is a non-UI runtime refactor.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 twenty-sixth slice:
+  - RED/contract: `tests/unit/generation-runtime-contract.test.ts` covers hook-owned `buildRetryGeneratedMediaLayout` and removal of inline `newImageNodes`/`generatedPositions` layout preparation from `App.tsx`.
+  - Targeted M4 billing/runtime/route tests: passed in the current validated working tree, `42` tests.
+  - `npm.cmd run typecheck`: passed after the follow-up cloud-sync guard type fix.
+  - `npm.cmd run test:unit`: passed in the current validated working tree, `1015` tests.
+  - `npm.cmd run build`: passed in the current validated working tree.
+  - Browser inspection: skipped; this was a source extraction preserving existing retry layout calculation and the current M4 gate covered the layout contract.
+- 2026-04-30 Milestone 4 twenty-seventh slice:
+  - RED/contract: `tests/unit/generation-runtime-contract.test.ts` covers hook-owned `scheduleRetryGeneratedMediaCloudSync` and prevents retry-branch `syncService` imports in `App.tsx`.
+  - Targeted M4 billing/runtime/route tests: passed, `42` tests.
+  - `npm.cmd run typecheck`: failed once because `Array.includes` narrowed the accepted mode literals; passed after replacing it with an explicit `shouldSyncImageMedia` guard.
+  - `npm.cmd run test:unit`: passed, `1015` tests.
+  - `npm.cmd run build`: passed.
+  - Browser inspection: skipped; this slice is a non-UI sync scheduling refactor.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.

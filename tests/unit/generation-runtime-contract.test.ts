@@ -541,6 +541,32 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
   });
 
+  test('retry generated media cloud sync scheduling is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /scheduleRetryGeneratedMediaCloudSync: \(params: ScheduleRetryGeneratedMediaCloudSyncParams\) => void;/);
+    assert.match(hookSource, /const scheduleRetryGeneratedMediaCloudSync = useCallback\(\(params: ScheduleRetryGeneratedMediaCloudSyncParams\): void => \{/);
+    assert.match(hookSource, /const shouldSyncImageMedia = params\.currentMode === GenerationMode\.IMAGE/);
+    assert.match(hookSource, /\|\| params\.currentMode === GenerationMode\.PPT/);
+    assert.match(hookSource, /\|\| params\.currentMode === GenerationMode\.ECOMMERCE;/);
+    assert.match(hookSource, /if \(!shouldSyncImageMedia\) \{/);
+    assert.match(hookSource, /if \(!params\.b64\.startsWith\('data:'\)\) \{/);
+    assert.match(hookSource, /import\('\.\.\/services\/system\/syncService'\)\.then/);
+    assert.match(hookSource, /await syncService\.uploadImagePair\(id, blob\);/);
+
+    assert.match(retryNodeSource, /scheduleRetryGeneratedMediaCloudSync\(\{/);
+    assert.match(retryNodeSource, /currentMode,/);
+    assert.match(retryNodeSource, /index,/);
+    assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/system\/syncService'\)/);
+    assert.doesNotMatch(retryNodeSource, /await syncService\.uploadImagePair\(id, blob\);/);
+    assert.doesNotMatch(retryNodeSource, /Already captured in mediaPersistence for persisted result metadata/);
+  });
+
   test('retry generated media result assembly is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
