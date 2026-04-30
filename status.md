@@ -1675,18 +1675,18 @@ Status: pending. See `plans.md` for the full ordered list:
   - `npm.cmd run check:encoding`: passed.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 - 2026-04-30 Milestone 4 thirty-first slice:
-  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `App.tsx` still called `buildRetryGeneratedMediaResult` directly and unpacked `requestTrace` / `resultMetadata` from `generatedMediaContext`.
-  - Added `BuildRetryGeneratedMediaResultFromContextParams` and `buildRetryGeneratedMediaResultFromContext` to `src/app/useGenerationRuntime.ts`, so retry media result assembly consumes the consolidated `generatedMediaContext` boundary inside the Hook.
-  - Updated `App.tsx` to pass `generatedMediaContext` through the Hook result assembler and removed direct retry result metadata wiring from the retry handler.
-  - Updated source-contract coverage so older result-assembly tests and the new context-boundary test agree on the same Hook boundary.
-  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1480, `tests/unit/generation-runtime-contract.test.ts` 740.
-  - Targeted M4 billing/runtime/route tests: passed, `46` tests.
+  - RED/contract: `tests/unit/generation-runtime-contract.test.ts` now covers Hook-owned retry generated-media attempt context and prevents `App.tsx` from directly building retry request IDs or timeout guards.
+  - Added `PrepareRetryGeneratedMediaAttemptContextParams`, `PrepareRetryGeneratedMediaAttemptContextResult`, and `prepareRetryGeneratedMediaAttemptContext` to `src/app/useGenerationRuntime.ts`, wrapping `buildGenerationAttemptRequestId` and `createRetryGenerationTimeoutGuard` behind the Hook boundary.
+  - Updated `App.tsx` to consume `prepareRetryGeneratedMediaAttemptContext` in the retry loop, passing `currentNodeId`, `executionNode`, `index`, and `GENERATION_TIMEOUT_MS` instead of assembling the attempt context inline.
+  - Updated source-contract coverage to assert the retry branch calls the Hook helper and no longer contains inline `buildGenerationAttemptRequestId` or `createRetryGenerationTimeoutGuard` calls.
+  - Current line counts: `src/App.tsx` 8591, `src/app/useGenerationRuntime.ts` 1481, `tests/unit/generation-runtime-contract.test.ts` 760.
+  - Targeted generation runtime contract test: passed, `32` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `1023` tests.
   - `npm.cmd run build`: passed.
-  - Browser inspection: skipped; this slice is a non-UI retry result assembly refactor.
-  - `npm.cmd run check:encoding`: passed after status update.
-  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - Browser inspection: in-app browser reloaded `http://127.0.0.1:4173/`; screenshot capture succeeded for the mobile dark workspace, settings overview, and storage settings surfaces. Observed neutral dark surfaces, readable storage copy, and reduced visual weight; desktop/light onboarding remains covered by source contract tests because the active in-app viewport is mobile-width and the local-folder permission flow was not triggered.
+  - `npm.cmd run governance:agent-docs`: passed.
+  - `npm.cmd run check:encoding`: passed.
   - `git diff --check`: passed with LF/CRLF working-copy warnings only.
 
 ## Risk Log

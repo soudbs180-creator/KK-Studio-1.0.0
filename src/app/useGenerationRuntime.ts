@@ -4,6 +4,7 @@ import type { CreditConsumeResult, CreditRefundResult } from '../context/Billing
 import { keyManager } from '../services/auth/keyManager';
 import {
   buildGenerationBillingAttempt,
+  buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
 import type { GenerateImageResult } from '../services/llm/geminiService';
@@ -203,6 +204,18 @@ export interface CreateRetryGenerationTimeoutGuardParams {
 export interface CreateRetryGenerationTimeoutGuardResult {
   markFinished: () => void;
   clear: () => void;
+}
+
+export interface PrepareRetryGeneratedMediaAttemptContextParams {
+  currentNodeId: string;
+  executionNode: PromptNode;
+  index: number;
+  timeoutMs: number;
+}
+
+export interface PrepareRetryGeneratedMediaAttemptContextResult {
+  requestId: string;
+  timeoutGuard: CreateRetryGenerationTimeoutGuardResult;
 }
 
 export interface CommitRetryGenerationStartParams {
@@ -492,6 +505,7 @@ export interface UseGenerationRuntimeResult {
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
+  prepareRetryGeneratedMediaAttemptContext: (params: PrepareRetryGeneratedMediaAttemptContextParams) => PrepareRetryGeneratedMediaAttemptContextResult;
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
@@ -742,6 +756,22 @@ export function useGenerationRuntime({
       clear: () => clearTimeout(timer),
     };
   }, [cancelGenerationRequest, updatePromptNode]);
+
+  const prepareRetryGeneratedMediaAttemptContext = useCallback((params: PrepareRetryGeneratedMediaAttemptContextParams): PrepareRetryGeneratedMediaAttemptContextResult => {
+    const requestId = buildGenerationAttemptRequestId(
+      params.executionNode.billingAttemptId || params.currentNodeId,
+      params.index,
+    );
+
+    return {
+      requestId,
+      timeoutGuard: createRetryGenerationTimeoutGuard({
+        executionNode: params.executionNode,
+        requestId,
+        timeoutMs: params.timeoutMs,
+      }),
+    };
+  }, [createRetryGenerationTimeoutGuard]);
 
   const commitRetryGenerationStart = useCallback((params: CommitRetryGenerationStartParams) => {
     updatePromptNode({
@@ -1457,6 +1487,7 @@ export function useGenerationRuntime({
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
+    prepareRetryGeneratedMediaAttemptContext,
     commitRetryGenerationStart,
     reportRetryRecoveryResult,
     prepareRetryGenerationRequestContext,

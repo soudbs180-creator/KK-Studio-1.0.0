@@ -328,14 +328,34 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /markFinished: \(\) => \{/);
     assert.match(hookSource, /clear: \(\) => clearTimeout\(timer\),/);
 
-    assert.match(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
-    assert.match(retryNodeSource, /requestId,/);
+    assert.match(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
     assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
     assert.match(retryNodeSource, /timeoutGuard\.markFinished\(\);/);
     assert.match(retryNodeSource, /timeoutGuard\.clear\(\);/);
+    assert.doesNotMatch(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
     assert.doesNotMatch(retryNodeSource, /const timer = setTimeout\(\(\) => \{/);
     assert.doesNotMatch(retryNodeSource, /cancelGeneration\(requestId\);/);
     assert.doesNotMatch(retryNodeSource, /Retry request exceeded 600000ms timeout/);
+  });
+
+  test('retry generated media attempt context is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf('const handleExportPptPackage = useCallback'),
+    );
+
+    assert.match(hookSource, /prepareRetryGeneratedMediaAttemptContext: \(params: PrepareRetryGeneratedMediaAttemptContextParams\) => PrepareRetryGeneratedMediaAttemptContextResult;/);
+    assert.match(hookSource, /const prepareRetryGeneratedMediaAttemptContext = useCallback\(\(params: PrepareRetryGeneratedMediaAttemptContextParams\): PrepareRetryGeneratedMediaAttemptContextResult => \{/);
+    assert.match(hookSource, /const requestId = buildGenerationAttemptRequestId\(/);
+    assert.match(hookSource, /params\.executionNode\.billingAttemptId \|\| params\.currentNodeId,/);
+    assert.match(hookSource, /timeoutGuard: createRetryGenerationTimeoutGuard\(\{/);
+
+    assert.match(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
+    assert.doesNotMatch(retryNodeSource, /const requestId = buildGenerationAttemptRequestId\(/);
+    assert.doesNotMatch(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
   });
 
   test('retry generation start commit is owned by useGenerationRuntime', () => {
