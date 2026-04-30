@@ -6,7 +6,7 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; first generation runtime slice is ready for commit
+- Current milestone: Milestone 4 generation runtime extraction is in progress; first generation runtime slice is complete through `e27cea39`
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
@@ -398,7 +398,7 @@ Next step:
 
 ### Milestone 4: Generation Runtime
 
-Status: in progress. First generation runtime slice extracted and validated; commit pending.
+Status: in progress. First generation runtime slice committed as `e27cea39 refactor: extract generation runtime guards`.
 
 First slice scope:
 - Added `tests/unit/generation-runtime-contract.test.ts` and verified RED before implementation because the new generation runtime hook boundary did not exist.
@@ -426,8 +426,6 @@ Current risk:
 - `App.tsx` still owns the billing and execution path; the next slice should avoid moving billing/PPT/ecommerce logic together.
 
 Next step:
-- Run documentation governance and diff whitespace checks after this status update.
-- Commit the first M4 slice.
 - Continue M4 with the next RED source contract around a small generation boundary, likely retry-timeout cancellation or billing-preparation orchestration, not the full `handleGenerate` body.
 
 ### Milestones 5-9
