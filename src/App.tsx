@@ -3306,6 +3306,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
     commitRetryGenerationStart,
+    reportRetryRecoveryResult,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -4516,12 +4517,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     const recovered = await recoverFailedSyncBridgeGeneration(executionNode);
     if (recovered.recoveredCount > 0 || recovered.pendingCount > 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        const message = recovered.pendingCount > 0
-          ? `已重新接管 ${recovered.pendingCount} 个可恢复请求，后台返图后会自动补回。`
-          : `已找到 ${recovered.recoveredCount} 个已返图结果，正在补回到当前卡片。`;
-        notify.info('恢复历史结果', message);
-      });
+      reportRetryRecoveryResult({ recoveredCount: recovered.recoveredCount, pendingCount: recovered.pendingCount });
       return;
     }
 
@@ -5005,7 +5001,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         extractErrorDetails,
       });
     }
-  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart]);
+  }, [config.parallelCount, isMobile, updatePromptNode, addImageNodes, config.enableGrounding, extractErrorDetails, normalizePptSlidesForCount, buildAutoPptSlides, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, commitRetryGenerationFailure, createRetryGenerationTimeoutGuard, commitRetryGenerationStart, reportRetryRecoveryResult]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode) => {
     if (!activeCanvas) return;

@@ -6,14 +6,14 @@ Last updated: 2026-04-30
 
 - Workspace: `C:\Users\Administrator\Downloads\KK-Studio-1.0.0`
 - Active plan: v1.4.2 progressive refactor in `plans.md`
-- Current milestone: Milestone 4 generation runtime extraction is in progress; retry generation start commit slice is complete in the current working line
+- Current milestone: Milestone 4 generation runtime extraction is in progress; retry recovery notification slice is complete in the current working line
 - Branch policy: continue on current branch unless the user explicitly asks otherwise
 - `apps/api/`: compatibility checks only
 - `apps/web/`: future migration target after `src/` boundaries are stable
 
 ## Baseline Snapshot
 
-- `src/App.tsx`: 8904 lines after Milestone 4 retry generation start commit extraction
+- `src/App.tsx`: 8900 lines after Milestone 4 retry recovery notification extraction
 - `src/app/useConnectorRenderer.ts`: 284 lines after Milestone 2 type hardening
 - `src/context/CanvasContext.tsx`: 5434 lines
 - `src/services/auth/keyManager.ts`: 5280 lines
@@ -783,8 +783,34 @@ Current risk:
 - `commitRetryGenerationStart` still accepts display-name resolution from `App.tsx`. Moving model display normalization into runtime needs a separate dependency-boundary decision.
 - The next safe slice should target retry recovery notification or another small retry bookkeeping boundary, not PPT/ecommerce bodies.
 
+Sixteenth slice scope:
+- Added hook-owned `reportRetryRecoveryResult` with explicit `ReportRetryRecoveryResultParams`.
+- Moved retry recovery notification message selection and `notify.info('恢复历史结果', message)` into `src/app/useGenerationRuntime.ts`.
+- Replaced inline retry recovery notification code in `App.tsx` with a single runtime call.
+- Kept recovery detection, retry request execution, timeout guard, start commit, success result alignment, PPT retry, and ecommerce flows unchanged.
+
+Line count change during Milestone 4 sixteenth slice:
+- `src/App.tsx`: `8904` lines after fifteenth slice -> `8900` lines.
+- `src/app/useGenerationRuntime.ts`: `738` lines -> `757` lines.
+- `tests/unit/generation-runtime-contract.test.ts`: `367` lines -> `386` lines.
+
+Validation passed:
+- RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `reportRetryRecoveryResult`, while `App.tsx` still built and sent the retry recovery notification directly.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts`: passed, `17` tests.
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts tests/unit/generation-billing-coordinator.test.ts tests/unit/billing-remaining-balance-contract.test.ts tests/unit/route-aware-credit-billing.test.ts tests/unit/credit-route-classification.test.ts`: passed, `31` tests.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run test:unit`: passed, `1004` tests.
+- `npm.cmd run build`: passed.
+- `npm.cmd run check:encoding`: passed after status update.
+- `npm.cmd run governance:agent-docs`: passed after status update.
+- `git diff --check`: passed with LF/CRLF working-copy warnings only.
+
+Current risk:
+- The previous test-only commit `4ebf35fc` introduced the retry recovery contract before the implementation landed in this working line; this slice closes that RED gap with the minimal runtime extraction.
+- The next safe slice should target another small retry bookkeeping boundary, not PPT/ecommerce bodies.
+
 Next step:
-- Continue M4 with the next RED source contract around retry recovery notification or another small shared generation runtime boundary.
+- Continue M4 with the next RED source contract around another small retry bookkeeping boundary.
 
 ### Milestones 5-9
 
@@ -1096,6 +1122,15 @@ Status: pending. See `plans.md` for the full ordered list:
   - Targeted M4 billing/runtime/route tests: passed, `30` tests.
   - `npm.cmd run typecheck`: passed.
   - `npm.cmd run test:unit`: passed, `1003` tests.
+  - `npm.cmd run build`: passed.
+  - `npm.cmd run check:encoding`: passed after status update.
+  - `npm.cmd run governance:agent-docs`: passed after status update.
+  - `git diff --check`: passed with LF/CRLF working-copy warnings only.
+- 2026-04-30 Milestone 4 sixteenth slice:
+  - RED: `tests/unit/generation-runtime-contract.test.ts` failed before implementation because `useGenerationRuntime.ts` did not own `reportRetryRecoveryResult`, while `App.tsx` still built and sent the retry recovery notification directly.
+  - Targeted M4 billing/runtime/route tests: passed, `31` tests.
+  - `npm.cmd run typecheck`: passed.
+  - `npm.cmd run test:unit`: passed, `1004` tests.
   - `npm.cmd run build`: passed.
   - `npm.cmd run check:encoding`: passed after status update.
   - `npm.cmd run governance:agent-docs`: passed after status update.

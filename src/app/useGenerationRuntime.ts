@@ -208,6 +208,11 @@ export interface CommitRetryGenerationStartParams {
   resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
 }
 
+export interface ReportRetryRecoveryResultParams {
+  recoveredCount: number;
+  pendingCount: number;
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -252,6 +257,7 @@ export interface UseGenerationRuntimeResult {
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
   createRetryGenerationTimeoutGuard: (params: CreateRetryGenerationTimeoutGuardParams) => CreateRetryGenerationTimeoutGuardResult;
   commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
+  reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -503,6 +509,18 @@ export function useGenerationRuntime({
     );
   }, [applyOptimisticServerCreditDebit, updatePromptNode]);
 
+  const reportRetryRecoveryResult = useCallback((params: ReportRetryRecoveryResultParams) => {
+    if (params.recoveredCount <= 0 && params.pendingCount <= 0) {
+      return;
+    }
+    const message = params.pendingCount > 0
+      ? `已重新接管 ${params.pendingCount} 个可恢复请求，后台返图后会自动补回。`
+      : `已找到 ${params.recoveredCount} 个已返图结果，正在补回到当前卡片。`;
+    import('../services/system/notificationService').then(({ notify }) => {
+      notify.info('恢复历史结果', message);
+    });
+  }, []);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -732,6 +750,7 @@ export function useGenerationRuntime({
     reportInitialGenerationFailure,
     createRetryGenerationTimeoutGuard,
     commitRetryGenerationStart,
+    reportRetryRecoveryResult,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };
