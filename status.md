@@ -10,18 +10,26 @@ Last updated: 2026-05-01
 - Original `.git` remains blocked by deny ACLs for this session, so commits are recorded through the writable full Git metadata copy at `node_modules/.codex-git-full` with `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
 - Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the non-UI ecommerce framework scheduler runtime slice, then continue the next ecommerce runtime slice with a reference map and contract test first.
+- Current focus: commit the non-UI ecommerce selection runtime slice, then continue Stage One M6 with the next contract-test-first ecommerce slice.
 
 ## Current Ecommerce Runtime Pass
 
-- Implemented in the working tree: `src/app/useEcommerceRuntime.ts` owns the ecommerce framework scheduler actions previously inline in `src/App.tsx`.
-- Extracted actions: `resolveEcommerceFrameworkQueuePhases`, `enqueueEcommerceFrameworkNodes`, `pumpEcommerceFrameworkQueue`, `handleGenerateEcommerceFramework`, `handlePauseEcommerceFramework`, `handleResumeEcommerceFramework`, `handleCancelEcommerceFrameworkNodeQueue`, and `handleGenerateEcommerceGroup`.
-- Contract hardening: `tests/unit/ecommerce-runtime-contract.test.ts` asserts hook ownership, explicit `UseEcommerceRuntimeDeps` / `UseEcommerceRuntimeResult`, and App wiring; `tests/unit/ecommerce-button-guards.test.ts` now follows the no-eligible-card warning contract from the hook.
-- RED evidence: the new ecommerce runtime ownership contract was added before the hook existed/wiring was complete and failed until the extraction was implemented.
-- Line counts after extraction: `src/App.tsx` 6716 lines; `src/app/useEcommerceRuntime.ts` 341 lines; `tests/unit/ecommerce-runtime-contract.test.ts` 44 lines.
-- Browser QA: skipped for this slice because it is non-UI runtime/scheduler logic. Parallel UI thread owns browser evidence for Clay surfaces.
-- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, and `tests/unit/ecommerce-button-guards.test.ts`.
+- Implemented in the working tree: ecommerce selection actions now route through `src/app/useEcommerceRuntime.ts`, with pure state helpers in `src/app/ecommerceSelectionRuntime.ts`.
+- Extracted actions: `handleToggleEcommerceAnalysisSelection`, `handleToggleEcommerceSelected`, and `handleSetEcommerceGroupSelection`.
+- Contract hardening: `tests/unit/ecommerce-runtime-contract.test.ts` asserts selection handler ownership and App wiring; `tests/unit/ecommerce-runtime-selection.test.ts` verifies selected item and group slot synchronization.
+- RED evidence: selection ownership and pure helper tests failed before hook/helper implementation; they passed after extraction and the narrowed `updateEcommerceSelectionState` dependency.
+- Line counts after extraction: `src/App.tsx` 6658 lines; `src/app/useEcommerceRuntime.ts` 390 lines; `src/app/ecommerceSelectionRuntime.ts` 101 lines; `tests/unit/ecommerce-runtime-selection.test.ts` 119 lines.
+- Browser QA: skipped for this slice because it is non-UI runtime/selection state logic. Parallel UI thread owns browser evidence for Clay surfaces.
+- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceRuntime.ts`, `src/app/ecommerceSelectionRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, and `tests/unit/ecommerce-runtime-selection.test.ts`.
 - Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
+
+## Completed In `294b0d3e`
+
+- `src/app/useEcommerceRuntime.ts` owns the ecommerce framework scheduler actions previously inline in `src/App.tsx`.
+- Extracted actions: `resolveEcommerceFrameworkQueuePhases`, `enqueueEcommerceFrameworkNodes`, `pumpEcommerceFrameworkQueue`, `handleGenerateEcommerceFramework`, `handlePauseEcommerceFramework`, `handleResumeEcommerceFramework`, `handleCancelEcommerceFrameworkNodeQueue`, and `handleGenerateEcommerceGroup`.
+- Contract hardening: `tests/unit/ecommerce-runtime-contract.test.ts` asserts hook ownership, explicit deps/result interfaces, and App wiring; `tests/unit/ecommerce-button-guards.test.ts` follows the no-eligible-card warning contract from the hook.
+- Line counts after extraction: `src/App.tsx` 6716 lines; `src/app/useEcommerceRuntime.ts` 341 lines; `tests/unit/ecommerce-runtime-contract.test.ts` 44 lines.
+- Validation passed before commit: targeted ecommerce framework tests (10/10), `npm.cmd run typecheck`, `npm.cmd run test:unit` (1065/1065), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and targeted `git diff --check`.
 
 ## Completed In `92abdacf`
 
@@ -82,6 +90,16 @@ Fresh validation for the current ecommerce runtime slice is tracked below:
 - Passed: `npm.cmd run check:encoding`.
 - Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-button-guards.test.ts status.md plans.md implement.md validation.md` with CRLF normalization warnings only.
 
+Fresh validation for the current ecommerce selection runtime slice is tracked below:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-runtime-selection.test.ts tests/unit/ecommerce-analysis-selection-contract.test.ts tests/unit/ecommerce-button-guards.test.ts tests/unit/ecommerce-group-slot-state.test.ts` (11/11).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1066/1066).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts src/app/ecommerceSelectionRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-runtime-selection.test.ts status.md` with CRLF normalization warnings only.
+
 ## Browser QA
 
 - Browser QA is not required for this non-UI runtime/PPT slice.
@@ -89,8 +107,8 @@ Fresh validation for the current ecommerce runtime slice is tracked below:
 
 ## Remaining Work
 
-1. Stage only the current ecommerce runtime slice through `node_modules/.codex-git-full`.
-2. Create the scoped ecommerce runtime commit.
+1. Stage only the current ecommerce selection runtime slice through `node_modules/.codex-git-full`.
+2. Create the scoped ecommerce selection runtime commit.
 3. Continue Stage One M6 ecommerce runtime with a reference map and contract tests before extraction.
 4. Keep the parallel Clay UI files out of runtime/PPT commits.
 

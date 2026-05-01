@@ -16,19 +16,24 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   const appSource = readSource('src/App.tsx');
   const hookSource = readSource('src/app/useEcommerceRuntime.ts');
 
-  assert.match(hookSource, /export interface UseEcommerceRuntimeDeps \{/);
+  assert.match(hookSource, /export interface UseEcommerceRuntimeDeps(?:<[\s\S]*?>)? \{/);
   assert.match(hookSource, /export interface UseEcommerceRuntimeResult \{/);
   assert.match(hookSource, /handleGenerateEcommerceFramework: \(node: PromptNode\) => Promise<void>;/);
   assert.match(hookSource, /handleGenerateEcommerceGroup: \(node: PromptNode, phase: 'desktop' \| 'mobile'\) => Promise<void>;/);
+  assert.match(hookSource, /handleToggleEcommerceAnalysisSelection: \(id: string, selected: boolean\) => void;/);
+  assert.match(hookSource, /handleToggleEcommerceSelected: \(node: PromptNode, selected: boolean\) => void;/);
+  assert.match(hookSource, /handleSetEcommerceGroupSelection: \(groupNode: PromptNode, selected: boolean\) => void;/);
   assert.match(hookSource, /enqueueEcommerceFrameworkNodes: \(/);
   assert.match(hookSource, /pumpEcommerceFrameworkQueue: \(frameworkId: string\) => void;/);
   assert.match(hookSource, /cancelEcommerceFrameworkNodeQueue/);
   assert.match(hookSource, /resolveEcommerceFrameworkDispatchPlan/);
   assert.match(hookSource, /resolveFrameworkLane/);
 
-  assert.match(appSource, /import \{ useEcommerceRuntime \} from '\.\/app\/useEcommerceRuntime';/);
-  assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?\} = useEcommerceRuntime\(\{/);
+  assert.match(appSource, /import \{ useEcommerceRuntime, type UpdateEcommerceSelectionState \} from '\.\/app\/useEcommerceRuntime';/);
+  assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?handleToggleEcommerceAnalysisSelection,[\s\S]*?handleToggleEcommerceSelected,[\s\S]*?handleSetEcommerceGroupSelection,[\s\S]*?\} = useEcommerceRuntime\(\{/);
   assert.match(appSource, /updateEcommerceFrameworkRuntime,/);
+  assert.match(appSource, /updateEcommerceSelectionState,/);
+  assert.match(appSource, /updateEcommerceNodeState,/);
   assert.match(appSource, /syncEcommerceFrameworkView,/);
   assert.match(appSource, /handleGenerateEcommerceNode,/);
   assert.match(appSource, /handleRetryEcommerceModule,/);
@@ -41,4 +46,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.doesNotMatch(appSource, /const handleResumeEcommerceFramework = useCallback/);
   assert.doesNotMatch(appSource, /const handleCancelEcommerceFrameworkNodeQueue = useCallback/);
   assert.doesNotMatch(appSource, /const handleGenerateEcommerceGroup = useCallback/);
+  assert.doesNotMatch(appSource, /const handleToggleEcommerceAnalysisSelection = useCallback/);
+  assert.doesNotMatch(appSource, /const handleToggleEcommerceSelected = useCallback/);
+  assert.doesNotMatch(appSource, /const handleSetEcommerceGroupSelection = useCallback/);
 });

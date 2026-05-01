@@ -97,7 +97,7 @@ import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
 import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { usePptRuntime } from './app/usePptRuntime';
-import { useEcommerceRuntime } from './app/useEcommerceRuntime';
+import { useEcommerceRuntime, type UpdateEcommerceSelectionState } from './app/useEcommerceRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -2149,16 +2149,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     }));
   }, []);
 
-  const handleToggleEcommerceAnalysisSelection = useCallback((id: string, selected: boolean) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        [id]: selected,
-      },
-    }));
-  }, []);
-
   const handleUpdateEcommerceSheetSetting = useCallback((
     sheet: EcommerceGroupSheet,
     patch: EcommerceSheetSettingPatch,
@@ -4070,66 +4060,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [applyEffectiveSizingToTaskState, config.enablePromptOptimization, config.prompt, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, handleRetryNode, resolveEcommerceNodeGenerationSettings, resolveEffectiveEcommerceThinkingMode, syncActiveEcommerceTask, updateEcommerceNodeState]);
 
-  const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean) => {
-    if (!node.ecommerce) return;
-    updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        [node.ecommerce?.sourceRowKey || node.id]: selected,
-      },
-      groupSlots: node.ecommerce?.sourceSheet
-        ? {
-            ...previousState.groupSlots,
-            [node.ecommerce.sourceSheet]: previousState.groupSlots[node.ecommerce.sourceSheet].map((slot) => (
-              slot.sourceKey === node.ecommerce?.sourceRowKey
-                ? { ...slot, selected }
-                : slot
-            )),
-          }
-        : previousState.groupSlots,
-    }));
-  }, [updateEcommerceNodeState]);
-
-  const handleSetEcommerceGroupSelection = useCallback((groupNode: PromptNode, selected: boolean) => {
-    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
-      return;
-    }
-
-    const childNodes = (activeCanvasRef.current?.promptNodes || []).filter((node) => (
-      node.mode === GenerationMode.ECOMMERCE
-      && node.ecommerce?.groupId === groupNode.id
-      && node.ecommerce.kind !== 'a-plus-group'
-    ));
-
-    childNodes.forEach((node) => {
-      updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
-    });
-
-    const affectedSourceKeys = new Set(
-      childNodes
-        .map((node) => node.ecommerce?.sourceRowKey)
-        .filter((sourceKey): sourceKey is string => Boolean(sourceKey)),
-    );
-
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        ...Object.fromEntries(Array.from(affectedSourceKeys).map((sourceKey) => [sourceKey, selected])),
-      },
-      groupSlots: {
-        ...previousState.groupSlots,
-        [groupNode.ecommerce!.sourceSheet]: previousState.groupSlots[groupNode.ecommerce!.sourceSheet].map((slot) => (
-          affectedSourceKeys.has(slot.sourceKey)
-            ? { ...slot, selected }
-            : slot
-        )),
-      },
-    }));
-  }, [updateEcommerceNodeState]);
-
   const handleGenerateEcommerceNode = useCallback(async (node: PromptNode) => {
     if (!node.ecommerce) return;
     if (node.ecommerce.kind === 'main-image') {
@@ -4182,6 +4112,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [runEcommerceNodeGeneration]);
 
+  const updateEcommerceSelectionState = useCallback<UpdateEcommerceSelectionState>((updater) => {
+    setEcommerceState((previousState) => ({
+      ...previousState,
+      ...updater(previousState),
+    }));
+  }, []);
+
   const {
     enqueueEcommerceFrameworkNodes,
     pumpEcommerceFrameworkQueue,
@@ -4190,10 +4127,15 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleResumeEcommerceFramework,
     handleCancelEcommerceFrameworkNodeQueue,
     handleGenerateEcommerceGroup,
+    handleToggleEcommerceAnalysisSelection,
+    handleToggleEcommerceSelected,
+    handleSetEcommerceGroupSelection,
   } = useEcommerceRuntime({
     activeCanvasRef,
     ecommerceFrameworkRuntimeRef,
     ecommerceState,
+    updateEcommerceSelectionState,
+    updateEcommerceNodeState,
     updateEcommerceFrameworkRuntime,
     resolveEcommerceFrameworkId,
     syncEcommerceFrameworkView,

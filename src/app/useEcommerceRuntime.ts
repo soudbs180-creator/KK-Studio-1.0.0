@@ -1,7 +1,7 @@
 import { useCallback, type RefObject } from 'react';
 
-import { keyManager } from '../services/auth/keyManager';
-import { resolveProviderKeyType } from '../services/api/providerStrategy';
+import { keyManager } from '../services/auth/keyManager.ts';
+import { resolveProviderKeyType } from '../services/api/providerStrategy.ts';
 import {
   cancelEcommerceFrameworkNodeQueue,
   enqueueEcommerceFrameworkItems,
@@ -10,8 +10,15 @@ import {
   resolveEcommerceFrameworkDispatchPlan,
   resolveFrameworkLane,
   resumeEcommerceFrameworkRuntime,
-} from '../services/ecommerce/frameworkRuntime';
-import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceFrameworkRuntimeState, type EcommerceGroupSheet, type PromptNode } from '../types';
+} from '../services/ecommerce/frameworkRuntime.ts';
+import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceFrameworkRuntimeState, type EcommerceGroupSheet, type PromptNode } from '../types.ts';
+import {
+  applyEcommerceAnalysisSelectionState,
+  applyEcommerceGroupSelectionState,
+  applyEcommerceNodeSelectionState,
+  resolveEcommerceGroupSelectionTargets,
+  type EcommerceSelectionRuntimeState,
+} from './ecommerceSelectionRuntime.ts';
 
 type EcommerceCanvasSnapshot = {
   promptNodes: PromptNode[];
@@ -30,11 +37,21 @@ type ResolveEcommerceFrameworkId = (node?: PromptNode | null) => string | null;
 type SyncEcommerceFrameworkView = (frameworkId: string, activeSheet: EcommerceGroupSheet) => void;
 type GenerateEcommerceNode = (node: PromptNode) => Promise<void>;
 type RetryEcommerceModule = (node: PromptNode) => Promise<void>;
+type UpdateEcommerceNodeState = (
+  nodeId: string,
+  patch: Partial<NonNullable<PromptNode['ecommerce']>>,
+  nodePatch?: Partial<PromptNode>,
+) => void;
+export type UpdateEcommerceSelectionState = (
+  updater: (previousState: EcommerceSelectionRuntimeState) => Partial<EcommerceSelectionRuntimeState>,
+) => void;
 
 export interface UseEcommerceRuntimeDeps {
   activeCanvasRef: RefObject<EcommerceCanvasSnapshot | null | undefined>;
   ecommerceFrameworkRuntimeRef: RefObject<Record<string, EcommerceFrameworkRuntimeState>>;
   ecommerceState: EcommerceRuntimeStateSnapshot;
+  updateEcommerceSelectionState: UpdateEcommerceSelectionState;
+  updateEcommerceNodeState: UpdateEcommerceNodeState;
   updateEcommerceFrameworkRuntime: UpdateEcommerceFrameworkRuntime;
   resolveEcommerceFrameworkId: ResolveEcommerceFrameworkId;
   syncEcommerceFrameworkView: SyncEcommerceFrameworkView;
@@ -58,18 +75,47 @@ export interface UseEcommerceRuntimeResult {
   handleResumeEcommerceFramework: (node: PromptNode) => void;
   handleCancelEcommerceFrameworkNodeQueue: (node: PromptNode) => void;
   handleGenerateEcommerceGroup: (node: PromptNode, phase: 'desktop' | 'mobile') => Promise<void>;
+  handleToggleEcommerceAnalysisSelection: (id: string, selected: boolean) => void;
+  handleToggleEcommerceSelected: (node: PromptNode, selected: boolean) => void;
+  handleSetEcommerceGroupSelection: (groupNode: PromptNode, selected: boolean) => void;
 }
 
 export function useEcommerceRuntime({
   activeCanvasRef,
   ecommerceFrameworkRuntimeRef,
   ecommerceState,
+  updateEcommerceSelectionState,
+  updateEcommerceNodeState,
   updateEcommerceFrameworkRuntime,
   resolveEcommerceFrameworkId,
   syncEcommerceFrameworkView,
   handleGenerateEcommerceNode,
   handleRetryEcommerceModule,
 }: UseEcommerceRuntimeDeps): UseEcommerceRuntimeResult {
+  const handleToggleEcommerceAnalysisSelection = useCallback((id: string, selected: boolean): void => {
+    updateEcommerceSelectionState((previousState) => applyEcommerceAnalysisSelectionState(previousState, id, selected));
+  }, [updateEcommerceSelectionState]);
+
+  const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean): void => {
+    if (!node.ecommerce) return;
+
+    updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
+    updateEcommerceSelectionState((previousState) => applyEcommerceNodeSelectionState(previousState, node, selected));
+  }, [updateEcommerceNodeState, updateEcommerceSelectionState]);
+
+  const handleSetEcommerceGroupSelection = useCallback((groupNode: PromptNode, selected: boolean): void => {
+    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
+      return;
+    }
+
+    const childNodes = resolveEcommerceGroupSelectionTargets(activeCanvasRef.current?.promptNodes, groupNode);
+    childNodes.forEach((node) => {
+      updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
+    });
+
+    updateEcommerceSelectionState((previousState) => applyEcommerceGroupSelectionState(previousState, groupNode, childNodes, selected));
+  }, [activeCanvasRef, updateEcommerceNodeState, updateEcommerceSelectionState]);
+
   const resolveEcommerceFrameworkQueuePhases = useCallback((
     node: PromptNode,
     phasePreference?: 'desktop' | 'mobile',
@@ -337,5 +383,8 @@ export function useEcommerceRuntime({
     handleResumeEcommerceFramework,
     handleCancelEcommerceFrameworkNodeQueue,
     handleGenerateEcommerceGroup,
+    handleToggleEcommerceAnalysisSelection,
+    handleToggleEcommerceSelected,
+    handleSetEcommerceGroupSelection,
   };
 }
