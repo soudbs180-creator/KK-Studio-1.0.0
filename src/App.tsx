@@ -27,7 +27,6 @@ import { buildEcommerceGroupExportManifest } from './services/ecommerce/groupExp
 import { buildEcommerceAssetRoleBindings } from './services/ecommerce/assetRoleBindings.ts';
 import {
   applyEcommerceSlotResult,
-  buildEcommerceSlotPreviewBundle,
   buildInitialEcommerceGroupSlotState,
   type EcommerceGroupSlotState,
 } from './services/ecommerce/groupSlotState.ts';
@@ -98,6 +97,7 @@ import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGro
 import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { usePptRuntime } from './app/usePptRuntime';
 import { useEcommerceRuntime, type UpdateEcommerceSelectionState } from './app/useEcommerceRuntime';
+import { useEcommerceSlotHistoryRuntime } from './app/useEcommerceSlotHistoryRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -1319,50 +1319,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       imageSize: sheetSettings.imageSize || node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize),
     };
   }, [ecommerceState.sheetSettings]);
-
-  const resolveEcommerceSlotState = useCallback((node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
-      return null;
-    }
-
-    return ecommerceState.groupSlots[node.ecommerce.sourceSheet].find(
-      (slot) => slot.sourceKey === node.ecommerce?.sourceRowKey,
-    ) ?? null;
-  }, [ecommerceState.groupSlots]);
-
-  const handlePreviewEcommerceSlotHistory = useCallback((
-    sourceSheet: EcommerceGroupSheet,
-    sourceKey: string,
-    preferredImageId?: string,
-  ) => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const slotState = ecommerceState.groupSlots[sourceSheet].find((slot) => slot.sourceKey === sourceKey);
-    if (!slotState) {
-      return;
-    }
-
-    const imagesById = new Map(canvas.imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
-    const previewBundle = buildEcommerceSlotPreviewBundle(slotState, imagesById, preferredImageId);
-    if (!previewBundle) {
-      return;
-    }
-
-    setWorkspaceSurface('workspace');
-    setPreviewImages(previewBundle.images);
-    setPreviewInitialIndex(previewBundle.initialIndex);
-  }, [ecommerceState.groupSlots]);
-
-  const handlePreviewEcommerceSlotHistoryForNode = useCallback((node: PromptNode, preferredImageId?: string) => {
-    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
-      return;
-    }
-
-    handlePreviewEcommerceSlotHistory(node.ecommerce.sourceSheet, node.ecommerce.sourceRowKey, preferredImageId);
-  }, [handlePreviewEcommerceSlotHistory]);
 
   useEffect(() => {
     if (config.mode !== GenerationMode.ECOMMERCE) {
@@ -4118,6 +4074,18 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...updater(previousState),
     }));
   }, []);
+
+  const {
+    resolveEcommerceSlotState,
+    handlePreviewEcommerceSlotHistory,
+    handlePreviewEcommerceSlotHistoryForNode,
+  } = useEcommerceSlotHistoryRuntime({
+    activeCanvasRef,
+    ecommerceState,
+    setWorkspaceSurface,
+    setPreviewImages,
+    setPreviewInitialIndex,
+  });
 
   const {
     enqueueEcommerceFrameworkNodes,

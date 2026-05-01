@@ -10,18 +10,28 @@ Last updated: 2026-05-01
 - Original `.git` remains blocked by deny ACLs for this session, so commits are recorded through the writable full Git metadata copy at `node_modules/.codex-git-full` with `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
 - Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the non-UI ecommerce selection runtime slice, then continue Stage One M6 with the next contract-test-first ecommerce slice.
+- Current focus: commit the non-UI ecommerce slot history runtime slice, then continue Stage One M6 with the next contract-test-first ecommerce slice.
 
 ## Current Ecommerce Runtime Pass
 
-- Implemented in the working tree: ecommerce selection actions now route through `src/app/useEcommerceRuntime.ts`, with pure state helpers in `src/app/ecommerceSelectionRuntime.ts`.
+- Implemented in the working tree: ecommerce slot history and preview entrypoints now route through `src/app/useEcommerceSlotHistoryRuntime.ts`.
+- Extracted actions: `resolveEcommerceSlotState`, `handlePreviewEcommerceSlotHistory`, and `handlePreviewEcommerceSlotHistoryForNode`.
+- Contract hardening: slot preview/source-shape tests now point at `useEcommerceSlotHistoryRuntime`; `App.tsx` imports and destructures the hook and no longer imports `buildEcommerceSlotPreviewBundle`.
+- Line counts after extraction: `src/App.tsx` 6626 lines; `src/app/useEcommerceSlotHistoryRuntime.ts` 92 lines.
+- Subagent review: spec reviewer passed the slice; code-quality reviewer reported no blocking findings. Follow-up debt: preserve non-`Error` queue messages in `useEcommerceRuntime` and replace the direct `keyManager` singleton with an injected lane/key resolver in a later scheduler-hardening slice.
+- Browser QA remains skipped for non-UI runtime slices. Parallel UI thread owns browser evidence for Clay surfaces.
+- Full `npm.cmd run test:unit` is currently blocked by parallel Clay UI work in `tests/unit/clay-frosted-surface-contract.test.ts`; the failures target `src/components/layout/ChatSidebar.tsx` and related UI-token assertions, not the slot history runtime slice.
+- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceSlotHistoryRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, `tests/unit/ecommerce-group-slot-integration.test.ts`, and `tests/unit/ecommerce-group-slot-preview-contract.test.ts`.
+- Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
+
+## Completed In `be63eda2`
+
+- Ecommerce selection actions now route through `src/app/useEcommerceRuntime.ts`, with pure state helpers in `src/app/ecommerceSelectionRuntime.ts`.
 - Extracted actions: `handleToggleEcommerceAnalysisSelection`, `handleToggleEcommerceSelected`, and `handleSetEcommerceGroupSelection`.
 - Contract hardening: `tests/unit/ecommerce-runtime-contract.test.ts` asserts selection handler ownership and App wiring; `tests/unit/ecommerce-runtime-selection.test.ts` verifies selected item and group slot synchronization.
 - RED evidence: selection ownership and pure helper tests failed before hook/helper implementation; they passed after extraction and the narrowed `updateEcommerceSelectionState` dependency.
 - Line counts after extraction: `src/App.tsx` 6658 lines; `src/app/useEcommerceRuntime.ts` 390 lines; `src/app/ecommerceSelectionRuntime.ts` 101 lines; `tests/unit/ecommerce-runtime-selection.test.ts` 119 lines.
-- Browser QA: skipped for this slice because it is non-UI runtime/selection state logic. Parallel UI thread owns browser evidence for Clay surfaces.
-- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceRuntime.ts`, `src/app/ecommerceSelectionRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, and `tests/unit/ecommerce-runtime-selection.test.ts`.
-- Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
+- Validation passed before commit: targeted ecommerce selection tests (11/11), `npm.cmd run typecheck`, `npm.cmd run test:unit` (1066/1066), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and targeted `git diff --check`.
 
 ## Completed In `294b0d3e`
 
@@ -100,6 +110,15 @@ Fresh validation for the current ecommerce selection runtime slice is tracked be
 - Passed: `npm.cmd run check:encoding`.
 - Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts src/app/ecommerceSelectionRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-runtime-selection.test.ts status.md` with CRLF normalization warnings only.
 
+Fresh validation for the current ecommerce slot history runtime slice is tracked below:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-group-slot-integration.test.ts tests/unit/ecommerce-group-slot-preview-contract.test.ts tests/unit/ecommerce-group-slot-state.test.ts` (8/8).
+- Passed: `npm.cmd run typecheck`.
+- Blocked by parallel UI lane: `npm.cmd run test:unit` fails in `tests/unit/clay-frosted-surface-contract.test.ts` after Clay UI source assertions were tightened against dirty UI files. Scoped ecommerce slot tests above passed.
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+
 ## Browser QA
 
 - Browser QA is not required for this non-UI runtime/PPT slice.
@@ -107,8 +126,8 @@ Fresh validation for the current ecommerce selection runtime slice is tracked be
 
 ## Remaining Work
 
-1. Stage only the current ecommerce selection runtime slice through `node_modules/.codex-git-full`.
-2. Create the scoped ecommerce selection runtime commit.
+1. Stage only the current ecommerce slot history runtime slice through `node_modules/.codex-git-full`.
+2. Create the scoped ecommerce slot history runtime commit.
 3. Continue Stage One M6 ecommerce runtime with a reference map and contract tests before extraction.
 4. Keep the parallel Clay UI files out of runtime/PPT commits.
 
