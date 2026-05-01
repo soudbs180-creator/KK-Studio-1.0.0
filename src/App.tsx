@@ -5,7 +5,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -39,7 +39,6 @@ import {
 } from './services/ecommerce/frameworkRuntime.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
-import { appendUploadFilesWithinLimit } from './components/ecommerce/ecommerceImportPreview.ts';
 import { getCardDimensions } from './utils/styleUtils';
 import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition } from './utils/canvasUtils';
@@ -99,6 +98,12 @@ import { usePptRuntime } from './app/usePptRuntime';
 import { useEcommerceRuntime, type UpdateEcommerceSelectionState } from './app/useEcommerceRuntime';
 import { useEcommerceFrameworkRuntimeState, type SetEcommerceFrameworkRuntimeState } from './app/useEcommerceFrameworkRuntimeState';
 import { useEcommerceSlotHistoryRuntime } from './app/useEcommerceSlotHistoryRuntime';
+import {
+  useEcommerceUploadReferenceRuntime,
+  type EcommerceManualReferenceBinding,
+  type EcommerceUploadReferenceBundle,
+  type SetEcommerceUploadReferenceState,
+} from './app/useEcommerceUploadReferenceRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -121,20 +126,6 @@ type EcommerceRuntimeState = {
   frameworkRuntime: Record<string, EcommerceFrameworkRuntimeState>;
   isAnalyzing: boolean;
   isConfirmingAnalysis: boolean;
-};
-
-type EcommerceManualReferenceBinding = {
-  assetId: string;
-  label: string;
-  fileName: string;
-  referenceImage: ReferenceImage;
-  assetRole: EcommerceTaskAssetRoleBinding;
-};
-
-type EcommerceUploadReferenceBundle = {
-  productReferences: ReferenceImage[];
-  extraReferences: ReferenceImage[];
-  productImageRef?: EcommerceImageRef;
 };
 
 type SharedPromptNodeActionProps = Pick<
@@ -196,10 +187,6 @@ type ConnectorDisconnectButtonProps = {
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 
-
-const MAX_ECOMMERCE_PRODUCT_FILES = 4;
-const MAX_ECOMMERCE_EXTRA_REFERENCE_FILES = 4;
-const MAX_ECOMMERCE_ITEM_REFERENCE_FILES = 6;
 
 const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x, y, onClick }) => (
   <foreignObject
@@ -1097,6 +1084,17 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
 
+  const updateEcommerceUploadReferenceState = useCallback<SetEcommerceUploadReferenceState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        productFiles: previousState.productFiles,
+        extraReferenceFiles: previousState.extraReferenceFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
   const updateEcommerceFrameworkRuntimeState = useCallback<SetEcommerceFrameworkRuntimeState>((updater) => {
     setEcommerceState((previousState) => {
       const patch = updater(previousState);
@@ -1679,109 +1677,24 @@ const AppContent: React.FC<AppContentProps> = () => {
     reader.readAsDataURL(blob);
   }), []);
 
-  const sanitizeReferenceToken = useCallback((value: string) => (
-    String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^\w.-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80) || 'ref'
-  ), []);
-
-  const buildUploadReferenceIdentity = useCallback((file: File, labelPrefix: string) => (
-    `${labelPrefix}-${sanitizeReferenceToken(file.name || labelPrefix)}-${file.size}-${file.lastModified}`
-  ), [sanitizeReferenceToken]);
-
-  const buildProductImageRef = useCallback((referenceImage?: ReferenceImage | null): EcommerceImageRef | undefined => (
-    referenceImage
-      ? {
-          id: referenceImage.id,
-          storageId: referenceImage.storageId,
-          label: '产品图1',
-          mimeType: referenceImage.mimeType,
-          url: referenceImage.url,
-        }
-      : undefined
-  ), []);
-
-  const buildReferenceImageSignature = useCallback((referenceImages: ReferenceImage[]) => (
-    referenceImages.map((referenceImage) => [
-      referenceImage.id,
-      referenceImage.storageId || '',
-      referenceImage.mimeType || '',
-      referenceImage.url || '',
-      referenceImage.data || '',
-    ].join('|')).join('||')
-  ), []);
-
-  const buildEcommerceImageRefSignature = useCallback((reference?: EcommerceImageRef) => (
-    reference
-      ? [reference.id, reference.storageId || '', reference.label || '', reference.mimeType || '', reference.url || ''].join('|')
-      : ''
-  ), []);
-
-  const buildTaskStateSyncSignature = useCallback((taskState?: EcommerceEditableTaskState | null) => JSON.stringify({
-    imageRoleSummary: taskState?.imageRoleSummary || [],
-    assetRoles: taskState?.assetRoles || [],
-    missingFields: taskState?.missingFields || [],
-    effectiveSizePolicy: taskState?.effectiveSizePolicy || '',
-    effectiveSizeTier: taskState?.effectiveSizeTier || '',
-    promptOverride: taskState?.promptOverride || '',
-    resolvedPromptPreview: taskState?.resolvedPromptPreview || '',
-    displayLabel: taskState?.displayLabel || '',
-  }), []);
-
-  const createReferenceImageFromFile = useCallback(async (file: File, labelPrefix: string): Promise<ReferenceImage> => {
-    const dataUrl = await readBlobAsDataUrl(file);
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    const referenceIdentity = buildUploadReferenceIdentity(file, labelPrefix);
-    return {
-      id: referenceIdentity,
-      storageId: referenceIdentity,
-      data: match?.[2] || '',
-      mimeType: match?.[1] || file.type || 'image/png',
-      url: dataUrl,
-    };
-  }, [buildUploadReferenceIdentity, readBlobAsDataUrl]);
-
-  const createReferenceImageFromAsset = useCallback((asset: EcommerceAnalysisAsset): ReferenceImage | null => {
-    if (!asset.previewUrl) return null;
-    const match = asset.previewUrl.match(/^data:([^;]+);base64,(.+)$/);
-    return {
-      id: `analysis-${asset.assetId}`,
-      storageId: asset.assetId,
-      data: match?.[2] || '',
-      mimeType: match?.[1] || asset.mimeType || 'image/png',
-      url: asset.previewUrl,
-    };
-  }, []);
-
-  const buildCurrentEcommerceUploadReferences = useCallback(async (): Promise<EcommerceUploadReferenceBundle> => {
-    const productReferences = await Promise.all(
-      ecommerceState.productFiles
-        .slice(0, MAX_ECOMMERCE_PRODUCT_FILES)
-        .map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)),
-    );
-    const extraReferences = await Promise.all(
-      ecommerceState.extraReferenceFiles
-        .slice(0, MAX_ECOMMERCE_EXTRA_REFERENCE_FILES)
-        .map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)),
-    );
-
-    return {
-      productReferences,
-      extraReferences,
-      productImageRef: buildProductImageRef(productReferences[0]),
-    };
-  }, [buildProductImageRef, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles]);
-
-  const extractEcommerceManualReferenceBindings = useCallback((taskStateSeed?: EcommerceEditableTaskState | null) => {
-    if (!taskStateSeed?.sourceRowKey) {
-      return [] as EcommerceManualReferenceBinding[];
-    }
-
-    return ecommerceState.itemReferenceFiles[taskStateSeed.sourceRowKey] || [];
-  }, [ecommerceState.itemReferenceFiles]);
+  const {
+    buildReferenceImageSignature,
+    buildEcommerceImageRefSignature,
+    buildTaskStateSyncSignature,
+    createReferenceImageFromAsset,
+    buildCurrentEcommerceUploadReferences,
+    extractEcommerceManualReferenceBindings,
+    handlePickEcommerceProductFiles,
+    handlePickEcommerceExtraReferenceFiles,
+    handleRemoveEcommerceProductFile,
+    handleRemoveEcommerceExtraReferenceFile,
+    handlePickEcommerceItemReferenceFiles,
+    handleRemoveEcommerceItemReferenceFile,
+  } = useEcommerceUploadReferenceRuntime({
+    ecommerceState,
+    setEcommerceUploadReferenceState: updateEcommerceUploadReferenceState,
+    readBlobAsDataUrl,
+  });
 
   const buildInitialEcommerceTaskStates = useCallback((analysis: EcommerceAnalysisResult): Record<string, EcommerceEditableTaskState> => {
     const nextStateMap: Record<string, EcommerceEditableTaskState> = {};
@@ -1874,101 +1787,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     setEcommerceState((previousState) => ({
       ...previousState,
       ...createEcommerceAnalysisResetPatch({ requirementFile: null, isAnalyzing: false }),
-    }));
-  }, []);
-
-  const handlePickEcommerceProductFiles = useCallback((files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (nextFiles.length === 0) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      productFiles: appendUploadFilesWithinLimit(
-        previousState.productFiles,
-        nextFiles,
-        MAX_ECOMMERCE_PRODUCT_FILES,
-      ),
-      analysis: previousState.analysis,
-    }));
-  }, []);
-
-  const handlePickEcommerceExtraReferenceFiles = useCallback((files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (nextFiles.length === 0) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      extraReferenceFiles: appendUploadFilesWithinLimit(
-        previousState.extraReferenceFiles,
-        nextFiles,
-        MAX_ECOMMERCE_EXTRA_REFERENCE_FILES,
-      ),
-    }));
-  }, []);
-
-  const handleRemoveEcommerceProductFile = useCallback((index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      productFiles: previousState.productFiles.filter((_, fileIndex) => fileIndex !== index),
-    }));
-  }, []);
-
-  const handleRemoveEcommerceExtraReferenceFile = useCallback((index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      extraReferenceFiles: previousState.extraReferenceFiles.filter((_, fileIndex) => fileIndex !== index),
-    }));
-  }, []);
-
-  const handlePickEcommerceItemReferenceFiles = useCallback(async (sourceKey: string, files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (!sourceKey || nextFiles.length === 0) {
-      return;
-    }
-
-    const manualReferenceBindings = await Promise.all(
-      nextFiles.map(async (file, index) => {
-        const referenceImage = await createReferenceImageFromFile(file, `item-${sourceKey}-${index + 1}`);
-        const assetId = referenceImage.storageId || referenceImage.id;
-        const label = `手动参考图${index + 1}`;
-
-        return {
-          assetId,
-          label,
-          fileName: file.name,
-          referenceImage,
-          assetRole: {
-            assetId,
-            role: 'reference' as const,
-            label,
-            normalizedLabel: label,
-            source: 'upload' as const,
-            note: '用户手动补传到当前需求的参考图',
-          },
-        } satisfies EcommerceManualReferenceBinding;
-      }),
-    );
-
-    setEcommerceState((previousState) => {
-      const previousBindings = previousState.itemReferenceFiles[sourceKey] || [];
-      return {
-        ...previousState,
-        itemReferenceFiles: {
-          ...previousState.itemReferenceFiles,
-          [sourceKey]: [
-            ...previousBindings,
-            ...manualReferenceBindings,
-          ].slice(0, MAX_ECOMMERCE_ITEM_REFERENCE_FILES),
-        },
-      };
-    });
-  }, [createReferenceImageFromFile]);
-
-  const handleRemoveEcommerceItemReferenceFile = useCallback((sourceKey: string, index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      itemReferenceFiles: {
-        ...previousState.itemReferenceFiles,
-        [sourceKey]: (previousState.itemReferenceFiles[sourceKey] || []).filter((_, bindingIndex) => bindingIndex !== index),
-      },
     }));
   }, []);
 

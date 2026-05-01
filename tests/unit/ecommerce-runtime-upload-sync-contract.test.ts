@@ -11,7 +11,9 @@ function readSource(relativePath: string): string {
 
 test('ecommerce runtime sync rehydrates built cards when product, extra, or per-item manual reference uploads change', () => {
   const appSource = readSource('src/App.tsx');
+  const uploadReferenceHookSource = readSource('src/app/useEcommerceUploadReferenceRuntime.ts');
 
+  assert.match(appSource, /useEcommerceUploadReferenceRuntime\(\{/);
   assert.match(appSource, /extractEcommerceManualReferenceBindings/);
   assert.match(appSource, /manualReferences: taskManualReferences/);
   assert.match(appSource, /manualReferences: manualReferences/);
@@ -27,6 +29,8 @@ test('ecommerce runtime sync rehydrates built cards when product, extra, or per-
   );
   assert.match(appSource, /referenceImages: nextReferenceImages/);
   assert.match(appSource, /productImageRef: nextProductImageRef/);
-  assert.match(appSource, /ecommerceState\.productFiles/);
-  assert.match(appSource, /ecommerceState\.extraReferenceFiles/);
+  assert.match(uploadReferenceHookSource, /productFiles/);
+  assert.match(uploadReferenceHookSource, /extraReferenceFiles/);
+  assert.match(uploadReferenceHookSource, /MAX_ECOMMERCE_PRODUCT_FILES/);
+  assert.match(uploadReferenceHookSource, /MAX_ECOMMERCE_EXTRA_REFERENCE_FILES/);
 });
