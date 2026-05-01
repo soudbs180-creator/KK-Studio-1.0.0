@@ -1,21 +1,23 @@
-# KK-Studio v1.4.2 Clay UI Audit Plan
+# KK-Studio v1.4.2 Dual-Lane Refactor Plan
 
 Last updated: 2026-05-01
 Branch policy: continue on the current branch unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-The active execution lane is the KK-Studio Clay UI audit. Stage One PPT/runtime extraction is paused in this thread and remains dirty work only; keep its files out of the UI audit commit. Browser inspection applies to this UI lane.
+The current baseline is commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. That commit includes the earlier Clay UI audit plus the Stage One generation/PPT runtime boundary work.
 
-The work must remain surgical. Reconcile `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces without redesigning flows or folding in unrelated runtime/PPT WIP.
+The active execution model is dual-lane:
+- This thread owns Stage One runtime/PPT follow-up and continues toward Stage One M6 ecommerce runtime.
+- Parallel UI thread `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI surface cleanup, browser evidence, and UI-only commits.
 
-Current user override: inputs, main cards, sub cards, and framework cards must use controlled frosted material. Dark mode must use neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Keep Clay brand colors for emphasis only.
+The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary: UI audit files and tests only. Existing dirty runtime/PPT files such as `src/App.tsx`, `src/app/useGenerationRuntime.ts`, `src/app/usePptRuntime.ts`, and PPT/generation runtime tests must not be staged into the UI commit; they remain paused until a separate runtime pass resumes them.
+Commit boundary going forward: UI fixes and runtime/PPT fixes must be staged separately even though `4c448660` is a combined baseline.
 
 ## Current Baseline
 
-- `src/App.tsx`: 6961 lines in the current mixed worktree; runtime/PPT edits remain paused and outside the UI commit boundary.
+- `src/App.tsx`: 6210 lines in commit `4c448660`; runtime/PPT follow-up work must use a separate future commit boundary.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
 - `src/context/CanvasContext.tsx`: 5434 lines.
 - `src/services/auth/keyManager.ts`: 5280 lines.
@@ -38,11 +40,11 @@ Every milestone follows this order:
 
 ## Milestones
 
-### 0. Clay Frosted UI Audit
+### 0. Clay Frosted UI Audit (Parallel UI Lane)
 
 Goal: replace the older Apple/dark-heavy/Airtable UI drift with a Clay system: warm cream light theme, neutral black-gray dark theme, controlled frosted material for inputs/main cards/sub cards/framework cards, near-black or cream readable text, saturated color blocks for emphasis, no blue/teal dark canvas, and no whole-page theme flicker.
 
-Current status: active in this thread. PPT/runtime work is paused and must keep its own future commit boundary.
+Current status: active in parallel UI thread `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc`. This runtime thread must not stage UI files.
 
 Scope:
 - Create the root `DESIGN.md` Clay reference from the cached `getdesign` Clay guidance.
@@ -156,7 +158,7 @@ Commit:
 
 ### 5. Stage One M5: PPT Runtime
 
-Status: paused while the Clay UI audit is active. Keep the PPT commit boundary separate from the UI audit lane.
+Status: active follow-up in this runtime thread. The first pass landed in `4c448660`; current follow-up work keeps exports, preview, editable package behavior, and deck child ordering on the shared PPT runtime helpers. Keep this runtime commit separate from Clay UI files.
 
 Goal: extract PPT editing, preview, export, and deck child image management from `src/App.tsx`.
 

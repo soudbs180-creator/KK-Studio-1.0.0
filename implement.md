@@ -4,11 +4,21 @@ Last updated: 2026-05-01
 
 ## Operating Mode
 
-This is a long-running execution. The active workstream in this thread is the Clay frosted UI audit. Stage One PPT/runtime extraction is paused and must stay out of the UI commit.
+This is a long-running execution. The current baseline is commit `4c448660 Refactor Clay UI and PPT runtime boundaries`.
+
+The active workstream in this thread is Stage One runtime/PPT follow-up. Clay UI audit and browser evidence are owned by parallel UI thread `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc`. The shared ledgers cover both lines, but this thread must stage and commit only runtime/PPT paths unless the user explicitly redirects scope.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-For the active UI audit, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. Paused PPT/runtime dirty files are tracked in `status.md` and must not be staged into the UI commit.
+For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only.
+
+Runtime/PPT recovery order:
+1. Keep the ledger files aligned with the dual-lane split.
+2. Finish the current PPT export-ordering hardening.
+3. Verify with runtime/PPT tests, typecheck, unit tests, build, docs governance, and encoding.
+4. Stage only runtime/PPT paths, leaving UI WIP for the parallel UI thread.
+
+Do not block runtime/PPT work on Clay UI browser closure. Instead, record which lane is active, which dirty files are excluded from the current commit, and whether browser inspection is skipped because the current slice is non-UI.
 
 ## Milestone Loop
 
@@ -32,8 +42,8 @@ For every milestone:
 ## Refactor Rules
 
 - Do not rewrite a subsystem when a surgical extraction is sufficient.
-- Keep runtime/PPT changes in the runtime lane and do not stage them into the UI audit commit.
-- Do not pull runtime/PPT behavior changes into the UI lane unless a compile failure proves it is necessary.
+- Keep runtime/PPT changes in the runtime lane and do not stage them into future UI commits.
+- Do not pull runtime/PPT behavior changes into future UI work unless a compile failure proves it is necessary.
 - For UI surfaces, use shared tokens instead of one-off inline glass, blue/indigo selected states, or heavy shadows.
 - Controlled frosted surfaces require a translucent background, readable contrast, hairline border, low tokenized shadow, `backdrop-filter` where supported, and a solid fallback where unsupported.
 - Keep `src/` as the active runtime until boundaries are stable.
@@ -62,11 +72,11 @@ For every milestone:
 - Every completed milestone requires `npm.cmd run check:encoding`.
 - Code milestones also require targeted tests, `npm.cmd run test:unit`, and `npm.cmd run build` unless `validation.md` documents a known blocker.
 - UI or visual changes in the UI lane require a real browser inspection before commit. Start the app locally, open it through the Codex in-app Browser (`browser-use` with the `iab` backend), inspect the changed surface on desktop and mobile-sized viewports when applicable, and record the browser result in `status.md`.
-- Non-UI runtime/docs slices may skip browser inspection, but the skip must be recorded in `status.md`.
+- Non-UI runtime/docs slices may skip browser inspection, but the skip must be recorded in `status.md`; runtime/PPT commits use the runtime/PPT gate in `validation.md`.
 - Do not claim a UI optimization is complete from source-contract tests, screenshots, build output, or smoke scripts alone. The browser check is mandatory for new UI work and can only be skipped for non-UI logic/docs changes with an explicit note.
 - If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
 - For shared v1.4.2 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and whether browser inspection is skipped because the slice is non-UI.
-- For the active UI audit lane, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
+- For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
 
 ## Context Exhaustion Protocol
 

@@ -1,98 +1,82 @@
-# KK-Studio v1.4.2 Refactor Coordination Status
+# KK-Studio v1.4.2 Coordination Status
 
 Last updated: 2026-05-01
 
 ## Active State
 
-- Active lane in this thread: Stage One runtime/PPT hardening, after the Clay UI audit pass.
-- Parallel UI lane: another Codex thread is handling Clay UI refactor; keep UI files and runtime/PPT files in separate commit scopes while keeping `plans.md`, `implement.md`, `validation.md`, and this status file as the shared ledger.
-- UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, `plans.md`, `implement.md`, and `validation.md`.
+- Active lane in this thread: Stage One runtime/PPT follow-up.
+- Parallel UI lane: `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI audit, browser evidence, and UI-only commits.
+- Current branch: `main`.
+- Original `.git` remains blocked by deny ACLs for this session, so commits are recorded through the writable full Git metadata copy at `node_modules/.codex-git-full` with `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
+- Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Worktree is mixed with Clay UI WIP, generation runtime WIP, and PPT runtime WIP. Any staging must be explicit path-based and reviewed before commit.
+- Current focus: commit the non-UI PPT runtime export-ordering hardening, then continue Stage One M6 ecommerce runtime.
 
-## Completed
+## Current Runtime/PPT Pass
 
-### Runtime / PPT
+- Implemented in the working tree: `src/app/usePptRuntime.ts` routes `handleExportPptx`, `handleExportPptPackage`, and `handleExportPptSinglePage` through `getOrderedPptNodeBundle`.
+- Contract hardening: `tests/unit/ppt-runtime-contract.test.ts` rejects direct `getPromptPptImageNodes` usage in the hook and asserts ordered-bundle export paths.
+- Browser QA: skipped for this slice because it is non-UI runtime/export logic. Parallel UI thread owns browser evidence for Clay surfaces.
+- Commit include scope for this runtime slice: `plans.md`, `implement.md`, `validation.md`, `status.md`, `src/app/usePptRuntime.ts`, and `tests/unit/ppt-runtime-contract.test.ts`.
+- Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
 
-- `handleRetryPptSinglePage` is owned by `src/app/useGenerationRuntime.ts`; `src/App.tsx` only consumes the hook result and wires it to `onRetryPptPage`.
-- `src/app/usePptRuntime.ts` now owns PPT preview opening via `tryOpenPptPreview`, with `setPreviewInitialIndex` injected through `UsePptRuntimeDeps`.
-- `src/app/pptRuntimeHelpers.ts` centralizes PPT image ordering, stale `childImageIds` fallback, missing parent prompt rejection, PPT deck child detection, and nullish image array guards.
-- `handleSavePptEditablePages` now builds an `image.id -> alias` map from each editable page's `backgroundImageId` / image layer id, avoiding array-index-only alias writes.
-- PPT runtime contracts were updated and expanded with `tests/unit/ppt-runtime-helper-contract.test.ts`.
+## Completed In `4c448660`
 
 ### Clay UI
 
-- Clay design and rule docs were reconciled with the frosted override.
-- Shared UI tokens were added for dark canvas and frosted input/main/sub/framework surfaces.
-- Major Clay surfaces were moved onto the shared material system: `SearchPalette`, `Sidebar`, prompt/composer inputs, mobile shell, settings, storage modal, ecommerce panels, and canvas/image cards.
-- Stale blue/indigo/heavy-shadow patterns were removed from the prompt bar, project manager, selection menu, notification/update surfaces, and the older dark settings token block.
-- Theme and canvas-card shadow helpers were aligned with the Clay surface model.
-- Contract coverage now includes controlled frosted tokens, neutral dark aliases, legacy blue-black token regressions, ecommerce frosted surfaces, mobile workspace surfaces, and theme contrast.
+- Clay design and rule docs were reconciled with `DESIGN-clay.md` and the user override for controlled frosted material.
+- Shared tokens were added for neutral dark surfaces and frosted inputs, main cards, sub cards, and framework cards.
+- Dark mode now targets neutral black-gray surfaces: `#0b0b0c`, `#141414`, and `#1f1f1f`.
+- Major UI surfaces were moved onto the shared material system: search palette, sidebar, prompt/composer inputs, mobile shell, settings, storage modal, ecommerce panels, and canvas/image cards.
+- Contract coverage includes controlled frosted tokens, neutral dark aliases, legacy blue-black token regressions, ecommerce frosted surfaces, mobile workspace surfaces, and theme contrast.
 
-## Latest Validation
+### Runtime / PPT Boundary Work
 
-- Runtime/PPT targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` (6/6).
-- Current shared gate passed after PPT hardening: `npm.cmd run typecheck`, `npm.cmd run test:unit` (1063/1063), `npm.cmd run build`, and `npm.cmd run check:encoding`.
+- `src/App.tsx` was reduced to 6210 lines in the committed baseline.
+- `src/app/useGenerationRuntime.ts` owns generation runtime orchestration and related retry/billing contracts.
+- `src/app/usePptRuntime.ts` owns PPT runtime orchestration.
+- `src/app/pptRuntimeHelpers.ts` centralizes PPT image ordering, stale child fallback, parent prompt rejection, deck child detection, and nullish image array guards.
+- PPT and generation runtime contracts were expanded in the same committed baseline.
+
+## Latest Recorded Validation
+
+The following validation was recorded before this status cleanup pass and belongs to the committed baseline:
+
 - Clay UI contract suite: passed, 35/35.
 - Additional ecommerce/mobile surface contracts: passed, 9/9.
-- `npm.cmd run verify:mobile-settings-smoke`: passed via fallback route checks; Playwright launch remains blocked by `spawn EPERM`.
-- `npm.cmd run verify:desktop-settings-smoke`: passed via fallback route checks; Playwright launch remains blocked by `spawn EPERM`.
-- Full gate passed after the latest token/test tightening and the minimal paused-PPT compile repair: `npm.cmd run typecheck`, `npm.cmd run test:unit` (1063/1063), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `git diff --check`.
+- Runtime/PPT targeted validation: passed, 6/6.
+- Shared gate: `npm.cmd run typecheck`, `npm.cmd run test:unit` (1063/1063), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `git diff --check`.
+- `npm.cmd run verify:mobile-settings-smoke`: passed via fallback route checks; Playwright launch was blocked by `spawn EPERM`.
+- `npm.cmd run verify:desktop-settings-smoke`: passed via fallback route checks; Playwright launch was blocked by `spawn EPERM`.
 
-## Browser Notes
+Fresh validation for this runtime/PPT follow-up pass is tracked below:
 
-- `npm.cmd run dev:restart` reports ready, but `npm.cmd run dev:status` still shows Vite `running=False; healthy=False`; direct HTTP to the dev process was connection refused.
-- A static preview server was started from `dist/` through the persistent Node REPL and confirmed `http://127.0.0.1:3000/?clayVerify=static20260501` returns 200.
-- Codex in-app Browser was attempted with the browser-use `iab` backend. Browser tab creation/listing worked, but navigation and input both timed out in CDP (`Page.enable` and `Input.dispatchKeyEvent`), leaving the tab at `about:blank`.
-- Because the in-app Browser could not navigate, current visual evidence is blocked at the browser plugin layer. Route-level smoke fallback passed for `/`, `/settings`, and `/settings/api-management`; do not treat that as a screenshot-based visual sign-off.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` (6/6).
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts` (57/57).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1064/1064).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git diff --check` with CRLF normalization warnings only.
+- Re-run after ledger correction: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` passed (6/6).
+- Re-run after ledger correction: `npm.cmd run governance:agent-docs` passed.
+- Re-run after ledger correction: `npm.cmd run check:encoding` passed.
+
+## Browser QA
+
+- Browser QA is not required for this non-UI runtime/PPT slice.
+- Browser QA remains mandatory for the parallel Clay UI lane before a UI commit.
 
 ## Remaining Work
 
-- Wait for the two active `gpt-5.5 xhigh` review agents to report on PPT runtime spec and code quality.
-- Attempt scoped staging/commit for the runtime/PPT slice if local `.git/index.lock` permission errors are resolved; otherwise keep the exact blocker recorded.
-- Continue Stage One with the next PPT runtime hardening or move to the next planned runtime module only after review issues are closed.
-- Retry in-app Browser visual verification if the browser plugin/CDP channel recovers.
-- If browser verification remains blocked, keep the limitation explicit in the handoff and do not claim screenshot-based desktop/mobile sign-off.
-- Keep Clay UI and runtime/PPT lanes separate even though they share the same coordination ledger.
-
-## UI Commit Include Scope
-
-- UI docs/rules: `plans.md`, `implement.md`, `validation.md`, `status.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`.
-- Clay UI implementation: `src/index.css`, `src/context/ThemeContext.tsx`, `src/utils/canvasCardShadow.ts`, and changed UI component files under `src/components/`, `src/components/layout/`, `src/components/mobile/`, `src/components/ecommerce/`, `src/components/canvas/`, `src/components/image/`, `src/components/common/`, `src/components/modals/`, plus `src/app/AppPromptComposer.tsx`.
-- UI contracts: `tests/unit/clay-global-ui-refit-contract.test.ts`, `tests/unit/clay-frosted-surface-contract.test.ts`, `tests/unit/ecommerce-frosted-surface-contract.test.ts`, `tests/unit/mobile-workspace-surface-contract.test.ts`, `tests/unit/responsive-surface.test.ts`, `tests/unit/settings-entry-surface-style-regression.test.ts`, `tests/unit/theme-contrast-contract.test.ts`, `tests/unit/theme-system-adaptation.test.ts`, `tests/unit/canvas-visual-regression.test.ts`, `tests/unit/ecommerce-composer-scroll-regression.test.ts`.
-
-## Commit Boundary Rules
-
-Do not stage or commit these runtime/PPT files into the Clay UI audit commit:
-
-- `src/App.tsx`
-- `src/app/useGenerationRuntime.ts`
-- `src/app/usePptRuntime.ts`
-- `src/app/pptRuntimeHelpers.ts`
-- `tests/unit/generation-runtime-contract.test.ts`
-- `tests/unit/generation-billing-runtime-contract.test.ts`
-- `tests/unit/ppt-runtime-contract.test.ts`
-- `tests/unit/ppt-deck-single-container-contract.test.ts`
-- `tests/unit/credit-route-classification.test.ts`
-- `tests/unit/route-aware-credit-billing.test.ts`
-
-For a runtime/PPT commit, do not stage Clay UI files such as `src/components/*`, `src/index.css`, `src/context/ThemeContext.tsx`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, or Clay-specific tests unless the commit is explicitly the UI audit commit.
-
-Current runtime/PPT line counts:
-
-- `src/App.tsx`: 6963
-- `src/app/useGenerationRuntime.ts`: 2605
-- `src/app/usePptRuntime.ts`: 1293
-- `src/app/pptRuntimeHelpers.ts`: 153
-- `tests/unit/ppt-runtime-contract.test.ts`: 232
-- `tests/unit/ppt-runtime-helper-contract.test.ts`: 38
-- `tests/unit/ppt-deck-single-container-contract.test.ts`: 46
-
-Runtime/PPT note: `src/App.tsx` is already substantially smaller than the original 10395-line baseline, but this line count includes earlier generation-runtime extraction WIP in the same mixed worktree.
+1. Stage only the current runtime/PPT slice through `node_modules/.codex-git-full`.
+2. Create the scoped runtime/PPT commit.
+3. Continue Stage One M6 ecommerce runtime with a reference map and contract tests before extraction.
+4. Keep the parallel Clay UI files out of runtime/PPT commits.
 
 ## Risks
 
-- Local git staging/commit may still be blocked by `.git/index.lock` permission errors.
-- Browser visual QA is blocked by the in-app Browser/CDP channel in this environment; route-level fallback is not equivalent to visual evidence.
+- Original `.git` is still not writable from this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - The worktree remains mixed, so any staging must be explicit path-based and reviewed before commit.
-- Latest staging attempt was blocked: `fatal: Unable to create 'C:/Users/Administrator/Downloads/KK-Studio-1.0.0/.git/index.lock': Permission denied`. No `.git` cleanup was performed.
+- Do not delete locks, change `.git` ACLs, or revert parallel UI work without explicit user confirmation.
