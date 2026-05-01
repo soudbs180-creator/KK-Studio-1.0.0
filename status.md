@@ -5,24 +5,35 @@ Last updated: 2026-05-01
 ## Active State
 
 - Active lane in this thread: Stage One M6 ecommerce runtime extraction.
-- Parallel UI lane: `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI audit, browser evidence, and UI-only commits.
+- Parallel UI lane: `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI audit, controlled frosted-surface cleanup, browser evidence, and UI-only commits.
 - Current branch: `main`.
 - Original `.git` remains blocked by deny ACLs for this session, so commits are recorded through the writable full Git metadata copy at `node_modules/.codex-git-full` with `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
 - Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
+- UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the non-UI ecommerce slot history runtime slice, then continue Stage One M6 with the next contract-test-first ecommerce slice.
+- Current focus: commit the non-UI ecommerce framework runtime state/view slice, then continue Stage One M6 with the next contract-test-first ecommerce slice. Keep UI lane files and UI ledger files out of the runtime commit unless explicitly documented below.
+
+## Current Clay UI Audit Pass
+
+- User override remains active: inputs, main cards, sub cards, and framework cards must use controlled frosted material; dark mode must use neutral black/gray surfaces, not teal/blue/indigo canvas.
+- Fixed in this pass: Profile Modal action list/security surfaces, toolbar selected tokens, TagInputModal shell/input/footer, ProjectManager dropdown/modal sub surfaces, ChatSidebar message/attachment sub surfaces, and PromptBar hard-coded sky accent buttons.
+- Contract coverage now includes toolbar selected tokens, ProjectManager sub surfaces, ChatSidebar message/attachment surfaces, TagInputModal frosted tokens, and PromptBar `#38bdf8` regression.
+- Browser QA is mandatory for this lane and is tracked below.
+- Commit include scope for the UI slice: `plans.md`, `implement.md`, `status.md`, `validation.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, `src/index.css`, touched UI components, and Clay UI tests.
+- Explicitly excluded dirty runtime/PPT paths for the UI commit: `src/app/usePptRuntime.ts`, `tests/unit/ppt-runtime-contract.test.ts`, ecommerce runtime extraction files/tests, and any runtime-only WIP unless included solely to keep the current mixed tree compiling.
 
 ## Current Ecommerce Runtime Pass
 
-- Implemented in the working tree: ecommerce slot history and preview entrypoints now route through `src/app/useEcommerceSlotHistoryRuntime.ts`.
-- Extracted actions: `resolveEcommerceSlotState`, `handlePreviewEcommerceSlotHistory`, and `handlePreviewEcommerceSlotHistoryForNode`.
-- Contract hardening: slot preview/source-shape tests now point at `useEcommerceSlotHistoryRuntime`; `App.tsx` imports and destructures the hook and no longer imports `buildEcommerceSlotPreviewBundle`.
-- Line counts after extraction: `src/App.tsx` 6626 lines; `src/app/useEcommerceSlotHistoryRuntime.ts` 92 lines.
-- Subagent review: spec reviewer passed the slice; code-quality reviewer reported no blocking findings. Follow-up debt: preserve non-`Error` queue messages in `useEcommerceRuntime` and replace the direct `keyManager` singleton with an injected lane/key resolver in a later scheduler-hardening slice.
-- Browser QA remains skipped for non-UI runtime slices. Parallel UI thread owns browser evidence for Clay surfaces.
-- Full `npm.cmd run test:unit` is currently blocked by parallel Clay UI work in `tests/unit/clay-frosted-surface-contract.test.ts`; the failures target `src/components/layout/ChatSidebar.tsx` and related UI-token assertions, not the slot history runtime slice.
-- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceSlotHistoryRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, `tests/unit/ecommerce-group-slot-integration.test.ts`, and `tests/unit/ecommerce-group-slot-preview-contract.test.ts`.
-- Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
+- Implemented in the working tree: ecommerce framework runtime state/view helpers now route through `src/app/useEcommerceFrameworkRuntimeState.ts`.
+- Extracted state/view boundary: `ecommerceFrameworkRuntimeRef`, `resolveEcommerceFrameworkId`, `updateEcommerceFrameworkRuntime`, `syncEcommerceFrameworkView`, and `handleActivateEcommerceGroupSheet`.
+- `src/app/useEcommerceRuntime.ts` now consumes a single `frameworkStateView` boundary object instead of individual App inline deps for framework runtime state/view.
+- Contract hardening: `tests/unit/ecommerce-framework-runtime-state-contract.test.ts` covers hook existence, explicit deps/result interfaces, App ordering, runtime-before-state ordering, sync-before-meta ordering, and the preserved `GenerationMode.ECOMMERCE` framework filter. `tests/unit/ecommerce-framework-runtime-order.test.ts` now targets the extracted hook.
+- RED evidence: framework state/view contract tests failed before the hook existed and before `useEcommerceRuntime` consumed `frameworkStateView`; the ecommerce-mode filter assertion failed before restoring the original guard.
+- Line counts after extraction: `src/App.tsx` 6484 lines; `src/app/useEcommerceFrameworkRuntimeState.ts` 240 lines; `src/app/useEcommerceRuntime.ts` 385 lines.
+- Subagent review: spec and code-quality reviewers found the extracted boundary shape correct. A P2 mode-filter regression was fixed before commit; a P3 order-test gap was tightened before final validation.
+- Browser QA: skipped for this slice because it is non-UI runtime state/view glue. Parallel UI thread owns browser evidence for Clay surfaces.
+- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceRuntime.ts`, `src/app/useEcommerceFrameworkRuntimeState.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, `tests/unit/ecommerce-framework-runtime-state-contract.test.ts`, and `tests/unit/ecommerce-framework-runtime-order.test.ts`.
+- Explicitly excluded dirty UI paths: `plans.md`, `implement.md`, `validation.md`, `.agent/rules/skills/SKILL.md`, `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
 
 ## Completed In `be63eda2`
 
@@ -76,7 +87,7 @@ The following validation was recorded before this status cleanup pass and belong
 - `npm.cmd run verify:mobile-settings-smoke`: passed via fallback route checks; Playwright launch was blocked by `spawn EPERM`.
 - `npm.cmd run verify:desktop-settings-smoke`: passed via fallback route checks; Playwright launch was blocked by `spawn EPERM`.
 
-Fresh validation for this runtime/PPT follow-up pass is tracked below:
+Historical validation for the paused runtime/PPT follow-up pass:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` (6/6).
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts` (57/57).
@@ -90,7 +101,7 @@ Fresh validation for this runtime/PPT follow-up pass is tracked below:
 - Re-run after ledger correction: `npm.cmd run governance:agent-docs` passed.
 - Re-run after ledger correction: `npm.cmd run check:encoding` passed.
 
-Fresh validation for the current ecommerce runtime slice is tracked below:
+Historical validation for the paused ecommerce runtime slice:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-framework-runtime.test.ts tests/unit/ecommerce-framework-contract.test.ts tests/unit/ecommerce-button-guards.test.ts` (10/10).
 - Passed: `npm.cmd run typecheck`.
@@ -100,7 +111,7 @@ Fresh validation for the current ecommerce runtime slice is tracked below:
 - Passed: `npm.cmd run check:encoding`.
 - Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-button-guards.test.ts status.md plans.md implement.md validation.md` with CRLF normalization warnings only.
 
-Fresh validation for the current ecommerce selection runtime slice is tracked below:
+Historical validation for the paused ecommerce selection runtime slice:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-runtime-selection.test.ts tests/unit/ecommerce-analysis-selection-contract.test.ts tests/unit/ecommerce-button-guards.test.ts tests/unit/ecommerce-group-slot-state.test.ts` (11/11).
 - Passed: `npm.cmd run typecheck`.
@@ -110,29 +121,40 @@ Fresh validation for the current ecommerce selection runtime slice is tracked be
 - Passed: `npm.cmd run check:encoding`.
 - Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts src/app/ecommerceSelectionRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-runtime-selection.test.ts status.md` with CRLF normalization warnings only.
 
-Fresh validation for the current ecommerce slot history runtime slice is tracked below:
+Historical validation for the paused ecommerce slot history runtime slice:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-group-slot-integration.test.ts tests/unit/ecommerce-group-slot-preview-contract.test.ts tests/unit/ecommerce-group-slot-state.test.ts` (8/8).
 - Passed: `npm.cmd run typecheck`.
-- Blocked by parallel UI lane: `npm.cmd run test:unit` fails in `tests/unit/clay-frosted-surface-contract.test.ts` after Clay UI source assertions were tightened against dirty UI files. Scoped ecommerce slot tests above passed.
+- Previous blocker now belongs to the active UI lane and was addressed by the current Clay frosted-surface contract update.
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+
+Fresh validation for the current ecommerce framework runtime state/view slice:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-framework-runtime-state-contract.test.ts tests/unit/ecommerce-framework-runtime-order.test.ts tests/unit/ecommerce-framework-runtime.test.ts tests/unit/ecommerce-framework-contract.test.ts tests/unit/ecommerce-button-guards.test.ts tests/unit/ecommerce-runtime-selection.test.ts tests/unit/ecommerce-group-slot-state.test.ts tests/unit/ecommerce-group-slot-integration.test.ts tests/unit/ecommerce-group-slot-preview-contract.test.ts` (22/22).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1069/1069).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
 
 ## Browser QA
 
-- Browser QA is not required for this non-UI runtime/PPT slice.
-- Browser QA remains mandatory for the parallel Clay UI lane before a UI commit.
+- Browser QA is mandatory for the active Clay UI lane before a UI commit.
+- Current browser target: `http://127.0.0.1:3000/?clayVerify=postbuild20260501` served from built `dist/` after `npm.cmd run dev:restart` left Vite unhealthy.
+- In-app Browser screenshot capture is currently timing out through `Page.captureScreenshot`; DOM snapshots and visible DOM checks are available and must be used as evidence if screenshots remain blocked.
+- Browser evidence still needs final refresh after the latest UI fixes and production build.
 
 ## Remaining Work
 
-1. Stage only the current ecommerce slot history runtime slice through `node_modules/.codex-git-full`.
-2. Create the scoped ecommerce slot history runtime commit.
+1. Stage only the current ecommerce framework runtime state/view slice through `node_modules/.codex-git-full`.
+2. Create the scoped ecommerce framework runtime state/view commit.
 3. Continue Stage One M6 ecommerce runtime with a reference map and contract tests before extraction.
-4. Keep the parallel Clay UI files out of runtime/PPT commits.
+4. Keep the parallel Clay UI files out of runtime commits; UI lane still needs browser evidence before its own UI commit.
 
 ## Risks
 
 - Original `.git` is still not writable from this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - The worktree remains mixed, so any staging must be explicit path-based and reviewed before commit.
-- Do not delete locks, change `.git` ACLs, or revert parallel UI work without explicit user confirmation.
+- Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.

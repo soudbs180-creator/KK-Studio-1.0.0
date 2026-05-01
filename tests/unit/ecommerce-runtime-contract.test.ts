@@ -36,16 +36,17 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(hookSource, /resolveFrameworkLane/);
 
   assert.match(appSource, /import \{ useEcommerceRuntime, type UpdateEcommerceSelectionState \} from '\.\/app\/useEcommerceRuntime';/);
+  assert.match(appSource, /import \{ useEcommerceFrameworkRuntimeState,[\s\S]*?\} from '\.\/app\/useEcommerceFrameworkRuntimeState';/);
   assert.match(appSource, /import \{ useEcommerceSlotHistoryRuntime \} from '\.\/app\/useEcommerceSlotHistoryRuntime';/);
   assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?handleToggleEcommerceAnalysisSelection,[\s\S]*?handleToggleEcommerceSelected,[\s\S]*?handleSetEcommerceGroupSelection,[\s\S]*?\} = useEcommerceRuntime\(\{/);
+  assert.match(appSource, /const frameworkStateView = useEcommerceFrameworkRuntimeState\(\{/);
   assert.match(appSource, /const \{[\s\S]*?resolveEcommerceSlotState,[\s\S]*?handlePreviewEcommerceSlotHistory,[\s\S]*?handlePreviewEcommerceSlotHistoryForNode,[\s\S]*?\} = useEcommerceSlotHistoryRuntime\(\{/);
-  assert.match(appSource, /updateEcommerceFrameworkRuntime,/);
+  assert.match(appSource, /frameworkStateView,/);
   assert.match(appSource, /updateEcommerceSelectionState,/);
   assert.match(appSource, /updateEcommerceNodeState,/);
   assert.match(appSource, /setWorkspaceSurface,/);
   assert.match(appSource, /setPreviewImages,/);
   assert.match(appSource, /setPreviewInitialIndex,/);
-  assert.match(appSource, /syncEcommerceFrameworkView,/);
   assert.match(appSource, /handleGenerateEcommerceNode,/);
   assert.match(appSource, /handleRetryEcommerceModule,/);
 
@@ -60,6 +61,9 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.doesNotMatch(appSource, /const handleToggleEcommerceAnalysisSelection = useCallback/);
   assert.doesNotMatch(appSource, /const handleToggleEcommerceSelected = useCallback/);
   assert.doesNotMatch(appSource, /const handleSetEcommerceGroupSelection = useCallback/);
+  assert.doesNotMatch(appSource, /const resolveEcommerceFrameworkId = useCallback/);
+  assert.doesNotMatch(appSource, /const updateEcommerceFrameworkRuntime = useCallback/);
+  assert.doesNotMatch(appSource, /const syncEcommerceFrameworkView = useCallback/);
   assert.doesNotMatch(appSource, /const resolveEcommerceSlotState = useCallback/);
   assert.doesNotMatch(appSource, /const handlePreviewEcommerceSlotHistory = useCallback/);
   assert.doesNotMatch(appSource, /const handlePreviewEcommerceSlotHistoryForNode = useCallback/);

@@ -11,7 +11,7 @@ import {
   resolveFrameworkLane,
   resumeEcommerceFrameworkRuntime,
 } from '../services/ecommerce/frameworkRuntime.ts';
-import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceFrameworkRuntimeState, type EcommerceGroupSheet, type PromptNode } from '../types.ts';
+import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceGroupSheet, type PromptNode } from '../types.ts';
 import {
   applyEcommerceAnalysisSelectionState,
   applyEcommerceGroupSelectionState,
@@ -19,6 +19,7 @@ import {
   resolveEcommerceGroupSelectionTargets,
   type EcommerceSelectionRuntimeState,
 } from './ecommerceSelectionRuntime.ts';
+import type { EcommerceFrameworkRuntimeStateView } from './useEcommerceFrameworkRuntimeState.ts';
 
 type EcommerceCanvasSnapshot = {
   promptNodes: PromptNode[];
@@ -28,13 +29,6 @@ type EcommerceRuntimeStateSnapshot = {
   activeGroupSheet: EcommerceGroupSheet | null;
 };
 
-type UpdateEcommerceFrameworkRuntime = (
-  frameworkId: string,
-  updater: (current: EcommerceFrameworkRuntimeState) => EcommerceFrameworkRuntimeState,
-) => EcommerceFrameworkRuntimeState;
-
-type ResolveEcommerceFrameworkId = (node?: PromptNode | null) => string | null;
-type SyncEcommerceFrameworkView = (frameworkId: string, activeSheet: EcommerceGroupSheet) => void;
 type GenerateEcommerceNode = (node: PromptNode) => Promise<void>;
 type RetryEcommerceModule = (node: PromptNode) => Promise<void>;
 type UpdateEcommerceNodeState = (
@@ -48,13 +42,10 @@ export type UpdateEcommerceSelectionState = (
 
 export interface UseEcommerceRuntimeDeps {
   activeCanvasRef: RefObject<EcommerceCanvasSnapshot | null | undefined>;
-  ecommerceFrameworkRuntimeRef: RefObject<Record<string, EcommerceFrameworkRuntimeState>>;
+  frameworkStateView: EcommerceFrameworkRuntimeStateView;
   ecommerceState: EcommerceRuntimeStateSnapshot;
   updateEcommerceSelectionState: UpdateEcommerceSelectionState;
   updateEcommerceNodeState: UpdateEcommerceNodeState;
-  updateEcommerceFrameworkRuntime: UpdateEcommerceFrameworkRuntime;
-  resolveEcommerceFrameworkId: ResolveEcommerceFrameworkId;
-  syncEcommerceFrameworkView: SyncEcommerceFrameworkView;
   handleGenerateEcommerceNode: GenerateEcommerceNode;
   handleRetryEcommerceModule: RetryEcommerceModule;
 }
@@ -82,16 +73,20 @@ export interface UseEcommerceRuntimeResult {
 
 export function useEcommerceRuntime({
   activeCanvasRef,
-  ecommerceFrameworkRuntimeRef,
+  frameworkStateView,
   ecommerceState,
   updateEcommerceSelectionState,
   updateEcommerceNodeState,
-  updateEcommerceFrameworkRuntime,
-  resolveEcommerceFrameworkId,
-  syncEcommerceFrameworkView,
   handleGenerateEcommerceNode,
   handleRetryEcommerceModule,
 }: UseEcommerceRuntimeDeps): UseEcommerceRuntimeResult {
+  const {
+    ecommerceFrameworkRuntimeRef,
+    updateEcommerceFrameworkRuntime,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+  } = frameworkStateView;
+
   const handleToggleEcommerceAnalysisSelection = useCallback((id: string, selected: boolean): void => {
     updateEcommerceSelectionState((previousState) => applyEcommerceAnalysisSelectionState(previousState, id, selected));
   }, [updateEcommerceSelectionState]);

@@ -97,6 +97,7 @@ import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGro
 import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { usePptRuntime } from './app/usePptRuntime';
 import { useEcommerceRuntime, type UpdateEcommerceSelectionState } from './app/useEcommerceRuntime';
+import { useEcommerceFrameworkRuntimeState, type SetEcommerceFrameworkRuntimeState } from './app/useEcommerceFrameworkRuntimeState';
 import { useEcommerceSlotHistoryRuntime } from './app/useEcommerceSlotHistoryRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -455,7 +456,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   useLayoutEffect(() => {
     activeCanvasRef.current = activeCanvas;
   }, [activeCanvas]);
-  const ecommerceFrameworkRuntimeRef = useRef<Record<string, EcommerceFrameworkRuntimeState>>({});
 
   const selectedNodeIdsRef = useRef<string[]>(selectedNodeIds);
   useEffect(() => {
@@ -1097,153 +1097,27 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
 
-  useEffect(() => {
-    ecommerceFrameworkRuntimeRef.current = ecommerceState.frameworkRuntime;
-  }, [ecommerceState.frameworkRuntime]);
-
-  useEffect(() => {
-    const frameworkNodes = (activeCanvas?.promptNodes || []).filter((node) => (
-      node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework'
-    ));
-
+  const updateEcommerceFrameworkRuntimeState = useCallback<SetEcommerceFrameworkRuntimeState>((updater) => {
     setEcommerceState((previousState) => {
-      const nextFrameworkRuntime: Record<string, EcommerceFrameworkRuntimeState> = {};
-      let didChange = false;
-
-      frameworkNodes.forEach((frameworkNode) => {
-        const existingRuntime = previousState.frameworkRuntime[frameworkNode.id];
-        if (existingRuntime) {
-          nextFrameworkRuntime[frameworkNode.id] = existingRuntime;
-          return;
-        }
-
-        nextFrameworkRuntime[frameworkNode.id] = createEcommerceFrameworkRuntimeState({
-          frameworkId: frameworkNode.id,
-          activeSheet: frameworkNode.ecommerce?.frameworkMeta?.activeSheet || frameworkNode.ecommerce?.sourceSheet || '主图',
-          config: frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig,
-        });
-        didChange = true;
-      });
-
-      if (!didChange) {
-        const previousIds = Object.keys(previousState.frameworkRuntime);
-        if (previousIds.length !== Object.keys(nextFrameworkRuntime).length) {
-          didChange = true;
-        } else if (previousIds.some((frameworkId) => !nextFrameworkRuntime[frameworkId])) {
-          didChange = true;
-        }
-      }
-
-      const nextActiveFrameworkId = previousState.activeFrameworkId && nextFrameworkRuntime[previousState.activeFrameworkId]
-        ? previousState.activeFrameworkId
-        : (frameworkNodes[0]?.id || null);
-      const nextActiveGroupSheet = previousState.activeTaskState?.sourceSheet
-        || (nextActiveFrameworkId
-          ? (previousState.activeGroupSheet || nextFrameworkRuntime[nextActiveFrameworkId]?.activeSheet || null)
-          : null);
-
-      if (
-        !didChange
-        && nextActiveFrameworkId === previousState.activeFrameworkId
-        && nextActiveGroupSheet === previousState.activeGroupSheet
-      ) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        frameworkRuntime: nextFrameworkRuntime,
-        activeFrameworkId: nextActiveFrameworkId,
-        activeGroupSheet: nextActiveGroupSheet,
-      };
+      const patch = updater(previousState);
+      return patch ? { ...previousState, ...patch } : previousState;
     });
-  }, [activeCanvas]);
-
-  const resolveEcommerceFrameworkId = useCallback((node?: PromptNode | null): string | null => {
-    if (!node?.ecommerce) {
-      return null;
-    }
-
-    if (node.ecommerce.kind === 'framework') {
-      return node.id;
-    }
-
-    return node.ecommerce.frameworkId || null;
   }, []);
 
-  const resolveEcommerceFrameworkNode = useCallback((frameworkId?: string | null): PromptNode | null => {
-    if (!frameworkId) {
-      return null;
-    }
+  const frameworkStateView = useEcommerceFrameworkRuntimeState({
+    activeCanvas,
+    activeCanvasRef,
+    ecommerceState,
+    setEcommerceState: updateEcommerceFrameworkRuntimeState,
+    updatePromptNode,
+  });
 
-    return activeCanvasRef.current?.promptNodes.find((node) => (
-      node.id === frameworkId && node.ecommerce?.kind === 'framework'
-    )) || null;
-  }, []);
-
-  const updateEcommerceFrameworkMeta = useCallback((
-    frameworkId: string,
-    patch: Partial<NonNullable<NonNullable<PromptNode['ecommerce']>['frameworkMeta']>>,
-  ) => {
-    const frameworkNode = activeCanvasRef.current?.promptNodes.find((node) => (
-      node.id === frameworkId && node.ecommerce?.kind === 'framework'
-    ));
-    if (!frameworkNode?.ecommerce) {
-      return;
-    }
-
-    updatePromptNode({
-      ...frameworkNode,
-      ecommerce: {
-        ...frameworkNode.ecommerce,
-        frameworkMeta: {
-          activeSheet: frameworkNode.ecommerce.frameworkMeta?.activeSheet || frameworkNode.ecommerce.sourceSheet || '主图',
-          groupIds: frameworkNode.ecommerce.frameworkMeta?.groupIds,
-          taskNodeIds: frameworkNode.ecommerce.frameworkMeta?.taskNodeIds,
-          schedulerConfig: frameworkNode.ecommerce.frameworkMeta?.schedulerConfig,
-          ...patch,
-        },
-      },
-    });
-  }, [updatePromptNode]);
-
-  const updateEcommerceFrameworkRuntime = useCallback((
-    frameworkId: string,
-    updater: (current: EcommerceFrameworkRuntimeState) => EcommerceFrameworkRuntimeState,
-  ): EcommerceFrameworkRuntimeState => {
-    const frameworkNode = resolveEcommerceFrameworkNode(frameworkId);
-    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId]
-      || createEcommerceFrameworkRuntimeState({
-        frameworkId,
-        activeSheet: frameworkNode?.ecommerce?.frameworkMeta?.activeSheet || frameworkNode?.ecommerce?.sourceSheet || '主图',
-        config: frameworkNode?.ecommerce?.frameworkMeta?.schedulerConfig,
-      });
-    const nextRuntime = updater(currentRuntime);
-
-    ecommerceFrameworkRuntimeRef.current = {
-      ...ecommerceFrameworkRuntimeRef.current,
-      [frameworkId]: nextRuntime,
-    };
-
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      frameworkRuntime: {
-        ...previousState.frameworkRuntime,
-        [frameworkId]: nextRuntime,
-      },
-    }));
-
-    return nextRuntime;
-  }, [resolveEcommerceFrameworkNode]);
-
-  const syncEcommerceFrameworkView = useCallback((frameworkId: string, activeSheet: EcommerceGroupSheet) => {
-    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => ({
-      ...currentRuntime,
-      activeSheet,
-      lastUpdatedAt: Date.now(),
-    }));
-    updateEcommerceFrameworkMeta(frameworkId, { activeSheet });
-  }, [updateEcommerceFrameworkMeta, updateEcommerceFrameworkRuntime]);
+  const {
+    ecommerceFrameworkRuntimeRef,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+    handleActivateEcommerceGroupSheet,
+  } = frameworkStateView;
 
   const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
     config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
@@ -2936,19 +2810,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [addPromptNode, bringNodesToFront, buildCurrentEcommerceUploadReferences, buildEcommerceFrameworkNode, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.isConfirmingAnalysis, ecommerceState.selectedItems, ecommerceState.taskStates, findNextGroupPosition, updatePromptNode]);
 
-  const handleActivateEcommerceGroupSheet = useCallback((sheet: '主图' | 'A+') => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeGroupSheet: sheet,
-    }));
-
-    if (ecommerceState.activeFrameworkId) {
-      syncEcommerceFrameworkView(ecommerceState.activeFrameworkId, sheet);
-    }
-  }, [ecommerceState.activeFrameworkId, syncEcommerceFrameworkView]);
-
   useEffect(() => {
     return () => {
     };
@@ -4100,13 +3961,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleSetEcommerceGroupSelection,
   } = useEcommerceRuntime({
     activeCanvasRef,
-    ecommerceFrameworkRuntimeRef,
+    frameworkStateView,
     ecommerceState,
     updateEcommerceSelectionState,
     updateEcommerceNodeState,
-    updateEcommerceFrameworkRuntime,
-    resolveEcommerceFrameworkId,
-    syncEcommerceFrameworkView,
     handleGenerateEcommerceNode,
     handleRetryEcommerceModule,
   });
